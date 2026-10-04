@@ -610,6 +610,26 @@
           ]
         },
         {
+          "name": "settlersTrained",
+          "compare": "exact",
+          "covers": [
+            "Seat.settlersTrained"
+          ],
+          "planes": [
+            "civ_settlers_trained"
+          ]
+        },
+        {
+          "name": "discountDistricts",
+          "compare": "exact",
+          "covers": [
+            "Seat.discountDistricts"
+          ],
+          "planes": [
+            "civ_discount_districts"
+          ]
+        },
+        {
           "name": "relicReserve",
           "compare": "exact",
           "covers": [

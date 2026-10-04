@@ -484,6 +484,7 @@ class SimInit:
 
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
+            ("settlers_trained", torch.long, 0), ("discount_districts", torch.long, 0),
             ("relic_reserve", torch.long, 0),
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
             ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
@@ -3601,8 +3602,11 @@ class SimInit:
         self.PROD_W = self.FORM_BASE + 2 * self.NU
         self._type_cost = torch.tensor([u["cost"] for u in ru], dtype=dtype, device=device)
         # CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the flat
-        # CostProgressionParam1 each copy already acquired adds to the next.
-        self._type_cost_step = torch.tensor([u["costStep"] for u in ru], dtype=dtype, device=device)
+        # CostProgressionParam1 each copy already acquired adds to the next,
+        # and the Cost it climbs from, both at the speed unfloored
+        # (`unitStepCost`: the sum floors once)
+        self._type_cost_step = torch.tensor([u["costStep"] for u in ru], dtype=torch.float64, device=device)
+        self._type_step_base = torch.tensor([u["stepBase"] for u in ru], dtype=torch.float64, device=device)
         self._type_combat = torch.tensor([u["combat"] for u in ru], dtype=torch.long, device=device)
         self._type_maintenance = torch.tensor([u["maintenance"] for u in ru], dtype=dtype, device=device)
         # NONCOMBAT — the set `unitIsNoncombat` names on TS, the support rows

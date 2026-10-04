@@ -143,6 +143,33 @@ def test_an_improved_plot_takes_a_district(sim) -> None:
     print("  an improved plot OK — the district takes it and removes the improvement")
 
 
+def test_a_pillaged_neighborhood_darkens_its_buildings(sim) -> None:
+    """`pillagedDistrictTypes` walks every instance in `city.districts`: one
+    pillaged Neighborhood darkens the type's buildings whichever tile the
+    one-per-type registry names (seed 9287 t230: a Food Market)."""
+    b, row, col = 0, 0, 0
+    nb = _didx(sim, "NEIGHBORHOOD")
+    _claim(sim, b, row, col)
+    ctr = int(sim.city_center[b, row, col])
+    free = [t for t in (sim.pair_dist[ctr] <= 2).nonzero().reshape(-1).tolist()
+            if int(sim.centre_slot_at[b, t]) < 0 and int(sim.district[b, t]) < 0][:2]
+    first, second = free
+    _put(sim, b, row, col, nb, second)
+    _put(sim, b, row, col, nb, first)  # the registry names the first
+    reg = sim.city_dist_tile[:, row, col:col + 1]
+    breq = sim._b_req_district
+    in_nb = (breq == nb).nonzero().reshape(-1)
+    assert in_nb.numel(), "a Neighborhood building must exist"
+    assert not bool(sim._bldg_dark(reg)[b, 0, in_nb].any()), "nothing pillaged yet"
+    sim.district_pillaged[b, second] = True
+    assert bool(sim._bldg_dark(reg)[b, 0, in_nb].all()), "the other Neighborhood's pillage darkens them"
+    sim.district_pillaged[b, second] = False
+    sim.district[b, second] = -1
+    sim.district[b, first] = -1
+    sim.city_dist_tile[b, row, col, nb] = -1
+    print("a pillaged Neighborhood darkens its buildings ok")
+
+
 def main() -> None:
     rules = load_rules()
     rj = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
@@ -161,6 +188,8 @@ def main() -> None:
     gp, dq, ec = cat["GOVERNMENT_PLAZA"], cat["DIPLOMATIC_QUARTER"], cat["ENTERTAINMENT_COMPLEX"]
     iz = cat["INDUSTRIAL_ZONE"]
     test_a_stripped_resource_stops_paying(sim)
+    test_a_pillaged_neighborhood_darkens_its_buildings(
+        settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)))
     test_an_improved_plot_takes_a_district(
         settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64)))
 

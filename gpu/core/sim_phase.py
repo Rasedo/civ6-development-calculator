@@ -1342,7 +1342,8 @@ class SimPhase:
             if _sw.numel():
                 self._log_pop(_sw, row, col[_sw], "se")
             if self._settler_idx >= 0:
-                self._spawn_unit(row, made_s, ctr, self._settler_idx)
+                landed = self._spawn_unit(row, made_s, ctr, self._settler_idx)
+                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
 
         made_u = done & (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         if bool(made_u.any()):
@@ -2254,6 +2255,12 @@ class SimPhase:
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
             # a CHANGE carries the slotted cards over
             self._carry_policies(row, _gov_on & (_adopted != _gov_before))
+        # the district discount's count of completed specialty districts,
+        # taken when a technology or civic completes — before the cities produce
+        _disc_at = tech_done | civic_done
+        if bool(_disc_at.any()):
+            self.civ_discount_districts[:, row] = torch.where(
+                _disc_at, self._completed_specialty(row), self.civ_discount_districts[:, row])
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
 

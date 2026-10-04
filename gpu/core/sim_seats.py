@@ -1754,10 +1754,12 @@ class SimSeats:
             # under-represented discount.
             return torch.full_like(d_cost, float(fc))
         disc = self._district_discounted(row, di)
-        # ...and the row's OWN discount: 40 everywhere the install writes it,
-        # 25 for the two plaza rows
-        _p_si = float(d_disc[di]) if di < len(d_disc) else 40.0
-        out = torch.where(disc, torch.floor(d_cost * (1.0 - _p_si / 100.0)), d_cost)
+        # ...and the row's OWN discount (`districtDiscountPct`): 40 on the
+        # specialty rows, 25 on the two plaza rows, 0 on a GAME_PROGRESS row —
+        # off the install's Cost, floored, BEFORE the climb (`districtScaledBase`)
+        _p_si = int(d_disc[di]) if di < len(d_disc) else 40
+        d_cut = self._progress_cost((_b_si * (100 - _p_si)) // 100, _k_si, pct).to(self.dtype)
+        out = torch.where(disc, d_cut, d_cost)
         # CIV6 (Bath): the unique district is "cheaper to build"
         _after_disc = out
         for _v in self._d_variants.get(di, []):
@@ -2370,6 +2372,16 @@ class SimSeats:
         slot = torch.where(ok, spawn, slot)
         return ok, slot
 
+    def _unit_step_cost(self, row: int, u_idx: int) -> torch.Tensor:
+        """[B] f64 — `unitStepCost`'s twin: a COST_PROGRESSION_PREVIOUS_COPIES
+        row's Cost after the copies this seat has acquired, (Cost + copies ·
+        Param1) at the speed floored once; the catalog Cost for a flat row."""
+        step = float(self._type_cost_step[u_idx])
+        if step == 0:
+            return torch.full((self.B,), float(self._type_cost[u_idx]), dtype=torch.float64, device=self.device)
+        return torch.floor(float(self._type_step_base[u_idx])
+                           + self.civ_unit_acq[:, row, u_idx].double() * step)
+
     def _unit_faith_cost(self, row: int, u_idx: int,
                          mult: torch.Tensor | None = None) -> torch.Tensor:
         """[B] f64 — `unitFaithCost`'s twin, at the copies this seat has already
@@ -2378,8 +2390,7 @@ class SimSeats:
         Cost, so the progression is charged BEFORE `mult`."""
         if u_idx < 0:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
-        base = (float(self._type_cost[u_idx])
-                + self.civ_unit_acq[:, row, u_idx].double() * float(self._type_cost_step[u_idx]))
+        base = self._unit_step_cost(row, u_idx)
         out = base * self.rules.faith_purchase_mult
         if mult is not None:
             out = out * mult
@@ -2422,20 +2433,13 @@ class SimSeats:
         q_mil = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) & (self._type_combat[q_ty] > 0) & self.city_alive[:, row]
         return live + q_mil.sum(dim=1)
 
-    def _settler_cost(self, n_cities: torch.Tensor, live: torch.Tensor) -> torch.Tensor:
-        """settlerCost — the ONE transcription, for every seat and caller:
-        `settlerBase + settlerPerCity * max(0, cities - 1 + LIVE settlers)`; a
-        settler still in a queue raises nothing."""
-        return self.rules.settler_base + self.rules.settler_per_city * (
-            n_cities - 1 + live
-        ).clamp(min=0).to(self.dtype)
-
     def _seat_settler_cost(self, row: int) -> torch.Tensor:
-        """[B] the settler price seat row `row` faces right now — the counts
-        read off the merged city block, then `_settler_cost`. Read by the buy
-        ladder and by the observation, so what a seat PAYS and what its policy
-        SEES cannot drift."""
-        return self._settler_cost(self.city_alive[:, row].sum(dim=1), self._seat_settlers(row))
+        """[B] settlerCost — the ONE transcription, for every seat and caller:
+        `settlerBase + settlerPerCity * settlers TRAINED or BOUGHT`; a settler
+        still in a queue raises nothing. Read by the queue, the buy ladder and
+        the observation, so what a seat PAYS and what its policy SEES cannot
+        drift."""
+        return self.rules.settler_base + self.rules.settler_per_city * self.civ_settlers_trained[:, row].to(self.dtype)
 
     def _seat_patronage_cost(self, row: int):
         """([B, nC] faith, [B, nC] gold) — the patronage price of each class's
@@ -2702,6 +2706,7 @@ class SimSeats:
             if bool(want_s.any()):
                 landed_s = self._spawn_unit(row, want_s, ctr_s, self._settler_idx)
                 self.civ_treasury[:, row] = torch.where(landed_s, self.civ_treasury[:, row] - sett_price, self.civ_treasury[:, row])
+                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed_s.long()
                 # purchased settlers cost the spawn city a pop (real Civ 6)
                 _pop_col = self.city_pop[bidx, row, spawn_slot]
                 self.city_pop[bidx, row, spawn_slot] = torch.where(landed_s, (_pop_col - 1).clamp(min=1), _pop_col)
@@ -2868,6 +2873,7 @@ class SimSeats:
                 if bool(buy_sl.any()):
                     landed_sl = self._spawn_unit(row, buy_sl, at_m, self._settler_idx)
                     self.civ_faith[:, row] = torch.where(landed_sl, self.civ_faith[:, row] - s_price, self.civ_faith[:, row])
+                    self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed_sl.long()
                     _pop_m = self.city_pop[bidx, row, jm]
                     self.city_pop[bidx, row, jm] = torch.where(landed_sl, (_pop_m - 1).clamp(min=1), _pop_m)
         n_kind, n_j = self._driven_buy_nat.pop(row) if row in self._driven_buy_nat else (None, None)
@@ -3082,9 +3088,6 @@ class SimSeats:
         NBn = rdv.b_cost.shape[0]
         nS = len(self._scaffold)
         ext = self.seat_ext[:, row]
-        alive_row = self.city_alive[:, row]
-        n_cities = alive_row.sum(dim=1)
-        settlers_live = self._seat_settlers(row)
         nW_a = self._wond_n
         nP_a = len(self._proj_rows)
         if dtile is not None and (dtile.dim() != 3 or int(dtile.shape[2]) != nS):
@@ -3094,8 +3097,7 @@ class SimSeats:
         # order for it, contributes nothing to any of them and writes nothing.
         # The two reads that decide it come FIRST, so a dead column costs one
         # reduction instead of seven code-range tests and their seven gates.
-        # `city_alive` is read LIVE, not off `alive_row`, because this walk is
-        # sequential and the snapshot above it is a different question.
+        # `city_alive` is read LIVE, because this walk is sequential.
         for j in range(min(int(production.shape[1]), self.RC)):
             alive_j = self.city_alive[:, row, j]
             if not bool(alive_j.any()):
@@ -3121,7 +3123,7 @@ class SimSeats:
             is_s = act & (a == self.SETTLER) & (self.city_pop[:, row, j] >= rls.settler_pop_gate) \
                 & ~self._no_settlers(row)
             if bool(is_s.any()):
-                s_cost = self._settler_cost(n_cities, settlers_live)
+                s_cost = self._seat_settler_cost(row)
                 self._q_push(row, j, is_s,
                              torch.full_like(a, self.SETTLER), s_cost)
             is_u = act & (a >= self.UNIT_BASE) & (a < self.UNIT_BASE + self.NU)
@@ -9161,9 +9163,36 @@ class SimSeats:
             comp = self.district_complete.gather(1, flat).reshape_as(dt_reg)
             pilf = self.district_pillaged.gather(1, flat).reshape_as(dt_reg)
             pil = (dt_reg >= 0) & comp & pilf  # [..., nD]
+            if self._rep_any:
+                pil = pil | self._rep_pillaged(dt_reg)
             breq = self._b_req_district  # [NB]
             out = pil[..., breq.clamp(min=0)] & (breq >= 0)  # [..., NB]
         return out if bldg_pil is None else out | bldg_pil
+
+    def _rep_pillaged(self, dt_reg: torch.Tensor) -> torch.Tensor:
+        """[..., nD] bool — a REPEATABLE type (the Neighborhood, the Dam) whose
+        city holds ANY complete-but-pillaged instance of it. The registry keeps
+        one tile per type; `pillagedDistrictTypes` walks `city.districts`, every
+        instance, so one pillaged Neighborhood darkens the Food Market whichever
+        tile the registry names. The city is the registry tile's own (seat,
+        city id)."""
+        rep_p = (self.district >= 0) & self.district_complete & self.district_pillaged \
+            & self._is_repeatable[self.district.clamp(min=0)]  # [B, T]
+        out = torch.zeros(dt_reg.shape, dtype=torch.bool, device=self.device)
+        if not bool(rep_p.any()):
+            return out
+        nD = dt_reg.shape[-1]
+        big = 1 << 20
+        key_t = (self.tile_seat.long() * big + self.tile_city.long()) * nD + self.district.clamp(min=0)
+        k = int(rep_p.sum(dim=1).max())
+        _, at = torch.topk(rep_p.to(torch.int8), k, dim=1)  # [B, k] the pillaged instances (and pads)
+        keys = torch.where(rep_p.gather(1, at), key_t.gather(1, at), torch.full_like(at, -1))  # [B, k]
+        B0 = dt_reg.shape[0]
+        flat = dt_reg.clamp(min=0).reshape(B0, -1)
+        q = ((self.tile_seat.long().gather(1, flat) * big + self.tile_city.long().gather(1, flat)) * nD
+             + torch.arange(nD, device=self.device).repeat(flat.shape[1] // nD))  # [B, n*nD]
+        hit = (q.unsqueeze(2) == keys[:B0].unsqueeze(1)).any(dim=2).reshape(dt_reg.shape)
+        return hit & (dt_reg >= 0) & self._is_repeatable
 
     def _building_pillaged(self, row: int, sl: slice | None = None) -> torch.Tensor:
         """[B, n, NB] bool — which of a row's buildings stand PILLAGED

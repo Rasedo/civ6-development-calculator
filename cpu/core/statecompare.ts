@@ -480,6 +480,8 @@ const SEAT: Record<string, Extractor> = {
   envoysAvailable: overSeats((s) => s.envoysAvailable),
   grantedTitles: overSeats((s) => s.grantedTitles),
   buildersTrained: overSeats((s) => s.buildersTrained),
+  settlersTrained: overSeats((s) => s.settlersTrained ?? 0),
+  discountDistricts: overSeats((s) => s.discountDistricts ?? 0),
   relicReserve: overSeats((s) => s.relicReserve ?? 0),
   conquestProdTurns: overSeats((s) => s.conquestProdTurns ?? 0),
   // what past emergencies left standing: envoy gold, minor-leg gold, the

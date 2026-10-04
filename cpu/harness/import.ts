@@ -34,13 +34,14 @@ import { luxuryHoldings } from '../core/city';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { FERTILITY_CAP } from '../core/disasters';
-import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../data/governors';
+import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS } from '../data/seats';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
-import { UNITS, CITY_MAX_HP, UNIT_HP } from '../data/units';
+import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP } from '../data/units';
+import { scaleByGameSpeed } from '../data/constants';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES } from '../data/policies';
@@ -63,7 +64,7 @@ import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
 import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
-import { projectCost, settlerCost } from '../core/game';
+import { projectCost, settlerCost, unitStepCost } from '../core/game';
 import { builderCost, traderCost } from '../core/units';
 import { computeUnlocks } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
@@ -346,6 +347,11 @@ export interface History {
    *  plot gained with nothing else about it or its owner moving (a flood, a
    *  storm, a blizzard) */
   eventYields: Map<number, [number, number, number]>;
+  /** each player's district-discount count (`Seat.discountDistricts`): the
+   *  specialty districts it had completed at the record before its research
+   *  last moved — the count the game took when the technology or civic
+   *  completed, ahead of that turn's productions */
+  discountDistricts: Map<number, number>;
   /** the age each era transition gave each player, in order (`AGE_DARK`,
    *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
   ages: Map<number, number[]>;
@@ -394,8 +400,30 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(),
-    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1 };
+}
+
+/** The copies of a progressive chassis a player's price quotes stand at: the
+ *  fewest `n` whose `price(n)` is the highest quote among its cities (a
+ *  city's queued copy holds the lower price it locked), or undefined where no
+ *  city quotes the row or no count reaches the quote. */
+function copiesQuoted(rec: TurnRecord, cat: Catalog, pid: number, unitName: string,
+  price: (n: number) => number): number | undefined {
+  const idx = cat.units.indexOf(unitName);
+  if (idx < 0) return undefined;
+  let top = -1;
+  for (const c of rec.cities) {
+    if (c.owner !== pid) continue;
+    for (const b of c.buy) if (b[0] === 'U' && b[1] === idx && num(b[2]) > top) top = num(b[2]);
+  }
+  if (top < 0) return undefined;
+  for (let n = 0; n < 200; n++) {
+    const v = price(n);
+    if (v === top) return n;
+    if (v > top) return undefined;
+  }
+  return undefined;
 }
 
 /** Fold one record into the history, in turn order. */
@@ -507,7 +535,11 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         const o = owner >= 0 ? owner : num(rec.head.localPlayer);
         if (owner >= 0 && moved.has(owner)) continue;
         if (o >= 0 && movesPlot(i, gained.get(o) ?? new Set())) continue;
-        if (nbr(i).some((n) => !still(n))) continue;
+        // a neighbour moving may move an improved plot's yields (an adjacency);
+        // an unimproved plot's reach no neighbour's row except through its
+        // own appeal (the flood that washed away the farms beside plot 540 of
+        // runs/h1_duelw1105 at t15 silted it +1 Food +1 Production)
+        if ((plotAt(rec, i)[P.improvement] as number) >= 0 ? nbr(i).some((n) => !still(n)) : !same(i, P.appeal)) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
         if (!y || !y0) continue;
@@ -548,8 +580,35 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         h.ages.set(p.id, list);
       }
     }
+    const done = (r: TurnRecord, pid: number) => (bitCount(r.players.find((q) => q.id === pid)?.techs)
+      + bitCount(r.players.find((q) => q.id === pid)?.civics));
+    for (const p of rec.players) {
+      if (bool(p.major) && done(rec, p.id) !== done(h.last, p.id)) {
+        h.discountDistricts.set(p.id, completedSpecialty(h.last, cat, p.id));
+      }
+    }
   }
   h.last = rec;
+}
+
+/** the 1s of a research bit string */
+function bitCount(bits: string | undefined): number {
+  let n = 0;
+  for (const ch of bits ?? '') if (ch === '1') n += 1;
+  return n;
+}
+
+/** the specialty districts (`countsTowardLimit`) a player had completed in a record */
+function completedSpecialty(rec: TurnRecord, cat: Catalog, pid: number): number {
+  let n = 0;
+  for (const c of rec.cities) {
+    if (c.owner !== pid) continue;
+    for (const d of c.districts) {
+      const id = engineRowOf(cat, 'district', d[0] as number) as DistrictId | null;
+      if (id && DISTRICTS[id]?.countsTowardLimit && d[3] === true) n += 1;
+    }
+  }
+  return n;
 }
 
 export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Imported {
@@ -664,7 +723,27 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     importPlayer(ctx, p, s);
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
-    s.buildersTrained = history?.builders.get(p.id) ?? 0;
+    // the copies a price progression counts are the game's own, read off its
+    // quote where one stands: a free Builder (a Tribal Village's) moves no
+    // price (runs/h1_duelw1105, China's t46 and t52 Builders left it at 31)
+    const builders = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_BUILDER',
+      (n) => UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * n);
+    s.buildersTrained = builders ?? history?.builders.get(p.id) ?? 0;
+    // a lost Settler stays counted and a captured one never was (China's t28
+    // capture left 70 standing): with no quote, the cities past the first and
+    // the Settlers in the field
+    const settlers = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_SETTLER',
+      (n) => UNITS.SETTLER.cost + scaleByGameSpeed(SETTLER_COST_STEP) * n);
+    s.discountDistricts = history?.discountDistricts.get(p.id) ?? completedSpecialty(rec, ctx.cat, p.id);
+    s.settlersTrained = settlers ?? Math.max(0, rec.cities.filter((c) => c.owner === p.id).length - 1
+      + rec.units.filter((u) => u.owner === p.id && ctx.cat.units[u.type] === 'UNIT_SETTLER').length);
+    for (const [id, def] of Object.entries(UNITS)) {
+      if (def.costStep === undefined) continue;
+      const n = copiesQuoted(rec, ctx.cat, p.id, `UNIT_${id}`, (k) => unitStepCost(id, k));
+      if (n === undefined) continue;
+      s.unitsAcquired ??= {};
+      s.unitsAcquired[id] = n;
+    }
     if (bool(p.major)) importAges(s, p, history);
   }
   for (const p of players) {
@@ -860,11 +939,16 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       // engine holds it implicitly (`GOVERNOR_DEFAULT_PROMOTION`), so its bit
       // stays clear
       const gi = GOVERNOR_INDEX[id as keyof typeof GOVERNOR_INDEX];
+      // the mask is a sum of powers of two past bit 31 (`promotionBitValue`),
+      // which a 32-bit `|` would wrap onto another governor's title
       let promotions = 0;
       for (const pi of promos) {
         const pid = engineId('promotion', cat.promotions[pi], 'GOVERNOR_PROMOTION_', GOVERNOR_PROMOTION_INDEX);
         if (!pid) gap(ctx, 'governor-promotion', cat.promotions[pi]);
-        else if (GOVERNOR_PROMOTION_INDEX[pid] !== GOVERNOR_DEFAULT_PROMOTION[gi]) promotions |= 1 << GOVERNOR_PROMOTION_INDEX[pid];
+        else {
+          const bit = GOVERNOR_PROMOTION_INDEX[pid];
+          if (bit !== GOVERNOR_DEFAULT_PROMOTION[gi] && !promotionBit(promotions, bit)) promotions += promotionBitValue(bit);
+        }
       }
       const minor = minorOfPlayer.get(owner);
       const city = cityByKey.get(`${owner}:${cityId}`);
@@ -1195,9 +1279,10 @@ function aliasOrPrefixed(individual: string): string | null {
  * entry's one type key, a civilization's unique row read as the row it
  * replaces), a district or wonder on the entry's plot; its progress is the
  * record's `queueProgress` where the record carries it and 0 where it does
- * not (`Imported.queueProgressRead`). The prices the engine locks at
- * queueing (a district's, a project's, a Settler's, a Builder's or a
- * Trader's) are the engine's own for the imported state.
+ * not (`Imported.queueProgressRead`). A district's locked price is the one
+ * the record quotes for it; the other prices the engine locks at queueing (a
+ * project's, a Settler's, a Builder's or a Trader's) are the engine's own for
+ * the imported state.
  */
 function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boolean {
   const s = seatOf(state, city.seat);
@@ -1236,8 +1321,14 @@ function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boole
     } else if (e.DistrictType !== undefined) {
       const id = engineRowOf(ctx.cat, 'district', e.DistrictType) as DistrictId | null;
       if (!id || at < 0) return gap(ctx, 'queue-district', ctx.cat.districts[e.DistrictType]);
+      // the price the game locked when the district was placed: its cost
+      // reader quotes it for a district standing in the city (the record's
+      // buy row); the engine's own for the imported state where none is read
+      const locked = c.buy.find((b) => b[0] === 'D' && b[1] === e.DistrictType);
+      const lockedCost = locked ? num(locked[2]) : NaN;
       unlocks ??= computeUnlocks(state, city.seat);
-      queue.push({ kind: 'district', district: id, tileIndex: at, progress, cost: districtSiteCost(state, s, id, unlocks) });
+      queue.push({ kind: 'district', district: id, tileIndex: at, progress,
+        cost: Number.isFinite(lockedCost) && lockedCost > 0 ? lockedCost : districtSiteCost(state, s, id, unlocks) });
     } else if (e.ProjectType !== undefined) {
       const name = ctx.cat.projects[e.ProjectType] ?? '';
       const id = engineId('project', name, 'PROJECT_', PROJECTS);

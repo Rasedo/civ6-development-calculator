@@ -32,7 +32,7 @@ import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, un
 import { cityDefenseStrength } from '../core/combat';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingPurchaseCost, settlerCost, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost } from '../core/game';
+import { buildingPurchaseCost, settlerCost, spreadReligiousPressure, tilePurchaseCost, unitPurchaseCost, unitStepCost, unitsAcquired } from '../core/game';
 import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { monumentalityBuyMult } from '../core/eras';
@@ -284,8 +284,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         const id = engineRowOf(cat, 'unit', idx);
         if (!id) continue;
         const prod = id === 'SETTLER' ? settlerCost(state, city.seat) : id === 'BUILDER' ? builderCost(state, city.seat)
-          : id === 'TRADER' ? traderCost(state, city.seat) : UNITS[id].cost;
+          : id === 'TRADER' ? traderCost(state, city.seat) : unitStepCost(id, unitsAcquired(state, city.seat, id));
         buyPush(`buy.unitCost`, near(prod, num(cost), 0.5), num(cost), prod, { unit: id });
+        // a chassis bought with Faith alone has no gold purchase to price: the
+        // faith-only rows and every progressive one (PurchaseYield YIELD_FAITH,
+        // MustPurchase)
+        if (UNITS[id].faithOnly || UNITS[id].noGold || UNITS[id].costStep !== undefined) {
+          out.push({ turn, check: 'buy.unitGold', subject, ok: true, skip: 'faith-only: no gold purchase' });
+          continue;
+        }
         const price = id === 'SETTLER'
           ? goldPrice(state, city.seat, settlerCost(state, city.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, city.seat))
           : goldPrice(state, city.seat, unitPurchaseCost(state, id, city.seat, city));
@@ -293,6 +300,16 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       } else if (kind === 'D') {
         const id = engineRowOf(cat, 'district', idx) as DistrictId | null;
         if (!id) continue;
+        // a district of this type already standing in the city: the game's
+        // cost reader answers the price it locked at placement (runs/h1_duelw1105:
+        // Xian's Holy Site t30-33 at 39 while the fresh price climbed to 41, and
+        // pillaged t44-63 at the same 39; Mediolanum's finished Dam t153-161 at
+        // 157), which the importer reads into the queue rather than the engine
+        // pricing it
+        if (city.districts.some((d) => d.type === id)) {
+          out.push({ turn, check: 'buy.districtCost', subject, ok: true, skip: 'standing in the city: the cost locked at placement' });
+          continue;
+        }
         const dc = districtSiteCost(state, s, id, unlocks);
         buyPush(`buy.districtCost`, near(dc, num(cost), 0.5), num(cost), dc, { district: id });
       }

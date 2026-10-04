@@ -56,20 +56,23 @@ describe('the faith price climbs with the copies already acquired', () => {
   it('counts a copy that was never bought — the Great Prophet\'s free Apostle', () => {
     const { state, cityId } = holyCity();
     const base = UNITS.APOSTLE.cost * FAITH_PURCHASE_MULT;
-    const step = UNITS.APOSTLE.costStep! * FAITH_PURCHASE_MULT;
+    // the online Cost after one copy is (200 + 15) / 2 floored ONCE: 107, so
+    // the faith price is 214, not 200 + 2 x 7.5 (runs/h1_duelw1105, China's
+    // second Apostle at 107)
+    const next = 107 * FAITH_PURCHASE_MULT;
     expect(unitFaithCost('APOSTLE', 1, unitsAcquired(state, 0, 'APOSTLE'))).toBe(base);
 
     // the free Apostle a founded seat's next Great Prophet grants: a copy
     // ACQUIRED, so it prices the next one, exactly as a purchase would
     spawnUnit(state, 'APOSTLE', tileAtCoords(state.map, 8, 8).index, 0);
     expect(unitsAcquired(state, 0, 'APOSTLE')).toBe(1);
-    expect(unitFaithCost('APOSTLE', 1, unitsAcquired(state, 0, 'APOSTLE'))).toBe(base + step);
+    expect(unitFaithCost('APOSTLE', 1, unitsAcquired(state, 0, 'APOSTLE'))).toBe(next);
 
     state.units = state.units.filter((u) => u.type !== 'APOSTLE');
     const s = seatOf(state, 0)!;
     const before = s.faith!;
     expect(purchaseReligiousUnit(state, cityId, 'APOSTLE', 0).ok).toBe(true);
-    expect(s.faith).toBe(before - purchaseStep(base + step));
+    expect(s.faith).toBe(before - purchaseStep(next));
   });
 
   it('leaves the Warrior Monk flat, and keeps each chassis\' tally its own', () => {

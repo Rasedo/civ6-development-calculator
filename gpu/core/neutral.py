@@ -237,8 +237,8 @@ def _buy_ctx(sim, row: int) -> dict:
     jj = torch.where(has_b, jj, torch.full_like(jj, -1))
     bb = torch.where(has_b, bb, torch.full_like(bb, -1))
     price = torch.where(has_b, price, torch.zeros_like(price))
-    # `settlerCost`: the cities and the live settlers, never one in a queue
-    sett_base = sim._settler_cost(n_cities, sim._seat_settlers(row)).double()
+    # `settlerCost`: the settlers trained or bought, never one in a queue
+    sett_base = sim._seat_settler_cost(row).double()
     mon_g = sim._golden_ded(row, sim._ded_monumentality)
     # the 0.7 before the five-step floor, as the buy arm prices it
     _sb = sett_base * sim.rules.gold_purchase_mult

@@ -11,7 +11,7 @@ import { canFoundCity, availableBuildings, buildingCompletable, worshipOffered, 
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, settlerCount, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -98,20 +98,28 @@ export function districtCostIn(research: ResearchState, base: number, k = DISTRI
   return progressCost(base, k, researchProgressPct(research));
 }
 
-/** CIV6 (`Districts.CostProgressionParam1`): what the under-represented
+/** CIV6 (`Districts.CostProgressionParam1`): the percent the under-represented
  *  discount takes off this row — 40 for every specialty district, 25 for the
- *  Government Plaza and the Diplomatic Quarter. ONE reader, so the price and
- *  the placement preview cannot disagree. */
-export function districtDiscountMult(type: DistrictId): number {
-  return 1 - (DISTRICTS[type]?.discountPct ?? 40) / 100;
+ *  Government Plaza and the Diplomatic Quarter, and 0 on a GAME_PROGRESS row,
+ *  whose Param1 is its climb (the Preserve: runs/h1_duelw1105 quotes it at the
+ *  full price, China t125-250 119 beside a discounted Harbor at 70). ONE
+ *  reader, so the price, the placement preview and the wire cannot disagree. */
+export function districtDiscountPct(type: DistrictId): number {
+  if (DISTRICTS[type]?.costProgressGame !== undefined) return 0;
+  return DISTRICTS[type]?.discountPct ?? 40;
 }
 
 /** CIV6 ("District", District discount mechanics): a specialty district is
  *  40% off when BOTH hold — A = specialty types unlocked, B = specialty
  *  districts COMPLETED, C(T) = districts of type T completed or placed:
  *  B >= A, and C(T) < B/A. `n < ceil(D/U)` is that inequality over integers.
- *  Government Plaza and Diplomatic Quarter take 25% instead; neither is in
- *  this roster. A district's cost locks in when it is placed. */
+ *  The roster is every RequiresPopulation row (`countsTowardLimit`: the
+ *  Government Plaza, the Diplomatic Quarter and the Preserve among them). B is
+ *  the count the seat took when its last technology or civic completed
+ *  (`Seat.discountDistricts`); A and C(T) are live (runs/h1_duelw110{3..8}:
+ *  8,200 quoted prices, 134 wrong on a live B, 15 on this one — China's fourth
+ *  Campus, done t123, discounted nothing until a technology landed at t125).
+ *  A district's cost locks in when it is placed. */
 export function districtDiscounted(
   state: GameState,
   seat: number,
@@ -122,16 +130,24 @@ export function districtDiscounted(
   const unlocks = owner?.unlocks ?? computeUnlocks(state, seat);
   const U = [...unlocks.districts].filter((d) => DISTRICTS[d as DistrictId]?.countsTowardLimit).length;
   if (U === 0) return false;
-  let D = 0;
   let n = 0;
   for (const c of owner?.cities ?? citiesOf(state, seat)) {
+    for (const d of c.districts) if (d.type === type) n += 1;
+  }
+  const D = seatOf(state, seat)?.discountDistricts ?? 0;
+  return D >= U && n < Math.ceil(D / U);
+}
+
+/** The specialty districts (`countsTowardLimit`) a seat has COMPLETED — what
+ *  `Seat.discountDistricts` takes when a technology or civic completes. */
+export function completedSpecialtyDistricts(state: GameState, seat: number): number {
+  let D = 0;
+  for (const c of citiesOf(state, seat)) {
     for (const d of c.districts) {
-      if (!DISTRICTS[d.type]?.countsTowardLimit) continue;
-      if (state.map.tiles[d.tileIndex].districtComplete) D += 1;
-      if (d.type === type) n += 1;
+      if (DISTRICTS[d.type]?.countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete) D += 1;
     }
   }
-  return D >= U && n < Math.ceil(D / U);
+  return D;
 }
 
 /** The climb of a district row's price model: `DISTRICT_TECH_K` on the
@@ -141,11 +157,18 @@ export function districtK(type?: DistrictId): number {
   return p === undefined ? DISTRICT_TECH_K : gameProgressK(p);
 }
 
-/** CIV6 (`Districts.CostProgressionModel`): a district's price before its
- *  discount, against its OWN model (`districtCostIn`). */
-export function districtScaledBase(research: ResearchState, type?: DistrictId): number {
-  const base = type !== undefined
+/** CIV6 (`Districts.CostProgressionModel`): a district's price against its
+ *  OWN model (`districtCostIn`). The under-represented discount comes off the
+ *  install's Cost BEFORE the climb, floored there: floor(Cost·(100 − pct)/100)
+ *  is the base the climb scales (runs/h1_duelw1105, China t125-128: a Harbor
+ *  at 70 where the full price is 119 — 32 x 4.42 / 2 = 70.7, not 0.6 x 119 =
+ *  71.4; runs/h1_duelw1103 t118: a Government Plaza at 50 beside a full 69 —
+ *  22 x 4.6 / 2). */
+export function districtScaledBase(research: ResearchState, type?: DistrictId, discounted = false): number {
+  const cost = type !== undefined
     ? (DISTRICTS[type]?.cost ?? DISTRICT_SPECIALTY_COST) : DISTRICT_SPECIALTY_COST;
+  const base = discounted && type !== undefined
+    ? Math.floor((cost * (100 - districtDiscountPct(type))) / 100) : cost;
   return districtCostIn(research, base, districtK(type));
 }
 
@@ -153,9 +176,7 @@ export function districtCost(state: GameState, seat: number, type?: DistrictId):
   // CIV6: the Spaceport's cost is FLAT — it never scales and takes no discount.
   if (type !== undefined && DISTRICTS[type]?.fixedCost) return scaleByGameSpeed(DISTRICTS[type].cost);
   const research = seatOf(state, seat)!.research;
-  const base = districtScaledBase(research, type);
-  const cost = type !== undefined && districtDiscounted(state, seat, type)
-    ? Math.floor(base * districtDiscountMult(type)) : base;
+  const cost = districtScaledBase(research, type, type !== undefined && districtDiscounted(state, seat, type));
   return type !== undefined ? districtVariantCost(state, seat, type, cost) : cost;
 }
 
@@ -206,17 +227,14 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
   };
 }
 
-/** The settler's price, rising with every city and live SETTLER unit — a
- * settler still in a queue raises nothing (the game's GetUnitCost, H-1 Duels
- * 1103 / 1104: Ostia t157–178 paid 85 beside a queued settler): the Units
- * row's Cost 80 + CostProgressionParam1 30 per copy, each through
- * `scaleByGameSpeed` as every unit cost is (40 + 15·n online). */
+/** The settler's price (COST_PROGRESSION_PREVIOUS_COPIES): the Units row's
+ * Cost 80 + CostProgressionParam1 30 per Settler the seat has trained or
+ * bought, each through `scaleByGameSpeed` as every unit cost is (40 + 15·n
+ * online). A settler still in a queue raises nothing, and one lost raises it
+ * all the same (runs/h1_duelw1105: China's two trained Settlers held 70 from
+ * t28, one of them captured, past the second's founding at t38). */
 export function settlerCost(state: GameState, seat: number): number {
-  return (
-    UNITS.SETTLER.cost +
-    scaleByGameSpeed(SETTLER_COST_STEP) *
-      Math.max(0, seatOf(state, seat)!.cities.length - 1 + settlerCount(state, seat))
-  );
+  return UNITS.SETTLER.cost + scaleByGameSpeed(SETTLER_COST_STEP) * (seatOf(state, seat)!.settlersTrained ?? 0);
 }
 
 function cityName(id: number): string {
@@ -579,9 +597,18 @@ export function faithBuysLandUnits(state: GameState, seat: number): boolean {
  *  applies to that whole Cost — the install progresses the Cost and modifies
  *  the total. `copies` 0 is the catalog row the exporter ships. */
 export function unitFaithCost(unitType: string, mult = 1, copies = 0): number {
+  return Math.round(unitStepCost(unitType, copies) * FAITH_PURCHASE_MULT * mult);
+}
+
+/** CIV6 (COST_PROGRESSION_PREVIOUS_COPIES): a chassis's Cost after `copies`
+ *  earlier ones — (Cost + copies · CostProgressionParam1) at the speed, floored
+ *  ONCE (runs/h1_duelw1105, China's Apostle 107, 115, 122, 130: 100 + 7.5n);
+ *  the catalog Cost for a flat row. */
+export function unitStepCost(unitType: string, copies = 0): number {
   const def = UNITS[unitType];
-  const base = (def?.cost ?? 0) + copies * (def?.costStep ?? 0);
-  return Math.round(base * FAITH_PURCHASE_MULT * mult);
+  if (!def) return 0;
+  return def.stepBase !== undefined && def.costStep !== undefined
+    ? Math.floor(def.stepBase + copies * def.costStep) : def.cost;
 }
 
 /** how many copies of a chassis this seat has ever acquired — what the price
@@ -640,6 +667,7 @@ export function purchaseSettler(state: GameState, cityId: number, seat: number):
     if (!state.sandbox) buyer.treasury += cost; // refund: nowhere to stand
     return { ok: false, reason: 'No free tile near the city center.' };
   }
+  buyer.settlersTrained = (buyer.settlersTrained ?? 0) + 1;
   // Purchased settlers cost the pop too (real Civ 6).
   city.population = Math.max(1, city.population - 1);
   logPopWrite(state, city, 'sb');
@@ -1120,6 +1148,7 @@ export function purchaseCivilianWithFaith(
   if (unitType === 'SETTLER') {
     city.population = Math.max(1, city.population - 1);
     logPopWrite(state, city, 'sf');
+    buyer.settlersTrained = (buyer.settlersTrained ?? 0) + 1;
   }
   else buyer.buildersTrained += 1;
   return { ok: true };

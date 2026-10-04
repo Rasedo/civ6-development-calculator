@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat } from '../../../cpu/core/seats';
-import { districtCostIn, districtScaledBase, districtCost, districtDiscountMult, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { districtCostIn, districtScaledBase, districtCost, districtDiscountPct, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { scaleByGameSpeed, gameProgressPct } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
@@ -11,8 +11,9 @@ import type { GameState } from '../../../cpu/core/types';
  * CIV6 (`Districts.Cost`): each row carries its OWN base — Aqueduct 36, Canal
  * and Dam 81, Government Plaza and Diplomatic Quarter 30, Spaceport 1800,
  * every specialty row 54 — where this engine priced them all as a Campus.
- * And `Districts.CostProgressionParam1` is the UNDER-REPRESENTED discount: 40
- * everywhere the install writes it, 25 for the two plaza rows.
+ * And `Districts.CostProgressionParam1` is the UNDER-REPRESENTED discount on
+ * the NUM_UNDER_AVG_PLUS_TECH rows: 40, 25 for the two plaza rows; a
+ * GAME_PROGRESS row takes none. It comes off the Cost before the climb.
  *
  * The GPU twin is tests/gpu/district_price_test.py.
  */
@@ -67,14 +68,26 @@ describe('a district is priced off its own row', () => {
     expect(districtScaledBase(rs, 'HOLY_SITE')).toBe(116); // 27 x 4.33 = 116.9
   });
 
-  it('takes 40% off a specialty row and 25% off the two plaza rows', () => {
-    expect(districtDiscountMult('CAMPUS')).toBeCloseTo(0.6);
-    expect(districtDiscountMult('HARBOR')).toBeCloseTo(0.6);
-    expect(districtDiscountMult('GOVERNMENT_PLAZA')).toBeCloseTo(0.75);
-    expect(districtDiscountMult('DIPLOMATIC_QUARTER')).toBeCloseTo(0.75);
+  it('takes 40% off a specialty row, 25% off the two plaza rows, none off a GAME_PROGRESS row', () => {
+    expect(districtDiscountPct('CAMPUS')).toBe(40);
+    expect(districtDiscountPct('HARBOR')).toBe(40);
+    expect(districtDiscountPct('GOVERNMENT_PLAZA')).toBe(25);
+    expect(districtDiscountPct('DIPLOMATIC_QUARTER')).toBe(25);
+    expect(districtDiscountPct('PRESERVE')).toBe(0);
+    expect(districtDiscountPct('AQUEDUCT')).toBe(0);
     // the two that differ are the ONLY two, or the install's 40 is not the rule
     const odd = Object.values(DISTRICTS).filter((d) => (d.discountPct ?? 40) !== 40).map((d) => d.id);
     expect(odd.sort()).toEqual(['DIPLOMATIC_QUARTER', 'GOVERNMENT_PLAZA']);
+  });
+
+  it('discounts the Cost before the climb (runs/h1_duelw1105: a Harbor at 70 beside a full 119)', () => {
+    const state = scene();
+    const rs = state.seats[0].research;
+    rs.techs.push(...Object.keys(TECHS).slice(0, 30));
+    expect(gameProgressPct(rs.techs.length, rs.civics.length)).toBe(38);
+    expect(districtScaledBase(rs, 'HARBOR')).toBe(119); // 27 x 4.42 = 119.3
+    expect(districtScaledBase(rs, 'HARBOR', true)).toBe(70); // 16 x 4.42 = 70.7, not floor(0.6 x 119) = 71
+    expect(districtScaledBase(rs, 'GOVERNMENT_PLAZA', true)).toBe(48); // floor(22.5) = 22, 11 x 4.42 = 48.6
   });
 
   it('keeps the Spaceport flat, discount and curve alike', () => {

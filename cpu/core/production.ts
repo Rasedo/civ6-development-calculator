@@ -372,7 +372,7 @@ export function completeQueueItem(
       // the city — a unit like any other, moved and founded by orders.
       // CIV6 (Provision): "Settlers trained in the city do not consume a
       // Population."
-      spawnUnit(state, 'SETTLER', city.centerIndex, city.seat);
+      if (spawnUnit(state, 'SETTLER', city.centerIndex, city.seat)) owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
       if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
         city.population = Math.max(1, city.population - 1);
       }

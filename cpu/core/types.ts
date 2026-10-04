@@ -711,6 +711,13 @@ export interface Seat {
    *  CIV6 (World's Fair): "1 point per Great Person POINT of every class". */
   gppTurn?: Partial<Record<GreatPersonClass, number>>;
   buildersTrained: number;
+  /** the Settlers this seat has TRAINED or BOUGHT — what `settlerCost`'s
+   *  progression counts (a starting, captured or granted one moves nothing). */
+  settlersTrained?: number;
+  /** the COMPLETED specialty districts the under-represented discount reads
+   *  (`districtDiscounted`): taken when a technology or civic completes, so a
+   *  district finished since moves no price until the next one does. */
+  discountDistricts?: number;
   /** CIV6: a Relic with no open slot is held until one opens, not lost. */
   relicReserve: number;
   /** CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus

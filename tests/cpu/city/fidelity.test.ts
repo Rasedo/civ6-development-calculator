@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf } from '../../../cpu/core/seats';
 import { canPlaceDistrict, makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
-import { foundCity, endTurn, districtCost, districtDiscounted, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { foundCity, endTurn, districtCost, districtDiscounted, districtScaledBase, completedSpecialtyDistricts, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { placeSeatDistrict } from '../../../cpu/core/phase';
 import { computeUnlocks } from '../../../cpu/core/effects';
 import { validImprovements } from '../../../cpu/core/rules';
@@ -82,9 +82,13 @@ describe('district cost scaling', () => {
       t.districtComplete = true;
       city.districts.push({ type: 'CAMPUS', tileIndex: t.index });
     }
+    // ...counted only once a technology or civic completes
+    expect(districtDiscounted(state, 0, 'HOLY_SITE')).toBe(false);
+    seatOf(state, 0)!.discountDistricts = completedSpecialtyDistricts(state, 0);
     expect(districtDiscounted(state, 0, 'HOLY_SITE')).toBe(true); // placed 0 < 1
     expect(districtDiscounted(state, 0, 'CAMPUS')).toBe(false); // placed 2 ≥ 1
-    expect(districtCost(state, 0, 'HOLY_SITE')).toBe(Math.floor(districtCost(state, 0) * 0.6));
+    // 40% off the install's Cost, floored, before the climb
+    expect(districtCost(state, 0, 'HOLY_SITE')).toBe(districtScaledBase(seatOf(state, 0)!.research, 'HOLY_SITE', true));
     expect(districtCost(state, 0, 'CAMPUS')).toBe(districtCost(state, 0));
   });
 });

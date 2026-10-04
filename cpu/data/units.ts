@@ -139,9 +139,12 @@ export interface UnitDef {
   airSlots?: number;
   /** CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): each copy the seat
    *  has already acquired raises the next one's Cost by this flat
-   *  `CostProgressionParam1`. Scaled by `GAME_SPEED` exactly as `cost` is.
-   *  Absent = a flat price forever. */
+   *  `CostProgressionParam1`, at the speed unfloored (`unitStepCost` floors
+   *  the sum once). Absent = a flat price forever. */
   costStep?: number;
+  /** the Cost a `costStep` row climbs from, at the speed unfloored; set by the
+   *  catalog builder. */
+  stepBase?: number;
   /** CIV6 (Units.CostProgressionParam1 on a COST_PROGRESSION_GAME_PROGRESS
    *  row): the climb over the game (`progressCost`, `gameProgressK`). */
   costProgressGame?: number;
@@ -396,7 +399,7 @@ const U = (def: UnitDef): UnitDef => ({
   ...def,
   cost: scaleByGameSpeed(def.cost),
   ...(def.costProgressGame === undefined ? {} : { progressBase: def.cost }),
-  ...(def.costStep === undefined ? {} : { costStep: scaleByGameSpeed(def.costStep) }),
+  ...(def.costStep === undefined ? {} : { costStep: def.costStep * GAME_SPEED, stepBase: def.cost * GAME_SPEED }),
 });
 
 /** CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): what each earlier copy

@@ -8,14 +8,17 @@ The TS twin is tests/cpu/city/district-price.test.ts.
 CIV6 (`Districts.Cost`): each row carries its OWN base — Aqueduct 36, Canal
 and Dam 81, Government Plaza and Diplomatic Quarter 30, Spaceport 1800, every
 specialty row 54 — where this engine priced them all as a Campus. And
-`Districts.CostProgressionParam1` is the UNDER-REPRESENTED discount: 40
-everywhere the install writes it, 25 for the two plaza rows.
+`Districts.CostProgressionParam1` is the UNDER-REPRESENTED discount on the
+NUM_UNDER_AVG_PLUS_TECH rows: 40, 25 for the two plaza rows; a GAME_PROGRESS
+row takes none. It comes off the Cost before the climb.
 """
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+
+import torch
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
@@ -53,12 +56,14 @@ def test_the_wire(rules, path) -> None:
             continue
         i = names.index(nm)
         assert per[i] == base, f"{nm} ships {per[i]}, expected the install's {base}"
-    # the ONLY two rows off the install's 40
-    odd = sorted(names[i] for i, p in enumerate(disc) if p != 40)
-    assert odd == ["DIPLOMATIC_QUARTER", "GOVERNMENT_PLAZA"], f"off-40 rows: {odd}"
-    for nm in odd:
-        assert disc[names.index(nm)] == 25
-    print("  1 the wire OK —", len(per), "bases, and 25 for the two plaza rows")
+    # the two plaza rows take 25, the GAME_PROGRESS rows none, the rest 40
+    odd = sorted(names[i] for i, p in enumerate(disc) if p == 25)
+    assert odd == ["DIPLOMATIC_QUARTER", "GOVERNMENT_PLAZA"], f"25% rows: {odd}"
+    none = sorted(names[i] for i, p in enumerate(disc) if p == 0)
+    for nm in ("AQUEDUCT", "CANAL", "DAM", "NEIGHBORHOOD", "PRESERVE"):
+        assert nm not in names or nm in none, f"{nm} is discounted: {none}"
+    assert all(p in (0, 25, 40) for p in disc), disc
+    print("  1 the wire OK —", len(per), "bases, 25 for the two plaza rows, 0 for", none)
 
 
 def test_bases_differ_from_the_specialty_one(rules, path) -> None:
@@ -122,7 +127,19 @@ def test_the_two_models_part(rules, path) -> None:
         want = (base * 50 * (100 + 9 * pct)) // 10000
         if not sim._d_variants.get(di):
             assert cost == want, f"row {di}: wanted {want}, got {cost}"
-    print(f"  4 the progress price OK — every row floor(1/2 base (1 + 9P)) at P {pct}%")
+    # the discount comes off the Cost, floored, before the climb: a Harbor
+    # at 38% progress is 16 x 4.42 = 70, not floor(0.6 x 119) = 71
+    sim.civ_techs[:, 0, : min(30, nt)] = True
+    assert int(sim._progress_pct(0)[0]) == 38
+    real = sim._district_discounted
+    sim._district_discounted = lambda row, di: torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+    try:
+        for si, (di, _ut, _uc, _plc, fc) in enumerate(sim._scaffold):
+            if sim.districts_cat[di].get("id") == "HARBOR" and fc < 0:
+                assert float(sim._district_cost_si(0, si)[0]) == 70.0, float(sim._district_cost_si(0, si)[0])
+    finally:
+        sim._district_discounted = real
+    print(f"  4 the progress price OK — every row floor(1/2 base (1 + 9P)) at P {pct}%, a discounted Harbor 70 at 38%")
 
 
 def main() -> int:

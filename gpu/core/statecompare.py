@@ -633,6 +633,8 @@ SEAT = {
     "envoysAvailable": _civ_scalar("civ_envoys_avail"),
     "grantedTitles": _civ_scalar("civ_granted_titles"),
     "buildersTrained": _civ_scalar("civ_builders_trained"),
+    "settlersTrained": _civ_scalar("civ_settlers_trained"),
+    "discountDistricts": _civ_scalar("civ_discount_districts"),
     "relicReserve": _civ_scalar("civ_relic_reserve"),
     "emergencyRewards": _emg_rewards,
     "bestMeleeCS": _civ_scalar("civ_best_melee"),

@@ -116,8 +116,9 @@ export interface DistrictDef {
    *  row's price climbs with the GAME's own progress rather than with the
    *  specialty curve — `base + floor(scaleByGameSpeed(param) x progress)`,
    *  the model `projectCost` runs for the district projects and the Cothon. The install writes it
-   *  on six rows at 1000; a civVariant carries its own base and the SAME
-   *  parameter, which is why the term is added after the variant ratio. */
+   *  on seven rows at 1000; a civVariant carries its own base and the SAME
+   *  parameter, which is why the term is added after the variant ratio. The
+   *  model takes no under-represented discount (`districtDiscountPct`). */
   costProgressGame?: number;
   countsTowardLimit: boolean;
   /** A city may hold SEVERAL of this type (CIV 6: the Neighborhood, which is
@@ -1027,6 +1028,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
   // "Cannot be built next to the City Center".
   PRESERVE: D({
     id: 'PRESERVE',
+    costProgressGame: 1000,
     plunder: { kind: 'gold', amount: 50 },
     name: 'Preserve',
     code: 'PR',
@@ -1048,6 +1050,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     src: {
       cost: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Cost'),
       countsTowardLimit: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'RequiresPopulation'),
+      costProgressGame: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'CostProgressionParam1'),
       housing: { stylized: 'the appeal band pays it — cpu/core/city.ts:384 takes the appealHousing arm and never reads this column; PRESERVE_APPEAL_HOUSING[2] (Average) is 1, the install Districts.Housing' },
       maintenance: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Maintenance'),
       appealAdjacent: xml('Districts', 'DistrictType=DISTRICT_PRESERVE', 'Appeal'),

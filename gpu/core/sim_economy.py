@@ -608,15 +608,22 @@ class SimEconomy:
         )
         return (unl & self._is_specialty.unsqueeze(0)).sum(dim=1)
 
+    def _completed_specialty(self, row: int) -> torch.Tensor:
+        """[B] `completedSpecialtyDistricts` — the specialty districts seat row
+        `row` has COMPLETED."""
+        placed = self.city_dist_tile[:, row]
+        tiles_f = placed.clamp(min=0).reshape(self.B, -1)
+        comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
+        return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2))
+
     def _district_discounted(self, row: int, di: int) -> torch.Tensor:
+        """`districtDiscounted`: U and n live, D the completed count the seat
+        took when its last technology or civic completed."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         U = self._unlocked_specialty_count(self._seat_techs(row), self._seat_civics(row))
-        placed = self.city_dist_tile[:, row]
-        n = (placed[:, :, di] >= 0).sum(dim=1)
-        tiles_f = placed.clamp(min=0).reshape(self.B, -1)
-        comp = (placed >= 0) & self.district_complete.gather(1, tiles_f).reshape(placed.shape)
-        D = (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2))
+        n = (self.city_dist_tile[:, row, :, di] >= 0).sum(dim=1)
+        D = self.civ_discount_districts[:, row]
         thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
         return (U > 0) & (D >= U) & (n < thresh)
 

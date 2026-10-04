@@ -63,7 +63,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, districtVariantCost, districtDiscountMult, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, landUnitPriceMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, completedSpecialtyDistricts, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -939,7 +939,7 @@ export function districtSiteCost(
   const cost0 = DISTRICTS[id]?.fixedCost
     ? scaleByGameSpeed(DISTRICTS[id].cost)
     : districtDiscounted(state, actor.seat, id, { unlocks, cities: actor.cities })
-      ? Math.floor(base * districtDiscountMult(id))
+      ? districtScaledBase(actor.research, id, true)
       : base;
   const varied = districtVariantCost(state, actor.seat, id, cost0);
   logDistrictCost(state.turn, actor.seat, id, base, cost0, varied);
@@ -2810,6 +2810,9 @@ export function seatPhase(state: GameState): void {
     const _govNow = seatGovernment(state, actor.seat);
     actor.government.held |= governmentBit(_govNow);
     if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat);
+    // the district discount's count of completed specialty districts, taken
+    // when a technology or civic completes — before the cities produce
+    if (techDone || civicDone) actor.discountDistricts = completedSpecialtyDistricts(state, actor.seat);
 
     // FAITH, off the cities as the civics left them.
     if (civicDone) yields = readYields();

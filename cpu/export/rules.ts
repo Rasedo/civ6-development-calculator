@@ -5,7 +5,7 @@
  * file is engine-side and exists solely to ship the catalogs to the GPU.
  */
 
-import { TURN_LIMIT, DISTRICT_SPECIALTY_COST, DISTRICT_TECH_K, districtK } from '../core/game';
+import { TURN_LIMIT, DISTRICT_SPECIALTY_COST, DISTRICT_TECH_K, districtK, districtDiscountPct } from '../core/game';
 import { eraUnitOfClass } from '../core/phase';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
@@ -619,10 +619,10 @@ export function buildRules() {
       // still what a district with no row of its own pays
       base: DISTRICT_SPECIALTY_COST, k: DISTRICT_TECH_K,
       // ...and each PLACEABLE row's own install Cost, climb (`districtK`) and
-      // under-represented discount (`Districts.CostProgressionParam1`)
+      // under-represented discount (`districtDiscountPct`)
       perDistrict: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.cost ?? DISTRICT_SPECIALTY_COST),
       perK: PLACEABLE_DISTRICTS.map((d) => districtK(d)),
-      discountPct: PLACEABLE_DISTRICTS.map((d) => DISTRICTS[d]?.discountPct ?? 40),
+      discountPct: PLACEABLE_DISTRICTS.map((d) => districtDiscountPct(d)),
     },
     // TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`
     // straight through, so the GPU draws from the same table TS does. Kinds
@@ -1937,7 +1937,10 @@ export function buildRules() {
       // the OPERATIONAL range, measured from the base.
       air: u.air === 'FIGHTER' ? 1 : u.air === 'BOMBER' ? 2 : 0,
       airSlots: u.airSlots ?? 0,
-      costStep: u.costStep ?? 0,  // COST_PROGRESSION_PREVIOUS_COPIES
+      // COST_PROGRESSION_PREVIOUS_COPIES: the climb and its base, at the speed
+      // unfloored (`unitStepCost`)
+      costStep: u.costStep ?? 0,
+      stepBase: u.stepBase ?? 0,
       rangedStrength: u.ranged?.strength ?? 0,
       rangedRange: u.ranged?.range ?? 0,
       moves: u.moves,
