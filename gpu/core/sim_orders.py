@@ -2073,11 +2073,12 @@ class SimOrders:
                 if self._barb_naval_type >= 0:
                     _nb = self.neigh[camp.clamp(min=0)]
                     _nbc = _nb.clamp(min=0)
+                    # `isWater` and not OCEAN (barbarians have no CARTOGRAPHY):
+                    # a Canal's ground is land here, as `barbarianPhase` reads it
                     _free = (
                         (_nb >= 0)
-                        & ((self.wpass.gather(1, _nbc)
-                            & ~self.ocean_tile.gather(1, _nbc))  # barbarians have no CARTOGRAPHY
-                           | self._canal_pass().gather(1, _nbc))
+                        & self.wpass.gather(1, _nbc)
+                        & ~self.ocean_tile.gather(1, _nbc)
                         & (self.military_at.gather(1, _nbc) < 0)  # no unit at all (`unitsAt(...).length === 0`)
                         & (self.civilian_at.gather(1, _nbc) < 0)
                         & (self.support_at.gather(1, _nbc) < 0)
