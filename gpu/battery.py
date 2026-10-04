@@ -228,8 +228,9 @@ def free_mb() -> float:
 def lane_mb() -> float:
     """What ONE concurrent lane costs, in MB — measured, not guessed. Every
     green run records the memory it actually consumed and how many lanes were
-    running; the median of the last five is the budget. Falls back to a
-    deliberately pessimistic default until that history exists."""
+    running; the latest one is the budget, so a lighter lane takes effect on
+    the next run. Falls back to a deliberately pessimistic default until that
+    history exists."""
     seen: list[float] = []
     try:
         for row in _stats._rows()[-25:]:
@@ -241,8 +242,7 @@ def lane_mb() -> float:
         return MEM_LANE_MB_DEFAULT
     if not seen:
         return MEM_LANE_MB_DEFAULT
-    tail = sorted(seen[-5:])
-    return tail[len(tail) // 2]
+    return seen[-1]
 
 
 def plan_pool(want_shards: int) -> tuple[int, int, str]:

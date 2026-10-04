@@ -1,7 +1,9 @@
 /**
  * THE DECISION-SERVER CLIENT CLI — the TS child `gpu/serve_gate.py` spawns.
  *
- *   CIV6_SERVE=1 CIV6_SERVE_SEED=9001 npx vite-node cpu/driver/serve.ts -- <turns> [worldsDir]
+ *   CIV6_SERVE=1 CIV6_SERVE_SEED=9001 node <bundle.mjs> <turns> [worldsDir]
+ *
+ * (the gate runs it bundled — `node cpu/driver/bundle.mjs <bundle.mjs>`)
  *
  * Loads the seed's WORLD FILE (Layer A — the seeder no longer plays or even
  * links the engine), builds the live state through `cpu/world/load.ts`, and

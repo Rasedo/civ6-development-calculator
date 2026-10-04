@@ -42,6 +42,16 @@ from core import neutral, records  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def ts_child_cmd(out_dir: str, turns: int) -> list[str]:
+    """The TS child's command line: `cpu/driver/serve.ts` bundled into
+    `out_dir` (`cpu/driver/bundle.mjs`) and run by a bare `node` — one process
+    per child, holding the engine and nothing else."""
+    bundle = os.path.join(out_dir, "serve.mjs")
+    subprocess.run(["node", str(ROOT / "cpu" / "driver" / "bundle.mjs"), bundle],
+                   cwd=ROOT, check=True)
+    return ["node", bundle, str(turns), str(FIXTURES)]
+
+
 def _q_eq(a, b, scale: int) -> bool:
     if isinstance(a, list) or isinstance(b, list):
         if not (isinstance(a, list) and isinstance(b, list)) or len(a) != len(b):
@@ -425,6 +435,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
     # real file rather than a PIPE, because nothing drains a pipe until the
     # read that discovers the crash — which is exactly when it would deadlock.
     errs: dict[int, object] = {}
+    bundle_dir = tempfile.TemporaryDirectory(prefix="civ6serve", ignore_cleanup_errors=True)
+    ts_cmd = ts_child_cmd(bundle_dir.name, turns)
     for sd in seeds:
         child_env = dict(os.environ)
         child_env.update({
@@ -453,9 +465,8 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
         else:
             ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
         ch = subprocess.Popen(
-            ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(turns), str(FIXTURES)],
-            cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=ef, text=True, encoding="utf-8", shell=True,
+            ts_cmd, cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=ef, text=True, encoding="utf-8",
         )
         errs[id(ch)] = ef
         children.append(ch)
@@ -660,6 +671,7 @@ def run_batched(turns: int, eps: float, ckpt_every: int = 0,
             except OSError:
                 pass
             ch.kill()
+        bundle_dir.cleanup()
     loop_s = _pc() - loop_t0
     if profile:
         total = sum(prof.values())
@@ -788,10 +800,13 @@ def main() -> None:
     if args.resume:
         child_env["CIV6_SERVE_LOAD"] = str(ckpt_dir / f"s{args.seed}_t{args.resume}.json")
     _ef = tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace")
+    # the bundle's directory lives as long as this process (its finalizer
+    # removes it at exit)
+    bundle_dir = tempfile.TemporaryDirectory(prefix="civ6serve", ignore_cleanup_errors=True)
     child = subprocess.Popen(
-        ["npx", "vite-node", "cpu/driver/serve.ts", "--", str(args.turns), str(FIXTURES)],
+        ts_child_cmd(bundle_dir.name, args.turns),
         cwd=ROOT, env=child_env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=_ef, text=True, encoding="utf-8", shell=True,
+        stderr=_ef, text=True, encoding="utf-8",
     )
 
     def read_msg() -> dict:
