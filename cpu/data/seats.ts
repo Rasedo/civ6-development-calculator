@@ -801,8 +801,8 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: +1 Amenity on duplicates of a Resource. / B: This Luxury
   // resource grants no Amenities." (Renaissance through Industrial per the
   // published table.) Outcome A's REACH — which cities a duplicate's +1
-  // serves — is unpublished; it rides the luxury machinery's own
-  // LUXURY_AMENITY_CITIES spread, a recorded model choice.
+  // serves — is unpublished; each duplicate is one more LUXURY_AMENITY_CITIES
+  // copy, served first (`luxuryAmenities`, fitted on the H-1 records).
   // CIV6 (Expansion2_Congress.xml): the row carries NO era columns.
   { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 0, maxEra: 99, target: 'luxury' },
 ];

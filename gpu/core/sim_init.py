@@ -1491,9 +1491,7 @@ class SimInit:
             self._wond_emp_mult = torch.tensor([w["empireMult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6] every city of the seat
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             _amen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
-            # wonderRegionalAmenities — a regional wonder's amenities. Reaches
-            # the tier balance only, never the luxury ranking's baseHave
-            # (city.ts luxuryAmenities).
+            # wonderRegionalAmenities — a regional wonder's amenities.
             self._wond_regam = _amen * (1.0 - _local)  # [nW]
             # ...and the ones a wonder pays only to the city that holds it.
             self._wond_cityamen = _amen * _local  # [nW]

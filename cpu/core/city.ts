@@ -486,6 +486,70 @@ export function luxuryHoldings(state: GameState, seat: number): { held: Map<stri
   return { held, spare };
 }
 
+/**
+ * Every amenity `city` has but its luxuries', net of war weariness and
+ * bankruptcy — the sum `luxuryAmenities` ranks cities on, and the one the
+ * tier balance adds the luxuries to. `m` is the city's own modifiers (its
+ * governor and follower beliefs folded in), `regionalAmenities` what the
+ * regional buildings reaching it pay. `ww` is the war-weariness part, for
+ * the amenity log.
+ */
+function nonLuxuryAmenities(
+  state: GameState, city: City, m: Modifiers, regionalAmenities: number,
+): { have: number; ww: number } {
+  const center = state.map.tiles[city.centerIndex];
+  let have =
+    localAmenities(state, city) +
+    parkAmenities(state, city) +
+    regionalAmenities +
+    wonderRegionalAmenities(state, city) +
+    wonderCityFlat(state, city, 'cityAmenities') +
+    wonderImprovementAmenities(state, city) +
+    improvementAmenities(state, city) +
+    m.amenitiesAll +
+    // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
+    (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +
+    (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
+    gpCityPermOf(city, 'amenities') +
+    notFoundedSum(state, city, 'amenity') +
+    // CIV6 (Dharma): "Cities gain an Amenity for every Religion with at least
+    // 1 Follower" (`RELIGION_AMENITY_ROWS`)
+    (m.religionAmenities.length
+      ? m.religionAmenities.reduce((n, r) => n + r.amenities
+        * religionsPresent(city).filter((g) => (city.religionPressure?.[g] ?? 0) >= r.followers).length, 0)
+      : 0);
+  const ww = warWearinessLosses(state, city.seat).get(city.id) ?? 0;
+  have -= ww;
+  // CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
+  // whose last upkeep fell short loses amenities to bankruptcy
+  have -= bankruptAmenities(seatOf(state, city.seat)?.goldShortfall ?? 0);
+  const specialtyCount = completedDistrictCount(state, city, true);
+  for (const rule of m.amenitiesIfSpecialty) {
+    if (specialtyCount >= rule.min) have += rule.amenities;
+  }
+  for (const rule of m.newDeal) {
+    if (specialtyCount >= rule.min) have += rule.amenities;
+  }
+  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
+    for (const rule of m.cityWithDistrict) have += rule.amenities;
+  }
+  return { have, ww };
+}
+
+/**
+ * Which cities each luxury's amenity reaches. CIV6 has no install row for it
+ * (a DLL rule); this is the rule fitted on the H-1 records
+ * (`GetAmenitiesFromLuxuries` per city):
+ * - every copy a luxury serves goes to `reach` cities (LUXURY_AMENITY_CITIES
+ *   for a worked one), one amenity each;
+ * - the cities stand in ONE list, founding (id) order at first, and before
+ *   every copy that list is stably re-sorted by need — amenitiesNeeded less
+ *   the city's non-luxury amenities (`nonLuxuryAmenities`) and the luxury
+ *   amenities granted so far — so equally needy cities keep the order the
+ *   previous copy left them in;
+ * - the Luxury Policy's duplicated luxury serves first, and while it does a
+ *   city holding fewer of its copies ranks ahead of any holding more.
+ */
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
   // a city-state's one city is its `minorCity` view (its Seat's `cities` is
   // empty): an improved luxury on its ground serves it like any city's
@@ -522,9 +586,13 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   }
 
   const baseHave = new Map<number, number>();
-  for (const c of cities) {
-    baseHave.set(c.id, localAmenities(state, c) + parkAmenities(state, c)
-      + regionalEffects(state, c, governorFlag(state, c, (e) => e.industryAllSources)).amenities);
+  if (cities.length > 1) {
+    const seatMods = getModifiers(state, seat);
+    for (const c of cities) {
+      const m = withGovernor(state, withFollowerBelief(state, seatMods, followerReligionsForCity(seatMods, c)), c);
+      baseHave.set(c.id, nonLuxuryAmenities(state, c, m,
+        regionalEffects(state, c, governorFlag(state, c, (e) => e.industryAllSources)).amenities).have);
+    }
   }
 
   // CIV6 (John Spilsbury, Helena Rubinstein, Levi Strauss, Estee Lauder): an
@@ -547,6 +615,9 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
       if (RESOURCES[t.resource]?.category === 'bonus') bonusLux.add(t.resource);
     }
   }
+  // the duplicated luxury's copies serve first: all of them while the seat
+  // holds it, the duplicates alone when its first copy is traded away
+  const dupRounds = dupCopies > 1 ? (dupLux !== null && luxuries.has(dupLux) ? dupCopies : dupCopies - 1) : 0;
   const reach = [
     ...new Array<number>(luxuries.size + Math.max(0, dupCopies - 1)).fill(LUXURY_AMENITY_CITIES),
     ...(seatOf(state, seat)?.gpLuxuries ?? []),
@@ -555,16 +626,20 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
   ];
   const dlR = (globalThis as { __diffLog?: string[] }).__diffLog;
   if (dlR) dlR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
-  for (const n of reach) {
-    const ranked = [...cities].sort((a, b) => {
-      const needA = amenitiesNeeded(a.population) - (baseHave.get(a.id)! + result.get(a.id)!);
-      const needB = amenitiesNeeded(b.population) - (baseHave.get(b.id)! + result.get(b.id)!);
-      return needB - needA || a.id - b.id;
-    });
-    for (const c of ranked.slice(0, n)) {
+  const need = (c: City): number => amenitiesNeeded(c.population) - ((baseHave.get(c.id) ?? 0) + result.get(c.id)!);
+  const dupHeld = new Map<number, number>();
+  for (const c of cities) dupHeld.set(c.id, 0);
+  // ONE list, re-sorted in place: Array.prototype.sort is stable, so a tie
+  // keeps the order the previous copy left
+  const order = [...cities].sort((a, b) => a.id - b.id);
+  reach.forEach((n, i) => {
+    const dup = i < dupRounds;
+    order.sort((a, b) => (dup ? dupHeld.get(a.id)! - dupHeld.get(b.id)! : 0) || need(b) - need(a));
+    for (const c of order.slice(0, n)) {
       result.set(c.id, result.get(c.id)! + 1);
+      if (dup) dupHeld.set(c.id, dupHeld.get(c.id)! + 1);
     }
-  }
+  });
   return result;
 }
 
@@ -1445,44 +1520,8 @@ export function computeCityStats(
   // one split point both engines share. Named so the amenity log can print
   // it: a disagreement here is a different sum, a disagreement in `lux`
   // alone is a different allocation of the same one.
-  const amenBase =
-    localAmenities(state, city) +
-    parkAmenities(state, city) +
-    regional.amenities;
-  let have =
-    amenBase +
-    wonderRegionalAmenities(state, city) +
-    wonderCityFlat(state, city, 'cityAmenities') +
-    wonderImprovementAmenities(state, city) +
-    improvementAmenities(state, city) +
-    m.amenitiesAll +
-    // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
-    (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +
-    (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
-    ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0) +
-    gpCityPermOf(city, 'amenities') +
-    notFoundedSum(state, city, 'amenity') +
-    // CIV6 (Dharma): "Cities gain an Amenity for every Religion with at least
-    // 1 Follower" (`RELIGION_AMENITY_ROWS`)
-    (m.religionAmenities.length
-      ? m.religionAmenities.reduce((n, r) => n + r.amenities
-        * religionsPresent(city).filter((g) => (city.religionPressure?.[g] ?? 0) >= r.followers).length, 0)
-      : 0);
-  const wwLoss = warWearinessLosses(state, city.seat).get(city.id) ?? 0;
-  have -= wwLoss;
-  // CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
-  // whose last upkeep fell short loses amenities to bankruptcy
-  have -= bankruptAmenities(seatOf(state, city.seat)?.goldShortfall ?? 0);
-  const specialtyCount = completedDistrictCount(state, city, true);
-  for (const rule of m.amenitiesIfSpecialty) {
-    if (specialtyCount >= rule.min) have += rule.amenities;
-  }
-  for (const rule of m.newDeal) {
-    if (specialtyCount >= rule.min) have += rule.amenities;
-  }
-  if (m.cityWithDistrict.length && completedDistrictCount(state, city, false) >= 1) {
-    for (const rule of m.cityWithDistrict) have += rule.amenities;
-  }
+  const { have: amenBase, ww: wwLoss } = nonLuxuryAmenities(state, city, m, regional.amenities);
+  const have = amenBase + ((luxMap ?? luxuryAmenities(state, city.seat)).get(city.id) ?? 0);
   const needed = amenitiesNeeded(city.population);
   const balance = have - needed;
   const tier = amenityTier(balance);

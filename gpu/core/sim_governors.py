@@ -313,7 +313,8 @@ class SimGovernors:
         minor = self.civ_gov_minor[:, row]
         S = self.S
         for g in range(NG):
-            live_g = ap[:, g]
+            # `live` masks every clock: a cityless seat runs none of this phase
+            live_g = ap[:, g] & live
             out[:, g] = torch.where(live_g & (out[:, g] > 0), out[:, g] - 1, out[:, g])
             seated = live_g & (city[:, g] >= 0)
             still = (alive & (ids == city[:, g].unsqueeze(1))).any(dim=1)

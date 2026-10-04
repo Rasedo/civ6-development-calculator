@@ -10,9 +10,11 @@ _LOCK_KEY_BASE = 1e12
 
 
 class SimEconomy:
-    #: the luxury ranking packs (need descending, city id ascending) into one
-    #: key; this is the need multiplier, wide enough to clear any city id.
-    _LUX_KEY_SCALE = float(1 << 20)
+    #: the luxury ranking packs (duplicate copies ascending, need descending,
+    #: list place ascending) into one key; each level's multiplier clears the
+    #: range of the one below it (a place is under a row's city capacity, a
+    #: need under half this in magnitude).
+    _LUX_KEY_SCALE = float(1 << 12)
 
     def _lux_holdings(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, L] held, [B, L] spare) — per luxury, the copies this row holds
@@ -87,9 +89,12 @@ class SimEconomy:
         # B: This Luxury resource grants no Amenities." B silences the named
         # luxury outright (the Affluence copies with it); A pays one extra
         # full-reach round per OWN copy — an improved plot or a Great
-        # Person's grant — beyond the first.
+        # Person's grant — beyond the first. The duplicated luxury's copies
+        # serve FIRST (`dup_seg` rounds): all of them while the row holds it,
+        # the duplicates alone when its first copy is traded away.
         lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
         dup = torch.zeros(B, dtype=torch.long, device=self.device)
+        dup_seg = dup
         if bool((lp_out >= 0).any()):
             t0 = lp_tgt.clamp(min=0, max=self._n_lux - 1)
             ban = lp_out == 1
@@ -97,6 +102,7 @@ class SimEconomy:
             dup = torch.where(lp_out == 0,
                               (own_copies.gather(1, t0.unsqueeze(1)).squeeze(1) - 1).clamp(min=0),
                               dup)
+            dup_seg = torch.where(dup > 0, dup + (counts.gather(1, t0.unsqueeze(1)).squeeze(1) > 0).long(), dup)
         rounds = (counts > 0).long().sum(dim=1) + dup
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how
@@ -137,14 +143,6 @@ class SimEconomy:
         mx = int(total.max().item())
         if mx == 0:
             return out
-        # THE TIE-BREAK IS THE CITY ID, not the slot. `luxuryAmenities` ranks
-        # `needB - needA || a.id - b.id`, and a slot is a storage address the
-        # compaction reorders while an id is fixed for the city's life — two
-        # equally needy cities went to different engines the moment those two
-        # orders parted. The key packs (need desc, id asc) into one number, so
-        # the multiplier has to clear any id this engine can mint: need is
-        # tens at most and halves at worst, so 2**20 leaves a 2**19 gap
-        # between adjacent need levels and stays exact in f64.
         if self._log_diff:
             for _rb in range(B):
                 _rr = [self._lux_k] * int(rounds[_rb])
@@ -155,7 +153,18 @@ class SimEconomy:
                     f"r:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
                     f" lux{int((counts > 0).long().sum(dim=1)[_rb])}"
                     f" dup{int(dup[_rb])} reach[{','.join(str(x) for x in _rr)}]")
-        seq = self.city_id[:, row, :cols].to(dt)
+        # ONE persistent list (`luxuryAmenities`): `pos` is each slot's place
+        # in it — city-id order at first, dead slots last — and every copy
+        # re-sorts it by need with the old place breaking ties. A slot is a
+        # storage address the compaction reorders; the id is fixed for the
+        # city's life, so the list starts from the id.
+        f64 = torch.float64
+        ar = torch.arange(cols, device=self.device, dtype=f64).expand(B, cols)
+        seq = torch.where(alive, self.city_id[:, row, :cols].to(f64), torch.full((B, cols), float("inf"),
+                                                                                 dtype=f64, device=self.device))
+        pos = torch.empty(B, cols, dtype=f64, device=self.device)
+        pos.scatter_(1, seq.argsort(dim=1, stable=True), ar)
+        held_dup = torch.zeros(B, cols, dtype=f64, device=self.device)
         kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).any()) else 0)
         if bool((spice_n > 0).any()):
             kmax = max(kmax, self._suz_spice_amen)
@@ -178,11 +187,20 @@ class SimEconomy:
                     torch.where(_after_gp < spice_n,
                                 torch.full_like(rounds, self._suz_spice_amen),
                                 torch.full_like(rounds, self._suz_bonus_amen))))
-            need = amen_need - (amen_have + out)
-            key = torch.where(alive, need * self._LUX_KEY_SCALE - seq, torch.full_like(need, -1e9))
-            top_v, top_i = key.topk(k, dim=1)
-            grant = (top_v > -1e8) & act.unsqueeze(1) & (krank < reach.unsqueeze(1))
+            need = (amen_need - (amen_have + out)).to(f64)
+            # while the duplicated luxury serves, fewer of its copies outrank
+            # more; the key packs (copies asc, need desc, place asc) into one
+            # f64, exact for need in halves and any place this row can hold
+            in_dup = (rnd < dup_seg).unsqueeze(1)
+            rk = torch.where(in_dup, held_dup, torch.zeros_like(held_dup))
+            key = torch.where(alive, (need - rk * self._LUX_KEY_SCALE) * self._LUX_KEY_SCALE - pos,
+                              -1e15 - pos)
+            order = key.argsort(dim=1, descending=True)
+            pos.scatter_(1, order, ar)
+            top_i = order[:, :k]
+            grant = alive.gather(1, top_i) & act.unsqueeze(1) & (krank < reach.unsqueeze(1))
             out.scatter_add_(1, top_i, grant.to(dt))
+            held_dup.scatter_add_(1, top_i, (grant & in_dup).to(f64))
         return out
 
     # ------------------------------------------------------------------

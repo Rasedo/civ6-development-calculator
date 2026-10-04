@@ -55,13 +55,13 @@ def post(sim, row: int, g: int, s: int, promos: int = 0) -> None:
 
 def poke_tie_is_the_id(rules, path) -> None:
     """CIV6 (`luxuryAmenities`): each luxury's reach goes to the NEEDIEST
-    cities, and TS breaks a tie with `a.id - b.id` — the CITY ID.
+    cities of one list that starts in CITY ID order, so the first copy breaks
+    a tie by the id.
 
-    The GPU ranked on the SLOT, which is a storage address the compaction
-    reorders, so the two engines handed a tied luxury to different cities the
-    moment a seat's slot order stopped matching its id order. The scene below
-    is that exact shape: two equally needy cities whose ids run OPPOSITE to
-    their slots.
+    A slot is a storage address the compaction reorders, so a list started
+    from the slot hands a tied luxury to a different city the moment a seat's
+    slot order stops matching its id order. The scene below is that exact
+    shape: two equally needy cities whose ids run OPPOSITE to their slots.
     """
     sim = fresh(rules, path)
     row, ca, cb = 1, 0, 1
@@ -95,11 +95,33 @@ def poke_tie_is_the_id(rules, path) -> None:
     print("  tie-break OK — the luxury ranking ties on the CITY ID, not the slot")
 
 
+def poke_list_persists(rules, path) -> None:
+    """CIV6 (`luxuryAmenities`, fitted on runs/h1_duelw1103 t110 seat 1): the
+    cities stand in ONE list, re-sorted stably before every copy, so a tie
+    keeps the order the previous copy left. Needs 4,4,4,2,1 under four
+    four-city copies end 4,4,4,2,2 — a fresh id order per copy would end
+    4,4,4,3,1."""
+    sim = fresh(rules, path)
+    row = 1
+    assert sim.RC >= 5 and sim.civ_gp_lux.shape[2] >= 4
+    for c in range(5):
+        sim.city_alive[0, row, c] = True
+        sim.city_id[0, row, c] = c + 1
+    sim.civ_gp_lux_n[0, row] = 4
+    sim.civ_gp_lux[0, row, :4] = 4
+    have = torch.zeros(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
+    need = torch.zeros(sim.B, sim.RC, dtype=torch.float64, device=sim.device)
+    need[0, :5] = torch.tensor([4.0, 4.0, 4.0, 2.0, 1.0], dtype=torch.float64)
+    got = [int(v) for v in sim._luxury_amenities(row, have, need)[0, :5]]
+    assert got == [4, 4, 4, 2, 2], f"the list did not persist across copies: {got}"
+
+
 def main() -> int:
     rules = load_rules()
     paths = fixture_paths()
     b, row, foe = 0, 0, 1
     poke_tie_is_the_id(rules, paths[0])
+    poke_list_persists(rules, paths[0])
 
     sim = fresh(rules, paths[0])
     assert sim.S >= 2, "the checks below need two minors"

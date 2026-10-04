@@ -9515,9 +9515,7 @@ class SimSeats:
 
     def _wonder_regional_amenities(self, row: int) -> torch.Tensor | None:
         """[B, cols] f64 — wonderRegionalAmenities: a regional wonder's
-        amenities at every city centre it reaches. Joins the TIER balance
-        only; the luxury ranking's baseHave is buildings + regional BUILDINGS
-        (city.ts luxuryAmenities)."""
+        amenities at every city centre it reaches."""
         hits = self._wonder_regional_hits(row)
         if hits is None:
             return None
@@ -10190,14 +10188,12 @@ class SimSeats:
         """THE amenity body, for every seat row — computeCityStats' amenity
         half, in f64.
 
-        baseHave = local (non-regional, unpillaged) building amenities + the
-        capital PALACE + regional BUILDING amenities; the need is
-        ceil(pop / CITY_POP_PER_AMENITY); luxuryAmenities ranks on
-        THAT and grants +1 to its luxAmenityCities neediest cities. The terms
-        city.ts leaves OUT of the ranking then join the TIER balance only:
-        government/policy amenitiesAll + newDeal, regional WONDER amenities,
-        follower Zen Meditation and pantheon River Goddess. War weariness is
-        subtracted last.
+        Every non-luxury amenity the city has — buildings, districts, the
+        Palace, regional buildings, National Parks, Great People, policies,
+        governors, wonders, improvements, beliefs — net of war weariness and
+        bankruptcy, is the base `_luxury_amenities` ranks on; the need is
+        ceil(pop / CITY_POP_PER_AMENITY); the balance is base + luxuries -
+        need.
 
         Returns (tier_idx, growth_f, yield_f, lux_add), each [B, cols]; the
         factors are f64 and a caller running self.dtype casts them. The seat
@@ -10265,28 +10261,18 @@ class SimSeats:
         if bool((selb & (self._b_pow_am > 0).reshape(1, 1, -1)).any()):
             _powam = torch.einsum("bjn,n->bj", selb.to(torch.float64), self._b_pow_am)
             have = have + _powam * self.city_powered[:, row, :cols].double()
-        # PALACE amenity on the capital — baseHave sums city.buildings, which
-        # hold the founding PALACE, so it joins BEFORE the luxury ranking.
-        # CITY_CENTER never pillages.
+        # PALACE amenity on the capital (`localAmenities` sums city.buildings,
+        # which hold the founding PALACE). CITY_CENTER never pillages.
         have = have + self._palace_amenities * (self._palace_at(row, slice(0, cols)) & alive).double()
-        # regional BUILDING amenities (Zoo/Stadium) join baseHave BEFORE the
-        # luxury ranking — the city.ts luxuryAmenities mirror.
+        # regional BUILDING amenities (Zoo/Stadium)
         _regional = self._seat_regional(row)
         if _regional is not None:
             have = have + _regional[1]
-        # NATIONAL PARK amenities join baseHave BEFORE the luxury ranking,
-        # exactly where `parkAmenities` sits in city.ts.
+        # NATIONAL PARK amenities (`parkAmenities`)
         have = have + self._park_amenities(row)
-        # THE RANKING BASE — everything `luxuryAmenities` ranks on, and the one
-        # split point both engines share. Kept for the amenity log alone.
-        _amen_base = have
         # CIV6 (CITY_POP_PER_AMENITY): one Amenity per this many citizens,
         # rounded up
         need = torch.ceil(self.city_pop[:, row, :cols].double() / self.rules.amenity_pop_per)
-        lux_add = self._luxury_amenities(row, have, need)
-        # A spent Great Person's permanent amenity joins AFTER the ranking, at
-        # `computeCityStats`' own position: `luxuryAmenities` ranks on the
-        # narrow baseHave (local + parks + regional) and nothing else.
         have = have + self._gp_city_perm(row, "amenities").double()
         # CIV6 (Great Turkish Bombard): "+1 Amenity" in a city not founded here
         have = have + self._not_founded_sum(row, 0)[:, :cols]
@@ -10311,9 +10297,8 @@ class SimSeats:
             _gsl = self.military_at.gather(1, _gc.clamp(min=0))
             _gar = (_gc >= 0) & (_gsl >= 0) & (self.unit_seat.gather(1, _gsl.clamp(min=0)) == row)
             have = have + _gar.double() * _ga.double().unsqueeze(1)
-        # WONDER amenities (Colosseum's regional reach, Alhambra's and Great
-        # Bath's local ones, Temple of Artemis' per-improvement count) join the
-        # TIER balance after the grant — city.ts leaves them out of baseHave.
+        # WONDER amenities: Colosseum's regional reach, Alhambra's and Great
+        # Bath's local ones, Temple of Artemis' per-improvement count.
         if self.n_governors and row < self.n_majors:
             have = have + self._governor_house_amen(row)[1][:, :cols]
         _wregam = self._wonder_regional_amenities(row)
@@ -10335,12 +10320,19 @@ class SimSeats:
                 _spec = self._district_counts(row)[1].double()
                 _z = torch.where(_spec >= zmin, zamt, torch.zeros_like(_spec))
                 extra = _z if extra is None else extra + _z
-        balance = have + lux_add - need if extra is None else have + lux_add + extra - need
+        if extra is not None:
+            have = have + extra
         _wwv = self._ww_losses(row).double()
-        balance = balance - _wwv
+        have = have - _wwv
         # CIV6 (GOLD_NEGATIVE_BALANCE_AMENITY_LOSS_LINE): every city of a seat
         # whose treasury has fallen to the line loses amenities to bankruptcy
-        balance = balance - self._bankrupt_amenities(row).unsqueeze(1)
+        have = have - self._bankrupt_amenities(row).unsqueeze(1)
+        # THE RANKING BASE — every non-luxury amenity, net of war weariness and
+        # bankruptcy: what `luxuryAmenities` ranks on, and the one split point
+        # both engines share. Kept for the amenity log.
+        _amen_base = have
+        lux_add = self._luxury_amenities(row, have, need)
+        balance = have + lux_add - need
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):
