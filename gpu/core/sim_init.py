@@ -456,6 +456,9 @@ class SimInit:
         self._suz_buy_bldg = torch.tensor(
             [list(x) + [-1] * (_pbw - len(x)) for x in _pb], dtype=torch.long, device=device)
         self._suz_bonus_amen = int(_suz["bonusAmenities"])
+        # Auckland: (yield, amount, terrain, own-era floor) plot rows
+        self._suz_c_shallow_prod = _sfx.index("shallowWaterProd") if "shallowWaterProd" in _sfx else -1
+        self._suz_shallow_rows = [(int(r[0]), float(r[1]), int(r[2]), int(r[3])) for r in _suz["shallowWaterRows"]]
         rr = rules.seats
         n_gp = len(rr["gpClassDistrict"]) or 5
 
@@ -2853,6 +2856,7 @@ class SimInit:
         self._campus_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "CAMPUS"), -1)
         self._commhub_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "COMMERCIAL_HUB"), -1)
         self._entcomplex_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "ENTERTAINMENT_COMPLEX"), -1)
+        self._waterpark_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "WATER_PARK"), -1)
         self._iz_idx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "INDUSTRIAL_ZONE"), -1)
         self._aerodrome_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "AERODROME"), -1)
         self._spaceport_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "SPACEPORT"), -1)

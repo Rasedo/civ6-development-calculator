@@ -49,6 +49,8 @@ export type AdjacencySource =
   | 'COMMERCIAL_HUB'
   | 'ENTERTAINMENT_COMPLEX'
   | 'HOLY_SITE_DISTRICT'
+  // CIV6 (Expansion2_Districts.xml WaterPark_Culture): per adjacent Water Park.
+  | 'WATER_PARK'
   // CIV6 (Hansa): "+1 Production for each adjacent Resource" — ANY resource
   // the owner sees, land or water, which no base row asks for.
   | 'RESOURCE'
@@ -394,6 +396,7 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
         { source: 'GOV_PLAZA', amount: 1 },
         { source: 'ENTERTAINMENT_COMPLEX', amount: 2 },
         { source: 'PAMUKKALE', amount: 2 },
+        { source: 'WATER_PARK', amount: 2 },
       ],
     }],
     plunder: { kind: 'culture', amount: 25 },
@@ -404,12 +407,15 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
     countsTowardLimit: true,
     adjacencyYield: 'culture',
     // GS Civilopedia: +2 Culture from EACH adjacent wonder tile (a major
-    // bonus, not a standard one), +1 per two adjacent districts.
+    // bonus, not a standard one), +1 per two adjacent districts; +2 from an
+    // adjacent Entertainment Complex or Water Park (Expansion2_Districts.xml).
     adjacency: [
       { source: 'BUILT_WONDER', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
       { source: 'PAMUKKALE', amount: 2 },
+      { source: 'ENTERTAINMENT_COMPLEX', amount: 2 },
+      { source: 'WATER_PARK', amount: 2 },
     ],
     housing: 0,
     maintenance: 1,
@@ -437,6 +443,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.2.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Culture', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Culture', 'TilesRequired')] },
       'adjacency.3.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
       'adjacency.3.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'YieldChange'),
+      'adjacency.4.source': xml('Adjacency_YieldChanges', 'ID=EntertainmentComplex_Culture', 'AdjacentDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
+      'adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=EntertainmentComplex_Culture', 'YieldChange'),
+      'adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=WaterPark_Culture', 'AdjacentDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
+      'adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=WaterPark_Culture', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_ACROPOLIS', 'Entertainment'),
@@ -452,6 +462,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'civVariants.0.adjacency.4.amount': xml('Adjacency_YieldChanges', 'ID=EntertainmentComplex_Culture', 'YieldChange'),
       'civVariants.0.adjacency.5.source': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'AdjacentFeature', { expect: 'FEATURE_PAMUKKALE' }),
       'civVariants.0.adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=Pamukkale_Culture', 'YieldChange'),
+      'civVariants.0.adjacency.6.source': xml('Adjacency_YieldChanges', 'ID=WaterPark_Culture', 'AdjacentDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
+      'civVariants.0.adjacency.6.amount': xml('Adjacency_YieldChanges', 'ID=WaterPark_Culture', 'YieldChange'),
     },
   }),
   COMMERCIAL_HUB: D({

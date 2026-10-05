@@ -125,17 +125,17 @@ describe("Nan Madol's water-adjacent districts", () => {
 });
 
 describe("Amsterdam's destination luxuries and Hunza's road", () => {
-  it('counts DISTINCT luxuries on the destination city tiles', () => {
+  it('counts every luxury plot of the destination city, copies included', () => {
     const { state } = scene();
     const other = settleAt(state, tileAtCoords(state.map, 15, 15).index, 0);
     const owned = state.map.tiles.filter((t) => t.ownerCity === other.id && t.ownerSeat === 0);
     expect(owned.length).toBeGreaterThanOrEqual(3);
     owned[0].resource = 'WINE';
     owned[1].resource = 'SILK';
-    owned[2].resource = 'WINE'; // a second copy is not a second head
-    expect(routeDestLuxuryGold(state, 0, other)).toBe(0); // no suzerain yet
+    owned[2].resource = 'WINE'; // a second copy is a second plot
+    expect(routeDestLuxuryGold(state, 0, other.seat, other.id, other.centerIndex)).toBe(0); // no suzerain yet
     suzerainOf(state, 'routeLuxuryGold');
-    expect(routeDestLuxuryGold(state, 0, other)).toBe(2 * AMSTERDAM_DEST_LUXURY_GOLD);
+    expect(routeDestLuxuryGold(state, 0, other.seat, other.id, other.centerIndex)).toBe(3 * AMSTERDAM_DEST_LUXURY_GOLD);
   });
 
   it('pays a fifth of a gold per plot of the path, in fixed point', () => {

@@ -321,6 +321,8 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile, owner: number, hi
       return neighbor.district === 'COMMERCIAL_HUB' && liveDistrict(neighbor);
     case 'ENTERTAINMENT_COMPLEX':
       return neighbor.district === 'ENTERTAINMENT_COMPLEX' && liveDistrict(neighbor);
+    case 'WATER_PARK':
+      return neighbor.district === 'WATER_PARK' && liveDistrict(neighbor);
     case 'HOLY_SITE_DISTRICT':
       return neighbor.district === 'HOLY_SITE' && liveDistrict(neighbor);
     // AdjacentResource (Hansa): any resource the owner sees, land or water

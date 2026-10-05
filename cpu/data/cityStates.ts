@@ -8,6 +8,7 @@
 
 import type { CityStateType, DistrictId, QueueItem, YieldKey } from '../core/types';
 import type { PromoClass } from './promotions';
+import type { PlotYieldRow } from './civilizations';
 import { type Src, type SrcMap, srcConst, xml } from './provenance';
 import { GAME_SPEED, speedTurns, speedTurnsSrc } from './constants';
 
@@ -64,7 +65,8 @@ export type SuzEffect =
   | 'routeLengthGold'    // Hunza
   | 'projectProduction'  // Hong Kong
   | 'landPurchaseDiscount' // Ngazargamu
-  | 'bonusAmenities';    // Buenos Aires
+  | 'bonusAmenities'     // Buenos Aires
+  | 'shallowWaterProd';  // Auckland
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -77,7 +79,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'routePostGold',
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
-  'bonusAmenities',
+  'bonusAmenities', 'shallowWaterProd',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -142,9 +144,22 @@ export const NAN_MADOL_WATER_CULTURE = 2;
 /** CIV6 (Leaders.xml, MINOR_CIV_AMSTERDAM_LUXURY_TRADE_ROUTE_BONUS):
  *  `MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_PER_DESTINATION_LUXURY_FOR
  *  _INTERNATIONAL` YIELD_GOLD Amount 1 — per DISTINCT luxury resource standing
- *  on the destination city's own tiles. (Antioch carries the same text in
- *  Expansion1.) */
+ *  on the destination city's own tiles. Expansion1_Leaders.xml's
+ *  MINOR_CIV_ANTIOCH_LUXURY_TRADE_ROUTE_BONUS is the same modifier type,
+ *  yield and Amount, so an Antioch suzerain holds the same rule; each
+ *  suzerainty attaches its own modifier, and two pay twice. */
 export const AMSTERDAM_DEST_LUXURY_GOLD = 1;
+
+/** CIV6 (DLC/VikingsLandmarks/Data/VikingsLandmarks_CityStates.xml,
+ *  MINOR_CIV_AUCKLAND_SHALLOW_WATER_PRODUCTION_BONUS_{BASE,INDUSTRIAL}): two
+ *  `MODIFIER_PLAYER_ADJUST_PLOT_YIELD` YIELD_PRODUCTION Amount 1 rows on every
+ *  plot of the suzerain whose terrain is TERRAIN_COAST (PLOT_HAS_SHALLOW_WATER;
+ *  this engine's LAKE is the install's COAST too), the second under
+ *  REQUIREMENT_PLAYER_ERA_AT_LEAST ERA_INDUSTRIAL. */
+export const AUCKLAND_PLOT_ROWS: readonly PlotYieldRow[] = (['COAST', 'LAKE'] as const).flatMap((terrain) => [
+  { yield: 'production' as const, amount: 1, terrain },
+  { yield: 'production' as const, amount: 1, terrain, playerEraAtLeast: 'Industrial' as const },
+]);
 
 /** CIV6 (Leaders.xml, MINOR_CIV_ZANZIBAR_{CINNAMON,CLOVES}_RESOURCE_BONUS):
  *  two `MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT` rows, Amount 1 each, for
@@ -217,12 +232,14 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
   Caguana: { name: 'Caguana', type: 'cultural', bonus: 'Your Builders can build Batey improvements.', suz: 'suzImprovement' },
   Amsterdam: { name: 'Amsterdam', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', suz: 'routeLuxuryGold' },
+  Antioch: { name: 'Antioch', type: 'trade', bonus: 'Your Trade Routes to foreign cities earn +1 Gold for each Luxury resource at the destination.', suz: 'routeLuxuryGold' },
   Zanzibar: { name: 'Zanzibar', type: 'trade', bonus: 'Receive the Cinnamon and Cloves Luxury resources. These cannot be earned any other way in the game, and provide 6 Amenities each.', suz: 'spiceLuxuries' },
   Jakarta: { name: 'Jakarta', type: 'trade', bonus: 'Your Trading Posts in foreign cities provide +1 Gold to your Trade Routes passing through or going to the city.', suz: 'routePostGold' },
   Hunza: { name: 'Hunza', type: 'trade', bonus: 'Receive +1 Gold for every 5 tiles a Trade Route travels.', suz: 'routeLengthGold' },
   'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', suz: 'projectProduction' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', suz: 'bonusAmenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
+  Auckland: { name: 'Auckland', type: 'industrial', bonus: 'Shallow water tiles you own provide +1 Production. Additional +1 when you reach the Industrial era.', suz: 'shallowWaterProd' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
   Akkad: { name: 'Akkad', type: 'militaristic', bonus: "Melee and anti-cavalry units' attacks do full damage to the city's walls.", suz: 'wallsFullDamage' },
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
@@ -247,8 +264,8 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Objec
 export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
   scientific: ['Geneva', 'Bologna', 'Anshan'],
   cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
-  trade: ['Amsterdam', 'Zanzibar', 'Jakarta', 'Hunza'],
-  industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff'],
+  trade: ['Amsterdam', 'Zanzibar', 'Jakarta', 'Hunza', 'Antioch'],
+  industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff', 'Auckland'],
   militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };

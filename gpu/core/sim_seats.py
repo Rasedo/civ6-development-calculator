@@ -5482,6 +5482,39 @@ class SimSeats:
                 codes[code] = base | (e3 & base.unsqueeze(1)).any(dim=2)
         return codes[code]
 
+    def _suz_effect_count(self, row: int, code: int) -> torch.Tensor:
+        """[B] long — `suzerainEffectCount`: how many live minors whose perk is
+        `code` row `row` holds, itself or through an economic ally at level 3
+        (each minor counted once)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if code < 0 or self.S == 0 or row >= self.n_majors:
+            return out
+        NMh = self.n_majors
+        hold = self.citystate_suz_code[:, :self.S] == code
+        blocked = self._congress_suz_bonus_blocked()
+        live = (self._suzerain_masks_all()[:, :, : self.S] & ~blocked.unsqueeze(1)
+                & hold.unsqueeze(1))                                   # [B, NM, S]
+        e3 = ((self.seat_alliance_type[:, row, :NMh] == 2)
+              & (self.seat_ally_turns[:, row, :NMh] > 0)
+              & (self.seat_alliance_pts[:, row, :NMh] >= self._al_l3_qp))   # [B, NM]
+        e3[:, row] = True
+        return (live & e3.unsqueeze(2)).any(dim=1).sum(dim=1)
+
+    def _cs_lux_plots(self) -> torch.Tensor:
+        """[B, S] long — `routeDestLuxuryGold`'s count on a minor: its luxury
+        plots within 3 rings of its centre, a copy counting again."""
+        B, S = self.B, self.S
+        if S == 0:
+            return torch.zeros(B, 1, dtype=torch.long, device=self.device)
+        s = self.tile_seat - 100
+        own = (self.lux_id >= 0) & (s >= 0) & (s < S)
+        sc = s.clamp(0, S - 1)
+        ctr = self.citystate_center[:, :S].gather(1, sc).clamp(min=0)            # [B, T]
+        near = self.pair_dist[ctr, torch.arange(self.T, device=self.device).expand_as(ctr)] <= 3
+        out = torch.zeros(B, S, dtype=torch.long, device=self.device)
+        out.scatter_add_(1, sc, (own & near).long())
+        return out
+
     def _suz_effect(self, row: int, code: int) -> torch.Tensor:
         """[B] — does seat row `row` hold a suzerain whose perk is `code`?
         Only a major holds one; a minor's or the Free row's city reads none."""
@@ -5489,24 +5522,21 @@ class SimSeats:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         return self._suz_effect_rows(code)[:, row]
 
-    def _city_lux_distinct(self) -> torch.Tensor:
-        """[B, n_majors, RC] long — DISTINCT luxury resources standing on each
-        city's own tiles, the count Amsterdam's suzerain pays a route per head.
-        Ownership is the gate, not an improvement: the modifier reads the
-        resource AT the destination."""
-        B, NM, RC, NL = self.B, self.n_majors, self.RC, self._n_lux
-        dump = NM * RC * NL
-        seen = torch.zeros(B, dump + 1, dtype=torch.bool, device=self.device)
-        if NL == 0:
-            return torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
+    def _city_lux_plots(self) -> torch.Tensor:
+        """[B, n_majors, RC] long — `routeDestLuxuryGold`'s count: each city's
+        own luxury plots within 3 rings of its centre, a copy counting again
+        (City_Resources 0x1f71b0). Ownership is the gate, not an improvement."""
+        B, NM, RC = self.B, self.n_majors, self.RC
+        out = torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
         has = self.lux_id >= 0
+        tix = torch.arange(self.T, device=self.device)
         for r in range(NM):
             sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
-            ok = has & (sl >= 0)
-            idx = (r * RC + sl.clamp(min=0)) * NL + self.lux_id.clamp(min=0)
-            idx = torch.where(ok, idx, torch.full_like(idx, dump))
-            seen.scatter_(1, idx, torch.ones_like(idx, dtype=torch.bool))
-        return seen[:, :dump].reshape(B, NM, RC, NL).sum(dim=3)
+            slc = sl.clamp(min=0)
+            ctr = self.city_center[:, r, :RC].gather(1, slc).clamp(min=0)    # [B, T]
+            near = self.pair_dist[ctr, tix.expand_as(ctr)] <= 3
+            out[:, r].scatter_add_(1, slc, (has & (sl >= 0) & near).long())
+        return out
 
     def _route_length_gold(self, crs: torch.Tensor) -> torch.Tensor:
         """`routeLengthGold`'s magnitude, [..., K] long — floor(n x a + a / 2)
@@ -8289,7 +8319,8 @@ class SimSeats:
         mutation sites. All consumers read-only."""
         # ...and the row's TECHS: a revealed resource starts paying its yield
         # (`_res_hidden`); the plane's version counter is the stamp
-        key = (row, self._eff_version, self._bel_stamp(), simbase.write_stamp(self.civ_techs))
+        key = (row, self._eff_version, self._bel_stamp(), simbase.write_stamp(self.civ_techs),
+               simbase.write_stamp(self.civ_civics))
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -8373,10 +8404,31 @@ class SimSeats:
         this seat holds (`plotYieldRowsFor` + the plot clause in `tileYields`):
         its civilization's or leader's, gated on the civic it holds and the
         WORLD era, paid where the plot's terrain/hills/mountain/feature/
-        improvement clauses match. The consumer masks impassable ground the
-        way `tileYields` leaves it."""
-        if not self._plot_rows_any:
+        improvement clauses match; and an Auckland suzerain's rows on its
+        terrain, the second under the row's OWN era (`civEraIndex`). The
+        consumer masks impassable ground the way `tileYields` leaves it."""
+        auck = None
+        if self._suz_c_shallow_prod >= 0 and row < self.n_majors:
+            auck = self._suz_effect(row, self._suz_c_shallow_prod)
+            if not bool(auck.count_nonzero()):
+                auck = None
+        if not self._plot_rows_any and auck is None:
             return None
+        B, T, dev = self.B, self.T, self.device
+        if auck is not None:
+            out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
+            own_era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+            for yk, amt, tr, er in self._suz_shallow_rows:
+                who = auck if er < 0 else auck & (own_era >= er)
+                out[:, :, yk] += (who.unsqueeze(1) & (self.terrain == tr)).to(self.dtype) * amt
+            if not self._plot_rows_any:
+                return out
+            base = self._plot_rows_plane(row)
+            return out if base is None else out + base
+        return self._plot_rows_plane(row)
+
+    def _plot_rows_plane(self, row: int) -> torch.Tensor | None:
+        """[B, T, 6] — the roster's own plot rows of `_plot_yield_plane`."""
         B, T, dev = self.B, self.T, self.device
         civ, lead = self.row_civ[:, row], self.row_leader[:, row]
         imp_live = (self.improvement >= 0) & ~self.pillaged
@@ -8412,13 +8464,14 @@ class SimSeats:
             out[:, :, yk] += m.to(self.dtype) * self._py_amt[k]
         return out
 
-    def _mountain_yield_plane(self, row: int) -> torch.Tensor | None:
+    def _mountain_yield_plane(self, row: int, plot_rows_only: bool = False) -> torch.Tensor | None:
         """[B, T, 6] — what a MOUNTAIN pays this row. CIV6 (Mit'a): a mountain
         yields nothing to anyone but the roster rows that NAME it — the plot
         rows keyed `mountain`, and the Food a Terrace Farm beside it pays
         (EFFECT_ADJUST_TERRAIN_YIELD_FROM_ADJACENT_IMPROVEMENTS). It rides its
         own plane because the tile-add mask refuses impassable ground, which is
-        exactly where TS's mountain arm sits."""
+        exactly where TS's mountain arm sits. `plot_rows_only` leaves the
+        Terrace Farm term out."""
         B, T, dev = self.B, self.T, self.device
         civ, lead = self.row_civ[:, row], self.row_leader[:, row]
         era = self._world_era()
@@ -8445,6 +8498,8 @@ class SimSeats:
             if out is None:
                 out = torch.zeros(B, T, 6, dtype=self.dtype, device=dev)
             out[:, :, yk] += m.to(self.dtype) * self._py_amt[k]
+        if plot_rows_only:
+            return out
         for _tc, _tl, _ti, _ty, _ta in self._live_rows(row, self._terrain_adj_yield_rows):
             _tw = self._row_is(row, _tc, _tl)
             if not bool(_tw.count_nonzero()):
@@ -8942,6 +8997,14 @@ class SimSeats:
             pg_c = self._route_post_gold(row, self.citystate_center[:, :S].gather(1, css))
             if bool((pg_c > 0).count_nonzero()):
                 _rk_add(2, pg_c.double() * pays_c.double())
+            # CIV6 (Amsterdam, Antioch): a city-state's city is a foreign city
+            # too — its own tiles' distinct luxuries, per suzerainty
+            if self._suz_c_dest_lux >= 0:
+                _vc = self._suz_effect_count(row, self._suz_c_dest_lux)
+                if bool(_vc.count_nonzero()):
+                    _lux_c = self._cs_lux_plots()[:, :S].gather(1, css)
+                    _rk_add(2, _lux_c.double() * self._suz_dest_lux_gold
+                            * _vc.double().unsqueeze(1) * pays_c.double())
         # INTERNATIONAL legs: a route to ANY OTHER MAJOR's city
         # (seat_route_dcity >= 0) pays District_TradeRouteYields' INTERNATIONAL
         # column over the dest's completed districts plus the centre row.
@@ -9021,12 +9084,12 @@ class SimSeats:
                 _nm = self.n_majors
                 _dom = self.civ_dominant[:, row].gather(1, dr.clamp(max=_nm - 1)) & (dr < _nm)
                 gold_i = gold_i + self._route_dom_gold * _dom.double()
-            # CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the
-            # destination" of an international route.
+            # CIV6 (Amsterdam, Antioch): "+1 Gold for each Luxury resource at
+            # the destination" of an international route, per suzerainty.
             if self._suz_c_dest_lux >= 0:
-                _ven = self._suz_effect(row, self._suz_c_dest_lux)
+                _ven = self._suz_effect_count(row, self._suz_c_dest_lux)
                 if bool(_ven.count_nonzero()):
-                    _lux_d = self._city_lux_distinct().gather(1, _rx).gather(2, _col).squeeze(2)
+                    _lux_d = self._city_lux_plots().gather(1, _rx).gather(2, _col).squeeze(2)
                     gold_i = gold_i + (_lux_d.double() * self._suz_dest_lux_gold
                                        * _ven.double().unsqueeze(1))
             # CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
@@ -11213,6 +11276,14 @@ class SimSeats:
                 (self.improvement == self.SEASIDE).to(self.dtype) * live_imp
             )
         featP = self._seat_tile_add(row)
+        # a candidate is unowned: the roster's plot rows (COLLECTION_PLAYER_
+        # PLOT_YIELDS) pay only the seat's own plots, so the score drops them
+        py = self._plot_yield_plane(row)
+        if py is not None:
+            featP = featP - py * self._tile_add_live()
+        mpy = self._mountain_yield_plane(row, plot_rows_only=True)
+        if mpy is not None:
+            featP = featP - mpy * (~self.nwonder).unsqueeze(2).to(self.dtype)
         f_plane = f_plane + featP[:, :, 0]
         p_plane = p_plane + featP[:, :, 1]
         y_oth = y_oth + featP[:, :, 2:].sum(dim=2)

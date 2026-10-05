@@ -4537,7 +4537,7 @@ class SimEconomy:
         _dmap = {"AQUEDUCT": self._aqueduct_idx, "DAM": self._dam_didx,
                  "CANAL": self._canal_didx, "GOV_PLAZA": self._govplaza_didx,
                  "COMMERCIAL_HUB": self._commhub_idx, "HOLY_SITE_DISTRICT": self._hs_idx,
-                 "ENTERTAINMENT_COMPLEX": self._entcomplex_idx}
+                 "ENTERTAINMENT_COMPLEX": self._entcomplex_idx, "WATER_PARK": self._waterpark_idx}
         if name in _dmap:
             _idx = _dmap[name]
             if _idx < 0:

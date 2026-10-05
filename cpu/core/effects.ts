@@ -25,7 +25,7 @@ import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { FORMATION_COST_MULT, UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
-import { NAN_MADOL_WATER_CULTURE } from '../data/cityStates';
+import { NAN_MADOL_WATER_CULTURE, AUCKLAND_PLOT_ROWS } from '../data/cityStates';
 import { IMPROVEMENTS } from '../data/improvements';
 
 import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
@@ -478,20 +478,28 @@ export interface Modifiers {
 }
 
 /** The plot rows a seat holds now — `PLOT_YIELD_ROWS` narrowed to its
- *  civilization or leader, the civic it holds and the world era. */
+ *  civilization or leader, the civic it holds and the world era, and an
+ *  Auckland suzerain's `AUCKLAND_PLOT_ROWS` under the seat's OWN era. */
 export function plotYieldRowsFor(state: GameState, seat: number, civ: string | null, leader: string | null): readonly PlotYieldRow[] {
   if (civ === null && leader === null) return [];
-  const civics = seatOf(state, seat)?.research.civics ?? [];
+  const research = seatOf(state, seat)?.research;
+  const civics = research?.civics ?? [];
   let era = -2;
-  return PLOT_YIELD_ROWS.filter((r) => {
-    if (r.civ !== undefined ? r.civ !== civ : r.leader !== leader) return false;
+  const live = (r: PlotYieldRow): boolean => {
     if (r.civic !== undefined && !civics.includes(r.civic)) return false;
     if (r.eraAtLeast !== undefined) {
       if (era === -2) era = worldEraIndex(state);
       if (era < ERAS.indexOf(r.eraAtLeast)) return false;
     }
+    if (r.playerEraAtLeast !== undefined
+        && civEraIndex(research?.techs ?? [], civics) < ERAS.indexOf(r.playerEraAtLeast)) return false;
     return true;
-  });
+  };
+  const rows = PLOT_YIELD_ROWS.filter((r) => (r.civ !== undefined ? r.civ === civ : r.leader === leader) && live(r));
+  if (state.cityStates?.length && suzerainEffect(state, seat, 'shallowWaterProd')) {
+    for (const r of AUCKLAND_PLOT_ROWS) if (live(r)) rows.push(r);
+  }
+  return rows;
 }
 
 /**

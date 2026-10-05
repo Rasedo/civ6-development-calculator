@@ -21,7 +21,7 @@ import { TRADE_COURSE_MAX, scaleByGameSpeed } from '../data/constants';
 import { civEraIndex } from './city';
 import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
-import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect } from './cityStates';
+import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect, suzerainEffectCount } from './cityStates';
 import { cityImprovedResourceKinds, completedDistrictCount } from './yields';
 import { CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
@@ -102,18 +102,27 @@ export function routeLengthGold(state: GameState, seat: number, r: TradeRoute): 
   return Math.floor((n * HUNZA_PATH_TILE_GOLD_FX + (HUNZA_PATH_TILE_GOLD_FX >> 1)) / 256);
 }
 
-/** CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the destination" of an
- *  international route — DISTINCT luxuries standing on the destination city's
- *  own tiles. */
-export function routeDestLuxuryGold(state: GameState, seat: number, dest: City): number {
-  if (!suzerainEffect(state, seat, 'routeLuxuryGold')) return 0;
-  const seen = new Set<string>();
-  for (const t of state.map.tiles) {
-    if (t.ownerSeat !== dest.seat || t.ownerCity !== dest.id || !t.resource) continue;
-    if (RESOURCES[t.resource]?.category === 'luxury') seen.add(t.resource);
+/** CIV6 (Amsterdam, Antioch): "+1 Gold for each Luxury resource at the
+ *  destination" of a route to a foreign city, a city-state's included, once
+ *  per such suzerainty. Trade_Manager 0x54c6c0 multiplies the origin city's
+ *  amount by City_Resources 0x1f71b0 on the DESTINATION: every luxury PLOT
+ *  (a second copy counts again) within 3 rings of its centre that the city
+ *  owns. `destCity` null is a city-state's one city: every tile its seat
+ *  owns. A luxury has no reveal tech, so the count's visibility test passes. */
+export function routeDestLuxuryGold(state: GameState, seat: number, destSeat: number, destCity: number | null,
+  centre: number): number {
+  const n = suzerainEffectCount(state, seat, 'routeLuxuryGold');
+  if (!n) return 0;
+  const c = state.map.tiles[centre];
+  let lux = 0;
+  for (const t of tilesWithin(state.map, c.col, c.row, DEST_LUXURY_RINGS)) {
+    if (t.ownerSeat !== destSeat || (destCity !== null && t.ownerCity !== destCity) || !t.resource) continue;
+    if (RESOURCES[t.resource]?.category === 'luxury') lux += 1;
   }
-  return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
+  return AMSTERDAM_DEST_LUXURY_GOLD * n * lux;
 }
+/** the rings City_Resources 0x1f71b0 walks: 1 + 6 + 12 plots and 18 more */
+const DEST_LUXURY_RINGS = 3;
 
 /** The Gold of the Trading Posts a route's course passes through, and for
  *  Rome its own post at the destination — the modifiers that name them; the
@@ -835,6 +844,8 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       out.gold += emergencyCsRouteGold(state, seat);
       out.gold += routePostGold(state, seat, cityState.centerIndex);
       out.gold += routeLengthGold(state, seat, route);
+      // CIV6 (Amsterdam): a city-state's city is a foreign city too
+      out.gold += routeDestLuxuryGold(state, seat, cityState.seat, null, cityState.centerIndex);
       // CIV6 (Ibn Fadlan, MODIFIER_PLAYER_ADJUST_TRADE_ROUTES_CITY_STATE_YIELD)
       out.faith += gpPermOf(gpOwner, 'csRouteFaith');
       // CIV6 (Raj): the same modifier on a policy card
@@ -891,7 +902,7 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       // (Trade_Manager 0x54c6c0)
       if (gpOwner?.culturallyDominant?.[route.toSeat]) out.gold += TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE;
       // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
-      out.gold += routeDestLuxuryGold(state, seat, civCity);
+      out.gold += routeDestLuxuryGold(state, seat, civCity.seat, civCity.id, civCity.centerIndex);
       // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This
       // city provides +2 Gold to foreign Trade Routes" — the destination's
       out.gold += gpCityPermOf(civCity, 'foreignRouteGold');

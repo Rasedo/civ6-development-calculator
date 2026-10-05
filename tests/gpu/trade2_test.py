@@ -663,7 +663,9 @@ def main() -> None:
     s14.seat_route_course[0, 1, 0, :3] = _crs14
     assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "one foreign crossing pays 3"
     s14.seat_route_course[0, 1, 0, 2] = -1
-    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a course ENDING at the city does not pass through it"
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 3.0, "a course ENDING at the city passes through it"
+    s14.seat_route_course[0, 1, 0, :2] = torch.tensor([ctr, _nb14[0]])
+    assert float(s14._governor_pass_route_gold(0)[0, 0]) == 0.0, "a course STARTING at the city does not"
     s14.seat_route_course[0, 1, 0, :3] = _crs14
     s14.seat_routes[0, 0, 0, 0] = int(s14.city_id[0, 0, 0])
     s14.seat_routes[0, 0, 0, 1] = int(s14.city_id[0, 0, 0])

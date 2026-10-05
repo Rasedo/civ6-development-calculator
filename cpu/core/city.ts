@@ -823,9 +823,14 @@ export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: Yiel
 }
 
 /** The plots culture growth would claim next: every candidate at the lowest
- *  `borderPlotCost`, in tile-index order. The game draws one of them. */
+ *  `borderPlotCost`, in tile-index order. The game draws one of them. A
+ *  candidate is unowned, and the roster's plot rows
+ *  (MODIFIER_PLAYER_ADJUST_PLOT_YIELD, COLLECTION_PLAYER_PLOT_YIELDS) pay
+ *  only the seat's OWN plots, so the cost reads none of them
+ *  (runs/h1_duelw1109 t137-149: Guangzhou's pick skips Auckland's coast). */
 export function borderBestPlots(state: GameState, city: City, ctx?: YieldCtx): number[] {
-  const yctx = ctx ?? makeYieldCtx(state, city.seat);
+  const own = ctx ?? makeYieldCtx(state, city.seat);
+  const yctx: YieldCtx = { ...own, mods: { ...own.mods, plotYields: [] } };
   const hidden = hiddenResourcesFor(state, city.seat);
   const camps = campTiles(state);
   let best = Infinity;
@@ -1586,15 +1591,17 @@ export function computeCityStats(
     if (n) bonuses[k] += n * liveSpecialtyCount(state, city);
   }
   // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade
-  // Route passing through the city" — a foreign route whose stored course
-  // crosses this centre short of both its ends.
+  // Route passing through the city" — another seat's route, a city-state's
+  // included, whose stored course reaches this centre past its origin: a
+  // route ENDING here passes through too (runs/h1_duelw1109: Reyna's
+  // Shenyang t120-130 and Beijing t136+ each +3 from one minor's route in).
   const perPass = governorSum(state, city, (e) => e.passRouteGold);
   if (perPass) {
     let n = 0;
-    for (const sx of state.seats) {
+    for (const sx of [...state.seats, ...(state.cityStates ?? [])]) {
       if (sx.seat === city.seat) continue;
       for (const r of sx.tradeRoutes ?? []) {
-        if ((r.course ?? []).slice(1, -1).includes(city.centerIndex)) n += 1;
+        if ((r.course ?? []).slice(1).includes(city.centerIndex)) n += 1;
       }
     }
     bonuses.gold += perPass * n;

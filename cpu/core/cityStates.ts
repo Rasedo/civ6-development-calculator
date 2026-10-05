@@ -295,6 +295,20 @@ export function suzerainEffect(state: GameState, seat: number, effect: SuzEffect
   return false;
 }
 
+/** How many city-states whose perk is the RULE `effect` `seat` holds (itself
+ *  or through an ally, `suzerainShareSeats`) — for a perk two city-states
+ *  carry, each suzerainty attaching its own modifier. */
+export function suzerainEffectCount(state: GameState, seat: number, effect: SuzEffect): number {
+  const hit = new Set<number>();
+  for (const holder of suzerainShareSeats(state, seat)) {
+    for (const cityState of state.cityStates ?? []) {
+      if (CITY_STATE_SUZERAIN_BONUS[cityState.name]?.suz !== effect) continue;
+      if (isSuzerain(state, cityState, holder) && !suzerainBonusBlocked(state, cityState)) hit.add(cityState.id);
+    }
+  }
+  return hit.size;
+}
+
 /** CIV6 (Economic alliance 3): "Allies share the Suzerain bonus of all
  *  city-states of which they are Suzerain" - the seat, then those allies. */
 export function suzerainShareSeats(state: GameState, seat: number): number[] {

@@ -703,7 +703,8 @@ export const ENKIDU_ALLIED_WAR_DISCOUNT = srcConst('enkiduAlliedWarDiscount', 15
  * TraitModifiers, one row per modifier. `hills` is the XML's own split
  * (TERRAIN_TUNDRA is the flat tundra, TERRAIN_TUNDRA_HILLS the hills); a
  * `civic` row waits on the seat's civic, an `eraAtLeast` row on the WORLD
- * era (REQUIREMENT_GAME_ERA_ATLEAST_EXPANSION). Both engines pay these
+ * era (REQUIREMENT_GAME_ERA_ATLEAST_EXPANSION), a `playerEraAtLeast` row on
+ * the seat's own era (REQUIREMENT_PLAYER_ERA_AT_LEAST, `civEraIndex`). Both engines pay these
  * inside the tile walk, so an impassable plot (a mountain) pays nothing
  * until the seat can work it.
  */
@@ -720,6 +721,7 @@ export interface PlotYieldRow {
   civic?: string;
   mountain?: boolean;
   eraAtLeast?: Era;
+  playerEraAtLeast?: Era;
 }
 
 export const PLOT_YIELD_ROWS: readonly PlotYieldRow[] = withSrc([
