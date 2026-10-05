@@ -216,7 +216,8 @@ def test_happy_rows(rules, path) -> None:
         reached.append((pop, lux, t_base))
         scot, t_scot = sci_and_tier("SCOTLAND", pop, lux)
         assert t_base == t_scot, "the roster row moved the TIER itself"
-        want = 1.05 if t_base == happy else 1.1 if t_base == ecstatic else 1.0
+        # the row's percent SUMS with the tier's own (Happy +10%, Ecstatic +20%)
+        want = 1.15 / 1.1 if t_base == happy else 1.3 / 1.2 if t_base == ecstatic else 1.0
         assert abs(scot - base * want) < 1e-9, f"tier {t_base} paid {scot / base if base else 0}"
     tiers_seen = {t for _, _, t in reached}
     assert {happy, ecstatic} <= tiers_seen, \

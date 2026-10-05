@@ -15,7 +15,7 @@ import { seatBuildingSum } from '../../../cpu/core/city';
 import { scoreLines } from '../../../cpu/core/score';
 import { SCORING_LINE_ITEMS } from '../../../cpu/data/scoring';
 import { BUILDINGS } from '../../../cpu/data/buildings';
-import { computeCityStats } from '../../../cpu/core/city';
+import { beliefSeatYields, computeCityStats } from '../../../cpu/core/city';
 import { tileYields } from '../../../cpu/core/yields';
 import { getModifiers, makeYieldCtx } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
@@ -47,7 +47,8 @@ describe('pantheons', () => {
     const before = computeCityStats(state, city);
     seatOf(state, 0)!.religion.pantheon = 'FERTILITY_RITES';
     const after = computeCityStats(state, city);
-    expect(after.effectiveFoodSurplus).toBeCloseTo(before.effectiveFoodSurplus * 1.1, 5);
+    // +10% in the game's 256ths: 25/256, truncated
+    expect(after.effectiveFoodSurplus).toBeCloseTo(before.effectiveFoodSurplus * (256 + 25) / 256, 5);
 
     // the price stands; the culture banked toward it grows
     seatOf(state, 0)!.religion.pantheon = 'RELIGIOUS_SETTLEMENTS';
@@ -221,9 +222,10 @@ describe('founding a religion', () => {
     standBuilding(state, city, 'GURDWARA');
     expect(city.buildings).toContain('GURDWARA');
     // Tithe (GS, TITHE_GOLD_CITY_MODIFIER): +3 gold per CITY following the
-    // religion — the Founder belief, added by the enhancement
+    // religion — the Founder belief, added by the enhancement; the player's
+    // income, in no city
     expect(adoptBeliefs(state, 0, [pick('TITHE'), pick('ITINERANT_PREACHERS')]).ok).toBe(true);
-    expect(computeCityStats(state, city).breakdown.bonuses.gold).toBeGreaterThanOrEqual(3);
+    expect(beliefSeatYields(state, 0, getModifiers(state, 0)).gold).toBeGreaterThanOrEqual(3);
   });
 
   it('the worship rows the install gives: the Gurdwara\'s housing, the Pagoda\'s favor, the Wat and the Synagogue', () => {

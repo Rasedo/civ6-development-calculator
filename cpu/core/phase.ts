@@ -27,7 +27,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, cityStateItemProduction, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
@@ -48,7 +48,7 @@ import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, seatBuildingSum, swapTileOk } from './city';
+import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -2685,6 +2685,11 @@ export function seatPhase(state: GameState): void {
     // (Merchant Confederation) per envoy placed — the player's, no city's.
     const foreignFollowers = (key: string, sum: number): number => {
       const sm = getModifiers(state, actor.seat);
+      // CIV6 (MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_BELIEF_YIELD: Tithe,
+      // Church Property, Lay Ministry, World Church, Pilgrimage): the
+      // player's income, in no city (runs/h1_duelw1108, Xi'an t232: China's
+      // capital reads none of Lay Ministry's 3 Culture and 2 Faith)
+      sum += beliefSeatYields(state, actor.seat, sm)[key as YieldKey];
       const foreignRows = sm.foreignFollowerYields;
       if (foreignRows.length) {
         const foreign = foreignFollowerCount(state, actor.seat);
@@ -3005,10 +3010,9 @@ export function seatPhase(state: GameState): void {
         _bpct += warBuffPct;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
-        // CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): a flat
-        // add toward the item, joining the city's Production before every
-        // percent above multiplies it
-        q.progress += (production + cityStateItemProduction(state, civCity, q.kind)) * _em;
+        // the city's Production holds its envoys' flat toward this item
+        // (`computeCityStats`)
+        q.progress += production * _em;
         // Pay in the bank right after the production add, so the field
         // written below is read back.
         if (civCity.productionBank) {

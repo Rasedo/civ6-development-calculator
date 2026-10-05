@@ -874,33 +874,32 @@ class SimEconomy:
         return out
 
     def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        """+1 fertility (capped) on land, non-mountain tiles. (row, tile)
+        """+1 fertility on land, non-mountain tiles. (row, tile)
         pairs must be unique — duplicates would collapse to a single +1."""
         ok = self.fertilizable[rows, tiles]
         r2, t2 = rows[ok], tiles[ok]
-        self.fertility[r2, t2] = (self.fertility[r2, t2] + 1).clamp(max=3)
+        self.fertility[r2, t2] += 1
 
     def _silt(self, plane: torch.Tensor, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        """`silt` — +1 of one silt channel (`plane`, capped) on the land,
+        """`silt` — +1 of one silt channel (`plane`) on the land,
         non-mountain (row, tile) pairs, while each game's climate still lays
         fertility down. Pairs must be unique."""
         ok = self.fertilizable[rows, tiles] & self._fertility_live()[rows]
         r2, t2 = rows[ok], tiles[ok]
         if r2.numel():
-            plane[r2, t2] = (plane[r2, t2] + 1).clamp(max=3)
+            plane[r2, t2] += 1
             self._eff_version += 1
 
     def _fertilize_counted(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
-        """Like _fertilize but duplicate (row, tile) pairs stack: min(3,
-        f + n) equals n sequential capped +1s, so a scatter-add then one
-        clamp reproduces the TS loop exactly."""
+        """Like _fertilize but duplicate (row, tile) pairs stack: a
+        scatter-add of n reproduces the TS loop's n sequential +1s."""
         ok = self.fertilizable[rows, tiles]
         gi = rows[ok] * self.T + tiles[ok]
         cnt = torch.zeros(self.B * self.T, dtype=torch.long, device=self.device)
         cnt.index_put_((gi,), torch.ones_like(gi), accumulate=True)
         touched = cnt > 0
         flat = self.fertility.reshape(-1)
-        flat[touched] = (flat[touched] + cnt[touched]).clamp(max=3)
+        flat[touched] += cnt[touched]
 
     def _scorch(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
         ok = ((self.improvement[rows, tiles] >= 0) & ~self.pillaged[rows, tiles]
@@ -1626,7 +1625,7 @@ class SimEconomy:
         self._lend_feature_adj(rows, tiles, 1.0)
         silt = self._fertility_live()[rows] & self.fertilizable[rows, tiles]
         r2, t2 = rows[silt], tiles[silt]
-        self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
+        self.fertility_prod[r2, t2] += 1
         self._eff_version += 1
 
     def _fire_turn(self) -> None:
@@ -2539,7 +2538,7 @@ class SimEconomy:
         if pr2.numel():
             ok = self.fertilizable[pr2, tc[pr2]]
             r2, t2 = pr2[ok], tc[pr2][ok]
-            self.fertility_prod[r2, t2] = (self.fertility_prod[r2, t2] + 1).clamp(max=3)
+            self.fertility_prod[r2, t2] += 1
 
     def _unit_damage_draws(self, fire: torch.Tensor, tile: torch.Tensor, naval: bool,
                            lo: torch.Tensor | int, hi: torch.Tensor | int) -> tuple[torch.Tensor, torch.Tensor]:
@@ -3680,9 +3679,10 @@ class SimEconomy:
             for _pi in range(self._npol):
                 if _card_on[_pi] and float(self._pol_byb[_pi, 0]) >= 0:
                     byb.append((cards[:, _pi], self._pol_byb[_pi]))
-            ymult = ymult * torch.where(
-                cards.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1),
-                torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
+            # 1 + the summed percents (`computeCityStats`)
+            ymult = ymult + torch.where(
+                cards.unsqueeze(2), self._pol_ymult.unsqueeze(0).expand(B, -1, -1) - 1,
+                torch.zeros(1, 1, 1, dtype=dt, device=dev)).sum(dim=1)
             if self._pol_fx_mag > 0:
                 for _k, _t in (("bcharge", self._pol_bcharge), ("mcut", self._pol_mcut),
                                ("vbarb", self._pol_vbarb), ("cdef", self._pol_cdef),
@@ -3749,9 +3749,9 @@ class SimEconomy:
                 fx["faithbuydisc"] = fx["faithbuydisc"] + sd @ self._pol_faithbuy
                 fx["domroute"] = fx["domroute"] + sd @ self._pol_dom_route
                 fx["impy"] = fx["impy"] + torch.einsum("bp,pik->bik", sd, self._pol_imp_y)
-                fx["govymul"] = fx["govymul"] * torch.where(
-                    cards.unsqueeze(2), self._pol_gov_ymult.unsqueeze(0).expand(B, -1, -1),
-                    torch.ones(1, 1, 1, dtype=dt, device=dev)).prod(dim=1)
+                fx["govymul"] = fx["govymul"] + torch.where(
+                    cards.unsqueeze(2), self._pol_gov_ymult.unsqueeze(0).expand(B, -1, -1) - 1,
+                    torch.zeros(1, 1, 1, dtype=dt, device=dev)).sum(dim=1)
                 fx["govpercit"] = fx["govpercit"] + sd @ self._pol_gov_percit
                 for _pi in range(self._npol):
                     if not _card_on[_pi]:
@@ -6373,15 +6373,14 @@ class SimEconomy:
         return (torch.where(self.appeal_over > -999, self.appeal_over, out),)
 
     def _farmadj_count(self) -> torch.Tensor:
-        """[B, T] long — on a live Farm, the Farms beside it (a pillaged one
-        counts); 0 elsewhere."""
+        """[B, T] long — on a live Farm, the live Farms beside it (a pillaged
+        one pays no adjacency); 0 elsewhere."""
         if self._fadjq_cache is not None and self._fadjq_cache[0] == self._eff_version:
             return self._fadjq_cache[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
-        farm_imp = self.improvement == self.FARM  # pillaged neighbors still count
-        adj = farm_imp[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
         live = (self.improvement == self.FARM) & ~self.pillaged
+        adj = live[:, nbc] & (nb >= 0).unsqueeze(0)  # [B, T, 6]
         out = torch.where(live, adj.sum(dim=2), torch.zeros_like(live, dtype=torch.long))
         self._fadjq_cache = (self._eff_version, out)
         return out
@@ -6493,6 +6492,46 @@ class SimEconomy:
         handed to whichever city compaction moves into the slot."""
         return self.city_worked[:, row]
 
+    def _belief_seat_yields(self, row: int) -> torch.Tensor:
+        """[B, 6] f64 — `beliefSeatYields`: the beliefs' yields the PLAYER
+        takes, in no city (CIV6, MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_BELIEF_YIELD):
+        perF (per N followers of the founder religion worldwide, fractional:
+        `religionFollowers`) + perC (per city following it, worldwide:
+        `citiesFollowing`), then (Lay Ministry, Sacred Places) per completed
+        district of a type and per city holding a completed World Wonder, over
+        the row's own cities."""
+        B, dev, F64 = self.B, self.device, torch.float64
+        out = torch.zeros(B, 6, dtype=F64, device=dev)
+        if not self._seat_has_beliefs(row):
+            return out
+        cols = self.RC
+        perF = self._bel_add("perF", row)  # [B, 7] = N, then the 6 yields
+        perC = self._bel_add("perC", row)  # [B, 6]
+        _liv = self.city_alive[:, row, :cols]
+        _zero = torch.zeros(B, dtype=F64, device=dev)
+        _frel = (self._founder_religion(row)
+                 if bool((perF[:, 0] > 0).count_nonzero()) or bool(perC.count_nonzero()) else None)
+        _fol = (self._religion_followers(_frel).double()
+                if _frel is not None and bool((perF[:, 0] > 0).count_nonzero()) else _zero)
+        _times = torch.where(perF[:, 0] > 0, _fol / perF[:, 0].clamp(min=1), _zero)
+        _nfol = (self._cities_following(_frel).double()
+                 if _frel is not None and bool(perC.count_nonzero()) else _zero)
+        out = out + perF[:, 1:] * _times.unsqueeze(1) + perC * _nfol.unsqueeze(1)
+        perD = self._bel_add("perD", row)  # [B, nD, 6]
+        perW = self._bel_add("perW", row)  # [B, 6]
+        if bool(perD.count_nonzero()):
+            _dreg = self.city_dist_tile[:, row, :cols]
+            _dcomp = (_dreg >= 0) & self.district_complete.gather(
+                1, _dreg.clamp(min=0).reshape(B, -1)).reshape_as(_dreg) & _liv.unsqueeze(2)
+            _dn = _dcomp.sum(dim=1).double()   # [B, nD]
+            out = out + (perD[:, :_dn.shape[1]] * _dn.unsqueeze(2)).sum(dim=1)
+        if bool(perW.count_nonzero()):
+            _cw = self._completed_wonders(row)
+            if _cw is not None:
+                _wc = (_cw.any(dim=2) & _liv).sum(dim=1).double()
+                out = out + perW * _wc.unsqueeze(1)
+        return out
+
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
                         pick: list | None = None, maint: torch.Tensor | None = None,
                         amen_tier: torch.Tensor | None = None) -> torch.Tensor:
@@ -6503,10 +6542,10 @@ class SimEconomy:
         single column.
 
         TS fills SIX buckets and sums them in ONE order — tiles, districts,
-        buildings, citizens, bonuses, trade — then scales: the amenity tier on
-        the five non-food columns, then m.yieldMult, then each wonder's
-        cityYieldMult, then `total.gold -= maintenance`. That order is LOAD
-        BEARING. CITIZEN_CULTURE is 0.3, the one non-dyadic term in the whole
+        buildings, citizens, bonuses, trade — then scales once by 1 + every
+        percent summed (the amenity tier on the five non-food columns,
+        m.yieldMult, each wonder's cityYieldMult), then `total.gold -=
+        maintenance`. That order is LOAD BEARING. CITIZEN_CULTURE is 0.3, the one non-dyadic term in the whole
         walk, so every add on the culture column is position-sensitive to a ulp
         and a ulp of culture flips a border-growth ceil. Everything else is
         integer- or dyadic-valued, which f64 sums exactly at any association —
@@ -7081,7 +7120,7 @@ class SimEconomy:
         bld_y[:, :, 4] = bld_y[:, :, 4] + _gwc[:, sl] * alivef
         _pb = self._golden_ded(row, self._ded_pen_brush)
         if bool(_pb.count_nonzero()):
-            bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._district_counts(row)[1][:, sl].double() * alivef
+            bld_y[:, :, 4] = bld_y[:, :, 4] + _pb.double().unsqueeze(1) * self._live_specialty_counts(row)[:, sl].double() * alivef
         bld_y[:, :, 5] = bld_y[:, :, 5] + _gwf[:, sl] * alivef
         # CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."
         _ml = bldg[:, :, rd.b_maxloy_culture]
@@ -7132,38 +7171,6 @@ class SimEconomy:
             for _e in self._cs_env_bars:
                 _cnt = torch.einsum("bs,bst->bt", ((_env >= _e) & _ylad).double(), self._cs_type_onehot)
                 b_cap = b_cap.index_add(1, self._cs_type_yidx, _cnt * self._cs_env_ycap[_e])
-        if has_bel:
-            # Founder capital incomes — perF (per N followers of the founder
-            # religion worldwide, fractional: `religionFollowers`) + perC (per
-            # city following it, worldwide: `citiesFollowing`).
-            perF = self._bel_add("perF", row)  # [B, 7] = N, then the 6 yields
-            perC = self._bel_add("perC", row)  # [B, 6]
-            _liv = self.city_alive[:, row, :cols]
-            _zero = torch.zeros(B, dtype=F64, device=dev)
-            _frel = (self._founder_religion(row)
-                     if bool((perF[:, 0] > 0).count_nonzero()) or bool(perC.count_nonzero()) else None)
-            _fol = (self._religion_followers(_frel).double()
-                    if _frel is not None and bool((perF[:, 0] > 0).count_nonzero()) else _zero)
-            _times = torch.where(perF[:, 0] > 0, _fol / perF[:, 0].clamp(min=1), _zero)
-            _nfol = (self._cities_following(_frel).double()
-                     if _frel is not None and bool(perC.count_nonzero()) else _zero)
-            b_cap = b_cap + perF[:, 1:] * _times.unsqueeze(1) + perC * _nfol.unsqueeze(1)
-            # CIV6 (Lay Ministry, Sacred Places): per completed district of a
-            # type and per city holding a completed World Wonder, over the
-            # row's own cities — `beliefCapitalYields`
-            perD = self._bel_add("perD", row)  # [B, nD, 6]
-            perW = self._bel_add("perW", row)  # [B, 6]
-            if bool(perD.count_nonzero()):
-                _dreg = self.city_dist_tile[:, row, :cols]
-                _dcomp = (_dreg >= 0) & self.district_complete.gather(
-                    1, _dreg.clamp(min=0).reshape(B, -1)).reshape_as(_dreg) & _liv.unsqueeze(2)
-                _dn = _dcomp.sum(dim=1).double()   # [B, nD]
-                b_cap = b_cap + (perD[:, :_dn.shape[1]] * _dn.unsqueeze(2)).sum(dim=1)
-            if bool(perW.count_nonzero()):
-                _cw = self._completed_wonders(row)
-                if _cw is not None:
-                    _wc = (_cw.any(dim=2) & _liv).sum(dim=1).double()
-                    b_cap = b_cap + perW * _wc.unsqueeze(1)
         bon = b_city.unsqueeze(1) * alivef.unsqueeze(2) + b_cap.unsqueeze(1) * is_cap.unsqueeze(2)
         # CIV6 (Autocracy): "+1 to all yields for each Government Plaza
         # building, Diplomatic Quarter building, and palace in a city."
@@ -7182,7 +7189,7 @@ class SimEconomy:
         # governed city) and the faith per SPECIALTY district.
         if self.n_governors and row < self.n_majors:
             _gpc = self._gov_mods(row)[12]["govpercit"]
-            _spec = self._district_counts(row)[1]
+            _spec = self._live_specialty_counts(row)
             _gb = self._governor_bonus(row, self.city_pop[:, row, :cols], _spec, _gpc)[:, sl] \
                 * alivef.unsqueeze(2)
             bon = bon + _gb
@@ -7190,8 +7197,19 @@ class SimEconomy:
         # Culture per Specialty District"
         _ysp = self._gov_mods(row)[12]["yspec"]
         if bool(_ysp.count_nonzero()):
-            _spc = self._district_counts(row)[1][:, sl].double()
+            _spc = self._live_specialty_counts(row)[:, sl].double()
             bon = bon + _ysp.double().unsqueeze(1) * _spc.unsqueeze(2) * alivef.unsqueeze(2)
+
+        # CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): the
+        # flat toward the item at the head of each city's queue is its
+        # Production as the game reads it (City:GetYield), under its percents
+        if (self.S > 0 and row < self.n_majors
+                and bool((self.citystate_alive & self._citystate_item_type).count_nonzero())):
+            bon = bon.clone()
+            for _c in range(n):
+                _col = torch.full((B,), _c if j is None else j, dtype=torch.long, device=dev)
+                _cur = self._q_unit_of(self.city_current[self._bidx, row, _col, 0])
+                bon[:, _c, 1] = bon[:, _c, 1] + self._cs_item_prod(row, _col, _cur) * alivef[:, _c]
 
         trade = zeros6
         _rt = self._seat_route_income(row)
@@ -7201,11 +7219,15 @@ class SimEconomy:
         total = tiles_y + dist_y + bld_y + citz + bon + trade
         # a full-width plane read on a one-column walk broadcasts silently
         assert total.shape[1] == n, f"city walk widened to {total.shape[1]} columns, expected {n}"
-        total[:, :, 1:] = total[:, :, 1:] * amen_yf.unsqueeze(2)
+        # CIV6 (GameAttribute::Value 0xaa740): ONE modifier per city yield,
+        # value = base + base x modifier / 100 — every percent below SUMS into
+        # `pct` (a fraction), applied once at the end (`computeCityStats`)
+        pct = torch.zeros_like(total)
+        pct[:, :, 1:] = pct[:, :, 1:] + (amen_yf.double() - 1.0).unsqueeze(2)
         # CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
-        # (`HAPPY_YIELD_ROWS`) — a percentage over the same total, on the
-        # yields the row names, in cities at the row's own tier. The tier comes
-        # from `_seat_amenity`, the one body that decides it.
+        # (`HAPPY_YIELD_ROWS`) — a percentage on the yields the row names, in
+        # cities at the row's own tier. The tier comes from `_seat_amenity`,
+        # the one body that decides it.
         _hrows = self._live_rows(row, self._happy_yield_rows)
         if _hrows:
             _tier = amen_tier if amen_tier is not None else self._seat_amenity(row)[0]
@@ -7215,10 +7237,10 @@ class SimEconomy:
                 if _hy == 0:
                     continue  # food takes no tier factor on either engine
                 _at = (_tier == _ht) & self._row_is(row, _hc, _hl).unsqueeze(1)
-                total[:, :, _hy] = torch.where(_at, total[:, :, _hy] * (1.0 + _hp / 100.0), total[:, :, _hy])
+                pct[:, :, _hy] = pct[:, :, _hy] + _at.double() * (_hp / 100.0)
         # CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB):
         # the seat's percent on every non-Food yield at the Happy / Ecstatic
-        # tier, after the roster's rows as TS composes each yield
+        # tier
         _khh = self._gp_perm(row, "happyYieldPct").double()
         _khe = self._gp_perm(row, "ecstaticYieldPct").double()
         if bool(_khh.count_nonzero()) or bool(_khe.count_nonzero()):
@@ -7229,7 +7251,7 @@ class SimEconomy:
                               torch.where(_ktier == self._gp_ecstatic_tier, _khe.unsqueeze(1),
                                           torch.zeros_like(_khh).unsqueeze(1)))
             for _ky in range(1, 6):
-                total[:, :, _ky] = torch.where(_kp != 0, total[:, :, _ky] * (1.0 + _kp / 100.0), total[:, :, _ky])
+                pct[:, :, _ky] = pct[:, :, _ky] + _kp / 100.0
         # CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for
         # a city with an ESTABLISHED governor, tripled in one this seat did not
         # found
@@ -7239,7 +7261,7 @@ class SimEconomy:
             _own = self.city_founder[:, row, sl] == row
             for _gc, _gl, _gy, _gp, _gf in _grows:
                 _hit = _est & (_own == bool(_gf)) & self._row_is(row, _gc, _gl).unsqueeze(1)
-                total[:, :, _gy] = torch.where(_hit, total[:, :, _gy] * (1.0 + _gp / 100.0), total[:, :, _gy])
+                pct[:, :, _gy] = pct[:, :, _gy] + _hit.double() * (_gp / 100.0)
         # CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
         # "+3% ... for each Promotion they have earned, including their first"
         _trows = self._live_rows(row, self._governor_title_yield_rows)
@@ -7247,8 +7269,7 @@ class SimEconomy:
             _tit = self._governor_titles(row)[:, sl]
             for _tc, _tl, _ty, _tp in _trows:
                 _tw = self._row_is(row, _tc, _tl).unsqueeze(1) & (_tit > 0)
-                _f = 1.0 + (_tit.double() * _tp) / 100.0
-                total[:, :, _ty] = torch.where(_tw, total[:, :, _ty] * _f, total[:, :, _ty])
+                pct[:, :, _ty] = pct[:, :, _ty] + _tw.double() * (_tit.double() * _tp) / 100.0
         # CIV6 (Righteousness of the Faith): the worship building this row
         # holds adds to the city's Science, Faith and Culture
         _wrows = self._live_rows(row, self._worship_rows)
@@ -7257,51 +7278,45 @@ class SimEconomy:
             for _wc, _wl, _wcp, _wyp in _wrows:
                 _ww = _hasw & self._row_is(row, _wc, _wl).unsqueeze(1)
                 for _wy in (3, 4, 5):  # science, culture, faith
-                    total[:, :, _wy] = torch.where(_ww, total[:, :, _wy] * (1.0 + _wyp / 100.0), total[:, :, _wy])
+                    pct[:, :, _wy] = pct[:, :, _wy] + _ww.double() * (_wyp / 100.0)
         # CIV6 (Geneva): "+15% Science" in every city while at peace with every
         # civilization — a percent on `m.yieldMult`.
         _gsci = self._suz_science_pct(row)
         if bool((_gsci > 0).count_nonzero()):
             gym = gym.clone()
-            gym[:, 3] = gym[:, 3] * (1 + _gsci.to(gym.dtype) / 100.0)
-        gymc = gym.double().unsqueeze(1)
-        # The governor's own multipliers are part of `m.yieldMult` on TS —
-        # ONE number scales the total, so they fold in before it lands.
+            gym[:, 3] = gym[:, 3] + _gsci.to(gym.dtype) / 100.0
+        gymc = gym.double().unsqueeze(1) - 1.0
+        # The governor's own percents are part of `m.yieldMult` on TS.
         if self.n_governors and row < self.n_majors:
             _gy = self._gov_mods(row)[12]["govymul"]
-            gymc = gymc * self._governor_ymult(row, _gy)[:, sl]
-        total = total * gymc
+            gymc = gymc + (self._governor_ymult(row, _gy)[:, sl] - 1.0)
+        pct = pct + gymc
         # CIV6 (Monasticism): "+75% Science in cities with a Holy Site";
         # (Robber Barons): "+50% Gold in cities with a Stock Exchange. +25%
-        # Production in cities with a Factory." Each names one city FACT and
-        # multiplies AFTER m.yieldMult, one card at a time.
+        # Production in cities with a Factory." Each names one city FACT.
         _fxm = self._gov_mods(row)[12]
         for _on, _di, _yi, _m in _fxm["distym"]:
             _has = self._dist_counts(row)[:, sl, _di] > 0
-            total[:, :, _yi] = total[:, :, _yi] * torch.where(
-                _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
+            pct[:, :, _yi] = pct[:, :, _yi] + (_on.unsqueeze(1) & _has).double() * (_m - 1.0)
         for _on, _bi, _yi, _m in _fxm["bldgym"]:
             _has = self.city_bldg[:, row, sl, _bi]
-            total[:, :, _yi] = total[:, :, _yi] * torch.where(
-                _on.unsqueeze(1) & _has, torch.full_like(alivef, _m), torch.ones_like(alivef))
+            pct[:, :, _yi] = pct[:, :, _yi] + (_on.unsqueeze(1) & _has).double() * (_m - 1.0)
         _seatw = self._completed_wonders(row)
         if _seatw is not None and bool(_seatw.count_nonzero()):
             # Each wonder's cityYieldMult (Ruhr production, Big Ben gold) where
-            # it stands in this city, then its empireYieldMult (Amundsen-Scott)
-            # wherever the seat holds it, LAST of the three scalings, as an
-            # EXPLICIT ascending wonder-index sequence of multiplications of the
-            # total — the order `seatWonders` sorts its list into and TS's
-            # `total[k] *=` walk, so two multipliers on the SAME channel round
-            # the same way on both engines.
+            # it stands in this city, and its empireYieldMult (Amundsen-Scott)
+            # wherever the seat holds it, in ascending wonder index — the order
+            # `seatWonders` sorts its list into and TS's `pct[k] +=` walk.
             _held = _seatw.any(dim=1)  # [B, nW]
-            ones6 = torch.ones(1, 1, 6, dtype=F64, device=dev)
+            zeros6 = torch.zeros(1, 1, 6, dtype=F64, device=dev)
             _held_any = _held.any(dim=0).tolist()
             for wi in range(_seatw.shape[2]):
                 if not _held_any[wi]:
                     continue
                 if compw is not None:
-                    total = total * torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6), ones6)
-                total = total * torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6), ones6)
+                    pct = pct + torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
+                pct = pct + torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
+        total = total * (1.0 + pct)
         # total.gold -= cityMaintenance. `maint` is the housing body's first
         # half handed in by a caller that needs its second half too (the
         # city-stats snapshot): the body reads nothing the walk writes, so
@@ -7365,25 +7380,25 @@ class SimEconomy:
         head = housing - pop
         hf = torch.where(head >= 2, torch.ones_like(head),
                          torch.where(head >= 1, torch.full_like(head, 0.5), torch.full_like(head, 0.25)))
-        eff = surplus * hf * growth_f
-        # `empireGrowthMult`: the Migration Treaty factor FIRST, the wonder
-        # products after, ONE number multiplied in — the TS association.
-        em = self._congress_growth(row)
-        hg = self._wonder_growth_mult(self._completed_wonders(row))
+        # ONE growth modifier, every percent on it summed (`computeCityStats`)
+        # in the game's 256ths, each truncated (`growth256`): the tier's, then
+        # `empireGrowth256` (the Migration Treaty's, then each wonder's), then
+        # `m.growthMult` (the beliefs', then the governor's — CIV6, Surplus
+        # Logistics: "+20% Growth in the city"); the product with the housing
+        # factor floored, never below none
+        def g256(f: torch.Tensor) -> torch.Tensor:
+            return torch.trunc((f - 1.0) * 256.0)
+        em = g256(self._congress_growth(row))
+        hg = self._wonder_growth256(self._completed_wonders(row))
         if hg is not None:
-            em = em * hg
-        eff = eff * em.unsqueeze(1)
-        # `m.growthMult`: the belief factor and the governor's own
-        # (CIV6, Surplus Logistics: "+20% Growth in the city") are ONE number
-        # on TS, so they fold together before the single multiply.
-        gmul = None
+            em = em + hg
+        gm = torch.ones_like(surplus)
         if self._seat_has_beliefs(row):
-            gmul = self._bel_mul("growth", row).unsqueeze(1)
+            gm = gm + (self._bel_sum1("growth", row) - 1.0).unsqueeze(1)
         if self.n_governors and row < self.n_majors:
-            gg = self._governor_mult(row, "growthMult")
-            gmul = gg if gmul is None else gmul * gg
-        if gmul is not None:
-            eff = eff * gmul
+            gm = gm + self._governor_sum_less1(row, "growthMult")
+        m256 = (256.0 + g256(growth_f) + em.unsqueeze(1) + g256(gm)).clamp(min=0.0)
+        eff = surplus * torch.floor(hf * m256) / 256.0
         eff = torch.where(surplus > 0, eff, surplus)
         need = self._growth_needed(pop)
         return total, eff, need, tier_idx, worked[0]

@@ -680,10 +680,11 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       'yields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_LIGHTHOUSE&YieldType=YIELD_GOLD', 'YieldChange', { absent: true }),
     },
   },
-  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'],
+  { id: 'SHIPYARD', name: 'Shipyard', district: 'HARBOR', cost: 290, requiresAny: ['LIGHTHOUSE'], yields: { food: 1 }, special: 'SHIPYARD', maintenance: 1, trainXpPct: 25, trainXpClasses: ['NAVAL_MELEE', 'NAVAL_RANGED', 'NAVAL_RAIDER'],
     coastPlotYields: { yields: { production: 1 }, unimproved: true },
     src: {
       'coastPlotYields.yields.production': xml('ModifierArguments', 'ModifierId=SHIPYARD_UNIMPROVED_COAST_PRODUCTION&Name=Amount', 'Value'),
+      'yields.food': xml('Building_YieldChanges', 'BuildingType=BUILDING_SHIPYARD&YieldType=YIELD_FOOD', 'YieldChange'),
       cost: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'PrereqDistrict', { expect: 'DISTRICT_HARBOR' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_SHIPYARD', 'Maintenance'),

@@ -9,6 +9,7 @@ import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSu
 import { seatGovernment, slottedPolicyIndices } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS } from '../data/policies';
+import { growthFoodNeeded } from '../data/constants';
 import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
 import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
@@ -114,9 +115,16 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number, tu
     logPopWrite(turn, city, 'gr');
     city.foodBox -= growthNeeded;
   } else if (city.foodBox < 0) {
-    city.population = Math.max(1, city.population - 1);
+    // CIV6: a starving city loses a citizen and its box stands at the new
+    // size's threshold plus the turn's (negative) surplus (the six duels'
+    // records, 43 of 43 starvations: runs/h1_duelw1108 Taiyuan t220, pop 7
+    // -> 6 on -2 Food, the box 0.86 -> 31 = 33 - 2); a one-citizen city keeps
+    // its citizen and an empty box
+    if (city.population > 1) {
+      city.population -= 1;
+      city.foodBox = growthFoodNeeded(city.population) + surplus;
+    } else city.foodBox = 0;
     logPopWrite(turn, city, 'sv');
-    city.foodBox = 0;
   }
 }
 

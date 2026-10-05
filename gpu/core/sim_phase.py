@@ -837,11 +837,18 @@ class SimPhase:
         box = old + eff
         grow = act & (box >= need)
         starve = act & ~grow & (box < 0)
-        nxt = torch.where(grow, box - need, torch.where(starve, torch.zeros_like(box), box))
+        # `seatGrowth`: a starving city loses a citizen and its box stands at
+        # the new size's threshold plus the turn's (negative) surplus; a
+        # one-citizen city keeps its citizen and an empty box
+        pop0 = self.city_pop[bidx, row, col]
+        shrink = starve & (pop0 > 1)
+        refill = self._growth_needed((pop0 - 1).clamp(min=1)) + eff
+        nxt = torch.where(grow, box - need,
+                          torch.where(shrink, refill, torch.where(starve, torch.zeros_like(box), box)))
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
         self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
-        pop = self.city_pop[bidx, row, col] + grow.long()
-        self.city_pop[bidx, row, col] = torch.where(starve, (pop - 1).clamp(min=1), pop)
+        pop = pop0 + grow.long()
+        self.city_pop[bidx, row, col] = torch.where(shrink, pop - 1, pop)
         if self._log_diff:
             for _t, _m in (("gr", grow), ("sv", starve)):
                 _w = _m.nonzero(as_tuple=True)[0]
@@ -936,10 +943,6 @@ class SimPhase:
                 _m2w = (_m2 & (_anyw[:, row].unsqueeze(1) | _anyw[:, : self.n_majors])).any(dim=1)
         pre["m2w"] = _m2w
         pre["warbuf"] = self._war_buff_prod_pct(row) if self._war_buff_rows else None
-        # whether any live Industrial / Militaristic city-state can pay this
-        # seat production toward items (only a major sends envoys)
-        pre["csi"] = (self.S > 0 and row < self.n_majors
-                      and bool((self.citystate_alive & self._citystate_item_type).count_nonzero()))
         return pre
 
     def _cs_item_prod(self, row: int, col: torch.Tensor, cur: torch.Tensor) -> torch.Tensor:
@@ -1317,11 +1320,8 @@ class SimPhase:
                 for _spc, _hit in _seen.values():
                     _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
         _emall = _emall * (1 + _add)
-        # CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): a flat
-        # add toward the item, joining the city's Production before every
-        # percent above multiplies it
-        if pre["csi"]:
-            prod = prod + self._cs_item_prod(row, col, cur).to(prod.dtype)
+        # the city's Production holds its envoys' flat toward this item (the
+        # walk's bonuses, `computeCityStats`)
         prod = prod * _emall
         # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
         # phase.ts spends the bank right after the production add.
@@ -2099,6 +2099,8 @@ class SimPhase:
             return s
 
         def foreign_followers(k: int, s: torch.Tensor) -> torch.Tensor:
+            # the beliefs' player yields (`beliefSeatYields`), in no city
+            s = s + self._belief_seat_yields(row)[:, k]
             # CIV6 (The Last Prophet): "+1 Science for each foreign city
             # following Arabia's Religion" (`FOREIGN_FOLLOWER_YIELD_ROWS`)
             for _fc, _fl, _fy, _fa, _fp in self._live_rows(row, self._foreign_follower_yield_rows):

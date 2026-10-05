@@ -36,8 +36,6 @@ import { STORM_EVENTS, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, windWeights, 
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
-export const FERTILITY_CAP = 3;
-
 function log(state: GameState, text: string): void {
   state.eventLog.push(text);
   if (state.eventLog.length > 20) state.eventLog.shift();
@@ -251,7 +249,7 @@ export function paintVolcanicSoil(t: Tile): void {
 function fertilize(state: GameState, tile: Tile): void {
   if (!fertilityLive(state)) return;
   if (!isWater(tile) && tile.elevation !== 'MOUNTAIN') {
-    tile.fertility = Math.min(FERTILITY_CAP, tile.fertility + 1);
+    tile.fertility += 1;
   }
 }
 
@@ -908,7 +906,7 @@ function fireTurn(state: GameState): void {
         t.feature = FIRE_START_FEATURE[burnt] as Tile['feature'];
         t.fireStart = undefined;
         if (fertilityLive(state) && !isWater(t) && t.elevation !== 'MOUNTAIN') {
-          t.fertilityProd = Math.min(FERTILITY_CAP, t.fertilityProd + 1);
+          t.fertilityProd += 1;
         }
       }
     } else {
@@ -998,11 +996,11 @@ function eruptionDamageP(kind: EruptionDamage, row: number): number {
   }
 }
 
-/** +1 of a silt channel on a land, non-mountain plot, capped — while the
- *  climate still lays fertility down. */
+/** +1 of a silt channel on a land, non-mountain plot, while the climate
+ *  still lays fertility down. */
 function silt(state: GameState, tile: Tile, key: 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'): void {
   if (!fertilityLive(state) || isWater(tile) || tile.elevation === 'MOUNTAIN') return;
-  tile[key] = Math.min(FERTILITY_CAP, (tile[key] ?? 0) + 1);
+  tile[key] = (tile[key] ?? 0) + 1;
 }
 
 /**
@@ -1352,6 +1350,6 @@ export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: b
   }
   if (rFood < k(ev.fertFood)) fertilize(state, tile);
   if (rProd < k(ev.fertProd) && fertilityLive(state) && !isWater(tile) && tile.elevation !== 'MOUNTAIN') {
-    tile.fertilityProd = Math.min(FERTILITY_CAP, tile.fertilityProd + 1);
+    tile.fertilityProd += 1;
   }
 }

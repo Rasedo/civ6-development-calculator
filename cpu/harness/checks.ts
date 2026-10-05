@@ -25,7 +25,7 @@
  * `gaps` lists the importer's roster gaps that touch the subject, so the
  * report can separate a clean failure from one an unimported row explains.
  */
-import type { City, CityState, GameState } from '../core/types';
+import type { City, CityState, GameState, Tile } from '../core/types';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
@@ -38,7 +38,8 @@ import { buildingCostIn } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
-import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf } from '../core/seats';
+import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
+import { governorFlag } from '../core/governors';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
@@ -450,8 +451,6 @@ export interface Actions {
   spreads: { owner: number; religion: number; plot: number }[];
   /** plots a city holds at t+1 and did not at t */
   plotsGained: Map<string, number[]>;
-  /** buildings or districts a city holds at t+1 and did not at t */
-  built: Map<string, number>;
   /** seats whose gold fell below what their income would leave */
   goldSpent: Map<number, number>;
   /** cities whose population moved across the pair while the food box ran
@@ -488,7 +487,6 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     }
   }
   const plotsGained = new Map<string, number[]>();
-  const built = new Map<string, number>();
   const governorChanged = new Set<string>();
   const popOutsideBox = new Set<string>();
   for (const [k, c1] of after) {
@@ -497,10 +495,10 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const had = new Set(c0.plots);
     const gained = c1.plots.filter((q) => !had.has(q));
     if (gained.length) plotsGained.set(k, gained);
-    const nb = c1.buildings.length - c0.buildings.length + c1.districts.length - c0.districts.length;
-    if (nb !== 0) built.set(k, nb);
     if (num(c0.governor) !== num(c1.governor)) governorChanged.add(k);
-    if (c1.pop !== c0.pop && num(c1.food) >= num(c0.food)) popOutsideBox.add(k);
+    // a starving city's refilled box is the growth step's own (`seatGrowth`)
+    const starved = c1.pop === c0.pop - 1 && num(c0.foodSurplus) < 0;
+    if (c1.pop !== c0.pop && num(c1.food) >= num(c0.food) && !starved) popOutsideBox.add(k);
   }
   const goldSpent = new Map<number, number>();
   for (const p1 of b.players) {
@@ -509,7 +507,7 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const expected = num(p0.gold) + num(p0.goldYield);
     if (num(p1.gold) < expected - 0.5) goldSpent.set(p1.id, expected - num(p1.gold));
   }
-  return { cityChanged, unitsNew, spreads, plotsGained, built, goldSpent, governorChanged, popOutsideBox,
+  return { cityChanged, unitsNew, spreads, plotsGained, goldSpent, governorChanged, popOutsideBox,
     notStarted: notStarted(a, b) };
 }
 
@@ -548,6 +546,76 @@ function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
   return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
 }
 
+/**
+ * The turn's production, landed: the buildings and districts the city stands
+ * with in record `b` — what it completed, bought or repaired across the pair
+ * — laid on the imported turn-t city, as the game's turn lands them before
+ * its cities grow and claim (runs/h1_duelw1108, Rome t17: the Granary it
+ * completed fed the food box 4 where the turn-t surplus read 3). Returns the
+ * switch between the turn-start city (`false`) and the landed one (`true`):
+ * the turn's loyalty change is the turn start's rate (tools/civ6lab/
+ * turn_order_civ6.md, "Loyalty's place"; runs/h1_duelw1103, Beijing t209:
+ * the Monument it completed paid none of its +1 that turn).
+ */
+function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCity, W: number): (landed: boolean) => void {
+  type Side = { buildings: string[]; pillaged: string[] | undefined; wonders: City['wonders']; districts: City['districts'];
+    tiles: [number, Tile['district'], boolean, boolean, boolean][] };
+  const touched = new Set<number>();
+  for (const d of next.districts) touched.add((d[2] as number) * W + (d[1] as number));
+  for (const t of state.map.tiles) if (t.builtWonder && t.ownerSeat === city.seat && t.ownerCity === city.id) touched.add(t.index);
+  const read = (): Side => ({ buildings: city.buildings, pillaged: city.pillagedBuildings, wonders: [...city.wonders],
+    districts: [...city.districts], tiles: [...touched].map((i) => {
+      const t = state.map.tiles[i];
+      return [i, t.district, t.districtComplete, t.districtPillaged ?? false, t.builtWonderComplete];
+    }) });
+  const write = (side: Side) => {
+    city.buildings = side.buildings;
+    city.pillagedBuildings = side.pillaged;
+    city.wonders = [...side.wonders];
+    city.districts = [...side.districts];
+    for (const [i, d, c, pl, wc] of side.tiles) {
+      const t = state.map.tiles[i];
+      t.district = d;
+      t.districtComplete = c;
+      t.districtPillaged = pl;
+      t.builtWonderComplete = wc;
+    }
+  };
+  const start = read();
+  const buildings: string[] = [];
+  const pillaged: string[] = [];
+  for (const [bi, pil] of next.buildings) {
+    const name = cat.buildings[bi];
+    if (cat.wonders.includes(name)) {
+      const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
+      if (!id || city.wonders.some((w) => w.id === id)) continue;
+      const t = state.map.tiles.find((x) => x.builtWonder === id && x.ownerSeat === city.seat && x.ownerCity === city.id);
+      if (!t) continue;
+      t.builtWonderComplete = true;
+      city.wonders.push({ id, tileIndex: t.index });
+      continue;
+    }
+    const id = engineRowOf(cat, 'building', bi);
+    if (!id) continue;
+    buildings.push(id);
+    if (pil) pillaged.push(id);
+  }
+  city.buildings = buildings;
+  city.pillagedBuildings = pillaged.length ? pillaged : undefined;
+  for (const d of next.districts) {
+    const [ti, dx, dy, complete, dpil] = d as [number, number, number, boolean, boolean];
+    const id = engineRowOf(cat, 'district', ti) as DistrictId | null;
+    if (!id || id === 'CITY_CENTER' || cat.districts[ti] === 'DISTRICT_WONDER') continue;
+    const t = state.map.tiles[dy * W + dx];
+    t.district = id;
+    t.districtComplete = complete === true;
+    t.districtPillaged = dpil === true;
+    if (!city.districts.some((x) => x.tileIndex === t.index)) city.districts.push({ type: id, tileIndex: t.index });
+  }
+  const landed = read();
+  return (side) => write(side ? landed : start);
+}
+
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
@@ -580,6 +648,24 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     perSeat.set(city.seat, list);
   }
   for (const [seat, list] of perSeat) {
+    // the loyalty step's stats, on the turn-start cities (`landProduction`)
+    const startStats = new Map(list.map(({ city }) => [city, computeCityStats(state, city)]));
+    const sides: ((landed: boolean) => void)[] = [];
+    // a Settler trained or bought beside the city across the pair: its
+    // citizen leaves with the turn's production, before the city grows
+    // (tools/civ6lab/turn_order_civ6.md, armS: pop 6 -> 5, then the pop-5
+    // surplus), unless the city's governor spares it (Provision)
+    const settled = new Set<City>();
+    for (const { city, dump: c } of list) {
+      const next = after.get(`${c.owner}:${c.id}`);
+      if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
+      sides.push(landProduction(state, cat, city, next, a.head.W));
+      if (acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
+        && tileDistance(state, u.plot, city.centerIndex) <= 1)) {
+        settled.add(city);
+        if (!governorFlag(state, city, (e) => e.settlerFreePop)) city.population = Math.max(1, city.population - 1);
+      }
+    }
     const lux = luxuryAmenities(state, seat);
     const mods = getModifiers(state, seat);
     const stats = new Map(list.map(({ city }) => [city, computeCityStats(state, city, lux, mods)]));
@@ -596,14 +682,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
 
       // growth
       const before = { pop: city.population, food: city.foodBox };
-      const settlerOut = acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
-        && tileDistance(state, u.plot, city.centerIndex) <= 1);
-      // the turn's production lands before the city grows and claims, and
-      // the step here reads the city as the record left it
-      const built = !!next && (next.buildings.length !== c.buildings.length || next.districts.length !== c.districts.length);
-      const outside = acts.popOutsideBox.has(k) ? 'a citizen came or went outside the food box' : null;
-      const growSkip = skipAll ?? (settlerOut ? 'a Settler left the city' : built ? 'the city completed a building or district'
-        : outside);
+      const outside = acts.popOutsideBox.has(k) && !settled.has(city) ? 'a citizen came or went outside the food box' : null;
+      const growSkip = skipAll ?? outside;
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
@@ -612,18 +692,24 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
           { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus), needed: st.growthNeeded,
             housing: st.housing, tier: st.amenities.tier.name });
       }
-      // border growth
+      // border growth, the plots bought in the turn landed first: with gold
+      // spent, every plot the city gained but the one its box paid for (the
+      // box fell and the plot is the turn's next plot); a box that fell on a
+      // gain without its next plot is no telling which was bought
+      const gainedGame = acts.plotsGained.get(k) ?? [];
+      const boxPaid = !!next && num(next.culture) < num(c.culture) - 0.01;
+      const spent = (acts.goldSpent.get(c.owner) ?? 0) > 0;
+      const boughtPlots = spent ? gainedGame.filter((q) => !(boxPaid && q === num(c.nextPlot))) : [];
+      const bought = spent && boxPaid && gainedGame.length > 0 && !gainedGame.includes(num(c.nextPlot));
+      for (const q of boughtPlots) setTileOwner(state.map.tiles[q], seat, city.id);
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
       const culture = cultureAfterGrowth(state, city, before.pop, st);
       cityBorderGrowth(state, city, seat, culture);
-      const gainedOurs = state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id && !plotsBefore.has(t.index)).map((t) => t.index);
-      const gainedGame = acts.plotsGained.get(k) ?? [];
-      const bought = (acts.goldSpent.get(c.owner) ?? 0) > 0 && gainedGame.some((q) => !gainedOurs.includes(q));
-      const borderSkip = skipAll ?? (built ? 'the city completed a building or district' : bought ? 'a plot may have been bought'
-        // the culture banks after the turn's production (a Settler's citizen
-        // gone) and reads a village's citizen given in the turn
-        : settlerOut && !!next && next.pop < c.pop ? 'a Settler left the city'
+      const gainedOurs = [...boughtPlots, ...state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id
+        && !plotsBefore.has(t.index)).map((t) => t.index)];
+      const borderSkip = skipAll ?? (bought ? 'a plot may have been bought'
+        // the culture reads a village's citizen given in the turn
         : outside && !!next && next.pop > c.pop && villagers.has(c.owner) ? 'a village gave the city a citizen'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
         : held.has(c.owner) ? 'the seat banked no border culture' : null);
@@ -637,7 +723,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // loyalty
       const loyBefore = city.loyalty;
       const hasGov = num(c.governor) >= 0;
-      applyLoyalty(state, city, st.amenities.tier.name, hasGov, st.foodSurplus < 0);
+      const st0 = startStats.get(city)!;
+      for (const side of sides) side(false);
+      applyLoyalty(state, city, st0.amenities.tier.name, hasGov, st0.foodSurplus < 0);
+      for (const side of sides) side(true);
       const loySkip = skipAll ?? (acts.governorChanged.has(k) ? 'governor changed' : null);
       if (loySkip || !next) out.push({ turn, check: 'step.loyalty', subject, ok: true, skip: loySkip ?? 'no t+1' });
       else {

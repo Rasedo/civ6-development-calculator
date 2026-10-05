@@ -16,8 +16,8 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, expandBorders, standBuilding } from '../helpers';
 import { foundCity, condemnHeretic } from '../../../cpu/core/game';
 import { seatOf, emptySeat, setWar } from '../../../cpu/core/seats';
-import { computeCityStats } from '../../../cpu/core/city';
-import { makeYieldCtx, religionFollowers } from '../../../cpu/core/effects';
+import { beliefSeatYields, computeCityStats } from '../../../cpu/core/city';
+import { getModifiers, makeYieldCtx, religionFollowers } from '../../../cpu/core/effects';
 import { availableBuildings } from '../../../cpu/core/rules';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { moveCostInto, riverCharge, religiousHeal, spawnUnit } from '../../../cpu/core/units';
@@ -45,6 +45,11 @@ function district(state: GameState, city: City, type: DistrictId, col: number, r
   city.districts.push({ type, tileIndex: t.index });
 }
 
+/** the yields seat 0's beliefs pay the player, in no city */
+function seatBelief(state: GameState) {
+  return beliefSeatYields(state, 0, getModifiers(state, 0));
+}
+
 /** seat 0's religion, founded, holding `founder` / `enhancer` */
 function religion(state: GameState, founder: string | null, enhancer: string | null): void {
   const rel = seatOf(state, 0)!.religion;
@@ -66,18 +71,20 @@ describe('the catalogs hold the install\'s nine Founders and nine Enhancers', ()
 });
 
 describe('Founder beliefs', () => {
-  it('Lay Ministry pays the capital +1 Faith per Holy Site and +1 Culture per Theater Square', () => {
+  it('Lay Ministry pays the player +1 Faith per Holy Site and +1 Culture per Theater Square, the capital none', () => {
     const { state, city } = sandboxCity();
     district(state, city, 'HOLY_SITE', 10, 9);
     district(state, city, 'THEATER_SQUARE', 8, 9);
-    const before = computeCityStats(state, city).breakdown.bonuses;
+    const capital = computeCityStats(state, city).breakdown.bonuses;
+    const before = seatBelief(state);
     religion(state, 'LAY_MINISTRY', null);
-    const after = computeCityStats(state, city).breakdown.bonuses;
+    const after = seatBelief(state);
     expect(after.faith - before.faith).toBe(1);
     expect(after.culture - before.culture).toBe(1);
+    expect(computeCityStats(state, city).breakdown.bonuses).toEqual(capital);
     // an unfinished district pays nothing
     tileAtCoords(state.map, 8, 9).districtComplete = false;
-    expect(computeCityStats(state, city).breakdown.bonuses.culture - before.culture).toBe(0);
+    expect(seatBelief(state).culture - before.culture).toBe(0);
   });
 
   it('Sacred Places pays +2 of four yields per city holding a completed World Wonder', () => {
@@ -86,12 +93,12 @@ describe('Founder beliefs', () => {
     t.builtWonder = 'STONEHENGE';
     t.builtWonderComplete = true;
     city.wonders.push({ id: 'STONEHENGE', tileIndex: t.index });
-    const before = computeCityStats(state, city).breakdown.bonuses;
+    const before = seatBelief(state);
     religion(state, 'SACRED_PLACES', null);
-    const after = computeCityStats(state, city).breakdown.bonuses;
+    const after = seatBelief(state);
     for (const k of ['science', 'culture', 'gold', 'faith'] as const) expect(after[k] - before[k]).toBe(2);
     t.builtWonderComplete = false;
-    const none = computeCityStats(state, city).breakdown.bonuses;
+    const none = seatBelief(state);
     expect(none.faith - before.faith).toBe(0);
   });
 
@@ -101,7 +108,7 @@ describe('Founder beliefs', () => {
     state.seats.push(emptySeat(1));
     const other = foundCity(state, tileAtCoords(state.map, 16, 16).index, 1).city!;
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 3, 16).index);
-    const faith = () => computeCityStats(state, city).breakdown.bonuses.faith;
+    const faith = () => seatBelief(state).faith;
     const f0 = faith();
     city.followedReligion = 0;
     expect(faith() - f0).toBe(2);
@@ -120,7 +127,7 @@ describe('Founder beliefs', () => {
     state.seats.push(emptySeat(1));
     const other = foundCity(state, tileAtCoords(state.map, 16, 16).index, 1).city!;
     const cs = placeCityStateAt(state, 0, 'Testopolis', 'militaristic', tileAtCoords(state.map, 3, 16).index);
-    const culture = () => computeCityStats(state, city).breakdown.bonuses.culture;
+    const culture = () => seatBelief(state).culture;
     const c0 = culture();
     // one follower at home: a quarter, not floored away
     city.religionPressure = [500, 0];

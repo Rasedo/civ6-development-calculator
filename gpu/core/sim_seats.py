@@ -8002,6 +8002,15 @@ class SimSeats:
             d[mk] = v
         return v
 
+    def _bel_sum1(self, key: str, row: int) -> torch.Tensor:
+        """[B] — a multiplier channel of the seat's beliefs as 1 + the
+        summed percents: the pantheon's, the follower's, the founder's."""
+        return (
+            1.0 + (self._bel["pan"][key].take(self.civ_pantheon[:, row] + 1) - 1.0)
+            + (self._bel["fol"][key].take(self.civ_follower[:, row] + 1) - 1.0)
+            + (self._bel["fou"][key].take(self._eff_founder(row) + 1) - 1.0)
+        )
+
     def _bel_mul(self, key: str, row: int) -> torch.Tensor:
         return (
             self._bel["pan"][key].take(self.civ_pantheon[:, row] + 1)
@@ -9538,12 +9547,16 @@ class SimSeats:
             out = add if out is None else out + add
         return out
 
-    def _wonder_growth_mult(self, compw: torch.Tensor | None) -> torch.Tensor | None:
+    def _wonder_growth256(self, compw: torch.Tensor | None) -> torch.Tensor | None:
+        """[B] f64 — `empireGrowth256`'s wonder half: each completed wonder's
+        growth percent in 256ths, truncated, summed; None when the seat holds
+        none."""
         if compw is None:
             return None
         return torch.where(
-            compw, self._wond_grow.reshape(1, 1, -1).expand_as(compw).double(), torch.ones_like(compw, dtype=torch.float64)
-        ).prod(dim=2).prod(dim=1)
+            compw, torch.trunc((self._wond_grow.reshape(1, 1, -1).expand_as(compw).double() - 1.0) * 256.0),
+            torch.zeros_like(compw, dtype=torch.float64)
+        ).sum(dim=2).sum(dim=1)
 
     def _wonder_regional_hits(self, row: int) -> torch.Tensor | None:
         """[B, nW, cols] f64 — `regionalWondersReaching`: 1 where this seat's

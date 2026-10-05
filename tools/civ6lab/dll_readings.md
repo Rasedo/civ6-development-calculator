@@ -568,6 +568,26 @@ owner. A city-state's or a Free City's city records neither. Great People
 (1103) and 372 / 480 (1104), from 382 and 365; the rest are moments the
 engines do not record.
 
+## H-1: the plot's event yields and the city yield's percent — READ
+
+- An event's yield gain 0xa190d0 (from the flood 0xa2ed80 "Boosted Yield
+  Chance", the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0
+  "Fertility Gain Chance" and 0xa21680): after the floater, the plot's
+  sparse yield slot takes `add [slot], amount` (0xa192ea / 0xa19337) — no
+  clamp, so a plot's event yields have no cap. Records: runs/h1_duelw1108
+  plot 609 (Plains, Volcanic Soil) reads 5 Food at t217 after four Food
+  draws.
+- A city's yield (Lua City:GetYield 0x981dd0 -> 0xaa060 -> GameAttribute
+  value 0xaa740): ONE fixed-point modifier per attribute, clamped to
+  (-1000, 1000), value = base + base x modifier / 100 (the 0xa3d70a3d...
+  divide). Every percent a modifier puts on the yield sums into that one
+  field. Records: runs/h1_duelw1108 Handan t105, 12.5 Science reads 13.125
+  (Displeased -10% + Librarian +15% = +5%), 9.1 Culture 9.55.
+- The city's Production read (GetYield) holds the flat the Industrial /
+  Militaristic envoys pay toward the head of the queue, under the same
+  percent: Xi'an t25 reads 10 building an Archer (9 + Wolin's 1), 8 at t45
+  building a district; t95 14.4 = (15 + 1) x 0.9.
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.

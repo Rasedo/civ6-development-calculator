@@ -174,10 +174,12 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
       }
     }
     // CIV6 (Farms_MedievalAdjacency TilesRequired 2, Farms_MechanizedAdjacency
-    // TilesRequired 1): Food per whole group of adjacent Farms
+    // TilesRequired 1): Food per whole group of adjacent Farms; a pillaged
+    // Farm is none (runs/h1_duelw1108, plot 340: a Food lost each time the
+    // Farm beside it was pillaged at t184 and t191, back at its repair)
     const fa = ctx.mods.farmAdj;
     if (imp === 'FARM' && fa) {
-      const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM').length;
+      const adjFarms = neighbors(ctx.map, tile).filter((n) => n.improvement === 'FARM' && !n.pillaged).length;
       out.food += fa.food * Math.floor(adjFarms / fa.per);
     }
     addYields(out, improvementAdjacency(ctx, tile, imp));

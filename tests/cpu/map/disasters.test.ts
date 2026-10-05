@@ -4,7 +4,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, FERTILITY_CAP, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots } from '../../../cpu/core/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
@@ -74,12 +74,6 @@ describe('disasters', () => {
     // pillaged on every row; a CATASTROPHIC or MEGACOLOSSAL one may take it away
     expect(slope.pillaged || slope.improvement === null).toBe(true);
     expect(slope.fertility).toBeGreaterThanOrEqual(1);
-
-    // fertility is capped
-    slope.fertility = FERTILITY_CAP;
-    const before = slope.fertility;
-    for (let i = 0; i < 1500; i++) disasterPhase(state);
-    expect(slope.fertility).toBe(before);
   });
 
   it('a flood pillages the district on the floodplain, not just the improvement', () => {

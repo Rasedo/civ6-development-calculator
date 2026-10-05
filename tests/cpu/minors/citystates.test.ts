@@ -317,14 +317,16 @@ describe('civ envoys and the suzerain contest', () => {
     expect(cityStateItemProduction(state, other, 'unit')).toBe(1); // a pillaged Armory does not count
   });
 
-  it('the flat add joins the Production before the item percents', () => {
+  it('the flat toward the queue head is the city\'s Production, and what the item takes', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    addCs(state, 9, 9, { type: 'militaristic', envoys: { [0]: 1 } });
     city.queue = [{ kind: 'unit', unit: 'WARRIOR', progress: 0, cost: 1000 }];
+    const bare = computeCityStats(state, city).total.production;
+    addCs(state, 9, 9, { type: 'militaristic', envoys: { [0]: 1 } });
     const made = computeCityStats(state, city).total.production;
+    expect(made).toBeCloseTo(bare + 1, 9);
     seatPhase(state);
-    expect(city.queue[0].progress).toBeCloseTo(made + 1, 9);
+    expect(city.queue[0].progress).toBeCloseTo(made, 9);
   });
 });
 

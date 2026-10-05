@@ -445,6 +445,15 @@ class SimGovernors:
         m = self._governor_mask(row)
         return torch.where(m, col.reshape(1, 1, -1), torch.ones_like(col).reshape(1, 1, -1)).prod(dim=2)
 
+    def _governor_sum_less1(self, row: int, channel: str) -> torch.Tensor:
+        """[B, RC] f64 — one MULTIPLICATIVE promotion channel as its summed
+        percents (each held row's multiplier less 1), per city."""
+        col = self._gpromo.get(channel)
+        if col is None:
+            return torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        m = self._governor_mask(row)
+        return torch.where(m, col.reshape(1, 1, -1) - 1.0, torch.zeros_like(col).reshape(1, 1, -1)).sum(dim=2)
+
     def _governor_flag(self, row: int, channel: str) -> torch.Tensor:
         """[B, RC] bool — is a promotion FLAG set by this city's governor?"""
         col = self._gpromo.get(channel)
@@ -459,13 +468,15 @@ class SimGovernors:
             return torch.zeros(self.B, self.RC, 1, dtype=torch.float64, device=self.device)
         return torch.einsum("bjn,nk->bjk", self._governor_mask(row).double(), col)
 
-    def _governor_vec_mult(self, row: int, channel: str) -> torch.Tensor:
-        """[B, RC, K] f64 — one VECTOR channel multiplied (yieldMult)."""
+    def _governor_vec_sum1(self, row: int, channel: str) -> torch.Tensor:
+        """[B, RC, K] f64 — one VECTOR channel of multipliers (yieldMult) as
+        1 + their summed percents."""
         col = self._gpromo.get(channel)
         if col is None:
             return torch.ones(self.B, self.RC, 1, dtype=torch.float64, device=self.device)
         m = self._governor_mask(row).unsqueeze(3)
-        return torch.where(m, col.reshape(1, 1, *col.shape), torch.ones_like(col).reshape(1, 1, *col.shape)).prod(dim=2)
+        return 1.0 + torch.where(m, col.reshape(1, 1, *col.shape) - 1.0,
+                                 torch.zeros_like(col).reshape(1, 1, *col.shape)).sum(dim=2)
 
     def _governor_tile_sum(self, row: int, channel: str) -> torch.Tensor:
         """[B, T] f64 — an additive channel spread to the TILES of the city
@@ -622,12 +633,12 @@ class SimGovernors:
         return out
 
     def _governor_ymult(self, row: int, gov_ymult: torch.Tensor) -> torch.Tensor:
-        """[B, RC, 6] f64 — the city's yield multipliers from its governor:
+        """[B, RC, 6] f64 — 1 + the city's yield percents from its governor:
         `governorYieldMult` (Merchant Republic's gold, which names an
-        ESTABLISHED governor) times every promotion's own."""
+        ESTABLISHED governor) and every promotion's own, summed."""
         est = self._governor_established(row).double().unsqueeze(2)       # [B, RC, 1]
         gate = 1.0 + (gov_ymult.double().unsqueeze(1) - 1.0) * est
-        return gate * self._governor_vec_mult(row, "yieldMult")
+        return gate + (self._governor_vec_sum1(row, "yieldMult") - 1.0)
 
     def _governor_house_amen(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC], [B, RC]) f64 — CIV6 (Water Works): housing per

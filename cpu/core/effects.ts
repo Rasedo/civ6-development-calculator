@@ -342,6 +342,8 @@ export interface Modifiers {
   newDeal: { min: number; housing: number; amenities: number }[];
   tilePurchaseMult: number;
   encampHarborProdMult: number;
+  /** 1 + the summed percents on a city's yields (the game sums them into the
+   *  yield's one modifier, `computeCityStats`) */
   yieldMult: Partial<Yields>;
   /** CIV6 (Nan Madol): Culture every district on or next to shallow water pays. */
   waterDistrictCulture: number;
@@ -352,6 +354,7 @@ export interface Modifiers {
   districtAdjacencyAdd: Partial<Record<DistrictId, AdjacencyRule[]>>;
   improvementOnResource: { category: ResourceCategory; yields: Partial<Yields> }[];
   borderExpansionPct: number;
+  /** 1 + the summed growth percents (`computeCityStats`) */
   growthMult: number;
   gppFlat: Partial<Record<GreatPersonClass, number>>;
   workEthic: boolean;
@@ -359,10 +362,13 @@ export interface Modifiers {
   buildingHousingAdd: Partial<Record<string, number>>;
   riverCity: { amenities: number; housing: number } | null;
   faithPerWonder: number;
-  /** a belief's capital yields per completed district of a type in the
+  /** a belief's player yields per completed district of a type in the
    *  seat's cities (Lay Ministry), and per city holding a completed World
-   *  Wonder (Sacred Places) — counted live by `beliefCapitalYields`. */
+   *  Wonder (Sacred Places) — counted live by `beliefSeatYields`. */
   beliefPerDistrict: Partial<Record<DistrictId, Partial<Yields>>>;
+  /** the beliefs' per-follower and per-city yields, the player's own
+   *  (`beliefSeatYields`) */
+  beliefSeatYields: Partial<Yields>;
   beliefPerWonderCity: Partial<Yields>;
   districtYieldAdd: Partial<Record<DistrictId, Partial<Yields>>>;
   prodBoosts: ProdBoost[];
@@ -630,6 +636,7 @@ export function defaultModifiers(): Modifiers {
     riverCity: null,
     faithPerWonder: 0,
     beliefPerDistrict: {},
+    beliefSeatYields: {},
     beliefPerWonderCity: {},
     districtYieldAdd: {},
     prodBoosts: [],
@@ -726,7 +733,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.encampHarborProdMult) mods.encampHarborProdMult *= fx.encampHarborProdMult;
   for (const [k, m] of Object.entries(fx.yieldMult ?? {})) {
     const key = k as keyof Yields;
-    mods.yieldMult[key] = (mods.yieldMult[key] ?? 1) * (m ?? 1);
+    mods.yieldMult[key] = (mods.yieldMult[key] ?? 1) + ((m ?? 1) - 1);
   }
   if (fx.amenitiesAll) mods.amenitiesAll += fx.amenitiesAll;
   if (fx.housingAll) mods.housingAll += fx.housingAll;
@@ -799,7 +806,7 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   // governed city
   for (const [k, m] of Object.entries(fx.governorYieldMult ?? {})) {
     const key = k as keyof Yields;
-    mods.governorYieldMult[key] = (mods.governorYieldMult[key] ?? 1) * (m ?? 1);
+    mods.governorYieldMult[key] = (mods.governorYieldMult[key] ?? 1) + ((m ?? 1) - 1);
   }
   addPartial(mods.governorPerCitizen, fx.governorPerCitizen);
   if (fx.routeYieldMult) mods.routeYieldMult *= fx.routeYieldMult;
@@ -1346,7 +1353,7 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
     // with every civilization — a percent on the yield, not a capital lump.
     if (suzerainEffect(state, seat, 'waterDistrictCulture')) mods.waterDistrictCulture = NAN_MADOL_WATER_CULTURE;
     const genevaPct = suzerainSciencePct(state, seat);
-    if (genevaPct) mods.yieldMult.science = (mods.yieldMult.science ?? 1) * (1 + genevaPct / 100);
+    if (genevaPct) mods.yieldMult.science = (mods.yieldMult.science ?? 1) + genevaPct / 100;
   }
   return mods;
 }
@@ -1487,7 +1494,7 @@ function applyBeliefEffects(
   }
   if (fx.improvementOnResource) mods.improvementOnResource.push(fx.improvementOnResource);
   if (fx.borderExpansionPct) mods.borderExpansionPct += fx.borderExpansionPct;
-  if (fx.growthMult) mods.growthMult *= fx.growthMult;
+  if (fx.growthMult) mods.growthMult += fx.growthMult - 1;
   for (const [cls, n] of Object.entries(fx.gppFlat ?? {})) {
     const key = cls as GreatPersonClass;
     mods.gppFlat[key] = (mods.gppFlat[key] ?? 0) + (n ?? 0);
@@ -1513,7 +1520,7 @@ function applyBeliefEffects(
     if (times > 0) {
       for (const [k, v] of Object.entries(fx.perFollowers.yields)) {
         const key = k as keyof Yields;
-        mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * times;
+        mods.beliefSeatYields[key] = (mods.beliefSeatYields[key] ?? 0) + (v ?? 0) * times;
       }
     }
   }
@@ -1521,7 +1528,7 @@ function applyBeliefEffects(
     const n = seat ? seat.cities : 0;
     for (const [k, v] of Object.entries(fx.perCity)) {
       const key = k as keyof Yields;
-      mods.capitalYields[key] = (mods.capitalYields[key] ?? 0) + (v ?? 0) * n;
+      mods.beliefSeatYields[key] = (mods.beliefSeatYields[key] ?? 0) + (v ?? 0) * n;
     }
   }
   for (const [d, y] of Object.entries(fx.perDistrict ?? {})) {
@@ -1952,7 +1959,7 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
   }
   if (established) {
     for (const k of Object.keys(base.governorYieldMult) as YieldKey[]) {
-      m.yieldMult[k] = (m.yieldMult[k] ?? 1) * (base.governorYieldMult[k] ?? 1);
+      m.yieldMult[k] = (m.yieldMult[k] ?? 1) + ((base.governorYieldMult[k] ?? 1) - 1);
     }
   }
   for (const e of fx) {
@@ -1963,13 +1970,13 @@ export function withGovernor(state: GameState, base: Modifiers, city: City): Mod
       m.perCitizen[k] = (m.perCitizen[k] ?? 0) + (e.perCitizen![k] ?? 0);
     }
     for (const k of Object.keys(e.yieldMult ?? {}) as YieldKey[]) {
-      m.yieldMult[k] = (m.yieldMult[k] ?? 1) * (e.yieldMult![k] ?? 1);
+      m.yieldMult[k] = (m.yieldMult[k] ?? 1) + ((e.yieldMult![k] ?? 1) - 1);
     }
     for (const d of Object.keys(e.adjacencyMult ?? {}) as DistrictId[]) {
       m.adjacencyMult[d] = (m.adjacencyMult[d] ?? 1) * (e.adjacencyMult![d] ?? 1);
     }
     m.faithPerSpecialty += e.faithPerSpecialty ?? 0;
-    m.growthMult *= e.growthMult ?? 1;
+    m.growthMult += (e.growthMult ?? 1) - 1;
     if (e.waterWorks) m.waterWorks = true;
   }
   if (m.waterWorks) {

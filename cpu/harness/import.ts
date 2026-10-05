@@ -36,7 +36,6 @@ import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryAmenities, luxuryH
 import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
-import { FERTILITY_CAP } from '../core/disasters';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
@@ -381,9 +380,11 @@ export interface History {
    *  plot gained with nothing else about it or its owner moving (a flood, a
    *  storm, a blizzard) */
   eventYields: Map<number, [number, number, number]>;
-  /** each plot's yields at the last record it stood bare (no improvement,
-   *  district, wonder or resource), keyed by its feature and owner then */
-  bare: Map<number, { key: string; y: number[] }>;
+  /** each plot's yields at the last record it stood bare (no working
+   *  improvement, district, wonder or revealed-by-research resource), keyed
+   *  by its feature, owner and resource then, and the draws read on it by
+   *  then */
+  bare: Map<number, { key: string; y: number[]; ev: number[] }>;
   /** each player's district-discount count (`Seat.discountDistricts`): the
    *  specialty districts it had completed at the record before its research
    *  last moved — the count the game took when the technology or civic
@@ -557,8 +558,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         h.nextPlotUnheld.add(k);
         continue;
       }
-      // the box fell: culture paid for a plot
-      const paid = num(c.culture) < num(b.culture) - 0.01;
+      // the box fell on a plot gained or a next plot held: culture paid for
+      // it (a box that falls with no plot gained and none to claim moves no
+      // price: runs/h1_duelw1108, Xi'an's 307 from t207 while its box
+      // emptied every nine turns)
+      const paid = num(c.culture) < num(b.culture) - 0.01
+        && (c.plots.length > b.plots.length || num(b.nextPlot) >= 0);
       if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
       // a box pays for one plot; any more came another way
       if (c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
@@ -566,21 +571,32 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';
     // signed: an event that lowers a plot for a while (a drought) is undone
-    // by its recovery
+    // by its recovery. No event lays yields on water or a mountain (the
+    // eruption's soil skips a water plot, tools/civ6lab/dll_readings.md; the
+    // engine's `silt`): a water plot's moves are a building's or research's
+    // (runs/h1_duelw1108, plot 930: the Crabs read +1 Food over its bare
+    // reading when a storm took its Fishing Boats at t131, Hunza's Lighthouse
+    // built since)
+    const dry = (i: number) => !/_(COAST|OCEAN|MOUNTAIN)$/.test(cat.terrains[plotAt(rec, i)[P.terrain] as number] ?? '')
+      && plotAt(rec, i)[P.isLake] !== 1;
     const addEvent = (i: number, f: number, pr: number, sc: number) => {
-      if (!f && !pr && !sc) return;
+      if ((!f && !pr && !sc) || !dry(i)) return;
       const acc = h.eventYields.get(i) ?? [0, 0, 0];
       h.eventYields.set(i, [acc[0] + f, acc[1] + pr, acc[2] + sc]);
     };
-    // the players whose own rows moved a plot's yields this turn: a pantheon,
-    // a card or a government may reach any plot (`moved`); a technology or a
-    // civic only an improved or resource plot (`researched`)
+    // the players whose own rows moved a plot's yields this turn: a pantheon
+    // or a government may reach any plot (`moved`); a card pays a plot only
+    // through its improvement, so a card change moves the working improved
+    // plots alone (`movedImproved`: runs/h1_duelw1108, plot 514, a bare
+    // Desert +1 Food at t152 beside a card swap); a technology or a civic
+    // only an improved or resource plot (`movesPlot`)
     const moved = new Set<number>();
+    const movedImproved = new Set<number>();
     const gained = new Map<number, Set<string>>();
     for (const q of rec.players) {
       const q0 = h.last.players.find((x) => x.id === q.id);
-      if (!q0 || JSON.stringify([q.pantheon, q.policies, q.government])
-        !== JSON.stringify([q0.pantheon, q0.policies, q0.government])) moved.add(q.id);
+      if (!q0 || JSON.stringify([q.pantheon, q.government]) !== JSON.stringify([q0.pantheon, q0.government])) moved.add(q.id);
+      else if (JSON.stringify(q.policies) !== JSON.stringify(q0.policies)) movedImproved.add(q.id);
       const got = new Set<string>();
       for (const [bits, names, prefix] of [[q.techs, cat.techs, 'TECH_'], [q.civics, cat.civics, 'CIVIC_']] as const) {
         const was = (q0 ? (prefix === 'TECH_' ? q0.techs : q0.civics) : '') ?? '';
@@ -608,7 +624,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       return ry.some((y) => (y.tech && got.has(y.tech)) || (y.civic && got.has(y.civic)));
     };
     // the plots of a city where a building that pays plots (`cityPlotBonus`)
-    // moved this turn: built, sold, pillaged or repaired
+    // moved this turn: built, sold, pillaged or repaired; a wonder paying
+    // the whole empire's plots moves every city of its owner's
+    // (runs/h1_duelw1108, plot 574: Rome's Marsh +1 Production +2 Science
+    // when Mediolanum completed the Etemenanki at t172)
     const cityMoved = new Set<number>();
     const bwas = new Map(h.last.cities.map((c) => [`${c.owner}:${c.id}`, c.buildings]));
     const pays = new Map<number, boolean>();
@@ -622,7 +641,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const diff = [...c.buildings.filter((b) => !was.has(JSON.stringify(b))),
         ...(bwas.get(`${c.owner}:${c.id}`) ?? []).filter((b) => !now.has(JSON.stringify(b)))];
       if (!diff.some((b) => paysAt(b[0] as number))) continue;
-      for (const q of c.plots) cityMoved.add(q);
+      const all = diff.some((b) => paysEmpire(cat, b[0] as number));
+      for (const d of rec.cities) if (d === c || (all && d.owner === c.owner)) for (const q of d.plots) cityMoved.add(q);
     }
     const preserve = cat.districts.indexOf('DISTRICT_PRESERVE');
     const centre = cat.districts.indexOf('DISTRICT_CITY_CENTER');
@@ -645,25 +665,50 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const was = fwas(i);
       const now = fname(i);
       if (was === now) {
-        // an improvement gone with nothing else about the plot moving (a
-        // flood's wash): its draw is what the bare plot reads above the bare
-        // plot of the last record that held no improvement on the same
-        // ground (runs/h1_duelw1105, plot 583: a Farm 3 Food at t34, washed at
-        // t43 to 3 Food 1 Production where the bare plot read 2 and 0); a
-        // resource plot is left out, its reading moved by research too
-        const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}`;
+        // an improvement gone or pillaged with nothing else about the plot
+        // moving (a flood's wash): its draw is what the bare plot reads above
+        // the bare plot of the last record that held no working improvement
+        // on the same ground (runs/h1_duelw1105, plot 583: a Farm 3 Food at
+        // t34, washed at t43 to 3 Food 1 Production where the bare plot read
+        // 2 and 0), less the draws already read since that record; a
+        // resource a technology reveals is left out, its reading moved by
+        // research too (runs/h1_duelw1108, plot 743: a Rice Farm washed at
+        // t175 to 5 Food 1 Production where the bare plot read 3 and 0, one
+        // Food of it read at t58). A pillaged improvement pays nothing, so its
+        // plot reads bare (runs/h1_duelw1108, plots 699 and 744: Farms 3 Food
+        // at t34, pillaged at t35 still reading 3 where the bare plots read 2
+        // and 2)
+        const res = plotAt(rec, i)[P.resource] as number;
+        const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}|${res}`;
         const y1 = plotAt(rec, i)[P.yields] as number[];
-        const bare = (plotAt(rec, i)[P.improvement] as number) < 0 && (plotAt(rec, i)[P.district] as number) < 0
-          && (plotAt(rec, i)[P.wonder] as number) < 0 && (plotAt(rec, i)[P.resource] as number) < 0 && Array.isArray(y1);
-        if (bare && (plotAt(h.last, i)[P.improvement] as number) >= 0 && same(i, P.owner) && same(i, P.resource)
+        const unimproved = (r: TurnRecord) => (plotAt(r, i)[P.improvement] as number) < 0
+          || plotAt(r, i)[P.improvementPillaged] === 1;
+        const bare = unimproved(rec) && (plotAt(rec, i)[P.district] as number) < 0
+          && (plotAt(rec, i)[P.wonder] as number) < 0 && Array.isArray(y1)
+          && (res < 0 || !RESOURCES[strip(cat.resources[res] ?? '', 'RESOURCE_')]?.revealTech);
+        const acc = h.eventYields.get(i) ?? [0, 0, 0];
+        if (bare && !unimproved(h.last) && same(i, P.owner) && same(i, P.resource)
           && same(i, P.district) && !cityMoved.has(i)) {
           const b = h.bare.get(i);
           const owner = plotAt(rec, i)[P.owner] as number;
           if (b && b.key === bareKey && !(owner >= 0 && moved.has(owner))) {
-            addEvent(i, Math.max(0, y1[0] - b.y[0]), Math.max(0, y1[1] - b.y[1]), Math.max(0, y1[3] - b.y[3]));
+            const draw = (k: number, a: number) => Math.max(0, y1[k] - b.y[k] - (acc[a] - b.ev[a]));
+            addEvent(i, draw(0, 0), draw(1, 1), draw(3, 2));
           }
         }
-        if (bare) h.bare.set(i, { key: bareKey, y: [...y1] });
+        if (bare) h.bare.set(i, { key: bareKey, y: [...y1], ev: [...(h.eventYields.get(i) ?? [0, 0, 0])] });
+        // a building that pays the city's plots, farmed or not, moved the
+        // improved plot: it moves the bare reading the same (runs/h1_duelw1108,
+        // plot 743: the Rice Farm +1 Food with Wolin's Water Mill at t58); one
+        // that moved with the plot itself leaves no bare reading to trust
+        // (runs/h1_duelw1105, plot 564: Nalanda's Water Mill and the Wheat's
+        // Farm both at t79)
+        else if (cityMoved.has(i) && h.bare.has(i)) {
+          const y0 = plotAt(h.last, i)[P.yields] as number[];
+          const b = h.bare.get(i)!;
+          if (still(i) && Array.isArray(y0) && Array.isArray(y1)) b.y = b.y.map((v, k) => v + y1[k] - y0[k]);
+          else h.bare.delete(i);
+        }
         // a plot whose yields rose with nothing about it, its neighbours or
         // its owner moving: a random event's draw
         // a district's plot yields nothing but the city centre's, which a
@@ -674,17 +719,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // has just revealed pays from that record on)
         const owner = plotAt(rec, i)[P.owner] as number;
         const o = owner >= 0 ? owner : num(rec.head.localPlayer);
-        if (owner >= 0 && moved.has(owner)) continue;
+        if (owner >= 0 && (moved.has(owner) || (movedImproved.has(owner) && !unimproved(rec)))) continue;
         if (o >= 0 && movesPlot(i, gained.get(o) ?? new Set())) continue;
-        const res = plotAt(rec, i)[P.resource] as number;
         if (o >= 0 && res >= 0 && newlyRevealed.get(o)?.has(strip(cat.resources[res] ?? '', 'RESOURCE_'))) continue;
         // a neighbour moving may move an improved plot's yields (an adjacency);
         // an unimproved plot's reach no neighbour's row except a Preserve's
         // Grove through the plot's own appeal (the flood that washed away the
         // farms beside plot 540 of runs/h1_duelw1105 at t15 silted it +1 Food
         // +1 Production; the storm that pillaged the Salt mine beside plot 473
-        // at t120 moved its appeal and left it +1 Food)
-        if ((plotAt(rec, i)[P.improvement] as number) >= 0 ? nbr(i).some((n) => !still(n))
+        // at t120 moved its appeal and left it +1 Food); a pillaged improvement
+        // takes no adjacency (runs/h1_duelw1106, plot 540: its pillaged Farm
+        // +1 Food at t114 by the flood that pillaged the Farm beside it)
+        if (!unimproved(rec) ? nbr(i).some((n) => !still(n))
           : !same(i, P.appeal) && preserve >= 0 && nbr(i).some((n) => (plotAt(rec, n)[P.district] as number) === preserve)) continue;
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
@@ -772,8 +818,20 @@ function paysPlots(cat: Catalog, bi: number): boolean {
   }
   const id = engineRowOf(cat, 'building', bi);
   const b = id ? BUILDINGS[id] : undefined;
+  // a unique row's clauses only where the record names the unique row (the
+  // Marae's, not the Amphitheater's it replaces)
+  const unique = cat.buildingReplaces.some(([u]) => u === name);
   return !!b && !!(b.coastPlotYields || b.plotFeatureYields || b.coastResourceYields || b.special === 'WATER_MILL'
-    || b.civVariants?.some((v) => v.featureTileYields || v.coastResourceYields));
+    || (unique && b.civVariants?.some((v) => v.featureTileYields || v.coastResourceYields)));
+}
+
+/** Does the building row `bi` of the record name a wonder paying every plot
+ *  of its owner's empire (`tileYields` rows with `empire`)? */
+function paysEmpire(cat: Catalog, bi: number): boolean {
+  const name = cat.buildings[bi];
+  if (!cat.wonders.includes(name)) return false;
+  const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
+  return !!(id && BUILT_WONDERS[id]?.effects?.tileYields?.some((r) => r.empire));
 }
 
 /** the 1s of a research bit string */
@@ -816,12 +874,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     tiles.push(tileOf(ctx, rec, i));
   }
   ctx.scopeTile = undefined;
-  for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = Math.min(FERTILITY_CAP, n);
-  for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = Math.min(FERTILITY_CAP, n);
+  for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = n;
+  for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = n;
   for (const [i, [f, pr, sc]] of history?.eventYields ?? []) {
-    tiles[i].fertility = Math.min(FERTILITY_CAP, tiles[i].fertility + Math.max(0, f));
-    tiles[i].fertilityProd = Math.min(FERTILITY_CAP, tiles[i].fertilityProd + Math.max(0, pr));
-    if (sc > 0) tiles[i].fertilitySci = Math.min(FERTILITY_CAP, (tiles[i].fertilitySci ?? 0) + sc);
+    tiles[i].fertility += Math.max(0, f);
+    tiles[i].fertilityProd += Math.max(0, pr);
+    if (sc > 0) tiles[i].fertilitySci = (tiles[i].fertilitySci ?? 0) + sc;
   }
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
   for (const t of tiles) {

@@ -79,6 +79,12 @@ def totals(sim, row: int) -> torch.Tensor:
     return sim._seat_city_walk(row, amen_yf=yf, maint=maint)[B0].double(), yf[B0].double()
 
 
+def seat_belief(sim, row: int) -> torch.Tensor:
+    """[6] the yields the row's beliefs pay the player, in no city"""
+    sim._eff_version += 1
+    return sim._belief_seat_yields(row)[B0].double()
+
+
 def own_tile(sim, row: int, j: int, skip=()) -> int:
     owned = ((sim.city_slot_at(row)[B0] == j) & (sim.district[B0] < 0) & (sim.centre_slot_at[B0] < 0)
              & (sim.built_wonder[B0] < 0) & sim.passable[B0]).nonzero(as_tuple=True)[0].tolist()
@@ -116,17 +122,17 @@ def test_founders(rules, path) -> None:
     district(sim, ROW, j, sim._hs_idx)
     ts_idx = int(next(d for d in sim.districts_cat if d["id"] == "THEATER_SQUARE")["idx"])
     district(sim, ROW, j, ts_idx)
-    t0, yf = totals(sim, ROW)
+    t0, _ = totals(sim, ROW)
+    b0 = seat_belief(sim, ROW)
     religion(sim, ROW, founder=LAY)
     t1, _ = totals(sim, ROW)
-    d = t1[j] - t0[j]
-    assert abs(float(d[5]) - float(yf[j])) < 1e-9, f"Lay Ministry faith {d.tolist()}"
-    assert abs(float(d[4]) - float(yf[j])) < 1e-9, f"Lay Ministry culture {d.tolist()}"
+    d = seat_belief(sim, ROW) - b0
+    assert torch.equal(t1[j], t0[j]), f"Lay Ministry paid the capital {(t1[j] - t0[j]).tolist()}"
+    assert abs(float(d[5]) - 1) < 1e-9, f"Lay Ministry faith {d.tolist()}"
+    assert abs(float(d[4]) - 1) < 1e-9, f"Lay Ministry culture {d.tolist()}"
     # an unfinished Theater Square pays nothing
     sim.district_complete[B0, int(sim.city_dist_tile[B0, ROW, j, ts_idx])] = False
-    sim._eff_version += 1
-    t2, _ = totals(sim, ROW)
-    assert float(t2[j, 4]) < float(t1[j, 4]), "an unfinished Theater Square paid"
+    assert float(seat_belief(sim, ROW)[4] - b0[4]) < 1e-9, "an unfinished Theater Square paid"
     # SACRED PLACES: +2 of four yields per city holding a completed wonder
     sim2 = fresh(rules, path, 4)
     j2 = cap_slot(sim2, ROW)
@@ -136,12 +142,11 @@ def test_founders(rules, path) -> None:
     sim2.built_wonder_complete[B0, t] = True
     sim2.city_wonder[B0, ROW, j2, w] = t
     sim2._eff_version += 1
-    s0, yf2 = totals(sim2, ROW)
+    s0 = seat_belief(sim2, ROW)
     religion(sim2, ROW, founder=SACRED)
-    s1, _ = totals(sim2, ROW)
-    d2 = s1[j2] - s0[j2]
+    d2 = seat_belief(sim2, ROW) - s0
     for k in (2, 3, 4, 5):
-        assert abs(float(d2[k]) - 2 * float(yf2[j2])) < 1e-9, f"Sacred Places {d2.tolist()}"
+        assert abs(float(d2[k]) - 2) < 1e-9, f"Sacred Places {d2.tolist()}"
     print(f"  2 Lay Ministry {d[4:].tolist()} and Sacred Places {d2[2:].tolist()} OK")
 
 
@@ -268,12 +273,10 @@ def test_pilgrimage(rules, path) -> None:
     sim = fresh(rules, path, 4)
     j = cap_slot(sim, ROW)
     religion(sim, ROW, founder=PILGRIM)
-    f0, yf = totals(sim, ROW)
-    f0 = float(f0[j, 5])
+    f0 = float(seat_belief(sim, ROW)[5])
 
     def gain() -> float:
-        sim._eff_version += 1
-        return (float(totals(sim, ROW)[0][j, 5]) - f0) / float(yf[j])
+        return float(seat_belief(sim, ROW)[5]) - f0
 
     sim.city_followed[B0, ROW, j] = ROW
     assert abs(gain() - 2) < 1e-9, gain()
@@ -302,13 +305,10 @@ def test_world_church(rules, path) -> None:
     s = int(sim.citystate_alive[B0].long().argmax())
     assert bool(sim.citystate_alive[B0, s]), "no live city-state"
     sim.citystate_pop[B0, s] = 2
-    sim._eff_version += 1
-    c0, yf = totals(sim, ROW)
-    c0 = float(c0[j, 4])
+    c0 = float(seat_belief(sim, ROW)[4])
 
     def gain() -> float:
-        sim._eff_version += 1
-        return (float(totals(sim, ROW)[0][j, 4]) - c0) / float(yf[j])
+        return float(seat_belief(sim, ROW)[4]) - c0
 
     def followers() -> int:
         return int(sim._religion_followers(torch.tensor([ROW]))[B0])

@@ -50,7 +50,7 @@ function giveLuxuries(state: GameState, city: City, n: number): void {
 }
 
 describe('the Scottish Enlightenment', () => {
-  it('pays a happy city 5% more Science and Production, an ecstatic one 10%', () => {
+  it('pays a happy city 5% more Science and Production, an ecstatic one 10%, summed with the tier\'s own', () => {
     expect(HAPPY_YIELD_ROWS.length).toBe(4);
     const yieldsOf = (row: number, luxuries: number) => {
       const state = sceneAs(row);
@@ -71,13 +71,13 @@ describe('the Scottish Enlightenment', () => {
     const happyScot = yieldsOf(seatRow('SCOTLAND'), 3);
     const happyPlain = yieldsOf(seatRow('AMERICA'), 3);
     expect(happyScot.tier).toBe('Happy');
-    expect(happyScot.science).toBeCloseTo(happyPlain.science * 1.05, 9);
-    expect(happyScot.production).toBeCloseTo(happyPlain.production * 1.05, 9);
+    expect(happyScot.science).toBeCloseTo(happyPlain.science * 1.15 / 1.1, 9);
+    expect(happyScot.production).toBeCloseTo(happyPlain.production * 1.15 / 1.1, 9);
     expect(happyScot.gold).toBeCloseTo(happyPlain.gold, 9); // an unnamed yield is untouched
     const ecstaticScot = yieldsOf(seatRow('SCOTLAND'), 5);
     const ecstaticPlain = yieldsOf(seatRow('AMERICA'), 5);
     expect(ecstaticScot.tier).toBe('Ecstatic');
-    expect(ecstaticScot.science).toBeCloseTo(ecstaticPlain.science * 1.1, 9);
+    expect(ecstaticScot.science).toBeCloseTo(ecstaticPlain.science * 1.3 / 1.2, 9);
   });
 
   it('pays a happy city a Great Scientist point per Campus, doubled while ecstatic', () => {

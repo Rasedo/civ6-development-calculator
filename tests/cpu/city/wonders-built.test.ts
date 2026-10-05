@@ -119,7 +119,8 @@ describe('world wonders', () => {
     hg.riverMask = 1;
     standWonder(state, city, 'HANGING_GARDENS', hg.index);
     const growthAfter = computeCityStats(state, city).effectiveFoodSurplus;
-    expect(growthAfter).toBeCloseTo(growthBefore * 1.15, 5);
+    // +15% in the game's 256ths: 38/256, truncated
+    expect(growthAfter).toBeCloseTo(growthBefore * (256 + 38) / 256, 5);
   });
 
   it('Forbidden City adds a wildcard policy slot', () => {

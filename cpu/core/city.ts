@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type CityState, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, completedDistrictCount, liveSpecialtyCount } from './yields';
+import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, liveSpecialtyCount } from './yields';
 import { seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -27,7 +27,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
+import { cityStateItemProduction, suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
@@ -888,15 +888,21 @@ export function swapTileOk(state: GameState, city: City, tileIndex: number): boo
   return neighbors(state.map, t).some((n) => tileBelongsTo(n, city));
 }
 
-export function empireGrowthMult(state: GameState, seat: number): number {
-  // Migration Treaty first, wonders after — the GPU folds in this order.
-  let mult = congressGrowthMult(state, seat);
+/** A growth factor's percent in the game's 256ths, truncated toward zero. */
+export function growth256(factor: number): number {
+  return Math.trunc((factor - 1) * 256);
+}
+
+/** The seat-wide growth percents in 256ths: the Migration Treaty's, then each
+ *  wonder's. */
+export function empireGrowth256(state: GameState, seat: number): number {
+  let n = growth256(congressGrowthMult(state, seat));
   for (const c of citiesOf(state, seat)) {
     for (const w of completedWonders(state, c)) {
-      if (w.def.effects?.growthAllMult) mult *= w.def.effects.growthAllMult;
+      if (w.def.effects?.growthAllMult) n += growth256(w.def.effects.growthAllMult);
     }
   }
-  return mult;
+  return n;
 }
 
 /** The flat amenities and housing a city's OWN complete wonders pay it — a
@@ -985,13 +991,14 @@ export function cardFavorPerBuilding(state: GameState, seat: number): number {
   return n;
 }
 
-/** CIV6 (BELIEF_YIELD_PER_DISTRICT, BELIEF_YIELD_PER_CITY_WITH_WONDER): the
- *  capital's belief yields counted over the seat's cities — each completed
- *  district of a type the belief names (Lay Ministry), and each city holding
- *  a completed World Wonder (Sacred Places). The reach is `perCity`'s: the
- *  belief seat's own cities. */
-export function beliefCapitalYields(state: GameState, seat: number, m: Modifiers): Yields {
+/** CIV6 (MODIFIER_PLAYER_RELIGION_ADD_RELIGIOUS_BELIEF_YIELD): the beliefs'
+ *  yields the PLAYER takes, in no city — per follower and per city following
+ *  (`beliefSeatYields`), each completed district of a type the belief names
+ *  (Lay Ministry) and each city holding a completed World Wonder (Sacred
+ *  Places), counted over the belief seat's own cities. */
+export function beliefSeatYields(state: GameState, seat: number, m: Modifiers): Yields {
   const out = emptyYields();
+  addYields(out, m.beliefSeatYields);
   const perD = Object.entries(m.beliefPerDistrict) as [DistrictId, Partial<Yields>][];
   const perW = Object.keys(m.beliefPerWonderCity).length > 0;
   if (!perD.length && !perW) return out;
@@ -1469,8 +1476,13 @@ export function computeCityStats(
   const gwy = greatWorkYields(state, city);
   buildings.culture += gwy.culture;
   // Golden PEN_BRUSH_AND_VOICE — +1 Culture per SPECIALTY district, from
-  // THIS CITY'S OWNER's dedication, which is the row the GPU reads.
-  buildings.culture += goldenCulturePerDistrict(state, city.seat) * completedDistrictCount(state, city, true);
+  // THIS CITY'S OWNER's dedication, which is the row the GPU reads. Every
+  // EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT row (this one, the governor's
+  // Faith, Digital Democracy's Culture) counts the live specialty districts:
+  // a pillaged one pays nothing (runs/h1_duelw1108, Xi'an t104: Moksha's 2
+  // Faith a district on its Holy Site and Theater Square alone, its Campus
+  // pillaged — 9 Faith before its tier, not 11)
+  buildings.culture += goldenCulturePerDistrict(state, city.seat) * liveSpecialtyCount(state, city);
   buildings.faith += gwy.faith;
   // CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein; `GP_BUILDING_YIELDS`):
   // a spent Great Person's add to one building's own yield, paid by each lit
@@ -1506,10 +1518,7 @@ export function computeCityStats(
 
   const bonuses = emptyYields();
   addYields(bonuses, m.cityYields);
-  if (city.isCapital) {
-    addYields(bonuses, m.capitalYields);
-    addYields(bonuses, beliefCapitalYields(state, city.seat, m));
-  }
+  if (city.isCapital) addYields(bonuses, m.capitalYields);
   // CIV6 (Autocracy): "+1 to all yields for each Government Plaza building,
   // Diplomatic Quarter building, and palace in a city."
   if (m.yieldsPerGovBuilding) {
@@ -1523,13 +1532,13 @@ export function computeCityStats(
     bonuses[k] = (bonuses[k] ?? 0) + city.population * (m.perCitizen[k] ?? 0);
   }
   if (m.faithPerSpecialty) {
-    bonuses.faith += m.faithPerSpecialty * completedDistrictCount(state, city, true);
+    bonuses.faith += m.faithPerSpecialty * liveSpecialtyCount(state, city);
   }
   // CIV6 (Digital Democracy, EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT): "+2
   // Culture per Specialty District"
   for (const k of Object.keys(m.yieldPerSpecialty) as YieldKey[]) {
     const n = m.yieldPerSpecialty[k] ?? 0;
-    if (n) bonuses[k] += n * completedDistrictCount(state, city, true);
+    if (n) bonuses[k] += n * liveSpecialtyCount(state, city);
   }
   // CIV6 (Land Acquisition): "+3 Gold per turn from each foreign Trade
   // Route passing through the city" — a foreign route whose stored course
@@ -1567,6 +1576,13 @@ export function computeCityStats(
     bonuses.science += perIn * all;
     bonuses.faith += perDom * dom;
   }
+  // CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): the flat
+  // toward the item at the head of the queue is the city's Production as
+  // the game reads it (City:GetYield), under the city's percents
+  // (runs/h1_duelw1108, Xi'an: 10 at t25 building an Archer with one envoy
+  // in Militaristic Wolin where its plots, Palace and Urban Planning pay 9;
+  // 14.4 at t95, (15 + 1) x 0.9 at its tier)
+  if (city.queue[0]) bonuses.production += cityStateItemProduction(state, city, city.queue[0].kind);
 
   const hParts = housingParts(state, city, m);
   const housing = hParts.reduce((a, b) => a + b, 0);
@@ -1587,7 +1603,7 @@ export function computeCityStats(
       // the COMPLETE specialty count this city carries: a governor's
       // `faithPerSpecialty` pays one faith a turn off it, so a count one
       // apart is an exact one-faith drift with no other symptom.
-      + ` spec${completedDistrictCount(state, city, true)}`);
+      + ` spec${liveSpecialtyCount(state, city)}`);
   }
   // the tier this walk RAN ON, kept where the census can read it — never a
   // recomputation, for the same reason `workedTiles` is not one: the city's
@@ -1606,67 +1622,79 @@ export function computeCityStats(
   // seat's percent on every non-Food yield at the Happy / Ecstatic tier
   const gpHappy = tier.name === 'Happy' ? gpPermOf(seatOf(state, city.seat), 'happyYieldPct')
     : tier.name === 'Ecstatic' ? gpPermOf(seatOf(state, city.seat), 'ecstaticYieldPct') : 0;
+  // CIV6 (GameAttribute::Value 0xaa740, the city yield's attribute): ONE
+  // modifier per yield, value = base + base x modifier / 100 — every percent
+  // on a city's yield (its amenity tier's, the cards', the governor's, the
+  // wonders') SUMS into it (runs/h1_duelw1108, Handan at t105: 12.5 Science
+  // reads 13.125, x 1.05 = -10% Displeased + 15% Librarian, not x 0.9 x 1.15)
+  const pct = emptyYields();
   for (const k of ['production', 'gold', 'science', 'culture', 'faith'] as YieldKey[]) {
-    total[k] *= tier.yieldFactor;
+    pct[k] += tier.yieldFactor - 1;
     // CIV6 (EFFECT_ADJUST_CITY_HAPPINESS_YIELD): the roster's per-tier rows
-    // (`HAPPY_YIELD_ROWS`) — a percentage over the same total
-    for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) total[k] *= 1 + r.pct / 100;
-    if (gpHappy) total[k] *= 1 + gpHappy / 100;
+    // (`HAPPY_YIELD_ROWS`)
+    for (const r of m.happyYields) if (r.tier === tier.name && r.yield === k) pct[k] += r.pct / 100;
+    pct[k] += gpHappy / 100;
     // CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for a
     // city with an ESTABLISHED governor, tripled in one this seat did not found
     if (m.governorYields.length && cityGovernorEffects(state, city).length > 0) {
       const founded = (city.founderSeat ?? city.seat) === city.seat;
-      for (const r of m.governorYields) if (r.yield === k && r.founded === founded) total[k] *= 1 + r.pct / 100;
+      for (const r of m.governorYields) if (r.yield === k && r.founded === founded) pct[k] += r.pct / 100;
     }
     // CIV6 (Hwarang, EFFECT_ADJUST_CITY_YIELD_MODIFIER_PER_GOVERNOR_TITLE):
     // "+3% ... for each Promotion they have earned, including their first"
     if (m.governorTitleYields.length) {
       const titles = cityGovernorTitles(state, city);
-      if (titles > 0) for (const r of m.governorTitleYields) if (r.yield === k) total[k] *= 1 + (r.pct * titles) / 100;
+      if (titles > 0) for (const r of m.governorTitleYields) if (r.yield === k) pct[k] += (r.pct * titles) / 100;
     }
     // CIV6 (Righteousness of the Faith): the worship building this row holds
     // adds to the city's Science, Faith and Culture
     if (m.worship.length && (k === 'science' || k === 'faith' || k === 'culture')
       && city.buildings.some((b) => BUILDINGS[b]?.worship === true)) {
-      for (const r of m.worship) total[k] *= 1 + r.yieldPct / 100;
+      for (const r of m.worship) pct[k] += r.yieldPct / 100;
     }
   }
   for (const k of Object.keys(m.yieldMult) as YieldKey[]) {
-    total[k] *= m.yieldMult[k] ?? 1;
+    pct[k] += (m.yieldMult[k] ?? 1) - 1;
     // CIV6 (Monasticism): "+75% Science in cities with a Holy Site";
     // (Robber Barons): "+50% Gold in cities with a Stock Exchange. +25%
     // Production in cities with a Factory." Each names one city FACT, so the
-    // multiplier pays only where that fact stands.
+    // percent pays only where that fact stands.
     for (const r of m.districtYieldMult) {
       if (r.yield === k && city.districts.some((d) => d.type === r.district
         && state.map.tiles[d.tileIndex].districtComplete
-        && !state.map.tiles[d.tileIndex].districtPillaged)) total[k] *= r.mult;
+        && !state.map.tiles[d.tileIndex].districtPillaged)) pct[k] += r.mult - 1;
     }
     for (const r of m.buildingYieldMult) {
-      if (r.yield === k && city.buildings.includes(r.building)) total[k] *= r.mult;
+      if (r.yield === k && city.buildings.includes(r.building)) pct[k] += r.mult - 1;
     }
   }
-  // Each seat wonder in catalog order: its own city's multiplier where it
-  // stands here, then its empire-wide one.
+  // Each seat wonder: its own city's percent where it stands here, and its
+  // empire-wide one.
   for (const w of seatWonders(state, city.seat)) {
     const mine = wonders.some((x) => x.idx === w.idx);
     for (const mult of [mine ? w.def.effects?.cityYieldMult : undefined, w.def.effects?.empireYieldMult]) {
       if (!mult) continue;
-      for (const k of Object.keys(mult) as YieldKey[]) total[k] *= mult[k] ?? 1;
+      for (const k of Object.keys(mult) as YieldKey[]) pct[k] += (mult[k] ?? 1) - 1;
     }
   }
+  for (const k of YIELD_KEYS) total[k] *= 1 + pct[k];
   const maintenance = cityMaintenance(state, city);
   total.gold -= maintenance;
 
   const foodSurplus = total.food - city.population * FOOD_PER_CITIZEN;
   let effective = foodSurplus;
   if (foodSurplus > 0) {
-    effective =
-      foodSurplus *
-      housingGrowthFactor(housing - city.population) *
-      tier.growthFactor *
-      empireGrowthMult(state, city.seat) *
-      m.growthMult;
+    // CIV6 (City:GetOverallGrowthModifier): the housing factor times ONE
+    // growth modifier, every percent on it summed — the amenity tier's, the
+    // wonders', the beliefs', the governor's — in the game's 1/256 fixed
+    // point: each percent truncated to 256ths, the product with the housing
+    // factor floored, never below none (runs/h1_duelw1108, Xi'an t83:
+    // Displeased -15% and the Hanging Gardens' +15% read an overall 1, the
+    // food box +11 on a surplus of 11; t144: housing 0.5 x (256 + 38) reads
+    // 146/256, the box +6.2734375 on 11; the six duels' recorded overall
+    // modifiers: -15% 218/256, -30% 180/256, +10% 281/256, 0.25 x -15% 54/256)
+    const m256 = Math.max(0, 256 + growth256(tier.growthFactor) + empireGrowth256(state, city.seat) + growth256(m.growthMult));
+    effective = foodSurplus * Math.floor(housingGrowthFactor(housing - city.population) * m256) / 256;
   }
   const growthNeeded = growthFoodNeeded(city.population);
   const turnsToGrow = effective > 0 ? Math.ceil((growthNeeded - city.foodBox) / effective) : null;
