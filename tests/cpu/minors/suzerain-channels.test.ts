@@ -14,11 +14,11 @@ import { luxuryAmenities } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
 import { unitPurchaseCost } from '../../../cpu/core/game';
 import { suzerainProjectMult, suzerainLandPurchaseMult } from '../../../cpu/core/cityStates';
-import { routeChainGold, routeLengthGold, routeDestLuxuryGold, routeTravelTiles } from '../../../cpu/core/trade';
+import { routeChainGold, routeLengthGold, routeDestLuxuryGold } from '../../../cpu/core/trade';
 import {
   CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING,
   NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES,
-  ZANZIBAR_LUXURY_AMENITIES, HUNZA_TILES_PER_GOLD, HUNZA_ROUTE_GOLD,
+  ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX,
   HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, BUENOS_AIRES_AMENITIES,
   type SuzEffect,
 } from '../../../cpu/data/cityStates';
@@ -138,19 +138,17 @@ describe("Amsterdam's destination luxuries and Hunza's road", () => {
     expect(routeDestLuxuryGold(state, 0, other)).toBe(2 * AMSTERDAM_DEST_LUXURY_GOLD);
   });
 
-  it('pays a whole gold per five tiles the route travels', () => {
+  it('pays a fifth of a gold per plot of the path, in fixed point', () => {
     const { state } = scene();
-    // the tiles travelled are the steps of the stored course
-    const course = Array.from({ length: 13 }, (_, k) => tileAtCoords(state.map, 5 + k, 5).index);
+    const course = Array.from({ length: 14 }, (_, k) => tileAtCoords(state.map, 5 + k, 5).index);
     const route: TradeRoute = { from: 0, course };
-    expect(routeTravelTiles(route)).toBe(12);
     expect(routeLengthGold(state, 0, route)).toBe(0);
     suzerainOf(state, 'routeLengthGold');
-    expect(routeLengthGold(state, 0, route))
-      .toBe(HUNZA_ROUTE_GOLD * Math.floor(12 / HUNZA_TILES_PER_GOLD));
-    // a longer course travels further
-    route.course = [...course, tileAtCoords(state.map, 18, 5).index, tileAtCoords(state.map, 19, 5).index];
-    expect(routeTravelTiles(route)).toBe(14);
+    // floor((14 x 51 + 25) / 256): fourteen plots pay 2, fifteen 3
+    expect(HUNZA_PATH_TILE_GOLD_FX).toBe(51);
+    expect(routeLengthGold(state, 0, route)).toBe(2);
+    route.course = [...course, tileAtCoords(state.map, 19, 5).index];
+    expect(routeLengthGold(state, 0, route)).toBe(3);
   });
 });
 

@@ -23,7 +23,7 @@ import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect } from './cityStates';
 import { cityImprovedResourceKinds, completedDistrictCount } from './yields';
-import { CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_ROUTE_GOLD, HUNZA_TILES_PER_GOLD, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
 import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
@@ -92,16 +92,14 @@ export function routePostGold(state: GameState, seat: number, destCenter: number
   return 1 + (suzerainEffect(state, seat, 'routePostGold') ? 1 : 0);
 }
 
-/** The tiles a route TRAVELS: the steps of its stored course. */
-export function routeTravelTiles(r: TradeRoute): number {
-  return Math.max((r.course ?? []).length - 1, 0);
-}
-
 /** CIV6 (Hunza): "+1 Gold for every 5 tiles a Trade Route travels"
- *  (`MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE`, Amount 0.2). */
+ *  (`MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE`, Amount 0.2).
+ *  Trade_Manager 0x54bdb0: n the plots of the route's path, both ends
+ *  included; the yield is floor(n x a + a / 2) in 24.8 fixed point. */
 export function routeLengthGold(state: GameState, seat: number, r: TradeRoute): number {
   if (!suzerainEffect(state, seat, 'routeLengthGold')) return 0;
-  return HUNZA_ROUTE_GOLD * Math.floor(routeTravelTiles(r) / HUNZA_TILES_PER_GOLD);
+  const n = (r.course ?? []).length;
+  return Math.floor((n * HUNZA_PATH_TILE_GOLD_FX + (HUNZA_PATH_TILE_GOLD_FX >> 1)) / 256);
 }
 
 /** CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the destination" of an

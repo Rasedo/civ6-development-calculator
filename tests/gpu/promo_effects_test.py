@@ -291,7 +291,8 @@ def test_spread_promos(sim) -> None:
     fctr = int(sim.city_center[0, other, 0])
     assert fctr >= 0 and bool(sim.city_alive[0, other, 0]), "no foreign city to spread into"
     near = free_tile(sim, fctr)
-    lump = int(sim._enh["mlump"][int(sim.civ_enhancer[0, ROW]) + 1])
+    lump = round(int(sim._rel_strength[sim._apostle_idx]) * sim._spread_strength_pct / 100
+                 * float(sim._enh["spreadMult"][int(sim.civ_enhancer[0, ROW]) + 1]))
 
     sim.city_pressure[0, other, 0, :] = 0
     sim.city_pressure[0, other, 0, other] = 400

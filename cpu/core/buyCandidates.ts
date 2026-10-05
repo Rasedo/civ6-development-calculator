@@ -17,12 +17,12 @@ import { tradeCourse, tradeReach } from './tradePath';
 import { isExplored } from './fog';
 import {
   buildingFaithCost, faithBuyableClass, faithBuysLandUnits, goldAffordable, naturalistCost, rockBandCost,
-  settlerCost, tilePurchaseCost, unitFaithCost, unitPurchaseCost, unitsAcquired, wallsGoldBlocked, buildingPurchaseCost } from './game';
+  settlerCost, tilePurchaseCost, unitFaithCost, unitFaithPrice, unitPurchaseCost, unitsAcquired, wallsGoldBlocked, buildingPurchaseCost } from './game';
 import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
 import { pickBorderTile } from './city';
-import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, ENHANCER_BELIEFS } from '../data/religion';
+import { MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP } from '../data/religion';
 import { buildingCompletable, purchasableBuildings, worshipOffered } from './rules';
 import { computeUnlocks, isCivicComplete, goldPrice, faithPrice, makeYieldCtx } from './effects';
 import { congressUdtBlockedDistrict } from './congress';
@@ -226,7 +226,7 @@ export function faithLandUnitCandidate(state: GameState, actor: Seat): { ok: boo
   for (const def of trainableUnits(state, actor.seat)) {
     if ((def.combat ?? 0) <= 0 || def.naval || def.air !== undefined || def.noGold) continue;
     if (purchaseSpotBlocked(state, spawn, actor.seat, def.id)) continue;
-    const cost = faithPrice(state, actor.seat, unitFaithCost(def.id, 1, unitsAcquired(state, actor.seat, def.id)));
+    const cost = unitFaithPrice(state, actor.seat, def.id, spawn)!;
     if (!goldAffordable(actor.faith ?? 0, cost)) continue;
     if (def.combat > pickCombat) {
       pickCombat = def.combat;
@@ -363,10 +363,9 @@ export function buyContext(state: GameState, seat: number): BuyContext {
     const shrineCity = cities.find((c) => c.buildings.includes('SHRINE') && holySiteOk(state, c) && follows(c));
     const templeCity = cities.find((c) => c.buildings.includes('SHRINE') && c.buildings.includes('TEMPLE')
       && holySiteOk(state, c) && follows(c));
-    const eb = actor.religion.enhancer ? ENHANCER_BELIEFS[actor.religion.enhancer]?.effects : undefined;
-    const price = (t: string, mult = 1) => faithPrice(state, seat, unitFaithCost(t, mult, unitsAcquired(state, seat, t)));
+    const price = (t: string) => unitFaithPrice(state, seat, t)!;
     if (shrineCity && liveUnits(state, seat, 'MISSIONARY') < MISSIONARY_CAP
-      && goldAffordable(faith, price('MISSIONARY', eb?.missionaryCostMult ?? 1))) {
+      && goldAffordable(faith, price('MISSIONARY'))) {
       out.missionary_ok = true;
       out.missionary_city = shrineCity.centerIndex;
     }
@@ -393,7 +392,7 @@ export function buyContext(state: GameState, seat: number): BuyContext {
       return rel >= 0 && seatOf(state, rel)?.religion.follower === 'WARRIOR_MONKS'
         && c.buildings.includes('TEMPLE') && holySiteOk(state, c);
     });
-    if (monkCity && goldAffordable(faith, faithPrice(state, seat, unitFaithCost('WARRIOR_MONK', 1, unitsAcquired(state, seat, 'WARRIOR_MONK'))))) {
+    if (monkCity && goldAffordable(faith, faithPrice(state, seat, unitFaithCost('WARRIOR_MONK', unitsAcquired(state, seat, 'WARRIOR_MONK'))))) {
       out.monk_ok = true;
       out.monk_city = monkCity.centerIndex;
     }

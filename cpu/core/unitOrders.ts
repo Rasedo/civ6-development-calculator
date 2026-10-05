@@ -2,7 +2,8 @@ import type { GameState, Seat, Tile, Unit } from './types';
 import { disbandUnit } from './units';
 import { neighbors } from '../../world/hex';
 import { allCities } from './seats';
-import { ENHANCER_BELIEFS, SPREAD_PRESSURE, followedReligionOf, unconvertedOf } from '../data/religion';
+import { ENHANCER_BELIEFS, SPREAD_STRENGTH_PCT, followedReligionOf, unconvertedOf } from '../data/religion';
+import { UNITS } from '../data/units';
 import { promoFirstUse, promoValue } from './promotions';
 
 export function snipeRing(state: GameState, here: Tile): number[] {
@@ -39,9 +40,9 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   // civilizations" — and the page's note extends it to city-states.
   const foreign = target.seat !== actor.seat ? Math.max(1, promoValue(unit, 'TRANSLATOR')) : 1;
   // CIV6 (Spread Religion): "Pressure = 2.2 * Apostle's current HP" — the
-  // lump scales with the spreader's health, on this model's compressed scale
-  // where the full-health lump is SPREAD_PRESSURE.
-  const lump = Math.floor(Math.round(SPREAD_PRESSURE * (eb?.spreadPressureMult ?? 1)) * unit.hp / 100) * foreign;
+  // unit's ReligiousStrength at SPREAD_STRENGTH_PCT, scaled by its health.
+  const full = Math.round((SPREAD_STRENGTH_PCT * (UNITS[unit.type].religiousStrength ?? 0) / 100) * (eb?.spreadPressureMult ?? 1));
+  const lump = Math.floor(full * unit.hp / 100) * foreign;
   let pres = target.religionPressure;
   if (!pres || pres.length !== nRel) {
     pres = new Array(nRel).fill(0);
@@ -49,10 +50,10 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
   }
   const wasFollowed = followedReligionOf(pres, target.population, unconvertedOf(target));
   pres[actor.seat] += lump;
-  // CIV6 (Spread Religion): the spread itself "reduces total Religious
-  // Pressure of all foreign religions in the city by 25%", and PROSELYTIZER
-  // raises the strip to its 50 (ModifierArguments APOSTLE_EVICT_ALL Amount 50).
-  const strip = Math.max(25, promoValue(unit, 'PROSELYTIZER'));
+  // CIV6 (Units.ReligionEvictPercent): the spread takes the unit's percent
+  // off every other religion's pressure (runs/h1_duelw1103 Lugdunum t124: a
+  // Missionary's 10, 1,000 -> 900), PROSELYTIZER raising it to its own.
+  const strip = Math.max(UNITS[unit.type].evictPct ?? 0, promoValue(unit, 'PROSELYTIZER'));
   if (strip > 0) {
     for (let g = 0; g < pres.length; g++) {
       if (g !== actor.seat) pres[g] = Math.floor(pres[g] * (100 - strip) / 100);

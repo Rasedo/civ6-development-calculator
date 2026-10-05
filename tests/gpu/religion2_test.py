@@ -16,7 +16,7 @@ Covered (all gate-unreachable):
      wire's missionary price buys exactly one missionary at the city center,
      faith down by exactly that price; the base
      row has 3 charges.
-  2. Missionary BUY pricing — HOLY_ORDER prices it 30% off (mcostMult row); SCRIPTURE
+  2. Missionary BUY pricing — HOLY_ORDER prices it 30% off (buyOff row); SCRIPTURE
      grants no extra charge (GS carries no mchg for it — the base 3).
   3. Missionary BUY gating — cap 2 (no third), no Shrine (no buy), incomplete /
      pillaged Holy Site (no buy).
@@ -83,10 +83,10 @@ def enh_rows(sim) -> dict:
 
     return {
         "ITINERANT": row(e["presR"] > 0),
-        "SCRIPTURE": row(e["mlump"] != e["mlump"][0]),
+        "SCRIPTURE": row(e["spreadMult"] != e["spreadMult"][0]),
         "JUST_WAR": row(e["cnear"] != 0),
         "DEFENDER": row(e["cdef"] != 0),
-        "HOLY_ORDER": row(e["mcostMult"] != float(e["mcostMult"][0])),
+        "HOLY_ORDER": row(e["buyOff"].sum(dim=1) > 0),
     }
 
 
@@ -257,7 +257,7 @@ def poke_missionary_buy(rules, rj, path):
 
 
 def poke_missionary_pricing(rules, rj, path):
-    """2. HOLY_ORDER prices the missionary 30% under the catalog base (mcostMult,
+    """2. HOLY_ORDER prices the missionary 30% under the catalog base (buyOff,
     CIV6 "Missionaries and Apostles are 30% cheaper to purchase"); SCRIPTURE
     grants no extra charge in GS (mchg 0), so its missionary carries the base 3."""
     sim = build(rules, path)
@@ -265,13 +265,12 @@ def poke_missionary_pricing(rules, rj, path):
     E = enh_rows(sim)
     SHRINE, TEMPLE = sim._shrine_bidx, sim._temple_bidx
     cost = float(sim._unit_faith_cost(r + 1, sim._missionary_idx)[0])
-    # CIV6 (Holy Order): the discount rides the whole Cost, progression included
-    mm = sim._enh["mcostMult"][E["HOLY_ORDER"] + 1]
-    ho_raw = round(cost * float(mm))   # `unitFaithCost`'s twin: the rate, before the till
-    got = int(sim._unit_faith_cost(r + 1, sim._missionary_idx, mm)[0])
-    assert got == ho_raw, f"HOLY_ORDER missionary price must be {ho_raw}, read {got}"
+    # CIV6 (Holy Order): the percent comes off the whole Cost, progression included
+    off = float(sim._enh["buyOff"][E["HOLY_ORDER"] + 1, sim._missionary_idx])
+    assert off == 30.0, f"HOLY_ORDER is 30% off the Missionary, read {off}"
+    assert float(sim._enh["buyOff"][E["HOLY_ORDER"] + 1, sim._apostle_idx]) == 30.0, "and off the Apostle"
     # what the till charges: the five-step floor every price takes (measured; `_faith_price`)
-    ho = (ho_raw // int(sim.rules.purchase_divisor)) * int(sim.rules.purchase_divisor)
+    ho = (int(cost * (1 - off / 100)) // int(sim.rules.purchase_divisor)) * int(sim.rules.purchase_divisor)
     assert int(sim._enh["mchg"][E["SCRIPTURE"] + 1]) == 0, "GS SCRIPTURE carries no charge bonus"
     assert int(sim._type_charges[sim._missionary_idx]) == 3, "base missionary charges must be 3"
 

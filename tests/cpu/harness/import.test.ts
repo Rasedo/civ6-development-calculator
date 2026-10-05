@@ -266,7 +266,8 @@ describe('the checks', () => {
     const b = record(11, { units: [{ ...record(10).units[0], spreadCharges: 1, religion: 3 }, record(10).units[1]] });
     const acts = diffActions(a, b);
     expect(acts.unitsNew.map((u) => u.plot)).toEqual([9]);
-    expect(acts.spreads).toEqual([{ owner: 0, religion: 3, plot: 8 }]);
+    expect(acts.spreads.map(({ owner, religion, plot, n }) => ({ owner, religion, plot, n })))
+      .toEqual([{ owner: 0, religion: 3, plot: 8, n: 1 }]);
   });
 });
 

@@ -1472,7 +1472,11 @@ class SimOrders:
                         # the minor by centre tile the same way)
                         nrows = self.n_majors + self.S
                         tc_sp = tgt_sp.clamp(min=0)
-                        lump = self._enh["mlump"][self.civ_enhancer[:, row] + 1]
+                        # the unit's ReligiousStrength at the spread's
+                        # percent, times the enhancer's multiplier
+                        _rs = self._rel_strength[utp.clamp(min=0)].double()
+                        lump = js_round(_rs * self._spread_strength_pct / 100
+                                        * self._enh["spreadMult"][self.civ_enhancer[:, row] + 1]).long()
                         pm = (
                             ok_sp.reshape(B, 1, 1)
                             & self.city_alive[:, :nrows]
@@ -1495,11 +1499,11 @@ class SimOrders:
                             # CIV6 (Proselytizer): "Religious spread eliminates
                             # 75% of existing pressure from other Religions in
                             # the target city."
-                            # CIV6 (Spread Religion): the spread itself
-                            # "reduces total Religious Pressure of all foreign
-                            # religions in the city by 25%"; PROSELYTIZER
-                            # raises the strip to its 75.
-                            _st = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER").clamp(min=25)
+                            # CIV6 (Units.ReligionEvictPercent): the spread
+                            # takes the unit's percent off every other
+                            # religion's pressure; PROSELYTIZER raises it.
+                            _st = torch.maximum(self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "PROSELYTIZER"),
+                                                self._type_evict[utp[pb].clamp(min=0)])
                             _hit = _st > 0
                             if bool(_hit.count_nonzero()):
                                 _hb, _hr, _hj, _hs = pb[_hit], pr[_hit], pj[_hit], _st[_hit]

@@ -435,23 +435,37 @@ the climate component's turn (0x2d1f20's component, the one the district
 repair's FLOODED / CONTAMINATED reasons read). The engines' `endTurn` runs
 `disasterPhase` then `climateTurn`, the same order.
 
-## C-20 tail: the trade path's land and water tests — PARTLY READ
+## C-20 tail: the trade path's land and water tests and the switch — READ
 
 IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's
-virtual +0x40 holds (a district stands there, unread), they read the plot
-info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4:
-land = bit 4 and not bit 1, water = bit 1 and not bit 4; a plot carrying
-both (or neither) is neither land nor water, so the 10000 switch cannot fire
-on it. Without a district: land = not water (0x834d0). Unread: which of those
-bits a City Centre's, a Harbor's and a Canal's plot carry (who writes word
-+0x14). Recorded (runs/h1_duelw1108 t182–211): Rome's Trader to Shenyang walks
-618 (land) -> its Harbor 617 -> Ocean, a path the 10000 would forbid against
-a 21-plot coast path, so a TradeEmbark district's plot is neither land nor
-water: a step onto or off one is no switch. The range callback's refuel
-(0x5579b0) needs the FROM plot to hold the refuelling district, so the
-switch cost could only fire on a land<->water step with no TradeEmbark
-district at either end, which the node test (0x558db0) refuses: the engines
-walk no switch at all (`walk` / `_trade_reach`).
+virtual +0x40 holds (a district stands there), they read the plot info's word
++0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4: land = bit 4
+and not bit 1, water = bit 1 and not bit 4; a plot carrying both (or neither)
+is neither land nor water. Without a district: land = not water (0x834d0).
+Who writes word +0x14 is unread; the records fix the answers (below).
+
+The range callback 0x5579b0, per edge: r = the from-node's range; a switch
+(0x558300) caps r at 1; a from-plot holding a TradeEmbark district of the
+origin city or of a city with the player's trading post refuels r to the land
+refuel onto land, the water refuel onto water, the larger of the two onto a
+plot that is neither; else a TradeEmbark district of the destination's city
+to 3 (+0x1b0); a refuel sets the context's flag +0x1cc. left = r - 1. The step
+cost 0x558970 swaps its 100 for 10100 (0x558a08) when 0x558300 answers a
+switch and the flag is clear. (The context's +0x1a2, a player-trade count
++0x4b0 / +0x510 <= 0, is set in every recorded game; clear, it would hold the
+base range and the land refuel at 3 and cap every step onto land at 1.)
+
+Recorded, runs/h1_duelw1108: Rome's Trader to Shenyang walks 618 (land) -> its
+Harbor 617 -> Ocean at t182 (Antium not yet founded: every way to sea pays a
+switch) and, from t212 with Antium standing, Rome -> Antium's centre 796 ->
+the coast -> Shenyang's Harbor 479 -> 522, 21 plots against 13: the step onto
+Rome's Harbor is a switch that pays 10000 (a Harbor's plot is water), the step
+from Antium's centre to sea is none or refuelled (a City Centre's plot is
+neither). China's Jiaodong -> Rome (t200) walks Shenyang's centre 522 -> its
+Harbor 479 -> sea with no post in Shenyang: a switch there would leave range
+0 at the Harbor and refuse the next step, so the centre is neither land nor
+water. The engines (`walk` / `_trade_reach`): a City Centre's plot neither,
+every other plot its ground; route.originYields on the six duels 112 -> 44.
 
 ## C-49 tail: the storm's start plot — READ
 
@@ -720,6 +734,52 @@ fraction bits (every amount is written `<< 8`).
   raises a player's great-work identity pressure (+0x588, + Great Works x
   +0x1aec) at a plot whose owner it dominates by 25%, before the distance
   falloff (gp +0xf0). No engine term matched yet (AUDIT C-94 BUILD).
+
+## H-1: a route's yield per path plot (Hunza) — READ
+
+Trade_Manager 0x54bdb0 (a route's yield of one type): the route's path from
+the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its
+plots (4-byte entries, both ends included); the posts counted on it
+(0x5500b0) times the player's own / foreign post bonuses (0x4d9750,
+0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector
++0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE writes through
+0x4d8220): floor(n x a + a / 2) in 24.8 fixed point (`and ebx, 0xffffff00`),
+a = Hunza's 0.2 held as 51. Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza
+(10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108; the
+engines' `routeLengthGold` / `_route_length_gold`). The route's path is laid
+once, when the route begins: the harness keeps the course the first record
+carrying a route laid (`History.routeCourse`).
+
+## H-1: the annex, the purchase and the stored next plot — READ
+
+0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city
+culture's stored next plot (+0x1c) to -1 and counts the plot (+0xc). Its
+callers: the culture turn (0x1a9bc0, which then draws and stores a fresh
+plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot
+swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route
+(0x558510) and the Gold purchase (0x977aa0: the price spent through
+0x4e02e0, then the annex). A purchase made after the turn's culture step so
+leaves the city with no stored plot until its next culture turn (the
+records' -1 after an AI's purchase: 1108 Chengdu t159–162); the engines
+clear it in `buyTile` / the GPU's tile purchase. Which record a purchase
+lands in against the culture step (the human seat's purchases fall before
+its next turn's step, the AI's after) is the harness's to read, so a city
+the record shows holding no plot after a plot gained stays a skip.
+
+## H-1: a religious unit's spread — PARTLY READ
+
+0x968e20 (the spread's pressure, a unit's): max(0, ReligiousStrength (unit
++0x1ce0) x RELIGION_SPREAD_STRENGTH_MULTIPLIER (gp +0x5f4, 200) / 100 −
+unit +0xcf0), then, when the caller's flag is set and the unit's +0x1d00 is
+positive, x (100 + it) / 100. Recorded: a full-health Missionary lands 200,
+an Apostle 220 (1108 Rome t108–110, Aquileia t239–240; 1104 Nanjing t233),
+and the spread takes the unit's Units.ReligionEvictPercent off every other
+religion (Missionary 10: 1103 Lugdunum 1,000 → 900 → 810 → 729), never off
+the unconverted. The engines: `spreadFromUnit` / the GPU's spread arm (the
+strength at SPREAD_STRENGTH_PCT, the enhancer's multiplier, the health
+scale, `evictPct`). Unread: what +0xcf0 holds (the engines scale by health)
+and who writes +0x1d00 — 1103 t144 / t191 and 1106 t179 Missionaries land
+250 with no Scripture in the religion, while 1103 t124 and 1108 land 200.
 
 ## C-94: the wounded law and the garrison — READ
 

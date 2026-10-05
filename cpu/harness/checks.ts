@@ -25,7 +25,8 @@
  * `gaps` lists the importer's roster gaps that touch the subject, so the
  * report can separate a clean failure from one an unimported row explains.
  */
-import type { City, CityState, GameState, Tile } from '../core/types';
+import type { City, CityState, GameState, Tile, Unit } from '../core/types';
+import { spreadFromUnit } from '../core/unitOrders';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
@@ -33,7 +34,7 @@ import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
+import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn, buildingFullCost } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
@@ -47,7 +48,7 @@ import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
-import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
+import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
@@ -104,7 +105,7 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
 
 /** the checks no plot of the city's feeds: a dropped row on one of its plots,
  *  or a dropped resource of its seat's, is no gap of theirs */
-const PLOT_BLIND = new Set(['buy.buildingCost', 'buy.buildingGold', 'buy.unitCost', 'buy.unitGold',
+const PLOT_BLIND = new Set(['buy.buildingCost', 'buy.buildingGold', 'buy.buildingFaith', 'buy.unitCost', 'buy.unitGold', 'buy.unitFaith',
   'buy.districtCost', 'buy.plotGold', 'city.defense', 'city.growthThreshold', 'step.pressure']);
 
 /** the checks an unrecorded National Park moves: its amenities and the tier
@@ -297,7 +298,14 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       out.push({ turn, check, subject, ok, game, ours, ...gapsFor(buyGaps, check), ...(ok || !st ? {} : { state: st }) });
     const unlocks = computeUnlocks(state, city.seat);
     const s = seatOf(state, city.seat)!;
-    for (const [kind, idx, cost, gold] of c.buy) {
+    // the faith price the record quotes beside the gold one: checked where an
+    // engine arm buys the row with Faith; the game's reader quotes a faith
+    // price for every row, so a row no arm buys has nothing to check
+    const faithPush = (check: string, ours: number | null, game: Read<number>, st: Record<string, unknown>) => {
+      if (ours === null || !num(game)) out.push({ turn, check, subject, ok: true, skip: 'no faith purchase' });
+      else buyPush(check, ours === num(game), num(game), ours, st);
+    };
+    for (const [kind, idx, cost, gold, faith] of c.buy) {
       if (kind === 'B') {
         if (cat.wonders.includes(cat.buildings[idx])) continue;
         const id = engineRowOf(cat, 'building', idx);
@@ -316,6 +324,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         } else {
           buyPush(`buy.buildingCost`, near(ours, num(cost), 0.5), num(cost), ours, { building: id });
         }
+        faithPush('buy.buildingFaith', buildingFaithPrice(state, city.seat, id), faith, { building: id });
         // a building the seat cannot buy with Gold has no gold price to check:
         // a row with no PurchaseYield, and the walls a Valletta suzerain buys
         // with Faith alone (the reader still quotes them, at the suzerain's
@@ -336,6 +345,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
           : (id === 'BUILDER' ? builderCost(state, city.seat) : id === 'TRADER' ? traderCost(state, city.seat)
             : unitStepCost(id, unitsAcquired(state, city.seat, id))) * unitProdCostMult(state, city.seat, id);
         buyPush(`buy.unitCost`, near(prod, num(cost), 0.5), num(cost), prod, { unit: id });
+        faithPush('buy.unitFaith', unitFaithPrice(state, city.seat, id, city), faith, { unit: id });
         // a chassis bought with Faith alone has no gold purchase to price: the
         // faith-only rows and every progressive one (PurchaseYield YIELD_FAITH,
         // MustPurchase)
@@ -460,8 +470,11 @@ export interface Actions {
   cityChanged: Set<string>;
   /** units that appeared, by owner, with their plot */
   unitsNew: { owner: number; type: number; plot: number }[];
-  /** religious units that spent a spread charge, with their t+1 plot */
-  spreads: { owner: number; religion: number; plot: number }[];
+  /** religious units that spent a spread charge, with their t+1 plot (their
+   *  t plot when gone), their type, health and promotions at t and the
+   *  charges spent (null: gone, where and how often it spread before unknown) */
+  spreads: { owner: number; religion: number; plot: number; type: number; hp: number; promos: number;
+    n: number | null }[];
   /** plots a city holds at t+1 and did not at t */
   plotsGained: Map<string, number[]>;
   /** seats whose gold fell below what their income would leave */
@@ -471,6 +484,15 @@ export interface Actions {
   popOutsideBox: Set<string>;
   /** players whose turn start had not run when the later record was read */
   notStarted: Set<number>;
+}
+
+/** the living city centres at `here` or beside it — where a religious unit
+ *  standing on `here` may spread */
+function spreadCentres(state: GameState, here: Tile): Tile[] {
+  const at = [here, ...neighbors(state.map, here).filter((t): t is Tile => !!t)];
+  const centres = new Set([...state.seats.flatMap((x) => x.cities.map((c) => c.centerIndex)),
+    ...state.cityStates.map((c) => c.centerIndex), ...(state.freeSeat?.cities ?? []).map((c) => c.centerIndex)]);
+  return at.filter((t) => centres.has(t.index));
 }
 
 export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
@@ -487,14 +509,16 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const was = unitsBefore.get(`${u.owner}:${u.id}`);
     if (!was) unitsNew.push({ owner: u.owner, type: u.type, plot: u.y * b.head.W + u.x });
     else if (num(was.spreadCharges) > num(u.spreadCharges)) {
-      spreads.push({ owner: u.owner, religion: num(u.religion), plot: u.y * b.head.W + u.x });
+      spreads.push({ owner: u.owner, religion: num(u.religion), plot: u.y * b.head.W + u.x, type: u.type,
+        hp: 100 - num(was.damage), promos: (was.promotions ?? []).length, n: num(was.spreadCharges) - num(u.spreadCharges) });
     }
   }
   // a religious unit that spent its last charge is gone at t+1
   const unitsAfter = new Set(b.units.map((u) => `${u.owner}:${u.id}`));
   for (const u of a.units) {
     if (!unitsAfter.has(`${u.owner}:${u.id}`) && num(u.spreadCharges) > 0) {
-      spreads.push({ owner: u.owner, religion: num(u.religion), plot: u.y * a.head.W + u.x });
+      spreads.push({ owner: u.owner, religion: num(u.religion), plot: u.y * a.head.W + u.x, type: u.type,
+        hp: 100 - num(u.damage), promos: (u.promotions ?? []).length, n: null });
     }
   }
   const plotsGained = new Map<string, number[]>();
@@ -683,9 +707,35 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       if (r.owner === owner && sx) (sx.tradeRoutes ??= []).push(r.route);
     }
   };
+  // a Missionary's or Apostle's spread on its owner's turn, after the
+  // owner's religion spread: the engine's own `spreadFromUnit` on the one
+  // city centre at or beside the unit (runs/h1_duelw1108: Rome +202 a
+  // charge t108-110, 200 of it the spread); a spread the record leaves
+  // unclear (a promoted unit, a unit gone — it may have moved before its
+  // last spread —, no single centre in reach, a religion not its owner's)
+  // stays a skip
+  const unclear: number[] = [];
+  const unitTurn = (seat: number) => {
+    for (const sp of acts.spreads) {
+      if (spreadImp.seatOfPlayer.get(sp.owner) !== seat) continue;
+      const type = engineRowOf(cat, 'unit', sp.type);
+      const actor = seatOf(spreadState, seat);
+      const here = spreadState.map.tiles[sp.plot];
+      const centres = spreadCentres(spreadState, here);
+      if (!actor || sp.n === null || sp.promos > 0 || (type !== 'MISSIONARY' && type !== 'APOSTLE')
+        || centres.length !== 1 || spreadImp.religionSeat.get(sp.religion) !== seat) {
+        unclear.push(sp.plot);
+        continue;
+      }
+      const unit: Unit = { id: -1, type, seat, tileIndex: sp.plot, movesLeft: 1, movesFull: 1, hp: sp.hp,
+        charges: sp.n + 1, xp: 0, level: 1 };
+      for (let k = 0; k < sp.n; k++) spreadFromUnit(spreadState, unit, actor, centres[0]);
+    }
+  };
   for (const s of spreadState.seats) {
     growAt(s.seat);
     spreadReligiousPressure(spreadState, s.seat);
+    unitTurn(s.seat);
     routeTurn(s.seat);
   }
   for (const cs of spreadState.cityStates ?? []) growAt(cs.seat);
@@ -808,7 +858,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       }
       // religious pressure
       const sc = spreadCities.get(`${seat}:${city.id}`);
-      const spreadNear = acts.spreads.some((s) => tileDistance(state, s.plot, city.centerIndex) <= 3);
+      const spreadNear = unclear.some((at) => tileDistance(state, at, city.centerIndex) <= 3);
       const relSkip = skipAll ?? (spreadNear ? 'a religious unit spread nearby' : null);
       if (!sc || relSkip || !next || !Array.isArray(next.religions) || !Array.isArray(c.religions)) {
         out.push({ turn, check: 'step.pressure', subject, ok: true, skip: relSkip ?? 'no reader' });

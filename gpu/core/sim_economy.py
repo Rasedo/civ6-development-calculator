@@ -3937,13 +3937,17 @@ class SimEconomy:
         price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
         return self._purchase_step(price)
 
-    def _faith_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
+    def _faith_price(self, row: int, price: torch.Tensor, off: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent
-        off every FAITH purchase, then the five-step floor —
+        off every FAITH purchase, summed with the item's own percents off
+        (`off`, broadcast against `price`), then the five-step floor —
         `faithPrice`'s twin."""
-        f = 1 - self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64) / 100
-        price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
-        return self._purchase_step(price)
+        d = self._gov_mods(row)[12]["faithbuydisc"].to(torch.float64)
+        if price.dim() > 1:
+            d = d.reshape(-1, *([1] * (price.dim() - 1)))
+        if off is not None:
+            d = d + off
+        return self._purchase_step(price * (1 - d / 100).clamp(min=0))
 
     def _seat_slotted(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` actually holds, its AGE and era

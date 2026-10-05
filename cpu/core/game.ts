@@ -25,7 +25,7 @@ import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult,
 import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
 import { commitProduction, domesticTourists, visitingTourists } from './seatTurn';
-import { completedWonders, seatWonderFlag } from './wonders';
+import { completedWonders, seatWonderFlag, seatWonderSum } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
@@ -600,8 +600,54 @@ export function faithBuysLandUnits(state: GameState, seat: number): boolean {
  *  charges it once per copy the seat has already acquired, and the discount
  *  applies to that whole Cost — the install progresses the Cost and modifies
  *  the total. `copies` 0 is the catalog row the exporter ships. */
-export function unitFaithCost(unitType: string, mult = 1, copies = 0): number {
-  return Math.round(unitStepCost(unitType, copies) * FAITH_PURCHASE_MULT * mult);
+export function unitFaithCost(unitType: string, copies = 0): number {
+  return Math.round(unitStepCost(unitType, copies) * FAITH_PURCHASE_MULT);
+}
+
+/** The faith price `seat` pays for a unit now, null where no faith purchase
+ *  arm buys it: the faith-only chassis and the Naturalist at their copies (a
+ *  Missionary at its enhancer's mult), the land combat units (Theocracy's and
+ *  the Chapel's grant), the Builder and Settler under Monumentality. */
+export function unitFaithPrice(state: GameState, seat: number, unitType: string, city?: City): number | null {
+  const def = UNITS[unitType];
+  if (!def) return null;
+  if (unitType === 'BUILDER' || unitType === 'SETTLER') {
+    if (!goldenDedication(state, seat, DED_MONUMENTALITY)) return null;
+    const base = unitType === 'SETTLER' ? settlerCost(state, seat) : builderCost(state, seat);
+    return faithPrice(state, seat, base * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat));
+  }
+  const land = (def.combat ?? 0) > 0 && !def.naval && def.air === undefined;
+  if (!def.faithOnly && unitType !== 'NATURALIST' && !land) return null;
+  return faithPrice(state, seat, unitFaithCost(unitType, unitsAcquired(state, seat, unitType)),
+    unitBuyOffPct(state, seat, unitType, city));
+}
+
+/** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_UNIT(S)_PURCHASE_COST): the percents
+ *  off one unit's purchase, summed — the seat's founded religion's Holy
+ *  Order (Missionary, Apostle), its Meenakshi Temple (Guru), and in the
+ *  buying `city` Ngazargamu's per Encampment building row (land units
+ *  bought with more than Faith). */
+export function unitBuyOffPct(state: GameState, seat: number, unitType: string, city?: City): number {
+  const rel = seatOf(state, seat)?.religion;
+  const eb = rel?.founded && rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer]?.effects : undefined;
+  let off = eb?.unitBuyOffPct?.[unitType] ?? 0;
+  if (unitType === 'GURU') off += seatWonderSum(state, seat, 'guruBuyOffPct');
+  // the domain-wide row passes over the chassis bought with Faith alone
+  // (runs/h1_duelw1103 Jiaodong t190-210: its Rock Band at full price beside
+  // its land units at 20% a row off)
+  const def = UNITS[unitType];
+  if (city && unitIsLandDomain(unitType) && !def?.faithOnly && !def?.naturalist) {
+    off += Math.round((1 - suzerainLandPurchaseMult(state, seat, city)) * 100);
+  }
+  return off;
+}
+
+/** The faith price `seat` pays for a building now, null where no faith
+ *  purchase arm buys it: the worship buildings and the classes a Valletta
+ *  suzerain or Songs of the Jeli opens. */
+export function buildingFaithPrice(state: GameState, seat: number, buildingId: string): number | null {
+  if (!BUILDINGS[buildingId]?.worship && !faithBuyableClass(state, seat, buildingId)) return null;
+  return faithPrice(state, seat, buildingFaithCost(state, seat, buildingId));
 }
 
 /** CIV6 (COST_PROGRESSION_PREVIOUS_COPIES): a chassis's Cost after `copies`
@@ -715,7 +761,7 @@ export function buyWorshipBuilding(state: GameState, cityId: number, seat: numbe
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = faithPrice(state, seat, buildingFaithCost(state, seat, wid));
+  const cost = buildingFaithPrice(state, seat, wid)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(wid);
@@ -741,7 +787,7 @@ export function purchaseBuildingWithFaith(state: GameState, cityId: number, buil
   if (!buildingCompletable(state, city, buildingId)) {
     return { ok: false, reason: 'Its district (or prerequisite building) must be finished first.' };
   }
-  const cost = faithPrice(state, city.seat, buildingFaithCost(state, city.seat, buildingId));
+  const cost = buildingFaithPrice(state, city.seat, buildingId)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   buyer.faith = (buyer.faith ?? 0) - cost;
   city.buildings.push(buildingId);
@@ -771,7 +817,7 @@ export function purchaseUnitWithFaith(state: GameState, cityId: number, unitType
   if (!trainableUnits(state, seat, city).some((d) => d.id === unitType)) {
     return { ok: false, reason: 'Unit not available (enable units mode / research).' };
   }
-  const cost = faithPrice(state, seat, unitFaithCost(unitType, 1, unitsAcquired(state, seat, unitType)));
+  const cost = unitFaithPrice(state, seat, unitType, city)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'Nowhere to place it.' };
@@ -1062,11 +1108,7 @@ export function purchaseReligiousUnit(
   const live = state.units.filter((u) => u.seat === seat && u.type === unitType).length;
   if (live >= cap) return { ok: false, reason: `${unitType} cap reached.` };
   const eb = buyer.religion.enhancer ? ENHANCER_BELIEFS[buyer.religion.enhancer]?.effects : undefined;
-  const cost = faithPrice(state, seat, unitFaithCost(
-    unitType,
-    unitType === 'MISSIONARY' ? (eb?.missionaryCostMult ?? 1) : 1,
-    unitsAcquired(state, seat, unitType),
-  ));
+  const cost = unitFaithPrice(state, seat, unitType)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   // CIV6 (Missionary / Apostle / Inquisitor): purchased "in a city that has a
   // majority religion and a Holy Site" with the tier's building — the
@@ -1119,7 +1161,7 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   if (!ht?.districtComplete || ht.districtPillaged) {
     return { ok: false, reason: 'Needs a complete, unpillaged Holy Site.' };
   }
-  const cost = faithPrice(state, seat, unitFaithCost('WARRIOR_MONK', 1, unitsAcquired(state, seat, 'WARRIOR_MONK')));
+  const cost = faithPrice(state, seat, unitFaithCost('WARRIOR_MONK', unitsAcquired(state, seat, 'WARRIOR_MONK')));
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1161,8 +1203,7 @@ export function purchaseCivilianWithFaith(
   if (unitType === 'SETTLER' && city.population < 2) {
     return { ok: false, reason: 'A city of 1 population cannot buy a settler.' };
   }
-  const base = unitType === 'SETTLER' ? settlerCost(state, seat) : builderCost(state, seat);
-  const cost = faithPrice(state, seat, base * FAITH_PURCHASE_MULT * monumentalityBuyMult(state, seat));
+  const cost = unitFaithPrice(state, seat, unitType)!;
   if (!goldAffordable(buyer.faith ?? 0, cost)) return { ok: false, reason: `Not enough faith (${cost} needed).` };
   const u = spawnUnit(state, unitType, city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
@@ -1232,12 +1273,12 @@ export function purchaseRockBand(state: GameState, cityId: number, seat: number)
 /** the live faith price of a Rock Band — the catalog row at the copies this
  *  seat already holds to its name. */
 export function rockBandCost(state: GameState, seat: number): number {
-  return unitFaithCost('ROCK_BAND', 1, unitsAcquired(state, seat, 'ROCK_BAND'));
+  return unitFaithCost('ROCK_BAND', unitsAcquired(state, seat, 'ROCK_BAND'));
 }
 
 /** the live faith price of a Naturalist — the same progression shape. */
 export function naturalistCost(state: GameState, seat: number): number {
-  return unitFaithCost('NATURALIST', 1, unitsAcquired(state, seat, 'NATURALIST'));
+  return unitFaithCost('NATURALIST', unitsAcquired(state, seat, 'NATURALIST'));
 }
 
 export function itemCost(item: QueueItem, state?: GameState, city?: City): number {
@@ -1434,6 +1475,9 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
   // count the culture cost climbs on: the game's `GetCultureCost` counts the
   // plots taken by culture alone (runs/h1_duelw1103 / 1104).
   claimTile(state, city, tileIndex);
+  // the annex (0x1a8b70, the purchase's 0x977aa0 calls it) clears the city's
+  // stored next plot; its culture step draws one again
+  city.nextPlot = -1;
   return { ok: true };
 }
 

@@ -133,6 +133,9 @@ export interface BuiltWonderDef {
     /** CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY): units spawned free at
      *  the completing city, row by row and `count` of each. */
     grantUnits?: { unit: string; count: number }[];
+    /** CIV6 (Meenakshi Temple, MODIFIER_PLAYER_CITIES_ADJUST_UNIT_PURCHASE_COST
+     *  UNIT_GURU): the percent off the seat's Guru purchases. */
+    guruBuyOffPct?: number;
     /** CIV6 (Great Zimbabwe): "Your Trade Routes from this city get +2 Gold
      *  for every Bonus resource within 3 tiles of the city and in this
      *  city's territory." */
@@ -935,9 +938,13 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'MEENAKSHI_TEMPLE', name: 'Meenakshi Temple', code: 'MT', cost: 710,
       requiresCivic: 'CIVIL_SERVICE', placement: { adjacentDistrict: 'HOLY_SITE', requiresReligion: true },
       cityYields: { faith: 3 },
-      description: '+3 faith. Adjacent to a Holy Site, once the seat has a religion.',
+      effects: { grantUnits: [{ unit: 'GURU', count: 2 }], guruBuyOffPct: 30 },
+      description: '+3 faith, two Gurus, Gurus 30% cheaper to buy. Adjacent to a Holy Site, once the seat has a religion.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
+        'effects.grantUnits.0.unit': xml('ModifierArguments', 'ModifierId=MEENAKSHITEMPLE_FREE_GURU&Name=UnitType', 'Value', { expect: 'UNIT_GURU' }),
+        'effects.grantUnits.0.count': xml('ModifierArguments', 'ModifierId=MEENAKSHITEMPLE_FREE_GURU&Name=Amount', 'Value'),
+        'effects.guruBuyOffPct': xml('ModifierArguments', 'ModifierId=MEENAKSHITEMPLE_GURU_DISCOUNT&Name=Amount', 'Value'),
         cost: xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'Cost', { scale: GAME_SPEED }),
         requiresCivic: xml('Buildings', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE', 'PrereqCivic', { expect: 'CIVIC_CIVIL_SERVICE' }),
         'cityYields.faith': xml('Building_YieldChanges', 'BuildingType=BUILDING_MEENAKSHI_TEMPLE&YieldType=YIELD_FAITH', 'YieldChange'),

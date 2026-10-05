@@ -7,7 +7,7 @@ import { applySeatUnitOrders } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
 import { spawnUnit } from '../../../cpu/core/units';
 import type { GameState, Seat } from '../../../cpu/core/types';
-import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
+import { SPREAD_STRENGTH_PCT } from '../../../cpu/data/religion';
 
 // civ MISSIONARY chassis (mirror of the GPU religion2_test pokes). The
 // scripted 250t rollout barely reaches a civ that has founded a religion AND
@@ -28,7 +28,7 @@ function spreadHere(state: GameState, actor: Seat, unitId: number): void {
 }
 
 describe('civ missionary chassis', () => {
-  it('a missionary within 1 of a differing city spreads SPREAD_PRESSURE (x1.25 SCRIPTURE), loses a charge, dies at 0', () => {
+  it('a missionary within 1 of a differing city spreads SPREAD_STRENGTH_PCT (x1.25 SCRIPTURE), loses a charge, dies at 0', () => {
     // base lump 200 (CIV6 RELIGION_SPREAD_STRENGTH_MULTIPLIER), charges 2 -> survives at 1.
     {
       const state = newGame();
@@ -42,7 +42,7 @@ describe('civ missionary chassis', () => {
       u.charges = 2;
       const uid = u.id;
       spreadHere(state, civSeat, uid);
-      expect((target.religionPressure ?? [])[1]).toBe(SPREAD_PRESSURE);
+      expect((target.religionPressure ?? [])[1]).toBe(SPREAD_STRENGTH_PCT);
       const still = state.units.find((x) => x.id === uid);
       expect(still?.charges).toBe(1);
     }
@@ -60,7 +60,7 @@ describe('civ missionary chassis', () => {
       u.charges = 1;
       const uid = u.id;
       spreadHere(state, civSeat, uid);
-      expect((target.religionPressure ?? [])[1]).toBe(Math.round(SPREAD_PRESSURE * 1.25));
+      expect((target.religionPressure ?? [])[1]).toBe(Math.round(SPREAD_STRENGTH_PCT * 1.25));
       expect(state.units.find((x) => x.id === uid)).toBeUndefined();
     }
   });

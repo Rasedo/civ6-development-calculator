@@ -294,7 +294,7 @@ def main() -> None:
     assert sim._suz_water_cul == 2.0, "Nan Madol pays +2 Culture"
     assert sim._suz_dest_lux_gold == 1.0, "Amsterdam pays +1 Gold per destination luxury"
     assert (sim._suz_spice_n, sim._suz_spice_amen) == (2, 6), "Zanzibar is two luxuries of six"
-    assert (sim._suz_route_tiles_per, sim._suz_route_len_gold) == (5, 1.0), "Hunza is +1 per 5 tiles"
+    assert sim._suz_route_tile_fx == 51, "Hunza is 0.2 a path plot, 24.8 fixed point"
     assert sim._suz_proj_pct == 20.0, "Hong Kong is +20% on projects"
     assert sim._suz_buy_pct == 20.0, "Ngazargamu is 20% off per building"
     assert sim._suz_bonus_amen == 1, "Buenos Aires' bonus resource serves one city"
@@ -376,13 +376,14 @@ def main() -> None:
     assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "the discount outlived the suzerainty"
     print("ngazargamu ok — 20% a row, the pair sharing one, gone with the suzerainty")
 
-    # Hunza's tiles travelled: the steps of the stored course, plots less one
-    _crs = torch.full((sim.B, 2, 5), -1, dtype=torch.long)
-    _crs[:, 0, :4] = torch.tensor([10, 11, 12, 13])
-    _tt = sim._route_travel_tiles(_crs)
-    assert int(_tt[0, 0]) == 3, "four plots are three tiles travelled"
-    assert int(_tt[0, 1]) == 0, "no course travels nothing"
-    print("hunza ok — the tiles travelled are the course's steps")
+    # Hunza's gold: floor(n x 51 + 25) / 256 over the course's n plots
+    _crs = torch.full((sim.B, 3, 10), -1, dtype=torch.long)
+    _crs[:, 0, :4] = torch.arange(10, 14)
+    _crs[:, 1, :5] = torch.arange(10, 15)
+    _crs[:, 2, :10] = torch.arange(10, 20)
+    _hg = sim._route_length_gold(_crs)
+    assert [int(x) for x in _hg[0]] == [0, 1, 2], "four plots pay 0, five 1, ten 2"
+    print("hunza ok — the gold is the course's plots in fixed point")
 
     print("SUZERAIN RULES OK — every coded perk fires, only for the strict "
           "suzerain, and Geneva's percent only at peace")

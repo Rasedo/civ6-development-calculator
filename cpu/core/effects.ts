@@ -1879,11 +1879,13 @@ export function purchaseStep(price: number): number {
 }
 
 /** CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent off every
- *  FAITH purchase, then the five-step floor — `_faith_price` is the
- *  twin. */
-export function faithPrice(state: GameState, seat: number, price: number): number {
-  const d = getModifiers(state, seat).faithBuyDiscountPct;
-  return purchaseStep(d ? price * (1 - d / 100) : price);
+ *  FAITH purchase, summed with the item's own percents off (`offPct`: Holy
+ *  Order, the Meenakshi Temple, Ngazargamu — runs/h1_duelw1108 t249, Xian's
+ *  Guru 144 at 30 + 15 off quotes 75), then the five-step floor —
+ *  `_faith_price` is the twin. */
+export function faithPrice(state: GameState, seat: number, price: number, offPct = 0): number {
+  const d = getModifiers(state, seat).faithBuyDiscountPct + offPct;
+  return purchaseStep(d ? price * Math.max(0, 1 - d / 100) : price);
 }
 
 /** The cards seat `seat` has SLOTTED and may still use: its stored choice minus

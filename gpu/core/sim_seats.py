@@ -2072,8 +2072,10 @@ class SimSeats:
             # THE FAITH RUNG sells the same class out of the other purse. The
             # SCOUT skip below is the GOLD ladder's own preference, not a rule,
             # so it does not reach here.
+            _ngz_f = self._suz_land_buy_mult(row).gather(1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
             return mil & self._afford(self.civ_faith[:, row].unsqueeze(1),
-                                      self._faith_price(row, self._type_cost.double().unsqueeze(0) * self.rules.faith_purchase_mult))
+                                      self._faith_price(row, self._type_cost.double().unsqueeze(0) * self.rules.faith_purchase_mult,
+                                                        self._ngz_off(_ngz_f)))
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
@@ -2231,13 +2233,14 @@ class SimSeats:
         first_t = elig_t.long().argmax(dim=1)
         if self._missionary_idx >= 0:
             n_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
-            mcost = self._faith_price(row, self._unit_faith_cost(
-                row, self._missionary_idx, self._enh["mcostMult"].take(self.civ_enhancer[:, row] + 1)))
+            mcost = self._faith_price(row, self._unit_faith_cost(row, self._missionary_idx),
+                                      self._unit_buy_off(row, self._missionary_idx))
             m_ok = founded & (n_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost) & elig_s.any(dim=1)
             m_j = torch.where(m_ok, first_s, m_j)
         if self._apostle_idx >= 0:
             n_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
-            acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx))
+            acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx),
+                                      self._unit_buy_off(row, self._apostle_idx))
             a_ok = founded & (n_a < self._apostle_cap) & self._afford(self.civ_faith[:, row], acost) & elig_t.any(dim=1)
             a_j = torch.where(a_ok, first_t, a_j)
         if self._inquisitor_idx >= 0:
@@ -2249,7 +2252,8 @@ class SimSeats:
         # kind 18 — the Guru, a Temple's like the Apostle
         if self._guru_idx >= 0:
             n_g = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._guru_idx)).sum(dim=1)
-            gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx))
+            gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx),
+                                      self._unit_buy_off(row, self._guru_idx))
             g_ok = founded & (n_g < self._guru_cap) & self._afford(self.civ_faith[:, row], gcost) & elig_t.any(dim=1)
             g_j = torch.where(g_ok, first_t, g_j)
         return w_ok, w_j, m_ok, m_j, a_ok, a_j, q_ok, q_j, k_ok, k_j, g_ok, g_j
@@ -2418,19 +2422,27 @@ class SimSeats:
         return torch.floor(float(self._type_step_base[u_idx])
                            + self.civ_unit_acq[:, row, u_idx].double() * step)
 
-    def _unit_faith_cost(self, row: int, u_idx: int,
-                         mult: torch.Tensor | None = None) -> torch.Tensor:
+    def _unit_faith_cost(self, row: int, u_idx: int) -> torch.Tensor:
         """[B] f64 — `unitFaithCost`'s twin, at the copies this seat has already
         acquired. CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): the Cost
-        climbs by `costStep` per copy, and a discount applies to that whole
-        Cost, so the progression is charged BEFORE `mult`."""
+        climbs by `costStep` per copy; a percent off applies to the climbed
+        Cost (`_unit_buy_off`)."""
         if u_idx < 0:
             return torch.zeros(self.B, dtype=torch.float64, device=self.device)
         base = self._unit_step_cost(row, u_idx)
-        out = base * self.rules.faith_purchase_mult
-        if mult is not None:
-            out = out * mult
-        return js_round(out)
+        return js_round(base * self.rules.faith_purchase_mult)
+
+    def _unit_buy_off(self, row: int, u_idx: int) -> torch.Tensor:
+        """[B] f64 — `unitBuyOffPct`'s seat half: the founded religion's Holy
+        Order percent off this unit, and the Meenakshi Temple's off a Guru."""
+        off = self._enh["buyOff"][:, u_idx].take(self.civ_enhancer[:, row] + 1)
+        if u_idx == self._guru_idx and self._wond_n:
+            off = off + self._seat_wonder_sum(row, self._wond_guru_off)
+        return off
+
+    def _ngz_off(self, mult: torch.Tensor) -> torch.Tensor:
+        """`unitBuyOffPct`'s city half: Ngazargamu's multiplier as percent off."""
+        return torch.round((1 - mult) * 100)
 
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (this seat
@@ -2815,8 +2827,8 @@ class SimSeats:
             exo_chg = exo_chg + (_bl_r.long() * self._b_rel_spreads.unsqueeze(0)).sum(dim=1)
             if self._missionary_idx >= 0:
                 n_live_m = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._missionary_idx)).sum(dim=1)
-                mcost = self._faith_price(row, self._unit_faith_cost(
-                    row, self._missionary_idx, self._enh["mcostMult"].take(self.civ_enhancer[:, row] + 1)))
+                mcost = self._faith_price(row, self._unit_faith_cost(row, self._missionary_idx),
+                                          self._unit_buy_off(row, self._missionary_idx))
                 buy_m = base_r & (rel_kind == 5) & (n_live_m < self._missionary_cap) & self._afford(self.civ_faith[:, row], mcost)
                 if bool(buy_m.count_nonzero()):
                     chg_m = self._type_charges[self._missionary_idx] + self._enh["mchg"][self.civ_enhancer[:, row] + 1] + exo_chg
@@ -2825,7 +2837,8 @@ class SimSeats:
                     bought_relig = bought_relig | landed_m
             if self._apostle_idx >= 0:
                 n_live_a = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._apostle_idx)).sum(dim=1)
-                acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx))
+                acost = self._faith_price(row, self._unit_faith_cost(row, self._apostle_idx),
+                                      self._unit_buy_off(row, self._apostle_idx))
                 buy_a = base_t & (rel_kind == 6) & ~bought_relig & (n_live_a < self._apostle_cap) \
                     & self._afford(self.civ_faith[:, row], acost)
                 if bool(buy_a.count_nonzero()):
@@ -2848,7 +2861,8 @@ class SimSeats:
                 # the Guru's charges heal: neither the Exodus nor a Mosque
                 # adds to them
                 n_live_g = (self.major_unit_alive & (self.major_unit_seat == row) & (self.major_unit_type == self._guru_idx)).sum(dim=1)
-                gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx))
+                gcost = self._faith_price(row, self._unit_faith_cost(row, self._guru_idx),
+                                      self._unit_buy_off(row, self._guru_idx))
                 buy_g = (base_t & (rel_kind == 18) & ~bought_relig & (n_live_g < self._guru_cap)
                          & self._afford(self.civ_faith[:, row], gcost))
                 if bool(buy_g.count_nonzero()):
@@ -2965,7 +2979,8 @@ class SimSeats:
             ju = uj.clamp(min=0, max=self.RC - 1)
             bu = ub.clamp(min=0, max=self.NU - 1)
             cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row), faith=True)
-            price_u = self._faith_price(row, self._type_cost.gather(0, bu).double() * self.rules.faith_purchase_mult)
+            price_u = self._faith_price(row, self._type_cost.gather(0, bu).double() * self.rules.faith_purchase_mult,
+                                        self._ngz_off(self._suz_land_buy_mult(row)[bidx, ju]))
             buy_u = (active & ext & (uj >= 0) & (ub >= 0) & self.city_alive[bidx, row, ju]
                      & self._seat_faith_unit_grant(row) & cand_u[bidx, bu]
                      & self._afford(self.civ_faith[:, row], price_u))
@@ -3010,6 +3025,8 @@ class SimSeats:
                     self._reveal_around(_rows, row, tt[_rows], 1)  # acquireTile's revealAround(seat, tile, 1)
                     self.tile_city[_rows, tt[_rows]] = self.city_id[_rows, row, jt[_rows]]
                     # `claimTile`: a purchase leaves the culture count alone
+                    # and clears the city's stored next plot (`buyTile`)
+                    self.city_next_plot[_rows, row, jt[_rows]] = -1
                     self._eff_version += 1
                     bought = bought | ok_t
         # THE MISSILE SILO'S LAUNCH. The silo is an improvement, so the order
@@ -5491,10 +5508,12 @@ class SimSeats:
             seen.scatter_(1, idx, torch.ones_like(idx, dtype=torch.bool))
         return seen[:, :dump].reshape(B, NM, RC, NL).sum(dim=3)
 
-    def _route_travel_tiles(self, crs: torch.Tensor) -> torch.Tensor:
-        """`routeTravelTiles`'s twin, [..., K] long — the steps of each stored
-        course `crs` [..., K, L]."""
-        return ((crs >= 0).sum(dim=-1) - 1).clamp(min=0)
+    def _route_length_gold(self, crs: torch.Tensor) -> torch.Tensor:
+        """`routeLengthGold`'s magnitude, [..., K] long — floor(n x a + a / 2)
+        in 24.8 fixed point, n the plots of each stored course `crs`
+        [..., K, L], both ends included."""
+        fx = self._suz_route_tile_fx
+        return ((crs >= 0).sum(dim=-1) * fx + fx // 2) // 256
 
     def _route_course_posts(self, row: int, crs: torch.Tensor) -> torch.Tensor:
         """`routeCoursePosts`' twin, [B, K, L] bool — the plots of each stored
@@ -9162,8 +9181,7 @@ class SimSeats:
                     _rxh = _drh.unsqueeze(2).expand(B, _rdc.shape[1], self.city_id.shape[2])
                     _hith = (self.city_id.gather(1, _rxh) == _rdc.unsqueeze(2)) & self.city_alive.gather(1, _rxh)
                     _pays_h = _pays_h | (_intl_h & has_from & _hith.any(dim=2))
-                _tiles = self._route_travel_tiles(crs)
-                _hgold = (_tiles // self._suz_route_tiles_per).double() * self._suz_route_len_gold
+                _hgold = self._route_length_gold(crs).double()
                 _rk_add(2,
                                  _hgold * (_pays_h & has_from).double() * _hz.double().unsqueeze(1))
         # `routeChainGold`: the modifiers that name the Trading Posts the

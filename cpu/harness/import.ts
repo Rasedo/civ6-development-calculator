@@ -426,6 +426,9 @@ export interface History {
   momentsWorld: number[];
   /** the first record each live trade route was seen in, by `routeKey` */
   routeSeen: Map<string, number>;
+  /** each live route's course as the first record it was seen in laid it,
+   *  by `routeKey`: the game paths a route once, when it begins */
+  routeCourse: Map<string, number[]>;
   /** the plots each live route's Trader stood on, record by record, by
    *  `routeKey` (a plot repeated is kept once) */
   trail: Map<string, number[]>;
@@ -515,7 +518,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
-    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtLocked: new Map() };
 }
@@ -955,6 +958,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   h.congressBefore = h.last ? h.last.congress : rec.congress;
   for (const k of [...h.routeSeen.keys()]) if (!live.has(k)) h.routeSeen.delete(k);
   for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
+  for (const k of [...h.routeCourse.keys()]) if (!live.has(k)) h.routeCourse.delete(k);
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
   if (h.last) foldGrowthDrift(h, h.last, rec);
   foldDominance(h, rec);
@@ -1520,15 +1524,22 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
     for (const [kind, idx] of c.buy) {
       if (kind !== 'D') continue;
       const id = engineRowOf(cat, 'district', idx) as DistrictId | null;
-      if (!id) continue;
+      if (!id || city.districts.some((d) => d.type === id)) continue;
       const key = `${c.owner}:${c.id}:${idx}`;
-      const at = city.districts.findIndex((d) => d.type === id);
-      if (at < 0) {
-        h.districtLocked.delete(key);
-        h.districtQuoted.add(key);
-        continue;
-      }
-      if (h.districtLocked.has(key) || !h.districtQuoted.has(key)) continue;
+      h.districtLocked.delete(key);
+      h.districtQuoted.add(key);
+    }
+    // a district locks at the first record it stands, quoted there or not (a
+    // complete one leaves the list until it is pillaged: runs/h1_duelw1104
+    // Rome's Industrial Zone bought t123 at 112, quoted again at 112 from
+    // its pillage at t184)
+    const prefix = `${c.owner}:${c.id}:`;
+    for (const key of h.districtQuoted) {
+      if (!key.startsWith(prefix) || h.districtLocked.has(key)) continue;
+      const idx = Number(key.slice(prefix.length));
+      const id = engineRowOf(cat, 'district', idx) as DistrictId | null;
+      const at = id ? city.districts.findIndex((d) => d.type === id) : -1;
+      if (!id || at < 0) continue;
       unlocks ??= computeUnlocks(state, city.seat);
       const [placed] = city.districts.splice(at, 1);
       h.districtLocked.set(key, districtSiteCost(state, s, id, unlocks));
@@ -1643,6 +1654,9 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     const made = routeOfRecord(r, state, cityByKey, minorOfPlayer);
     if (!made) continue;
     const { owner, route } = made;
+    const kept = history?.routeCourse.get(routeKey(r));
+    if (kept) route.course = [...kept];
+    else history?.routeCourse.set(routeKey(r), [...(route.course ?? [])]);
     const trail = history?.trail.get(routeKey(r));
     if (trail) route.course = trailCourse(state, owner.seat, route.course ?? [], trail);
     const seen = history?.routeSeen.get(routeKey(r));
@@ -1711,13 +1725,21 @@ function trailCourse(state: GameState, seat: number, course: number[], seen: num
   if (part.length === 0) stops = whole ?? course;
   else if (outbound) stops = [origin, ...part, dest];
   else stops = [origin, ...part.reverse(), dest];
+  // a plot the course already holds closes a loop the Trader walked off its
+  // route (1108 Rome's Trader out to Antium and back before Shenyang): the
+  // loop is cut
   const out: number[] = [stops[0]];
+  const step = (at: number) => {
+    const k = out.indexOf(at);
+    if (k >= 0) out.length = k + 1;
+    else out.push(at);
+  };
   for (let i = 1; i < stops.length; i++) {
     const a = out[out.length - 1];
     const b = stops[i];
     if (a === b) continue;
-    if (dist(a, b) === 1) out.push(b);
-    else out.push(...join(a, b).slice(1));
+    if (dist(a, b) === 1) step(b);
+    else for (const at of join(a, b).slice(1)) step(at);
   }
   return out;
 }

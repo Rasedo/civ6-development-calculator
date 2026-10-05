@@ -2023,7 +2023,10 @@ class SimMasks:
         lists, g -1 where unreached. Dijkstra's walk, one label per plot: the
         least cost pops first, the lower plot index on a tie; a label is
         replaced by a cheaper one, or by an equally cheap one leaving more
-        range; edges in neighbour-direction order, then the portal exit. Bound
+        range; edges in neighbour-direction order, then the portal exit. A
+        land<->water step with no centre at either end caps the range at 1
+        and, where `u` refuels nothing, costs `_trade_cost_switch` more; a
+        refuel onto a centre is the larger of the two. Bound
         to a destination centre `dest` (-1 none), that city's own TradeEmbark
         plots refuel to `_trade_dest_refuel` where no other refuel applies.
         Kept per (game, row, origin, dest) against the graph it walked."""
@@ -2031,7 +2034,7 @@ class SimMasks:
         memo = self._trade_reach_memo.get(key)
         if memo is not None and memo[0] == gr:
             return memo[1]
-        opn, water, _centre, embark, refuel, danger, term, exit_, _harb = gr
+        opn, water, centre, embark, refuel, danger, term, exit_, _harb = gr
         T = self.T
         neigh = self._neigh_list
         g = [-1] * T
@@ -2042,7 +2045,7 @@ class SimMasks:
         g[origin] = 0
         left[origin] = self._trade_base_range
         heap = [origin]
-        step = self._trade_cost_step
+        step, swc = self._trade_cost_step, self._trade_cost_switch
         lref, wref, dref = self._trade_land_refuel, self._trade_water_refuel, self._trade_dest_refuel
         while heap:
             k = heapq.heappop(heap)
@@ -2055,24 +2058,25 @@ class SimMasks:
             nb = [x for x in neigh[u] if x >= 0]
             if exit_[u] >= 0:
                 nb.append(exit_[u])
-            wu, eu = water[u], embark[u] >= 0
+            wu, cu, eu = water[u], centre[u], embark[u] >= 0
             fuel = embark[u] >= 0 and (embark[u] == origin or refuel[u])
             dfuel = not fuel and dest >= 0 and embark[u] == dest
             for v in nb:
                 if done[v] or not opn[v]:
                     continue
-                wv = water[v]
-                if wu != wv and not eu and embark[v] < 0:
+                wv, cv = water[v], centre[v]
+                sw = not cu and not cv and wu != wv
+                if sw and not eu and embark[v] < 0:
                     continue
-                r = left[u]
+                r = min(left[u], 1) if sw else left[u]
                 if fuel:
-                    r = wref if wv else lref
+                    r = max(wref, lref) if cv else wref if wv else lref
                 elif dfuel:
                     r = dref
                 lv = r - 1
                 if lv < 0:
                     continue
-                gv = g[u] + step + term[v]
+                gv = g[u] + step + term[v] + (swc if sw and not fuel and not dfuel else 0)
                 if g[v] < 0 or gv < g[v] or (gv == g[v] and lv > left[v]):
                     g[v] = gv
                     left[v] = lv

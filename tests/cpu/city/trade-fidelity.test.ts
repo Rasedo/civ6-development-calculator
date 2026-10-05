@@ -4,7 +4,7 @@ import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../he
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
 import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, routeChainGold, routeCoursePosts, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, TRADE_ROUTE_DURATION } from '../../../cpu/core/trade';
-import { routeInRange, tradeCourse, tradeReach, TRADE_BASE_RANGE, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_STEP, TRADE_COST_LAND, type TradeReach } from '../../../cpu/core/tradePath';
+import { routeInRange, tradeCourse, tradeReach, TRADE_BASE_RANGE, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_STEP, TRADE_COST_LAND, TRADE_COST_SWITCH, type TradeReach } from '../../../cpu/core/tradePath';
 import { TRADE_COURSE_MAX } from '../../../cpu/data/constants';
 import { computeCityStats } from '../../../cpu/core/city';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
@@ -374,10 +374,10 @@ describe('the Trader unit', () => {
   });
 
   // a step between land and water needs a TradeEmbark district at one end
-  // (0x558db0); a district plot is neither land nor water to the switch test
-  // (0x558300), so the step onto the Harbor caps nothing and costs no switch,
-  // and the Harbor refuels the sea leg (0x5579b0): an inland city reaches the
-  // sea through its Harbor
+  // (0x558db0); a Harbor's plot is water to the switch test (0x558300), so
+  // the step onto it caps the range and pays the switch, and the Harbor
+  // refuels the sea leg (0x5579b0): an inland city reaches the sea through
+  // its Harbor
   it('an inland city embarks only at a Harbor, which refuels its sea leg', () => {
     const state = makeState(makeMap(30, 8));
     state.sandbox = true;
@@ -392,11 +392,13 @@ describe('the Trader unit', () => {
     const reach = tradeReach(state, 0, origin.centerIndex);
     const course = tradeCourse(reach, across.centerIndex)!;
     expect(course).toContain(ht.index);
-    // three land steps leave 12 on the Harbor; the Harbor refuels 30 onto water
-    expect(reach.left[ht.index]).toBe(12);
+    // the step from land onto the Harbor's water is a switch nothing refuels:
+    // the range caps at 1 and leaves 0, and it pays TRADE_COST_SWITCH
+    // (runs/h1_duelw1108, Rome's Trader 618 -> its Harbor 617); the Harbor
+    // refuels 30 onto water
+    expect(reach.left[ht.index]).toBe(0);
     expect(reach.left[tileAtCoords(state.map, 10, 4).index]).toBe(29);
-    // the step onto it is no switch: no switch cost
-    expect(reach.g[ht.index]).toBeLessThan(10000);
+    expect(reach.g[ht.index]).toBeGreaterThan(TRADE_COST_SWITCH);
   });
 
   // 0x5579b0: the DESTINATION city's own TradeEmbark district refuels to 3

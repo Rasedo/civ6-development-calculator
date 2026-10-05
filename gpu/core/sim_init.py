@@ -447,8 +447,7 @@ class SimInit:
         self._suz_dest_lux_gold = float(_suz["destLuxuryGold"])
         self._suz_spice_n = int(_suz["spiceLuxuries"])
         self._suz_spice_amen = int(_suz["spiceAmenities"])
-        self._suz_route_tiles_per = int(_suz["routeTilesPerGold"])
-        self._suz_route_len_gold = float(_suz["routeLengthGold"])
+        self._suz_route_tile_fx = int(_suz["routePathTileGoldFx"])
         self._suz_proj_pct = float(_suz["projectPct"])
         self._suz_buy_pct = float(_suz["purchasePct"])
         _pb = _suz["purchaseBuildingIdx"]
@@ -1408,13 +1407,10 @@ class SimInit:
                     f"a belief hands district {_di} adjacency source {_s}, which names "
                     "neither a feature nor a terrain — _adj_src_count cannot count it")
         _erows = _bl["enhancers"]
-        # The missionary chassis anchors + per-enhancer channels. The exporter
-        # pre-rounds mlump to an INTEGER (Math.round on the TS side), so both
-        # engines read the identical value; the pad row (index 0 = no enhancer)
-        # carries the BASE lump and a discount of 1, unlike the additive zero
-        # pads of the other channels. The PRICE itself is `_unit_faith_cost`,
-        # which charges the progression before this discount.
-        _mlump0 = int(_bl["spreadPressure"])
+        # The missionary chassis anchors + per-enhancer channels: a Spread
+        # lands `_spread_strength_pct` of the unit's ReligiousStrength times
+        # the enhancer's `spreadMult` (the pad row, no enhancer, 1).
+        self._spread_strength_pct = int(_bl["spreadStrengthPct"])
         self._missionary_idx = int(_bl["missionaryIdx"])
         self._missionary_cap = int(_bl["missionaryCap"])
         self._apostle_idx = int(_bl["apostleIdx"])
@@ -1438,6 +1434,8 @@ class SimInit:
         self._condemn_swing = int(_bl["condemnPressureSwing"])
         _rs = _bl["relStrength"] or []
         self._rel_strength = torch.tensor(list(_rs) + [0] * 64, dtype=torch.long, device=device)
+        # Units.ReligionEvictPercent: what a Spread takes off the other religions
+        self._type_evict = torch.tensor(list(_bl["evictPct"] or []) + [0] * 64, dtype=torch.long, device=device)
         self._theo_swing = float(_bl["theoPressureSwing"])
         self._theo_range = int(_bl["theoPressureRange"])
         self._relig_heal_per_faith = int(_bl["religiousHealPerFaith"])
@@ -1450,8 +1448,10 @@ class SimInit:
             "cdef": torch.tensor([0.0] + [float(x["cdef"]) for x in _erows], dtype=torch.float64, device=device),
             "cvs": torch.tensor([0.0] + [float(x["cvs"]) for x in _erows], dtype=torch.float64, device=device),
             "mchg": torch.tensor([0] + [int(x["mchg"]) for x in _erows], dtype=torch.long, device=device),
-            "mlump": torch.tensor([_mlump0] + [int(x["mlump"]) for x in _erows], dtype=torch.long, device=device),
-            "mcostMult": torch.tensor([1.0] + [float(x["mcostMult"]) for x in _erows], dtype=torch.float64, device=device),
+            "spreadMult": torch.tensor([1.0] + [float(x["spreadMult"]) for x in _erows], dtype=torch.float64, device=device),
+            # Holy Order: the percent off each unit's purchase [nEnh + 1, NU]
+            "buyOff": torch.tensor([[0.0] * len(rules.units)] + [[float(v) for v in x["buyOff"]] for x in _erows],
+                                   dtype=torch.float64, device=device),
             # Missionary Zeal, Monastic Isolation's kept percent, Holy Waters
             "zeal": torch.tensor([0] + [int(x["zeal"]) for x in _erows], dtype=torch.long, device=device),
             "theoKeep": torch.tensor([0] + [int(x["theoKeep"]) for x in _erows], dtype=torch.long, device=device),
@@ -1618,6 +1618,8 @@ class SimInit:
             self._wond_occdef = torch.tensor([int(w["occupyDefense"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freeciv = torch.tensor([int(w["freeCivics"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freetech = torch.tensor([int(w["freeTechs"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # the Meenakshi Temple: the percent off the seat's Guru purchases
+            self._wond_guru_off = torch.tensor([float(w["guruBuyOff"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_treasury = torch.tensor([float(w["treasuryMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_erascore = torch.tensor([int(w["eraScorePerMoment"]) for w in self._wond_rows], dtype=torch.long, device=device)
         self.feat_id = torch.tensor([[t.get("fid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
@@ -2882,6 +2884,7 @@ class SimInit:
         self._trade_cost_route = int(_tr["costRoute"])
         self._trade_cost_water = int(_tr["costWater"])
         self._trade_cost_land = int(_tr["costLand"])
+        self._trade_cost_switch = int(_tr["costSwitch"])
         # the placeable ones; the centre is every living city's own
         self._trade_embark_didx = [i for i, d in enumerate(rules.districts) if d["id"] in _tr["embarkDistricts"]]
         self._trade_danger_fid = [int(x) for x in _tr["dangerFid"]]

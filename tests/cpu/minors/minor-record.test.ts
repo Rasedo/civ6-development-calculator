@@ -11,7 +11,8 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { containmentBonus } from '../../../cpu/core/effects';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { OPEN_BORDERS_CIVIC } from '../../../cpu/data/seats';
-import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
+import { SPREAD_STRENGTH_PCT } from '../../../cpu/data/religion';
+import { UNITS } from '../../../cpu/data/units';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import { tilesWithin } from '../../../world/hex';
@@ -180,7 +181,7 @@ describe('a city-state can be converted', () => {
     spreadFromUnit(state, ap, state.seats[0], state.map.tiles[cs.centerIndex]);
     // CIV6 (Translator): the promotion's note extends the triple to
     // city-states; unpromoted the lump is the plain one.
-    expect(cs.religionPressure?.[0]).toBe(SPREAD_PRESSURE);
+    expect(cs.religionPressure?.[0]).toBe(SPREAD_STRENGTH_PCT * UNITS.APOSTLE.religiousStrength! / 100);
     expect(ap.charges).toBe(2);
   });
 });

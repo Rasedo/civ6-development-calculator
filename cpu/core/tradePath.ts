@@ -58,6 +58,11 @@ export const TRADE_COST_ROUTE = srcConst('trade.costRoute', 50, { lab: `${COST_L
 export const TRADE_COST_WATER = srcConst('trade.costWater', 50, { lab: `${COST_LAB}: water with no route +50` });
 /** onto bare land, per point of the plot's movement cost */
 export const TRADE_COST_LAND = srcConst('trade.costLand', 100, { lab: `${COST_LAB}: land with no route +100 x the plot's movement cost` });
+/** a land<->water switch the range callback did not refuel */
+export const TRADE_COST_SWITCH = srcConst('trade.costSwitch', 10000, {
+  lab: `${COST_LAB}: 0x558a08 swaps the step's 100 for 10100 when 0x558300 answers a switch and the range `
+    + 'callback 0x5579b0 left its refuelled flag (context +0x1cc) clear',
+});
 
 /** CIV6 (`Districts.TradeEmbark`): the districts a Trader embarks and refuels
  *  at. The Royal Navy Dockyard and the Cothon are this engine's Harbor. */
@@ -187,16 +192,16 @@ class KeyHeap {
 
 /**
  * THE WALK from `origin` for `seat`'s Traders, over every plot. Per edge
- * u -> v: a step between land and water needs a TradeEmbark district at one
- * end (0x558db0) — a district plot is neither land nor water to the
- * switch test (0x558300 over IsLand 0x5583a0 / IsWater 0x558460), so such a
- * step is no switch and pays no switch cost, and a step between land and
- * water with no such district is refused; the range r left at u is
- * refuelled at u's refuelling district to TRADE_LAND_REFUEL onto land or
- * TRADE_WATER_REFUEL onto water, or else at a district of the destination's
- * city (`dest`'s embark plots, -1 none) to TRADE_DEST_REFUEL; the edge
- * leaves r - 1 and is refused below 0. The cost: TRADE_COST_STEP and v's
- * plot term. A plot whose feature is a danger is reached but never walked
+ * u -> v: a switch, a step between land and water (0x558300 over IsLand
+ * 0x5583a0 / IsWater 0x558460: a City Centre's plot answers neither, any
+ * other plot its ground, a Harbor water), needs a TradeEmbark district at
+ * one end (0x558db0) and caps the range r left at u to 1; r is then
+ * refuelled at u's refuelling district to TRADE_LAND_REFUEL onto land,
+ * TRADE_WATER_REFUEL onto water, the larger onto a centre, or else at a
+ * district of the destination's city (`dest`'s embark plots, -1 none) to
+ * TRADE_DEST_REFUEL; the edge leaves r - 1 and is refused below 0. The cost:
+ * TRADE_COST_STEP, v's plot term, and TRADE_COST_SWITCH on a switch u did not
+ * refuel. A plot whose feature is a danger is reached but never walked
  * through.
  */
 function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, dest: number): TradeReach {
@@ -228,6 +233,7 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
     const ex = gr.exit.get(u) ?? -1;
     if (ex >= 0) nb.push(ex);
     const wu = isWater(at);
+    const cu = gr.holder.has(u);
     const eu = gr.embark.has(u);
     const fuel = gr.refuel.has(u);
     const dfuel = !fuel && dest >= 0 && gr.embark.get(u) === dest;
@@ -236,13 +242,15 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
       const to = tiles[v];
       if (!plotOpen(state, gr, seat, to)) continue;
       const wv = isWater(to);
-      if (wu !== wv && !eu && !gr.embark.has(v)) continue;
-      let r = left[u];
-      if (fuel) r = wv ? TRADE_WATER_REFUEL : TRADE_LAND_REFUEL;
+      const cv = gr.holder.has(v);
+      const sw = !cu && !cv && wu !== wv;
+      if (sw && !eu && !gr.embark.has(v)) continue;
+      let r = sw ? Math.min(left[u], 1) : left[u];
+      if (fuel) r = cv ? Math.max(TRADE_WATER_REFUEL, TRADE_LAND_REFUEL) : wv ? TRADE_WATER_REFUEL : TRADE_LAND_REFUEL;
       else if (dfuel) r = TRADE_DEST_REFUEL;
       const lv = r - 1;
       if (lv < 0) continue;
-      const gv = g[u] + TRADE_COST_STEP + plotTerm(gr, to);
+      const gv = g[u] + TRADE_COST_STEP + plotTerm(gr, to) + (sw && !fuel && !dfuel ? TRADE_COST_SWITCH : 0);
       if (g[v] < 0 || gv < g[v] || (gv === g[v] && lv > left[v])) {
         g[v] = gv;
         left[v] = lv;

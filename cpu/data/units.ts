@@ -203,6 +203,9 @@ export interface UnitDef {
    * CIV6 magnitudes, exact: Apostle 110, Missionary 100, Inquisitor 70.
    */
   religiousStrength?: number;
+  /** CIV6 (Units.ReligionEvictPercent): the percent a Spread takes off every
+   *  other religion's pressure in the target city — Missionary 10, Apostle 25. */
+  evictPct?: number;
   /** spawn-ONLY chassis — never trainable, gold-purchasable, or
    * faith-buyable. GENERAL/ADMIRAL are born of the Great-General/Admiral
    * claim (applyGreatPersonEffect + the mirror), the barbarians' own cavalry
@@ -735,6 +738,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 3,
       faithOnly: true,
       religiousStrength: 100, // defends theological combat, never initiates
+      evictPct: 10,
       description: 'Spreads its religion to nearby cities (3 charges, faith purchase only).',
       src: {
         cost: xml('Units', 'UnitType=UNIT_MISSIONARY', 'Cost', { scale: GAME_SPEED }),
@@ -745,6 +749,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         charges: xml('Units', 'UnitType=UNIT_MISSIONARY', 'SpreadCharges'),
         faithOnly: xml('Units', 'UnitType=UNIT_MISSIONARY', 'PurchaseYield', { expect: 'YIELD_FAITH' }),
         religiousStrength: xml('Units', 'UnitType=UNIT_MISSIONARY', 'ReligiousStrength'),
+        evictPct: xml('Units', 'UnitType=UNIT_MISSIONARY', 'ReligionEvictPercent'),
       },
     }),
     // The Great General / Great Admiral support chassis (appended
@@ -812,6 +817,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 3,
       faithOnly: true,
       religiousStrength: 110,
+      evictPct: 25,
       description: 'Spreads its religion and wins theological combat (3 charges, faith purchase only).',
       src: {
         cost: xml('Units', 'UnitType=UNIT_APOSTLE', 'Cost', { scale: GAME_SPEED }),
@@ -822,6 +828,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         charges: xml('Units', 'UnitType=UNIT_APOSTLE', 'SpreadCharges'),
         faithOnly: xml('Units', 'UnitType=UNIT_APOSTLE', 'PurchaseYield', { expect: 'YIELD_FAITH' }),
         religiousStrength: xml('Units', 'UnitType=UNIT_APOSTLE', 'ReligiousStrength'),
+        evictPct: xml('Units', 'UnitType=UNIT_APOSTLE', 'ReligionEvictPercent'),
       },
     }),
     // The MILITARY ENGINEER, sourced from the Gathering Storm

@@ -68,7 +68,9 @@ export interface BeliefEffects {
    *  see `tradeReligionYields`; cpu/core/game.ts still reads the field. */
   missionaryChargeBonus?: number;
   spreadPressureMult?: number;
-  missionaryCostMult?: number;
+  /** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_UNIT_PURCHASE_COST): the percent off
+   *  each named unit's purchase. */
+  unitBuyOffPct?: Partial<Record<string, number>>;
   /** a WORSHIP belief's building: the one Holy Site building the religion
    *  holding the belief may build or buy (`WORSHIP_BELIEFS`). */
   worshipBuilding?: string;
@@ -372,10 +374,10 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
       xml('ModifierArguments', 'ModifierId=DEFENDER_OF_FAITH_COMBAT_BONUS_MODIFIER&Name=Amount', 'Value'),
   },
   HOLY_ORDER: {
-    'effects.missionaryCostMult': {
-      derived: '1 - Amount/100 — the install writes the purchase DISCOUNT (30), the catalog the multiplier',
-      inputs: [xml('ModifierArguments', 'ModifierId=HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER&Name=Amount', 'Value')],
-    },
+    'effects.unitBuyOffPct.MISSIONARY':
+      xml('ModifierArguments', 'ModifierId=HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER&Name=Amount', 'Value'),
+    'effects.unitBuyOffPct.APOSTLE':
+      xml('ModifierArguments', 'ModifierId=HOLY_ORDER_APOSTLE_DISCOUNT_MODIFIER&Name=Amount', 'Value'),
   },
   MISSIONARY_ZEAL: {
     'effects.religiousIgnoreTerrain':
@@ -570,7 +572,7 @@ export const ENHANCER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
       combatDefendFollowing: 5,
     }),
     B('HOLY_ORDER', 'Holy Order', 'Missionaries and Apostles are 30% cheaper to purchase.', {
-      missionaryCostMult: 0.7,
+      unitBuyOffPct: { MISSIONARY: 30, APOSTLE: 30 },
     }),
     B('MISSIONARY_ZEAL', 'Missionary Zeal', 'Religious units ignore Movement costs of terrain and features.', {
       religiousIgnoreTerrain: true,
@@ -725,10 +727,12 @@ export function gainPopulationPressure(
   if (g >= 0) city.religionPressure![g] += ATHEISM_PRESSURE_PER_POP * n;
 }
 
-/** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the lump a full-health
- * Spread lands on the target city; SCRIPTURE multiplies it x1.25 (250) —
- * SCRIPTURE_SPEAD_STRENGTH's SpreadMultiplier is a PERCENT. */
-export const SPREAD_PRESSURE = 200;
+/** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): a full-health Spread
+ * lands this percent of the unit's ReligiousStrength on the target city — a
+ * Missionary 200, an Apostle 220 (runs/h1_duelw1104 Nanjing t233, 1108 Rome
+ * t108); SCRIPTURE multiplies it x1.25 — SCRIPTURE_SPEAD_STRENGTH's
+ * SpreadMultiplier is a PERCENT. */
+export const SPREAD_STRENGTH_PCT = 200;
 
 /** how a city's citizens are shared among its religions and THE UNCONVERTED
  *  (measured live, lab 2 scene E — "pop × pressure share, rounded, forced to

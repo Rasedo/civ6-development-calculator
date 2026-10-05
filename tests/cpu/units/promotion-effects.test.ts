@@ -11,7 +11,8 @@ import {
 } from '../../../cpu/core/promotions';
 import { spreadFromUnit } from '../../../cpu/core/unitOrders';
 import { emptySeat, BARB_SEAT, setTileOwner } from '../../../cpu/core/seats';
-import { SPREAD_PRESSURE } from '../../../cpu/data/religion';
+import { SPREAD_STRENGTH_PCT } from '../../../cpu/data/religion';
+import { UNITS } from '../../../cpu/data/units';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
 /** the column a unit's own class list gives one effect kind. */
@@ -122,7 +123,7 @@ describe('promotion effects that are not Combat Strength', () => {
     const vT = hold(ap, 'TRANSLATOR');
     const vP = hold(ap, 'PROSELYTIZER');
     spreadFromUnit(state, ap, state.seats[0], state.map.tiles[city.centerIndex]);
-    expect(city.religionPressure![0]).toBe(SPREAD_PRESSURE * vT);
+    expect(city.religionPressure![0]).toBe(SPREAD_STRENGTH_PCT * UNITS.APOSTLE.religiousStrength! / 100 * vT);
     expect(city.religionPressure![1]).toBe(Math.floor(400 * (100 - vP) / 100));
   });
 

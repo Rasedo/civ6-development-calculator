@@ -158,11 +158,8 @@ export const ZANZIBAR_LUXURY_AMENITIES = 6;
 /** CIV6 (GranColombia_Maya_Leaders.xml,
  *  MINOR_CIV_HUNZA_GOLD_FROM_TRADE_ROUTE_LENGTH):
  *  `MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_PATH_TILE` YIELD_GOLD Amount
- *  0.2 — the trait text's "+1 Gold for every 5 tiles a Trade Route travels".
- *  Taken as the text's whole gold per five tiles rather than as a fifth per
- *  tile: a fraction summed on two engines drifts, an integer does not. */
-export const HUNZA_TILES_PER_GOLD = 5;
-export const HUNZA_ROUTE_GOLD = 1;
+ *  0.2, held as the DLL holds a modifier's Amount: 24.8 fixed point, 51. */
+export const HUNZA_PATH_TILE_GOLD_FX = Math.floor(0.2 * 256);
 
 /** CIV6 (Leaders.xml, MINOR_CIV_HONG_KONG_PROJECT_PRODUCTION_BONUS):
  *  `MODIFIER_PLAYER_CITIES_ADJUST_ALL_PROJECTS_PRODUCTION` Amount 20. */
