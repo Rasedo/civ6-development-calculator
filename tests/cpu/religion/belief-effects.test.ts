@@ -135,6 +135,7 @@ describe('Founder beliefs', () => {
     expect(culture() - c0).toBe(0.25);
     // one of a foreign city's four citizens, the unconverted its majority
     other.population = 4;
+    other.unconvertedPressure = 200;
     other.religionPressure = [60, 0];
     expect(religionFollowers(state, 0)).toBe(2);
     expect(culture() - c0).toBe(0.5);

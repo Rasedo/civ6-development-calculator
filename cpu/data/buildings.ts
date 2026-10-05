@@ -227,6 +227,11 @@ export interface BuildingDef {
    *  on COLLECTION_OWNER): flat Tourism on the building's own district, paid
    *  while it stands (`buildingTourism`). */
   tourism?: number;
+  /** CIV6 (CONSERVATION_*_TOURISM, MODIFIER_PLAYER_DISTRICTS_ADJUST_TOURISM_CHANGE):
+   *  Tourism on the building's own district once the seat holds `civic` —
+   *  the City Center for each level of walls, the Entertainment Complex for
+   *  the Arena — paid while the building stands (`buildingTourism`). */
+  civicTourism?: { civic: string; amount: number };
   /** CIV6 (Power Plants): this row SUPPLIES Power to its own city and to every
    *  city centre within the regional range of its Industrial Zone. */
   powerPlant?: boolean;
@@ -364,7 +369,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
     },
   },
   { id: 'ANCIENT_WALLS', name: 'Ancient Walls', district: 'CITY_CENTER', cost: 80, maintenance: 0, walls: 1, wallsStrength: 3,
+    civicTourism: { civic: 'CONSERVATION', amount: 1 },
     src: {
+      'civicTourism.civic': xml('CivicModifiers', 'CivicType=CIVIC_CONSERVATION&ModifierId=CONSERVATION_ANCIENT_WALL_TOURISM', 'CivicType', { expect: 'CIVIC_CONSERVATION' }),
+      'civicTourism.amount': xml('ModifierArguments', 'ModifierId=CONSERVATION_ANCIENT_WALL_TOURISM&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_WALLS', 'Maintenance'),
@@ -877,7 +885,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   },
 
   { id: 'ARENA', name: 'Arena', district: 'ENTERTAINMENT_COMPLEX', cost: 150, amenities: 2, yields: { culture: 1 }, maintenance: 1,
+    civicTourism: { civic: 'CONSERVATION', amount: 1 },
     src: {
+      'civicTourism.civic': xml('CivicModifiers', 'CivicType=CIVIC_CONSERVATION&ModifierId=CONSERVATION_ARENA_TOURISM', 'CivicType', { expect: 'CIVIC_CONSERVATION' }),
+      'civicTourism.amount': xml('ModifierArguments', 'ModifierId=CONSERVATION_ARENA_TOURISM&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_ARENA', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_ARENA', 'PrereqDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_ARENA', 'Maintenance'),
@@ -947,7 +958,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   // the Archaeological Museum above. Both carry the Gathering Storm cost and
   // require the tier below; both refuse a gold purchase.
   { id: 'MEDIEVAL_WALLS', name: 'Medieval Walls', district: 'CITY_CENTER', cost: 220, requiresAny: ['ANCIENT_WALLS'], maintenance: 0, walls: 2, wallsStrength: 3, noPurchase: true,
+    civicTourism: { civic: 'CONSERVATION', amount: 2 },
     src: {
+      'civicTourism.civic': xml('CivicModifiers', 'CivicType=CIVIC_CONSERVATION&ModifierId=CONSERVATION_MEDIEVAL_WALL_TOURISM', 'CivicType', { expect: 'CIVIC_CONSERVATION' }),
+      'civicTourism.amount': xml('ModifierArguments', 'ModifierId=CONSERVATION_MEDIEVAL_WALL_TOURISM&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_CASTLE', 'Maintenance'),
@@ -973,7 +987,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       yields: { faith: 4 }, goldenAgeYields: { faith: 4 },
       wallsHpBonus: 100,
     }],
+    civicTourism: { civic: 'CONSERVATION', amount: 3 },
     src: {
+      'civicTourism.civic': xml('CivicModifiers', 'CivicType=CIVIC_CONSERVATION&ModifierId=CONSERVATION_RENAISSANCE_WALL_TOURISM', 'CivicType', { expect: 'CIVIC_CONSERVATION' }),
+      'civicTourism.amount': xml('ModifierArguments', 'ModifierId=CONSERVATION_RENAISSANCE_WALL_TOURISM&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'PrereqDistrict', { expect: 'DISTRICT_CITY_CENTER' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_STAR_FORT', 'Maintenance'),

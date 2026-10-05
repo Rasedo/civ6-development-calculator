@@ -443,6 +443,26 @@ export const GREAT_PEOPLE: Record<GreatPersonClass, GreatPersonDef[]> = {
     P('MUSICIAN', 'GP_GAUHAR_JAAN', 'Gauhar Jaan', 7),
   ],
 };
+
+/** CIV6 (GreatWorks.Tourism): the makers every one of whose works carries a
+ *  raised Tourism — the Babylon pack's seven, 4 where their object type's rows
+ *  pay 2 (`gwWorkTourism`). */
+export const GP_WORK_TOURISM: Readonly<Record<string, number>> = {
+  GP_KAMAL_UD_DIN_BEHZAD: srcConst('greatPeople.workTourism.GP_KAMAL_UD_DIN_BEHZAD', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_BEHZAD_1', 'Tourism')),
+  GP_HASEGAWA_TOHAKU: srcConst('greatPeople.workTourism.GP_HASEGAWA_TOHAKU', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_TOHAKU_1', 'Tourism')),
+  GP_WASSILY_KANDINSKY: srcConst('greatPeople.workTourism.GP_WASSILY_KANDINSKY', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_KANDINSKY_1', 'Tourism')),
+  GP_VALMIKI: srcConst('greatPeople.workTourism.GP_VALMIKI', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_BABYLON_VALMIKI_1', 'Tourism')),
+  GP_RUMI: srcConst('greatPeople.workTourism.GP_RUMI', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_BABYLON_RUMI_1', 'Tourism')),
+  GP_BEATRIX_POTTER: srcConst('greatPeople.workTourism.GP_BEATRIX_POTTER', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_BABYLON_BEATRIX_POTTER_1', 'Tourism')),
+  GP_GABRIELA_MISTRAL: srcConst('greatPeople.workTourism.GP_GABRIELA_MISTRAL', 4,
+    xml('GreatWorks', 'GreatWorkType=GREATWORK_BABYLON_GABRIELA_MISTRAL_1', 'Tourism')),
+};
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
 /**

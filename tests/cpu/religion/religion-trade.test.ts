@@ -363,7 +363,7 @@ describe('trade routes', () => {
 describe('religious pressure spread', () => {
   it("a trade route carries the origin's religion to a far destination, and the destination's back at half strength", () => {
     // CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 / _FOR_ORIGIN
-    // 0.5); the half-point lands on EVEN turns. The GPU twin is
+    // 0.5); the half lands every turn. The GPU twin is
     // tests/gpu/route_pressure_test.py.
     const state = makeState(makeMap(40, 20));
     state.sandbox = true;
@@ -383,20 +383,19 @@ describe('religious pressure spread', () => {
       run();
       return (city.religionPressure?.[g] ?? 0) - before;
     };
-    // an EVEN turn: 1 down the route, the half-point back
-    state.turn = 10;
-    expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(1);
-    // an ODD turn: 1 down the route, nothing back
-    state.turn = 11;
-    expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
-    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(0);
+    // 1 down the route on religion 0's turn and the half back on religion
+    // 1's, whatever the turn
+    for (const turn of [10, 11]) {
+      state.turn = turn;
+      expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(1);
+      expect(delta(a, 1, () => spreadReligiousPressure(state, 1))).toBe(0.5);
+    }
     // a Holy City takes none of its own step
     expect(delta(a, 0, () => spreadReligiousPressure(state, 0))).toBe(0);
-    // India: +100% on the OWNER's routes — 2 down, 1 back, on an odd turn too
+    // India: +100% on the OWNER's routes — 2 down, 1 back
     state.seats[0].civ = CIV_LEADERS.findIndex((l) => l.civ === 'INDIA');
     expect(delta(b, 0, () => spreadReligiousPressure(state, 0))).toBe(2);
-    expect(delta(a, 1, () => spreadReligiousPressure(state, 0))).toBe(1);
+    expect(delta(a, 1, () => spreadReligiousPressure(state, 1))).toBe(1);
   });
 
   it("a holy city converts cities within range each turn; distant cities stay unconverted", () => {

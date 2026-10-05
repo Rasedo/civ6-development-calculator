@@ -37,7 +37,7 @@ import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_C
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
-import { ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
+import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
 import { isExplored, revealAround, unexploredByAll } from './fog';
 import { srcConst, xml } from '../data/provenance';
 import { wipeConstruction } from './production';
@@ -2779,6 +2779,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, Math.floor(cityState.population * 0.75)),
     hp: Math.round(CITY_MAX_HP / 2), // a conquered CS joins at half HP
   });
   const _csList = seatOf(state, seat)!.cities;
@@ -2831,6 +2832,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * Math.max(1, Math.floor(cityState.population * 0.75)),
     hp: Math.round(CITY_MAX_HP / 2),
     foundedTurn: state.turn,
   });

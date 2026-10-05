@@ -7,18 +7,18 @@ tests/cpu/religion/religion-trade.test.ts.
 
 CIV6 (GlobalParameters): RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION
 1.0 and _FOR_ORIGIN 0.5 — a live route carries its ORIGIN city's religion to
-the destination each turn and the destination's back at half strength;
-Dharma's +100% (ROUTE_PRESSURE_ROWS) doubles both on India's own routes.
-READING: the accumulator is an integer, so the half-point lands on EVEN turns
-(`_route_pressure_share`).
+the destination and the destination's back at half strength, on each
+religion's founder's turn (GameCore 0x496980); the half lands as a half, a
+city's pressure being fixed point. Dharma's +100% (ROUTE_PRESSURE_ROWS)
+doubles both on India's own routes.
 
 Scene: two cities of row 0 more than 10 tiles apart (no ambient reach), A
 following religion 0 and B following religion 1, one domestic route A -> B.
 
-  1. an even turn: B takes +1 of religion 0, A takes +1 of religion 1.
-  2. an odd turn: B takes +1, A takes nothing (the half waits).
-  3. India: B takes +2 and A +1 on any turn.
-  4. a route whose destination follows nobody presses nothing back.
+  1. religion 0's turn: B takes +1 of religion 0; religion 1's: A takes +0.5
+     of religion 1 — on any turn.
+  2. India: B takes +2 and A +1.
+  3. a route whose destination follows nobody presses nothing back.
 """
 
 from __future__ import annotations
@@ -76,6 +76,7 @@ def build():
         sim.city_center[0, ROW, s] = t
         sim.city_id[0, ROW, s] = 900 + s
         sim.city_pop[0, ROW, s] = 3
+        sim.city_unconverted[0, ROW, s] = 3 * sim._atheism_per_pop
         sim.city_pressure[0, ROW, s] = 0
         sim.city_pressure[0, ROW, s, g] = 9000
         sim.city_followed[0, ROW, s] = g
@@ -96,8 +97,9 @@ def spread_delta(sim, turn: int):
     sim.turn = turn
     before_a = sim.city_pressure[0, ROW, SA].clone()
     before_b = sim.city_pressure[0, ROW, SB].clone()
-    # the route owner's spread, on its own turn: both cities are its
-    sim._spread_religious_pressure(ROW, torch.ones(sim.B, dtype=torch.bool))
+    # each religion spreads on its founder's turn: religion 0, then 1
+    for g in (0, 1):
+        sim._spread_religious_pressure(g, torch.ones(sim.B, dtype=torch.bool))
     da = (sim.city_pressure[0, ROW, SA] - before_a).tolist()
     db = (sim.city_pressure[0, ROW, SB] - before_b).tolist()
     return da, db
@@ -107,28 +109,24 @@ def main() -> int:
     sim = build()
     play(sim, ROW, None)
     # a city takes none of its own pressure: the route's terms alone land
-    da, db = spread_delta(sim, 10)
-    assert db[0] == 1 and db[1] == 0, f"even turn: B took {db} (want +1 of religion 0 from the route, none of its own)"
-    assert da[1] == 1 and da[0] == 0, f"even turn: A took {da} (want the half-point of religion 1 back, none of its own)"
-    print("  1 even turn OK — the destination takes 1, the origin takes the half-point back")
-
-    da, db = spread_delta(sim, 11)
-    assert db[0] == 1, f"odd turn: B took {db}"
-    assert da[1] == 0, f"odd turn: A took {da} of religion 1 — the half-point must wait for an even turn"
-    print("  2 odd turn OK — the destination still takes 1, the origin nothing")
+    for turn in (10, 11):
+        da, db = spread_delta(sim, turn)
+        assert db[0] == 1 and db[1] == 0, f"turn {turn}: B took {db} (want +1 of religion 0 from the route, none of its own)"
+        assert da[1] == 0.5 and da[0] == 0, f"turn {turn}: A took {da} (want the half of religion 1 back, none of its own)"
+    print("  1 OK — the destination takes 1, the origin the half back, every turn")
 
     play(sim, ROW, "INDIA")
     da, db = spread_delta(sim, 11)
-    assert db[0] == 2, f"India, odd turn: B took {db} (want +2)"
-    assert da[1] == 1, f"India, odd turn: A took {da} (want +1 every turn)"
-    print("  3 Dharma OK — +100% on the owner's routes: 2 down the route, 1 back, every turn")
+    assert db[0] == 2, f"India: B took {db} (want +2)"
+    assert da[1] == 1, f"India: A took {da} (want +1)"
+    print("  2 Dharma OK — +100% on the owner's routes: 2 down the route, 1 back")
 
     play(sim, ROW, None)
     sim.city_pressure[0, ROW, SB] = 0
     sim.city_followed[0, ROW, SB] = -1
     da, db = spread_delta(sim, 10)
     assert db[0] == 1 and da[1] == 0, f"a destination following nobody pressed back: A {da}, B {db}"
-    print("  4 no religion at the destination OK — nothing comes back")
+    print("  3 no religion at the destination OK — nothing comes back")
     print("BATTERY OK route_pressure")
     return 0
 

@@ -486,7 +486,7 @@ def poke_presr(rules, rj, path):
         for s in (S2, S3):
             sim.city_pressure[0, r + 1, s] = 0
             sim.city_followed[0, r + 1, s] = -1
-        sim._spread_religious_pressure(r + 1, torch.ones(sim.B, dtype=torch.bool))
+        sim._spread_religious_pressure(g, torch.ones(sim.B, dtype=torch.bool))
         return int(sim.city_pressure[0, r + 1, S2, g]), int(sim.city_pressure[0, r + 1, S3, g])
 
     # WITH ITINERANT: range base+3 -> receiver at base+3 gets the Holy City's step, base+4 nothing.
@@ -505,7 +505,7 @@ def poke_free_city_pressure(rules, rj, path):
     """6b. THE FREE ROW IS IN THE WALK. `CivilizationLevels` names no
     religion column and the spread operation carries no owner filter, so a
     Free City takes pressure like any other city and presses back, on the
-    Free Cities' own turn, once it follows.
+    religion's founder's turn, once it follows.
 
     This poke also guards the axis: `O` counts RELIGIONS and `NSC` counts
     CITY ROWS, and they are not the same number. A Free City must NOT be
@@ -534,6 +534,7 @@ def poke_free_city_pressure(rules, rj, path):
     sim.city_alive[0, F, 0] = True
     sim.city_center[0, F, 0] = C
     sim.city_pop[0, F, 0] = 1
+    sim.city_unconverted[0, F, 0] = 1 * sim._atheism_per_pop
     sim.city_pressure[0, F, 0] = 0
     sim.city_followed[0, F, 0] = -1
 
@@ -557,7 +558,7 @@ def poke_free_city_pressure(rules, rj, path):
     sim.city_pressure[0, g, S2] = 0
     sim.city_followed[0, g, S2] = -1
     sim.city_alive[0, g, 0] = False          # silence the Holy City
-    sim._spread_religious_pressure(F, every)
+    sim._spread_religious_pressure(g, every)
     lone = int(sim.city_pressure[0, g, S2, g])
     assert lone > 0, "a following Free City pressed nobody — the free row is not a SOURCE"
 
@@ -568,12 +569,60 @@ def poke_free_city_pressure(rules, rj, path):
     print(f"  6b the free row takes pressure ({step}) and presses back ({lone}) OK")
 
 
+def poke_walk_and_growth(rules, rj, path):
+    """6d. THE WALK AND THE GROWING CITY — tests/cpu/religion/pressure-sources
+    and majority's twins. A city the founder's walk converts presses when its
+    own place comes, the same turn (GameCore 0x498660); a city that grows adds
+    50 a citizen to the group it follows, its majority religion else the
+    unconverted (GameCore 0x1f3050)."""
+    sim = build(rules, path)
+    g = 0
+    every = torch.ones(sim.B, dtype=torch.bool)
+    sim.holy_tile[0] = -1
+    sim.city_pressure[0] = 0
+    sim.city_followed[0] = -1
+    sim.city_alive[0, :sim.n_majors] = False
+    tiles = free_tiles(sim, 600)
+    A = tiles[0]
+    near = [t for t in tiles[1:] if 0 < int(sim.pair_dist[A, t]) <= 4]
+    Bt = near[0]
+    # the Holy City at slot 0, a pop-1 city later in the walk at slot 1
+    sim.holy_tile[0, g] = A
+    for s, t, pop in ((0, A, 3), (1, Bt, 1)):
+        sim.city_alive[0, g, s] = True
+        sim.city_center[0, g, s] = t
+        sim.city_pop[0, g, s] = pop
+        sim.city_unconverted[0, g, s] = pop * sim._atheism_per_pop
+    sim.city_pressure[0, g, 0, g] = 1000
+    sim.city_followed[0, g, 0] = g
+    sim.city_pressure[0, g, 1, g] = 45
+    per = int(sim._pressure_per_turn)
+    step = int(sim._holy_city_mult) * per
+    sim._spread_religious_pressure(g, every)
+    assert float(sim.city_pressure[0, g, 1, g]) == 45 + step, "the convert took the Holy City's step"
+    assert int(sim.city_followed[0, g, 1]) == g, "the convert follows"
+    assert float(sim.city_pressure[0, g, 0, g]) == 1000 + per, "the convert pressed the Holy City the same turn"
+    # growth: the following city adds 50 to its religion, the unconverted none
+    b = torch.tensor([0])
+    pres0 = float(sim.city_pressure[0, g, 0, g])
+    sim._gain_population_pressure(b, g, torch.tensor([0]), torch.tensor([1]))
+    assert float(sim.city_pressure[0, g, 0, g]) == pres0 + sim._atheism_per_pop
+    assert float(sim.city_unconverted[0, g, 0]) == 3 * sim._atheism_per_pop
+    # a city following nothing adds it to the unconverted; a shrink keeps all
+    sim.city_pressure[0, g, 1] = 0
+    sim._gain_population_pressure(b, g, torch.tensor([1]), torch.tensor([2]))
+    assert float(sim.city_unconverted[0, g, 1]) == 3 * sim._atheism_per_pop
+    sim._gain_population_pressure(b, g, torch.tensor([1]), torch.tensor([-1]))
+    assert float(sim.city_unconverted[0, g, 1]) == 3 * sim._atheism_per_pop
+    print("  6d the walk's convert presses the same turn; growth adds 50 to the followed group OK")
+
+
 def poke_pressure_sources(rules, rj, path):
     """6c. WHAT A CITY PRESSES, AND WHO TAKES IT — tests/cpu/religion/
     pressure-sources.test.ts's twin: the Holy City x4 with its Holy Site
     beside it (never x8); a pillaged Holy Site x2 elsewhere; no city takes its
     own; a city-state's city takes pressure and, following what its pressure
-    row holds, presses on its own turn."""
+    row holds, presses on the religion's founder's turn."""
     sim = build(rules, path)
     assert bool(sim.citystate_alive[0, :sim.S].any()), "the fixture holds no living city-state"
     g, F = 1, sim.FREE_ROW
@@ -592,11 +641,13 @@ def poke_pressure_sources(rules, rj, path):
     sim.city_alive[0, F, 0] = True
     sim.city_center[0, F, 0] = C
     sim.city_pop[0, F, 0] = 1
+    sim.city_unconverted[0, F, 0] = 1 * sim._atheism_per_pop
     # the Holy City at A with a completed Holy Site
     sim.holy_tile[0, g] = A
     sim.city_alive[0, g, 0] = True
     sim.city_center[0, g, 0] = A
     sim.city_pop[0, g, 0] = 3
+    sim.city_unconverted[0, g, 0] = 3 * sim._atheism_per_pop
     sim.city_followed[0, g, 0] = g
     sim.city_dist_tile[0, g, 0, HS] = H1
     sim.district_complete[0, H1] = True
@@ -608,6 +659,7 @@ def poke_pressure_sources(rules, rj, path):
     sim.city_alive[0, g, 1] = True
     sim.city_center[0, g, 1] = Bt
     sim.city_pop[0, g, 1] = 3
+    sim.city_unconverted[0, g, 1] = 3 * sim._atheism_per_pop
     sim.city_followed[0, g, 1] = g
     sim.city_dist_tile[0, g, 1, HS] = H2
     sim.district_complete[0, H2] = True
@@ -621,14 +673,18 @@ def poke_pressure_sources(rules, rj, path):
     sim.city_followed[0, g, 0] = g   # a dead slot's follow was cleared
     sim.city_center[0, m0, 0] = Mt
     sim.city_pop[0, m0, 0] = 2
+    sim.city_unconverted[0, m0, 0] = 2 * sim._atheism_per_pop
     sim.city_pressure[0, m0, 0] = 0
     sim._spread_religious_pressure(g, every)
     assert int(sim.city_pressure[0, m0, 0, g]) == int(sim._holy_city_mult) * per, "the city-state took no pressure"
-    # ...and, following once its row holds the majority, presses on its own turn
+    # ...and, following once its row holds the majority, presses on the
+    # founder's turn
     sim.city_pressure[0, m0, 0, g] = 500
     sim.city_alive[0, g, 0] = False
     before = int(sim.city_pressure[0, F, 0, g])
     sim._spread_religious_pressure(m0, every)
+    assert int(sim.city_pressure[0, F, 0, g]) == before, "a minor's own turn spread"
+    sim._spread_religious_pressure(g, every)
     assert int(sim.city_pressure[0, F, 0, g]) - before == per, "the city-state pressed nobody"
     assert int(sim.city_pressure[0, m0, 0, g]) == 500, "the city-state took its own pressure"
     assert int(sim.city_followed[0, m0, 0]) == -1, "a minor's follow is never stored"
@@ -1059,6 +1115,7 @@ def main() -> None:
     poke_presr(rules, rj, path)
     poke_free_city_pressure(rules, rj, path)
     poke_pressure_sources(rules, rj, path)
+    poke_walk_and_growth(rules, rj, path)
     poke_combat_cs(rules, rj, path)
     poke_religious_community(rules, rj, path)
     poke_victor_direct(rules, rj, path)

@@ -3279,6 +3279,7 @@ class SimEconomy:
         if not bool(ok.count_nonzero()):
             return
         before, had = self._adopted_gov(row)
+        slots_before = self._seat_policy_slots(row)
         chg = ok & (~had | (gc != before))
         # a record that names the government the seat already chose changes
         # nothing, so it leaves every plane and the version untouched
@@ -3288,24 +3289,71 @@ class SimEconomy:
         back = chg & (((self.civ_gov_held[:, row] >> gc) & 1) > 0)
         self.civ_gov_held[:, row] |= torch.where(chg, torch.ones_like(gc) << gc, torch.zeros_like(gc))
         self._eff_version += 1
-        self._carry_policies(row, chg)
+        self._carry_policies(row, chg, slots_before)
         self.civ_gov_anarchy_end[:, row] = torch.where(
             back, torch.full_like(gc, int(self.turn) + int(self.rules.anarchy_turns)), self.civ_gov_anarchy_end[:, row])
         self._eff_version += 1
 
-    def _carry_policies(self, row: int, chg: torch.Tensor) -> None:
-        """Where `chg`: a CHANGED government keeps the slotted cards that are
-        still open under it and fit its slots, and drops the rest; the freed
-        slots wait for the driver's next decision. `carryPolicies`' twin."""
+    def _carry_policies(self, row: int, chg: torch.Tensor, before: torch.Tensor) -> None:
+        """Where `chg`: a CHANGED government rebuilds the slots (CIV6,
+        dll_readings "C-94: the slot rebuild"). The old layout — the stored
+        cards laid into the slots `before` [B, 4] held, `_fit_policy_set`'s
+        order — is saved sorted by each card's unlocking civic Cost, highest
+        first, ties in slot order; the new slots, the government's own then
+        the extras, each kind in SLOT_KINDS order, are walked in order: while
+        more than one stands empty, the j-th slot of a kind takes the j-th
+        saved card of that slot kind, the card spent whether or not the new
+        government opens it. The cards laid back are slotted but LAPSED
+        (`civ_policy_lapsed`); the rest are dropped. `carryPolicies`' twin."""
         if not self._npol or not bool(chg.count_nonzero()):
             return
+        B, dev, npol = self.B, self.device, self._npol
         civ = self._seat_civics(row)
-        adopted, _has = self._adopted_gov(row)
+        adopted, has_gov = self._adopted_gov(row)
         _open = self._policy_unlocked(civ, self.civ_age[:, row] == 0,
                                       self._civ_era(self.civ_techs[:, row], civ),
                                       self.civ_gov_held[:, row], adopted)
-        kept = self._fit_policy_set(self.civ_policies[:, row] & _open, self._seat_policy_slots(row))
-        self.civ_policies[:, row] = torch.where(chg.unsqueeze(1), kept, self.civ_policies[:, row])
+        stored = self.civ_policies[:, row]
+        # each stored card's OLD slot kind: its own kind within that kind's
+        # count in table order, the overflow (and every wildcard-only card)
+        # the wildcard slots
+        nb = before.clamp(min=0)
+        oldk = torch.full((B, npol), -1, dtype=torch.long, device=dev)
+        inkind = torch.zeros(B, npol, dtype=torch.bool, device=dev)
+        for k in range(3):
+            uk = stored & (self._pol_kind == k).unsqueeze(0)
+            fit = uk & (uk.long().cumsum(dim=1) <= nb[:, k:k + 1])
+            oldk = torch.where(fit, torch.full_like(oldk, k), oldk)
+            inkind = inkind | fit
+        over = stored & ~inkind
+        oldk = torch.where(over & (over.long().cumsum(dim=1) <= nb[:, 3:4]), torch.full_like(oldk, 3), oldk)
+        # each card's rank among the saved cards of its old slot kind: Cost
+        # descending, then table order (the order its kind's slots hold it in)
+        cost = self._pol_civic_cost
+        ar = torch.arange(npol, device=dev)
+        ahead = (cost.unsqueeze(0) > cost.unsqueeze(1)) | ((cost.unsqueeze(0) == cost.unsqueeze(1)) & (ar.unsqueeze(0) < ar.unsqueeze(1)))
+        same = (oldk.unsqueeze(2) == oldk.unsqueeze(1)) & (oldk >= 0).unsqueeze(1)
+        rank = (same & ahead.unsqueeze(0)).sum(dim=2)
+        # the new slots: the government's own (a negative extra takes its kind
+        # off them), then the extras
+        gov = self._gov_slots[adopted] * has_gov.long().unsqueeze(1)
+        xs = self._wonder_extra_slots(row) * has_gov.long().unsqueeze(1)
+        blocks = ((gov - (-xs).clamp(min=0)).clamp(min=0), xs.clamp(min=0))
+        n = blocks[0].sum(dim=1) + blocks[1].sum(dim=1)
+        placed = torch.zeros(B, dtype=torch.long, device=dev)
+        seen = torch.zeros(B, 4, dtype=torch.long, device=dev)
+        kept = torch.zeros(B, npol, dtype=torch.bool, device=dev)
+        for blk in blocks:
+            for k in range(4):
+                for j in range(int(blk[:, k].max())):
+                    go = chg & (j < blk[:, k]) & (n - placed > 1)
+                    take = stored & (oldk == k) & (rank == seen[:, k:k + 1]) & go.unsqueeze(1)
+                    put = take & _open
+                    kept = kept | put
+                    placed = placed + put.any(dim=1).long()
+                    seen[:, k] = seen[:, k] + go.long()
+        self.civ_policies[:, row] = torch.where(chg.unsqueeze(1), kept, stored)
+        self.civ_policy_lapsed[:, row] = torch.where(chg.unsqueeze(1), kept, self.civ_policy_lapsed[:, row])
         self._eff_version += 1
 
     def _policy_unlocked(self, civics2: torch.Tensor, dark: torch.Tensor | None,
@@ -3438,6 +3486,7 @@ class SimEconomy:
             civ, self._wonder_extra_slots(row), self.civ_age[:, row] == 0,
             self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]), self.civ_gov_held[:, row],
             self._adopted_gov(row))
+        self.civ_policy_lapsed[:, row] = False
         self._eff_version += 1
 
     def _gov_policy_mods(self, civics2: torch.Tensor, extra_slots: torch.Tensor | None = None,
@@ -3638,8 +3687,9 @@ class SimEconomy:
                 slotted = (self._seat_policies(row)
                            & self._policy_unlocked(civics2, dark, era, held, adopted)
                            & has_gov.unsqueeze(1))
-            # a LEGACY card is an ordinary row: its government's inherent bonus
-            cards = slotted
+            # a LEGACY card is an ordinary row: its government's inherent
+            # bonus. A LAPSED card stays slotted but pays nothing.
+            cards = slotted & ~self._seat_lapsed(row) if row is not None else slotted
             # which cards any game slots, read once for every per-card walk
             _card_on = cards.any(dim=0).tolist()
             fx["milpol"] = (cards & (self._pol_kind == 0)).sum(dim=1)  # SLOT_KIND_IDX: military is 0
@@ -3840,7 +3890,7 @@ class SimEconomy:
         """`_gov_mods`' inputs for seat row `row`, each a copy, never a view
         of a live plane (a key that is a view compares equal to itself forever
         and freezes the answer): (civics, extra slots, dark age, era, legacy
-        held, the cards chosen, the government chosen — read -2 in Anarchy,
+        held, the cards chosen beside the lapsed ones, the government chosen — read -2 in Anarchy,
         empty on a minor's row)."""
         civ = self._seat_civics(row).clone()
         slots = self._wonder_extra_slots(row)
@@ -3853,8 +3903,8 @@ class SimEconomy:
         era = self._civ_era(self._seat_techs(row), civ)
         held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
-        pols = self._seat_policies(row).clone()
-        chosen = torch.where(self._in_anarchy(row), torch.full_like(self.civ_gov_chosen[:, row], -2),
+        pols = torch.cat([self._seat_policies(row), self._seat_lapsed(row)], dim=1)
+        chosen =torch.where(self._in_anarchy(row), torch.full_like(self.civ_gov_chosen[:, row], -2),
                              self.civ_gov_chosen[:, row]) if major \
             else torch.zeros(0, dtype=self.civ_gov_chosen.dtype, device=self.device)
         return civ, slots, dark, era, held, pols, chosen
@@ -5060,7 +5110,8 @@ class SimEconomy:
         return cul, fai
 
     def _gw_tourism_general(self, row: int, printing: torch.Tensor | None, km: torch.Tensor | None) -> torch.Tensor:
-        """[B, RC] long — `greatWorkTourism`: every work but a Relic, PRINTING
+        """[B, RC] long — `greatWorkTourism`: every work but a Relic at its own
+        Tourism (`_gw_maker_tourism`, `gwWorkTourism`), PRINTING
         doubling a Work of Writing's, the row's Artifact percent (Mary
         Leakey), the Congress multiplier by created kind, a themed holder
         doubling its own."""
@@ -5069,7 +5120,29 @@ class SimEconomy:
         if not bool(held.count_nonzero()):
             return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
         oc = obj.clamp(min=0)
-        base = self._gw_obj_tourism.take(oc) * (held & (obj != 7)).long()
+        # a work's own Tourism: its maker's raised figure, else its object type's
+        mk = self.city_gw_maker[:, row]
+        mw = self._gw_maker_tourism.shape[1]
+        ov = self._gw_maker_tourism[oc, mk.clamp(min=0, max=mw - 1)]
+        ov = torch.where((mk >= 0) & (mk < mw), ov, torch.full_like(ov, -1))
+        base = torch.where(ov >= 0, ov, self._gw_obj_tourism.take(oc)) * (held & (obj != 7)).long()
+        # CIV6 (Building_GreatWorks.NonUniquePersonTourism): a work whose
+        # person already has one in an earlier slot of the holder pays the
+        # row's figure (`gwRepeatsPerson`)
+        if self._gw_nonunique_groups:
+            cls = torch.where(held, self._gw_maker_class.take(oc), torch.full_like(oc, -1))
+            for grp in self._gw_nonunique_groups:
+                for jj in range(1, len(grp)):
+                    s = grp[jj]
+                    if self._gw_slot_nonunique[s] <= 0:
+                        continue
+                    rep = torch.zeros_like(held[:, :, s])
+                    for ii in range(jj):
+                        p = grp[ii]
+                        rep = rep | ((mk[:, :, p] == mk[:, :, s]) & (cls[:, :, p] == cls[:, :, s]))
+                    rep = rep & (cls[:, :, s] >= 0) & (mk[:, :, s] >= 0)
+                    base[:, :, s] = torch.where(rep, torch.full_like(base[:, :, s], self._gw_slot_nonunique[s]),
+                                                base[:, :, s])
         if printing is not None:
             pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
                              torch.ones(self.B, dtype=torch.long, device=self.device))
@@ -5111,131 +5184,134 @@ class SimEconomy:
             fol[:, m0:m0 + self.S, 0] = self._minor_followed()
         return fol
 
-    def _spread_religious_pressure(self, src: int, act: torch.Tensor) -> None:
-        """The spreadReligiousPressure twin, from the cities of row `src` (a
-        major's row, a city-state's or the Free Cities row) on that row's own
-        turn, in the games of `act` [B]. CIV6: a player's cities press their neighbours
-        during its start of turn and the neighbours convert then
-        (tools/civ6lab/turn_order_civ6.md: 13 of 15 follower changes inside
-        the presser's block). CIV6 (GlobalParameters): every city of `src`
-        FOLLOWING a religion presses every OTHER live city within range, the
-        city-states' among them — the Holy City at x4, else a city with a Holy
-        Site or an AllowsHolyCity wonder at x2, any other at x1, times the
-        Bishop's doubling at the source — `src`'s trade routes carry their
-        religions both ways, and every city then follows the religion holding
-        more than half of its total pressure with the atheism baseline
-        (`_followed_religion`); a minor's follow is never stored, it is read
-        from its pressure row (`_relig_followed`). Religions are the seat
-        rows: g IS seat g. Deterministic, zero-RNG.
+    def _spread_religious_pressure(self, g: int, act: torch.Tensor) -> None:
+        """The spreadReligiousPressure twin: religion `g` (its founder's major
+        row) spreads on its founder's own turn, in the games of `act` [B].
+        CIV6 (PlayerReligion's turn, GameCore 0x4967f0 -> 0x498570 ->
+        0x498660 -> 0x496980): every live city in the world FOLLOWING it —
+        the city rows in player order, the majors, the city-states, the Free
+        Cities, each row's slots in order — presses every OTHER city: its
+        own step within the religion's range (the Holy City x4, else a
+        completed Holy Site, pillaged or not, or an AllowsHolyCity wonder x2,
+        a Holy-Site city of the Jerusalem suzerain x4, times the Bishop's
+        doubling) plus each live route between the two, the source's route
+        into the target at the destination share and the target's into the
+        source at the origin share (`_route_pressure_pairs`). Each add lands
+        at once and the target re-reads what it follows, so a city converted
+        earlier in the walk presses when its place comes: the converts are
+        found as the least fixed point of "the pressure from the sources
+        before it makes it follow g" (adding g pressure never takes a city off
+        g, so the set only grows). Every city then follows what
+        `_followed_religion` picks (a minor's follow is read from its row,
+        `_relig_followed`). Deterministic, zero-RNG.
 
         KILL hygiene: dead/absent slots are zeroed at every spread (torch.where
         on the alive mask), so a razed-then-reused slot starts fresh — the TS
         mirror is the fresh City object a founded/flipped city gets.
         city_pressure/city_followed permute with their city in _reclaim_cities,
         so pressure tracks the CITY, not the slot, through compaction."""
-        B, O = self.B, self.n_majors
-        # Itinerant Preachers: per-religion range — base + the religion's
-        # claimed enhancer's presR. A religion is keyed by its FOUNDER's row
-        # and every row can claim an enhancer, which is what TS walks:
-        # `for (const sx of state.seats) range[sx.seat] += presR`.
-        RANGE = torch.full((B, O), int(self._pressure_range), dtype=torch.long, device=self.device)
-        if self._enh_any:
-            RANGE += self._enh["presR"].take(self.civ_enhancer[:, :O] + 1).long()
-        founded = self.holy_tile >= 0  # [B, O]
-        # THE ROW AXIS IS NOT THE RELIGION AXIS. `O` counts RELIGIONS (each is
-        # keyed by its founder's major row); `NSC` counts the CITY ROWS this
-        # walk covers — every one: the majors, the city-states, the Free
-        # Cities row — so every site below names the axis it means.
-        M = self.n_majors
+        B, O, M = self.B, self.n_majors, self.n_majors
+        if not 0 <= g < M:
+            return  # only a major founds a religion
+        dev = self.device
         NSC = self.CITY_ROWS
         RC = self.city_center.shape[2]
         K = NSC * RC
         liv = self.city_alive                                            # [B, NSC, RC]
-        cen_f = self.city_center.clamp(min=0).reshape(B, K)
+        on = act & (self.holy_tile[:, g] >= 0)                           # [B]
         fol0 = self._relig_followed()                                    # [B, NSC, RC]
-        # THE SOURCE: row `src`'s cells alone, each with the religion it follows
-        s_cen = cen_f.reshape(B, NSC, RC)[:, src]                        # [B, RC]
-        s_fol = fol0[:, src]
-        emits = ((s_fol >= 0) & liv[:, src] & founded.gather(1, s_fol.clamp(min=0))
-                 & act.unsqueeze(1))
-        # the source's step: the Holy City x4 — CIV6 (Jerusalem's suzerain):
-        # "Your cities with Holy Sites exert pressure as if they were Holy
-        # Cities", so the founder's own Holy-Site cities take that step too;
-        # any other city x2 when it holds a completed Holy Site (pillaged or
-        # not) or a wonder that AllowsHolyCity, never on top of the x4.
-        holy = emits & (s_cen == self.holy_tile.gather(1, s_fol.clamp(min=0)))
-        site = torch.zeros(B, RC, dtype=torch.bool, device=self.device)
-        if self._hs_idx >= 0:
-            hs = self.city_dist_tile[:, src, :RC, self._hs_idx]
-            site = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0))
-            # a suzerain effect is a MAJOR's; the free row claims none
-            if self._suz_c_holy >= 0 and src < M:
-                holy = holy | (site & (s_fol == src) & self._suz_effect(src, self._suz_c_holy).unsqueeze(1))
-        if self._wond_n and bool(self._wond_religion_site.any()):
-            site = site | (self._completed_wonders(src) & self._wond_religion_site.reshape(1, 1, -1)).any(dim=2)
-        step = (torch.where(holy, self._holy_city_mult, torch.where(site, self._holy_site_mult, 1))
-                * self._pressure_per_turn)
-        # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
-        # stronger from this city" — the SOURCE city's own governor, a major's.
-        if self.n_governors and src < M:
-            step = (step.double() * self._governor_mult(src, "pressureMult").double()).long()
-        w = torch.where(emits, step, torch.zeros_like(step))            # [B, RC]
-        # every receiver against every OTHER source (a city never presses
-        # itself; no two centres share a tile): within the source religion's range
-        d = self.pair_dist[cen_f.unsqueeze(2), s_cen.unsqueeze(1)].to(torch.long)   # [B, K recv, RC src]
-        reach = RANGE.gather(1, s_fol.clamp(min=0))                      # [B, RC src]
-        contrib = torch.where((d <= reach.unsqueeze(1)) & (d > 0), w.unsqueeze(1), torch.zeros_like(d))  # [B, K, RC]
-        onehot = ((s_fol.unsqueeze(2) == torch.arange(O, device=self.device).reshape(1, 1, O)) & emits.unsqueeze(2)).double()
-        add = (contrib.double() @ onehot).long().reshape(B, NSC, RC, O) * liv.unsqueeze(3).long()
-        # which RELIGION each walked row founds, -1 for a row that founds none
-        # (a city-state, the Free Cities player) — what the "is this the
-        # owner's own religion" test keys on, in place of an arange over rows.
-        row_rel = torch.full((NSC,), -1, dtype=torch.long, device=self.device)
-        row_rel[:M] = torch.arange(M, device=self.device)
-        if src != self.FREE_ROW:
-            self._route_pressure_terms(add, founded, liv, fol0, src, act)
-        # CIV6 (Citadel of God): "City ignores pressure ... from Religions not
-        # founded by the Governor's player."
-        if self.n_governors:
-            _own = torch.arange(O, device=self.device).reshape(1, 1, 1, O) \
-                == row_rel.reshape(1, NSC, 1, 1)
-            _deaf = torch.cat([torch.stack([self._governor_flag(g, "ignoreForeignPressure") for g in range(M)], dim=1),
-                               torch.zeros(B, NSC - M, RC, dtype=torch.bool, device=self.device)], dim=1)
-            add = torch.where(_deaf.unsqueeze(3) & ~_own, torch.zeros_like(add), add)
-        # CIV6 (Religious alliance 1): allies' religions exert no pressure on
-        # each other's cities - zero the ally-founded column at ally-owned rows.
-        # the alliance planes are [B, n_majors, n_majors]: a city-state and the
-        # Free Cities player hold no alliance row, so their clause is all-False.
-        _rp = torch.cat([((self.seat_alliance_type[:, :M, :O] == 4)
-                          & (self.seat_ally_turns[:, :M, :O] > 0)),
-                         torch.zeros(B, NSC - M, O, dtype=torch.bool, device=self.device)], dim=1)
-        if bool(_rp.count_nonzero()):
-            add = torch.where(_rp.unsqueeze(2), torch.zeros_like(add), add)
-        # CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
-        # Religious Pressure in cities with no followers of your ally's
-        # Religion" — per founder g, each level-3 Religious ally whose own
-        # religion exists and has NO pressure in the receiving city raises g's
-        # whole per-turn add there by the percent; the SUM is scaled and
-        # floored once, as `spreadReligiousPressure` floors `addG`.
-        if self._al_rel3_pressure_pct:
-            for g in range(O):
-                allies = self._allied_type(g, 4, 3) & founded                   # [B, O]
-                if not bool(allies.count_nonzero()):
+        if bool(on.count_nonzero()):
+            # Itinerant Preachers: the religion's range is the base plus its
+            # founder's claimed enhancer's presR
+            reach = torch.full((B,), int(self._pressure_range), dtype=torch.long, device=dev)
+            if self._enh_any:
+                reach = reach + self._enh["presR"].take(self.civ_enhancer[:, g] + 1).long()
+            cen = self.city_center.clamp(min=0).reshape(B, K)
+            livf = liv.reshape(B, K)
+            # every city's step as a source of g
+            holy = self.city_center == self.holy_tile[:, g].reshape(B, 1, 1)
+            site = torch.zeros(B, NSC, RC, dtype=torch.bool, device=dev)
+            if self._hs_idx >= 0:
+                hs = self.city_dist_tile[:, :, :RC, self._hs_idx]
+                site = (hs >= 0) & self.district_complete.gather(1, hs.clamp(min=0).reshape(B, -1)).reshape(B, NSC, RC)
+                # CIV6 (Jerusalem's suzerain): "Your cities with Holy Sites
+                # exert pressure as if they were Holy Cities" — the effect is
+                # the city OWNER's, whatever religion it follows (GameCore
+                # 0x1f33e0); a suzerain effect is a major's
+                if self._suz_c_holy >= 0:
+                    suz = self._suz_effect_rows(self._suz_c_holy)                  # [B, M]
+                    holy[:, :M] = holy[:, :M] | (site[:, :M] & suz.unsqueeze(2))
+            if self._wond_n and bool(self._wond_religion_site.any()):
+                for r in [*range(M), self.FREE_ROW]:
+                    cw = self._completed_wonders(r)
+                    if cw is not None:
+                        site[:, r] = site[:, r] | (cw & self._wond_religion_site.reshape(1, 1, -1)).any(dim=2)
+            step = (torch.where(holy, self._holy_city_mult, torch.where(site, self._holy_site_mult, 1))
+                    * self._pressure_per_turn).double()
+            # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
+            # stronger from this city" — the SOURCE city's own governor, a major's.
+            if self.n_governors:
+                for r in range(M):
+                    step[:, r] = step[:, r] * self._governor_mult(r, "pressureMult").double()
+            stepf = step.reshape(B, K)
+            # the pair amount: [B, target, source]
+            d = self.pair_dist[cen.unsqueeze(2), cen.unsqueeze(1)].to(torch.long)
+            w = torch.where((d <= reach.reshape(B, 1, 1)) & (d > 0), stepf.unsqueeze(1), torch.zeros((), dtype=torch.float64, device=dev))
+            w = w + self._route_pressure_pairs(cen, livf)
+            # a target that hears no g: the Citadel of God's city of another
+            # founder, and (Religious alliance 1) an ally's city
+            shut = torch.zeros(B, NSC, RC, dtype=torch.bool, device=dev)
+            for r in range(M):
+                if r == g:
                     continue
-                pct = torch.zeros(B, NSC, RC, dtype=torch.long, device=self.device)
-                for a in range(O):
-                    if a == g or not bool(allies[:, a].count_nonzero()):
-                        continue
-                    nofol = self.city_pressure[..., a] == 0
-                    pct = pct + (allies[:, a].view(B, 1, 1) & nofol).long() * self._al_rel3_pressure_pct
-                add[..., g] = (add[..., g] * (100 + pct)).div(100, rounding_mode="floor")
-        self.city_pressure.copy_(torch.where(liv.unsqueeze(3), self.city_pressure + add,
-                                             torch.zeros_like(self.city_pressure)))
-        best = self._followed_religion(self.city_pressure, self.city_pop)
+                if self.n_governors:
+                    shut[:, r] = shut[:, r] | self._governor_flag(r, "ignoreForeignPressure")
+                al = (self.seat_alliance_type[:, r, g] == 4) & (self.seat_ally_turns[:, r, g] > 0)
+                shut[:, r] = shut[:, r] | al.unsqueeze(1)
+            pair_ok = livf.unsqueeze(2) & livf.unsqueeze(1) & ~shut.reshape(B, K, 1) & on.reshape(B, 1, 1)
+            w = torch.where(pair_ok, w, torch.zeros_like(w))
+            # the sources: who follows g as the walk opens, and the converts
+            src = (fol0.reshape(B, K) == g) & livf & on.unsqueeze(1)
+            before = torch.ones(K, K, dtype=torch.bool, device=dev).tril(-1)          # source before target
+            presf = self.city_pressure.reshape(B, K, O)
+            popf = self.city_pop.reshape(B, K)
+            unf = self.city_unconverted.reshape(B, K)
+            while True:
+                pre = (w * (src.unsqueeze(1) & before).double()).sum(dim=2)          # [B, K]
+                cand = ~src & livf & (pre > 0)
+                if not bool(cand.count_nonzero()):
+                    break
+                cb, ck = cand.nonzero(as_tuple=True)
+                pc = presf[cb, ck].clone()
+                pc[:, g] = pc[:, g] + pre[cb, ck]
+                new = self._followed_religion(pc, popf[cb, ck], unf[cb, ck]) == g
+                if not bool(new.count_nonzero()):
+                    break
+                src[cb[new], ck[new]] = True
+            add = (w * src.unsqueeze(1).double()).sum(dim=2).reshape(B, NSC, RC)
+            # CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
+            # Religious Pressure in cities with no followers of your ally's
+            # Religion" — each level-3 Religious ally of the founder whose own
+            # religion exists and has NO pressure in the receiving city raises
+            # the city's whole add by the percent, floored once.
+            if self._al_rel3_pressure_pct:
+                founded = self.holy_tile >= 0
+                allies = self._allied_type(g, 4, 3) & founded                   # [B, O]
+                if bool(allies.count_nonzero()):
+                    pct = torch.zeros(B, NSC, RC, dtype=torch.long, device=dev)
+                    for a in range(O):
+                        if a == g or not bool(allies[:, a].count_nonzero()):
+                            continue
+                        nofol = self.city_pressure[..., a] == 0
+                        pct = pct + (allies[:, a].view(B, 1, 1) & nofol).long() * self._al_rel3_pressure_pct
+                    add = torch.where(pct > 0, (add * (100 + pct)).div(100, rounding_mode="floor"), add)
+            self.city_pressure[..., g] += torch.where(liv, add, torch.zeros_like(add))
+        self.city_pressure.copy_(torch.where(liv.unsqueeze(3), self.city_pressure, torch.zeros_like(self.city_pressure)))
+        best = self._followed_religion(self.city_pressure, self.city_pop, self.city_unconverted)
         # EXODUS pays era score each time a city CONVERTS; compare against the
-        # PRE-flip follow set, exactly like `wasFollowed`.
+        # PRE-walk follow set, exactly like `wasFollowed`.
         was = fol0
-        _fol1 = torch.where(liv, torch.where(act.view(B, 1, 1), best, was), torch.full_like(best, -1))
+        _fol1 = torch.where(liv, torch.where(on.view(B, 1, 1), best, was), torch.full_like(best, -1))
         # the stored follow is the majors' and the Free row's; a minor's is
         # read from its pressure row
         self.city_followed[:, :M].copy_(_fol1[:, :M])
@@ -5255,42 +5331,27 @@ class SimEconomy:
                     if _a != _g:
                         self._promise_incursion(_a, _g, self.PROMISE_CONVERT, _conv[:, _a].sum(dim=1))
 
-    def _route_pressure_share(self, base: float, pct: torch.Tensor) -> torch.Tensor:
-        """[B] long — `routePressureShare`'s twin: a per-turn route amount's
-        whole part every turn and its half on EVEN turns (the accumulator is
-        an integer)."""
-        amt = base * (100 + pct.double()) / 100
-        whole = amt.floor()
-        half = ((amt > whole) & (self.turn % 2 == 0)).double()
-        return (whole + half).long()
-
-    def _route_pressure_terms(self, add: torch.Tensor, founded: torch.Tensor, liv: torch.Tensor,
-                              fol: torch.Tensor, row: int, act: torch.Tensor) -> None:
-        """CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
-        _FOR_ORIGIN 0.5): every live route carries its ORIGIN's religion to
-        the destination and the destination's back at half strength, Dharma's
-        +100% on the route OWNER's rows. Every receiver lands in `add`, so the
-        Citadel and alliance masks apply.
-
-        The RECEIVER axis is the caller's — every city row, the city-states'
-        and the Free Cities' among them — and `fol` what each city follows as
-        the spread opened. The route OWNER is row `row` — a major's or a
-        city-state's, Dharma's rows a major's alone — on its own turn, in the
-        games of `act`: the Free Cities player runs no trade route."""
+    def _route_pressure_pairs(self, cen: torch.Tensor, livf: torch.Tensor) -> torch.Tensor:
+        """[B, target, source] f64 — CIV6
+        (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
+        _FOR_ORIGIN 0.5): each live route of every row — a major's or a
+        city-state's — gives its destination the destination share when its
+        origin is the source, and its origin the origin share when its
+        destination is; Dharma's +100% rides the route OWNER's rows. `cen` /
+        `livf` are the flattened city centres and alive mask [B, K]."""
         B, O = self.B, self.n_majors
-        cen_f = self.city_center.reshape(B, -1)
-        fol_f = fol.reshape(B, -1)
-        liv_f = liv.reshape(B, 1, -1)
-        add_f = add.reshape(B, -1, O)
+        K = cen.shape[1]
+        out = torch.zeros(B, K, K, dtype=torch.float64, device=self.device)
 
-        def cell_of(ct: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-            hit = (ct.unsqueeze(2) == cen_f.unsqueeze(1)) & liv_f & (ct >= 0).unsqueeze(2)
-            cell = hit.long().argmax(dim=2)
-            return hit.any(dim=2), cell, fol_f.gather(1, cell)
+        def cell_of(ct: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+            hit = (ct.unsqueeze(2) == cen.unsqueeze(1)) & livf.unsqueeze(1) & (ct >= 0).unsqueeze(2)
+            return hit.any(dim=2), hit.long().argmax(dim=2)
 
-        oc, dc = self._route_centres(row)
-        live = (oc >= 0) & (dc >= 0) & act.unsqueeze(1)
-        if bool(live.count_nonzero()):
+        for row in range(self.n_majors + self.S):
+            oc, dc = self._route_centres(row)
+            live = (oc >= 0) & (dc >= 0)
+            if not bool(live.count_nonzero()):
+                continue
             pct_o = torch.zeros(B, dtype=torch.long, device=self.device)
             pct_d = torch.zeros(B, dtype=torch.long, device=self.device)
             for civ, lead, o_f, d_f, pct in (self._live_rows(row, self._route_pressure_rows) if row < O else ()):
@@ -5299,22 +5360,17 @@ class SimEconomy:
                     pct_o = pct_o + has
                 if d_f:
                     pct_d = pct_d + has
-            w_d = self._route_pressure_share(self._route_dest_pressure, pct_d)
-            w_o = self._route_pressure_share(self._route_origin_pressure, pct_o)
-            o_ok, o_cell, g_o = cell_of(oc)
-            d_ok, d_cell, g_d = cell_of(dc)
-            src_o = live & o_ok & (g_o >= 0) & founded.gather(1, g_o.clamp(min=0))
-            src_d = live & d_ok & (g_d >= 0) & founded.gather(1, g_d.clamp(min=0))
-            # the origin's religion lands on the destination
-            m = src_o & d_ok & (w_d.unsqueeze(1) > 0)
-            if bool(m.count_nonzero()):
-                b, k = m.nonzero(as_tuple=True)
-                add_f.index_put_((b, d_cell[b, k], g_o[b, k]), w_d.take(b), accumulate=True)
-            # the destination's religion lands back on the origin
-            m = src_d & o_ok & (w_o.unsqueeze(1) > 0)
-            if bool(m.count_nonzero()):
-                b, k = m.nonzero(as_tuple=True)
-                add_f.index_put_((b, o_cell[b, k], g_d[b, k]), w_o.take(b), accumulate=True)
+            w_d = self._route_dest_pressure * (100 + pct_d.double()) / 100
+            w_o = self._route_origin_pressure * (100 + pct_o.double()) / 100
+            o_ok, o_cell = cell_of(oc)
+            d_ok, d_cell = cell_of(dc)
+            m = live & o_ok & d_ok
+            if not bool(m.count_nonzero()):
+                continue
+            b, k = m.nonzero(as_tuple=True)
+            out.index_put_((b, d_cell[b, k], o_cell[b, k]), w_d.take(b), accumulate=True)
+            out.index_put_((b, o_cell[b, k], d_cell[b, k]), w_o.take(b), accumulate=True)
+        return out
 
     def _rel_combat_planes(self) -> tuple[torch.Tensor, torch.Tensor]:
         """(near3, terr) — [B, O, T] bool planes for the enhancer combat
@@ -6193,36 +6249,93 @@ class SimEconomy:
                 extra = extra + torch.div(own.long() * pct, 100, rounding_mode="floor")
         return None if min_era < 0 else (extra, min_era)
 
-    def _tourism_religious_of(self, row: int) -> torch.Tensor:
-        """[B] — the RELIGIOUS half of a seat's per-turn tourism, banked apart
-        (`civ_tourism_rel`) because a rival's Enlightenment or a different
-        religion halves THIS half at the read (`_culture_victor`), never the
-        general half. CIV6 (Tourism): "Relics generate Religious Tourism"
-        (St. Basil's multiplier is the HOLDING city's) and "Holy Cities
-        generate +8 Religious Tourism per turn" — a religion's Holy City pays
-        its CURRENT owner (`seatTourismReligious`)."""
+    def _seat_tourism_pct(self, row: int) -> torch.Tensor:
+        """[B] long — CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM): the percent the
+        row's research adds to every city's Tourism (`seatTourismPct`)."""
+        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if row >= self.n_majors:
+            return out
+        for kind, idx, pct in self._tour_pct_rows:
+            if idx < 0:
+                continue
+            has = self.civ_techs[:, row, idx] if kind == 0 else self.civ_civics[:, row, idx]
+            out = out + has.long() * pct
+        return out
+
+    @staticmethod
+    def _raised_tourism(t: torch.Tensor, pct: torch.Tensor) -> torch.Tensor:
+        """a city's half of its Tourism raised by the seat's percent `pct` [B],
+        floored (`raisedTourism`); `t` [B] or [B, RC]"""
+        p = pct.reshape(-1, *([1] * (t.dim() - 1)))
+        return torch.div(t.long() * (100 + p), 100, rounding_mode="floor")
+
+    def _seat_tourism_general(self, row: int, inp: dict) -> torch.Tensor:
+        """[B] — the GENERAL half of a seat's per-turn tourism: each city's
+        own, raised by the seat's percent (`_seat_tourism_pct`) — with none,
+        the seat's whole sum (`seatTourism`)."""
+        own = self.tile_seat == row
+        nat = self._tourism_of(
+            inp["gw_tour"], self.city_alive[:, row], own, inp["era"],
+            resort_mult=inp["resort_mult"], park_mult=inp["park_mult"], gov_tile=inp["gov_tile"],
+            wonder_pct=inp["wonder_pct"],
+            suz_tour=self._suzerain_tourism(row, own) + self._gp_district_tourism(row) + self._building_tourism(row),
+            gw_mult=inp["gw_mult"])
+        pct = self._seat_tourism_pct(row)
+        if not bool(pct.count_nonzero()):
+            return nat
+        cols = self.RC
+        alive = self.city_alive[:, row, :cols]
+        slot = self.city_slot_at(row)
+        raised = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        for j in alive.any(dim=0).nonzero().flatten().tolist():
+            one = torch.zeros(self.B, cols, dtype=torch.bool, device=self.device)
+            one[:, j] = alive[:, j]
+            own_j = (slot == j) & alive[:, j].unsqueeze(1)
+            t = self._tourism_of(
+                inp["gw_tour"], one, own_j, inp["era"],
+                resort_mult=inp["resort_mult"], park_mult=inp["park_mult"], gov_tile=inp["gov_tile"],
+                suz_tour=self._suzerain_tourism(row, own_j) + self._gp_district_tourism(row, one)
+                + self._building_tourism(row, one),
+                gw_mult=inp["gw_mult"], wonder_pct=inp["wonder_pct"])
+            raised = raised + self._raised_tourism(t, pct)
+        return torch.where(pct != 0, raised, nat.long())
+
+    def _city_religious_tourism(self, row: int) -> torch.Tensor:
+        """[B, RC] long — the RELIGIOUS half each city of row `row` makes:
+        CIV6 (Tourism) "Relics generate Religious Tourism" (St. Basil's
+        multiplier is the HOLDING city's) and "Holy Cities generate +8
+        Religious Tourism per turn" — a religion's Holy City pays its CURRENT
+        owner (`cityReligiousTourism`)."""
         alive = self.city_alive[:, row]
         relics = self._gw_tourism_relic(row)
         rm = (self._city_wonder_mult(row, self._wond_relictour).long()
               if self._wond_n else torch.ones_like(relics))
-        t = (relics * alive.long() * rm).sum(dim=1)
+        t = relics * alive.long() * rm
         centres = self.city_center[:, row]
         for g in range(self.n_majors):
             ht = self.holy_tile[:, g]
-            holds = (ht >= 0) & ((centres == ht.unsqueeze(1)) & alive).any(dim=1)
-            t = t + holds.long() * self._holy_city_tour
+            t = t + ((ht >= 0).unsqueeze(1) & (centres == ht.unsqueeze(1)) & alive).long() * self._holy_city_tour
         return t
+
+    def _tourism_religious_of(self, row: int) -> torch.Tensor:
+        """[B] — the RELIGIOUS half of a seat's per-turn tourism, banked apart
+        (`civ_tourism_rel`) because a rival's Enlightenment or a different
+        religion halves THIS half at the read (`_culture_victor`), never the
+        general half: each city's own, raised by the seat's percent
+        (`seatTourismReligious`)."""
+        return self._raised_tourism(self._city_religious_tourism(row), self._seat_tourism_pct(row)).sum(dim=1)
 
     def _building_tourism(self, row: int, col_mask: torch.Tensor | None = None) -> torch.Tensor:
         """[B] long — `buildingTourism`: a building's flat Tourism on its own
-        district (Ferris Wheel, Shopping Mall); CIV6 (Marae,
+        district (Ferris Wheel, Shopping Mall), and once the seat holds a
+        civic (Conservation's walls and Arena, `_b_civic_tour`); CIV6 (Marae,
         MARAE_TOURISM_FEATURES) Tourism per owned tile carrying a feature once
         Flight is held; (Thermal Bath, THERMALBATH_ADDTOURISM) Tourism while
         the border holds a Geothermal Fissure. A dark building pays nothing.
         `col_mask` [B, RC] narrows the sum to some of the row's cities."""
         out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        if row >= self.n_majors or (not self._b_tour_any and not self._bvar_tour_feat
-                                    and not self._bvar_tour_with_feat):
+        if row >= self.n_majors or (not self._b_tour_any and not self._b_civic_tour_any
+                                    and not self._bvar_tour_feat and not self._bvar_tour_with_feat):
             return out
         cols = self.RC
         dreg = self.city_dist_tile[:, row, :cols]
@@ -6234,6 +6347,10 @@ class SimEconomy:
                 & alive.unsqueeze(2))
         if self._b_tour_any:
             out = out + (held.long() * self._b_tourism).sum(dim=(1, 2))
+        if self._b_civic_tour_any:
+            cv = self._b_civic_tour[:, 0]
+            has = self.civ_civics[:, row].gather(1, cv.clamp(min=0).unsqueeze(0).expand(self.B, -1)) & (cv >= 0)
+            out = out + (held.long() * (has.long() * self._b_civic_tour[:, 1]).unsqueeze(1)).sum(dim=(1, 2))
         feat_cnt = None
         for (bi, c), (amt, tech) in self._bvar_tour_feat.items():
             w = self._row_plays_idx(row, c)

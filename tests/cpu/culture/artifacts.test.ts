@@ -26,7 +26,7 @@ describe('artifacts and archaeology', () => {
   it('the sourced constants and the museum choice', () => {
     expect(GWO_CULTURE[GWO_ARTIFACT]).toBe(3);
     expect(GWO_TOURISM[GWO_ARTIFACT]).toBe(3);
-    expect(GW_HOLDERS.find((h) => h.id === ARTIFACT_BUILDING)!.slots).toEqual([{ type: GWS_ARTIFACT, count: ARTIFACT_SLOTS }]);
+    expect(GW_HOLDERS.find((h) => h.id === ARTIFACT_BUILDING)!.slots).toEqual([{ type: GWS_ARTIFACT, count: ARTIFACT_SLOTS, nonUniqueTourism: 1 }]);
     expect(ARCHAEOLOGIST_CHARGES).toBe(3);
     // real Civ 6: a Theater Square holds the ART museum OR the ARCHAEOLOGICAL
     // one, never both

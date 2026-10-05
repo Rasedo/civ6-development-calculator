@@ -2,8 +2,9 @@
  * WHAT A CITY PRESSES, AND WHO TAKES IT (runs/h1_duelw1103..1108, the
  * harness's step.pressure): the Holy City x4, a Holy Site (pillaged or not)
  * or Stonehenge x2 elsewhere, the two never stacked; no city takes its own;
- * a city-state's one city takes pressure, follows and presses on its own
- * turn. The GPU twin is tests/gpu/religion2_test.py's `poke_pressure_sources`.
+ * a city-state's one city takes pressure, follows and presses on the
+ * religion's founder's turn, as every following city does, a city the walk
+ * converts included. The GPU twin is tests/gpu/religion2_test.py's `poke_pressure_sources`.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
@@ -82,8 +83,9 @@ describe('the pressure a city presses', () => {
     expect(other.religionPressure[0]).toBe(HOLY_CITY_PRESSURE_MULT * base);
   });
 
-  it("a city-state's city takes pressure, follows, and presses on its own turn", () => {
+  it("a city-state's city takes pressure, follows, and presses on the founder's turn", () => {
     const { state, holy, other } = scene();
+    holy.religionPressure = [1000];
     other.followedReligion = null;
     const cs = cityStateAt(state, 8, 12);
     spreadReligiousPressure(state, 0);
@@ -91,12 +93,30 @@ describe('the pressure a city presses', () => {
     // it follows what its pressure holds against its 50 a citizen
     cs.religionPressure![0] = 500;
     expect(majorityReligionOf(state, cs.seat)).toBe(0);
-    // ...and presses on its own turn, every other city in range
+    // ...and presses every other city in range when the religion's founder
+    // spreads it; a minor's own turn spreads nothing
     const h0 = holy.religionPressure?.[0] ?? 0;
     const o0 = other.religionPressure?.[0] ?? 0;
     spreadReligiousPressure(state, cs.seat);
-    expect(holy.religionPressure![0]).toBe(h0 + base);
-    expect(other.religionPressure![0]).toBe(o0 + base);
     expect(cs.religionPressure![0]).toBe(500);
+    spreadReligiousPressure(state, 0);
+    expect(holy.religionPressure![0]).toBe(h0 + base);
+    expect(other.religionPressure![0]).toBe(o0 + base + HOLY_CITY_PRESSURE_MULT * base);
+    expect(cs.religionPressure![0]).toBe(500 + HOLY_CITY_PRESSURE_MULT * base);
+  });
+
+  it('a city the walk converts presses when its own place comes, the same turn (GameCore 0x498660)', () => {
+    // runs/h1_duelw1108 t128: Shanghai, pop 1 on 26 of the religion against
+    // its 50 unconverted, takes the Holy City's step, follows, and presses
+    // Xian before the turn ends
+    const { state, holy, other } = scene();
+    holy.religionPressure = [1000];
+    other.followedReligion = null;
+    other.religionPressure = [45];
+    other.unconvertedPressure = 50;
+    spreadReligiousPressure(state, 0);
+    expect(other.religionPressure[0]).toBe(45 + HOLY_CITY_PRESSURE_MULT * base);
+    expect(other.followedReligion).toBe(0);
+    expect(holy.religionPressure[0]).toBe(1000 + base);
   });
 });

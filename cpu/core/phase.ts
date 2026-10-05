@@ -614,15 +614,25 @@ function wonderLoyaltyAura(state: GameState, city: City): boolean {
   return false;
 }
 
+/** A city's loyalty change a turn, every term summed — what the game
+ *  reports as its loyalty per turn, a capital's too (which stands at full
+ *  whatever it reads). */
+export function loyaltyPerTurn(state: GameState, city: City, amenityTierName: string, hasGovernor = false,
+  starving = false): number {
+  return loyaltyDelta(state, city, amenityTierName)
+    + (hasGovernor ? GOVERNOR_LOYALTY : 0)
+    + (cityGovernorEstablished(state, city) ? 0 : ungovernedLoyalty(state, city.seat))
+    + (starving ? LOYALTY_STARVATION : 0)
+    + gpCityPermOf(city, 'loyalty')
+    + congressLoyaltyDelta(state, city.seat) + emergencyLoyalty(state, city.seat, city.id);
+}
+
 /**
  * Apply a turn of loyalty to `city` (called from endTurn with the stats it
  * already computed). Returns true when the city has hit 0 and must flip.
  */
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false,
   starving = false): boolean {
-  const govBonus = (hasGovernor ? GOVERNOR_LOYALTY : 0)
-    + (cityGovernorEstablished(state, city) ? 0 : ungovernedLoyalty(state, city.seat))
-    + (starving ? LOYALTY_STARVATION : 0);
   if (!cityHolders(state).some((s) => s.seat !== city.seat && s.cities.length > 0)) return false;
   // CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia and
   // located on the same continent as the Phoenician Capital are 100% Loyal."
@@ -633,9 +643,7 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
     city.loyalty = LOYALTY_MAX;
     return false;
   }
-  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyDelta(state, city, amenityTierName) + govBonus
-    + gpCityPermOf(city, 'loyalty')
-    + congressLoyaltyDelta(state, city.seat) + emergencyLoyalty(state, city.seat, city.id);
+  const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyPerTurn(state, city, amenityTierName, hasGovernor, starving);
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
   return city.loyalty <= 0;
 }
@@ -825,9 +833,9 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  city takes its grant when one falls due,
  *  puts the same stats' Production into its build table (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires and runs
- *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`). Then
- *  its cities' religious pressure goes out (`spreadReligiousPressure`), then
- *  the Free Cities' land
+ *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
+ *  cities press a religion they follow on that religion's founder's turn
+ *  (`spreadReligiousPressure`). Then the Free Cities' land
  *  units walk (`walkUnit`, C-60's tables, around the nearest Free City, in
  *  unit order off a list taken before anyone moves); the cities that reached
  *  0 join their race's winner, in array order, after the walk. */
@@ -874,7 +882,6 @@ export function freeCitiesPhase(state: GameState): void {
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
   });
-  spreadReligiousPressure(state, FREE_SEAT);
   const homes = free.cities.map((c) => c.centerIndex);
   for (const u of state.units.filter((x) => x.seat === FREE_SEAT && landWalker(x))) {
     walkUnit(state, u, homes, FREE_WALK_STEPS, FREE_WALK_WEIGHTS);
@@ -1401,6 +1408,7 @@ export function transferCity(
     // flip — no error, just a value that vanishes.
     // Religion travels with the city here too (the GPU twin keeps it).
     religionPressure: civCity.religionPressure ? [...civCity.religionPressure] : undefined,
+    unconvertedPressure: civCity.unconvertedPressure,
     followedReligion: civCity.followedReligion,
     greatWorks: civCity.greatWorks ? civCity.greatWorks.map((w) => ({ ...w })) : undefined,
     // the laser stations ride the flip with the Spaceport that holds them —
@@ -1520,7 +1528,11 @@ export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatAction
       const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, gov);
       const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
       const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
-      if (fit && (!policySetChanges(state, actor.seat, fit) || unlock())) actor.government.policies = fit;
+      // a lapsed card the set keeps keeps its standing; one it drops is gone
+      if (fit && (!policySetChanges(state, actor.seat, fit) || unlock())) {
+        actor.government.policies = fit;
+        actor.government.lapsed = actor.government.lapsed.filter((c) => fit.includes(c));
+      }
     }
   }
 }
@@ -2816,6 +2828,7 @@ export function seatPhase(state: GameState): void {
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
     const bCivic = rosterBoostPoints(state, actor.seat, true);
     const _govBefore = seatGovernment(state, actor.seat);
+    const _slotsBefore = governmentSlots(state, actor.seat);
     let civicDone = false;
     while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
       rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
@@ -2834,7 +2847,7 @@ export function seatPhase(state: GameState): void {
     // exit; a CHANGE carries the slotted cards over.
     const _govNow = seatGovernment(state, actor.seat);
     actor.government.held |= governmentBit(_govNow);
-    if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat);
+    if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat, _slotsBefore);
     // the district discount's count of completed specialty districts, taken
     // when a technology or civic completes — before the cities produce
     if (techDone || civicDone) actor.discountDistricts = completedSpecialtyDistricts(state, actor.seat);

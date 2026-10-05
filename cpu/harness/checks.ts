@@ -31,7 +31,7 @@ import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity } from '../core/cityStates';
-import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost } from '../core/phase';
+import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
 import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn } from '../core/rules';
@@ -41,15 +41,15 @@ import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
 import { governorFlag } from '../core/governors';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
-import { LOYALTY_MAX } from '../data/seats';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
+import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, routeChanges,
   type History, type Imported,
 } from './import';
 import {
@@ -258,19 +258,13 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     }
     // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
-    if (bool(c.capital)) out.push({ turn, check: 'city.loyaltyPerTurn', subject, ok: true, skip: 'capital' });
-    else {
+    {
       // the whole per-turn change the turn step applies (the governor's term
-      // and the seat's terms beside the city's own), read off a city held at
-      // mid loyalty so no bound clips it
-      // the city's standing amenity tier beside the congress the game holds
-      // now (1107 t242: China's cities read the new session's loyalty terms
+      // and the seat's terms beside the city's own), a capital's too; the
+      // city's standing amenity tier beside the congress the game holds now
+      // (1107 t242: China's cities read the new session's loyalty terms
       // beside their old amenities)
-      const was = city.loyalty;
-      city.loyalty = LOYALTY_MAX / 2;
-      applyLoyalty(state, city, standing.tier.name, num(c.governor) >= 0, stats.foodSurplus < 0);
-      const ours = city.loyalty - LOYALTY_MAX / 2;
-      city.loyalty = was;
+      const ours = loyaltyPerTurn(state, city, standing.tier.name, num(c.governor) >= 0, stats.foodSurplus < 0);
       push('city.loyaltyPerTurn', near(ours, gameLpt, 0.05), gameLpt, round3(ours),
         { breakdown: c.loyaltyBreakdown, tier: standing.tier.name });
     }
@@ -401,9 +395,18 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       state: { units: state.units.filter((x) => x.seat === seat).map((x) => x.type) } });
     // the game's reader answers the whole output, the religious half with it
     // (runs/h1_duelw1103 t150: Rome's 8 is its Holy City's)
+    // The game's seat figure is its cities' sum as its last turn processing
+    // left them; a record whose cities moved since (a wonder completed in
+    // the turn: 1108 Rome t102, the Pyramids' 3 in Rome's figure, 0 in the
+    // seat's) holds no reading of the seat's
     const tour = seatTourism(state, seat) + seatTourismReligious(state, seat);
-    out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour),
-      ...gapsFor([...new Set(sg)], 'seat.tourism') });
+    const citySum = rec.cities.filter((c) => c.owner === pid).reduce((n, c) => n + num(c.tourism), 0);
+    if (rec.cities.some((c) => c.owner === pid && c.tourism !== undefined) && citySum !== num(p.tourism)) {
+      out.push({ turn, check: 'seat.tourism', subject, ok: true, skip: 'the seat figure predates its cities\'' });
+    } else {
+      out.push({ turn, check: 'seat.tourism', subject, ok: near(tour, num(p.tourism), 0.5), game: num(p.tourism), ours: round3(tour),
+        ...gapsFor([...new Set(sg)], 'seat.tourism') });
+    }
   }
 
   // each live trade route: what it pays its origin and its destination, each
@@ -456,8 +459,6 @@ export interface Actions {
   /** cities whose population moved across the pair while the food box ran
    *  on (a village's citizen; a citizen lost with no Settler and no famine) */
   popOutsideBox: Set<string>;
-  /** cities whose governor changed */
-  governorChanged: Set<string>;
   /** players whose turn start had not run when the later record was read */
   notStarted: Set<number>;
 }
@@ -487,7 +488,6 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     }
   }
   const plotsGained = new Map<string, number[]>();
-  const governorChanged = new Set<string>();
   const popOutsideBox = new Set<string>();
   for (const [k, c1] of after) {
     const c0 = before.get(k);
@@ -495,7 +495,6 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const had = new Set(c0.plots);
     const gained = c1.plots.filter((q) => !had.has(q));
     if (gained.length) plotsGained.set(k, gained);
-    if (num(c0.governor) !== num(c1.governor)) governorChanged.add(k);
     // a starving city's refilled box is the growth step's own (`seatGrowth`)
     const starved = c1.pop === c0.pop - 1 && num(c0.foodSurplus) < 0;
     if (c1.pop !== c0.pop && num(c1.food) >= num(c0.food) && !starved) popOutsideBox.add(k);
@@ -507,7 +506,7 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
     const expected = num(p0.gold) + num(p0.goldYield);
     if (num(p1.gold) < expected - 0.5) goldSpent.set(p1.id, expected - num(p1.gold));
   }
-  return { cityChanged, unitsNew, spreads, plotsGained, goldSpent, governorChanged, popOutsideBox,
+  return { cityChanged, unitsNew, spreads, plotsGained, goldSpent, popOutsideBox,
     notStarted: notStarted(a, b) };
 }
 
@@ -629,14 +628,48 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const after = new Map(b.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const settlerIdx = cat.units.indexOf('UNIT_SETTLER');
 
-  // the religious spread first, on the untouched turn-t state: every player's
-  // sources in the turn's order — the majors, the city-states, the Free Cities
+  // the religious spread first, on the untouched turn-t state: each founder's
+  // religion on its own turn, in the turn's order
   const pressBefore = new Map<City, number[]>();
   for (const { city } of citiesOfImport(imp)) pressBefore.set(city, [...(city.religionPressure ?? [])]);
-  const spreadState: GameState = importTurn(a, cat, history).state;
-  for (const s of spreadState.seats) spreadReligiousPressure(spreadState, s.seat);
-  for (const cs of spreadState.cityStates ?? []) spreadReligiousPressure(spreadState, cs.seat);
-  spreadReligiousPressure(spreadState, FREE_SEAT);
+  // — each player's cities first adding the citizens the record says they
+  // grew on its turn (`gainPopulationPressure`), the majors before their
+  // spread, the city-states and the Free Cities after the last
+  const spreadImp = importTurn(a, cat, history);
+  const spreadState: GameState = spreadImp.state;
+  // a city whose food box emptied while a Settler of its owner came out
+  // beside it grew the citizen the Settler took
+  const grownBy = (c: DumpCity, centre: number) => {
+    const next = after.get(`${c.owner}:${c.id}`);
+    if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) return 0;
+    const settled = num(next.food) < num(c.food) && acts.unitsNew.some((u) => u.owner === c.owner
+      && u.type === settlerIdx && tileDistance(spreadState, u.plot, centre) <= 2);
+    return next.pop - c.pop + (settled ? 1 : 0);
+  };
+  const growAt = (seat: number) => {
+    for (const [city, c] of spreadImp.dumpOfCity) if (city.seat === seat) gainPopulationPressure(city, grownBy(c, city.centerIndex));
+    for (const [cs, c] of spreadImp.dumpOfMinor) if (cs.seat === seat) gainPopulationPressure(cs, grownBy(c, cs.centerIndex));
+  };
+  // a route ends and begins on its owner's turn: an earlier major's changes
+  // stand by the time a later founder spreads
+  const routesMoved = routeChanges(spreadImp, b);
+  const routeTurn = (owner: number) => {
+    for (const r of routesMoved.ended) {
+      const sx = seatOf(spreadState, r.owner);
+      if (r.owner === owner && sx?.tradeRoutes) sx.tradeRoutes = sx.tradeRoutes.filter((x) => x !== r.route);
+    }
+    for (const r of routesMoved.begun) {
+      const sx = seatOf(spreadState, r.owner);
+      if (r.owner === owner && sx) (sx.tradeRoutes ??= []).push(r.route);
+    }
+  };
+  for (const s of spreadState.seats) {
+    growAt(s.seat);
+    spreadReligiousPressure(spreadState, s.seat);
+    routeTurn(s.seat);
+  }
+  for (const cs of spreadState.cityStates ?? []) growAt(cs.seat);
+  growAt(FREE_SEAT);
   const spreadCities = new Map<string, City>();
   for (const s of spreadState.seats) for (const c of s.cities) spreadCities.set(`${s.seat}:${c.id}`, c);
 
@@ -727,7 +760,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       for (const side of sides) side(false);
       applyLoyalty(state, city, st0.amenities.tier.name, hasGov, st0.foodSurplus < 0);
       for (const side of sides) side(true);
-      const loySkip = skipAll ?? (acts.governorChanged.has(k) ? 'governor changed' : null);
+      const loySkip = skipAll;
       if (loySkip || !next) out.push({ turn, check: 'step.loyalty', subject, ok: true, skip: loySkip ?? 'no t+1' });
       else {
         res('step.loyalty', near(city.loyalty ?? 100, num(next.loyalty), 0.05), num(next.loyalty), round3(city.loyalty ?? 100),

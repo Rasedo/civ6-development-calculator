@@ -75,7 +75,7 @@ import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/cityStates';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
@@ -561,6 +561,8 @@ const SEAT: Record<string, Extractor> = {
   }),
   policiesSlotted: overSeats((s) => s.government.policies
     .map((p) => (p ? POLICY_IDX.get(p) ?? -1 : -1)).filter((i) => i >= 0).sort((a, b) => a - b)),
+  policiesLapsed: overSeats((s) => s.government.lapsed
+    .map((p) => POLICY_IDX.get(p) ?? -1).filter((i) => i >= 0).sort((a, b) => a - b)),
   prevAge: overSeats((s) => s.prevAge ?? 1),
   darkAges: overSeats((s) => s.darkAges ?? 0),
   goldenAges: overSeats((s) => s.goldenAges ?? 0),
@@ -700,6 +702,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorDistricts: overCityStates((cityState) => PLACEABLE_DISTRICTS.map((d) => cityState.districts?.find((x) => x.type === d)?.tileIndex ?? -1)),
   minorOuterHp: overCityStates((cityState) => cityState.outerHp ?? 0),
   religionPressure: overCityStates((cityState, st) => perCiv(st, (seat) => cityState.religionPressure?.[seat] ?? 0)),
+  minorUnconverted: overCityStates((cityState) => unconvertedOf(cityState)),
   levySeat: overCityStates((cityState) => cityState.levySeat ?? -1),
   levyEnds: overCityStates((cityState) => cityState.levyEnds ?? -1),
   minorLastHit: overCityStates((cityState) => cityState.lastHitTurn ?? 0),
@@ -788,6 +791,7 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.religionPressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
+  unconvertedPressure: overCities((r) => unconvertedOf(r.city)),
   // a FREE CITY's race — the pressure each major has put on it since it
   // revolted; all zeros for a city that is not Free
   freePressure: overCities((r, st) => {

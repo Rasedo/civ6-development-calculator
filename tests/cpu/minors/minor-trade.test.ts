@@ -104,6 +104,7 @@ describe("a city-state's route", () => {
     minorTrade(state, cs);
     const r = cs.tradeRoutes![0];
     const exp = r.expiresTurn!;
+    const firstGold = cityTradeYields(state, minorCity(cs)).gold;
     let moved = false;
     for (let turn = state.turn + 1; turn < exp + 40 && (cs.tradeRoutes ?? []).length > 0; turn++) {
       state.turn = turn;
@@ -115,6 +116,13 @@ describe("a city-state's route", () => {
     expect(cs.tradeRoutes).toEqual([]);
     expect(state.turn).toBeGreaterThanOrEqual(exp);
     expect(state.units.filter((u) => u.seat === cs.seat && u.type === 'TRADER')).toHaveLength(1);
+    // the completed route planted the minor's Trading Post at both of its
+    // cities, and its next route there pays the post's +1 Gold
+    const dest = routeDestCenter(state, cs, r);
+    expect(cs.tradingPosts).toEqual([cs.centerIndex, dest].sort((a, b) => a - b));
+    minorTrade(state, cs);
+    expect(routeDestCenter(state, cs, cs.tradeRoutes![0])).toBe(dest);
+    expect(cityTradeYields(state, minorCity(cs)).gold).toBe(firstGold + 1);
   });
 
   it("a war with the destination's holder cancels it, and a destination at war is never taken", () => {

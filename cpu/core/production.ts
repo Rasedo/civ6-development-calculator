@@ -14,6 +14,7 @@ import { grantEraBoosts } from './game';
 import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
+import { gainPopulationPressure } from '../data/religion';
 import { governorFlag, governorSum } from './governors';
 import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
@@ -341,6 +342,7 @@ export function completeQueueItem(
       // the owner holds grows once.
       if (fx?.popAllCities) {
         for (const c of citiesOf(state, city.seat)) {
+          gainPopulationPressure(c, fx.popAllCities);
           c.population += fx.popAllCities;
           logPopWrite(state, c, 'wp');
         }
@@ -415,6 +417,7 @@ export function completeQueueItem(
       for (const r of getModifiers(state, city.seat).unitPopCost) {
         if (r.unit !== item.unit) continue;
         if (r.foundedOnly && city.founderSeat !== city.seat) continue;
+        gainPopulationPressure(city, r.amount);
         city.population = Math.max(1, city.population + r.amount);
         logPopWrite(state, city, 'jn');
       }

@@ -13,8 +13,8 @@ class SimMinors:
         # adjacency across the border: its levied army home when due, the loss
         # its army shows, its grid; its economy and the research it completes;
         # its city — the plan, the item its Production goes to now, then growth
-        # and borders on the city as it stands after that, and its religious
-        # pressure out; then its actions —
+        # and borders on the city as it stands after that (its city presses a
+        # religion it follows on the founder's turn); then its actions —
         # the upgrades a completion triggers, its purchases, its Builders'
         # work, its trade routes, its city's ranged strikes (the majors' own
         # body, `cityStrikes`), its army's walk; and the army it ends the turn
@@ -35,7 +35,6 @@ class SimMinors:
             self._minor_plan(s)
             self._minor_build(s, self._minor_production(s))
             self._minor_growth(s)
-            self._spread_religious_pressure(self._CITY_MINOR0 + s, alive)
             self._minor_upgrades(s, gained)
             self._minor_purchases(s)
             self._minor_builders(s)
@@ -216,8 +215,9 @@ class SimMinors:
         (`minorRouteOriginYields`): the international column of
         `District_TradeRouteYields` over the destination city's completed
         districts plus the centre row (a city-state's under Sovereignty's
-        multiplier, `_cs_route_y6`), and the path term. A destination gone
-        pays nothing. None with no route."""
+        multiplier, `_cs_route_y6`), the path term, and its own Trading Post
+        at the destination (`_route_post_gold`). A destination gone pays
+        nothing. None with no route."""
         row = self._CITY_MINOR0 + s
         rr = self.seat_routes[:, row]
         act = rr[:, :, 0] >= 0
@@ -259,7 +259,9 @@ class SimMinors:
             _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
             _p_want = _p_want | valid
         if bool(_p_want.count_nonzero()):
-            rk[:, :, 2] += self._route_path_gold(row, _p_d, _p_want)
+            _oc, _dc = self._route_centres(row)
+            rk[:, :, 2] += self._route_path_gold(row, _p_d, _p_want) \
+                + (self._route_post_gold(row, _dc) * _p_want.long()).double()
         return rk
 
     def _minor_repair(self, s: int) -> tuple[torch.Tensor, torch.Tensor]:

@@ -321,6 +321,24 @@ def test_shopping_mall(sim) -> None:
     print("  shopping mall OK: excluded with the Food Market, +2/+2 Gold, +4 Tourism, the powered amenity")
 
 
+def test_conservation(sim) -> None:
+    # CIV6 (CONSERVATION_*_WALL_TOURISM): each level of walls pays its City
+    # Center Tourism 1 / 2 / 3 once the seat holds Conservation
+    row, j = a_city(sim)
+    walls = [bidx(sim, n) for n in ("ANCIENT_WALLS", "MEDIEVAL_WALLS", "RENAISSANCE_WALLS")]
+    cv = int(sim._b_civic_tour[walls[0], 0])
+    assert cv >= 0 and [int(sim._b_civic_tour[w, 1]) for w in walls] == [1, 2, 3]
+    sim.civ_civics[0, row, cv] = False
+    t0 = int(sim._building_tourism(row)[0])
+    for w in walls:
+        sim.city_bldg[0, row, j, w] = True
+    sim._eff_version += 1
+    assert int(sim._building_tourism(row)[0]) == t0, "the walls paid Tourism before Conservation"
+    sim.civ_civics[0, row, cv] = True
+    assert int(sim._building_tourism(row)[0]) - t0 == 6, "CIV6 (Conservation): the walls pay 1 + 2 + 3"
+    print("  conservation OK: the walls pay 1 / 2 / 3 Tourism once the civic is held")
+
+
 def a_source(sim, row: int, rid: int = -1) -> tuple[int, int]:
     """A map tile carrying a strategic resource, handed to seat `row` and
     improved. Returns (tile, stockpile slot)."""
@@ -785,7 +803,7 @@ def main() -> None:
     assert path is not None, "no fixture's map carries the strategic resources the scenes hand out"
     print(f"power_test on {path.name}")
     for fn in (test_demand, test_plant_reach, test_cardiff, test_powered_yields,
-               test_regional_powered, test_fuel, test_logistics, test_shopping_mall,
+               test_regional_powered, test_fuel, test_logistics, test_shopping_mall, test_conservation,
                test_accrual, test_unit_charge,
                test_upkeep, test_starved_heal, test_renewables, test_generator_ground,
                test_reactor_age, test_reactor_accident, test_free_city_reactor, test_spec_tier):

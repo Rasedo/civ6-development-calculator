@@ -105,31 +105,37 @@ def main() -> None:
                 and bool(sim.passable[0, t]) and not bool(sim.wpass[0, t])
                 and int(sim.centre_slot_at[0, t]) < 0][:2]
         assert len(near) == 2, "no two free tiles beside the capital"
+
+        def spread_all():
+            # each founder's religion on its own turn
+            for g in range(sim.n_majors):
+                sim._spread_religious_pressure(g, torch.ones(sim.B, dtype=torch.bool))
         SA, SB = sim.RC - 2, sim.RC - 1
         for s, t, g in ((SA, near[0], 1), (SB, near[1], 2)):
             sim.city_alive[:, 0, s] = True
             sim.city_center[:, 0, s] = t
             sim.city_pop[:, 0, s] = 1
+            sim.city_unconverted[:, 0, s] = 1 * sim._atheism_per_pop
             sim.city_pressure[:, 0, s] = 0
             sim.city_pressure[:, 0, s, g] = 9000
             sim.city_followed[:, 0, s] = g
-        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
+        spread_all()
         per = int(sim._pressure_per_turn)
         assert bool((sim.city_pressure[:, 0, 0, 1] == per).all()), "religion-1 +2 pressure"
         assert bool((sim.city_pressure[:, 0, 0, 2] == per).all()), "religion-2 +2 pressure"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "a tie is no majority"
         for _ in range(3):
-            sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
+            spread_all()
         assert bool((sim.city_pressure[:, 0, 0, 1] == 4 * per).all()), "integer accumulation over turns"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "still tied -> nobody"
         # Break the tie: religion 2 pulls past half of the total (the other
         # religion's 4 plus the atheism baseline) -> majority flip to 2.
-        sim.city_pressure[:, 0, 0, 2] += 5 + int(sim._atheism_per_pop) * sim.city_pop[:, 0, 0].long()
-        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
+        sim.city_pressure[:, 0, 0, 2] += 5 + sim.city_unconverted[:, 0, 0]
+        spread_all()
         assert bool((sim.city_followed[:, 0, 0] == 2).all()), "majority pressure must flip to religion 2"
         # KILL hygiene: a razed city's pressure row is zeroed, follows nothing.
         sim.city_alive[:, 0, 0] = False
-        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
+        spread_all()
         assert bool((sim.city_pressure[:, 0, 0, :] == 0).all()), "dead-slot pressure must reset (KILL hygiene)"
         assert bool((sim.city_followed[:, 0, 0] == -1).all()), "dead city follows nothing"
         sim.city_alive[:, 0, 0] = True
@@ -137,7 +143,7 @@ def main() -> None:
         sim.city_pressure[:, 1:sim.n_majors].zero_()
         sim.city_followed[:, 1:sim.n_majors].fill_(-1)
         sim.city_pressure[:, 0 + 1, 0, 1] = 7  # stale pressure on a (possibly dead) slot
-        sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
+        spread_all()
         dead_rc = ~sim.city_alive[:, 1, 0]
         if bool(dead_rc.any()):
             assert bool((sim.city_pressure[dead_rc, 0 + 1, 0, :] == 0).all()), "dead rc-slot pressure must reset"
@@ -147,6 +153,7 @@ def main() -> None:
             sim.city_alive[:, 0, s] = False
             sim.city_center[:, 0, s] = -1
             sim.city_pop[:, 0, s] = 0
+            sim.city_unconverted[:, 0, s] = 0 * sim._atheism_per_pop
         sim.city_pressure[:, 0, :sim.RC].zero_()
         sim.city_followed[:, 0, :sim.RC].fill_(-1)
         sim.holy_tile.fill_(-1)

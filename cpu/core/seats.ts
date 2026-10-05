@@ -1,5 +1,5 @@
 
-import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP, followedReligionOf } from '../data/religion';
+import { HOLY_CITY_FOUNDING_PRESSURE_PER_POP, followedReligionOf, unconvertedOf } from '../data/religion';
 import type { City, CityState, GameState, Seat, Tile, Unit } from './types';
 import type { CivId, LeaderId, SeatCaps, SeatClass } from '../data/seats';
 import { ENKIDU_WAR_CS, ENKIDU_ALLIED_WAR_DISCOUNT, DIPLO_VIS_ROWS, WAR_BAN_ROWS, rowIsFor, type DiploVisRow } from '../data/civilizations';
@@ -140,7 +140,7 @@ export function emptySeat(seat: number): Seat {
     peaceTurns: 0,
     treasury: 0, goldShortfall: 0, scienceTotal: 0, cultureTotal: 0, faith: 0, tourism: 0,
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
-    government: { chosen: null, policies: [], held: 0, civicTurn: 0, anarchyEnd: 0 },
+    government: { chosen: null, policies: [], held: 0, civicTurn: 0, anarchyEnd: 0, lapsed: [] },
     religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
     grantedTitles: 0,
     gpp: {}, gpEarned: [],
@@ -773,7 +773,7 @@ export function dominantReligionOf(s: { cities: { followedReligion?: number | nu
 export function majorityReligionOf(state: GameState, seat: number): number {
   if (isCityStateSeat(seat)) {
     const cs = seatOf(state, seat) as CityState | undefined;
-    return cs ? followedReligionOf(cs.religionPressure ?? [], cs.population) : -1;
+    return cs ? followedReligionOf(cs.religionPressure ?? [], cs.population, unconvertedOf(cs)) : -1;
   }
   if (isBarbSeat(seat)) return -1;
   const s = seatOf(state, seat);

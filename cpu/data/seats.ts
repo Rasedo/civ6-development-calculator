@@ -1101,6 +1101,17 @@ export const CULTURE_PER_DOMESTIC_TOURIST = srcConst('seats.culturePerDomesticTo
  *  paid to the holy city's CURRENT owner. */
 export const HOLY_CITY_TOURISM = srcConst('seats.holyCityTourism', 8,
   gp('TOURISM_FROM_HOLY_CITY'));
+/** CIV6 (COMPUTERS_BOOST_ALL_TOURISM, ENVIRONMENTALISM_BOOST_ALL_TOURISM —
+ *  MODIFIER_PLAYER_ADJUST_TOURISM): the percent a technology or civic adds to
+ *  every city's Tourism (`seatTourismPct`). */
+export const TOURISM_PCT_ROWS: readonly { tech?: string; civic?: string; pct: number }[] = [
+  { tech: srcConst('seats.tourismPctTech.COMPUTERS', 'COMPUTERS',
+      xml('TechnologyModifiers', 'TechnologyType=TECH_COMPUTERS&ModifierId=COMPUTERS_BOOST_ALL_TOURISM', 'TechnologyType', { expect: 'TECH_COMPUTERS' })),
+    pct: srcConst('seats.tourismPct.COMPUTERS', 25, xml('ModifierArguments', 'ModifierId=COMPUTERS_BOOST_ALL_TOURISM&Name=Amount', 'Value')) },
+  { civic: srcConst('seats.tourismPctCivic.ENVIRONMENTALISM', 'ENVIRONMENTALISM',
+      xml('CivicModifiers', 'CivicType=CIVIC_ENVIRONMENTALISM&ModifierId=ENVIRONMENTALISM_BOOST_ALL_TOURISM', 'CivicType', { expect: 'CIVIC_ENVIRONMENTALISM' })),
+    pct: srcConst('seats.tourismPct.ENVIRONMENTALISM', 25, xml('ModifierArguments', 'ModifierId=ENVIRONMENTALISM_BOOST_ALL_TOURISM&Name=Amount', 'Value')) },
+];
 /** CIV6 (Tourism): "-50% (Religious Tourism only) if the foreign
  *  civilization has The Enlightenment" — the read-side halving's key. */
 export const ENLIGHTENMENT_CIVIC = srcConst('seats.enlightenmentCidx', 'ENLIGHTENMENT',

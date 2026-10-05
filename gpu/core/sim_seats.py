@@ -1194,6 +1194,9 @@ class SimSeats:
                 # version, which the government memo's fast path trusts alone
                 if not torch.equal(laid, self.civ_policies[:, row]):
                     self.civ_policies[:, row] = laid
+                    # a lapsed card the set keeps keeps its standing; one it
+                    # drops is gone
+                    self.civ_policy_lapsed[:, row] = self.civ_policy_lapsed[:, row] & laid
                     self._eff_version += 1
         return carried
 
@@ -5196,7 +5199,8 @@ class SimSeats:
         cs.population)`): the resolver writes `city_followed` for the majors
         and the Free row only, so a minor's is read from the rule itself."""
         M0, S = self._CITY_MINOR0, self.S
-        return self._followed_religion(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S])
+        return self._followed_religion(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S],
+                                       self.city_unconverted[:, M0:M0 + S, 0])
 
     def _seat_majority_religion(self, seat: torch.Tensor) -> torch.Tensor:
         """`majorityReligionOf` per absolute seat, `seat`'s shape — the ONE
@@ -5259,12 +5263,14 @@ class SimSeats:
         pres = torch.cat([self.city_pressure[:, :M, :self.RC], self.city_pressure[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
         pop = torch.cat([self.city_pop[:, :M, :self.RC], self.city_pop[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
         alive = torch.cat([self.city_alive[:, :M, :self.RC], self.city_alive[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
-        f, _ = self._followers_of(pres, torch.where(alive, pop, torch.zeros_like(pop)))   # [B, R, RC, n+1]
+        unc = torch.cat([self.city_unconverted[:, :M, :self.RC], self.city_unconverted[:, self.FREE_ROW:self.FREE_ROW + 1, :self.RC]], dim=1)
+        f, _ = self._followers_of(pres, torch.where(alive, pop, torch.zeros_like(pop)), unc)   # [B, R, RC, n+1]
         idx = gc.reshape(B, 1, 1, 1).expand(-1, f.shape[1], f.shape[2], 1)
         n = (f.gather(3, idx).squeeze(3) * alive.long()).sum(dim=(1, 2))
         if self.S > 0:
             M0, S = self._CITY_MINOR0, self.S
-            fm, _ = self._followers_of(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S])   # [B, S, n+1]
+            fm, _ = self._followers_of(self.city_pressure[:, M0:M0 + S, 0], self.citystate_pop[:, :S],
+                                       self.city_unconverted[:, M0:M0 + S, 0])   # [B, S, n+1]
             n = n + (fm.gather(2, gc.reshape(B, 1, 1).expand(-1, S, 1)).squeeze(2)
                      * self.citystate_alive[:, :S].long()).sum(dim=1)
         return torch.where(g >= 0, n, torch.zeros_like(n))
@@ -5493,9 +5499,7 @@ class SimSeats:
     def _route_course_posts(self, row: int, crs: torch.Tensor) -> torch.Tensor:
         """`routeCoursePosts`' twin, [B, K, L] bool — the plots of each stored
         course `crs` [B, K, L] short of both ends that are a living city's
-        centre holding row `row`'s Trading Post (none for a city-state)."""
-        if row >= self.n_majors:
-            return torch.zeros_like(crs, dtype=torch.bool)
+        centre holding row `row`'s Trading Post."""
         B = crs.shape[0]
         n = (crs >= 0).sum(dim=-1, keepdim=True)
         pos = torch.arange(crs.shape[-1], device=self.device)
@@ -6761,6 +6765,9 @@ class SimSeats:
                 self.unit_hp[b, gs] = min(cap, int(self.unit_hp[b, gs]) + amt)
         elif pay == ch["population"]:
             if near >= 0:
+                self._gain_population_pressure(torch.tensor([b], device=self.device), srow,
+                                               torch.tensor([near], device=self.device),
+                                               torch.tensor([int(amt)], device=self.device))
                 self.city_pop[b, srow, near] += amt
                 self._log_pop(torch.tensor([b]), srow, torch.tensor([near]), "gh")
         elif pay == ch["governorTitle"]:
@@ -7979,6 +7986,13 @@ class SimSeats:
             return self.civ_policies[:, row]
         return torch.zeros(self.B, self.civ_policies.shape[2], dtype=torch.bool, device=self.device)
 
+    def _seat_lapsed(self, row: int) -> torch.Tensor:
+        """[B, nPol] the cards a city ROW's holder has slotted without their
+        modifiers (`GovernmentState.lapsed`) — none off a major's row."""
+        if row < self.n_majors:
+            return self.civ_policy_lapsed[:, row]
+        return torch.zeros(self.B, self.civ_policy_lapsed.shape[2], dtype=torch.bool, device=self.device)
+
     def _seat_has_beliefs(self, row: int) -> bool:
         # only a major founds a pantheon or a religion; a minor's and the Free
         # row's cities follow one but claim none — Mvemba's borrowed founder
@@ -9138,6 +9152,17 @@ class SimSeats:
                     _fgn = live_c & (self.tile_seat.gather(1, chf).reshape(crs.shape) != row)
                     cg = cg + _fgn.double().sum(dim=2) * _bb.double().unsqueeze(1)
             _rk_add(2, cg * (act & has_from).double())
+        # Rome's own post at the DESTINATION: the posts are counted from the
+        # plot past the origin through the course's last (Trade_Manager
+        # 0x5500b0)
+        _rome_d = self._row_plays(row, "ROME")
+        if bool(_rome_d.count_nonzero()):
+            _n = (crs >= 0).sum(dim=2)
+            _lf = crs.gather(2, (_n - 1).clamp(min=0).unsqueeze(2)).squeeze(2).clamp(min=0)  # [B, K]
+            _dpost = ((_n > 1) & self.trading_post[:, row].gather(1, _lf) & self._centre_city_map().gather(1, _lf)
+                      & (self.tile_seat.gather(1, _lf) == row))
+            _rk_add(2, _dpost.double() * self._rome_post_gold * _rome_d.double().unsqueeze(1)
+                    * (act & has_from).double())
         if per_route:
             return rk
         for _yc in range(6):
@@ -10501,6 +10526,7 @@ class SimSeats:
         self._bldg_version += 1
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
+        self.city_unconverted[b, row, col] = 0
         self.city_free_press[b, row, col, :] = 0
         self.city_freed_turn[b, row, col] = -1
         # the walk's stash: a city no walk has read yet carries none
@@ -10798,6 +10824,7 @@ class SimSeats:
         # indexed, so the fact has to be carried across by hand.
         old_fol = int(self.city_followed[b, src_row, src_col])
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
+        old_unconv = float(self.city_unconverted[b, src_row, src_col])
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
         # a perimeter at its FULL pool is TS's unset `outerHp`, which a flip
@@ -10942,6 +10969,7 @@ class SimSeats:
         self.city_spec_pin[b, dst_row, col, :] = -1
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
+        self.city_unconverted[b, dst_row, col] = old_unconv
         # The receiver's district registry is DERIVED from the tiles that just
         # re-owned, COMPLETE ones only — never copied from the loser's registry,
         # which is written at QUEUE time and so lists paves that never finished.
@@ -11348,6 +11376,7 @@ class SimSeats:
         # TRANSFERS deliberately do NOT reset: a transfer moves the existing city
         # and its pressure travels with it.
         self.city_pressure[rows, row, slot, :] = 0
+        self.city_unconverted[rows, row, slot] = float(self._atheism_per_pop)
         self.city_followed[rows, row, slot] = -1
         if colon_g is not None:
             _ch = colon_p > 0
@@ -11457,6 +11486,8 @@ class SimSeats:
             for _cc, _cl, _cpop, _ch, _ca, _cy in self._live_rows(row, self._capital_rows):
                 if _cpop:
                     _fw = _first & self._row_is(row, _cc, _cl)[rows]
+                    self._gain_population_pressure(rows[_fw], row, slot[_fw],
+                                                   torch.full_like(slot[_fw], int(_cpop)))
                     self.city_pop[rows[_fw], row, slot[_fw]] += _cpop
         self._settle_incursion(row, found, tile)
         self._eff_version += 1
@@ -12175,8 +12206,8 @@ class SimSeats:
                     pres = self.city_pressure[r, o, host]
                     others = pres.clone()
                     others[row] = 0
-                    floor = int(others.sum()) + self._atheism_per_pop * int(self.city_pop[r, o, host])
-                    pres[row] = max(int(pres[row]), floor + 1)
+                    floor = float(others.sum()) + float(self.city_unconverted[r, o, host])
+                    pres[row] = max(float(pres[row]), floor + 1)
         sc = slot[rows]
         self.unit_band_album[rows, sc] = album[rows] + rowt[rows, 0]
         promo = rowt[rows, 2] > 0
@@ -14527,11 +14558,11 @@ class SimSeats:
         the Trading Post this row holds at a route's foreign DESTINATION, +1
         Gold, the destination's share of the path term's T
         (`_route_path_gold` counts the cities the path crosses); Jakarta's
-        suzerain pays the same destination again."""
-        if row >= self.n_majors:
-            return torch.zeros_like(dest_ct)
+        suzerain pays the same destination again (a city-state is no one's
+        suzerain)."""
         post = self.trading_post[:, row].gather(1, dest_ct.clamp(min=0).reshape(self.B, -1)).reshape(dest_ct.shape)
-        amt = 1 + self._suz_effect(row, self._suz_c_route_post).long()
+        amt = 1 + (self._suz_effect(row, self._suz_c_route_post).long() if row < self.n_majors
+                   else torch.zeros(self.B, dtype=torch.long, device=self.device))
         return post.long() * amt.reshape((self.B,) + (1,) * (dest_ct.dim() - 1))
 
     def _route_path_gold(self, row: int, d: torch.Tensor, want: torch.Tensor) -> torch.Tensor:
@@ -15446,11 +15477,12 @@ class SimSeats:
         # round trip done, never a route cut short.
         if row < self.n_majors:
             self._dedication_event(row, self._ded_coinage, completed.sum(dim=1))
-        if row < self.n_majors and bool(completed.count_nonzero()):
+        if bool(completed.count_nonzero()):
             # CIV6 (Trading Post): "created in a city when a civilization
             # finishes a Trade Route to that city for the first time" — and
-            # one at home, "in the origin and destination cities". Only a
-            # FULL term stamps; a plundered or dest-dead route plants nothing.
+            # one at home, "in the origin and destination cities"; a
+            # city-state's routes plant them too. Only a FULL term stamps; a
+            # plundered or dest-dead route plants nothing.
             for src in (oc, dc):
                 m = completed & (src >= 0)
                 if bool(m.count_nonzero()):

@@ -32,12 +32,14 @@ def main() -> None:
     def T(x, dtype=torch.long):
         return torch.tensor([x], dtype=dtype)
 
+    # the unconverted term defaults to a city founded at this population
+    # and never grown, 50 a citizen
     def followers(pres, pop, none=None):
-        f, _ = sim._followers_of(T(pres), T(pop), None if none is None else T(none))
+        f, _ = sim._followers_of(T(pres), T(pop), T(50 * pop if none is None else none))
         return f[0].tolist()
 
     def majority(pres, pop, none=None):
-        return int(sim._followed_religion(T(pres), T(pop), None if none is None else T(none))[0])
+        return int(sim._followed_religion(T(pres), T(pop), T(50 * pop if none is None else none))[0])
 
     # followers — the largest-remainder allocation
     assert followers([212, 641, 940], 9, 400) == [1, 2, 4, 2], followers([212, 641, 940], 9, 400)
@@ -65,7 +67,6 @@ def main() -> None:
     none = torch.tensor([400, 300, 0], dtype=torch.long)
     assert sim._followed_religion(pres, pop, none).tolist() == [-1, PROT, PROT]
     assert sim._followed_religion(pres.unsqueeze(0), pop.unsqueeze(0), none.unsqueeze(0)).tolist() == [[-1, PROT, PROT]]
-    assert sim._followed_religion(pres, pop).tolist() == [-1, PROT, PROT], "the engine's own unconverted term agrees on these rows"
     print("  3 batched shapes OK")
 
     # ── THE SEAT'S MAJORITY (GetReligionInMajorityOfCities): more than half of
@@ -83,6 +84,7 @@ def main() -> None:
     assert int(sim._dominant_religion()[B0, 0]) == -1, "1-1-none"
     sim.city_followed[B0, 0, :3] = torch.tensor([1, 1, -1])
     sim.citystate_pop[B0, s0] = 3
+    sim.city_unconverted[B0, M + s0, 0] = 150
     sim.city_pressure[B0, M + s0, 0, :] = 0
     sim.city_pressure[B0, M + s0, 0, 1] = 400              # 2 followers of 1, 1 unconverted
     assert int(sim._minor_followed()[B0, s0]) == 1

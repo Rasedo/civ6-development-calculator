@@ -96,6 +96,17 @@ describe('power', () => {
     expect(city.powered).toBe(false); // the bank ran out
   });
 
+  // CIV6 (CONSERVATION_*_WALL_TOURISM): each level of walls pays its City
+  // Center Tourism 1 / 2 / 3 once the seat holds Conservation
+  it('Conservation: the walls pay Tourism on the City Center once the civic is held', () => {
+    const { state, city } = industrialCity();
+    const t0 = buildingTourism(state, 0, [city]);
+    city.buildings.push('ANCIENT_WALLS', 'MEDIEVAL_WALLS', 'RENAISSANCE_WALLS');
+    expect(buildingTourism(state, 0, [city])).toBe(t0);
+    grantCivics(state, 'CONSERVATION');
+    expect(buildingTourism(state, 0, [city]) - t0).toBe(6);
+  });
+
   it('the Shopping Mall: Gold, an Amenity and Tourism, more of both powered, and never beside a Food Market', () => {
     const { state, city } = industrialCity();
     grantCivics(state, 'CAPITALISM');

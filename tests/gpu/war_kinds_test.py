@@ -248,11 +248,12 @@ def poke_alliance_pressure(rules, path):
     sim.city_alive[0, 2, R] = True
     sim.city_center[0, 2, R] = near
     sim.city_pop[0, 2, R] = 1
+    sim.city_unconverted[0, 2, R] = 1 * sim._atheism_per_pop
     sim.city_followed[0, 2, R] = -1
     sim.city_pressure.zero_()
     sim._pressure_per_turn = 5  # one scene knob for both arms, so the floor shows
     snap = sim.snapshot()
-    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
+    sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
     plain = int(sim.city_pressure[0, 2, R, 0])
     assert plain > 0, "the Holy City presses the city beside it"
 
@@ -261,7 +262,7 @@ def poke_alliance_pressure(rules, path):
     sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = 10
     sim.seat_alliance_pts[0, 0, 1] = sim.seat_alliance_pts[0, 1, 0] = sim._al_l3_qp
     assert int(sim._allied_type(0, 4, 3)[0, 1]) == 1
-    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
+    sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
     boosted = int(sim.city_pressure[0, 2, R, 0])
     want = plain * (100 + sim._al_rel3_pressure_pct) // 100
     assert boosted == want and boosted > plain, f"+20% floored: want {want}, got {boosted} (plain {plain})"
@@ -272,7 +273,7 @@ def poke_alliance_pressure(rules, path):
     sim.seat_ally_turns[0, 0, 1] = sim.seat_ally_turns[0, 1, 0] = 10
     sim.seat_alliance_pts[0, 0, 1] = sim.seat_alliance_pts[0, 1, 0] = sim._al_l3_qp
     sim.city_pressure[0, 2, R, 1] = 1
-    sim._spread_religious_pressure(2, torch.ones(sim.B, dtype=torch.bool))
+    sim._spread_religious_pressure(0, torch.ones(sim.B, dtype=torch.bool))
     assert int(sim.city_pressure[0, 2, R, 0]) == plain, "a follower of the ally's religion ends the bonus"
     print(f"  d alliance pressure OK ({plain} -> {boosted} with the level-3 Religious ally)")
 

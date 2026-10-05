@@ -74,6 +74,8 @@ export interface DumpPlayer {
   goldenAge: Read<boolean>;
   heroic: Read<boolean>;
   favor: Read<number>;
+  /** the Diplomatic Favor a turn the game reports (`GetFavorPerTurn`) */
+  favorPerTurn?: Read<number>;
   tourism: Read<number>;
   tokens: Read<number>;
   suzerain: Read<number>;

@@ -13,7 +13,7 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followersOf, type BeliefEffects, type BeliefDef } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followersOf, unconvertedOf, type BeliefEffects, type BeliefDef } from '../data/religion';
 import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
@@ -936,12 +936,13 @@ export function foreignFollowerCount(state: GameState, seat: number): number {
 export function religionFollowers(state: GameState, g: number): number {
   if (g < 0) return 0;
   let n = 0;
-  const add = (pres: readonly number[] | undefined, pop: number) => {
-    if (pres && g < pres.length && pres[g] > 0) n += followersOf(pres, pop)[g];
+  const add = (c: { religionPressure?: number[]; unconvertedPressure?: number; population: number }) => {
+    const pres = c.religionPressure;
+    if (pres && g < pres.length && pres[g] > 0) n += followersOf(pres, c.population, unconvertedOf(c))[g];
   };
-  for (const o of state.seats) for (const c of o.cities) add(c.religionPressure, c.population);
-  for (const c of state.freeSeat?.cities ?? []) add(c.religionPressure, c.population);
-  for (const cs of state.cityStates ?? []) add(cs.religionPressure, cs.population);
+  for (const o of state.seats) for (const c of o.cities) add(c);
+  for (const c of state.freeSeat?.cities ?? []) add(c);
+  for (const cs of state.cityStates ?? []) add(cs);
   return n;
 }
 
@@ -1325,7 +1326,10 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
     if (rowIsFor(r, mods.civ, mods.leader)) (mods.districtAdjacencyAdd[r.district] ??= []).push({ source: r.source ?? 'DISTRICT', amount: r.amount });
   }
 
-  applyGovernment(mods, seatGovernment(state, seat), s.research, s.government.policies,
+  // a lapsed card stays slotted but pays nothing (`GovernmentState.lapsed`)
+  const lapsed = s.government.lapsed;
+  applyGovernment(mods, seatGovernment(state, seat), s.research,
+                  lapsed.length ? s.government.policies.filter((p) => !p || !lapsed.includes(p)) : s.government.policies,
                   congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
 
   const beliefSeat = { followers: pop, cities: cities.length };
@@ -1679,11 +1683,12 @@ export function adoptGovernment(state: GameState, seat: number, index: number): 
   const g = GOVERNMENT_LIST[index];
   if (!s || !g || !governmentsOpen(state, seat).includes(index)) return;
   const before = seatGovernment(state, seat);
+  const slotsBefore = governmentSlots(state, seat);
   s.government.chosen = g.id;
   if (g.id === before) return;
   const back = (s.government.held & governmentBit(g.id)) !== 0;
   s.government.held |= governmentBit(g.id);
-  carryPolicies(state, seat);
+  carryPolicies(state, seat, slotsBefore);
   if (back) s.government.anarchyEnd = state.turn + ANARCHY_TURNS;
 }
 
@@ -1736,17 +1741,64 @@ export function policySetChanges(state: GameState, seat: number, cards: readonly
   return now.size !== next.size || [...next].some((p) => !now.has(p));
 }
 
-/** A CHANGED government keeps the slotted cards that are still open under it
- *  and fit its slots, and drops the rest; the freed slots wait for the
- *  driver's next decision. `_carry_policies` is the twin. */
-export function carryPolicies(state: GameState, seat: number): void {
+/** A CHANGED government rebuilds the slots (CIV6, dll_readings "C-94: the
+ *  slot rebuild"): every card comes off, and the old layout — the stored
+ *  cards laid into the slots `before` held, `fitPoliciesLoose` — is laid back
+ *  into the new slots by `carryLayout`, each card it lays slotted but LAPSED
+ *  (`GovernmentState.lapsed`); the rest are dropped, and the freed slots wait
+ *  for the driver's next decision. `_carry_policies` is the twin. */
+export function carryPolicies(state: GameState, seat: number, before: readonly SlotKind[]): void {
   const s = seatOf(state, seat)!;
   const gov = seatGovernment(state, seat);
   if (!gov) return;
   const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
-  s.government.policies = fitPoliciesLoose(
-    governmentSlots(state, seat),
-    s.government.policies.filter((p): p is string => !!p && open.has(p)));
+  const old = fitPoliciesLoose(before, s.government.policies.filter((p): p is string => !!p));
+  const laid = carryLayout(old.map((c, i) => [before[i], c] as const), governmentSlots(state, seat), (c) => open.has(c));
+  s.government.policies = laid;
+  s.government.lapsed = laid.filter((c): c is string => !!c);
+}
+
+/** The Cost of the civic that unlocks card `id`, -1 for a card no civic
+ *  unlocks (a Dark Age or legacy card) — the slot rebuild's sort key. */
+const CARD_CIVIC_COST: ReadonlyMap<string, number> = (() => {
+  const out = new Map<string, number>();
+  for (const c of Object.values(CIVICS)) {
+    for (const fx of c.effects) if (fx.kind === 'unlockPolicy' && !out.has(fx.policy)) out.set(fx.policy, c.cost);
+  }
+  return out;
+})();
+export function cardCivicCost(id: string): number {
+  return CARD_CIVIC_COST.get(id) ?? -1;
+}
+
+/**
+ * CIV6 (PlayerCulture's slot rebuild, dll_readings "C-94: the slot rebuild"):
+ * the old slots `old` ([slot kind, card] in slot order) are saved and sorted
+ * by their card's unlocking civic Cost, highest first — a card no civic
+ * unlocks after, an empty slot last, ties in slot order — and the new slots
+ * `slots` are walked in order: while more than one of them stands empty, each
+ * takes the first saved entry of ITS OWN slot kind, the entry spent whether or
+ * not `open` admits its card. The cards laid back are slotted without their
+ * modifiers attached. `_carry_layout` is the twin.
+ */
+export function carryLayout(old: readonly (readonly [SlotKind, string | null])[], slots: readonly SlotKind[],
+                            open: (id: string) => boolean): (string | null)[] {
+  const key = (c: string | null) => (c === null ? -2 : cardCivicCost(c));
+  const saved = old.map((e, i) => ({ kind: e[0], card: e[1], i }))
+    .sort((a, b) => key(b.card) - key(a.card) || a.i - b.i);
+  const out: (string | null)[] = slots.map(() => null);
+  let placed = 0;
+  for (let i = 0; i < slots.length; i++) {
+    if (slots.length - placed <= 1) break;
+    const j = saved.findIndex((e) => e.kind === slots[i] && e.card !== null);
+    if (j < 0) continue;
+    const card = saved[j].card!;
+    saved.splice(j, 1);
+    if (!open(card)) continue;
+    out[i] = card;
+    placed++;
+  }
+  return out;
 }
 
 /**
@@ -1873,6 +1925,7 @@ export function slotGreedily(state: GameState, seat: number): void {
   const s = seatOf(state, seat)!;
   s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state),
     inDarkAge(state, seat), s.government.held, seatGovernment(state, seat)).policies;
+  s.government.lapsed = [];
 }
 
 /** Lay `cards` (table order) into `slots`: each takes the first open slot of

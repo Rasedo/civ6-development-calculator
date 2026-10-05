@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { followersOf, followedReligionOf, ATHEISM_PRESSURE_PER_POP, FOUNDER_BELIEFS } from '../../../cpu/data/religion';
+import { followersOf, followedReligionOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, FOUNDER_BELIEFS } from '../../../cpu/data/religion';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, majorityReligionOf, dominantReligionOf, BARB_SEAT } from '../../../cpu/core/seats';
 import { rosterCS, conquistadorConvert } from '../../../cpu/core/combat';
@@ -12,8 +12,8 @@ import type { City, GameState } from '../../../cpu/core/types';
 // A city's MAJORITY religion, measured live (lab 2 scene E, eight draws
 // including the decider; tools/civ6lab/runs/religion_20260920T183900Z.jsonl).
 // Religion ids here follow the game's order: CATH < PROT < BUD. The rows pass
-// the UNCONVERTED pressure the game reported (an accumulator the live game
-// keeps — 300 at pop 2 after a shrink — where this engine derives 50 × pop).
+// the UNCONVERTED pressure the game reported (an accumulator — 300 at pop 2
+// after a shrink — that both engines keep, `unconvertedOf`).
 const CATH = 0;
 const PROT = 1;
 const BUD = 2;
@@ -28,11 +28,28 @@ describe('followers — pop × pressure share, rounded, forced to sum to pop', (
   it('STAVANGER pop 3, three groups: one citizen each', () => {
     expect(followersOf([359, 710], 3, 300)).toEqual([1, 1, 1]);
   });
-  it('the engine derives the unconverted pressure at 50 per citizen; pop 0 seats nobody', () => {
+  it('a city is founded on 50 unconverted per citizen; pop 0 seats nobody', () => {
     expect(ATHEISM_PRESSURE_PER_POP).toBe(50);
-    expect(followersOf([], 4)).toEqual([4]);
-    expect(followersOf([100], 2)).toEqual([1, 1]);   // 100 vs 100: the remainder tie goes to the lower id
-    expect(followersOf([100], 0)).toEqual([0, 0]);
+    expect(followersOf([], 4, 200)).toEqual([4]);
+    expect(followersOf([100], 2, 100)).toEqual([1, 1]);   // 100 vs 100: the remainder tie goes to the lower id
+    expect(followersOf([100], 0, 0)).toEqual([0, 0]);
+  });
+});
+
+describe('a growing city adds 50 per citizen to the group it follows (CityReligion 0x1f3050)', () => {
+  it('to its majority religion, else to the unconverted; a shrink keeps every pressure', () => {
+    // runs/h1_duelw1108: Xian, pop 7, 1,400 of its religion against 450
+    // unconverted, grows and takes +50 of the religion it follows
+    const c = { religionPressure: [1400, 0], unconvertedPressure: 450, population: 7 };
+    gainPopulationPressure(c, 1);
+    expect(c.religionPressure).toEqual([1450, 0]);
+    expect(c.unconvertedPressure).toBe(450);
+    const d = { religionPressure: [100, 0], unconvertedPressure: 300, population: 6 };
+    gainPopulationPressure(d, 2);
+    expect(d.religionPressure).toEqual([100, 0]);
+    expect(d.unconvertedPressure).toBe(300 + 2 * ATHEISM_PRESSURE_PER_POP);
+    gainPopulationPressure(d, -1);
+    expect(d.unconvertedPressure).toBe(400);
   });
 });
 
@@ -53,12 +70,12 @@ describe('the majority — most followers, ties by pressure, at least half the c
     expect(followedReligionOf([579, 532], 2, 0)).toBe(CATH);
     expect(followedReligionOf([434, 752], 2, 0)).toBe(PROT);   // the decider
   });
-  it('through the engine\'s own unconverted term: a religion holding every citizen of a one-pop city is its majority; pop 0 is nobody\'s', () => {
-    expect(followedReligionOf([0, 0, 300], 1)).toBe(BUD);
-    expect(followedReligionOf([300], 0)).toBe(-1);
+  it('through the unconverted term: a religion holding every citizen of a one-pop city is its majority; pop 0 is nobody\'s', () => {
+    expect(followedReligionOf([0, 0, 300], 1, 50)).toBe(BUD);
+    expect(followedReligionOf([300], 0, 0)).toBe(-1);
     // exactly half the citizens is enough; the unconverted at equal followers and higher pressure is not
-    expect(followedReligionOf([100], 2)).toBe(CATH);        // 1-1, 100 vs 100: the lower id
-    expect(followedReligionOf([90], 2)).toBe(-1);           // 1-1, 90 vs 100: the unconverted
+    expect(followedReligionOf([100], 2, 100)).toBe(CATH);        // 1-1, 100 vs 100: the lower id
+    expect(followedReligionOf([90], 2, 100)).toBe(-1);           // 1-1, 90 vs 100: the unconverted
   });
 });
 

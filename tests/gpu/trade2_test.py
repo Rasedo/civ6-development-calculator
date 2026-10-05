@@ -454,7 +454,7 @@ def main() -> None:
     # pays +1 gold (+1 under Bandar Jakarta's suzerain).
     s10 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     assert "trading_post" in _MUTABLE and s10.trading_post.dtype == torch.bool
-    assert tuple(s10.trading_post.shape) == (s10.B, s10.n_majors, s10.T)
+    assert tuple(s10.trading_post.shape) == (s10.B, s10.NS, s10.T)
     row10 = 0
     s10.civ_techs[:, row10, s10._celestial_tech] = False  # land walks only
     s10.seat_explored[:] = True

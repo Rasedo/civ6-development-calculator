@@ -26,7 +26,7 @@
  * (the best melee a seat has trained, a city's culture expansions, a seat's
  * plot purchases) comes from a `History` folded over the earlier records.
  */
-import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
+import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
@@ -37,7 +37,8 @@ import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
+import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
+import { addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
@@ -46,7 +47,7 @@ import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORM
 import { scaleByGameSpeed } from '../data/constants';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
-import { GOVERNMENTS, POLICIES } from '../data/policies';
+import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
 import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
 import { AGE_GOLDEN } from '../data/seats';
 import { CITY_STATE_SUZERAIN_BONUS, CITY_STATE_TYPES } from '../data/cityStates';
@@ -70,7 +71,7 @@ import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
 import { builderCost, traderCost, unitDomain } from '../core/units';
-import { computeUnlocks } from '../core/effects';
+import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
@@ -412,6 +413,23 @@ export interface History {
    *  every route that left the records while its Trader lived on (a route
    *  run to its end; a plundered route takes its Trader with it) */
   posts: Map<number, Set<number>>;
+  /** each major's policy slots as each record listed them, by player and
+   *  turn: the government, the slot kinds, the card in each slot and the
+   *  cards slotted without their modifiers (`importLapsed`) */
+  policySlots: Map<number, Map<number, PolicySlots>>;
+  /** the last record a project only one scored competition counts stood in
+   *  a queue, by `COMPETITIONS` place */
+  competitionSeen: Map<number, number>;
+  /** the competitions each player took the podium's top of, [competition,
+   *  0 gold (the top tier alone) / 1 the top tier shared] */
+  podium: Map<number, [number, number][]>;
+}
+
+interface PolicySlots {
+  gov: number;
+  kinds: SlotKind[];
+  cards: (string | null)[];
+  lapsed: Set<string>;
 }
 
 /** A record route's identity: its Trader and its two cities. */
@@ -459,7 +477,8 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
-    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), posts: new Map() };
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), posts: new Map(), policySlots: new Map(),
+    competitionSeen: new Map(), podium: new Map() };
 }
 
 /** The copies of a progressive chassis a player's price quotes stand at: the
@@ -793,6 +812,41 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       }
       h.posts.set(r.TraderUnitPlayer, posts);
     }
+    // a scored competition's podium: the record names none, but the seat
+    // the top quarter's Favor reached (its Favor up by its rate plus the
+    // competition's `silverFavor`) while a project only one competition
+    // scores was queued within its run took that competition's top tier,
+    // and, alone there, its gold (1108 Rome t201: 35 → 86 at 1 a turn, the
+    // World Games' Training Athletes queued t196–199)
+    const running = COMPETITIONS.flatMap((_def, k) => {
+      const seen = h.competitionSeen.get(k);
+      return seen !== undefined && rec.turn - seen <= COMPETITION_TURNS ? [k] : [];
+    });
+    if (running.length === 1) {
+      const def = COMPETITIONS[running[0]]!;
+      const top = rec.players.filter((p) => {
+        const was = h.last!.players.find((q) => q.id === p.id);
+        return bool(p.major) && was && num(p.favor) - num(was.favor) - num(was.favorPerTurn) === def.silverFavor;
+      });
+      for (const p of top) {
+        const won = h.podium.get(p.id) ?? [];
+        won.push([running[0], top.length === 1 ? 0 : 1]);
+        h.podium.set(p.id, won);
+      }
+      if (top.length) h.competitionSeen.delete(running[0]);
+    }
+  }
+  // the competitions a queued project tells running: the projects only one
+  // competition's score counts
+  for (const c of rec.cities) {
+    for (const q of c.queue ?? []) {
+      const pi = typeof q === 'object' ? num(q.ProjectType) : -1;
+      const name = pi >= 0 ? cat.projects[pi] : undefined;
+      if (!name) continue;
+      const kinds = COMPETITIONS.flatMap((def, k) =>
+        def.scored.some((r) => r.source === 'project' && `PROJECT_${r.of}` === name) ? [k] : []);
+      if (kinds.length === 1) h.competitionSeen.set(kinds[0]!, rec.turn);
+    }
   }
   const live = new Set<string>();
   for (const r of recordRoutes(rec)) {
@@ -908,6 +962,13 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     seat.name = String(p.civ);
     for (const r of GP_RESOURCE_REVEAL) {
       if (history?.revealed.get(p.id)?.has(r.resource)) (seat.gpPerm ??= GP_PERM.map(() => 0))[GP_PERM.indexOf(r.perm)] = 1;
+    }
+    // the podiums the history saw it take (`History.podium`): the gold's
+    // permanent channels and the top tier's
+    for (const [k, tier] of history?.podium.get(p.id) ?? []) {
+      const def = COMPETITIONS[k]!;
+      if (tier === 0 && def.goldPerm) addSeatPerm(seat, def.goldPerm);
+      if (def.silverPerm) addSeatPerm(seat, def.silverPerm);
     }
     state.seats.push(seat);
     seatOfPlayer.set(p.id, i);
@@ -1096,10 +1157,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
     const religionPressure = new Array(state.seats.length).fill(0);
     let followed: number | null = null;
+    let unconvertedPressure: number | undefined;
     if (Array.isArray(c.religions)) {
       for (const r of c.religions) {
         const g = religionSeat.get(r.Religion);
         if (g !== undefined) religionPressure[g] = r.Pressure;
+        if (r.Religion === -1) unconvertedPressure = r.Pressure;
       }
     }
     const maj = num(c.majorityReligion);
@@ -1118,6 +1181,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.pillagedBuildings = pillaged.length ? pillaged : undefined;
       minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER');
       minor.religionPressure = religionPressure;
+      minor.unconvertedPressure = unconvertedPressure;
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       continue;
@@ -1150,6 +1214,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       wonders,
       loyalty: num(c.loyalty),
       religionPressure,
+      unconvertedPressure,
       followedReligion: followed,
       specialistPref: pins,
       ...(pillaged.length ? { pillagedBuildings: pillaged } : {}),
@@ -1293,6 +1358,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     active !== undefined && (playerOfSeat.get(seat) ?? Infinity) <= active.id ? now.list : before.list;
   state.congress = now.list;
   unrecordedLuxuryGaps(ctx, rec, state, luxUnrecorded, seatOfGame, congressOf);
+  if (history) importLapsed(rec, cat, state, seatOfGame, history);
   const congressGaps = [...new Set([...now.gaps, ...before.gaps])];
   // (a queued row the engine lacks is the game's gap, no city's: nothing a
   // check reads comes from the queue)
@@ -1308,6 +1374,53 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
   };
+}
+
+/**
+ * The cards each major holds slotted without their modifiers
+ * (`GovernmentState.lapsed`), read off the records' slot lists by the game's
+ * rules (dll_readings "C-94: the slot rebuild"): a slot rebuild — the
+ * government or the slot count changed since the record before — lays the
+ * old cards back by `carryLayout`, unattached, and the AI then slots its
+ * choices one slot at a time, each SetSlotPolicy attaching its card; so a
+ * card standing where the rebuild laid it is lapsed, any other attached.
+ * Between records with no rebuild a card keeps its standing while it keeps
+ * its slot, and a card in a slot it did not hold was slotted anew. The first
+ * record a player is seen in reads every card attached. Each turn is read
+ * once and kept, so a record imported again (the pair checks' t+1) reads the
+ * same answer.
+ */
+function importLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seatOfGame: (pid: number) => number,
+  history: History): void {
+  for (const p of rec.players) {
+    if (!bool(p.major)) continue;
+    const seat = seatOfGame(p.id);
+    const s = seatOf(state, seat);
+    if (!s || seat < 0 || seat >= state.seats.length) continue;
+    const byTurn = history.policySlots.get(p.id) ?? new Map<number, PolicySlots>();
+    history.policySlots.set(p.id, byTurn);
+    let now = byTurn.get(rec.turn);
+    if (!now) {
+      const cards = (p.policies ?? []).map((pi) => {
+        const i = num(pi);
+        return i >= 0 ? engineId('policy', cat.policies[i], 'POLICY_', POLICIES) : null;
+      });
+      const kinds = governmentSlots(state, seat);
+      const gov = num(p.government);
+      const before = Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn));
+      const prev = byTurn.get(before);
+      const lapsed = new Set<string>();
+      if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
+        const laid = carryLayout(prev.kinds.map((k, i) => [k, prev!.cards[i] ?? null] as const), kinds, () => true);
+        cards.forEach((c, i) => { if (c && laid[i] === c) lapsed.add(c); });
+      } else if (prev) {
+        cards.forEach((c, i) => { if (c && prev!.cards[i] === c && prev!.lapsed.has(c)) lapsed.add(c); });
+      }
+      now = { gov, kinds, cards, lapsed };
+      byTurn.set(rec.turn, now);
+    }
+    s.government.lapsed = [...now.lapsed];
+  }
 }
 
 /**
@@ -1366,21 +1479,9 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
   }
   const out: Imported['routes'] = [];
   for (const r of recordRoutes(rec)) {
-    const origin = cityByKey.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
-    const minorOwner = minorOfPlayer.get(r.OriginCityPlayer);
-    const owner = minorOwner ?? (origin && isCiv(origin.seat) ? seatOf(state, origin.seat) : undefined);
-    if (!owner) continue;
-    const from = minorOwner ? -1 : origin!.id;
-    const originCentre = minorOwner ? minorOwner.centerIndex : origin!.centerIndex;
-    const dest = cityByKey.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
-    const minor = minorOfPlayer.get(r.DestinationCityPlayer);
-    const route: TradeRoute | null = minor ? { from, toCs: minor.id }
-      : !dest ? null
-      : dest.seat === owner.seat ? { from, to: dest.id }
-      : { from, toSeat: dest.seat, toSeatCity: dest.id };
-    if (!route) continue;
-    const destCentre = minor ? minor.centerIndex : dest!.centerIndex;
-    route.course = tradeCourse(tradeReach(state, owner.seat, originCentre), destCentre) ?? [];
+    const made = routeOfRecord(r, state, cityByKey, minorOfPlayer);
+    if (!made) continue;
+    const { owner, route } = made;
     const seen = history?.routeSeen.get(routeKey(r));
     if (seen !== undefined) {
       route.createdTurn = seen;
@@ -1390,6 +1491,50 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     out.push({ owner: owner.seat, route, game: r });
   }
   return out;
+}
+
+/** One of the game's route rows as the engine's route on its owner — a
+ *  major's or a city-state's — with the course the engine walks; null when
+ *  either end is no city of the import. */
+function routeOfRecord(r: Record<string, number>, state: GameState, cityByKey: Map<string, City>,
+  minorOfPlayer: Map<number, CityState>): { owner: Seat | CityState; route: TradeRoute } | null {
+  const origin = cityByKey.get(`${r.OriginCityPlayer}:${r.OriginCityID}`);
+  const minorOwner = minorOfPlayer.get(r.OriginCityPlayer);
+  const owner = minorOwner ?? (origin && isCiv(origin.seat) ? seatOf(state, origin.seat) : undefined);
+  if (!owner) return null;
+  const from = minorOwner ? -1 : origin!.id;
+  const originCentre = minorOwner ? minorOwner.centerIndex : origin!.centerIndex;
+  const dest = cityByKey.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`);
+  const minor = minorOfPlayer.get(r.DestinationCityPlayer);
+  const route: TradeRoute | null = minor ? { from, toCs: minor.id }
+    : !dest ? null
+    : dest.seat === owner.seat ? { from, to: dest.id }
+    : { from, toSeat: dest.seat, toSeatCity: dest.id };
+  if (!route) return null;
+  const destCentre = minor ? minor.centerIndex : dest!.centerIndex;
+  route.course = tradeCourse(tradeReach(state, owner.seat, originCentre), destCentre) ?? [];
+  return { owner, route };
+}
+
+/** The routes that ended and began between an import's record and the next
+ *  one, each on the owner it ran for — a route ends and begins on its
+ *  owner's turn, so a reader stepping through the turn applies each once
+ *  that owner's turn has passed. */
+export function routeChanges(imp: Imported, next: TurnRecord): {
+  ended: { owner: number; route: TradeRoute }[]; begun: { owner: number; route: TradeRoute }[];
+} {
+  const nextRows = recordRoutes(next);
+  const nextKeys = new Set(nextRows.map(routeKey));
+  const haveKeys = new Set(imp.routes.map((r) => routeKey(r.game as Record<string, number>)));
+  const ended = imp.routes.filter((r) => !nextKeys.has(routeKey(r.game as Record<string, number>)))
+    .map((r) => ({ owner: r.owner, route: r.route }));
+  const begun: { owner: number; route: TradeRoute }[] = [];
+  for (const r of nextRows) {
+    if (haveKeys.has(routeKey(r))) continue;
+    const made = routeOfRecord(r, imp.state, imp.cityByKey, imp.minorOfPlayer);
+    if (made) begun.push({ owner: made.owner.seat, route: made.route });
+  }
+  return { ended, begun };
 }
 
 function bitsToIds(bits: string, names: string[], kind: string, prefix: string, known: object, ctx: Ctx): string[] {

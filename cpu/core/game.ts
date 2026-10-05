@@ -45,13 +45,13 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { nextRandom } from './rand';
-import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, routePressureShare, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
-import { BARB_SEAT, allCities, cityHolders, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
+import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
 import { allRoadsLeadToRome, routeCities, routeDestCenter } from './trade';
@@ -288,6 +288,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     wonders: [],
     hp: CITY_MAX_HP,
     foundedTurn: state.turn,
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP,
   };
   markCityCentre(tile);
   tile.improvement = null;
@@ -351,7 +352,10 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   // CIV6 (Kupe's Voyage): the FIRST city's Population and Builder
   const cmods = getModifiers(state, seat);
   if (list.length === 1) {
-    for (const r of cmods.capital) city.population += r.firstCityPop ?? 0;
+    for (const r of cmods.capital) {
+      gainPopulationPressure(city, r.firstCityPop ?? 0);
+      city.population += r.firstCityPop ?? 0;
+    }
     logPopWrite(state, city, 'fc');
   }
   // CIV6 (Pax Britannica / Treasure Fleet): a city founded on a continent
@@ -1782,15 +1786,16 @@ function theologicalCombatPhase(state: GameState): void {
  * never on top of the x4 — times the Bishop's doubling at the source
  * (`RELIGION_PRESSURE_PER_TURN`'s fit). CIV6 (Jerusalem's suzerain): "Your
  * cities with Holy Sites exert pressure as if they were Holy Cities (4x
- * Religion pressure on all cities within 10 tiles)" — the founder's
- * Holy-Site cities take the Holy City's step.
+ * Religion pressure on all cities within 10 tiles)" — the suzerain's
+ * Holy-Site cities take the Holy City's step whatever religion they follow
+ * (GameCore 0x1f33e0 reads the effect off the city's OWNER).
  */
 export function pressureFromCity(state: GameState, city: City, g: number): number {
   const tiles = state.map.tiles;
   const hs = city.districts.find((d) => d.type === 'HOLY_SITE');
   const holySite = !!hs && !!tiles[hs.tileIndex].districtComplete;
   const asHoly = city.centerIndex === seatOf(state, g)!.religion.holyTile
-    || (holySite && city.seat === g && suzerainEffect(state, g, 'holySitePressure'));
+    || (holySite && suzerainEffect(state, city.seat, 'holySitePressure'));
   const site = holySite || completedWonders(state, city).some((w) => w.def.effects?.religionSite);
   const mult = asHoly ? HOLY_CITY_PRESSURE_MULT : site ? HOLY_SITE_PRESSURE_MULT : 1;
   // CIV6 (Bishop): "Religious pressure to adjacent cities is 100% stronger
@@ -1799,139 +1804,111 @@ export function pressureFromCity(state: GameState, city: City, g: number): numbe
 }
 
 /**
- * Religious pressure spread from seat `src`'s cities, on `src`'s own turn
- * (deterministic, zero-RNG). CIV6: a player's cities press their neighbours
- * during that player's start of turn, and the neighbours convert then
- * (tools/civ6lab/turn_order_civ6.md: 13 of 15 follower changes inside the
- * presser's block), so a city converted by an earlier player presses with its
- * new religion when its own owner's turn comes. Religions are indexed by
- * seat: religion g is seat g's. `src` is a major, a city-state or the Free
- * Cities. Every city of `src` following a founded religion presses the other
- * cities within range, the city-states' among them, `src`'s trade routes carry their
- * religions both ways, and every city then FOLLOWS what `followedReligionOf`
- * picks from its accumulated pressure. The GPU mirror is
+ * Religion `g`'s pressure spread, on its founder's own turn (deterministic,
+ * zero-RNG). CIV6 (PlayerReligion's turn, GameCore 0x4967f0 -> 0x498570 ->
+ * 0x498660 -> 0x496980): a player that founded a religion spreads it at its
+ * start of turn, and a player with none spreads nothing. Every city in the
+ * world FOLLOWING it — the players in id order (the majors, the
+ * city-states, the Free Cities), each player's cities in order — presses
+ * every OTHER city: its own step within the religion's range
+ * (`pressureFromCity`), plus each live trade route between the two, the
+ * source's route into the target at
+ * RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION and the target's route
+ * into the source at _FOR_ORIGIN (Dharma's +100% on the route OWNER's
+ * rows). Each add lands at once and the target re-reads what it follows, so
+ * a city converted earlier in the walk presses when its own place comes
+ * (runs/h1_duelw1108 t128: Shanghai converts and presses Xian the same
+ * turn). Religions are indexed by seat: religion g is seat g's. Every city
+ * then FOLLOWS what `followedReligionOf` picks. The GPU mirror is
  * BatchSim._spread_religious_pressure. Fresh City objects (founded/flipped
  * cities) carry no pressure — the reset-on-birth KILL hygiene, mirrored on
  * the GPU by zeroing dead/absent slots at every spread.
  */
-export function spreadReligiousPressure(state: GameState, src: number): void {
+export function spreadReligiousPressure(state: GameState, g: number): void {
+  if (g < 0 || g >= state.seats.length) return;
+  const rel = state.seats[g].religion;
+  if (!rel.founded || rel.holyTile == null || rel.holyTile < 0) return;
   const nRel = state.seats.length;
-  const founded = state.seats.map((sx) => sx.religion.founded && sx.religion.holyTile != null && sx.religion.holyTile >= 0);
-  if (!founded.some(Boolean)) return; // no religion exists yet — nothing to spread
-  const range: number[] = new Array(nRel).fill(RELIGION_PRESSURE_RANGE);
-  for (const sx of state.seats) {
-    const eb = sx.religion.enhancer;
-    if (eb) range[sx.seat] += ENHANCER_BELIEFS[eb]?.effects.pressureRangeBonus ?? 0;
-  }
+  const range = RELIGION_PRESSURE_RANGE + (rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer]?.effects.pressureRangeBonus ?? 0 : 0);
   const tiles = state.map.tiles;
   // CIV6: the install has ONE city rule for religion, and nothing in it
-  // excludes a Free City. `CivilizationLevels` withholds founding cities,
-  // culture and gold claims, great people, influence and wonders from the
-  // Free Cities player and names no religion column at all; the
-  // spread-religion operation row carries no owner filter; and the
-  // `RELIGION_SPREAD_*` parameters are written per CITY. So a Free City is a
-  // city here — it takes pressure, it follows what holds the majority, and
-  // once it follows it PRESSES like any other.
-  //
-  // `cityHolders` and not `allCities`: `allCities` answers a different
-  // question at four other sites (combat, capture, the trade walk), and the
-  // census already walks the majors then the free row in exactly this order.
-  // A city-state's one city is a city too (runs/h1_duelw1105-1107:
-  // Antananarivo, Kandy, Jerusalem take pressure, follow and press 2 or 4 a
-  // turn on their own turn): its view (`minorCity`) shares the minor's
-  // pressure row, and what it follows is read from that row each time
-  // (`majorityReligionOf`), the minor holding no follow of its own.
-  const cities = cityHolders(state).flatMap((sx) => sx.cities);
+  // excludes a Free City or a city-state's city: each takes pressure,
+  // follows what holds its majority and, following, presses like any other
+  // (runs/h1_duelw1105-1107: Antananarivo, Kandy, Jerusalem). A minor's
+  // view (`minorCity`) shares its pressure row, and what it follows is read
+  // from that row each time, the minor holding no follow of its own.
   const minors = (state.cityStates ?? []).map((cs) => {
     if (!cs.religionPressure || cs.religionPressure.length !== nRel) cs.religionPressure = new Array(nRel).fill(0);
     return minorCity(cs);
   });
-  const followed = new Map<City, number>();
-  for (const c of cities) followed.set(c, c.followedReligion ?? -1);
-  for (const c of minors) followed.set(c, followedReligionOf(c.religionPressure!, c.population));
-  const receivers = [...cities, ...minors];
-  const sources: { g: number; tile: Tile; w: number }[] = [];
-  for (const city of receivers) {
-    if (city.seat !== src) continue;
-    const g = followed.get(city)!;
-    if (g < 0 || !founded[g]) continue;
-    sources.push({ g, tile: tiles[city.centerIndex], w: pressureFromCity(state, city, g) });
+  const order: City[] = [...state.seats.flatMap((sx) => sx.cities), ...minors, ...(state.freeSeat?.cities ?? [])];
+  for (const c of order) {
+    if (!c.religionPressure || c.religionPressure.length !== nRel) c.religionPressure = new Array(nRel).fill(0);
   }
-  // CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 / _FOR_ORIGIN
-  // 0.5): a live route carries its origin's religion to the destination and
-  // the destination's back at half strength, Dharma's +100% on the OWNER's
-  // routes; a city-state's own routes carry its city's religion alike
-  // (runs/h1_duelw1105: Bandar Brunei's route into Shenyang, +1 a turn).
-  // Keyed by the RECEIVER's centre.
-  const routeTerms = new Map<number, { g: number; w: number }[]>();
-  const byCentre = new Map(receivers.map((c) => [c.centerIndex, c]));
+  const minor = new Set(minors);
+  const followed = new Map<City, number>();
+  for (const c of order) {
+    followed.set(c, minor.has(c) ? followedReligionOf(c.religionPressure!, c.population, unconvertedOf(c)) : c.followedReligion ?? -1);
+  }
+  // the live routes, keyed origin centre > destination centre, each with the
+  // two shares its OWNER's rows give it
+  const routes = new Map<string, { wD: number; wO: number }[]>();
   for (const sx of [...state.seats, ...(state.cityStates ?? [])]) {
-    if (sx.seat !== src || !sx.tradeRoutes?.length) continue;
+    if (!sx.tradeRoutes?.length) continue;
     const rows = isCityStateSeat(sx.seat) ? [] : getModifiers(state, sx.seat).routePressure;
     const pctO = rows.filter((r) => r.origin).reduce((s, r) => s + r.pct, 0);
     const pctD = rows.filter((r) => r.destination).reduce((s, r) => s + r.pct, 0);
-    const wD = routePressureShare(ROUTE_PRESSURE_DESTINATION * (100 + pctD) / 100, state.turn);
-    const wO = routePressureShare(ROUTE_PRESSURE_ORIGIN * (100 + pctO) / 100, state.turn);
+    const w = { wD: ROUTE_PRESSURE_DESTINATION * (100 + pctD) / 100, wO: ROUTE_PRESSURE_ORIGIN * (100 + pctO) / 100 };
     for (const r of sx.tradeRoutes) {
       const o = routeCities(state, sx.seat).find((c) => c.id === r.from);
-      const origin = o ? byCentre.get(o.centerIndex) : undefined;
       const dCentre = routeDestCenter(state, sx, r);
-      if (!origin || dCentre < 0) continue;
-      const gO = followed.get(origin) ?? -1;
-      if (gO >= 0 && founded[gO] && wD > 0) (routeTerms.get(dCentre) ?? routeTerms.set(dCentre, []).get(dCentre)!).push({ g: gO, w: wD });
-      const dest = byCentre.get(dCentre);
-      const gD = dest ? followed.get(dest)! : -1;
-      if (gD >= 0 && founded[gD] && wO > 0) (routeTerms.get(origin.centerIndex) ?? routeTerms.set(origin.centerIndex, []).get(origin.centerIndex)!).push({ g: gD, w: wO });
+      if (!o || dCentre < 0) continue;
+      const key = `${o.centerIndex}>${dCentre}`;
+      (routes.get(key) ?? routes.set(key, []).get(key)!).push(w);
+    }
+  }
+  // CIV6 (Citadel of God): "City ignores pressure ... from Religions not
+  // founded by the Governor's player"; (Religious alliance 1): allies'
+  // religions exert no pressure on each other's cities.
+  const shut = new Set(order.filter((c) => c.seat !== g && (
+    (!minor.has(c) && governorFlag(state, c, (e) => e.ignoreForeignPressure))
+    || alliedAtLevel(state, c.seat, g, ALLIANCE_RELIGIOUS, 1))));
+  const add = new Map<City, number>();
+  for (const s of order) {
+    const a = add.get(s) ?? 0;
+    const follows = followed.get(s) === g || (a > 0 && followedReligionOf(
+      s.religionPressure!.map((p, k) => (k === g ? p + a : p)), s.population, unconvertedOf(s)) === g);
+    if (!follows) continue;
+    const sc = tiles[s.centerIndex];
+    const step = pressureFromCity(state, s, g);
+    for (const t of order) {
+      if (t === s || shut.has(t)) continue;
+      const tc = tiles[t.centerIndex];
+      let w = hexDistance(state.map, tc.col, tc.row, sc.col, sc.row) <= range ? step : 0;
+      for (const r of routes.get(`${s.centerIndex}>${t.centerIndex}`) ?? []) w += r.wD;
+      for (const r of routes.get(`${t.centerIndex}>${s.centerIndex}`) ?? []) w += r.wO;
+      if (w > 0) add.set(t, (add.get(t) ?? 0) + w);
     }
   }
   // CIV6 (Religious alliance 3, ALLIANCE_RELIGIOUS_PRESSURE): "Bonus
   // Religious Pressure in cities with no followers of your ally's Religion"
-  // — per founder, the level-3 Religious allies whose own religion exists;
-  // each one whose religion has NO pressure in the receiving city raises the
-  // founder's whole per-turn add there by ALLIANCE_REL3_PRESSURE_PCT.
-  const rel3Allies: number[][] = state.seats.map((sx) => founded[sx.seat]
-    ? state.seats.filter((o) => o.seat !== sx.seat && founded[o.seat]
-      && alliedAtLevel(state, sx.seat, o.seat, ALLIANCE_RELIGIOUS, 3)).map((o) => o.seat)
-    : []);
+  // — each level-3 Religious ally of the founder whose own religion exists
+  // and has NO pressure in the receiving city raises the city's whole add by
+  // ALLIANCE_REL3_PRESSURE_PCT, floored once.
+  const rel3 = state.seats.filter((o) => o.seat !== g && o.religion.founded && o.religion.holyTile != null
+    && o.religion.holyTile >= 0 && alliedAtLevel(state, g, o.seat, ALLIANCE_RELIGIOUS, 3)).map((o) => o.seat);
   const converted = new Map<string, number>();
-  for (const city of receivers) {
-    let pres = city.religionPressure;
-    if (!pres || pres.length !== nRel) {
-      pres = new Array(nRel).fill(0);
-      city.religionPressure = pres;
-    }
-    const cc = tiles[city.centerIndex];
-    const minor = isCityStateSeat(city.seat);
-    // CIV6 (Citadel of God): "City ignores pressure ... from Religions not
-    // founded by the Governor's player." A minor holds no such governor.
-    const deaf = !minor && governorFlag(state, city as City, (e) => e.ignoreForeignPressure);
-    // this turn's add per religion, summed BEFORE the alliance percent so
-    // the GPU's one matmul column and this walk floor the same number
-    const addG: number[] = new Array(nRel).fill(0);
-    for (const src of sources) {
-      const g = src.g;
-      if (deaf && g !== city.seat) continue;
-      if (src.tile === cc) continue; // a city never presses itself
-      // CIV6 (Religious alliance 1): allies' religions exert no pressure on
-      // each other's cities.
-      if (g !== city.seat && alliedAtLevel(state, city.seat, g, ALLIANCE_RELIGIOUS, 1)) continue;
-      if (hexDistance(state.map, cc.col, cc.row, src.tile.col, src.tile.row) > range[g]) continue;
-      addG[g] += src.w;
-    }
-    for (const t of routeTerms.get(city.centerIndex) ?? []) {
-      if (deaf && t.g !== city.seat) continue;
-      if (t.g !== city.seat && alliedAtLevel(state, city.seat, t.g, ALLIANCE_RELIGIOUS, 1)) continue;
-      addG[t.g] += t.w;
-    }
-    for (let g = 0; g < nRel; g++) {
-      if (addG[g] === 0) continue;
+  for (const city of order) {
+    const pres = city.religionPressure!;
+    const a = add.get(city) ?? 0;
+    if (a > 0) {
       let pct = 0;
-      for (const a of rel3Allies[g] ?? []) if (pres[a] === 0) pct += ALLIANCE_REL3_PRESSURE_PCT;
-      pres[g] += pct ? Math.floor((addG[g] * (100 + pct)) / 100) : addG[g];
+      for (const o of rel3) if (pres[o] === 0) pct += ALLIANCE_REL3_PRESSURE_PCT;
+      pres[g] += pct ? Math.floor((a * (100 + pct)) / 100) : a;
     }
-    const best = followedReligionOf(pres, city.population);
+    const best = followedReligionOf(pres, city.population, unconvertedOf(city));
     const wasFollowed = followed.get(city)!;
-    if (!minor) city.followedReligion = best >= 0 ? best : null;
+    if (!minor.has(city)) city.followedReligion = best >= 0 ? best : null;
     if (best >= 0 && best !== wasFollowed) {
       dedicationEvent(state, best, DED_EXODUS);
       converted.set(`${city.seat}>${best}`, (converted.get(`${city.seat}>${best}`) ?? 0) + 1);

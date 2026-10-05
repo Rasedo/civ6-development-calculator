@@ -4,7 +4,7 @@
  * actions. Combat lives in combat.ts.
  */
 
-import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS } from '../data/religion';
+import { ENHANCER_BELIEFS, gainPopulationPressure, unconvertedOf } from '../data/religion';
 import type { GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -1512,7 +1512,7 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   // CIV6 (Religious Rock): "Converts the city to the Rock Band's Religion" —
   // the band's civ's own, and only once it has one; its pressure rises to the
   // smallest MAJORITY: one past every other religion's pressure and the
-  // atheism baseline together (`followedReligionOf`'s more-than-half rule).
+  // unconverted together (`followedReligionOf`'s more-than-half rule).
   if (host && promoFlag(unit, 'CONCERT_CONVERT') && band?.religion.founded) {
     const n = state.seats.length;
     let pres = host.religionPressure;
@@ -1520,7 +1520,7 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
       pres = new Array(n).fill(0);
       host.religionPressure = pres;
     }
-    let floor = ATHEISM_PRESSURE_PER_POP * host.population;
+    let floor = unconvertedOf(host);
     for (let g = 0; g < n; g++) if (g !== seat) floor += pres[g];
     pres[seat] = Math.max(pres[seat], floor + 1);
   }
@@ -2205,6 +2205,7 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
     case 'population': {
       const city = nearestCityTo(state, owner, tile);
       if (city) {
+        gainPopulationPressure(city, amount);
         city.population += amount;
         logPopWrite(state, city, 'gh');
       }

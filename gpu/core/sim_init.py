@@ -1089,11 +1089,11 @@ class SimInit:
         self.seat_route_course = torch.full(
             (B, self.NS, k_routes, int(self.rules.trade["courseMax"])), -1,
             dtype=torch.long, device=device)
-        # CIV6 (Trading Post): one bool per (major row, CENTRE tile) — the row
-        # holds a Trading Post there. Stamped at both endpoints when a route
-        # runs its FULL term; the chain and gold readers gate on a living city
-        # still standing at the centre.
-        self.trading_post = torch.zeros(B, self.n_majors, T, dtype=torch.bool, device=device)
+        # CIV6 (Trading Post): one bool per (seat row, CENTRE tile) — the row,
+        # a major's or a city-state's, holds a Trading Post there. Stamped at
+        # both endpoints when a route runs its FULL term; the chain and gold
+        # readers gate on a living city still standing at the centre.
+        self.trading_post = torch.zeros(B, self.NS, T, dtype=torch.bool, device=device)
         self._alloc_cs_pairs(B, self.n_majors, s_pad, device)
 
         self.centre_slot_at = torch.full((B, T), -1, dtype=torch.long, device=device)
@@ -1282,8 +1282,14 @@ class SimInit:
         self._route_origin_pressure = float(rr["routeOriginPressure"])
         self.holy_tile = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
         # ONE religion plane pair over every seat row, matching TS's single
-        # `allCities(state)` loop over one religionPressure field.
-        self.city_pressure = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=torch.long, device=device)
+        # `allCities(state)` loop over one religionPressure field. Pressure
+        # is fixed point in the game (8 fraction bits): a route's half lands
+        # as a half.
+        self.city_pressure = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=torch.float64, device=device)
+        # the UNCONVERTED group's pressure (`City.unconvertedPressure`):
+        # ATHEISM_PRESSURE_PER_POP a citizen at founding, then grown only by a
+        # citizen the city gains following no religion
+        self.city_unconverted = (self._atheism_per_pop * self.city_pop).to(torch.float64)
         # A FREE CITY's race — the loyalty pressure each major has put on it
         # "since the Free City became independent" (`City.freePressure`),
         # accrued by `_free_cities_phase`; zeros for any other city.
@@ -1757,6 +1763,11 @@ class SimInit:
         self._gw_slot_holder = torch.tensor([int(x) for x in _gw["slotHolder"]], dtype=torch.long, device=device)
         self._gw_slot_type = torch.tensor([int(x) for x in _gw["slotType"]], dtype=torch.long, device=device)
         self._gw_slot_extra = torch.tensor([int(x) for x in _gw["slotExtraRank"]], dtype=torch.long, device=device)
+        # each slot row's NonUniquePersonTourism (0 none), and per holder whose
+        # row writes one, its slots in order
+        self._gw_slot_nonunique = [int(x) for x in _gw["slotNonUniqueTourism"]]
+        self._gw_nonunique_groups = [[s for s in range(len(self._gw_slot_nonunique)) if int(_gw["slotHolder"][s]) == h]
+                                     for h in sorted({int(_gw["slotHolder"][s]) for s, v in enumerate(self._gw_slot_nonunique) if v > 0})]
         self._gw_holder_bidx = [int(h["bidx"]) for h in _gw["holders"]]
         self._gw_holder_widx = [int(h["widx"]) for h in _gw["holders"]]
         self._gw_holder_wonder = [bool(h["wonder"]) for h in _gw["holders"]]
@@ -1792,6 +1803,9 @@ class SimInit:
         self._shipwreck_civic = int(_ri["shipwreckCivic"])
         self._gw_printing_tech = int(rr["gwPrintingTech"])
         self._gw_printing_mult = int(rr["gwPrintingWritingMult"])
+        # a maker's raised work Tourism, [object type, roster index], -1 none
+        self._gw_maker_tourism = torch.tensor(rr["gwMakerTourism"], dtype=torch.long, device=device)
+        self._gw_maker_class = torch.tensor(rr["gwMakerClass"], dtype=torch.long, device=device)
         self._wonder_tour_base = int(rr["wonderTourismBase"])
         self._tourism_per_visitor = int(rr["tourismPerVisitorPerCiv"])
         # (building idx, district idx, venue value) — the exporter carries the
@@ -1810,6 +1824,8 @@ class SimInit:
         self._band_venue_districts = [(int(_b), int(_d)) for _b, _d in rr["bandVenueDistricts"] if int(_d) >= 0]
         self._concert_share_range = int(rr["concertShareRange"])
         self._holy_city_tour = int(rr["holyCityTourism"])
+        # [kind (0 technology, 1 civic), index, percent] — `seatTourismPct`
+        self._tour_pct_rows = [tuple(int(x) for x in r) for r in rr["tourismPctRows"]]
         self._enl_cidx = int(rr["enlightenmentCidx"])
         self._culture_per_tourist = int(rr["culturePerDomesticTourist"])
         self._tech_era = torch.tensor(rr["techEra"] or [0], dtype=torch.long, device=device)
@@ -2438,9 +2454,10 @@ class SimInit:
         self._ngov = len(_govs)
         self._npol = len(_pols)
         # the cards a seat has SLOTTED — a DRIVER decision carried on the
-        # wire. INERT this step: the record writes it and the compare reads it;
-        # the greedy fill in `_slotted_policies` still pays every effect.
+        # wire — and those of them slotted without their modifiers, laid back
+        # by a slot rebuild (`GovernmentState.lapsed`): they pay nothing
         self.civ_policies = torch.zeros(self.B, self.n_majors, max(self._npol, 1), dtype=torch.bool, device=device)
+        self.civ_policy_lapsed = torch.zeros_like(self.civ_policies)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_intol = torch.tensor([int(g["intolerance"]) for g in _govs], dtype=torch.long, device=device)
@@ -2589,6 +2606,12 @@ class SimInit:
         if self._npol:
             self._pol_kind = torch.tensor([int(p["kind"]) for p in _pols], dtype=torch.long, device=device)
             self._pol_unlock_civic = torch.tensor([int(p["unlockCivic"]) for p in _pols], dtype=torch.long, device=device)
+            # the slot rebuild's sort key (`cardCivicCost`): the Cost of the
+            # civic that unlocks the card, -1 where none does
+            _ccost = rules.c_cost.to(device=device, dtype=torch.float64)
+            self._pol_civic_cost = torch.where(
+                self._pol_unlock_civic >= 0, _ccost[self._pol_unlock_civic.clamp(min=0)],
+                torch.full_like(self._pol_unlock_civic, -1, dtype=torch.float64))
             self._pol_city_y = torch.tensor([[float(x) for x in p["cityYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_cap_y = torch.tensor([[float(x) for x in p["capitalYields"]] for p in _pols], dtype=dtype, device=device)
             self._pol_housing = torch.tensor([float(p["housingAll"]) for p in _pols], dtype=dtype, device=device)  # [nPol]
@@ -3312,6 +3335,8 @@ class SimInit:
         self._levy_discount_rows = [(b, int(p)) for b, p in enumerate(rules.b_levy_discount.tolist()) if int(p) > 0]
         self._b_tourism = rules.b_tourism.to(device)
         self._b_tour_any = bool(self._b_tourism.count_nonzero())
+        self._b_civic_tour = rules.b_civic_tour.to(device)
+        self._b_civic_tour_any = bool((self._b_civic_tour[:, 0] >= 0).any())
         self._b_loy_no_gov = rules.b_loy_no_gov.to(device)
         self._b_amen_gov = rules.b_amen_gov.to(device)
         self._b_house_gov = rules.b_house_gov.to(device)

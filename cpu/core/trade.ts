@@ -117,10 +117,10 @@ export function routeDestLuxuryGold(state: GameState, seat: number, dest: City):
   return AMSTERDAM_DEST_LUXURY_GOLD * seen.size;
 }
 
-/** The Gold of the Trading Posts a route's course passes through — the
- *  modifiers that name them; the post's own +1 is the path's
- *  (`routePathGold`), which the lab read on foreign cities alone and never
- *  for another civilization's post. */
+/** The Gold of the Trading Posts a route's course passes through, and for
+ *  Rome its own post at the destination — the modifiers that name them; the
+ *  post's own +1 is the path's (`routePathGold`), which the lab read on
+ *  foreign cities alone and never for another civilization's post. */
 export function routeChainGold(state: GameState, seat: number, r: TradeRoute): number {
   // CIV6 (Jakarta): "Your Trading Posts in FOREIGN cities provide +1
   // Gold to your Trade Routes PASSING THROUGH or going to the city" — the
@@ -136,6 +136,13 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
     if (jakarta && !own) g += 1;
     if (rome && own) g += ROME_OWN_POST_GOLD;
   }
+  // the posts are counted from the plot past the origin through the
+  // DESTINATION (Trade_Manager 0x5500b0): an own city at the end of the
+  // course pays Rome too (1108 Aquileia→Antium, +1)
+  const course = r.course ?? [];
+  const dest = course[course.length - 1];
+  if (rome && course.length > 1 && tileSeat(state.map.tiles[dest]) === seat
+      && (seatOf(state, seat)?.tradingPosts ?? []).includes(dest) && centreHasCity(state, dest)) g += ROME_OWN_POST_GOLD;
   return g;
 }
 
@@ -705,12 +712,15 @@ export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null
 }
 
 /** What ONE of a city-state's routes pays its city: the
- *  destination's rows (`minorRouteYields`) plus the path term; null where the
+ *  destination's rows (`minorRouteYields`) plus the path term and the
+ *  city-state's own Trading Post at the destination (`routePostGold`;
+ *  1105 Bandar Brunei→Shenyang, 1108 Hunza→Mediolanum: +1 Gold from the
+ *  route after the first one there ran its term); null where the
  *  destination is gone. */
 export function minorRouteOriginYields(state: GameState, minor: Seat, r: TradeRoute): Yields | null {
   const y = minorRouteYields(state, r);
   if (!y) return null;
-  y.gold += routePathGold(state, minor.seat, r, y.gold);
+  y.gold += routePathGold(state, minor.seat, r, y.gold) + routePostGold(state, minor.seat, routeDestCenter(state, minor, r));
   return y;
 }
 
@@ -1179,12 +1189,12 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
   const destGone = (x: TradeRoute): boolean =>
     x.toSeatCity !== undefined && !(seatOf(state, x.toSeat ?? NO_SEAT)?.cities ?? []).some((c) => c.id === x.toSeatCity);
   const done = cur.filter((x) => isDone(x));
-  if (done.length > 0 && !isCityStateSeat(actor.seat)) {
-    dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
-    for (const r of done) {
-      stampTradingPost(actor, routeOriginCenter(state, actor, r));
-      stampTradingPost(actor, routeDestCenter(state, actor, r));
-    }
+  if (done.length > 0 && !isCityStateSeat(actor.seat)) dedicationEvent(state, actor.seat, DED_COINAGE, done.length);
+  // a completed route plants its owner's Trading Post at both of its cities —
+  // a city-state's too
+  for (const r of done) {
+    stampTradingPost(actor, routeOriginCenter(state, actor, r));
+    stampTradingPost(actor, routeDestCenter(state, actor, r));
   }
   const ended = cur.filter((x) => isDone(x) || destGone(x));
   if (ended.length > 0) {
@@ -1204,10 +1214,10 @@ export function tradeRouteExpiry(state: GameState, actor: Seat): void {
  * key): the new in-range destination whose route pays the most, its yields
  * summed (`minorRouteYields`) — the other city-states in id order, then every
  * major's cities in seat and array order, strictly-greater beats, so ties
- * keep the first. A minor has no fog, meets no one and holds no Trading
- * Post, so the gates are the range (`tradeReach` from its city), a route not
- * already running, no war with the destination's holder, and Trade Policy's
- * ban on a banned major. Null = none.
+ * keep the first. A minor has no fog and meets no one, so the gates are the
+ * range (`tradeReach` from its city, its Trading Posts refuelling), a route
+ * not already running, no war with the destination's holder, and Trade
+ * Policy's ban on a banned major. Null = none.
  */
 export function minorRouteCandidate(state: GameState, cityState: CityState): TradeRoute | null {
   const routes = cityState.tradeRoutes ?? [];

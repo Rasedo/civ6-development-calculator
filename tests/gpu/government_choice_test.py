@@ -9,14 +9,15 @@ A seat's government is a DRIVER decision on the wire: the record's
 against `_gov_open` (unlocked by the civics; nothing in Anarchy) and stores it
 in `civ_gov_chosen`, where it stands until another record names one. A seat
 no record has chosen for is in the newest government its civics unlock
-(`_adopted_gov`). A change marks the new government held and carries the
-slotted cards that still fit; a return to one held before leaves the seat in
+(`_adopted_gov`). A change marks the new government held and rebuilds the
+slots, laying the old cards back lapsed; a return to one held before leaves the seat in
 no government for `anarchy_turns` turns (runs/bds3_anarchy_20260926T102305Z.jsonl).
 
   1. the default is the newest tier; the record reaches every tier-mate and
      pays its bonus.
   2. a locked government is refused; a return costs Anarchy, a new one none.
-  3. the choice stands when a newer tier unlocks; a change carries the cards.
+  3. the choice stands when a newer tier unlocks; a change lays the cards
+     back lapsed, by the slot rebuild.
   4. the record round-trips (`extract_record` / `replay_seat`), the
      observation carries `government` and `gov_open`, the compare renders
      the choice, and the driver's style pick takes every tier-mate across
@@ -140,7 +141,40 @@ def main() -> int:
     assert torch.equal(sim.civ_policies[0, ROW], up[0]), "the card set was not laid into the chosen government"
     record(gov["MONARCHY"])
     assert now() == "MONARCHY" and bool(sim.civ_policies[0, ROW][up[0]].all()), "the change dropped a card that fits"
-    print("  3 the standing choice OK - a newer tier leaves it, a change carries the cards")
+    assert torch.equal(sim.civ_policy_lapsed[0, ROW], up[0]), "the card laid back is not lapsed"
+    print("  3 the standing choice OK - a newer tier leaves it, a change lays the cards back lapsed")
+
+    # 3b) the slot rebuild (dll_readings "C-94: the slot rebuild"): the old
+    # cards sorted by their unlocking civic's Cost, each new slot taking the
+    # first of its own slot kind while more than one slot stands empty
+    scene("CODE_OF_LAWS", "POLITICAL_PHILOSOPHY", "DIVINE_RIGHT", "REFORMED_CHURCH", "URBANIZATION",
+          "MOBILIZATION", "CULTURAL_HERITAGE", "COLONIALISM", "CIVIL_SERVICE", "ENLIGHTENMENT")
+    pid = [p["id"] for p in rj["policies"]]
+    cards = ["FORCE_MODERNIZATION", "LEVEE_EN_MASSE", "HERITAGE_TOURISM", "RAJ", "CIVIL_PRESTIGE", "LIBERALISM"]
+
+    def mask(names) -> torch.Tensor:
+        m = torch.zeros(sim.B, sim._npol, dtype=torch.bool)
+        m[:, [pid.index(n) for n in names]] = True
+        return m
+
+    def names(m: torch.Tensor) -> list[str]:
+        return sorted(pid[i] for i in m.nonzero().flatten().tolist())
+
+    record(gov["MONARCHY"], mask(cards))
+    assert names(sim.civ_policies[0, ROW]) == sorted(cards), "the Monarchy set was not stored"
+    assert float(sim._gov_mods(ROW)[12]["mcut"][0]) == 2.0, "Levee en Masse is not paid"
+    record(gov["THEOCRACY"])
+    laid = ["FORCE_MODERNIZATION", "HERITAGE_TOURISM", "LEVEE_EN_MASSE", "LIBERALISM", "RAJ"]
+    assert names(sim.civ_policies[0, ROW]) == laid, names(sim.civ_policies[0, ROW])
+    assert names(sim.civ_policy_lapsed[0, ROW]) == laid, names(sim.civ_policy_lapsed[0, ROW])
+    assert float(sim._gov_mods(ROW)[12]["mcut"][0]) == 0.0, "a lapsed card is paid"
+    record(None, mask(cards))
+    assert names(sim.civ_policy_lapsed[0, ROW]) == laid, "the record's set changed a kept card's standing"
+    record(None, mask([c for c in cards if c != "LEVEE_EN_MASSE"]))
+    record(None, mask(cards))
+    assert not bool(sim.civ_policy_lapsed[0, ROW, pid.index("LEVEE_EN_MASSE")]), "a card slotted anew stays lapsed"
+    assert float(sim._gov_mods(ROW)[12]["mcut"][0]) == 2.0, "a card slotted anew is not paid"
+    print("  3b the slot rebuild OK - by civic Cost and slot kind, the cards laid back lapsed until slotted anew")
 
     # 4) the wire, the observation, the compare and the driver
     kw = {name: None for name in inspect.signature(records.extract_record).parameters}

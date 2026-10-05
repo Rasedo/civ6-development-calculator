@@ -119,7 +119,16 @@ def main() -> int:
     assert not bool((sim.seat_routes[B0, row, :, 0] >= 0).any()), "the route never ended"
     assert int(sim.turn) >= exp, "the route ended before its term"
     assert traders(sim, s) == t0, "the Trader did not come home"
-    print(f"  4 round trip OK — home at turn {int(sim.turn)} (term {exp})")
+    # the completed route planted the minor's Trading Post at both of its
+    # cities, and its next route there pays the post's +1 Gold
+    assert bool(sim.trading_post[B0, row, int(sim.citystate_center[B0, s])]), "no post at home"
+    assert bool(sim.trading_post[B0, row, int(dct[B0])]), "no post at the destination"
+    a_trader(sim, s)
+    sim._minor_trade(s)
+    again = sim._minor_route_income(s)
+    assert again is not None and abs(float(again[B0, 0, 2]) - (y[2] + 1)) < 1e-9, \
+        f"the second route pays {float(again[B0, 0, 2])} Gold, not {y[2]} + its post's 1"
+    print(f"  4 round trip OK — home at turn {int(sim.turn)} (term {exp}), its Trading Posts planted and paid")
 
     # -- 5 a major's war on the minor cancels its route to that major ----------
     sim.restore(base)

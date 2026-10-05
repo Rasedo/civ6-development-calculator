@@ -73,6 +73,22 @@ describe('All Roads Lead to Rome', () => {
     state.seats[0].civ = civ('ROME');
     expect(routeChainGold(state, 0, route)).toBe(1);
   });
+
+  // Trade_Manager 0x5500b0 counts the posts from the plot past the origin
+  // through the destination: an own post at the course's end pays Rome, the
+  // origin's never (1108 Aquileia→Antium +1)
+  it('pays +1 Gold for an own post city at the end of the course, never at its start', () => {
+    const state = makeState(makeMap(12, 12, 'GRASSLAND'));
+    state.seats[0].civ = civ('ROME');
+    const a = settleAt(state, tileAtCoords(state.map, 2, 6).index, 0);
+    const b = settleAt(state, tileAtCoords(state.map, 8, 6).index, 0);
+    const mid = [3, 4, 5, 6, 7].map((c) => tileAtCoords(state.map, c, 6).index);
+    const route: TradeRoute = { from: a.id, to: b.id, course: [a.centerIndex, ...mid, b.centerIndex] };
+    state.seats[0].tradingPosts = [a.centerIndex];
+    expect(routeChainGold(state, 0, route)).toBe(0);
+    state.seats[0].tradingPosts = [a.centerIndex, b.centerIndex];
+    expect(routeChainGold(state, 0, route)).toBe(1);
+  });
 });
 
 describe('Iteru', () => {

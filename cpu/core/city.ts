@@ -29,7 +29,7 @@ import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { cityStateItemProduction, suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
-import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
+import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
@@ -1204,7 +1204,8 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
 }
 
 /** The Tourism a building pays its city: flat on its own district (Ferris
- *  Wheel, Shopping Mall — `BuildingDef.tourism`); and a unique building's —
+ *  Wheel, Shopping Mall — `BuildingDef.tourism`), and once the seat holds a
+ *  civic (Conservation's walls and Arena — `BuildingDef.civicTourism`); and a unique building's —
  *  CIV6 (Marae, MARAE_TOURISM_FEATURES; Thermal Bath, THERMALBATH_ADDTOURISM)
  *  per owned tile carrying a feature (EFFECT_ADJUST_CITY_TOURISM_PER_FEATURE
  *  names no passability) once Flight is held, or flat while the border holds
@@ -1213,12 +1214,15 @@ export function gpDistrictTourism(state: GameState, seat: number, cities: readon
 export function buildingTourism(state: GameState, seat: number, cities: readonly City[]): number {
   const civ = civOf(state, seat);
   const techs = seatOf(state, seat)?.research.techs ?? [];
+  const civics = seatOf(state, seat)?.research.civics ?? [];
   let t = 0;
   for (const c of cities) {
     const dark = darkBuildings(state.map, c);
     for (const id of c.buildings) {
       if (dark.has(id)) continue;
       t += BUILDINGS[id]?.tourism ?? 0;
+      const ct = BUILDINGS[id]?.civicTourism;
+      if (ct && civics.includes(ct.civic)) t += ct.amount;
       const bv = buildingVariantFor(civ, id);
       if (!bv) continue;
       const pf = bv.tourismPerFeature;
@@ -1237,6 +1241,26 @@ export function buildingTourism(state: GameState, seat: number, cities: readonly
   return t;
 }
 
+/** CIV6 (MODIFIER_PLAYER_ADJUST_TOURISM, `TOURISM_PCT_ROWS`): the percent the
+ *  seat's research adds to every city's Tourism. `_seat_tourism_pct` is the
+ *  twin. */
+export function seatTourismPct(state: GameState, seat: number): number {
+  const r = seatOf(state, seat)?.research;
+  if (!r) return 0;
+  let pct = 0;
+  for (const x of TOURISM_PCT_ROWS) {
+    if ((x.tech && r.techs.includes(x.tech)) || (x.civic && r.civics.includes(x.civic))) pct += x.pct;
+  }
+  return pct;
+}
+
+/** a city's half of its Tourism raised by the seat's percent, floored
+ *  (GetTourism: each half per city, 1108 China t223: Computers' 25% on 46,
+ *  40, 26, 20, 8 and 7 reads 57, 50, 32, 25, 10 and 8) */
+const raisedTourism = (t: number, pct: number): number => (pct ? Math.floor((t * (100 + pct)) / 100) : t);
+
+/** The GENERAL half of a seat's per-turn tourism: each city's own, raised by
+ *  the seat's percent (`seatTourismPct`) — with none, the seat's whole sum. */
 export function seatTourism(
   state: GameState,
   seat: number,
@@ -1245,22 +1269,34 @@ export function seatTourism(
   const s = seatOf(state, seat);
   if (!s) return 0;
   const cities = citiesOf(state, seat);
-  return tourismOf(state, s, cities, cities, (tile: Tile) => tileOwnedByCiv(tile, seat), govCityIds);
+  const pct = seatTourismPct(state, seat);
+  if (!pct) return tourismOf(state, s, cities, cities, (tile: Tile) => tileOwnedByCiv(tile, seat), govCityIds);
+  let t = 0;
+  for (const c of cities) {
+    t += raisedTourism(tourismOf(state, s, [c], cities, (tile: Tile) => tileBelongsTo(tile, c), govCityIds), pct);
+  }
+  return t;
 }
 
-/** One city's share of its seat's tourism, both halves: what its works,
- *  districts, buildings and plots make, its relics and a Holy City it holds
- *  (the game's per-city GetTourism). */
-export function cityTourism(state: GameState, city: City): number {
-  const s = seatOf(state, city.seat);
-  if (!s) return 0;
-  const km = congressGwMult(state);
-  let t = tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city))
-    + relicTourism(state, city, km) * wonderMult(state, [city], 'religiousTourismMult');
+/** The RELIGIOUS half one city makes: its relics (its own wonder multiplier)
+ *  and the Holy Cities it holds. */
+function cityReligiousTourism(state: GameState, city: City): number {
+  let t = relicTourism(state, city, congressGwMult(state)) * wonderMult(state, [city], 'religiousTourismMult');
   for (const g of state.seats) {
     if (g.religion.founded && g.religion.holyTile === city.centerIndex) t += HOLY_CITY_TOURISM;
   }
   return t;
+}
+
+/** One city's share of its seat's tourism, both halves: what its works,
+ *  districts, buildings and plots make, its relics and a Holy City it holds,
+ *  each half raised by the seat's percent (the game's per-city GetTourism). */
+export function cityTourism(state: GameState, city: City): number {
+  const s = seatOf(state, city.seat);
+  if (!s) return 0;
+  const pct = seatTourismPct(state, city.seat);
+  return raisedTourism(tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city)), pct)
+    + raisedTourism(cityReligiousTourism(state, city), pct);
 }
 
 /** CIV6 (Film Studio, FILMSTUDIO_ENHANCEDLATETOURISM): the EXTRA a seat
@@ -1333,19 +1369,12 @@ function tourismOf(
  *  per turn" — banked apart (`Seat.tourismReligious`) because a rival's
  *  Enlightenment or a different religion halves THIS half at the read
  *  (`cultureVictor`), never the general half. St. Basil's multiplier is the
- *  HOLDING city's, and a religion's Holy City pays its CURRENT owner. */
+ *  HOLDING city's, and a religion's Holy City pays its CURRENT owner; each
+ *  city's half raised by the seat's percent. */
 export function seatTourismReligious(state: GameState, seat: number): number {
-  const cities = citiesOf(state, seat);
+  const pct = seatTourismPct(state, seat);
   let t = 0;
-  const km = congressGwMult(state);
-  for (const c of cities) {
-    t += relicTourism(state, c, km) * wonderMult(state, [c], 'religiousTourismMult');
-  }
-  for (const g of state.seats) {
-    const ht = g.religion.holyTile;
-    if (!g.religion.founded || ht == null || ht < 0) continue;
-    if (cities.some((c) => c.centerIndex === ht)) t += HOLY_CITY_TOURISM;
-  }
+  for (const c of citiesOf(state, seat)) t += raisedTourism(cityReligiousTourism(state, c), pct);
   return t;
 }
 

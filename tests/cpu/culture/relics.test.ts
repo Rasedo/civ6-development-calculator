@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { makeState, holdWorks } from '../helpers';
-import { drainRelicReserve, greatWorkYields, gwCountObjs, placeGreatWorkIn, relicTourism, type WorkCity } from '../../../cpu/core/greatWorks';
+import { makeState, makeMap, holdWorks, settleAt, grantTechs, tileAtCoords } from '../helpers';
+import { seatTourismReligious } from '../../../cpu/core/city';
+import { drainRelicReserve, greatWorkTourism, greatWorkYields, gwCountObjs, gwWorkTourism, placeGreatWorkIn, relicTourism, type WorkCity } from '../../../cpu/core/greatWorks';
+import { GREAT_PEOPLE } from '../../../cpu/data/greatPeople';
 import { GW_HOLDERS, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWS_RELIC } from '../../../cpu/data/greatWorks';
 import type { GameState } from '../../../cpu/core/types';
 
@@ -114,5 +116,43 @@ describe('relics', () => {
     const other = city(['TEMPLE']);
     other.pillagedBuildings = ['TEMPLE'];
     expect(placeGreatWorkIn(state, [other], relic)).toBeUndefined();
+  });
+
+  // CIV6 (COMPUTERS_BOOST_ALL_TOURISM, MODIFIER_PLAYER_ADJUST_TOURISM): +25% to
+  // each city's half, floored per city (1108 China t223)
+  it('Computers raises each city’s religious half by a quarter, floored', () => {
+    const state = makeState(makeMap(12, 12, 'GRASSLAND'));
+    const c = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
+    c.buildings.push('TEMPLE');
+    holdWorks(c, GWO_RELIC, 1);
+    expect(seatTourismReligious(state, 0)).toBe(GWO_TOURISM[GWO_RELIC]);
+    grantTechs(state, 'COMPUTERS');
+    expect(seatTourismReligious(state, 0)).toBe(Math.floor((GWO_TOURISM[GWO_RELIC]! * 125) / 100));
+  });
+
+  // CIV6 (GreatWorks.Tourism): every work of the Babylon pack's seven makers
+  // carries 4 where its object type's rows pay 2 (1108 Xian, Behzād's Landscape)
+  it('a work pays its maker’s raised Tourism', () => {
+    const behzad = GREAT_PEOPLE.ARTIST.findIndex((p) => p.id === 'GP_KAMAL_UD_DIN_BEHZAD');
+    expect(behzad).toBe(4);
+    expect(gwWorkTourism({ obj: 2, maker: behzad })).toBe(4);
+    expect(gwWorkTourism({ obj: 2, maker: 0 })).toBe(GWO_TOURISM[2]);
+    expect(gwWorkTourism({ obj: 2, maker: -1 })).toBe(GWO_TOURISM[2]);
+  });
+
+  // CIV6 (Building_GreatWorks.NonUniquePersonTourism 1 on the Art Museum): a
+  // second work by the same person pays 1 (1108 Handan t169: Behzād's
+  // Landscape and Portrait, 4 + 1)
+  it('a second work by the same person in an Art Museum pays the row’s figure', () => {
+    const state = makeState(makeMap(12, 12, 'GRASSLAND'));
+    const c = settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
+    c.buildings.push('MUSEUM');
+    const behzad = GREAT_PEOPLE.ARTIST.findIndex((p) => p.id === 'GP_KAMAL_UD_DIN_BEHZAD');
+    holdWorks(c, 2, 1, { maker: behzad, seat: 0 });
+    expect(greatWorkTourism(state, c, false)).toBe(4);
+    holdWorks(c, 1, 1, { maker: behzad, seat: 0 });
+    expect(greatWorkTourism(state, c, false)).toBe(4 + 1);
+    holdWorks(c, 2, 1, { maker: 0, seat: 0 });
+    expect(greatWorkTourism(state, c, false)).toBe(4 + 1 + GWO_TOURISM[2]!);
   });
 });

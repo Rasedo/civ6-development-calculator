@@ -675,10 +675,11 @@ export const HOLY_CITY_PRESSURE_MULT = srcConst('religion.holyCityPressureMult',
   xml('GlobalParameters', 'Name=RELIGION_SPREAD_HOLY_CITY_PRESSURE_MULTIPLIER', 'Value'));
 export const HOLY_SITE_PRESSURE_MULT = srcConst('religion.holySitePressureMult', 2,
   xml('GlobalParameters', 'Name=RELIGION_SPREAD_HOLY_SITE_PRESSURE_MULTIPLIER', 'Value'));
-/** CIV6 (RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP 50): every city carries this
- * much "no religion" pressure per citizen — the UNCONVERTED group's pressure,
- * one of the groups the city's citizens are shared among
- * (`followedReligionOf`). */
+/** CIV6 (RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP 50): a city is founded with
+ * this much "no religion" pressure per citizen — the UNCONVERTED group's
+ * pressure, one of the groups the city's citizens are shared among
+ * (`followedReligionOf`) — and each citizen it grows adds as much to the
+ * group it follows (`gainPopulationPressure`). */
 export const ATHEISM_PRESSURE_PER_POP = 50;
 /** CIV6 (Religious Colonization): the pressure a city founded under the belief
  * starts with — the belief's `colonizePressure` per two citizens, rounded up,
@@ -696,17 +697,32 @@ export const HOLY_CITY_FOUNDING_PRESSURE_PER_POP = 200;
 /** CIV6 (RELIGION_SPREAD_TRADE_ROUTE_PRESSURE_FOR_DESTINATION 1.0 /
  * _FOR_ORIGIN 0.5): a live Trade Route carries its ORIGIN city's religion to
  * the destination each turn, and the destination's back to the origin at
- * half strength. READING: the accumulator is an integer, so a half-point
- * lands on EVEN turns (`routePressureShare`). Dharma's +100% rides the
- * route OWNER's rows (`ROUTE_PRESSURE_ROWS`). */
+ * half strength — the half lands every turn, a city's pressure being a
+ * fixed-point number with 8 fraction bits (CityReligion 0x1f3050 writes
+ * `amount << 8`; runs/h1_duelw1108 Jiaodong +30.5 a turn). Dharma's +100%
+ * rides the route OWNER's rows (`ROUTE_PRESSURE_ROWS`). */
 export const ROUTE_PRESSURE_DESTINATION = 1.0;
 export const ROUTE_PRESSURE_ORIGIN = 0.5;
 
-/** the whole points a per-turn route amount lands THIS turn: its whole part
- *  every turn and its half on even turns — `_route_pressure_share`'s twin */
-export function routePressureShare(amount: number, turn: number): number {
-  const whole = Math.floor(amount);
-  return whole + (amount > whole && turn % 2 === 0 ? 1 : 0);
+/** a city's unconverted pressure: the stored accumulator, or
+ *  ATHEISM_PRESSURE_PER_POP x pop for a city built outside the engine */
+export function unconvertedOf(city: { unconvertedPressure?: number; population: number }): number {
+  return city.unconvertedPressure ?? ATHEISM_PRESSURE_PER_POP * Math.max(0, city.population);
+}
+
+/** CIV6 (CityReligion's population change, GameCore 0x1f3050): a city whose
+ *  population GROWS by `n` adds RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP x n
+ *  to the group it follows — its majority religion, else the unconverted —
+ *  read before the citizen joins; a shrinking city keeps every pressure.
+ *  `_gain_population_pressure` is the twin. */
+export function gainPopulationPressure(
+  city: { religionPressure?: number[]; unconvertedPressure?: number; population: number }, n: number,
+): void {
+  if (n <= 0) return;
+  const none = unconvertedOf(city);
+  const g = city.religionPressure ? followedReligionOf(city.religionPressure, city.population, none) : -1;
+  city.unconvertedPressure = g >= 0 ? none : none + ATHEISM_PRESSURE_PER_POP * n;
+  if (g >= 0) city.religionPressure![g] += ATHEISM_PRESSURE_PER_POP * n;
 }
 
 /** CIV6 (RELIGION_SPREAD_STRENGTH_MULTIPLIER 200): the lump a full-health
@@ -722,15 +738,13 @@ export const SPREAD_PRESSURE = 200;
  *  tie goes to the higher pressure, then the lower id (the one step the lab
  *  did not pin). Index `pres.length` is the unconverted. `_followers_of` is
  *  the twin; the division is written `pop * p / total` on both engines.
- *  `unconverted` is the unconverted group's pressure: the engine derives
- *  ATHEISM_PRESSURE_PER_POP × pop; the live game keeps it as an ACCUMULATOR
- *  that does not shrink with the city (300 at pop 2 after a nuclear strike,
- *  400 at pop 9), which the measured rows pass in explicitly and this
- *  engine does not model. */
-export function followersOf(pres: readonly number[], population: number, unconverted?: number): number[] {
+ *  `unconverted` is the unconverted group's pressure, an ACCUMULATOR that
+ *  does not shrink with the city (300 at pop 2 after a nuclear strike, 400
+ *  at pop 9; `unconvertedOf`). */
+export function followersOf(pres: readonly number[], population: number, unconverted: number): number[] {
   const n = pres.length;
   const pop = Math.max(0, population);
-  const p = [...pres, unconverted ?? ATHEISM_PRESSURE_PER_POP * pop];
+  const p = [...pres, unconverted];
   let total = 0;
   for (const x of p) total += x;
   const f = new Array<number>(n + 1).fill(0);
@@ -756,11 +770,10 @@ export function followersOf(pres: readonly number[], population: number, unconve
  *  (2 × followers ≥ population), and the unconverted winning means NO
  *  majority (-1). `_followed_religion` is the twin, and every follow read on
  *  this engine goes through here so no two sites can disagree about a tie. */
-export function followedReligionOf(pres: readonly number[], population: number, unconverted?: number): number {
+export function followedReligionOf(pres: readonly number[], population: number, none: number): number {
   const n = pres.length;
   const pop = Math.max(0, population);
   if (pop <= 0) return -1;
-  const none = unconverted ?? ATHEISM_PRESSURE_PER_POP * pop;
   const f = followersOf(pres, population, none);
   let best = n;   // the unconverted, until a religion beats it
   for (let g = 0; g < n; g++) {

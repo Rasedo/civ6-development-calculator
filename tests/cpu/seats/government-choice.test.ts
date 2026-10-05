@@ -17,7 +17,7 @@ import type { GameState, SeatActionRecord } from '../../../cpu/core/types';
  * stores it in `government.chosen`, where it stands until another record
  * names one. A seat no record has chosen for is in the newest government its
  * civics unlock (`seatGovernment`). A change marks the new government held
- * and carries the slotted cards that still fit; a return to one held before
+ * and rebuilds the slots, laying the old cards back lapsed; a return to one held before
  * leaves the seat in no government for `ANARCHY_TURNS` turns
  * (runs/bds3_anarchy_20260926T102305Z.jsonl).
  *
@@ -116,14 +116,48 @@ describe('the government choice', () => {
     expect(seatGovernment(state, 0)).toBe('MONARCHY');
   });
 
-  it('a change keeps the slotted cards that still fit, and lands before the record’s cards', () => {
+  it('a change lays the slotted cards back, lapsed, and lands before the record’s cards', () => {
     const state = scene('CODE_OF_LAWS', 'POLITICAL_PHILOSOPHY', 'DIVINE_RIGHT');
     const s = seatOf(state, 0)!;
     adopt(state, REC(GOV('CHIEFDOM'), [POL('URBAN_PLANNING')]));
     expect(s.government.policies.filter((p) => p !== null)).toEqual(['URBAN_PLANNING']);
+    expect(s.government.lapsed).toEqual([]);
     adopt(state, REC(GOV('MONARCHY')));
     expect(s.government.policies.filter((p) => p === 'URBAN_PLANNING').length).toBe(1);
     expect(s.government.policies.length).toBe(governmentSlots(state, 0).length);
+    expect(s.government.lapsed).toEqual(['URBAN_PLANNING']);
+  });
+
+  // dll_readings "C-94: the slot rebuild": the old cards sorted by their
+  // unlocking civic's Cost (Cultural Heritage 977, Mobilization 770,
+  // Urbanization 605, Colonialism 400, the Enlightenment 360, Civil Service
+  // 150), each new slot taking the first of its own slot kind while more than
+  // one slot stands empty
+  it('a change rebuilds the slots by civic Cost and slot kind, every card laid back lapsed', () => {
+    const state = scene('CODE_OF_LAWS', 'POLITICAL_PHILOSOPHY', 'DIVINE_RIGHT', 'REFORMED_CHURCH', 'URBANIZATION',
+      'MOBILIZATION', 'CULTURAL_HERITAGE', 'COLONIALISM', 'CIVIL_SERVICE', 'ENLIGHTENMENT');
+    const s = seatOf(state, 0)!;
+    const cards = ['FORCE_MODERNIZATION', 'LEVEE_EN_MASSE', 'HERITAGE_TOURISM', 'RAJ', 'CIVIL_PRESTIGE', 'LIBERALISM'];
+    adopt(state, REC(GOV('MONARCHY'), cards.map(POL)));
+    expect(s.government.policies.filter((p) => p !== null).sort()).toEqual([...cards].sort());
+    expect(getModifiers(state, 0).unitMaintenanceCut).toBe(2);
+    // Monarchy [M M E D W W] holds, in table order, Levée and Force
+    // Modernization, Liberalism, Raj, then Civil Prestige and Heritage
+    // Tourism in the wildcards; Theocracy [M M E E D W] lays back Levée, Force
+    // Modernization, Liberalism, nothing in the second Economic slot, Raj, and
+    // in the last wildcard Heritage Tourism, the costlier wildcard card
+    adopt(state, REC(GOV('THEOCRACY')));
+    expect(s.government.policies).toEqual(['LEVEE_EN_MASSE', 'FORCE_MODERNIZATION', 'LIBERALISM', null, 'RAJ', 'HERITAGE_TOURISM']);
+    expect([...s.government.lapsed].sort()).toEqual(['FORCE_MODERNIZATION', 'HERITAGE_TOURISM', 'LEVEE_EN_MASSE', 'LIBERALISM', 'RAJ']);
+    expect(getModifiers(state, 0).unitMaintenanceCut).toBe(0);
+    // the record's set keeps the lapsed cards lapsed and pays the fresh one;
+    // a card it drops and a later set slots again pays
+    adopt(state, REC(undefined, cards.map(POL)));
+    expect([...s.government.lapsed].sort()).toEqual(['FORCE_MODERNIZATION', 'HERITAGE_TOURISM', 'LEVEE_EN_MASSE', 'LIBERALISM', 'RAJ']);
+    adopt(state, REC(undefined, cards.filter((c) => c !== 'LEVEE_EN_MASSE').map(POL)));
+    adopt(state, REC(undefined, cards.map(POL)));
+    expect(s.government.lapsed).not.toContain('LEVEE_EN_MASSE');
+    expect(getModifiers(state, 0).unitMaintenanceCut).toBe(2);
   });
 
   it('the seat phase applies the record at its turn', () => {

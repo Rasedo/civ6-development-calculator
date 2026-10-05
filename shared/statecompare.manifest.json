@@ -959,6 +959,17 @@
           "note": "the cards a seat has SLOTTED, as a sorted index set over the policy table — a DRIVER decision carried on the wire, and the set whose effects both engines pay."
         },
         {
+          "name": "policiesLapsed",
+          "compare": "exact",
+          "covers": [
+            "GovernmentState.lapsed"
+          ],
+          "planes": [
+            "civ_policy_lapsed"
+          ],
+          "note": "the slotted cards a slot rebuild carried without attaching their modifiers (GameCore 0x391650), as a sorted index set; they pay nothing until the next policy change."
+        },
+        {
           "name": "age",
           "compare": "exact",
           "covers": [
@@ -1858,6 +1869,17 @@
           "note": "the minor's one city holds pressure like any other city row."
         },
         {
+          "name": "minorUnconverted",
+          "compare": "exact",
+          "covers": [
+            "CityState.unconvertedPressure"
+          ],
+          "planes": [
+            "city_unconverted"
+          ],
+          "note": "the minor's one city's unconverted pressure, an accumulator like any city's."
+        },
+        {
           "name": "levySeat",
           "compare": "exact",
           "covers": [
@@ -2336,6 +2358,17 @@
           "planes": [
             "city_pressure"
           ]
+        },
+        {
+          "name": "unconvertedPressure",
+          "compare": "exact",
+          "covers": [
+            "City.unconvertedPressure"
+          ],
+          "planes": [
+            "city_unconverted"
+          ],
+          "note": "the unconverted group's pressure: 50 a citizen at founding, grown only by a citizen the city gains following no religion."
         },
         {
           "name": "freePressure",

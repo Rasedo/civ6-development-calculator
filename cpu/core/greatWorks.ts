@@ -28,7 +28,8 @@ import {
   GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
   holderSlots, slotAccepts, type GreatWork,
 } from '../data/greatWorks';
-import { GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { GP_WORK_TOURISM, GREAT_PEOPLE, GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import type { GreatPersonClass } from './types';
 
 /** the shape every work-holding city answers with — a City, a capture's stub */
 export type WorkCity = {
@@ -232,6 +233,41 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
  * (Mary Leakey), the Congress multiplier by created kind, a themed holder
  * doubling its own.
  */
+/** the class whose roster a work's `maker` indexes, by object type: the four
+ *  kinds of Art an Artist's, Writing a Writer's (Sun Tzu's Writing reads the
+ *  Writer roster at his General index, which no raised maker shares), Music
+ *  a Musician's; an Artifact or a Relic has no maker */
+export const GW_MAKER_CLASS: readonly (GreatPersonClass | null)[] = ['ARTIST', 'ARTIST', 'ARTIST', 'ARTIST', null, 'WRITER', 'MUSICIAN', null];
+
+/** CIV6 (GreatWorks.Tourism): a work's own Tourism — its maker's raised
+ *  figure (`GP_WORK_TOURISM`) or its object type's. `_gw_maker_tourism` is
+ *  the twin. */
+export function gwWorkTourism(w: { obj: number; maker: number }): number {
+  const cls = GW_MAKER_CLASS[w.obj];
+  const p = cls && w.maker >= 0 ? GREAT_PEOPLE[cls][w.maker] : undefined;
+  return (p ? GP_WORK_TOURISM[p.id] : undefined) ?? GWO_TOURISM[w.obj]!;
+}
+
+/** does an earlier slot of `w`'s holder hold a work by the same Great Person
+ *  (the same class and roster place)? A find or a Relic has no person. */
+function gwRepeatsPerson(works: readonly GreatWork[], w: GreatWork): boolean {
+  const cls = GW_MAKER_CLASS[w.obj];
+  if (!cls || w.maker < 0) return false;
+  const h = GW_LAYOUT[w.slot]!.holder;
+  return works.some((o) => o.slot < w.slot && GW_LAYOUT[o.slot]!.holder === h && o.maker === w.maker
+    && GW_MAKER_CLASS[o.obj] === cls);
+}
+
+/** the override table the GPU reads: per object type and maker index, the
+ *  maker's raised Tourism, -1 where the object type's pays */
+export function gwMakerTourismTable(): number[][] {
+  const width = Math.max(...Object.values(GREAT_PEOPLE).map((r) => r.length));
+  return GW_MAKER_CLASS.map((cls) => Array.from({ length: width }, (_, i) => {
+    const p = cls ? GREAT_PEOPLE[cls][i] : undefined;
+    return (p ? GP_WORK_TOURISM[p.id] : undefined) ?? -1;
+  }));
+}
+
 export function greatWorkTourism(state: GameState, city: WorkCity, printing: boolean, omult?: readonly number[]): number {
   const works = gwWorks(city);
   if (works.length === 0) return 0;
@@ -243,7 +279,11 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
   let t = 0;
   for (const w of works) {
     if (w.obj === GWO_RELIC) continue;
-    t += GWO_TOURISM[w.obj]! * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
+    // CIV6 (Building_GreatWorks.NonUniquePersonTourism): a work whose person
+    // already has one in an earlier slot of the holder pays the row's figure
+    const nu = GW_LAYOUT[w.slot]!.nonUniqueTourism;
+    const own = nu && gwRepeatsPerson(works, w) ? nu : gwWorkTourism(w);
+    t += own * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
       * (w.obj === GWO_ARTIFACT ? artifact : 1) * scale[w.obj]!
       * (omult?.[w.obj] ?? 1) * mult[w.slot]!;
   }

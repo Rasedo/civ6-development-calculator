@@ -151,6 +151,29 @@ def main() -> None:
     assert int(with_relics[0] - base[0]) == 2 * 8, f"two relics must add 16 tourism, got {int(with_relics[0] - base[0])}"
     _c, fai = s2._gw_yields(0)
     assert float(fai[0, 0]) == 8.0 and float(_c[0, 0]) == 0.0, "two relics pay 8 faith and no culture"
+    # CIV6 (COMPUTERS_BOOST_ALL_TOURISM): +25% to each city's half, floored per city
+    tech = next(i for k, i, _p in s2._tour_pct_rows if k == 0)
+    per_city = s2._city_religious_tourism(0)
+    s2.civ_techs[:, 0, tech] = True
+    want = torch.div(per_city * 125, 100, rounding_mode="floor").sum(dim=1)
+    assert torch.equal(s2._tourism_religious_of(0), want), "Computers does not raise each city's half"
+    s2.civ_techs[:, 0, tech] = False
+    # CIV6 (GreatWorks.Tourism): a Behzād Landscape carries 4, another 2
+    behzad = 4  # his place in the Artist roster (`gwWorkTourism`'s twin reads it)
+    assert int(s2._gw_maker_tourism[2, behzad]) == 4 and int(s2._gw_maker_tourism[2, 0]) == -1
+    g0 = int(s2._gw_tourism_general(0, None, None)[0, 0])
+    hold_works(s2, 0, 0, 0, 2, 1, maker=behzad)
+    hold_works(s2, 0, 0, 0, 2, 1, maker=0)
+    assert int(s2._gw_tourism_general(0, None, None)[0, 0]) - g0 == 4 + 2, "a maker's raised Tourism is not paid"
+    # CIV6 (Building_GreatWorks.NonUniquePersonTourism 1 on the Art Museum): a
+    # second work by the same person pays 1
+    clear_works(s2)
+    museum = [s for s in range(s2.GW_W) if int(s2._gw_slot_holder[s]) == 3]  # GW_HOLDERS[3] is the Art Museum
+    g1 = int(s2._gw_tourism_general(0, None, None)[0, 0])
+    for s, obj in zip(museum[:2], (2, 1)):
+        s2.city_gw_obj[0, 0, 0, s] = obj
+        s2.city_gw_maker[0, 0, 0, s] = behzad
+    assert int(s2._gw_tourism_general(0, None, None)[0, 0]) - g1 == 4 + 1, "a repeated person pays its own Tourism"
     s2.city_alive[:, 0, 0] = False
     dead = s2._tourism_religious_of(0)
     assert int(dead[0] - base[0]) == 0, "a lost city must stop paying relic tourism"

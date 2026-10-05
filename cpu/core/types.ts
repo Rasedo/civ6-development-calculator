@@ -139,6 +139,11 @@ export interface City {
   projectBoostTurn?: number;
   religionPressure?: number[];
   followedReligion?: number | null;
+  /** the UNCONVERTED group's pressure: RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP
+   *  per citizen at founding, then an accumulator that grows only when the city
+   *  grows following no religion (`gainPopulationPressure`) and never shrinks
+   *  with the city. */
+  unconvertedPressure?: number;
   /** the Great Works held here, one per occupied layout slot (`GW_LAYOUT`):
    *  object type, maker, era and civilization. Carried on capture.
    *  Yield-bearing, so the GPU mirror bumps _eff_version on every write. */
@@ -186,6 +191,12 @@ export interface GovernmentState {
    *  government the seat held before; the seat is in no government while
    *  the turn is below it (`seatGovernment`) */
   anarchyEnd: number;
+  /** CIV6 (PlayerCulture, dll_readings "the slot rebuild"): the slotted cards
+   *  whose modifiers are not attached. A slot rebuild (a government change)
+   *  detaches every card and lays the old cards back into the new slots
+   *  without attaching them; a card pays again only once it is slotted anew.
+   *  A subset of `policies`; `civ_policy_lapsed` is the twin. */
+  lapsed: string[];
 }
 
 export interface SeatActionRecord {
@@ -903,6 +914,8 @@ export interface CityState extends Seat {
   suzerain?: number;
   /** The minor's one city holds pressure like any other city (index = seat). */
   religionPressure?: number[];
+  /** its city's unconverted pressure (`City.unconvertedPressure`) */
+  unconvertedPressure?: number;
   /** the minor's own BUILD record — `minorBuild` writes these, the tile
    *  planes carry the districts, and the conquest hands the whole set to the
    *  captured City. Absent = nothing built yet. */

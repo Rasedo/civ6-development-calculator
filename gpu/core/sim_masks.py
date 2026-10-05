@@ -788,18 +788,17 @@ class SimMasks:
         return torch.maximum(best.reshape(promos.shape), ones)
 
     def _followers_of(self, pres: torch.Tensor, pop: torch.Tensor,
-                      unconv: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+                      unconv: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """(followers [..., n+1] long, pressures [..., n+1] double) — how a
         city's citizens are shared among its religions and THE UNCONVERTED
         (last index): `followersOf`'s twin — the largest-remainder allocation
         measured live (lab 2 scene E): floor each quota `pop * p / total`,
         then one more citizen to each of the largest fractional remainders; a
         remainder tie goes to the higher pressure, then the lower id. `unconv`
-        is the unconverted group's pressure — the engine derives
-        ATHEISM_PRESSURE_PER_POP x pop (the live game keeps an accumulator
-        that does not shrink with the city; the pokes pass it explicitly)."""
+        is the unconverted group's pressure (`city_unconverted`), an
+        accumulator that does not shrink with the city."""
         popc = pop.clamp(min=0).long()
-        none = (self._atheism_per_pop * popc).double() if unconv is None else unconv.double()
+        none = unconv.double()
         p = torch.cat([pres.double(), none.unsqueeze(-1)], dim=-1)
         total = p.sum(dim=-1, keepdim=True)
         live = (popc > 0).unsqueeze(-1) & (total > 0)
@@ -821,7 +820,7 @@ class SimMasks:
         return f, p
 
     def _followed_religion(self, pres: torch.Tensor, pop: torch.Tensor,
-                           unconv: torch.Tensor | None = None) -> torch.Tensor:
+                           unconv: torch.Tensor) -> torch.Tensor:
         """the religion a pressure row follows — its MAJORITY as measured live
         (lab 2 scene E), `followedReligionOf`'s twin: the group with the MOST
         followers (`_followers_of`, the unconverted counted as a group); a tie
@@ -840,6 +839,29 @@ class SimMasks:
         popc = pop.clamp(min=0).long()
         ok = (best < n) & (popc > 0) & (fb * 2 >= popc)
         return torch.where(ok, best, torch.full_like(best, -1))
+
+    def _gain_population_pressure(self, b: torch.Tensor, row, col: torch.Tensor, n: torch.Tensor) -> None:
+        """`gainPopulationPressure`'s twin — CIV6 (CityReligion's population
+        change, GameCore 0x1f3050): a city growing by `n` citizens adds
+        RELIGION_SPREAD_ATHEISM_PRESSURE_PER_POP x n to the group it follows,
+        its majority religion else the unconverted, read before the citizen
+        joins; a shrink keeps every pressure. `b` / `col` / `n` index the
+        cities ([k] each), `row` an int or a [k] tensor; call it before the
+        population write."""
+        n = n.long()
+        m = n > 0
+        if not bool(m.count_nonzero()):
+            return
+        b, col, n = b[m], col[m], n[m]
+        r = row[m] if isinstance(row, torch.Tensor) else row
+        pres = self.city_pressure[b, r, col]
+        un = self.city_unconverted[b, r, col]
+        g = self._followed_religion(pres, self.city_pop[b, r, col], un)
+        add = (self._atheism_per_pop * n).double()
+        has = g >= 0
+        oh = (torch.arange(pres.shape[-1], device=self.device).unsqueeze(0) == g.unsqueeze(1)) & has.unsqueeze(1)
+        self.city_pressure[b, r, col] = pres + oh.double() * add.unsqueeze(1)
+        self.city_unconverted[b, r, col] = torch.where(has, un, un + add)
 
     def _promo_first_use(self, utype: torch.Tensor, promos: torch.Tensor,
                          used: torch.Tensor, kind: str):
@@ -1970,11 +1992,8 @@ class SimMasks:
         centre = holder >= 0
         war_h = self.war[gi, row].gather(1, holder.clamp(min=0)) & centre & (holder != row)
         opn = opn & ~war_h
-        if row < self.n_majors:
-            post = self.trading_post[gi, row] & centre & ((holder == row) | ~war_h)
-            refuel = (embark >= 0) & post.gather(1, embark.clamp(min=0))
-        else:
-            refuel = torch.zeros(n, T, dtype=torch.bool, device=dev)
+        post = self.trading_post[gi, row] & centre & ((holder == row) | ~war_h)
+        refuel = (embark >= 0) & post.gather(1, embark.clamp(min=0))
         danger = self._fid_in(self._trade_danger_fid)[gi]
         water = self.water[gi]
         portal = self._portal_plane()[gi]

@@ -57,11 +57,14 @@ describe('the pressure walk reaches the free row', () => {
     // and the Holy City's x4 step needs past that to take the majority.
     for (let i = 0; i < 120; i++) spreadReligiousPressure(state, 0);
     expect(free.followedReligion).toBe(0);
-    // the Free Cities' own spread reads `city.followedReligion` for their
-    // cities, so the Free City is a source on its own turn, pressing the
-    // Holy City beside it; nothing about the source step asks who owns it.
+    // the founder's spread reads `city.followedReligion` for every city in
+    // the world, so the Free City is a source too, pressing the Holy City
+    // beside it; nothing about the source step asks who owns it, and the
+    // Free Cities' own turn spreads nothing.
     const before = (holy.religionPressure ?? [])[0] ?? 0;
     spreadReligiousPressure(state, FREE_SEAT);
+    expect((holy.religionPressure ?? [])[0] ?? 0).toBe(before);
+    spreadReligiousPressure(state, 0);
     expect((holy.religionPressure ?? [])[0] ?? 0).toBeGreaterThan(before);
   });
 });

@@ -300,11 +300,15 @@ def test_world_church(rules, path) -> None:
     religion(sim, ROW, founder=WORLD)
     sim.city_pressure[B0] = 0
     sim.city_pop[B0, ROW, j] = 1
+    sim.city_unconverted[B0, ROW, j] = 50
     k = int(sim.city_alive[B0, 1].long().argmax())
     sim.city_pop[B0, 1, k] = 4
+    sim.city_unconverted[B0, 1, k] = 200
     s = int(sim.citystate_alive[B0].long().argmax())
     assert bool(sim.citystate_alive[B0, s]), "no live city-state"
     sim.citystate_pop[B0, s] = 2
+    sim.city_unconverted[B0, sim._CITY_MINOR0 + s, 0] = 100
+    sim._eff_version += 1
     c0 = float(seat_belief(sim, ROW)[4])
 
     def gain() -> float:

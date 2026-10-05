@@ -588,6 +588,112 @@ engines do not record.
   percent: Xi'an t25 reads 10 building an Archer (9 + Wolin's 1), 8 at t45
   building a district; t95 14.4 = (15 + 1) x 0.9.
 
+## C-94: the slot rebuild — READ
+
+Player_Culture.cpp and GameEffects_GameEventHandler.cpp. The slots are a
+vector of {slot type, policy} pairs (+0x3d8, read at +0x430, count +0x440;
+`GetSlotPolicy` 0x399ab0); a byte per policy (+0x7c8, read at +0x820) marks
+it slotted (`IsPolicyActive` 0x39dff0 reads it, so it never shows a lapse).
+A card's modifiers attach on the "policy added" signal (GameSignals +0x11a0,
+handler 0xc97410, "Policy Enacted - Attaching modifiers") and detach on
+"policy removed" (+0x11b8, 0xc97780, "Policy Retracted - Detaching").
+
+- SetSlotPolicy 0x3a3990: CanSlot 0x393400 (refuses a card already flagged
+  slotted), flag the card, signal REMOVED for the card the slot held
+  (unflagging it), store, signal ADDED. ClearPolicySlot 0x394730: unflag,
+  REMOVED. The civics command 0x44bb0 (type 0 set one slot, 1 government,
+  2 clear one slot, 3 the UI's clear list then add list).
+- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00,
+  0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort
+  0x386350 / 0x385b50 by the card's policy row +0x88 link's +0x1c — the
+  PrereqCivic's Cost, the civics loader's column 4 at +0x1c (0xabc150) —
+  highest first; a card with no link after, an empty slot last; insertion
+  sort, so ties keep slot order), clear every slot (0x3942d0 with -1:
+  unflag and REMOVED for each card), build the new slots (0x391650: the
+  government's rows, the player's extra slots, the removals, the per-
+  government extras), then walk the new slots in order: while more than
+  one slot stands empty (0x3996b0 counts them), 0x398cf0 takes the first
+  saved entry whose SLOT type is the new slot's, spends it and flags its
+  card slotted; 0x3930a0 (the card valid under the government) and the
+  card is written into the slot directly — no ADDED signal, so its
+  modifiers stay detached.
+- The AI (0x625d70, on a completed civic and each turn): the government
+  command, then each slot in order: the best-scoring card CanSlot admits
+  (so never one already slotted, a laid-back one included) scoring above
+  the slot's card takes the slot by command type 0. A card laid back pays
+  again only when it is displaced and slotted again; one left where the
+  rebuild laid it pays nothing while it is listed.
+- Fit: `importLapsed` reads the records' slot lists by these rules (a
+  rebuild where the government or the slot count moved). Over the six
+  Duels gap-free city.housing 1,319 → 438, city.amenities 1,629 → 827,
+  city.amenityTier 767 → 404, city.loyaltyPerTurn 758 → 441, buy.plotGold
+  978 → 174 (Expropriation); 1108's housing 1,940 / 1,940. 1108 China t249
+  (Monarchy [Force Modernization, Levée, Heritage Tourism, Raj, Civil
+  Prestige, Liberalism] → Theocracy with an extra Economic slot): Liberalism
+  (the Enlightenment 360) lapses in the Wildcard, Civil Prestige (Civil
+  Service 150) is slotted anew and pays.
+
+## C-94: the religious spread — READ
+
+City_Religion.cpp, PlayerReligion. A city's religion object holds a vector
+of {religion, followers, pressure, remainder} entries (+0xa0, count +0xb0),
+the majority at +8 (the last one at +0xc8). Pressure is fixed point, 8
+fraction bits (every amount is written `<< 8`).
+
+- The spread (0x4967f0 PlayerReligion's turn: faith, the purchase
+  notification, then 0x498570): a player whose founded religion (the
+  vector at +0xa0 by its +0x128 index) is not -1 spreads THAT religion: for
+  every player in the game's list (+0x7f8), every city of it whose majority
+  ([city +0x1910]) is the religion, 0x498660 walks every player's every
+  city other than the source and adds 0x496980's amount when positive
+  (0x1f20e0, the entry found or appended), then recomputes the target
+  (0x1f6480). A player with no religion — a city-state, the Free Cities —
+  spreads nothing; its cities press on the founder's turn.
+- The pair amount 0x496980(religion, source, target): nothing to an ally's
+  city (the 0xd71225de check) or a Citadel-of-God city of another founder
+  (+0x19e8); the source's step (0x1f33e0) when the target is within the
+  range and the source follows the religion; then the trade manager's
+  route source -> target (0x54ae60, TRADE_ROUTE_PRESSURE_FOR_DESTINATION at
+  gp +0x5f8) and target -> source (0x54bae0, _FOR_ORIGIN at +0x5fc).
+- The step 0x1f33e0: ADJACENT_PER_TURN_PRESSURE (gp +0x5d4); x
+  HOLY_CITY_PRESSURE_MULTIPLIER (+0x5e0) on the religion's Holy City plot,
+  or when the OWNER's religion object counts TREAT_HOLY_SITE_AS_HOLY_CITY
+  (+0xce0, Jerusalem's suzerain) and the city has a Holy Site, or the
+  owner counts TREAT_CAPITAL_AS_HOLY_CITY (+0xc80, gone in Gathering Storm:
+  Expansion2_RemoveData deletes the base Jerusalem trait) and its +0x1368
+  player founded the religion; else HOLY_SITE_PRESSURE_MULTIPLIER (+0x5e8)
+  with a Holy Site; then x (100 + the owner religion's 0x4975a0 + the
+  city's +0xd4 (MODIFIER_SINGLE_CITY_RELIGION_PRESSURE, the Bishop) + a
+  table term read through the city's +0x2170) / 100, then the game speed
+  (0x525590). The unread percent terms are 1107 Kandy's 8 against 4.
+- The population change 0x1f3050 (called from City ChangePopulation
+  0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n,
+  `<< 8`, to the entry of the current majority (+8: -1 when none, the
+  unconverted), then recomputes; a loss only recomputes. The reset
+  0x1f6360 leaves one entry, {religion, pop x 50}; a recompute with no
+  positive pressure leaves {-1, 1 follower, 50} (0x1f43c0).
+- The recompute 0x1f43c0 shares the citizens by largest remainder; the
+  leftover citizens go one at a time to the entry with the largest
+  remainder, a tie to the LATER entry (`jl` at 0x1f48aa) — the engines'
+  tie order (higher pressure, lower id) is the lab's fit and unread here.
+- Fit: the harness spreads each founder in seat order on the record's
+  state, each major's recorded growth (`gainPopulationPressure`) before
+  its spread and its route changes after: 1108 step.pressure 1,415 / 307
+  → 1,720 / 2; six duels 7,172 / 2,973 → 8,648 / 1,516.
+
+## C-94: trade posts and cultural dominance — READ
+
+- Trade_Manager 0x5500b0 counts the Trading Posts on a route's path from
+  index 1 through the destination, own and foreign apart: a foreign post
+  pays TRADING_POST_GOLD_IN_FOREIGN_CITY, an own one the player's own
+  bonus (Rome's All Roads Lead to Rome +1, the destination's post too).
+- Cultural dominance: 0x393af0 sets a pair's flag when the player's
+  tourists visiting the other exceed the other's domestic tourists
+  (+0x10b0; equal keeps the flag); 0x54c6c0 adds
+  TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose
+  origin's owner dominates the destination's. Not modelled (AUDIT C-94
+  BUILD).
+
 ## DLL rules the engines contradict
 
 None known: every rule read above ships on both engines.

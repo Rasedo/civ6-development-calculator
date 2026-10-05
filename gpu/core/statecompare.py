@@ -673,6 +673,7 @@ SEAT = {
     "policySlotsExtra": lambda sim, b, rows: [
         [int(x) for x in _batch_rows(sim, "wslots", c, sim._wonder_extra_slots)[b]] for c in rows],
     "policiesSlotted": _civ_mask("civ_policies"),
+    "policiesLapsed": _civ_mask("civ_policy_lapsed"),
     "prevAge": _civ_scalar("prev_age"),
     "darkAges": _civ_scalar("dark_ages"),
     "goldenAges": _civ_scalar("golden_ages"),
@@ -806,7 +807,8 @@ CITY_STATE = {
         [int(x) for x in sim.city_dist_tile[b, sim._CITY_MINOR0 + s, 0].tolist()] for s in rows],
     "minorOuterHp": lambda sim, b, rows: [int(sim.city_outer_hp[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "religionPressure": lambda sim, b, rows: [
-        [int(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
+        [float(sim.city_pressure[b, sim._CITY_MINOR0 + s, 0, c]) for c in _civ_seats(sim)] for s in rows],
+    "minorUnconverted": lambda sim, b, rows: [float(sim.city_unconverted[b, sim._CITY_MINOR0 + s, 0]) for s in rows],
     "levySeat": lambda sim, b, rows: [int(sim._ROW_SEAT[int(sim.citystate_levy_seat[b, s])])
                                       if int(sim.citystate_levy_seat[b, s]) >= 0 else -1 for s in rows],
     "levyEnds": lambda sim, b, rows: [int(sim.citystate_levy_ends[b, s]) for s in rows],
@@ -947,8 +949,9 @@ CITY = {
     "queueCost": _queue_cost,
     "followedReligion": _cty("city_followed"),
     "religionPressure": lambda sim, b, rows: [
-        [int(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
+        [float(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
     ],
+    "unconvertedPressure": _cty("city_unconverted"),
     "freePressure": lambda sim, b, rows: [
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],

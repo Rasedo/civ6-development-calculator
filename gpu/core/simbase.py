@@ -359,6 +359,7 @@ class Rules:
     b_favor: torch.Tensor  # long [NB] — diplomatic favor per turn, paid to the SEAT
     b_levy_discount: torch.Tensor  # long [NB] — percent off the SEAT's levies
     b_tourism: torch.Tensor  # long [NB] — flat Tourism on the building's own district
+    b_civic_tour: torch.Tensor  # long [NB, 2] — the civic (-1 none) that opens Tourism on its own district, and the amount
     b_loy_no_gov: torch.Tensor  # f64 [NB] — loyalty per turn in every one of the seat's UNGOVERNED cities
     b_amen_gov: torch.Tensor  # f64 [NB] — amenities in every city that HOLDS a governor
     b_house_gov: torch.Tensor  # f64 [NB] — housing in every city that HOLDS a governor
@@ -598,6 +599,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         b_favor=torch.tensor([int(b["favorPerTurn"]) for b in B], dtype=torch.long),
         b_levy_discount=torch.tensor([int(b["levyDiscountPct"]) for b in B], dtype=torch.long),
         b_tourism=torch.tensor([int(b["tourism"]) for b in B], dtype=torch.long),
+        b_civic_tour=torch.tensor([[int(x) for x in b["civicTourism"]] for b in B], dtype=torch.long).reshape(-1, 2),
         b_loy_no_gov=torch.tensor([float(b["loyaltyWithoutGovernor"]) for b in B], dtype=torch.float64),
         b_amen_gov=torch.tensor([float(b["amenitiesWithGovernor"]) for b in B], dtype=torch.float64),
         b_house_gov=torch.tensor([float(b["housingWithGovernor"]) for b in B], dtype=torch.float64),
@@ -1000,18 +1002,19 @@ _MUTABLE = [
     "citystate_levy_seat", "citystate_levy_ends",
     "seat_warkind", "seat_denounced", "seat_friend_turns", "seat_ally_turns", "seat_alliance_type", "seat_alliance_pts", "civ_sci_rate", "civ_cul_rate", "civ_tour_rate", "seat_borders_turns", "seat_delegation",
     "deal_offer_left", "deal_offer_give", "deal_offer_ask", "deal_term_left", "deal_term_item", "seat_spy_held", "seat_promise", "seat_promise_broken",
-    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "moment_seen", "moment_world", "dark_bar", "golden_bar", "game_era", "era_start", "era_countdown", "road_tier", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
+    "comp_kind", "comp_left", "comp_target", "comp_score", "comp_member", "congress_sessions", "congress_slate", "congress_active", "civ_congress_vote", "emg_kind", "emg_target", "emg_city", "emg_phase", "emg_act", "emg_affected", "emg_member", "last_session_turn", "civ_emg_heal", "civ_emg_strike", "civ_emg_envoy_gold", "civ_emg_route_gold", "civ_emg_nuke_cs", "civ_emg_nuke_cut", "era_score", "moment_seen", "moment_world", "dark_bar", "golden_bar", "game_era", "era_start", "era_countdown", "road_tier", "dark_ages", "golden_ages", "civ_age", "civ_gov_held", "civ_gov_chosen", "civ_civic_turn", "civ_gov_anarchy_end", "civ_policies", "civ_policy_lapsed", "prev_age", "dedications", "ded_picks", "feat_id", "feat_stripped", "res_stripped", "district_complete", "encamp_hp", "encamp_outer_hp", "road", "seat_ext", "city_prod_bank",
     "city_dist_tile",
     "seat_routes", "seat_route_exp",  # domestic trade routes (rc-id pairs)
     "seat_route_dseat", "seat_route_dcity",  # international dest (seat row, city id), else -1/-1 (domestic/CS)
     "seat_route_born", "seat_route_walk", "seat_route_leg",  # the Trader's walk (birth turn, tile, leg)
     "seat_route_course",  # the stored course (the path's plots, origin to destination, -1-padded)
-    "trading_post",  # Trading Posts by (major row, centre tile)
+    "trading_post",  # Trading Posts by (seat row, centre tile)
     "city_id",
     "unit_next",
     "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "civ_gp_lux_copies", "city_gp_perm", "pantheon_claimed_n",
     "pan_claimed", "fol_claimed", "wor_claimed", "fou_claimed", "enh_claimed",  # belief-claim masks, one per class
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
+    "city_unconverted",  # each city's unconverted pressure
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind

@@ -1480,7 +1480,8 @@ class SimOrders:
                         )
                         pb, pr, pj = pm.nonzero(as_tuple=True)
                         if len(pb):
-                            _was = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj])
+                            _was = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj],
+                                                           self.city_unconverted[pb, pr, pj])
                             # CIV6 (Translator): "Religious spread is triple
                             # strength in cities of other civilizations."
                             _tr = self._promo_val(utp[pb], self.unit_promos[pb, sc[pb]], "TRANSLATOR")
@@ -1510,7 +1511,8 @@ class SimOrders:
                             # CIV6 (Indulgence Vendor): "Gain 100 Gold if this
                             # unit converts a city to your Religion for the
                             # first time."
-                            _now = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj])
+                            _now = self._followed_religion(self.city_pressure[pb, pr, pj], self.city_pop[pb, pr, pj],
+                                                           self.city_unconverted[pb, pr, pj])
                             _flip = (_now == row) & (_was != row)
                             if bool(_flip.count_nonzero()):
                                 _gv, _gu = self._promo_first_use(
@@ -1716,6 +1718,7 @@ class SimOrders:
                     torch.full((self.B,), col, dtype=torch.long, device=dev))[b].to(self.city_outer_hp.dtype)
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0
+            self.city_unconverted[b, row, col] = float(self._atheism_per_pop * pop)
         self._eff_version += 1
 
     def _strip_feature_at(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:

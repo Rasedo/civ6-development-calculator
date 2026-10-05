@@ -242,7 +242,20 @@ def test_rome_chain_gold(rules, path) -> None:
     g_other = float(sim._seat_route_income(rome)[B0, 0, 2])
     play(sim, rome, "ROME")
     assert abs((g_rome - g_other) - 1.0) < 1e-9, (g_rome, g_other)
-    print("  4 Rome chain gold OK — +1 per own-city hop")
+    # the count runs through the course's LAST plot (Trade_Manager 0x5500b0):
+    # a domestic route ending in the own post city pays Rome +1
+    j = int((sim.city_center[B0, rome] == t).nonzero()[0])
+    sim.seat_routes[B0, rome, 0, 1] = int(sim.city_id[B0, rome, j])
+    sim.seat_route_course[B0, rome, 0, :] = -1
+    sim.seat_route_course[B0, rome, 0, :2] = torch.tensor([cap, t])
+    sim._eff_version += 1
+    g_rome = float(sim._seat_route_income(rome)[B0, 0, 2])
+    play(sim, rome, "EGYPT")
+    sim._eff_version += 1
+    g_other = float(sim._seat_route_income(rome)[B0, 0, 2])
+    play(sim, rome, "ROME")
+    assert abs((g_rome - g_other) - 1.0) < 1e-9, ("destination post", g_rome, g_other)
+    print("  4 Rome chain gold OK — +1 per own-city hop, the destination's included")
 
 
 def _river_district(sim, row: int) -> tuple[int, int]:

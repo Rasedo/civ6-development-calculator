@@ -2,6 +2,7 @@
 import type { City, CityState, CityStateQuest, CityStateType, GameState, QueueItem, Yields } from './types';
 import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
+import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
@@ -36,6 +37,7 @@ export function placeCityStateAt(
     type,
     centerIndex,
     population: 3,
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * 3,
     envoys: {},
     met: [],
     suzerain: -1,
@@ -576,5 +578,6 @@ export function minorCity(cityState: CityState): City {
     lastHitTurn: cityState.lastHitTurn,
     powered: cityState.powered,
     religionPressure: cityState.religionPressure,
+    unconvertedPressure: cityState.unconvertedPressure,
   };
 }

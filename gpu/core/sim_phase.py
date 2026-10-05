@@ -256,7 +256,7 @@ class SimPhase:
             self._city_strikes(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
-        # its cities' religious pressure goes out, on its own turn
+        # its religion, if it founded one, spreads on its own turn
         self._spread_religious_pressure(row, active)
         self._seat_war_peace_tail(row, active)
         # THE SEAT'S ACTIONS, after its processing and before the next
@@ -814,8 +814,6 @@ class SimPhase:
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
-        # its cities' religious pressure goes out, on its own turn
-        self._spread_religious_pressure(row, acting)
         self._free_walk(acting)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
@@ -847,6 +845,7 @@ class SimPhase:
                           torch.where(shrink, refill, torch.where(starve, torch.zeros_like(box), box)))
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
         self.city_growth[bidx, row, col] = torch.where(act, nxt, old).to(old.dtype)
+        self._gain_population_pressure(bidx, row, col, grow.long())
         pop = pop0 + grow.long()
         self.city_pop[bidx, row, col] = torch.where(shrink, pop - 1, pop)
         if self._log_diff:
@@ -1427,6 +1426,7 @@ class SimPhase:
                     _pw = _pw & (self.city_founder[bidx, row, col] == row)
                 if not bool(_pw.count_nonzero()):
                     continue
+                self._gain_population_pressure(bidx, row, col, _pw.long() * _pa)
                 _pop = self.city_pop[bidx, row, col]
                 self.city_pop[bidx, row, col] = torch.where(
                     _pw, (_pop + _pa).clamp(min=1), _pop)
@@ -1575,6 +1575,8 @@ class SimPhase:
                     pa[wr] = self._wond_popall[wi[wr]]
                     grow = (pa > 0).unsqueeze(1) & self.city_alive[:, row]
                     if bool(grow.count_nonzero()):
+                        _gb, _gc = grow.nonzero(as_tuple=True)
+                        self._gain_population_pressure(_gb, row, _gc, pa[_gb])
                         self.city_pop[:, row] = self.city_pop[:, row] + torch.where(
                             grow, pa.unsqueeze(1), torch.zeros_like(pa).unsqueeze(1)).to(self.city_pop.dtype)
                         _gb, _gc = grow.nonzero(as_tuple=True)
@@ -2222,18 +2224,7 @@ class SimPhase:
                 cul_sum = cul_sum + torch.where(
                     _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
         _tin = self._tourism_inputs(row, gov)
-        _nat_gen = self._tourism_of(
-            _tin["gw_tour"],
-            self.city_alive[:, row],
-            self.tile_seat == row,
-            _tin["era"],
-            resort_mult=_tin["resort_mult"],
-            park_mult=_tin["park_mult"],
-            gov_tile=_tin["gov_tile"],
-            wonder_pct=_tin["wonder_pct"],
-            suz_tour=self._suzerain_tourism(row, self.tile_seat == row) + self._gp_district_tourism(row) + self._building_tourism(row),
-            gw_mult=_tin["gw_mult"],
-        )
+        _nat_gen = self._seat_tourism_general(row, _tin)
         # CIV6 (Film Studio): the per-rival extra, read with the same snapshot
         _late = self._late_era_tourism(row, _tin)
         _rel_t = self._tourism_religious_of(row)
@@ -2286,6 +2277,7 @@ class SimPhase:
         bank(self.civ_civic_prog, cul_sum)
         bank(self.civ_culture, cul_sum)
         _gov_before = self._adopted_gov(row)[0] if self._ngov else None
+        _slots_before = self._seat_policy_slots(row) if self._ngov else None
         civic_done = torch.zeros(B, dtype=torch.bool, device=dev)
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
@@ -2322,7 +2314,7 @@ class SimPhase:
             self.civ_gov_held[:, row] |= torch.where(
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
             # a CHANGE carries the slotted cards over
-            self._carry_policies(row, _gov_on & (_adopted != _gov_before))
+            self._carry_policies(row, _gov_on & (_adopted != _gov_before), _slots_before)
         # the district discount's count of completed specialty districts,
         # taken when a technology or civic completes — before the cities produce
         _disc_at = tech_done | civic_done
