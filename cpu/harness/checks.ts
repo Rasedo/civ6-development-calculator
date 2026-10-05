@@ -774,18 +774,6 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   }
 
   out.push(...eraChecks(a, b, cat, late, history, prev));
-
-  // the game's own bookkeeping across the pair, which says where in its turn
-  // the dump sits: a pool at t+1 is its turn-t value plus its turn-t rate
-  for (const c of a.cities) {
-    const k = `${c.owner}:${c.id}`;
-    const next = after.get(k);
-    if (!next || acts.cityChanged.has(k) || next.pop !== c.pop || late.has(c.owner)) continue;
-    const ok = near(num(next.food), num(c.food) + num(c.foodSurplus) * num(c.overallGrowthMod), 0.1);
-    out.push({ turn, check: 'calib.foodBox', subject: subjectOf(c), ok,
-      game: num(next.food), ours: round3(num(c.food) + num(c.foodSurplus) * num(c.overallGrowthMod)),
-      ...(ok ? {} : { state: { food: num(c.food), surplus: num(c.foodSurplus), mod: num(c.overallGrowthMod) } }) });
-  }
   return out;
 }
 

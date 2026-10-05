@@ -236,7 +236,7 @@ def poke_dark_cards(rules, path):
     d = int(dark[0])
     lo, hi = int(sim._pol_dark_lo[d]), int(sim._pol_dark_hi[d])
     nP = int(sim._pol_dark_lo.numel())
-    slots = torch.full((sim.B, sim._gov_slots.shape[1]), 6, dtype=torch.long, device=sim.device)  # a wide bench
+    slots = torch.full((sim.B, sim._gov_slots.shape[1]), nP, dtype=torch.long, device=sim.device)  # a bench every card fits
     civ2 = torch.ones(sim.B, sim.civ_civics.shape[2], dtype=torch.bool, device=sim.device)
 
     def slotted(is_dark: bool, era: int) -> torch.Tensor:
