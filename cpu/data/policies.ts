@@ -147,6 +147,17 @@ export interface PolicyEffects {
    *  military units garrisons (REQUIREMENT_CITY_HAS_GARRISON_UNIT) */
   amenitiesWithGarrison?: number;
   loyaltyWithGarrison?: number;
+  /** amenities in each city holding the named building
+   *  (MODIFIER_PLAYER_CITIES_ADJUST_POLICY_AMENITY behind REQUIREMENT_CITY_HAS_BUILDING) */
+  amenitiesWithBuilding?: { building: string; amenities: number }[];
+  /** Power each city holding a completed, unpillaged district of the type
+   *  supplies itself (MODIFIER_SINGLE_CITY_ADJUST_FREE_POWER behind
+   *  REQUIREMENT_CITY_HAS_DISTRICT) */
+  powerWithDistrict?: { district: DistrictId; power: number }[];
+  /** a strategic resource each such city pays into the stockpile every turn
+   *  (MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION behind
+   *  REQUIREMENT_CITY_HAS_DISTRICT) */
+  extractionWithDistrict?: { district: DistrictId; resource: string; perTurn: number }[];
   /** Great Person points of a class, per turn, in each city holding the named
    *  building (MODIFIER_PLAYER_CITIES_ADJUST_GREAT_PERSON_POINT behind
    *  REQUIREMENT_CITY_HAS_BUILDING) — paid where the roster's own
@@ -352,6 +363,19 @@ const POLICY_SRC: Record<string, SrcMap> = {
     kind: xml('Policies', 'PolicyType=POLICY_AESTHETICS', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
     obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_AESTHETICS', 'ObsoletePolicy')] },
     'effects.adjacencyMult.THEATER_SQUARE': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=AESTHETICS_DISTRICTCULTURE&Name=Amount', 'Value')] },
+  },
+  FUTURE_VICTORY_SCIENCE: {
+    kind: xml('Policies', 'PolicyType=POLICY_FUTURE_VICTORY_SCIENCE', 'GovernmentSlotType', { expect: 'SLOT_WILDCARD' }),
+    'effects.powerWithDistrict.0.district': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_SPACEPORT&Name=DistrictType', 'Value', { expect: 'DISTRICT_SPACEPORT' }),
+    'effects.powerWithDistrict.0.power': xml('ModifierArguments', 'ModifierId=FUTURE_VICTORY_SCIENCE_SPACEPORT_POWER_IN_CITY&Name=Amount', 'Value'),
+    'effects.extractionWithDistrict.0.resource': xml('ModifierArguments', 'ModifierId=FUTURE_VICTORY_SCIENCE_SPACEPORT_ALUMINUM_IN_CITY&Name=ResourceType', 'Value', { expect: 'RESOURCE_ALUMINUM' }),
+    'effects.extractionWithDistrict.0.perTurn': xml('ModifierArguments', 'ModifierId=FUTURE_VICTORY_SCIENCE_SPACEPORT_ALUMINUM_IN_CITY&Name=Amount', 'Value'),
+  },
+  SPORTS_MEDIA: {
+    kind: xml('Policies', 'PolicyType=POLICY_SPORTS_MEDIA', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
+    'effects.adjacencyMult.THEATER_SQUARE': { derived: '1 + Amount/100 - the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=SPORTSMEDIA_DISTRICTCULTURE&Name=Amount', 'Value')] },
+    'effects.amenitiesWithBuilding.0.building': xml('RequirementArguments', 'RequirementId=REQUIRES_CITY_HAS_STADIUM&Name=BuildingType', 'Value', { expect: 'BUILDING_STADIUM' }),
+    'effects.amenitiesWithBuilding.0.amenities': xml('ModifierArguments', 'ModifierId=SPORTSMEDIA_STADIUMENTERTAINMENT&Name=Amount', 'Value'),
   },
   MEDINA_QUARTER: {
     kind: xml('Policies', 'PolicyType=POLICY_MEDINA_QUARTER', 'GovernmentSlotType', { expect: 'SLOT_ECONOMIC' }),
@@ -1343,6 +1367,21 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     // the install's Amount is 50 (its text says 25%).
     P('AFTER_ACTION_REPORTS', 'After Action Reports', 'military', 'All units gain +50% combat experience.', undefined, {
       xpPct: 50,
+    }),
+    // CIV6 (Sports Media, Policies.xml): "+100% Theater Square adjacency
+    // bonuses, and Stadiums generate +1 Amenity" — SPORTSMEDIA_DISTRICTCULTURE
+    // (Aesthetics' channel) and SPORTSMEDIA_STADIUMENTERTAINMENT in each city
+    // holding a Stadium. No ObsoletePolicies row retires it.
+    P('SPORTS_MEDIA', 'Sports Media', 'economic', '+100% Theater Square adjacency bonuses; +1 Amenity in cities with a Stadium.', undefined, {
+      adjacencyMult: { THEATER_SQUARE: 2 },
+      amenitiesWithBuilding: [{ building: 'STADIUM', amenities: 1 }],
+    }),
+    // CIV6 (Future Victory Science, Expansion2_Policies.xml): a Wildcard card
+    // of Exodus Imperative — every city with a Spaceport gets +3 Power
+    // (FREE_POWER_SOURCE_MISC) and +3 Aluminum a turn.
+    P('FUTURE_VICTORY_SCIENCE', 'Future Victory Science', 'wildcard', '+3 Power and +3 Aluminum per turn in cities with a Spaceport.', undefined, {
+      powerWithDistrict: [{ district: 'SPACEPORT', power: 3 }],
+      extractionWithDistrict: [{ district: 'SPACEPORT', resource: 'ALUMINUM', perTurn: 3 }],
     }),
   ].map((p) => [p.id, { ...p, src: POLICY_SRC[p.id] }]),
 );

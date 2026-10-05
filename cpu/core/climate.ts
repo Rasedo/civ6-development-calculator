@@ -136,14 +136,13 @@ export function warmingDegrees(state: GameState): number {
   return Math.max(0, worldCarbon(state)) / CO2_PER_DEGREE;
 }
 
-/** The lowland bands the sea has already taken, 0..LOWLAND_MAX_BAND — the
- *  "flood level" the Flood Barrier prices itself against. */
+/** The SEA LEVEL, 0 before the first rise: one per climate phase entered
+ *  (each phase is a RANDOM_EVENT_SEA_LEVEL_RISE<n>, Severity n) — what the
+ *  Flood Barrier prices itself against (Buildings_XP2 CostMultiplierPerSeaLevel;
+ *  runs/h1_duelw1112: Guangzhou's barrier for its one lowland plot quoted 40
+ *  through t216 and 80 from SEA_LEVEL_RISE1 at t217, before any band flooded). */
 export function floodLevel(state: GameState): number {
-  let lvl = 0;
-  for (let p = 0; p <= (state.climateIdx ?? -1); p++) {
-    lvl = Math.max(lvl, CLIMATE_PHASES[p].flood, CLIMATE_PHASES[p].submerge);
-  }
-  return lvl;
+  return (state.climateIdx ?? -1) + 1;
 }
 
 /** The lowland tiles a city holds — what a Flood Barrier costs and covers. */

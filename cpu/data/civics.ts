@@ -250,6 +250,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_STADIUM', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
     'effects.1.building': xml('Buildings', 'BuildingType=BUILDING_AQUATICS_CENTER', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
     'effects.2.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_SKI_RESORT', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
+    'effects.3.policy': xml('Policies', 'PolicyType=POLICY_SPORTS_MEDIA', 'PrereqCivic', { expect: 'CIVIC_PROFESSIONAL_SPORTS' }),
   },
   SUFFRAGE: {
     era: xml('Civics', 'CivicType=CIVIC_SUFFRAGE', 'EraType', { expect: 'ERA_MODERN' }),
@@ -453,6 +454,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'EraType', { expect: 'ERA_FUTURE' }),
     cost: xml('Civics', 'CivicType=CIVIC_EXODUS_IMPERATIVE', 'Cost', { scale: GAME_SPEED }),
     prereqs: { stylized: 'the install writes no CivicPrereqs row for CIVIC_EXODUS_IMPERATIVE (its only published gate is the era); the deepest node this tree carries stands in' },
+    'effects.0.policy': xml('Policies', 'PolicyType=POLICY_FUTURE_VICTORY_SCIENCE', 'PrereqCivic', { expect: 'CIVIC_EXODUS_IMPERATIVE' }),
   },
   CULTURAL_HEGEMONY: {
     era: xml('Civics', 'CivicType=CIVIC_CULTURAL_HEGEMONY', 'EraType', { expect: 'ERA_FUTURE' }),
@@ -648,6 +650,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockBuilding', building: 'STADIUM' },
       { kind: 'unlockBuilding', building: 'AQUATICS_CENTER' },
       { kind: 'unlockImprovement', improvement: 'SKI_RESORT' }, // CIV6 (Ski Resort): PrereqCivic
+      { kind: 'unlockPolicy', policy: 'SPORTS_MEDIA' },
     ]),
     C('SUFFRAGE', 'Suffrage', 'Modern', 1640, ['IDEOLOGY'], [
       { kind: 'unlockGovernment', government: 'DEMOCRACY' },
@@ -770,11 +773,13 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     // Information-era civic stands in as the prereq.
     C('INFORMATION_WARFARE', 'Information Warfare', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
     // CIV6: Future civics whose only published gate is the ERA stand on the
-    // deepest Information-era civic, as Information Warfare does. Their
-    // policy cards (the FUTURE_VICTORY_* / FUTURE_COUNTER_* wildcards) are
-    // not in this catalog.
+    // deepest Information-era civic, as Information Warfare does. Of their
+    // policy cards (the FUTURE_VICTORY_* / FUTURE_COUNTER_* wildcards) this
+    // catalog carries Future Victory Science alone.
     C('SMART_POWER_DOCTRINE', 'Smart Power Doctrine', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
-    C('EXODUS_IMPERATIVE', 'Exodus Imperative', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
+    C('EXODUS_IMPERATIVE', 'Exodus Imperative', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE'], [
+      { kind: 'unlockPolicy', policy: 'FUTURE_VICTORY_SCIENCE' },
+    ]),
     C('CULTURAL_HEGEMONY', 'Cultural Hegemony', 'Future', 3200, ['NEAR_FUTURE_GOVERNANCE']),
     // CIV6 (Global Warming Mitigation): a Future civic that "unlocks the
     // Carbon Recapture project and awards 3 Envoys and 1 Diplomatic Victory

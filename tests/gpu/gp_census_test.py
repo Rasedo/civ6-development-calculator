@@ -303,10 +303,15 @@ def test_channels(rules, path, R) -> None:
     sim._bldg_version += 1
     sim._eff_version += 1
     r0 = float(sim._seat_regional(ROW)[0][B0, 0, 1])
+    w0 = float(p.walk()[B0, 0, 1])
     sim.civ_gp_perm[:, ROW, sim._gp_perm_names.index("factoryProduction")] = 2.0
     sim._eff_version += 1
-    assert float(sim._seat_regional(ROW)[0][B0, 0, 1]) == r0 + 2, "Watt's +2 rides the Factory's reach"
-    print("  3 building yields OK — Hypatia's Library, Watt's regional Factory")
+    # runs/h1_duelw1109 t183: Watt's +2 stays in the Factory's own city
+    assert float(sim._seat_regional(ROW)[0][B0, 0, 1]) == r0, "Watt's +2 does not ride the Factory's reach"
+    w1 = float(p.walk()[B0, 0, 1])
+    yf = float(sim._seat_amenity(ROW)[2][B0, 0])
+    assert abs(w1 - w0 - 2.0 * yf) < 1e-9, f"Watt's +2 on the Factory at home: {w0} -> {w1} (tier {yf})"
+    print("  3 building yields OK — Hypatia's Library, Watt's Factory at home")
 
     # Hildegard: a Holy Site where its adjacency is not 0
     hs = p.dcat["HOLY_SITE"]

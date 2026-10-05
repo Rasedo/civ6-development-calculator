@@ -245,3 +245,18 @@ Object.assign(FEATURES, {
   LAKE_RETBA: { id: 'LAKE_RETBA', name: 'Lake Retba', yields: { production: 1, gold: 2, culture: 2 }, ...NW },
   PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// THREE MORE WONDERS, appended after Pamukkale; the engines' map generator
+// lays none, an imported world carries them. CIV6 (Expansion1_Features_Major.xml):
+// DELICATE_ARCH (one plot of Desert, Impassable, SightThroughModifier 1),
+// Feature_AdjacentYields Faith 2 Gold 1; UBSUNUR_HOLLOW (four plots of
+// Tundra, passable, MovementChange 1, DefenseModifier -2),
+// Feature_YieldChanges Food 1 Production 1 Faith 2. CIV6
+// (Indonesia_Khmer_GameplayData.xml): HA_LONG_BAY (two plots of Coast,
+// passable, DefenseModifier 15), Feature_YieldChanges Food 3 Production 1
+// Culture 1. A wonder's own Feature_YieldChanges are its plots' whole yields.
+Object.assign(FEATURES, {
+  DELICATE_ARCH: { id: 'DELICATE_ARCH', name: 'Delicate Arch', yields: {}, impassable: true, adjacentYields: { faith: 2, gold: 1 }, ...NW },
+  UBSUNUR_HOLLOW: { id: 'UBSUNUR_HOLLOW', name: 'Ubsunur Hollow', yields: { food: 1, production: 1, faith: 2 }, ...NW },
+  HA_LONG_BAY: { id: 'HA_LONG_BAY', name: 'Ha Long Bay', yields: { food: 3, production: 1, culture: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

@@ -315,9 +315,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         // the repair the engine prices
         const ours = buildingPillaged(city, id) ? buildingFullCost(state, city, id) : buildingCostIn(state, city, id);
         // a Flood Barrier is priced off the city's Coastal Lowland plots, which
-        // the record does not carry (the importer's map has only the engine's
-        // own derivation of them)
-        if (BUILDINGS[id]?.floodBarrier) {
+        // a record without the lowland columns does not carry (the importer's
+        // map has only the engine's own derivation of them)
+        if (BUILDINGS[id]?.floodBarrier && !imp.lowlandsRead) {
           const ok = near(ours, num(cost), 0.5);
           out.push({ turn, check: 'buy.buildingCost', subject, ok, game: num(cost), ours,
             ...(ok ? {} : { gaps: [...(gapsFor(buyGaps, 'buy.buildingCost').gaps ?? []), 'coastal lowland'], state: { building: id } }) });
@@ -405,8 +405,8 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     for (const [key, c] of imp.cityByKey) if (c.seat === seat) for (const g of imp.cityGaps.get(key) ?? []) sg.push(g);
     const gaps = gapsFor([...new Set(sg)], 'seat.maint');
     // a Flood Barrier's upkeep is priced off its city's Coastal Lowland plots,
-    // which the record does not carry
-    const barrier = state.seats[seat].cities.some((c) => c.buildings.some((id) => BUILDINGS[id]?.floodBarrier));
+    // which a record without the lowland columns does not carry
+    const barrier = !imp.lowlandsRead && state.seats[seat].cities.some((c) => c.buildings.some((id) => BUILDINGS[id]?.floodBarrier));
     const bok = b === num(p.maintBuildings);
     const bgaps = !bok && barrier ? { gaps: [...(gaps.gaps ?? []), 'coastal lowland'] } : gaps;
     out.push({ turn, check: 'seat.maintBuildings', subject, ok: bok, game: num(p.maintBuildings), ours: b, ...bgaps });

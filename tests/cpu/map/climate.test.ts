@@ -283,7 +283,7 @@ describe('the Flood Barrier', () => {
     // flood level)" — at flood level 0 that is the first term alone.
     expect(floodLevel(state)).toBe(0);
     expect(floodBarrierCost(state, city)).toBe(FLOOD_BARRIER_PER_TILE * n);
-    state.climateIdx = 1; // Phase II has taken the 1m band
+    state.climateIdx = 0; // Phase I: the first sea level rise
     expect(floodLevel(state)).toBe(1);
     expect(floodBarrierCost(state, city)).toBe(FLOOD_BARRIER_PER_TILE * n * 2);
     expect(buildingCostIn(state, city, 'FLOOD_BARRIER')).toBe(FLOOD_BARRIER_PER_TILE * n * 2);

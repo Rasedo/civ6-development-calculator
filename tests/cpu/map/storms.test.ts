@@ -308,7 +308,7 @@ describe('the eight storms are the install\'s table', () => {
     expect(stormFootprint(map, tileAtCoords(map, 0, 0), 19).length).toBeLessThan(19);
   });
 
-  it('silt on a natural wonder pays nothing: the wonder keeps its own row', () => {
+  it('silt on a natural wonder pays on top of its own row (runs/h1_duelw1111 plot 184)', () => {
     const state = board(null);
     const t = tileAtCoords(state.map, 5, 5);
     t.feature = 'EYE_OF_THE_SAHARA';
@@ -317,7 +317,7 @@ describe('the eight storms are the install\'s table', () => {
     const before = tileYields(makeYieldCtx(state, 0), t);
     t.fertility = 2;
     t.fertilityProd = 1;
-    expect(tileYields(makeYieldCtx(state, 0), t)).toEqual(before);
+    expect(tileYields(makeYieldCtx(state, 0), t)).toEqual({ ...before, food: before.food + 2, production: before.production + 1 });
   });
   it('a storm tile draws ten times whatever stands there, then once per unit its share strikes', () => {
     const state = board(null);

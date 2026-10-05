@@ -34,6 +34,8 @@ import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
+import { riverReach } from '../core/disasters';
+import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
@@ -58,7 +60,7 @@ import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { YIELD_KEYS } from '../../world/types';
-import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, type GreatPersonDef } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -123,6 +125,9 @@ export interface Imported {
    *  gives its flood count (`importFloodCounts`). A read-back column cannot
    *  disagree, so the plot checks leave it out */
   readBack: Map<number, Set<number>>;
+  /** does the record carry each plot's coastal lowland band (`importLowlands`)?
+   *  Where it does not, the bands are the engine's own derivation */
+  lowlandsRead: boolean;
   /** the yield column (YIELD_KEYS order) of each city, by
    *  `${gamePlayer}:${gameCityId}`, whose district project's conversion the
    *  records cannot give (`importProjectYield`): the step that put the
@@ -376,9 +381,9 @@ export interface History {
    *  the player's at t gone at t+1 */
   gpSpent: Map<number, Map<GreatPersonClass, number>>;
   /** the resources each player SEES ahead of their revealing technology
-   *  (`GP_RESOURCE_REVEAL`, James Young's Oil): the record names no Great
-   *  Person, but a plot the player reads paying the resource's yield without
-   *  the technology is the grant, latched */
+   *  (`GP_RESOURCE_REVEAL`, James Young's Oil) where the records name no
+   *  Great Person (`History.people` null): a plot the player reads paying the
+   *  resource's yield without the technology is the grant, latched */
   revealed: Map<number, Set<string>>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
@@ -464,6 +469,30 @@ export interface History {
    *  out of the city */
   districtQuoted: Set<string>;
   districtLocked: Map<string, number>;
+  /** the floods the records' `events` named, by `${turn}:${RandomEvents
+   *  index}`, each with the plot it started on; null where no record carried
+   *  `events` */
+  floods: Map<string, number> | null;
+  /** the sea level the records' `events` reached: the highest
+   *  RANDOM_EVENT_SEA_LEVEL_RISE<n> named */
+  seaLevel: number;
+  /** every great person the records' `greatPeople` named, by
+   *  GreatPersonIndividuals index; null where no record carried it */
+  people: Map<number, RecruitedPerson> | null;
+}
+
+/** A recruited great person as the records follow it: the unit that carried
+ *  it (`owner:id`, bound the record it was first listed in, to a Great
+ *  Person unit of its claimant and class new in that record), the plot that
+ *  unit last stood on, and the turn the records first lacked the unit — its
+ *  charges spent. A person listed with no new unit to carry it was spent
+ *  before the record. */
+interface RecruitedPerson {
+  player: number;
+  cls: string;
+  unit: string | null;
+  at: number;
+  spent: number | null;
 }
 
 interface PolicySlots {
@@ -520,7 +549,53 @@ export function newHistory(): History {
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtLocked: new Map() };
+    dominant: new Map(), districtQuoted: new Set(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null };
+}
+
+/** Fold a record's `events` into the history: the floods (each with its
+ *  start plot) and the sea level. */
+function foldEvents(h: History, rec: TurnRecord, cat: Catalog): void {
+  if (!Array.isArray(rec.events)) return;
+  h.floods ??= new Map();
+  for (const [turn, type, , start] of rec.events) {
+    const name = cat.randomEvents?.[type] ?? '';
+    const rise = /^RANDOM_EVENT_SEA_LEVEL_RISE(\d+)$/.exec(name);
+    if (rise) h.seaLevel = Math.max(h.seaLevel, Number(rise[1]));
+    if (name.startsWith('RANDOM_EVENT_FLOOD_') && num(start) >= 0) h.floods.set(`${turn}:${type}`, num(start));
+  }
+}
+
+/** Fold a record's `greatPeople` into the history (`RecruitedPerson`);
+ *  false where the record carries none. */
+function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
+  if (!Array.isArray(rec.greatPeople)) return false;
+  const W = rec.head.W;
+  h.people ??= new Map();
+  const live = new Map(rec.units.map((u) => [`${u.owner}:${u.id}`, u]));
+  const before = new Set((h.last ?? { units: [] }).units.map((u) => `${u.owner}:${u.id}`));
+  const bound = new Set([...h.people.values()].map((p) => p.unit).filter((u): u is string => u !== null));
+  for (const [ind, player, cls] of rec.greatPeople) {
+    if (h.people.has(ind)) continue;
+    const name = strip(cat.greatPersonClasses?.[cls] ?? '', 'GREAT_PERSON_CLASS_');
+    const unit = rec.units.find((u) => u.owner === player && cat.units[u.type] === `UNIT_GREAT_${name}`
+      && !before.has(`${u.owner}:${u.id}`) && !bound.has(`${u.owner}:${u.id}`));
+    const key = unit ? `${unit.owner}:${unit.id}` : null;
+    if (key) bound.add(key);
+    h.people.set(ind, { player, cls: name, unit: key, at: unit ? unit.y * W + unit.x : -1, spent: unit ? null : rec.turn });
+  }
+  for (const p of h.people.values()) {
+    if (p.spent !== null || p.unit === null) continue;
+    const u = live.get(p.unit);
+    if (u) p.at = u.y * W + u.x;
+    else p.spent = rec.turn;
+  }
+  return true;
+}
+
+/** A GreatPersonIndividuals index's engine person, or undefined. */
+function personOf(cat: Catalog, ind: number): GreatPersonDef | undefined {
+  const pid = aliasOrPrefixed(cat.greatPeople?.[ind] ?? '');
+  return pid ? PEOPLE[pid] : undefined;
 }
 
 /** The record's cultural dominance by the engine's rule, each major in id
@@ -610,9 +685,22 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     return def && def.combat > 0 && unitDomain(id!) === 'military' ? def.combat + (FORMATION_CS[formation] ?? 0) : 0;
   };
   // a resource a player reads paying its yield without the revealing
-  // technology: the grant (`GP_RESOURCE_REVEAL`). An unowned plot is the
-  // local player's reading.
+  // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
+  // great person, and a reading no random event made either way. An unowned
+  // plot is the local player's reading.
   const newlyRevealed = new Map<number, Set<string>>();
+  foldEvents(h, rec, cat);
+  // a person spent by this record: a resource it reveals moves its owner's
+  // plots this turn
+  for (const [ind, p] of foldPeople(h, rec, cat) ? h.people! : []) {
+    if (p.spent !== rec.turn) continue;
+    const person = personOf(cat, ind);
+    for (const r of GP_RESOURCE_REVEAL) {
+      if (!person || !gpEffectOf(person).perm?.[r.perm]) continue;
+      if (!newlyRevealed.has(p.player)) newlyRevealed.set(p.player, new Set());
+      newlyRevealed.get(p.player)!.add(r.resource);
+    }
+  }
   for (const { resource } of GP_RESOURCE_REVEAL) {
     const def = RESOURCES[resource];
     const ri = cat.resources.indexOf(`RESOURCE_${resource}`);
@@ -1055,6 +1143,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     state.eraStartTurn = history.eraStartTurn;
     state.eraCountdown = history.eraCountdown;
   }
+  const lowlandsRead = importLowlands(rec, tiles);
+  // the sea level the records' events reached: one climate phase per rise
+  if (history?.floods) state.climateIdx = history.seaLevel - 1;
+  // the National Parks: each plot names its park by the park's lowest plot
+  const parksRead = Array.isArray(rec.parks);
+  for (const [, plots] of parksRead ? rec.parks as [string, number[]][] : []) {
+    const anchor = Math.min(...plots);
+    for (const q of plots) if (tiles[q]) tiles[q].park = anchor;
+  }
 
   const seatOfPlayer = new Map<number, number>();
   const playerOfSeat = new Map<number, number>();
@@ -1068,7 +1165,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (row < 0) gap(ctx, 'leader', String(p.leader));
     seat.civ = row;
     seat.name = String(p.civ);
-    for (const r of GP_RESOURCE_REVEAL) {
+    for (const r of history?.people ? [] : GP_RESOURCE_REVEAL) {
       if (history?.revealed.get(p.id)?.has(r.resource)) (seat.gpPerm ??= GP_PERM.map(() => 0))[GP_PERM.indexOf(r.perm)] = 1;
     }
     // the podiums the history saw it take (`History.podium`): the gold's
@@ -1214,6 +1311,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (ii >= 0 && cat.improvements[ii] === 'IMPROVEMENT_BARBARIAN_CAMP') state.barbSeat.camps.push(t.index);
   }
 
+  const shortfallRead = importShortfalls(rec, state, seatOfGame, history);
+
   // the cities
   const cityByKey = new Map<string, City>();
   const dumpOfCity = new Map<City, DumpCity>();
@@ -1221,9 +1320,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const cities = [...rec.cities].sort((a, b) => a.owner - b.owner || a.id - b.id);
   for (const c of cities) {
     ctx.scopeCity = `${c.owner}:${c.id}`;
-    // the record carries no National Park plots: a city its parks reach
+    // a record with no National Park plots: a city its parks reach
     // (GetAmenitiesFromNationalParks) reads with the park missing
-    if (num(c.amenityParts?.[6] ?? 0) > 0) gap(ctx, 'national-park', 'unrecorded');
+    if (!parksRead && num(c.amenityParts?.[6] ?? 0) > 0) gap(ctx, 'national-park', 'unrecorded');
     const seat = seatOfGame(c.owner);
     const center = c.y * W + c.x;
     const pillaged: string[] = [];
@@ -1354,7 +1453,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // the amenities war weariness and a gold shortfall take: the engine's
     // weariness and shortfall ledgers are not in the dump
     if (num(c.amenityParts?.[13]) > 0) gap(ctx, 'war-weariness', 'not imported');
-    if (num(c.amenityParts?.[14]) > 0) gap(ctx, 'bankruptcy', 'not imported');
+    if (num(c.amenityParts?.[14]) > 0 && !shortfallRead.has(c.owner)) gap(ctx, 'bankruptcy', 'not imported');
   }
 
   // the governors: each appointed one in its catalog slot, seated in the
@@ -1431,7 +1530,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
-  spentPersonGaps(ctx, rec, cityByKey, history);
+  if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame);
+  else spentPersonGaps(ctx, rec, cityByKey, history);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
   // the units
@@ -1498,12 +1598,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const col = importProjectYield(state, ctx.cat, c, prevCities.get(key), !!b2 && !late.has(c.owner), city);
     if (col >= 0) projectYieldUnread.set(key, col);
   }
-  const readBack = importFloodCounts(rec, state, cityByKey.values());
+  const readBack = history?.floods ? importFloods(state, history.floods) : importFloodCounts(rec, state, cityByKey.values());
   if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, congressOf, queueProgressRead, readBack, projectYieldUnread, routes,
+    congressGaps, congressOf, queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
     districtLocked: history?.districtLocked ?? new Map(),
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
@@ -1596,8 +1696,68 @@ function importLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seatOfGam
 }
 
 /**
- * The floods each Floodplains plot of a Great Bath city has taken. The
- * record names no flood, but the Bath pays its Floodplains plots Faith per
+ * The plots' coastal lowland bands (the record's `coastalLowlands` index 0,
+ * 1, 2 is the engine's band 1, 2, 3), flooded and submerged, where the record
+ * carries them; false where it does not.
+ */
+function importLowlands(rec: TurnRecord, tiles: Tile[]): boolean {
+  if ((plotAt(rec, 0)?.length ?? 0) <= P.submerged) return false;
+  for (const t of tiles) {
+    const p = plotAt(rec, t.index);
+    const band = num(p[P.lowland] as number);
+    t.lowland = band >= 0 ? band + 1 : undefined;
+    const on = (v: unknown) => v === 1 || v === true;
+    if (on(p[P.flooded])) t.flooded = true;
+    if (on(p[P.submerged])) t.submerged = true;
+  }
+  return true;
+}
+
+/**
+ * Each seat's gold shortfall (`Seat.goldShortfall`, what its cities'
+ * bankruptcy amenities read) off the record before, a turn earlier: the
+ * Gold its treasury, Gold income and upkeep left below 0
+ * (`goldShortfall`), 0 where the record's own treasury stands above 0 —
+ * a shortfall clamps the treasury at 0 (`bankruptcy`). 493 of 497 major
+ * seat-turns of runs/h1_duelw1109 agree with the cities' recorded loss
+ * (amenity part 14, which is never read); the rest moved their income
+ * between the records. Returns the players
+ * read; a player with no record of the turn before is not.
+ */
+function importShortfalls(rec: TurnRecord, state: GameState, seatOfGame: (pid: number) => number,
+  history?: History): Set<number> {
+  const read = new Set<number>();
+  const prev = history?.last === rec ? history.before : history?.last;
+  if (!prev || prev.turn !== rec.turn - 1) return read;
+  for (const p of rec.players) {
+    const s = seatOf(state, seatOfGame(p.id));
+    const q = prev.players.find((x) => x.id === p.id);
+    if (!s || !q) continue;
+    const balance = num(q.gold) + num(q.goldYield) - num(q.maintTotal);
+    if (Number.isNaN(balance) || Number.isNaN(num(p.gold))) continue;
+    s.goldShortfall = num(p.gold) > 0 ? 0 : goldShortfall(balance);
+    read.add(p.id);
+  }
+  return read;
+}
+
+/**
+ * The floods the records named (`History.floods`): each one's river from
+ * the plot it started on (`riverReach`), every plot of it one flood more
+ * (`Tile.floodCount`, the Great Bath's Faith). Nothing is read back.
+ */
+function importFloods(state: GameState, floods: Map<string, number>): Map<number, Set<number>> {
+  for (const start of floods.values()) {
+    const t = state.map.tiles[start];
+    if (!t) continue;
+    for (const r of riverReach(state.map, t)) r.floodCount = (r.floodCount ?? 0) + 1;
+  }
+  return new Map();
+}
+
+/**
+ * The floods each Floodplains plot of a Great Bath city has taken, where
+ * the records name no flood (no `events`): the Bath pays its Floodplains plots Faith per
  * flood (`cityPlotBonus`), so in such a city the plot's recorded Faith above
  * what the plot pays with no flood counted IS its count. Elsewhere the count
  * pays nothing and stays 0. Returns the plots whose Faith column was read
@@ -1898,12 +2058,11 @@ const PEOPLE = Object.fromEntries(Object.values(GREAT_PEOPLE).flat().map((p) => 
  * the seat's gaps.
  *
  * An import no export matches is a Great Person's grant of that luxury
- * (Colaeus, Magellan: `plotLuxury`) when the history saw the seat spend a
- * person of a class holding one — at most one grant per such person in the
- * roster and per person of the class spent. The record names neither the
- * person nor the plot (the unit moves and spends within one turn), so the
- * spent class is the evidence; with no history, every unmatched import stays
- * a gap.
+ * (Colaeus, Magellan: `plotLuxury`): where the records name the people
+ * (`History.people`), each spent person's own grant; else when the history
+ * saw the seat spend a person of a class holding one — at most one grant per
+ * such person in the roster and per person of the class spent, the spent
+ * class the evidence. With no history, every unmatched import stays a gap.
  *
  * A player the record carries no luxury rows for at all (a dump written
  * before the dumper read them) is no player holding nothing: its seats come
@@ -1913,7 +2072,12 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
                            seatOfGame: (pid: number) => number, history?: History): number[] {
   const unrecorded: number[] = [];
   const grants = new Map<number, number>(); // seat -> copies a spent person may have granted
-  for (const [pid, spent] of history?.gpSpent ?? []) {
+  for (const [ind, p] of history?.people ?? []) {
+    const person = p.spent !== null ? personOf(cat, ind) : undefined;
+    const n = person ? (gpEffectOf(person).plotLuxury ?? 0) * gpChargesOf(person) : 0;
+    if (n > 0) grants.set(seatOfGame(p.player), (grants.get(seatOfGame(p.player)) ?? 0) + n);
+  }
+  for (const [pid, spent] of history?.people ? [] : history?.gpSpent ?? []) {
     let n = 0;
     for (const [cls, k] of spent) {
       const amounts = GREAT_PEOPLE[cls].map((p) => gpEffectOf(p).plotLuxury ?? 0).filter((a) => a > 0);
@@ -2264,10 +2428,69 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
 }
 
 /**
+ * The great people the records saw spent (`History.people`), each charge's
+ * lasting effect as the engine's `activateGreatPerson` lays it: the seat's
+ * permanent channels (James Young's Oil, Hypatia's Libraries, Ibn Khaldun's
+ * happiness yields ...), invented luxuries, the spend itself
+ * (`Seat.gpActivated`), and the city and district channels on the plot the
+ * person's unit last stood on — the city owning it, else the capital. A
+ * person spent before any record showed its unit has no plot: a city or
+ * district channel of its is the seat's `gp-site` gap. A person outside the
+ * roster is the seat's `gp-person` gap.
+ */
+function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<number, RecruitedPerson>,
+  seatOfGame: (pid: number) => number): void {
+  for (const [ind, p] of people) {
+    if (p.spent === null || p.spent > rec.turn) continue;
+    const seat = seatOfGame(p.player);
+    const s = seatOf(state, seat);
+    if (!s || seat < 0 || seat >= state.seats.length) continue;
+    ctx.scopeSeat = seat;
+    const person = personOf(ctx.cat, ind);
+    if (!person) {
+      gap(ctx, 'gp-person', ctx.cat.greatPeople?.[ind] ?? String(ind));
+      ctx.scopeSeat = undefined;
+      continue;
+    }
+    const fx = gpEffectOf(person);
+    const charges = gpChargesOf(person);
+    for (let k = 0; k < charges; k++) {
+      addSeatPerm(s, fx.perm ?? {});
+      (s.gpActivated ??= []).push(person.id);
+      if (fx.luxuryCopies) for (let i = 0; i < fx.luxuryCopies; i++) (s.gpLuxuries ??= []).push(fx.luxuryAmenities ?? 1);
+    }
+    const cityPerm = Object.entries(fx.cityPerm ?? {}).filter(([, n]) => n);
+    const tilePerm = Object.entries(fx.tilePerm ?? {}).filter(([, n]) => n);
+    if (cityPerm.length || tilePerm.length) {
+      const tile = p.at >= 0 ? state.map.tiles[p.at] : undefined;
+      if (!tile) gap(ctx, 'gp-site', person.id);
+      else {
+        const city = s.cities.find((c) => tile.ownerSeat === seat && c.id === tile.ownerCity)
+          ?? s.cities.find((c) => c.isCapital);
+        for (const [k, n] of cityPerm) {
+          if (!city) continue;
+          const v = (city.gpPerm ??= GP_CITY_PERM.map(() => 0));
+          const at = GP_CITY_PERM.indexOf(k as (typeof GP_CITY_PERM)[number]);
+          // the Bank's slots are already read off a work standing in one
+          // (`importGreatWorks`): the widening is one, however it was seen
+          v[at] = k === 'bankGwSlots' ? Math.max(v[at], n) : v[at] + n * charges;
+        }
+        for (const [k, n] of tilePerm) {
+          const v = (tile.gpPerm ??= GP_TILE_PERM.map(() => 0));
+          v[GP_TILE_PERM.indexOf(k as (typeof GP_TILE_PERM)[number])] += n * charges;
+        }
+      }
+    }
+    ctx.scopeSeat = undefined;
+  }
+}
+
+/**
  * CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE, `GP_BUILDING_YIELDS`):
  * a spent Great Person pays a building row in every city of its player for
  * good (Hypatia's Libraries, Newton's Universities, Leonardo's Workshops ...),
- * and the record names no person, only the class spent (`History.gpSpent`).
+ * and a record without `greatPeople` names no person, only the class spent
+ * (`History.gpSpent`).
  * A city holding the row's building, whose owner has spent a person of the
  * class whose era the world has reached, carries a `gp-unknown` gap on the
  * readers of that yield.

@@ -747,9 +747,10 @@ export const GP_BUILDING_TOURISM: readonly { perm: GpPermKey; building: string; 
 /** CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE): a seat-wide add
  *  to one building's yield — Leonardo da Vinci's Workshop Culture, Hypatia's
  *  Library, Newton's University, Einstein's Research Lab Science, James Watt's
- *  Factory Production. It is the building's own yield, so a building standing
- *  dark pays none of it and a REGIONAL building carries it to the cities its
- *  own yield reaches. */
+ *  Factory Production. A lit copy pays it in its own city — a building standing
+ *  dark pays none of it, and a REGIONAL building's reach does not carry it
+ *  (runs/h1_duelw1109 t183: Watt built Rome's Factory, whose reach paid
+ *  Arretium, Antium and Setia +3 Production and no more). */
 export const GP_BUILDING_YIELDS: readonly { perm: GpPermKey; building: string; yield: YieldKey }[] = [
   { perm: 'workshopCulture', building: 'WORKSHOP', yield: 'culture' },
   { perm: 'libraryScience', building: 'LIBRARY', yield: 'science' },

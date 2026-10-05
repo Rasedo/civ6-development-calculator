@@ -276,8 +276,9 @@ def main() -> int:
     assert int((sim2.storm_at[0] >= 0).sum()) == 0 and not bool(sim2.storm_struck[0].any()), \
         "an expired storm leaves its slot empty"
     print("  6 persistence OK — a live storm counts down 3 -> 0, travels, and leaves the table at 0")
-    # a natural wonder keeps its row: silt that lands on one pays nothing,
-    # food or production (tileYields early-returns above the fertility lines)
+    # a natural wonder takes its row and the silt on top of it
+    # (runs/h1_duelw1111 plot 184: Ubsunur Hollow's 1 Food read 2 after a
+    # Significant Blizzard's fertility)
     sim3 = fresh(rules)
     nw = sim3.nwonder[0].nonzero().flatten()
     if nw.numel():
@@ -285,9 +286,9 @@ def main() -> int:
         sim3.fertility[0, w] = 2
         sim3.fertility_prod[0, w] = 1
         sim3._eff_version += 1
-        assert float(sim3._neutral_prod()[0, w]) == float(sim3.tile_yields[0, w, 1]), 'silt paid production on a natural wonder'
-        assert float(sim3._eff_food()[0, w]) == float(sim3.tile_yields[0, w, 0]), 'silt paid food on a natural wonder'
-        print('  7 natural wonder OK — silt on it pays neither food nor production')
+        assert float(sim3._neutral_prod()[0, w]) == float(sim3.tile_yields[0, w, 1]) + 1, 'silt production on a natural wonder'
+        assert float(sim3._eff_food()[0, w]) == float(sim3.tile_yields[0, w, 0]) + 2, 'silt food on a natural wonder'
+        print('  7 natural wonder OK — silt on it pays food and production on top of its row')
     else:
         print('  7 natural wonder — the fixture holds none; no scene')
     # -- 8: the prevailing winds ride the wire, pooled at each row's latitude,

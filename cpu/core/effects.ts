@@ -407,6 +407,12 @@ export interface Modifiers {
    *  garrisons (`garrisonOf`) */
   amenitiesWithGarrison: number;
   loyaltyWithGarrison: number;
+  /** amenities in each city holding the named building */
+  amenitiesWithBuilding: readonly { building: string; amenities: number }[];
+  /** Power, and a strategic resource a turn, in each city holding a live
+   *  district of the type */
+  powerWithDistrict: readonly { district: DistrictId; power: number }[];
+  extractionWithDistrict: readonly { district: DistrictId; resource: string; perTurn: number }[];
   /** percent production toward Space Race projects in a city holding one of
    *  the buildings */
   spaceProjectProd: { pct: number; buildings: string[] }[];
@@ -664,6 +670,9 @@ export function defaultModifiers(): Modifiers {
     upgradeResourceDiscountPct: 0,
     amenitiesWithGarrison: 0,
     loyaltyWithGarrison: 0,
+    amenitiesWithBuilding: [],
+    powerWithDistrict: [],
+    extractionWithDistrict: [],
     spaceProjectProd: [],
     spyOffenseTimeCutPct: 0,
     yieldPerSpecialty: {},
@@ -772,6 +781,9 @@ export function applyPolicyEffects(mods: Modifiers, fx: PolicyEffects): void {
   if (fx.upgradeResourceDiscountPct) mods.upgradeResourceDiscountPct += fx.upgradeResourceDiscountPct;
   if (fx.amenitiesWithGarrison) mods.amenitiesWithGarrison += fx.amenitiesWithGarrison;
   if (fx.loyaltyWithGarrison) mods.loyaltyWithGarrison += fx.loyaltyWithGarrison;
+  if (fx.amenitiesWithBuilding?.length) mods.amenitiesWithBuilding = [...mods.amenitiesWithBuilding, ...fx.amenitiesWithBuilding];
+  if (fx.powerWithDistrict?.length) mods.powerWithDistrict = [...mods.powerWithDistrict, ...fx.powerWithDistrict];
+  if (fx.extractionWithDistrict?.length) mods.extractionWithDistrict = [...mods.extractionWithDistrict, ...fx.extractionWithDistrict];
   // the cards' per-building Great Person rows join the roster's
   if (fx.gppPerBuilding?.length) mods.gppBuildings = [...mods.gppBuildings, ...fx.gppPerBuilding];
   if (fx.spaceProjectProd) mods.spaceProjectProd.push(fx.spaceProjectProd);

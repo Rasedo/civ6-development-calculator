@@ -104,6 +104,10 @@ export function featureDefense(feature: string | null | undefined): number {
   if (feature === 'REEF') return 3;
   // CIV6 (Expansion2_Features.xml): FEATURE_GOBUSTAN DefenseModifier 3
   if (feature === 'GOBUSTAN') return 3;
+  // CIV6 (Expansion1_Features_Major.xml): FEATURE_UBSUNUR_HOLLOW DefenseModifier -2;
+  // (Indonesia_Khmer_GameplayData.xml): FEATURE_HA_LONG_BAY DefenseModifier 15
+  if (feature === 'UBSUNUR_HOLLOW') return -2;
+  if (feature === 'HA_LONG_BAY') return 15;
   return 0;
 }
 

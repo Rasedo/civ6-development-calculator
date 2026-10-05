@@ -15,7 +15,7 @@ import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
-import { GP_BUILDING_YIELDS, gpPermOf, gpTilePermOf } from '../data/greatPeople';
+import { gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
@@ -102,6 +102,14 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
         if (adj) addYields(out, adj);
       }
     }
+    // an event's fertility pays a wonder plot too (runs/h1_duelw1111, plot
+    // 184: Ubsunur Hollow 1 Food 1 Production 2 Faith, 2 Food from the
+    // Significant Blizzard that added 1 fertility from plot 183 at t159);
+    // no drought reaches it
+    out.food += tile.fertility;
+    out.production += tile.fertilityProd;
+    out.science += tile.fertilitySci ?? 0;
+    out.culture += tile.fertilityCul ?? 0;
     return out;
   }
   if (isMountain(tile)) {
@@ -700,6 +708,11 @@ export function cityPower(state: GameState, city: City): CityPower {
       if (BUILDINGS[id]?.district === 'HARBOR') supply += CARDIFF_HARBOR_POWER;
     }
   }
+  // CIV6 (Future Victory Science, FREE_POWER_SOURCE_MISC): Power in a city
+  // holding a live district of the row's type, no renewable for Biosphere
+  for (const r of getModifiers(state, city.seat).powerWithDistrict) {
+    if (cityHasLiveDistrict(state, city, r.district)) supply += r.power;
+  }
   const center = state.map.tiles[city.centerIndex];
   const reach = regionalReach(state, city.seat);
   // CATALOG order, so `resolveSeatPower`'s "largest stockpile wins" tie-break
@@ -749,6 +762,15 @@ export function completedDistrictCount(state: GameState, city: City, specialtyOn
   }).length;
 }
 
+/** REQUIREMENT_CITY_HAS_DISTRICT: a completed, unpillaged district of the
+ *  type stands in the city. */
+export function cityHasLiveDistrict(state: GameState, city: City, type: DistrictId): boolean {
+  return city.districts.some((d) => {
+    const t = state.map.tiles[d.tileIndex];
+    return d.type === type && t.districtComplete && !t.districtPillaged;
+  });
+}
+
 /** REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS' count: the city's finished,
  *  unpillaged specialty districts (a city whose one Holy Site lies pillaged
  *  takes no Classical Republic housing). */
@@ -775,7 +797,6 @@ export function regionalEffects(
   const out: RegionalEffects = { yields: emptyYields(), amenities: 0 };
   const civ = civOf(state, city.seat);
   const techs = seatOf(state, city.seat)?.research.techs ?? [];
-  const gpOwner = seatOf(state, city.seat);
   for (const other of citiesOf(state, city.seat)) {
     for (const inst of other.districts) {
       const tile = state.map.tiles[inst.tileIndex];
@@ -794,9 +815,6 @@ export function regionalEffects(
         if (every || !seen.has(id)) {
           seen.add(id);
           if (def.yields) addYields(out.yields, def.yields);
-          // CIV6 (James Watt, `GP_BUILDING_YIELDS`): a spent Great Person's
-          // add to the building's own yield rides the same reach
-          for (const r of GP_BUILDING_YIELDS) if (r.building === id) out.yields[r.yield] += gpPermOf(gpOwner, r.perm);
           // CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
           // yields the row pays once its owner holds the technology ride
           // the same reach as its own

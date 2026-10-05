@@ -20,7 +20,7 @@ import { suzerainMinorSeats } from './cityStates';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable, unitPurchaseCost } from './game';
-import { cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
+import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import { ageReactors } from './disasters';
 import type { City, GameState, Seat, Tile, Unit } from './types';
@@ -158,6 +158,13 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     const k = strategicSlot(r.resource);
     if (k < 0) continue;
     for (const city of citiesOf(state, seat)) bk[k] += gpCityPermOf(city, r.perm);
+  }
+  // CIV6 (Future Victory Science, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
+  // each city holding a live district of the row's type
+  for (const r of getModifiers(state, seat).extractionWithDistrict) {
+    const k = strategicSlot(r.resource);
+    if (k < 0) continue;
+    for (const city of citiesOf(state, seat)) if (cityHasLiveDistrict(state, city, r.district)) bk[k] += r.perTurn;
   }
   const cap = stockpileCap(state, seat);
   for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;

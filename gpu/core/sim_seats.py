@@ -9755,6 +9755,11 @@ class SimSeats:
             n_hb = (stand & hb).sum(dim=2).double()
             supply = supply + n_hb * self._cardiff_harbor_power \
                 * self._suz_effect(row, self._suz_c_harbor_pow).double().unsqueeze(1)
+        # CIV6 (Future Victory Science, FREE_POWER_SOURCE_MISC): Power in a
+        # city holding a live district of the row's type (`powerWithDistrict`)
+        for _pon, _pd, _pp in self._gov_mods(row)[12]["dpow"]:
+            _has = self._dist_counts(row)[:, :cols, _pd] > 0
+            supply = supply + (_has & alive & _pon.unsqueeze(1)).double() * _pp
         if self._iz_idx >= 0 and self._plant_bidx:
             st = dreg[:, :, self._iz_idx]
             stc = st.clamp(min=0)
@@ -9941,6 +9946,12 @@ class SimSeats:
             if _fk >= 0 and 0 <= _fs < bank.shape[1]:
                 _cp = self.city_gp_perm[:, row, : self.RC, _fk].long()
                 bank[:, _fs] += (_cp * self.city_alive[:, row, : self.RC].long()).sum(dim=1)
+        # CIV6 (Future Victory Science, MODIFIER_SINGLE_CITY_ADJUST_FREE_RESOURCE_EXTRACTION):
+        # each city holding a live district of the row's type (`extractionWithDistrict`)
+        for _eon, _ed, _es, _en in self._gov_mods(row)[12]["dext"]:
+            if _es < bank.shape[1]:
+                _has = (self._dist_counts(row)[:, : self.RC, _ed] > 0) & self.city_alive[:, row, : self.RC]
+                bank[:, _es] += (_has & _eon.unsqueeze(1)).long().sum(dim=1) * _en
         cap = self._stockpile_cap(row).unsqueeze(1)
         bank.copy_(torch.minimum(bank, cap))
         if self._log_diff:
@@ -10081,12 +10092,6 @@ class SimSeats:
                 y6 = torch.zeros(B, cols, 6, dtype=torch.float64, device=self.device)
                 am = torch.zeros(B, cols, dtype=torch.float64, device=self.device)
             y6 = y6 + hf.unsqueeze(2) * bcol["yields"][:, n, :].reshape(B, 1, 6)
-            # CIV6 (James Watt, `GP_BUILDING_YIELDS`): a spent Great Person's
-            # add to the building's own yield rides the same reach
-            for _pk, _bi, _yi in self._gp_building_yields:
-                if _bi == n and _pk >= 0:
-                    _gy = self._gp_perm(row, self._gp_perm_names[_pk]).double()
-                    y6[:, :, _yi] = y6[:, :, _yi] + hf * _gy.unsqueeze(1)
             # CIV6 (Electronics Factory, ELECTRONICSFACTORY_CULTURE): the
             # yields the row pays once its owner holds the technology ride
             # the same reach as its own
@@ -10452,6 +10457,10 @@ class SimSeats:
             _gsl = self.military_at.gather(1, _gc.clamp(min=0))
             _gar = (_gc >= 0) & (_gsl >= 0) & (self.unit_seat.gather(1, _gsl.clamp(min=0)) == row)
             have = have + _gar.double() * _ga.double().unsqueeze(1)
+        # CIV6 (Sports Media): "Stadiums generate +1 Amenity" — each city
+        # holding the row's building (`amenitiesWithBuilding`)
+        for _bon, _bb, _ba in _gm[12]["bamen"]:
+            have = have + (self.city_bldg[:, row, :cols, _bb] & _bon.unsqueeze(1)).double() * _ba
         # WONDER amenities: Colosseum's regional reach, Alhambra's and Great
         # Bath's local ones, Temple of Artemis' per-improvement count.
         if self.n_governors and row < self.n_majors:

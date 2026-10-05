@@ -253,7 +253,7 @@ def main() -> int:
     assert per == 40, per
     assert int(s6._flood_level()[b]) == 0
     assert int(s6._flood_barrier_cost(row)[b, col]) == per * n
-    s6.climate_idx[b] = 1
+    s6.climate_idx[b] = 0  # Phase I: the first sea level rise
     assert int(s6._flood_level()[b]) == 1
     assert int(s6._flood_barrier_cost(row)[b, col]) == per * n * 2
     bi = torch.full((s6.B,), bidx, dtype=torch.long)
@@ -418,7 +418,7 @@ def main() -> int:
     n12 = int(s12._city_lowland_count(row)[b, col12])
     s12.city_current[b, row, col12, 0] = s12._barrier_bidx
     s12.city_cost[b, row, col12, 0] = s12._barrier_per_tile * n12
-    s12.climate_idx[b] = 1
+    s12.climate_idx[b] = 0  # Phase I: the first sea level rise
     s12._reprice_live(row)
     assert int(s12.city_cost[b, row, col12, 0]) == s12._barrier_per_tile * n12 * 2, "the sea moved the price"
     # and the digest reads the same live number the plane now holds

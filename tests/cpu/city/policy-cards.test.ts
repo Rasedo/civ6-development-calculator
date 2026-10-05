@@ -251,6 +251,17 @@ describe('the empire-wide channels', () => {
     expect(garrisonOf(state, city)?.type).toBe('WARRIOR');
   });
 
+  it('SPORTS_MEDIA pays a Stadium city an amenity; FUTURE_VICTORY_SCIENCE a Spaceport city Power and Aluminum', () => {
+    const m = defaultModifiers();
+    applyPolicyEffects(m, POLICIES.SPORTS_MEDIA.effects);
+    applyPolicyEffects(m, POLICIES.FUTURE_VICTORY_SCIENCE.effects);
+    expect(m.adjacencyMult.THEATER_SQUARE).toBe(2);
+    expect(m.amenitiesWithBuilding).toEqual([{ building: 'STADIUM', amenities: 1 }]);
+    expect(m.powerWithDistrict).toEqual([{ district: 'SPACEPORT', power: 3 }]);
+    expect(m.extractionWithDistrict).toEqual([{ district: 'SPACEPORT', resource: 'ALUMINUM', perTurn: 3 }]);
+    expect(POLICIES.FUTURE_VICTORY_SCIENCE.kind).toBe('wildcard');
+  });
+
   it('the per-building Great Person cards join the roster’s per-building rows', () => {
     const m = defaultModifiers();
     applyPolicyEffects(m, POLICIES.INVENTION.effects);

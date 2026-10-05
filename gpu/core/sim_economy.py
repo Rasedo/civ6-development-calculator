@@ -775,15 +775,15 @@ class SimEconomy:
         """tileYields' last three lines over a food plane: fertility feeds
         (+1 each, already capped), drought starves (−1, floored at 0) unless
         the plot's city holds a drought shield (`_drought_shield`), and a
-        natural-wonder tile keeps the wonder's fixed food because it
-        EARLY-RETURNS above all of it — the disaster STATE still lands on it
-        (the trace counts it), but its food never moves."""
-        food = base + self.fertility.to(self.dtype)
+        natural-wonder tile takes the wonder's fixed food and its fertility,
+        no drought."""
+        fert = self.fertility.to(self.dtype)
+        food = base + fert
         dry = self.drought > 0
         if bool(dry.count_nonzero()):
             dry = dry & ~self._drought_shield()
         food = torch.where(dry, (food - 1).clamp(min=0), food)
-        return torch.where(self.nwonder, self.tile_yields[:, :, 0], food)
+        return torch.where(self.nwonder, self.tile_yields[:, :, 0] + fert, food)
 
     def _food_key(self) -> tuple[int, int]:
         """The version a cached food plane is good for: `_eff_version`, and
@@ -841,11 +841,9 @@ class SimEconomy:
         when it builds the yield context from `getModifiers(state,
         city.seat)`. Cached per _eff_version (improvement/pillage changes
         bump it)."""
-        # a natural-wonder tile keeps the wonder's fixed production, as its
-        # food does in `_food_tail`: tileYields early-returns above the
-        # fertility lines, so silt that lands there never pays
-        base = torch.where(self.nwonder, self.tile_yields[:, :, 1],
-                           self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype))
+        # a natural-wonder tile takes the wonder's fixed production and its
+        # silt, as its food does in `_food_tail`
+        base = self.tile_yields[:, :, 1] + self.fertility_prod.to(self.dtype)
         if self._nprod_cache is not None and self._nprod_cache[0] == self._eff_version:
             return self._nprod_cache[1]
         live = ~self.pillaged
@@ -863,14 +861,12 @@ class SimEconomy:
     def _silt_y(self) -> torch.Tensor | None:
         """[B, T, 6] the SCIENCE and CULTURE silt (`fertilitySci`,
         `fertilityCul`) in their yield columns — tileYields' fertility lines,
-        which a natural-wonder plot never reaches — or None while no plot
-        holds any."""
+        a natural-wonder plot's included — or None while no plot holds any."""
         if not bool(self.fertility_sci.count_nonzero()) and not bool(self.fertility_cul.count_nonzero()):
             return None
         out = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
-        live = (~self.nwonder).to(self.dtype)
-        out[:, :, 3] = self.fertility_sci.to(self.dtype) * live
-        out[:, :, 4] = self.fertility_cul.to(self.dtype) * live
+        out[:, :, 3] = self.fertility_sci.to(self.dtype)
+        out[:, :, 4] = self.fertility_cul.to(self.dtype)
         return out
 
     def _fertilize(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:
@@ -1030,26 +1026,9 @@ class SimEconomy:
         return (self._world_carbon().clamp(min=0) / self._co2_per_point).floor().long()
 
     def _flood_level(self) -> torch.Tensor:
-        """[B] — the lowland bands the sea has already taken, which is what the
-        Flood Barrier prices itself against (`floodLevel`). Cached under the
-        write counters of the climate phase and its band tables; callers only
-        read it."""
-        planes = (self.climate_idx, self._cl_flood, self._cl_submerge)
-        ent = self._flood_level_cache
-        if ent is not None and simbase.stamp_holds(ent[0], planes):
-            return ent[1]
-        out = self._flood_level_read()
-        self._flood_level_cache = (simbase.plane_stamp(planes), out)
-        return out
-
-    def _flood_level_read(self) -> torch.Tensor:
-        """`_flood_level` computed."""
-        out = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for p in range(len(self._cl_ice_melt)):
-            at = self.climate_idx >= p
-            band = torch.maximum(self._cl_flood[p], self._cl_submerge[p])
-            out = torch.where(at, torch.maximum(out, band.expand_as(out)), out)
-        return out
+        """[B] — the SEA LEVEL, one per climate phase entered, which is what
+        the Flood Barrier prices itself against (`floodLevel`)."""
+        return self.climate_idx + 1
 
     def _fertility_live(self) -> torch.Tensor:
         """[B] — CIV6: "In Phase IV and beyond, Storms and Floods will no
@@ -3566,7 +3545,7 @@ class SimEconomy:
             # percent, building)
             "govtit": [], "bprod": [], "byield": [], "spacep": [],
             # Great Person points per building (active, building, class, points)
-            "gppb": [],
+            "gppb": [], "bamen": [], "dpow": [], "dext": [],
             # each great-work object type's tourism factor
             "gwscale": torch.ones(B, self._gw_obj_tourism.shape[0], dtype=torch.float64, device=dev),
             "stockps": torch.zeros(B, _nst, dtype=torch.float64, device=dev),
@@ -3678,7 +3657,8 @@ class SimEconomy:
                 _gon = has_gov & (adopted == _gi)
                 self._fx_rows(fx, _gon, self._gov_govtit[_gi], self._gov_bprod_rows[_gi],
                               self._gov_byield_rows[_gi], self._gov_spacep_rows[_gi],
-                              self._gov_gppb_rows[_gi])
+                              self._gov_gppb_rows[_gi], self._gov_bamen_rows[_gi],
+                              self._gov_dpow_rows[_gi], self._gov_dext_rows[_gi])
             fx["ucst"] = fx["ucst"] + self._gov_ucs_by_type[adopted] * _gf.double().unsqueeze(1)
             # a production row no game holds adds nothing to the additive
             # percent sum, so only the adopted ones are listed
@@ -3782,7 +3762,8 @@ class SimEconomy:
                         _pon = cards[:, _pi]
                         self._fx_rows(fx, _pon, self._pol_govtit[_pi], self._pol_bprod_rows[_pi],
                                       self._pol_byield_rows[_pi], self._pol_spacep_rows[_pi],
-                                      self._pol_gppb_rows[_pi])
+                                      self._pol_gppb_rows[_pi], self._pol_bamen_rows[_pi],
+                                      self._pol_dpow_rows[_pi], self._pol_dext_rows[_pi])
                 fx["ucst"] = fx["ucst"] + cards.double() @ self._pol_ucs_by_type
                 # ...and only the slotted cards'
                 for _pi in range(self._npol):
@@ -3832,7 +3813,7 @@ class SimEconomy:
 
     @staticmethod
     def _fx_rows(fx: dict, on: torch.Tensor, govtit: torch.Tensor, bprod: list, byield: list,
-                 spacep: list, gppb: list) -> None:
+                 spacep: list, gppb: list, bamen: list, dpow: list, dext: list) -> None:
         """one government's or card's ROW channels onto `fx`, active where `on`"""
         if float(govtit[0]) >= 0:
             fx["govtit"].append((on, int(govtit[0]), float(govtit[1]), float(govtit[2])))
@@ -3844,6 +3825,12 @@ class SimEconomy:
             fx["spacep"].append((on, _pct, _b))
         for _b, _c, _a in gppb:
             fx["gppb"].append((on, _b, _c, _a))
+        for _b, _a in bamen:
+            fx["bamen"].append((on, _b, _a))
+        for _d, _p in dpow:
+            fx["dpow"].append((on, _d, _p))
+        for _d, _s, _n in dext:
+            fx["dext"].append((on, _d, _s, _n))
 
     def _cond_house_amen(self, hid, nd, spec_d):
         """The two district-conditional rules, for ANY seat.
@@ -7188,20 +7175,21 @@ class SimEconomy:
         # the row this SEAT builds — a unique building's own yields, Power and
         # regional reach all arrive through `_b_cols` (`effectiveBuilding`)
         bcol = self._b_cols(row)
-        selb = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl]) & ~bcol["regional"].unsqueeze(1)
+        lit = bldg & ~self._bldg_dark(dreg, self.city_bldg_pillaged[:, row, sl])
+        # CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein, James Watt;
+        # `GP_BUILDING_YIELDS`): a spent Great Person's add to one building's
+        # own yield, per lit copy standing here, a REGIONAL one's included —
+        # its add stays in its own city
+        for _pk, _bi, _yi in self._gp_building_yields:
+            if _pk < 0 or _bi < 0:
+                continue
+            _wc = self._gp_perm(row, self._gp_perm_names[_pk]).double()
+            if bool(_wc.count_nonzero()):
+                bld_y[:, :, _yi] = bld_y[:, :, _yi] + _wc.unsqueeze(1) * lit[:, :, _bi].double()
+        selb = lit & ~bcol["regional"].unsqueeze(1)
         if bool(selb.count_nonzero()):
             selbf = selb.double()
             bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, bcol["yields"])
-            # CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein;
-            # `GP_BUILDING_YIELDS`): a spent Great Person's add to one
-            # building's own yield, per lit copy standing here — `selb` holds no
-            # REGIONAL building, which carries its add in `_seat_regional`
-            for _pk, _bi, _yi in self._gp_building_yields:
-                if _pk < 0 or _bi < 0:
-                    continue
-                _wc = self._gp_perm(row, self._gp_perm_names[_pk]).double()
-                if bool(_wc.count_nonzero()):
-                    bld_y[:, :, _yi] = bld_y[:, :, _yi] + _wc.unsqueeze(1) * selbf[:, :, _bi]
             # CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): a unique row may pay
             # again while its seat stands in a Golden (or Heroic) Age.
             for (_gbi, _gciv), _gy in (self._bvar_golden_y.items()

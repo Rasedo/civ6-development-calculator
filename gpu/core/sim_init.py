@@ -2608,6 +2608,10 @@ class SimInit:
             self._gov_garamen = torch.tensor([float(r["amenitiesWithGarrison"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_garloy = torch.tensor([float(r["loyaltyWithGarrison"]) for r in _govs], dtype=torch.float64, device=device)
             self._gov_gppb_rows = [[(int(x[0]), int(x[1]), float(x[2])) for x in r["gppPerBuilding"] if int(x[0]) >= 0] for r in _govs]
+            self._gov_bamen_rows = [[(int(x[0]), float(x[1])) for x in r["amenitiesWithBuilding"] if int(x[0]) >= 0] for r in _govs]
+            self._gov_dpow_rows = [[(int(x[0]), float(x[1])) for x in r["powerWithDistrict"] if int(x[0]) >= 0] for r in _govs]
+            self._gov_dext_rows = [[(int(x[0]), int(x[1]), int(x[2])) for x in r["extractionWithDistrict"]
+                                     if int(x[0]) >= 0 and int(x[1]) >= 0] for r in _govs]
             self._gov_infl = torch.tensor([float(r["influencePerTurn"]) for r in _govs], dtype=dtype, device=device)
             self._gov_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _govs], dtype=torch.bool, device=device)
             self._gov_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _govs], dtype=torch.bool, device=device)
@@ -2647,7 +2651,8 @@ class SimInit:
                 + sum(len(x) for x in self._gov_spacep_rows) + (self._gov_gwscale - 1).abs().sum()
                 + self._gov_stockps.abs().sum() + self._gov_upgold.abs().sum() + self._gov_upres.abs().sum()
                 + self._gov_spycut.abs().sum() + self._gov_garamen.abs().sum() + self._gov_garloy.abs().sum()
-                + sum(len(x) for x in self._gov_gppb_rows)
+                + sum(len(x) for x in self._gov_gppb_rows) + sum(len(x) for x in self._gov_bamen_rows)
+                + sum(len(x) for x in self._gov_dpow_rows) + sum(len(x) for x in self._gov_dext_rows)
                 + (self._gov_pillm - 1).abs().sum()
                 + self._gov_infl.abs().sum() + self._gov_envoy1.sum()
                 + self._gov_gpp.abs().sum()
@@ -2740,6 +2745,10 @@ class SimInit:
             self._pol_garamen = torch.tensor([float(r["amenitiesWithGarrison"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_garloy = torch.tensor([float(r["loyaltyWithGarrison"]) for r in _pols], dtype=torch.float64, device=device)
             self._pol_gppb_rows = [[(int(x[0]), int(x[1]), float(x[2])) for x in r["gppPerBuilding"] if int(x[0]) >= 0] for r in _pols]
+            self._pol_bamen_rows = [[(int(x[0]), float(x[1])) for x in r["amenitiesWithBuilding"] if int(x[0]) >= 0] for r in _pols]
+            self._pol_dpow_rows = [[(int(x[0]), float(x[1])) for x in r["powerWithDistrict"] if int(x[0]) >= 0] for r in _pols]
+            self._pol_dext_rows = [[(int(x[0]), int(x[1]), int(x[2])) for x in r["extractionWithDistrict"]
+                                     if int(x[0]) >= 0 and int(x[1]) >= 0] for r in _pols]
             self._pol_infl = torch.tensor([float(r["influencePerTurn"]) for r in _pols], dtype=dtype, device=device)
             self._pol_envoy1 = torch.tensor([bool(r["firstEnvoyDouble"]) for r in _pols], dtype=torch.bool, device=device)
             self._pol_envoy2 = torch.tensor([bool(r["envoyDoubleDiffGov"]) for r in _pols], dtype=torch.bool, device=device)
@@ -2825,7 +2834,8 @@ class SimInit:
                 + sum(len(x) for x in self._pol_spacep_rows) + (self._pol_gwscale - 1).abs().sum()
                 + self._pol_stockps.abs().sum() + self._pol_upgold.abs().sum() + self._pol_upres.abs().sum()
                 + self._pol_spycut.abs().sum() + self._pol_garamen.abs().sum() + self._pol_garloy.abs().sum()
-                + sum(len(x) for x in self._pol_gppb_rows)
+                + sum(len(x) for x in self._pol_gppb_rows) + sum(len(x) for x in self._pol_bamen_rows)
+                + sum(len(x) for x in self._pol_dpow_rows) + sum(len(x) for x in self._pol_dext_rows)
                 + (self._pol_pillm - 1).abs().sum()
                 + self._pol_infl.abs().sum() + self._pol_envoy1.sum()
                 + self._pol_gpp.abs().sum()
@@ -3291,7 +3301,6 @@ class SimInit:
         self._sight_thru_cache: dict = {}  # see-through flag -> (plane stamp, heights, [B,T]) — `_sight_through_plane`
         self._imp_ground_cache: dict = {}  # improvement -> (plane stamp, Appeal plane, [B,T]) — `_imp_ground_ok`
         self._encamp_live_cache = None     # (plane stamp, [B,T], any live) — `_encamp_block`
-        self._flood_level_cache = None     # (plane stamp, [B]) — `_flood_level`
         self._dcount_cache: dict = {}      # row -> (plane stamp, (all, specialty)) — `_district_counts`
         self._golden_ded_cache: dict = {}  # kind -> (plane stamp, [B, n_majors]) — `_golden_ded_table`
         self._arm_mat_cache = None         # (arm constants, widest code, [codes, arms]) — `_unit_arm_matrix`

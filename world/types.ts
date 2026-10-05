@@ -74,7 +74,10 @@ export type FeatureId =
   | 'DEVILS_TOWER'
   | 'GIANTS_CAUSEWAY'
   | 'LAKE_RETBA'
-  | 'PAMUKKALE';
+  | 'PAMUKKALE'
+  | 'DELICATE_ARCH'
+  | 'UBSUNUR_HOLLOW'
+  | 'HA_LONG_BAY';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

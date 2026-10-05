@@ -329,7 +329,7 @@ describe('the standing channels', () => {
     expect(stockOf(state, 0, 'OIL')).toBe(oil0 + 1 + 1 + 3);
   });
 
-  it('a building\'s own yield: Hypatia\'s Library, Newton\'s University, Einstein\'s Lab; Watt\'s Factory rides its reach', () => {
+  it('a building\'s own yield: Hypatia\'s Library, Newton\'s University, Einstein\'s Lab; Watt\'s Factory pays at home', () => {
     const state = newGame();
     const seat = state.seats[0];
     const city = seat.cities[0];
@@ -347,11 +347,11 @@ describe('the standing channels', () => {
     district(state, 'INDUSTRIAL_ZONE');
     city.buildings.push('FACTORY');
     const p0 = regionalEffects(state, city).yields.production;
-    addSeatPerm(seat, GP_ABILITY.GP_JAMES_WATT.perm!);
-    expect(regionalEffects(state, city).yields.production).toBe(p0 + 2);
-    // the Factory is regional: its add is not paid a second time at home
     const b0 = computeCityStats(state, city).breakdown.buildings.production;
-    addSeatPerm(seat, { factoryProduction: 2 });
+    addSeatPerm(seat, GP_ABILITY.GP_JAMES_WATT.perm!);
+    // the Factory is regional, but Watt's add stays in the city holding it
+    // (runs/h1_duelw1109 t183: Arretium took Rome's Factory's +3 and no more)
+    expect(regionalEffects(state, city).yields.production).toBe(p0);
     expect(computeCityStats(state, city).breakdown.buildings.production).toBe(b0 + 2);
   });
 

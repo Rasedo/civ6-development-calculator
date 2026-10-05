@@ -51,6 +51,7 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
   TSINGY: srcConst('improvements.featSightThrough.TSINGY', 1, feat('FEATURE_TSINGY')),
   DEVILS_TOWER: srcConst('improvements.featSightThrough.DEVILS_TOWER', 2, feat('FEATURE_DEVILSTOWER')),
   PAMUKKALE: srcConst('improvements.featSightThrough.PAMUKKALE', 1, feat('FEATURE_PAMUKKALE')),
+  DELICATE_ARCH: srcConst('improvements.featSightThrough.DELICATE_ARCH', 1, feat('FEATURE_DELICATE_ARCH')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both

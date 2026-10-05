@@ -630,6 +630,8 @@ function nonLuxuryAmenities(
     m.amenitiesAll +
     // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
     (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +
+    // CIV6 (Sports Media): "Stadiums generate +1 Amenity"
+    m.amenitiesWithBuilding.reduce((n, r) => n + (city.buildings.includes(r.building) ? r.amenities : 0), 0) +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     gpCityPermOf(city, 'amenities') +
     notFoundedSum(state, city, 'amenity') +
@@ -1526,15 +1528,16 @@ export function computeCityStats(
   // pillaged — 9 Faith before its tier, not 11)
   buildings.culture += goldenCulturePerDistrict(state, city.seat) * liveSpecialtyCount(state, city);
   buildings.faith += gwy.faith;
-  // CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein; `GP_BUILDING_YIELDS`):
-  // a spent Great Person's add to one building's own yield, paid by each lit
-  // copy standing here; a REGIONAL building carries it in `regionalEffects`
+  // CIV6 (Leonardo da Vinci, Hypatia, Newton, Einstein, James Watt;
+  // `GP_BUILDING_YIELDS`): a spent Great Person's add to one building's own
+  // yield, paid by each lit copy standing here — a REGIONAL building's add
+  // stays in its own city (runs/h1_duelw1109 t183: Watt built Rome's Factory,
+  // whose reach paid Arretium, Antium and Setia +3 Production and no more)
   const gpOwner = seatOf(state, city.seat);
   const gpDark = darkBuildings(map, city);
   for (const r of GP_BUILDING_YIELDS) {
     const n = gpPermOf(gpOwner, r.perm);
     if (!n || !city.buildings.includes(r.building) || gpDark.has(r.building)) continue;
-    if (effectiveBuilding(ctx.mods.civ, r.building)?.regional) continue;
     buildings[r.yield] += n;
   }
   // CIV6 (Monument): "+1 additional Culture if city is at maximum Loyalty."

@@ -22,6 +22,9 @@ export const P = {
   terrain: 0, feature: 1, resource: 2, resourceCount: 3, improvement: 4, improvementPillaged: 5,
   owner: 6, district: 7, wonder: 8, wonderComplete: 9, route: 10, riverBits: 11, cliffBits: 12,
   freshWater: 13, appeal: 14, workers: 15, yields: 16, isLake: 17, routePillaged: 18,
+  /** the coastal lowland band (a `coastalLowlands` index, -1 none), flooded
+   *  and submerged — absent from records the dumper wrote before it read them */
+  lowland: 20, flooded: 21, submerged: 22,
 } as const;
 
 export type PlotRow = (number | string | number[])[];
@@ -226,6 +229,15 @@ export interface TurnRecord {
   cities: DumpCity[];
   units: DumpUnit[];
   errors: string[];
+  /** the random events of the record's turn and the one before: [turn,
+   *  RandomEvents index, current plot, start plot, fertility added, tiles
+   *  damaged, population lost, units lost] */
+  events?: Read<[number, number, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>][]>;
+  /** every great person recruited so far: [GreatPersonIndividuals index,
+   *  claimant player, GreatPersonClasses index, era, turn granted] */
+  greatPeople?: Read<[number, number, number, number, number][]>;
+  /** the National Parks: [name, plot indices] */
+  parks?: Read<[string, number[]][]>;
 }
 
 export interface Catalog {
@@ -258,6 +270,10 @@ export interface Catalog {
   unitPromotions?: string[];
   commemorations?: string[];
   alliances?: string[];
+  greatPeople?: string[];
+  greatPersonClasses?: string[];
+  randomEvents?: string[];
+  coastalLowlands?: string[];
 }
 
 /** The plot at game (x, y) of a record: rows are y, plots x. */

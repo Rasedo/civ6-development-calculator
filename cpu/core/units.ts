@@ -245,6 +245,8 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   else if (fireFeature(tile.feature)) cost += MP_SCALE;
   // CIV6 (Expansion2_Features.xml): FEATURE_GOBUSTAN MovementChange 1
   else if (tile.feature === 'GOBUSTAN') cost += MP_SCALE;
+  // CIV6 (Expansion1_Features_Major.xml): FEATURE_UBSUNUR_HOLLOW MovementChange 1
+  else if (tile.feature === 'UBSUNUR_HOLLOW') cost += MP_SCALE;
   return cost;
 }
 

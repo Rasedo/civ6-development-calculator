@@ -231,6 +231,12 @@ const effectRow = (fx: PolicyEffects) => ({
   upgradeGoldDiscountPct: fx.upgradeGoldDiscountPct ?? 0,
   upgradeResourceDiscountPct: fx.upgradeResourceDiscountPct ?? 0,
   amenitiesWithGarrison: fx.amenitiesWithGarrison ?? 0,
+  // [building index, amenities] per building that opens the clause
+  amenitiesWithBuilding: (fx.amenitiesWithBuilding ?? []).map((r) => [buildingIdx.get(r.building) ?? -3, r.amenities]),
+  // [district index, Power] and [district index, STRATEGIC_IDS slot, per turn] rows
+  powerWithDistrict: (fx.powerWithDistrict ?? []).map((r) => [PLACEABLE_DISTRICTS.indexOf(r.district), r.power]),
+  extractionWithDistrict: (fx.extractionWithDistrict ?? []).map((r) =>
+    [PLACEABLE_DISTRICTS.indexOf(r.district), STRATEGIC_IDS.indexOf(r.resource), r.perTurn]),
   loyaltyWithGarrison: fx.loyaltyWithGarrison ?? 0,
   // [building index, Great Person class index, points] per building row
   gppPerBuilding: (fx.gppPerBuilding ?? []).map((r) => [buildingIdx.get(r.building) ?? -3, GP_CLASSES.indexOf(r.cls), r.amount]),

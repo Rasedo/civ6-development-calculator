@@ -7,8 +7,9 @@ import { FEATURE_SIGHT_THROUGH } from '../../../cpu/data/sight';
 import type { FeatureId } from '../../../world/types';
 
 /**
- * PIOPIOTAHI, TSINGY, DEVIL'S TOWER, GIANT'S CAUSEWAY, LAKE RETBA and
- * PAMUKKALE, read against the install (Feature_AdjacentYields,
+ * PIOPIOTAHI, TSINGY, DEVIL'S TOWER, GIANT'S CAUSEWAY, LAKE RETBA,
+ * PAMUKKALE, DELICATE ARCH, UBSUNUR HOLLOW and HA LONG BAY, read against the
+ * install (Feature_AdjacentYields,
  * Feature_YieldChanges, Adjacency_YieldChanges Pamukkale_*) and the recorded
  * games runs/h1_duelw1104 / 1106 / 1107 / 1108.
  */
@@ -18,6 +19,7 @@ describe('the adjacent-yield wonders', () => {
     ['TSINGY', { culture: 1, science: 1 }],
     ['DEVILS_TOWER', { faith: 1, production: 1 }],
     ['GIANTS_CAUSEWAY', { culture: 1 }],
+    ['DELICATE_ARCH', { faith: 2, gold: 1 }],
   ];
   for (const [id, adj] of rows) {
     it(`${id} is an Impassable natural wonder paying its ring once per plot it touches`, () => {
@@ -44,6 +46,25 @@ describe('the adjacent-yield wonders', () => {
     expect(FEATURE_SIGHT_THROUGH.TSINGY).toBe(1);
     expect(FEATURE_SIGHT_THROUGH.DEVILS_TOWER).toBe(2);
     expect(FEATURE_SIGHT_THROUGH.PAMUKKALE).toBe(1);
+    expect(FEATURE_SIGHT_THROUGH.DELICATE_ARCH).toBe(1);
+  });
+});
+
+describe('Ubsunur Hollow and Ha Long Bay', () => {
+  it('yield their own rows in place of the ground under them, an event’s fertility on top', () => {
+    const map = makeMap(8, 8, 'TUNDRA');
+    const u = tileAtCoords(map, 3, 3);
+    u.feature = 'UBSUNUR_HOLLOW';
+    let y = tileYields(bareCtx(map), u);
+    expect([y.food, y.production, y.gold, y.science, y.culture, y.faith]).toEqual([1, 1, 0, 0, 0, 2]);
+    // runs/h1_duelw1111 plot 184: a Significant Blizzard's +1 Food
+    u.fertility = 1;
+    y = tileYields(bareCtx(map), u);
+    expect(y.food).toBe(2);
+    const h = tileAtCoords(makeMap(8, 8, 'COAST'), 3, 3);
+    h.feature = 'HA_LONG_BAY';
+    y = tileYields(bareCtx(makeMap(8, 8, 'COAST')), h);
+    expect([y.food, y.production, y.gold, y.science, y.culture, y.faith]).toEqual([3, 1, 0, 0, 1, 0]);
   });
 });
 
