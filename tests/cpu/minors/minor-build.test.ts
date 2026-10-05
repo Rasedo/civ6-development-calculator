@@ -22,7 +22,7 @@ import {
   MINOR_HARBOR_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY,
   MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_WALLS_PROD_PCT, type MinorBuildRow, MINOR_REPAIR_RESUME_PCT,
 } from '../../../cpu/data/cityStates';
-import { PROJECTS, projectYieldLump } from '../../../cpu/data/projects';
+import { PROJECTS, projectConversionRate } from '../../../cpu/data/projects';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { TECHS } from '../../../cpu/data/techs';
 import { UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN } from '../../../cpu/data/units';
@@ -500,7 +500,7 @@ describe('the rows the table grew', () => {
     expect(cs.outerHp).toBe(WALLS_TIER_HP[1]);
   });
 
-  it("the project row runs its district's project and pays the yield into the minor's own pot", () => {
+  it("the project row converts its row's percent of the turn's Production, read by the city's yields next turn", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'] });
     idleBuilder(state, cs);
@@ -512,9 +512,16 @@ describe('the rows the table grew', () => {
     hold(cs, 'CAMPUS', tileAtCoords(state.map, 13, 12));
     const cost = projectCost(state, cs.seat, 'RESEARCH_GRANTS');
     cs.prodProgress = cost;
-    const y = computeCityStats(state, minorCity(cs)).total.science;
+    const stats = computeCityStats(state, minorCity(cs)).total;
     minorPhase(state);
-    expect(cs.research.techProgress).toBeCloseTo(sci0 + y + projectYieldLump(PROJECTS.RESEARCH_GRANTS, cost), 9);
+    // the completion pays no lump: the turn's Science alone
+    expect(cs.research.techProgress).toBeCloseTo(sci0 + stats.science, 9);
+    const conv = Math.min(stats.production, cost) * projectConversionRate(PROJECTS.RESEARCH_GRANTS);
+    expect(cs.projectYield).toEqual({ key: 'science', amount: conv });
+    expect(conv).toBeGreaterThan(0);
+    const withConv = computeCityStats(state, minorCity(cs)).total.science;
+    delete cs.projectYield;
+    expect(withConv).toBeGreaterThan(computeCityStats(state, minorCity(cs)).total.science);
   });
 
   it('a running Logistics project lights the next turn\'s grid; a finished one does not', () => {

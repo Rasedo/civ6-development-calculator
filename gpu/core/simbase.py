@@ -243,6 +243,7 @@ class Rules:
     citizen_science: float
     citizen_culture: float
     food_per_citizen: float
+    housing_left_growth: tuple  # (half, quarter, zero): growth falls to half / a quarter at, halts below
     boost_fraction: float
     housing_fresh: float
     housing_coastal: float
@@ -485,6 +486,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         citizen_science=r["citizenScience"],
         citizen_culture=r["citizenCulture"],
         food_per_citizen=r["foodPerCitizen"],
+        housing_left_growth=tuple(int(x) for x in r["housingLeftGrowth"]),
         boost_fraction=r["boostFraction"],
         housing_fresh=r["housing"]["fresh"],
         housing_coastal=r["housing"]["coastal"],
@@ -1072,6 +1074,7 @@ _MUTABLE = [
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
+    "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step
     "seat_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair

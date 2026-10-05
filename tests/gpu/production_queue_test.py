@@ -169,6 +169,31 @@ def test_a_drop_empties_the_head(rules, path) -> None:
     print("  7 drop OK — the head goes and the slot comes back empty")
 
 
+def test_a_project_converts_its_production(rules, path) -> None:
+    """`City.projectYield`: a district project heading the queue converts its
+    row's 1/256 fixed-point rate of the step's Production, the bank with it,
+    into its yield; the next step clears it first."""
+    sim = build(rules, path)
+    j = a_city(sim)
+    pi = next(i for i, p in enumerate(sim._proj_rows) if int(p["y"]) == 3 and int(p["yp"]) > 0)
+    rate = (int(sim._proj_rows[pi]["yp"]) * 256 // 100) / 256
+    load_queue(sim, j, [sim.PROJECT_BASE + pi], costs=[10_000])
+    sim.city_prod_bank[B0, ROW, j] = 2.5
+    col = torch.full((sim.B,), j, dtype=torch.long)
+    act = torch.zeros(sim.B, dtype=torch.bool)
+    act[B0] = True
+    sim._seat_city_produce(ROW, col, act, torch.full((sim.B,), 9.9, dtype=torch.float64))
+    assert int(sim.city_proj_yield[B0, ROW, j]) == 3, "the conversion is not the project's Science"
+    want = (9.9 + 2.5) * rate
+    assert abs(float(sim.city_proj_conv[B0, ROW, j]) - want) < 1e-12, \
+        f"converted {float(sim.city_proj_conv[B0, ROW, j])}, want {want}"
+    load_queue(sim, j, [unit(sim, 0)], costs=[10_000])
+    sim._seat_city_produce(ROW, col, act, torch.full((sim.B,), 9.9, dtype=torch.float64))
+    assert int(sim.city_proj_yield[B0, ROW, j]) == -1 and float(sim.city_proj_conv[B0, ROW, j]) == 0.0, \
+        "the next step did not clear the conversion"
+    print(f"  8 project OK — {want:.4f} Science of 12.4 Production, cleared by the next step")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -178,6 +203,7 @@ def main() -> int:
     test_a_busy_city_is_offered_nothing(rules, path)
     test_a_queued_building_is_not_offered_twice(rules, path)
     test_a_drop_empties_the_head(rules, path)
+    test_a_project_converts_its_production(rules, path)
     print("BATTERY OK production_queue")
     return 0
 

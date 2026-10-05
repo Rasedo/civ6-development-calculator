@@ -413,10 +413,22 @@ export function growthFoodNeeded(pop: number): number {
     + Math.pow(pop - 1, CITY_GROWTH_EXPONENT));
 }
 
+/** CIV6 (GlobalParameters CITY_HOUSING_LEFT_50PCT_GROWTH 1,
+ *  CITY_HOUSING_LEFT_25PCT_GROWTH 0, CITY_HOUSING_LEFT_ZERO_GROWTH -4): the
+ *  housing a city has left above its population where its growth falls to
+ *  half, to a quarter, and below which it halts — every recorded city of the
+ *  six Duels reads 1 at 2+ left, 0.5 at 1, 0.25 from 0 to -4 and 0 at -5 or
+ *  less (`housingGrowthMod`; runs/h1_duelw1108, Handan t147-173: housing 4,
+ *  population 9, its food box held at 0.449 on a surplus of 7). */
+export const HOUSING_LEFT_HALF_GROWTH = srcConst('constants.housingLeftHalfGrowth', 1, gp('CITY_HOUSING_LEFT_50PCT_GROWTH'));
+export const HOUSING_LEFT_QUARTER_GROWTH = srcConst('constants.housingLeftQuarterGrowth', 0, gp('CITY_HOUSING_LEFT_25PCT_GROWTH'));
+export const HOUSING_LEFT_ZERO_GROWTH = srcConst('constants.housingLeftZeroGrowth', -4, gp('CITY_HOUSING_LEFT_ZERO_GROWTH'));
+
 export function housingGrowthFactor(remaining: number): number {
-  if (remaining >= 2) return 1;
-  if (remaining >= 1) return 0.5;
-  return 0.25;
+  if (remaining > HOUSING_LEFT_HALF_GROWTH) return 1;
+  if (remaining > HOUSING_LEFT_QUARTER_GROWTH) return 0.5;
+  if (remaining >= HOUSING_LEFT_ZERO_GROWTH) return 0.25;
+  return 0;
 }
 
 /** CIV6 (CITY_POP_PER_AMENITY 2): a city needs one Amenity per this many

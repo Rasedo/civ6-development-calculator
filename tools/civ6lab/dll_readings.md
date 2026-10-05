@@ -798,6 +798,25 @@ mountain rules close 1104 t143 and 1108 t187 (an Industrial Zone at 3 rows
 `tests/gpu/adjacency_rows_test.py`; H-1 `city.yields` 5,759 → 5,921 passes,
 `step.eraScore` 2,690 → 2,693 over the six Duels.
 
+## H-1: a district project's yield conversion — READ
+
+City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production
+(0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the
+city's yield component) and its project id (+0x1360 = -1), then applies the
+Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's
+Project_YieldConversions rows (Project +0x168, loader 0xa98af0): for each,
+amount = min(the Production passed in, the item's full cost (0x179510)) x
+(PercentOfProductionRate << 8) / 100 — fixed point, so the rate is the
+percent truncated to 256ths (15% 38/256, 30% 76/256) — plus a player
+attribute's percent of that (hash 0xbcfe99b8, 0 in every record), asserted
+non-negative and never the Production yield itself, added into +0x1108 at
+the row's yield. The city's yields read the vector under their one percent
+until the next step clears it; a completion pays no lump. Records:
+runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9,
+t169-176 16.75 Gold = 12 + 16 x 76/256; the first step's figure holds the
+bank paid in (t111 14.8 Production). Engines: `City.projectYield` /
+`city_proj_conv`, `city_proj_yield`; `projectConversionRate`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

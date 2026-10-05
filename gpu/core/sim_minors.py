@@ -827,6 +827,9 @@ class SimMinors:
         self.citystate_full_power[:, s] = False
         rd = self.rules_dev
         row = self._CITY_MINOR0 + s
+        # the step clears the yield the last one converted
+        self.city_proj_conv[:, row, 0] = 0
+        self.city_proj_yield[:, row, 0] = -1
         seat = 100 + s
         bidx = self._bidx
         dcp = self.rules.district_cost
@@ -968,6 +971,15 @@ class SimMinors:
                     cost_p = (self._progress_cost(int(prow["pgb"]), int(prow["pk"]), _mpct).double()
                               if int(prow["pgb"]) >= 0
                               else torch.full_like(zero_b, float(max(int(prow["pc"]), 0))))
+                    yi = int(prow["y"])
+                    if yi >= 0:
+                        # the row's percent of the turn's Production, never
+                        # above its cost, converted into its yield, which the
+                        # city's yields read until the next step
+                        _cv = torch.minimum(turn, cost_p) * self._proj_rate_t[pi]
+                        self.city_proj_conv[:, row, 0] = torch.where(avail, _cv, self.city_proj_conv[:, row, 0])
+                        self.city_proj_yield[:, row, 0] = torch.where(
+                            avail, torch.full_like(self.city_proj_yield[:, row, 0], yi), self.city_proj_yield[:, row, 0])
                     pay = avail & (self.citystate_prod[:, s] >= cost_p)
                     if pi in self._proj_fp:
                         # a project still running lights the next turn's grid
@@ -975,16 +987,6 @@ class SimMinors:
                     self.citystate_repair_wait[:, s] &= ~pay
                     if bool(pay.count_nonzero()):
                         self.citystate_prod[:, s] -= torch.where(pay, cost_p, zero_b)
-                        yi = int(prow["y"])
-                        amt = torch.where(pay, js_round(cost_p * (self._proj_yp[pi] / 100)), zero_b)
-                        if yi == 2:
-                            self.citystate_treasury[:, s] += amt
-                        elif yi == 3:
-                            self.citystate_tech_prog[:, s] += amt
-                        elif yi == 4:
-                            self.citystate_civic_prog[:, s] += amt
-                        elif yi == 5:
-                            self.citystate_faith[:, s] += amt
                     halt = halt | avail
                 continue
             if kind in ("building", "worship"):

@@ -616,17 +616,18 @@ def test_the_project_row(rules, path) -> None:
     sim.city_dist_tile[B0, row, 0, sim._campus_idx] = t
     sim._eff_version += 1
     prow = sim._proj_rows[grants]
-    import math
     pct = int(sim._progress_pct_of(sim.citystate_techs[:, s].sum(dim=1), sim.citystate_civics[:, s].sum(dim=1))[B0])
     cost = float((int(prow["pgb"]) * 50 * (100 + int(prow["pk"]) * pct)) // 10000)
     sim.citystate_prod[B0, s] = cost
     sci0 = float(sim.citystate_tech_prog[B0, s])
-    sim._minor_build(s)
-    want = math.floor(cost * (sim._proj_yp[grants] / 100) + 0.5)
-    assert abs(float(sim.citystate_tech_prog[B0, s]) - (sci0 + want)) < 1e-9, \
-        f"the project paid {float(sim.citystate_tech_prog[B0, s]) - sci0} Science, want {want}"
-    assert abs(float(sim.citystate_prod[B0, s])) < 1e-9
-    print(f"  12 project OK — Research Grants for {cost:.0f}, +{want} Science into the minor's pot")
+    turn = 4.0
+    sim._minor_build(s, torch.full((sim.B,), turn, dtype=torch.float64))
+    want = min(turn, cost) * ((int(prow["yp"]) * 256 // 100) / 256)  # the rate in 1/256 fixed point
+    assert int(sim.city_proj_yield[B0, row, 0]) == 3, "the conversion is the project's Science"
+    assert abs(float(sim.city_proj_conv[B0, row, 0]) - want) < 1e-12, \
+        f"the step converted {float(sim.city_proj_conv[B0, row, 0])} Science, want {want}"
+    assert float(sim.citystate_tech_prog[B0, s]) == sci0, "the completion pays no lump"
+    print(f"  12 project OK — Research Grants for {cost:.0f}: {want:.2f} Science of {turn:.0f} Production converted")
 
 
 def test_the_logistics_power(rules, path) -> None:

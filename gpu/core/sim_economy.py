@@ -5161,7 +5161,8 @@ class SimEconomy:
 
     def _gw_yields(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC] culture, [B, RC] faith) double — `greatWorkYields`: the
-        works' own face, a themed holder's paying twice."""
+        works' own face (a maker's raised Culture, `gwWorkCulture`), a themed
+        holder's paying twice."""
         obj = self.city_gw_obj[:, row]
         held = obj >= 0
         if not bool(held.count_nonzero()):
@@ -5169,7 +5170,12 @@ class SimEconomy:
             return z, z
         mult = self._gw_slot_mult(row).double()
         oc = obj.clamp(min=0)
-        cul = (self._gw_obj_culture.take(oc) * mult * held.double()).sum(dim=2)
+        mk = self.city_gw_maker[:, row]
+        mw = self._gw_maker_culture.shape[1]
+        ov = self._gw_maker_culture[oc, mk.clamp(min=0, max=mw - 1)]
+        ov = torch.where((mk >= 0) & (mk < mw), ov, torch.full_like(ov, -1.0))
+        face = torch.where(ov >= 0, ov, self._gw_obj_culture.take(oc).double())
+        cul = (face * mult * held.double()).sum(dim=2)
         fai = (self._gw_obj_faith.take(oc) * mult * held.double()).sum(dim=2)
         return cul, fai
 
@@ -7391,6 +7397,13 @@ class SimEconomy:
                 _col = torch.full((B,), _c if j is None else j, dtype=torch.long, device=dev)
                 _cur = self._q_unit_of(self.city_current[self._bidx, row, _col, 0])
                 bon[:, _c, 1] = bon[:, _c, 1] + self._cs_item_prod(row, _col, _cur) * alivef[:, _c]
+        # CIV6 (Project_YieldConversions): the yield the last production step
+        # converted from a district project, under the city's percents
+        # (`City.projectYield`); a column it does not name adds an exact 0
+        _pyc = self.city_proj_yield[:, row, sl]
+        if bool((_pyc >= 0).count_nonzero()):
+            _poh = torch.nn.functional.one_hot(_pyc.clamp(min=0), 6).double() * (_pyc >= 0).unsqueeze(2).double()
+            bon = bon + _poh * (self.city_proj_conv[:, row, sl].double() * alivef).unsqueeze(2)
 
         trade = zeros6
         _rt = self._seat_route_income(row)
@@ -7559,8 +7572,12 @@ class SimEconomy:
         pop = self.city_pop[:, row, : self.RC].double()
         surplus = total[:, :, 0] - pop * self.rules.food_per_citizen
         head = housing - pop
-        hf = torch.where(head >= 2, torch.ones_like(head),
-                         torch.where(head >= 1, torch.full_like(head, 0.5), torch.full_like(head, 0.25)))
+        # `housingGrowthFactor`: full above the half-growth mark, half above
+        # the quarter mark, a quarter down to the zero mark, none below it
+        h_half, h_quarter, h_zero = self.rules.housing_left_growth
+        hf = torch.where(head > h_half, torch.ones_like(head),
+                         torch.where(head > h_quarter, torch.full_like(head, 0.5),
+                                     torch.where(head >= h_zero, torch.full_like(head, 0.25), torch.zeros_like(head))))
         # ONE growth modifier, every percent on it summed (`computeCityStats`)
         # in the game's 256ths, each truncated (`growth256`): the tier's, then
         # `empireGrowth256` (the Migration Treaty's, then each wonder's), then

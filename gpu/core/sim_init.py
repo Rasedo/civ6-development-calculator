@@ -1473,9 +1473,13 @@ class SimInit:
         self._proj_seat_rows: list[tuple[int, int]] = [
             (int(p["cv"]), int(p["ld"])) for p in self._proj_rows]
         self._proj_move_cap = {i for i, p in enumerate(self._proj_rows) if int(p["mc"])}
-        # each row's yield conversion (`yieldPct`, 0 for none) and the rows
-        # that power their city while they head its queue (`fullyPowered`)
-        self._proj_yp = [int(p["yp"]) for p in self._proj_rows]
+        # each row's yield-conversion rate (`projectConversionRate`: the
+        # percent over 100 in 1/256 fixed point, truncated; 0 for none), its
+        # yield column (-1 for none), and the rows that power their city while
+        # they head its queue (`fullyPowered`)
+        self._proj_rate_t = torch.tensor([(int(p["yp"]) * 256 // 100) / 256 for p in self._proj_rows] or [0.0],
+                                         dtype=torch.float64, device=device)
+        self._proj_y_t = torch.tensor([int(p["y"]) for p in self._proj_rows] or [-1], dtype=torch.long, device=device)
         self._proj_fp = [i for i, p in enumerate(self._proj_rows) if int(p["fp"])]
         self._proj_gf = float(_pj["gppFraction"])
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
@@ -1832,6 +1836,8 @@ class SimInit:
         self._gw_printing_mult = int(rr["gwPrintingWritingMult"])
         # a maker's raised work Tourism, [object type, roster index], -1 none
         self._gw_maker_tourism = torch.tensor(rr["gwMakerTourism"], dtype=torch.long, device=device)
+        # ...and its raised work Culture, the same shape
+        self._gw_maker_culture = torch.tensor(rr["gwMakerCulture"], dtype=torch.float64, device=device)
         self._gw_maker_class = torch.tensor(rr["gwMakerClass"], dtype=torch.long, device=device)
         self._wonder_tour_base = int(rr["wonderTourismBase"])
         self._tourism_per_visitor = int(rr["tourismPerVisitorPerCiv"])
@@ -3606,6 +3612,12 @@ class SimInit:
         # a FREE CITY's build pot (`City.freePot`), read at the Free Cities row
         # alone; a full city-block plane so compaction carries it
         self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
+        # `City.projectYield`: the yield the city's last production step
+        # converted from a district project — its amount and its yield
+        # column (-1 for none) — which the city's yields read until the next
+        # step clears it
+        self.city_proj_conv = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
+        self.city_proj_yield = torch.full((B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
         self.seat_science_total = torch.zeros(B, self.n_majors, dtype=dtype, device=device)
 
         self.units_mode = bool(f0.get("unitsMode", 0))

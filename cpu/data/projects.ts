@@ -1,7 +1,8 @@
 /**
- * District projects (base Civ 6 set). Repeatable production sinks: on
- * completion they grant a lump of their yield plus great-person points of the
- * matching class. Cost scales with research progress like districts (locked in
+ * District projects (base Civ 6 set). Repeatable production sinks: each
+ * turn they convert a share of the Production put into them into their yield
+ * (`City.projectYield`), and on completion they grant great-person points of
+ * the matching class. Cost scales with research progress like districts (locked in
  * when queued).
  *
  * The district -> yield -> GP-class mapping is the install's
@@ -33,9 +34,8 @@ export interface ProjectDef {
   district: DistrictId;
   yield: YieldKey | null;
   /** CIV6 (Project_YieldConversions.PercentOfProductionRate): the share of
-   *  the Production invested that the project converts into `yield`, paid as
-   *  one lump on completion (the Production invested equals the cost, so the
-   *  totals agree). Present exactly where `yield` is. */
+   *  the Production put into the project each step that it converts into
+   *  `yield` (`City.projectYield`). Present exactly where `yield` is. */
   yieldPct?: number;
   /** CIV6 (Projects_XP2.FullyPoweredWhileActive): the city counts as fully
    *  powered, with no fuel burned, while this project heads its queue. */
@@ -546,10 +546,12 @@ export function isSpaceProject(id: string): boolean {
  *  requirement by 5 each time it is completed". */
 export const LASER_POWER_LOAD = 5;
 
-/** The yield lump a district project pays on completion: its cost at the
- *  row's `yieldPct`. */
-export function projectYieldLump(p: ProjectDef, cost: number): number {
-  return Math.round(cost * ((p.yieldPct ?? 0) / 100));
+/** CIV6 (City_BuildQueue 0x184ae0): the rate a district project converts
+ *  its Production at — PercentOfProductionRate over 100 in the game's 1/256
+ *  fixed point, truncated (runs/h1_duelw1108, Aquileia t169-176: Commercial
+ *  Hub Investment's 30% on 16 Production reads 4.75 Gold, 16 x 76/256). */
+export function projectConversionRate(p: ProjectDef): number {
+  return Math.floor(((p.yieldPct ?? 0) * 256) / 100) / 256;
 }
 export const PROJECT_GPP_FRACTION = 0.22;
 

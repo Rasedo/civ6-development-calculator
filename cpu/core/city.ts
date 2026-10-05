@@ -1612,6 +1612,11 @@ export function computeCityStats(
   // in Militaristic Wolin where its plots, Palace and Urban Planning pay 9;
   // 14.4 at t95, (15 + 1) x 0.9 at its tier)
   if (city.queue[0]) bonuses.production += cityStateItemProduction(state, city, city.queue[0].kind);
+  // CIV6 (Project_YieldConversions): the yield the last production step
+  // converted from a district project, under the city's percents
+  // (runs/h1_duelw1108, Aquileia t112-125: Campus Research Grants on 9.9
+  // Production read 7.625 Science, (7 + 15% x 9.9) x 0.9 Displeased)
+  if (city.projectYield) bonuses[city.projectYield.key] += city.projectYield.amount;
 
   const hParts = housingParts(state, city, m);
   const housing = hParts.reduce((a, b) => a + b, 0);

@@ -32,7 +32,7 @@ import {
 } from '../data/cityStates';
 import { ENCAMPMENT_HP, UNIT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
-import { PROJECTS, projectYieldLump } from '../data/projects';
+import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
@@ -44,7 +44,6 @@ import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
-import { applyLumpYield } from './economy';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
@@ -666,9 +665,11 @@ function minorRepairTarget(state: GameState, cityState: CityState): string | und
  *  With no row wanting anything the pot takes it under the city's percent
  *  alone. A district paves its plot (`paveGround`). The repair restores the
  *  walls, the city's and its Encampment's, at the HP it puts back
- *  (`projectCost`); a district project pays its yield conversion, its cost at
- *  the row's `yieldPct` (`projectYieldLump`), into the minor's own pot for that yield (a
- *  city-state earns no Great People, so its points go nowhere).
+ *  (`projectCost`); a district project converts the row's `yieldPct` of the
+ *  turn's Production (never above its cost) into its yield, which the city's
+ *  yields read until the next step (`CityState.projectYield`; a city-state
+ *  earns no Great People, so its points go nowhere). The step clears the
+ *  last conversion first.
  *  A PILLAGED building is queued after the item the minor was working on
  *  when it fell (`CityState.repairWait`, cleared as an item completes or when
  *  no row wants one) and then comes first: it resumes at
@@ -676,6 +677,7 @@ function minorRepairTarget(state: GameState, cityState: CityState): string | und
  *  (`minorRepairTarget`). */
 function minorBuild(state: GameState, cityState: CityState, production: number): void {
   cityState.fullyPowered = false;
+  delete cityState.projectYield;
   let pot = cityState.prodProgress ?? 0;
   const toward = (pct: number) => {
     pot += minorProduction(production, pct);
@@ -744,6 +746,9 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       const city = minorCity(cityState);
       const cost = projectCost(state, cityState.seat, want.project, city);
       const def = PROJECTS[want.project];
+      if (def.yield) {
+        cityState.projectYield = { key: def.yield, amount: Math.min(production, cost) * projectConversionRate(def) };
+      }
       if (pot < cost) {
         cityState.fullyPowered = !!def.fullyPowered;
         return;
@@ -753,9 +758,6 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       if (def.repair) {
         cityState.outerHp = wallsMax(state, city);
         fitEncampOuter(state, city);
-      } else if (def.yield) {
-        applyLumpYield(state, cityState.centerIndex, { key: def.yield, amount: projectYieldLump(def, cost) },
-          cityState.seat);
       }
       return;
     }

@@ -19,7 +19,7 @@ import { governorFlag, governorSum } from './governors';
 import { DISTRICTS } from '../data/districts';
 import { CARBON_RECAPTURE_FAVOR, CARBON_RECAPTURE_UNITS } from '../data/climate';
 import { emitCarbon, repairBehindBarrier } from './climate';
-import { PROJECTS, projectYieldLump, gpClassesOf, gppFractionOf } from '../data/projects';
+import { PROJECTS, gpClassesOf, gppFractionOf } from '../data/projects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY } from '../data/seats';
 import { ERAS, TECHS } from '../data/techs';
@@ -161,18 +161,15 @@ export function completeProject(state: GameState, city: City, projectId: string,
     }
     return;
   }
-  if (def.yield) {
-    const amount = projectYieldLump(def, cost);
-    applyLumpYield(state, city.centerIndex, { key: def.yield, amount }, city.seat);
-    state.eventLog.push(`${city.name} completed ${def.name}: +${amount} ${def.yield}.`);
-  }
+  // a district project's yield is converted turn by turn as the Production
+  // goes in (`City.projectYield`); its completion pays the points
   const classes = gpClassesOf(def);
   if (classes.length) {
     const pts = Math.round(cost * gppFractionOf(def));
     for (const gc of classes) {
       owner.gpp[gc] = (owner.gpp[gc] ?? 0) + pts * congressGppFactor(state, gc);
     }
-    if (!def.yield) state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${classes.join('/')} points.`);
+    state.eventLog.push(`${city.name} completed ${def.name}: +${pts} ${classes.join('/')} points.`);
   }
 }
 

@@ -4,6 +4,12 @@ import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
 export type FocusId = 'balanced' | YieldKey;
 
+/** a district project's converted yield (`City.projectYield`) */
+export interface ProjectYield {
+  key: YieldKey;
+  amount: number;
+}
+
 /** CIV6 (Pillaging): what a wrecked improvement or district pays its
  *  pillager. HEAL is a flat HP lump; every other kind is a yield lump that
  *  scales with game progress (`progressScale`). */
@@ -116,6 +122,13 @@ export interface City {
   districts: { type: DistrictId; tileIndex: number }[];
   wonders: { id: string; tileIndex: number }[];
   productionBank?: number;
+  /** CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): the yield
+   *  the city's last production step converted from the Production it put
+   *  into a district project — PercentOfProductionRate of that Production
+   *  (with the bank paid in, never above the project's cost). The step
+   *  clears it first (0x177d10), and the city's yields read it, under their
+   *  percent, until the next step. Absent = none. */
+  projectYield?: ProjectYield;
   loyalty?: number;
   /** A FREE CITY's race: the loyalty pressure each major seat has exerted on
    *  it "since the Free City became independent", dense over seats. CIV6:
@@ -933,6 +946,9 @@ export interface CityState extends Seat {
   /** the build pot: the city's own Production, banked until the build
    *  table's next item is covered (`minorPhase`). */
   prodProgress?: number;
+  /** the yield its last build step converted from a district project
+   *  (`City.projectYield`, which `minorCity` hands its city) */
+  projectYield?: ProjectYield;
   /** the episode's draws (`minorPlan`): per `MINOR_BUILD_ROWS` row, the turn
    *  from which it wants its item (-1 never, 0 for a row that draws none),
    *  and the army it keeps. Absent = not drawn yet. */

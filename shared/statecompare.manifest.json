@@ -1752,6 +1752,18 @@
           ]
         },
         {
+          "name": "minorProjectYield",
+          "compare": "milli",
+          "covers": [
+            "CityState.projectYield"
+          ],
+          "planes": [
+            "city_proj_yield",
+            "city_proj_conv"
+          ],
+          "note": "the yield the minor's last build step converted from a district project: [yield index, amount], [-1, 0] for none."
+        },
+        {
           "name": "minorTreasury",
           "compare": "milli",
           "covers": [
@@ -2296,6 +2308,18 @@
           "planes": [
             "city_prod_bank"
           ]
+        },
+        {
+          "name": "projectYield",
+          "compare": "milli",
+          "covers": [
+            "City.projectYield"
+          ],
+          "planes": [
+            "city_proj_yield",
+            "city_proj_conv"
+          ],
+          "note": "the yield the city's last production step converted from a district project: [yield index, amount], [-1, 0] for none."
         },
         {
           "name": "specialists",

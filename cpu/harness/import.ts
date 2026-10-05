@@ -65,7 +65,7 @@ import {
 } from '../data/greatWorks';
 import { CONGRESS_RESOLUTIONS, UDT_DISTRICTS } from '../data/seats';
 import { CONGRESS_CURRENCIES } from '../core/congress';
-import { PROJECTS, PROJECT_LIST } from '../data/projects';
+import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../data/policies';
 import { LUXURY_IDS } from '../../world/resources';
@@ -123,6 +123,12 @@ export interface Imported {
    *  gives its flood count (`importFloodCounts`). A read-back column cannot
    *  disagree, so the plot checks leave it out */
   readBack: Map<number, Set<number>>;
+  /** the yield column (YIELD_KEYS order) of each city, by
+   *  `${gamePlayer}:${gameCityId}`, whose district project's conversion the
+   *  records cannot give (`importProjectYield`): the step that put the
+   *  project's first Production in also paid in a bank no record holds, so
+   *  `city.yields` leaves that column out */
+  projectYieldUnread: Map<string, number>;
   /** every live trade route of the record, on its owner's `tradeRoutes`,
    *  beside the game's route table it came from */
   routes: { owner: number; route: TradeRoute; game: Record<string, unknown> }[];
@@ -349,6 +355,9 @@ function leaderRow(leader: string): number {
 export interface History {
   firstTurn: number;
   last: TurnRecord | null;
+  /** the record folded in before `last`, and the one before that */
+  before: TurnRecord | null;
+  beforeThat: TurnRecord | null;
   /** the World Congress table the record before the current one showed */
   congressBefore?: unknown;
   bestMelee: Map<number, number>;
@@ -501,7 +510,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -945,6 +954,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
   foldDominance(h, rec);
+  h.beforeThat = h.before;
+  h.before = h.last;
   h.last = rec;
 }
 
@@ -1465,12 +1476,24 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   for (const city of cityByKey.values()) {
     if (importQueue(ctx, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
   }
+  // the record before is the last step's input where it is the turn before
+  // and the owner's turn start ran once between each pair (`notStarted`)
+  const b1 = history?.before?.turn === rec.turn - 1 ? history.before : null;
+  const b2 = b1 && history?.beforeThat?.turn === rec.turn - 2 ? history.beforeThat : null;
+  const late = new Set([...(b1 ? notStarted(b1, rec) : []), ...(b1 && b2 ? notStarted(b2, b1) : [])]);
+  const prevCities = new Map((b1?.cities ?? []).map((c) => [`${c.owner}:${c.id}`, c]));
+  const projectYieldUnread = new Map<string, number>();
+  for (const [key, city] of cityByKey) {
+    const c = dumpOfCity.get(city)!;
+    const col = importProjectYield(state, ctx.cat, c, prevCities.get(key), !!b2 && !late.has(c.owner), city);
+    if (col >= 0) projectYieldUnread.set(key, col);
+  }
   const readBack = importFloodCounts(rec, state, cityByKey.values());
   if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, congressOf, queueProgressRead, readBack, routes,
+    congressGaps, congressOf, queueProgressRead, readBack, projectYieldUnread, routes,
     districtLocked: history?.districtLocked ?? new Map(),
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
@@ -2083,6 +2106,62 @@ function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boole
   });
   city.queue = queue;
   return read;
+}
+
+/**
+ * The players whose turn start had not run when `b` was read: every city of
+ * theirs that `a` saw with food and culture coming in shows both boxes
+ * exactly where `a` left them. The next record then carries two turn starts
+ * at once, so neither pair is a one-turn step for that player.
+ */
+export function notStarted(a: TurnRecord, b: TurnRecord): Set<number> {
+  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
+  const moving = new Map<number, boolean>();
+  for (const c1 of b.cities) {
+    const c0 = before.get(`${c1.owner}:${c1.id}`);
+    if (!c0 || c0.pop !== c1.pop || !(num(c0.foodSurplus) > 0) || !(num(c0.cultureYield) > 0)) continue;
+    const still = num(c1.food) === num(c0.food) && num(c1.culture) === num(c0.culture);
+    moving.set(c1.owner, (moving.get(c1.owner) ?? false) || !still);
+  }
+  return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
+}
+
+/**
+ * The yield a city's last production step converted from a district project
+ * (`City.projectYield`). Where the record before is that step's input
+ * (`known`), it holds the item heading the queue and the city's Production:
+ * a converting project heading it there took that Production — completed or
+ * not — and converted its row's rate of it, never above the project's cost.
+ * A converting project heading the queue now that did not head it before
+ * took its first step with a bank paid in that no record holds, and where
+ * the record before is no step's input the step is unknown: the return
+ * names that project's yield column (YIELD_KEYS order), which `city.yields`
+ * leaves out; -1 otherwise.
+ */
+function importProjectYield(state: GameState, cat: Catalog, c: DumpCity, prev: DumpCity | undefined, known: boolean,
+  city: City): number {
+  const head = (d: DumpCity | undefined): string | undefined => {
+    const e = d?.queue?.[0];
+    if (!e || typeof e !== 'object' || e.ProjectType === undefined) return undefined;
+    const id = engineId('project', cat.projects[e.ProjectType] ?? '', 'PROJECT_', PROJECTS);
+    return id && PROJECTS[id]?.yield ? id : undefined;
+  };
+  const before = head(prev);
+  if (!known) {
+    const any = before ?? head(c);
+    return any ? YIELD_KEYS.indexOf(PROJECTS[any].yield!) : -1;
+  }
+  if (before) {
+    const def = PROJECTS[before];
+    const production = num(prev!.yields[1]);
+    city.projectYield = {
+      key: def.yield!,
+      amount: Math.min(production, projectCost(state, city.seat, before, city)) * projectConversionRate(def),
+    };
+    return -1;
+  }
+  const now = head(c);
+  return now ? YIELD_KEYS.indexOf(PROJECTS[now].yield!) : -1;
 }
 
 /** a resolution's engine index by the game's ResolutionType hash */

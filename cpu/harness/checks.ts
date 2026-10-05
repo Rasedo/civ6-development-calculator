@@ -49,7 +49,7 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, routeChanges,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, notStarted, routeChanges,
   type History, type Imported,
 } from './import';
 import {
@@ -215,7 +215,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       breakdown: Object.fromEntries(Object.entries(stats.breakdown).map(([k, y]) => [k, YIELD_KEYS.map((q) => round3(y[q]))])),
       tier: stats.amenities.tier.name,
     };
-    push('city.yields', oy.every((v, i) => near(v, gy[i], 0.05)), gy, oy, cityState);
+    // a district project's first conversion took a bank no record holds
+    const unread = imp.projectYieldUnread.get(`${c.owner}:${c.id}`) ?? -1;
+    push('city.yields', oy.every((v, i) => i === unread || near(v, gy[i], 0.05)), gy, oy, cityState);
     const centre = plotAt(rec, city.centerIndex)[P.yields] as number[];
     const oc = cityCentreYields(state, city);
     const occ = YIELD_KEYS.map((k) => oc[k]);
@@ -507,24 +509,6 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
   }
   return { cityChanged, unitsNew, spreads, plotsGained, goldSpent, popOutsideBox,
     notStarted: notStarted(a, b) };
-}
-
-/**
- * The players whose turn start had not run when `b` was read: every city of
- * theirs that `a` saw with food and culture coming in shows both boxes
- * exactly where `a` left them. The next record then carries two turn starts
- * at once, so neither pair is a one-turn step for that player.
- */
-function notStarted(a: TurnRecord, b: TurnRecord): Set<number> {
-  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
-  const moving = new Map<number, boolean>();
-  for (const c1 of b.cities) {
-    const c0 = before.get(`${c1.owner}:${c1.id}`);
-    if (!c0 || c0.pop !== c1.pop || !(num(c0.foodSurplus) > 0) || !(num(c0.cultureYield) > 0)) continue;
-    const still = num(c1.food) === num(c0.food) && num(c1.culture) === num(c0.culture);
-    moving.set(c1.owner, (moving.get(c1.owner) ?? false) || !still);
-  }
-  return new Set([...moving].filter(([, m]) => !m).map(([o]) => o));
 }
 
 /**

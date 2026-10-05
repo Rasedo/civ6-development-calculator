@@ -28,7 +28,7 @@ import {
   GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
   holderSlots, slotAccepts, type GreatWork,
 } from '../data/greatWorks';
-import { GP_WORK_TOURISM, GREAT_PEOPLE, GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
+import { GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import type { GreatPersonClass } from './types';
 
 /** the shape every work-holding city answers with — a City, a capture's stub */
@@ -221,7 +221,7 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
   let culture = 0;
   let faith = 0;
   for (const w of works) {
-    culture += GWO_CULTURE[w.obj]! * mult[w.slot]!;
+    culture += gwWorkCulture(w) * mult[w.slot]!;
     faith += GWO_FAITH[w.obj]! * mult[w.slot]!;
   }
   return { culture, faith };
@@ -258,13 +258,22 @@ function gwRepeatsPerson(works: readonly GreatWork[], w: GreatWork): boolean {
     && GW_MAKER_CLASS[o.obj] === cls);
 }
 
-/** the override table the GPU reads: per object type and maker index, the
- *  maker's raised Tourism, -1 where the object type's pays */
-export function gwMakerTourismTable(): number[][] {
+/** CIV6 (GreatWork_YieldChanges): a work's own Culture — its maker's raised
+ *  figure (`GP_WORK_CULTURE`) or its object type's. `_gw_maker_culture` is
+ *  the twin. */
+export function gwWorkCulture(w: { obj: number; maker: number }): number {
+  const cls = GW_MAKER_CLASS[w.obj];
+  const p = cls && w.maker >= 0 ? GREAT_PEOPLE[cls][w.maker] : undefined;
+  return (p ? GP_WORK_CULTURE[p.id] : undefined) ?? GWO_CULTURE[w.obj]!;
+}
+
+/** an override table the GPU reads: per object type and maker index, the
+ *  maker's raised figure in `table`, -1 where the object type's pays */
+export function gwMakerTable(table: Readonly<Record<string, number>>): number[][] {
   const width = Math.max(...Object.values(GREAT_PEOPLE).map((r) => r.length));
   return GW_MAKER_CLASS.map((cls) => Array.from({ length: width }, (_, i) => {
     const p = cls ? GREAT_PEOPLE[cls][i] : undefined;
-    return (p ? GP_WORK_TOURISM[p.id] : undefined) ?? -1;
+    return (p ? table[p.id] : undefined) ?? -1;
   }));
 }
 

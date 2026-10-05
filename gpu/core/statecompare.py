@@ -791,6 +791,10 @@ CITY_STATE = {
     "techProgress": lambda sim, b, rows: [float(sim.citystate_tech_prog[b, s]) for s in rows],
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
+    "minorProjectYield": lambda sim, b, rows: [
+        [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
+        for s in rows
+    ],
     "minorTreasury": lambda sim, b, rows: [float(sim.citystate_treasury[b, s]) for s in rows],
     "minorShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim._CITY_MINOR0 + s]) for s in rows],
     # a minor's row is a row of the CITY BLOCK, so its population and its
@@ -941,6 +945,9 @@ CITY = {
     ],
     "productionBank": lambda sim, b, rows: [
         float(sim.city_prod_bank[b, c, s]) for c, s in rows
+    ],
+    "projectYield": lambda sim, b, rows: [
+        [int(sim.city_proj_yield[b, c, s]), float(sim.city_proj_conv[b, c, s])] for c, s in rows
     ],
     "queueFront": lambda sim, b, rows: [_qfront(sim, b, c, s) for c, s in rows],
     "specialists": _spec_rows,

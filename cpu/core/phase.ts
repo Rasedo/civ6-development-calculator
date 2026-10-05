@@ -33,7 +33,7 @@ import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from '
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
-import { PROJECT_LIST } from '../data/projects';
+import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
@@ -2918,6 +2918,9 @@ export function seatPhase(state: GameState): void {
     for (const civCity of walkCities) {
       const production = madeOf.get(civCity.id)!;
       const q = civCity.queue[0];
+      // CIV6 (City_BuildQueue 0x177d10): the step clears the yield the last
+      // one converted before it puts this turn's Production in
+      delete civCity.projectYield;
       if (q && (q.kind === 'settler' || q.kind === 'unit' || q.kind === 'district' || q.kind === 'building' || q.kind === 'project' || q.kind === 'wonder')) {
         // The seat's GOVERNMENT/POLICY encampHarborProdMult: a seat that
         // adopts the government owns its effects; the multiplier keys on
@@ -3025,6 +3028,7 @@ export function seatPhase(state: GameState): void {
         _bpct += warBuffPct;
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
+        const banked = civCity.productionBank ?? 0;
         // the city's Production holds its envoys' flat toward this item
         // (`computeCityStats`)
         q.progress += production * _em;
@@ -3043,6 +3047,15 @@ export function seatPhase(state: GameState): void {
               : q.kind === 'wonder'
                 ? BUILT_WONDERS[q.wonder]?.cost ?? 54 // catalog cost (already speed-scaled)
                 : q.cost ?? 54; // settler / district / project carry their own cost
+        // CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): a
+        // district project converts PercentOfProductionRate of the Production
+        // the step put into it — before the item's own percents, with the
+        // bank, never above its cost — into its yield, which the city's
+        // yields read until the next step
+        const conv = q.kind === 'project' ? PROJECTS[q.project] : undefined;
+        if (conv?.yield) {
+          civCity.projectYield = { key: conv.yield, amount: Math.min(production + banked, cost) * projectConversionRate(conv) };
+        }
         if (q.progress >= cost) {
           civCity.queue.shift();
           completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);

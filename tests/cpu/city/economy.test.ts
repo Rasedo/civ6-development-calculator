@@ -7,7 +7,8 @@ import { commitProduction } from '../../../cpu/core/seatTurn';
 import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
 import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
-import { PROJECTS, projectYieldLump, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
+import { PROJECTS, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
+import { computeCityStats } from '../../../cpu/core/city';
 import { purchasableBuildings } from '../../../cpu/core/rules';
 import { purchaseStep } from '../../../cpu/core/effects';   // every price is floored to a multiple of five (measured)
 import { gameProgressPct } from '../../../cpu/data/constants';
@@ -235,7 +236,7 @@ describe('district projects', () => {
     expect(availableProjects(state, city).map((p) => p.id)).toContain('RESEARCH_GRANTS');
   });
 
-  it('convert production into a yield lump plus great-person points, repeatably', () => {
+  it('convert the Production put in into their yield each step, pay great-person points, repeatably', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'CAMPUS', 6, 5);
@@ -257,22 +258,27 @@ describe('district projects', () => {
     expect(cost).toBe(projectCost(state, 0, 'RESEARCH_GRANTS'));
 
     city.queue[0].progress = cost; // about to finish
-    const sciBefore = seatOf(state, 0)!.scienceTotal;
     endTurn(state);
-    const lump = projectYieldLump(PROJECTS.RESEARCH_GRANTS, cost);
-    expect(lump).toBe(Math.round(cost * 0.15));
     const gpp = Math.round(cost * PROJECT_GPP_FRACTION);
     expect(city.queue.length).toBe(0);
-    expect(seatOf(state, 0)!.scienceTotal - sciBefore).toBeGreaterThanOrEqual(lump);
-    expect(seatOf(state, 0)!.research.techProgress).toBeGreaterThanOrEqual(lump);
     expect(seatOf(state, 0)!.gpp.SCIENTIST ?? 0).toBeGreaterThanOrEqual(gpp);
     expect(state.eventLog.some((e) => e.includes('Research Grants'))).toBe(true);
+    // CIV6 (Project_YieldConversions): the step converted 15% of the
+    // Production it put in — never above the cost — into Science, which the
+    // city's yields read until its next step
+    const conv = city.projectYield!;
+    expect(conv.key).toBe('science');
+    expect(conv.amount).toBeGreaterThan(0);
+    expect(conv.amount).toBeLessThanOrEqual(cost * 0.15);
+    const withConv = computeCityStats(state, city).total.science;
+    delete city.projectYield;
+    expect(withConv).toBeGreaterThan(computeCityStats(state, city).total.science);
 
     // Repeatable: nothing stops you queueing it again.
     expect(queueProject(state, city.id, 'RESEARCH_GRANTS', 0).ok).toBe(true);
   });
 
-  it('Encampment Training converts 15% of its cost into Gold and pays General points', () => {
+  it('Encampment Training converts 15% of its Production into Gold and pays General points', () => {
     const state = makeState();
     const city = foundAt(state, 5, 5);
     addDistrict(state, city, 'ENCAMPMENT', 6, 5);
@@ -284,11 +290,10 @@ describe('district projects', () => {
       Math.round(cost * PROJECT_GPP_FRACTION),
     );
     // CIV6 (Project_YieldConversions): YIELD_GOLD at 15% of the Production
-    const lump = projectYieldLump(PROJECTS.TRAINING, cost);
     expect(PROJECTS.TRAINING.yield).toBe('gold');
-    expect(lump).toBe(Math.round(cost * 0.15));
-    expect(lump).toBeGreaterThan(0);
-    expect(state.eventLog).toContain(`${city.name} completed Encampment Training: +${lump} gold.`);
+    expect(city.projectYield?.key).toBe('gold');
+    expect(city.projectYield!.amount).toBeGreaterThan(0);
+    expect(city.projectYield!.amount).toBeLessThanOrEqual(cost * 0.15);
     expect(seatOf(state, 0)!.gpp.SCIENTIST ?? 0).toBe(0);
     expect(seatOf(state, 0)!.gpp.ARTIST ?? 0).toBe(0);
   });
@@ -296,7 +301,6 @@ describe('district projects', () => {
   it('each district project converts at its own install percent', () => {
     const pct = Object.fromEntries(Object.values(PROJECTS).filter((p) => p.yield).map((p) => [p.id, p.yieldPct]));
     expect(pct).toEqual({ RESEARCH_GRANTS: 15, FESTIVAL: 15, PRAYERS: 15, INVESTMENT: 30, SHIPPING: 15, TRAINING: 15 });
-    expect(projectYieldLump(PROJECTS.INVESTMENT, 100)).toBe(30);
     expect(PROJECTS.LOGISTICS.yield).toBeNull();
   });
 

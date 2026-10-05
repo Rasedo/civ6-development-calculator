@@ -575,6 +575,7 @@ export function minorCity(cityState: CityState): City {
     districts: [{ type: 'CITY_CENTER', tileIndex: cityState.centerIndex }, ...(cityState.districts ?? [])],
     wonders: [],
     outerHp: cityState.outerHp,
+    projectYield: cityState.projectYield,
     lastHitTurn: cityState.lastHitTurn,
     powered: cityState.powered,
     religionPressure: cityState.religionPressure,

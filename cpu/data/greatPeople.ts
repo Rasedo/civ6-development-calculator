@@ -463,6 +463,20 @@ export const GP_WORK_TOURISM: Readonly<Record<string, number>> = {
   GP_GABRIELA_MISTRAL: srcConst('greatPeople.workTourism.GP_GABRIELA_MISTRAL', 4,
     xml('GreatWorks', 'GreatWorkType=GREATWORK_BABYLON_GABRIELA_MISTRAL_1', 'Tourism')),
 };
+/** CIV6 (GreatWork_YieldChanges): the makers every one of whose works pays a
+ *  raised Culture — the Babylon pack's four Writers, 4 where a Work of
+ *  Writing's rows pay 2 (`gwWorkCulture`; runs/h1_duelw1108, Jiaodong
+ *  t212-249: Beatrix Potter's work reads 4). */
+export const GP_WORK_CULTURE: Readonly<Record<string, number>> = {
+  GP_VALMIKI: srcConst('greatPeople.workCulture.GP_VALMIKI', 4,
+    xml('GreatWork_YieldChanges', 'GreatWorkType=GREATWORK_BABYLON_VALMIKI_1&YieldType=YIELD_CULTURE', 'YieldChange')),
+  GP_RUMI: srcConst('greatPeople.workCulture.GP_RUMI', 4,
+    xml('GreatWork_YieldChanges', 'GreatWorkType=GREATWORK_BABYLON_RUMI_1&YieldType=YIELD_CULTURE', 'YieldChange')),
+  GP_BEATRIX_POTTER: srcConst('greatPeople.workCulture.GP_BEATRIX_POTTER', 4,
+    xml('GreatWork_YieldChanges', 'GreatWorkType=GREATWORK_BABYLON_BEATRIX_POTTER_1&YieldType=YIELD_CULTURE', 'YieldChange')),
+  GP_GABRIELA_MISTRAL: srcConst('greatPeople.workCulture.GP_GABRIELA_MISTRAL', 4,
+    xml('GreatWork_YieldChanges', 'GreatWorkType=GREATWORK_BABYLON_GABRIELA_MISTRAL_1&YieldType=YIELD_CULTURE', 'YieldChange')),
+};
 export const GP_CLASSES = Object.keys(GP_CLASS_DISTRICT) as GreatPersonClass[];
 
 /**

@@ -1009,6 +1009,12 @@ class SimPhase:
         bidx = self._bidx
         if pre is None:
             pre = self._produce_pre(row)
+        # CIV6 (City_BuildQueue 0x177d10): the step clears the yield the last
+        # one converted before it puts this turn's Production in
+        self.city_proj_conv[bidx, row, col] = torch.where(
+            act, torch.zeros_like(self.city_proj_conv[bidx, row, col]), self.city_proj_conv[bidx, row, col])
+        self.city_proj_yield[bidx, row, col] = torch.where(
+            act, torch.full_like(self.city_proj_yield[bidx, row, col], -1), self.city_proj_yield[bidx, row, col])
         cur = self.city_current[bidx, row, col, 0].clone()
         # A FORMATION head is the unit's own column to every multiplier and to
         # the completion below — TS's `kind === 'unit'` tests cannot tell them
@@ -1320,6 +1326,7 @@ class SimPhase:
                 for _spc, _hit in _seen.values():
                     _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
         _emall = _emall * (1 + _add)
+        raw = prod
         # the city's Production holds its envoys' flat toward this item (the
         # walk's bonuses, `computeCityStats`)
         prod = prod * _emall
@@ -1341,6 +1348,20 @@ class SimPhase:
         # plant the Global Energy Treaty is discounting this session.
         self._reprice_live(row)
         cost = self.city_cost[bidx, row, col, 0].clone()
+        # CIV6 (Project_YieldConversions; City_BuildQueue 0x184ae0): a
+        # district project converts PercentOfProductionRate of the Production
+        # the step put into it — before the item's own percents, with the
+        # bank, never above its cost — into its yield, which the city's yields
+        # read until the next step (`City.projectYield`)
+        if self._proj_rows:
+            _pi = cur - self.PROJECT_BASE
+            _pic = _pi.clamp(min=0, max=len(self._proj_rows) - 1)
+            _py = self._proj_y_t.take(_pic)
+            _pon = has_q & (_pi >= 0) & (_pi < len(self._proj_rows)) & (_py >= 0)
+            if bool(_pon.count_nonzero()):
+                _amt = torch.minimum(raw.double() + bank.double(), cost.double()) * self._proj_rate_t.take(_pic)
+                self.city_proj_conv[bidx, row, col] = torch.where(_pon, _amt, self.city_proj_conv[bidx, row, col])
+                self.city_proj_yield[bidx, row, col] = torch.where(_pon, _py, self.city_proj_yield[bidx, row, col])
         done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
         if not bool(done.count_nonzero()):
             return
@@ -1602,21 +1623,9 @@ class SimPhase:
                     # "Completing the X project" whatever the project then
                     # goes on to do, so the score lands FIRST, as TS's does.
                     self._score_project(row, hit, pidx)
-                    y_i = int(prow["y"])
-                    # `projectYieldLump`: the cost at the row's own percent
-                    amt_y = js_round(cost * (self._proj_yp[pidx] / 100))
-                    # ORACLE: applyLumpYield's science/culture arms feed the
-                    # LIFETIME banks alongside the pools.
-                    if y_i == 3:
-                        self.civ_tech_prog[:, row] = torch.where(hit, self.civ_tech_prog[:, row] + amt_y, self.civ_tech_prog[:, row])
-                        self.seat_science_total[:, row] = torch.where(hit, self.seat_science_total[:, row] + amt_y, self.seat_science_total[:, row])
-                    elif y_i == 4:
-                        self.civ_civic_prog[:, row] = torch.where(hit, self.civ_civic_prog[:, row] + amt_y, self.civ_civic_prog[:, row])
-                        self.civ_culture[:, row] = torch.where(hit, self.civ_culture[:, row] + amt_y, self.civ_culture[:, row])
-                    elif y_i == 2:
-                        self.civ_treasury[:, row] = torch.where(hit, self.civ_treasury[:, row] + amt_y, self.civ_treasury[:, row])
-                    elif y_i == 5:
-                        self.civ_faith[:, row] = torch.where(hit, self.civ_faith[:, row] + amt_y, self.civ_faith[:, row])
+                    # a district project's yield is converted step by step as
+                    # the Production goes in (`city_proj_conv`); its
+                    # completion pays the points
                     amt_g = js_round(cost * float(prow["gf"]))
                     g_list = prow["gs"]
                     if not g_list:

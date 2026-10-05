@@ -43,7 +43,8 @@ import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { City, CityState, DealItem, GameState, Seat, Tile, Unit } from './types';
+import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Unit } from './types';
+import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
 import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, isFreeSeat, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
@@ -242,6 +243,9 @@ const overUnits = (fn: (u: Unit) => Val): Extractor => (_state, rows) => (rows a
 const overTiles = (fn: (t: Tile) => Val): Extractor => (_state, rows) => (rows as Tile[]).map(fn);
 const overCityStates = (fn: (cityState: CityState, state: GameState) => Val): Extractor =>
   (state, rows) => (rows as CityState[]).map((cityState) => fn(cityState, state));
+/** a district project's converted yield as [yield index, amount], [-1, 0] for none */
+const projectYieldCols = (p: ProjectYield | undefined): number[] =>
+  (p ? [YIELD_KEYS.indexOf(p.key), p.amount] : [-1, 0]);
 
 /** Every route of one holder — a major or a city-state — as flattened
  *  [fromTile, destTile, kind, exp, born, walkTile, leg, course...] rows, sorted.
@@ -690,6 +694,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   techProgress: overCityStates((cityState) => cityState.research.techProgress),
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
+  minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),
   minorPop: overCityStates((cityState) => cityState.population),
@@ -773,6 +778,7 @@ const CITY: Record<string, Extractor> = {
       .sort((a, b) => a - b),
   ),
   productionBank: overCities((r) => r.city.productionBank ?? 0),
+  projectYield: overCities((r) => projectYieldCols(r.city.projectYield)),
   queueFront: overCities((r) => overQueue(r.city.queue, (q) => [queueItemColumn(q), queueTile(q)]).flat()),
   specialists: overCities((r, state) => {
     const eff = effectiveSpecialists(state, r.city);

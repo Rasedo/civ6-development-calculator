@@ -1703,6 +1703,8 @@ class SimOrders:
             self.city_outer_hp[b, row, col] = _m_outer
             self._q_clear(b, row, col)
             self.city_prod_bank[b, row, col] = 0
+            self.city_proj_conv[b, row, col] = 0
+            self.city_proj_yield[b, row, col] = -1
             for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
                 getattr(self, _p)[b, row, col, :] = -1
             self.city_dist_tile[b, row, col, :] = self.city_dist_tile[b, self._CITY_MINOR0 + s, 0, :]

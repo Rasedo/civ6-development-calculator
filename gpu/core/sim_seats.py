@@ -10532,6 +10532,8 @@ class SimSeats:
         self.city_last_hit[b, row, col] = 0
         self._q_clear(b, row, col)
         self.city_prod_bank[b, row, col] = 0
+        self.city_proj_conv[b, row, col] = 0
+        self.city_proj_yield[b, row, col] = -1
         self.city_free_pot[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
@@ -10963,6 +10965,8 @@ class SimSeats:
         self.city_freed_turn[b, dst_row, col] = int(self.turn) if dst_row == self.FREE_ROW else -1
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
+        self.city_proj_conv[b, dst_row, col] = 0
+        self.city_proj_yield[b, dst_row, col] = -1
         self.city_lasers[b, dst_row, col] = old_lz  # the stations ride the flip with the Spaceport that holds them
         self.city_reactor_age[b, dst_row, col] = old_age
         self.city_gp_perm[b, dst_row, col, :] = 0  # a Great Person's grants stay behind (TS: a fresh City)
@@ -11409,6 +11413,8 @@ class SimSeats:
                 self.city_pressure[rows[_ch], row, slot[_ch], colon_g[_ch]] = _cpres.to(self.city_pressure.dtype)
                 self.city_followed[rows[_ch], row, slot[_ch]] = colon_g[_ch]
         self.city_prod_bank[rows, row, slot] = 0
+        self.city_proj_conv[rows, row, slot] = 0
+        self.city_proj_yield[rows, row, slot] = -1
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
             getattr(self, _p)[rows, row, slot, :] = -1
         self.city_spec_pin[rows, row, slot, :] = -1
