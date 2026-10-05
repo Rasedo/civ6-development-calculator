@@ -86,6 +86,10 @@ if ZCAT == 1 then
     unitPromotions = namesIf("UnitPromotions", "UnitPromotionType"),
     commemorations = namesIf("CommemorationTypes", "CommemorationType"),
     alliances = namesIf("Alliances", "AllianceType"),
+    greatPeople = namesIf("GreatPersonIndividuals", "GreatPersonIndividualType"),
+    greatPersonClasses = namesIf("GreatPersonClasses", "GreatPersonClassType"),
+    randomEvents = namesIf("RandomEvents", "RandomEventType"),
+    coastalLowlands = namesIf("CoastalLowlands", "CoastalLowlandType"),
     buildingReplaces = pairsOf(GameInfo.BuildingReplaces, "CivUniqueBuildingType", "ReplacesBuildingType"),
     districtReplaces = pairsOf(GameInfo.DistrictReplaces, "CivUniqueDistrictType", "ReplacesDistrictType"),
     unitReplaces = pairsOf(GameInfo.UnitReplaces, "CivUniqueUnitType", "ReplacesUnitType"),
@@ -97,7 +101,8 @@ end
 -- the map: per plot [terrain, feature, resource, resourceCount, improvement,
 -- improvementPillaged, owner, district, wonder, wonderComplete, route,
 -- riverBits (1 NE, 2 NW, 4 W), cliffBits (same), freshWater, appeal,
--- workers, yields x6, isLake, routePillaged, owning city id (-1 unowned)]
+-- workers, yields x6, isLake, routePillaged, owning city id (-1 unowned),
+-- coastal lowland band (TerrainManager, -1 none), flooded, submerged]
 for y = 0, H - 1 do
   local row = {}
   for x = 0, W - 1 do
@@ -116,7 +121,9 @@ for y = 0, H - 1 do
       P(function() return q:GetWorkerCount() end),
       yields6(function(i) return q:GetYield(i) end),
       b(function() return q:IsLake() end), b(function() return q:IsRoutePillaged() end),
-      q:GetOwner() >= 0 and P(function() local c = Cities.GetPlotPurchaseCity(q); return c and c:GetID() or -1 end) or -1}
+      q:GetOwner() >= 0 and P(function() local c = Cities.GetPlotPurchaseCity(q); return c and c:GetID() or -1 end) or -1,
+      P(function() return TerrainManager.GetCoastalLowlandType(q) end),
+      b(function() return TerrainManager.IsFlooded(q) end), b(function() return TerrainManager.IsSubmerged(q) end)}
   end
   OUT({k = "row", y = y, plots = row})
 end
@@ -274,6 +281,40 @@ OUT({k = "religions", list = P(function() return Game.GetReligion():GetReligions
 local firstMajor = -1
 for _, p in ipairs(players) do if firstMajor < 0 and Players[p]:IsMajor() then firstMajor = p end end
 OUT({k = "congress", resolutions = P(function() return Game.GetWorldCongress():GetResolutions(firstMajor) end)})
+-- the random event of this turn and the last (floods, eruptions, storms,
+-- droughts …), as the climate screen reads them: [turn, RandomEvents index,
+-- current plot, start plot, fertility added, tiles damaged, population lost,
+-- units lost]
+local events = {}
+for t = turn - 1, turn do
+  local okv, ev = pcall(function() return GameRandomEvents.GetEventsForTurn(t) end)
+  if okv and type(ev) == "table" and ev.RandomEvent ~= nil then
+    events[#events + 1] = {t, ev.RandomEvent, P(function() return ev.CurrentLocation end),
+      P(function() return ev.StartLocation end), P(function() return ev.FertilityAdded end),
+      P(function() return ev.TilesDamaged end), P(function() return ev.PopLost end),
+      P(function() return ev.UnitsLost end)}
+  end
+end
+OUT({k = "events", list = events})
+-- every great person recruited so far, by individual: [GreatPersonIndividuals
+-- index, claimant player, class, era, turn granted]
+OUT({k = "greatPeople", past = P(function()
+  local out = {}
+  for _, e in ipairs(Game.GetGreatPeople():GetPastTimeline()) do
+    if e.Claimant ~= nil then
+      out[#out + 1] = {e.Individual, e.Claimant, e.Class, e.Era, e.TurnGranted}
+    end
+  end
+  return out
+end)})
+-- the National Parks: [name, {plot indices}]
+OUT({k = "parks", list = P(function()
+  local out = {}
+  for _, np in pairs(Game.GetNationalParks():EnumerateNationalParks()) do
+    out[#out + 1] = {np.Name, np.Plots}
+  end
+  return out
+end)})
 
 local DG = DefenseTypes and DefenseTypes.DISTRICT_GARRISON
 local DO = DefenseTypes and DefenseTypes.DISTRICT_OUTER

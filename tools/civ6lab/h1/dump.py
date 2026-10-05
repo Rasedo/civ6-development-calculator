@@ -10,7 +10,9 @@ counter read before and after the dump; a record whose counter moved under
 it carries `moved: true` and no check reads it), `head`, `map` (one list per
 row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
 `players`, `religions`, `congress` (the World Congress resolutions table,
-raw), `cities` (each with its `plots`: the map plots whose
+raw), `events` (the random events of the turn and the one before),
+`greatPeople` (every recruited person by individual), `parks` (the
+National Parks' plots), `cities` (each with its `plots`: the map plots whose
 owner and owning city are the city's), `units`. The catalogs (index -> type
 name) go once to `<out>.cat.json`.
 
@@ -77,6 +79,12 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
             rec["congress"] = o["resolutions"]
         elif k == "religions":
             rec["religions"] = o["list"]
+        elif k == "events":
+            rec["events"] = o["list"]
+        elif k == "greatPeople":
+            rec["greatPeople"] = o["past"]
+        elif k == "parks":
+            rec["parks"] = o["list"]
         elif k == "city":
             rec["cities"].append(o)
         elif k == "unit":
