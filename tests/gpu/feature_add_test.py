@@ -248,7 +248,10 @@ def main() -> None:
     sim4._flood_river = lambda hit, tile, sev: None
     strip = sim4._desertification_live()
     for _ in range(8000):
+        # no turn passes between the draws: empty the storm and drought
+        # tables a real turn would have aged
         sim4.storm_left.zero_()
+        sim4.drought_left.zero_()
         sim4._random_event(strip)
     del sim4._erupt, sim4._flood_river
     sim4._eruption_weight = ew

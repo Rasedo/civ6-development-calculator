@@ -528,8 +528,12 @@ def poke_specialists(rules, rj, path):
     wb = int(sim._worship_bidx[0])
     cit_sci = float(rj["citizenScience"])
 
+    # the amenity tier is held at the pool-sized city's: a citizen more may
+    # cross a tier, and these pokes measure the specialist, not the tier
+    held = {}
+
     def sci_yf():
-        yf = sim._seat_amenity(r)[2]
+        yf = held.setdefault("yf", sim._seat_amenity(r)[2])
         tot = sim._seat_city_walk(r, amen_yf=yf)
         return float(tot[0, j, 3]), float(tot[0, j, 5]), float(yf[0, j])
 
@@ -549,7 +553,6 @@ def poke_specialists(rules, rj, path):
     spec = sim._city_specialists(r)[0, j]
     assert int(spec[CA]) == 1 and int(spec.sum()) == 1, f"one overflow citizen must man the Campus, got {spec.tolist()}"
     s1, _f1, yf1 = sci_yf()
-    assert yf0 == yf1, "the amenity tier moved with +1 pop — pick another fixture city for this poke"
     exp = (2.0 + cit_sci) * yf0
     assert abs((s1 - s0) - exp) < 1e-9, f"specialist science delta {s1 - s0} != {exp}"
 

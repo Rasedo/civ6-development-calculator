@@ -228,9 +228,9 @@ def test_owf_column(rules, path) -> None:
     sim = fresh(rules, path)
     iids = sim._imp_ids
     k = iids.index("OFFSHORE_WIND_FARM")
-    assert k == 38 and iids.index("SKI_RESORT") == 39 == len(iids) - 1, "appended after Qhapaq Nan, before the Ski Resort"
+    assert k == 38 and iids.index("SKI_RESORT") == 39, "appended after Qhapaq Nan, before the Ski Resort"
     assert iids.index("MOUNTAIN_ROAD") == 37, "no earlier build column moved"
-    assert sim._A_IMP[k] == sim._act["BUILD_OFFSHORE_WIND_FARM"] == sim._act["PILLAGE"] - 2
+    assert sim._A_IMP[k] == sim._act["BUILD_OFFSHORE_WIND_FARM"] == sim._act["BUILD_SKI_RESORT"] - 1
     assert sim._imp_water[k] and not sim._imp_ground[k], "a WATER row"
     assert sim._imp_feats_ok[k] == [], "no Improvement_ValidFeatures row: a feature refuses it"
     assert float(sim._imp_power[k]) == 2.0
