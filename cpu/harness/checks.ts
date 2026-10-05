@@ -49,7 +49,7 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type TurnRecord } from './record';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, notStarted, routeChanges,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
 } from './import';
 import {
@@ -120,6 +120,9 @@ function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
   let g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
   if (!PARK_READERS.has(check)) g = g.filter((x) => !x.startsWith('national-park:'));
   if (!LUXURY_READERS.has(check)) g = g.filter((x) => !x.startsWith('luxury-') && !x.startsWith('luxuries:'));
+  // an unknown spent person's building row moves its yield's readers only
+  g = g.filter((x) => !x.startsWith('gp-unknown:') || check === 'city.yields'
+    || (check === 'step.border' && x.endsWith(' culture')));
   return g.length ? { gaps: g } : {};
 }
 
@@ -217,7 +220,13 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     };
     // a district project's first conversion took a bank no record holds
     const unread = imp.projectYieldUnread.get(`${c.owner}:${c.id}`) ?? -1;
-    push('city.yields', oy.every((v, i) => i === unread || near(v, gy[i], 0.05)), gy, oy, cityState);
+    const yieldsOk = oy.every((v, i) => i === unread || near(v, gy[i], 0.05));
+    // an unknown spent person's row is the gap only where the game pays more
+    // of the row's yield than the engine
+    const yieldGaps = gaps.filter((x) => !x.startsWith('gp-unknown:')
+      || YIELD_KEYS.some((k, i) => x.endsWith(` ${k}`) && gy[i] > oy[i] + 0.05));
+    out.push({ turn, check: 'city.yields', subject, ok: yieldsOk, game: gy, ours: oy, ...gapsFor(yieldGaps, 'city.yields'),
+      ...(yieldsOk ? {} : { state: cityState }) });
     const centre = plotAt(rec, city.centerIndex)[P.yields] as number[];
     const oc = cityCentreYields(state, city);
     const occ = YIELD_KEYS.map((k) => oc[k]);
@@ -571,6 +580,10 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     if (cat.wonders.includes(name)) {
       const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
       if (!id || city.wonders.some((w) => w.id === id)) continue;
+      // a wonder granting every city a citizen lands after the cities have
+      // grown, its Housing with it (runs/h1_duelw1108 t183, Angkor Wat:
+      // Chengdu grows at its old quarter-growth housing band)
+      if (BUILT_WONDERS[id]?.effects?.popAllCities) continue;
       const t = state.map.tiles.find((x) => x.builtWonder === id && x.ownerSeat === city.seat && x.ownerCity === city.id);
       if (!t) continue;
       t.builtWonderComplete = true;
@@ -598,6 +611,29 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
   return (side) => write(side ? landed : start);
 }
 
+/** the citizens a wonder completed in this city across the pair grants every
+ *  city of its owner (Angkor Wat's `popAllCities`), 0 where none */
+function popGrant(cat: Catalog, c: DumpCity, next: DumpCity): number {
+  const had = new Set(c.buildings.map((x) => x[0]));
+  let n = 0;
+  for (const [b] of next.buildings) {
+    if (had.has(b)) continue;
+    n += BUILT_WONDERS[(cat.buildings[b] ?? '').replace(/^BUILDING_/, '')]?.effects?.popAllCities ?? 0;
+  }
+  return n;
+}
+
+/** how far a Settler the city trained can stand from it at the next record:
+ *  its moves on the turn it appears */
+const SETTLER_WALK = UNITS.SETTLER.moves;
+
+/** pin the city's citizens to the plots the later record works — the step
+ *  after a citizen left with a Settler grows the city the game kept */
+function relockWorked(state: GameState, city: City, was: DumpCity, next: DumpCity): void {
+  for (const q of was.worked) state.map.tiles[q].locked = false;
+  for (const q of next.worked) if (q !== city.centerIndex && !state.map.tiles[q].district) state.map.tiles[q].locked = true;
+}
+
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
@@ -605,6 +641,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const acts = diffActions(a, b);
   const villagers = new Set(villagesEntered(a, b, cat).values());
   const late = new Set([...acts.notStarted, ...(prev ? notStarted(prev, a) : [])]);
+  const lateCities = new Set([...citiesNotStarted(a, b), ...(prev ? citiesNotStarted(prev, a) : [])]);
   const held = bordersHeld(a, b);
   const imp = importTurn(a, cat, history);
   const state = imp.state;
@@ -676,12 +713,28 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const next = after.get(`${c.owner}:${c.id}`);
       if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
       sides.push(landProduction(state, cat, city, next, a.head.W));
+      // the Settler stands beside the city, or the city trained it (its
+      // queue's head) and it walked off within its first moves
+      const trained = (c.queue?.[0] as { UnitType?: number } | undefined)?.UnitType === settlerIdx && next.pop === c.pop - 1;
       if (acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
-        && tileDistance(state, u.plot, city.centerIndex) <= 1)) {
+        && tileDistance(state, u.plot, city.centerIndex) <= (trained ? SETTLER_WALK : 1))) {
         settled.add(city);
-        if (!governorFlag(state, city, (e) => e.settlerFreePop)) city.population = Math.max(1, city.population - 1);
+        if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
+          city.population = Math.max(1, city.population - 1);
+          // the citizen that left is the one the later record no longer works
+          if (next.pop === city.population) relockWorked(state, city, c, next);
+        }
       }
     }
+    // a wonder granting every city a citizen (Angkor Wat) completed across
+    // the pair: every city grows and banks its culture on the citizens it
+    // had, then takes the grant (runs/h1_duelw1108 t183: Taiyuan completes
+    // it, and Xi'an, Handan, Taiyuan, Chengdu and Shenyang each bank their
+    // old size's surplus and culture, one citizen larger at t184)
+    const grant = list.reduce((n, { dump: c }) => {
+      const next = after.get(`${c.owner}:${c.id}`);
+      return n + (next ? popGrant(cat, c, next) : 0);
+    }, 0);
     const lux = luxuryAmenities(state, seat);
     const mods = getModifiers(state, seat);
     const stats = new Map(list.map(({ city }) => [city, computeCityStats(state, city, lux, mods)]));
@@ -692,19 +745,22 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const gaps = cityGaps(imp, c);
       const skipAll = acts.cityChanged.has(k) || !next ? 'city changed hands or vanished'
         : late.has(c.owner) ? 'a turn start missing from a record' : null;
+      // the boxes of a city whose own turn start the pair missed
+      const boxSkip = skipAll ?? (lateCities.has(k) ? 'a turn start missing from a record' : null);
+      const granted = grant > 0 && !!next && !acts.cityChanged.has(k);
       const st = stats.get(city)!;
       const res = (check: string, ok: boolean, game: unknown, ours: unknown, s?: Record<string, unknown>) =>
         out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !s ? {} : { state: s }) });
 
       // growth
       const before = { pop: city.population, food: city.foodBox };
-      const outside = acts.popOutsideBox.has(k) && !settled.has(city) ? 'a citizen came or went outside the food box' : null;
-      const growSkip = skipAll ?? outside;
+      const outside = acts.popOutsideBox.has(k) && !settled.has(city) && !granted ? 'a citizen came or went outside the food box' : null;
+      const growSkip = boxSkip ?? outside;
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
-        res('step.growth', city.population === next.pop && near(city.foodBox, num(next.food), 0.05),
-          [next.pop, num(next.food)], [city.population, round3(city.foodBox)],
+        res('step.growth', city.population + (granted ? grant : 0) === next.pop && near(city.foodBox, num(next.food), 0.05),
+          [next.pop, num(next.food)], [city.population + (granted ? grant : 0), round3(city.foodBox)],
           { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus), needed: st.growthNeeded,
             housing: st.housing, tier: st.amenities.tier.name });
       }
@@ -722,9 +778,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const boxBefore = city.cultureBox;
       const culture = cultureAfterGrowth(state, city, before.pop, st);
       cityBorderGrowth(state, city, seat, culture);
+      if (granted) city.population += grant;
       const gainedOurs = [...boughtPlots, ...state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id
         && !plotsBefore.has(t.index)).map((t) => t.index)];
-      const borderSkip = skipAll ?? (bought ? 'a plot may have been bought'
+      const borderSkip = boxSkip ?? (bought ? 'a plot may have been bought'
         // the culture reads a village's citizen given in the turn
         : outside && !!next && next.pop > c.pop && villagers.has(c.owner) ? 'a village gave the city a citizen'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'

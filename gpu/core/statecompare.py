@@ -961,6 +961,7 @@ CITY = {
         [float(x) for x in sim.city_pressure[b, c, s].tolist()] for c, s in rows
     ],
     "unconvertedPressure": _cty("city_unconverted"),
+    "growthDrift": _cty("city_growth_drift"),
     "freePressure": lambda sim, b, rows: [
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],

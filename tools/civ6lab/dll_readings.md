@@ -817,6 +817,36 @@ t169-176 16.75 Gold = 12 + 16 x 76/256; the first step's figure holds the
 bank paid in (t111 14.8 Production). Engines: `City.projectYield` /
 `city_proj_conv`, `city_proj_yield`; `projectConversionRate`.
 
+## C-94: the growth modifier — READ (the accumulator's writer unread)
+
+Lua `City:GetGrowth():GetOverallGrowthModifier()` (binding 0x9876b0) reads
+the city-growth cache's +0x28, a 24.8 fixed-point value; the cache copy
+0xa7b10 (its data 8 bytes into the cache) fills it from CityGrowth
+0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18),
+other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:
+
+- r = 1.0 (0x100); r += the amenity tier's Happinesses.GrowthModifier as
+  (percent << 8) / 100 through the fixed-point divide 0x16e940 (an integer
+  idiv: −15% −38, −30% −76);
+- r += other (0x1b6180): a game-configuration percent turned to fixed point
+  through float (floor of the value, then the fraction × 256 truncated —
+  0 in every record) plus CityGrowth +0x84, m_iOtherGrowthModifier, the
+  accumulator EFFECT_ADJUST_CITY_GROWTH feeds (the effect's Amount parsed by
+  0xbc1300 into its +8; the writer of +0x84 is not read);
+- r < 0 → 0; r ×= the housing factor (0x1b5f70), then ×= 0x1b6040 (1 in
+  every record), each a fixed-point multiply.
+
+The accumulator, fitted on runs/h1_duelw1103–1108 (`growthmods.py`-style
+reads of `overallGrowthMod` where the housing factor is 1): a +15% percent
+(the Hanging Gardens) reads +38, a +20% (the Migration Treaty, Surplus
+Logistics) +51; when the treaty ends its cities fall by 52 (1108 Jiaodong
+89 → 37 at the t142 session, Rome's 51 → −1 at t222), so a detach adds
+floor(−p·256/100): each detach of a percent that is no whole number of
+256ths leaves −1 for good (1104 China's 38 → 37 → 36 over two sessions).
+Engines: `growth256` (the tier), `growthPct256` (the accumulator's terms),
+`City.growthDrift` / `city_growth_drift` (the residue), the treaty's detach in
+`congressSession` / `_world_congress`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

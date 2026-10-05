@@ -555,6 +555,7 @@ function greatWorksWire() {
     slotType: GW_LAYOUT.map((s) => s.type),
     slotExtraRank: GW_LAYOUT.map((s) => s.extraRank),
     slotNonUniqueTourism: GW_LAYOUT.map((s) => s.nonUniqueTourism),
+    slotNonUniqueYield: GW_LAYOUT.map((s) => s.nonUniqueYield),
     holders,
     accepts: GWS_ACCEPTS.map((a) => Array.from({ length: GWO_COUNT }, (_, o) => (a.includes(o) ? 1 : 0))),
     objCulture: [...GWO_CULTURE],

@@ -221,7 +221,10 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
   let culture = 0;
   let faith = 0;
   for (const w of works) {
-    culture += gwWorkCulture(w) * mult[w.slot]!;
+    // CIV6 (Building_GreatWorks.NonUniquePersonYield): a work whose person
+    // already has one in an earlier slot of the holder pays the row's figure
+    const nu = GW_LAYOUT[w.slot]!.nonUniqueYield;
+    culture += (nu && gwRepeatsPerson(works, w) ? nu : gwWorkCulture(w)) * mult[w.slot]!;
     faith += GWO_FAITH[w.obj]! * mult[w.slot]!;
   }
   return { culture, faith };

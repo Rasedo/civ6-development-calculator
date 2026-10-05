@@ -799,6 +799,7 @@ const CITY: Record<string, Extractor> = {
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
   unconvertedPressure: overCities((r) => unconvertedOf(r.city)),
+  growthDrift: overCities((r) => r.city.growthDrift ?? 0),
   // a FREE CITY's race — the pressure each major has put on it since it
   // revolted; all zeros for a city that is not Free
   freePressure: overCities((r, st) => {

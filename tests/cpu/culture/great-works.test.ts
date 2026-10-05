@@ -74,14 +74,16 @@ describe('Great Works', () => {
     expect(b1.gold - b0.gold).toBe(0); // NO Great Work pays gold in Civ 6
   });
 
-  it('an ARTIST fills the Art Museum (3 slots, +3 culture each)', () => {
+  it('an ARTIST fills the Art Museum: the first work pays its own, each repeat its row\'s NonUniquePersonYield', () => {
     const { state, city } = cityWithAmphitheater();
     standBuilding(state, city, 'MUSEUM');
     const cul0 = culture(state, city);
     expect(GW_WORKS_PER_PERSON[GW_KIND_ART]).toBe(3); // real Civ 6: an Artist makes 3
     expect(activate(state, city, 'ARTIST', 2)).toBe(0); // Donatello's three sculptures fit exactly
     expect(gwCountKind(city, GW_KIND_ART)).toBe(3);
-    expect(culture(state, city) - cul0).toBe(GWO_CULTURE[GWO_SCULPTURE]! * 3); // +9
+    const nu = GW_HOLDERS.find((h) => h.id === 'MUSEUM')!.slots[0]!.nonUniqueYield!;
+    expect(nu).toBe(1);
+    expect(culture(state, city) - cul0).toBe(GWO_CULTURE[GWO_SCULPTURE]! + 2 * nu); // 3 + 1 + 1
   });
 
   it('PRINTING doubles WRITING tourism only', () => {

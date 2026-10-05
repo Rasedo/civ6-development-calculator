@@ -255,6 +255,10 @@ def main() -> None:
     assert s6.city_gw_obj[0, 0, 0, ms].tolist() == works[1].tolist() == [3, 0, 0]
     assert s6.city_gw_maker[0, 0, 0, ms].tolist() == [1, 1, 1]
     assert not bool(s6._gw_themed(0)[0, 0, H_MUS]), "one artist's own works must not theme"
+    # Building_GreatWorks.NonUniquePersonYield: the first work pays its own 3,
+    # each later work by the same artist the row's 1 (`greatWorkYields`)
+    cul1, _f = s6._gw_yields(0)
+    assert float(cul1[0, 0]) == 3 + 2 * 1, f"a repeated artist pays the row's figure, got {float(cul1[0, 0])}"
     # THREE artists, one type: Rublev (0), Michelangelo (1) and Bosch (3) all
     # open with a RELIGIOUS work
     clear_works(s6)

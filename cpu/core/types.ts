@@ -157,6 +157,11 @@ export interface City {
    *  grows following no religion (`gainPopulationPressure`) and never shrinks
    *  with the city. */
   unconvertedPressure?: number;
+  /** the residue the city's growth accumulator keeps, in 256ths (0 when
+   *  absent): a growth percent p attaches as floor(p·256/100) and detaches as
+   *  floor(−p·256/100), so each detach of a percent that is no whole number
+   *  of 256ths leaves −1 (`growthDetachResidue`). */
+  growthDrift?: number;
   /** the Great Works held here, one per occupied layout slot (`GW_LAYOUT`):
    *  object type, maker, era and civilization. Carried on capture.
    *  Yield-bearing, so the GPU mirror bumps _eff_version on every write. */

@@ -1319,6 +1319,10 @@ class SimInit:
         # on every other city (TS's `foundedTurn`, which the transfer writes).
         # Its grants fall due off it.
         self.city_freed_turn = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
+        # the residue the city's growth accumulator keeps, in 256ths
+        # (`City.growthDrift`): each detached growth percent leaves its
+        # attach plus its detach, floored both ways
+        self.city_growth_drift = torch.zeros((B, self.CITY_ROWS, civ_city_pad), dtype=torch.long, device=device)
         # the Free Cities seat's own persistent city-id counter and treasury —
         # the twins of `civ_next_city_id` and `civ_treasury` for a row that has
         # no civ block
@@ -1794,11 +1798,13 @@ class SimInit:
         self._gw_slot_holder = torch.tensor([int(x) for x in _gw["slotHolder"]], dtype=torch.long, device=device)
         self._gw_slot_type = torch.tensor([int(x) for x in _gw["slotType"]], dtype=torch.long, device=device)
         self._gw_slot_extra = torch.tensor([int(x) for x in _gw["slotExtraRank"]], dtype=torch.long, device=device)
-        # each slot row's NonUniquePersonTourism (0 none), and per holder whose
-        # row writes one, its slots in order
+        # each slot row's NonUniquePersonTourism and NonUniquePersonYield (0
+        # none), and per holder whose row writes either, its slots in order
         self._gw_slot_nonunique = [int(x) for x in _gw["slotNonUniqueTourism"]]
+        self._gw_slot_nonunique_yield = [int(x) for x in _gw["slotNonUniqueYield"]]
         self._gw_nonunique_groups = [[s for s in range(len(self._gw_slot_nonunique)) if int(_gw["slotHolder"][s]) == h]
-                                     for h in sorted({int(_gw["slotHolder"][s]) for s, v in enumerate(self._gw_slot_nonunique) if v > 0})]
+                                     for h in sorted({int(_gw["slotHolder"][s]) for s in range(len(self._gw_slot_nonunique))
+                                                      if self._gw_slot_nonunique[s] > 0 or self._gw_slot_nonunique_yield[s] > 0})]
         self._gw_holder_bidx = [int(h["bidx"]) for h in _gw["holders"]]
         self._gw_holder_widx = [int(h["widx"]) for h in _gw["holders"]]
         self._gw_holder_wonder = [bool(h["wonder"]) for h in _gw["holders"]]

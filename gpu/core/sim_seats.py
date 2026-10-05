@@ -5979,6 +5979,19 @@ class SimSeats:
         self.congress_sessions.add_(fires.long())
         self.last_session_turn.copy_(torch.where(
             fires, torch.full_like(self.last_session_turn, int(self.turn)), self.last_session_turn))
+        # the standing Migration Treaty detaches from its target's cities,
+        # each keeping the residue its growth percent leaves (`City.growthDrift`)
+        mig_out, mig_tgt = self._congress_by_id("MIGRATION_TREATY")
+        mig = fires & (mig_out >= 0)
+        if bool(mig.count_nonzero()):
+            for r in range(self.n_majors):
+                hit = mig & (mig_tgt == r)
+                if not bool(hit.count_nonzero()):
+                    continue
+                f = self._congress_growth(r)
+                residue = (torch.floor((f - 1.0) * 256.0) + torch.floor((1.0 - f) * 256.0)).long()
+                live = self.city_alive[:, r, : self.RC] & hit.unsqueeze(1)
+                self.city_growth_drift[:, r, : self.RC] += torch.where(live, residue.unsqueeze(1), torch.zeros_like(residue).unsqueeze(1))
         # The standing set is REPLACED wholesale where a session fires, and
         # the cached legality bodies must see the change.
         for k in range(2):
@@ -9596,12 +9609,12 @@ class SimSeats:
 
     def _wonder_growth256(self, compw: torch.Tensor | None) -> torch.Tensor | None:
         """[B] f64 — `empireGrowth256`'s wonder half: each completed wonder's
-        growth percent in 256ths, truncated, summed; None when the seat holds
-        none."""
+        growth percent in 256ths, floored (`growthPct256`), summed; None when
+        the seat holds none."""
         if compw is None:
             return None
         return torch.where(
-            compw, torch.trunc((self._wond_grow.reshape(1, 1, -1).expand_as(compw).double() - 1.0) * 256.0),
+            compw, torch.floor((self._wond_grow.reshape(1, 1, -1).expand_as(compw).double() - 1.0) * 256.0),
             torch.zeros_like(compw, dtype=torch.float64)
         ).sum(dim=2).sum(dim=1)
 
@@ -10551,6 +10564,7 @@ class SimSeats:
         self.city_followed[b, row, col] = -1
         self.city_pressure[b, row, col, :] = 0
         self.city_unconverted[b, row, col] = 0
+        self.city_growth_drift[b, row, col] = 0
         self.city_free_press[b, row, col, :] = 0
         self.city_freed_turn[b, row, col] = -1
         # the walk's stash: a city no walk has read yet carries none
@@ -10849,6 +10863,7 @@ class SimSeats:
         old_fol = int(self.city_followed[b, src_row, src_col])
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
         old_unconv = float(self.city_unconverted[b, src_row, src_col])
+        old_drift = int(self.city_growth_drift[b, src_row, src_col])
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
         # a perimeter at its FULL pool is TS's unset `outerHp`, which a flip
@@ -10996,6 +11011,7 @@ class SimSeats:
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
         self.city_unconverted[b, dst_row, col] = old_unconv
+        self.city_growth_drift[b, dst_row, col] = old_drift
         # The receiver's district registry is DERIVED from the tiles that just
         # re-owned, COMPLETE ones only — never copied from the loser's registry,
         # which is written at QUEUE time and so lists paves that never finished.
@@ -11403,6 +11419,7 @@ class SimSeats:
         # and its pressure travels with it.
         self.city_pressure[rows, row, slot, :] = 0
         self.city_unconverted[rows, row, slot] = float(self._atheism_per_pop)
+        self.city_growth_drift[rows, row, slot] = 0
         self.city_followed[rows, row, slot] = -1
         if colon_g is not None:
             _ch = colon_p > 0

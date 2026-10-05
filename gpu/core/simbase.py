@@ -1017,6 +1017,7 @@ _MUTABLE = [
     "pan_claimed", "fol_claimed", "wor_claimed", "fou_claimed", "enh_claimed",  # belief-claim masks, one per class
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_unconverted",  # each city's unconverted pressure
+    "city_growth_drift",  # the residue each city's growth accumulator keeps
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind

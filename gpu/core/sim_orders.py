@@ -1721,6 +1721,7 @@ class SimOrders:
             self.city_followed[b, row, col] = -1
             self.city_pressure[b, row, col, :] = 0
             self.city_unconverted[b, row, col] = float(self._atheism_per_pop * pop)
+            self.city_growth_drift[b, row, col] = 0
         self._eff_version += 1
 
     def _strip_feature_at(self, rows: torch.Tensor, tiles: torch.Tensor) -> None:

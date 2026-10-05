@@ -1318,6 +1318,21 @@ def main() -> None:
         s8.congress_active[:, 0, :] = torch.tensor([0, 1, s8._holy_didx], dtype=torch.long)
         assert bool(s8._congress_holy_blocked().all()), "a HOLY_SITE ban refuses the worship faith-buy"
 
+    # a session ends the standing Migration Treaty: each city of its target
+    # keeps its growth percent's residue, floor(−20·2.56) + floor(20·2.56) = −1
+    # (`City.growthDrift`, `congressSession`)
+    s8.congress_active[:, 0, :] = torch.tensor([3, 0, 1], dtype=torch.long)   # Heritage A on ART
+    s8.congress_active[:, 1, :] = torch.tensor([2, 1, 0], dtype=torch.long)   # Migration B on seat 0
+    s8._eff_version += 1
+    s8.city_growth_drift.zero_()
+    s8.turn = 2 * s8._congress_interval
+    s8._world_congress()
+    _live0 = s8.city_alive[0, 0, : s8.RC]
+    assert bool(_live0.any()), "seat 0 must hold a city"
+    assert s8.city_growth_drift[0, 0, : s8.RC][_live0].tolist() == [-1] * int(_live0.sum()), (
+        f"the treaty's cities keep -1, got {s8.city_growth_drift[0, 0, : s8.RC].tolist()}")
+    assert int(s8.city_growth_drift[0, 1].abs().sum()) == 0, "a seat the treaty missed keeps none"
+
     # the victory check itself
     s9 = build(rules, path, steps=0)
     s9.civ_diplo_points[:, 0] = s9._dvp_win - 1

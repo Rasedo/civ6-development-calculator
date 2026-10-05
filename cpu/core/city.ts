@@ -888,18 +888,31 @@ export function swapTileOk(state: GameState, city: City, tileIndex: number): boo
   return neighbors(state.map, t).some((n) => tileBelongsTo(n, city));
 }
 
-/** A growth factor's percent in the game's 256ths, truncated toward zero. */
+/** The amenity tier's growth percent in the game's 256ths, truncated toward
+ *  zero (DLL 0x1b62d0: the percent's 24.8 value over 100, an integer divide). */
 export function growth256(factor: number): number {
   return Math.trunc((factor - 1) * 256);
+}
+
+/** An EFFECT_ADJUST_CITY_GROWTH percent as the city's growth accumulator
+ *  holds it, in 256ths, floored (+15% 38, +20% 51, −20% −52). */
+export function growthPct256(factor: number): number {
+  return Math.floor((factor - 1) * 256);
+}
+
+/** What detaching a growth percent leaves in the accumulator: its attach
+ *  plus its detach, −1 where the percent is no whole number of 256ths. */
+export function growthDetachResidue(factor: number): number {
+  return Math.floor((factor - 1) * 256) + Math.floor((1 - factor) * 256);
 }
 
 /** The seat-wide growth percents in 256ths: the Migration Treaty's, then each
  *  wonder's. */
 export function empireGrowth256(state: GameState, seat: number): number {
-  let n = growth256(congressGrowthMult(state, seat));
+  let n = growthPct256(congressGrowthMult(state, seat));
   for (const c of citiesOf(state, seat)) {
     for (const w of completedWonders(state, c)) {
-      if (w.def.effects?.growthAllMult) n += growth256(w.def.effects.growthAllMult);
+      if (w.def.effects?.growthAllMult) n += growthPct256(w.def.effects.growthAllMult);
     }
   }
   return n;
@@ -1718,16 +1731,17 @@ export function computeCityStats(
   const foodSurplus = total.food - city.population * FOOD_PER_CITIZEN;
   let effective = foodSurplus;
   if (foodSurplus > 0) {
-    // CIV6 (City:GetOverallGrowthModifier): the housing factor times ONE
-    // growth modifier, every percent on it summed — the amenity tier's, the
-    // wonders', the beliefs', the governor's — in the game's 1/256 fixed
-    // point: each percent truncated to 256ths, the product with the housing
-    // factor floored, never below none (runs/h1_duelw1108, Xi'an t83:
-    // Displeased -15% and the Hanging Gardens' +15% read an overall 1, the
-    // food box +11 on a surplus of 11; t144: housing 0.5 x (256 + 38) reads
-    // 146/256, the box +6.2734375 on 11; the six duels' recorded overall
-    // modifiers: -15% 218/256, -30% 180/256, +10% 281/256, 0.25 x -15% 54/256)
-    const m256 = Math.max(0, 256 + growth256(tier.growthFactor) + empireGrowth256(state, city.seat) + growth256(m.growthMult));
+    // CIV6 (City:GetOverallGrowthModifier, DLL 0x1b62d0): one modifier in
+    // the game's 1/256 fixed point — 256, plus the amenity tier's percent
+    // truncated to 256ths, plus the city's growth accumulator (0x1b6180: each
+    // EFFECT_ADJUST_CITY_GROWTH percent — the wonders', the Migration
+    // Treaty's, the beliefs', the governor's — floored, and the residue its
+    // detaches left, `City.growthDrift`), never below none; then times the
+    // housing factor, floored (runs/h1_duelw1108: Displeased −15% −38 and the
+    // Hanging Gardens' +15% 38; the Migration Treaty's +20% 51 attached and
+    // −52 detached leaves its cities 37 — Xi'an t160 255/256, t159 293/256)
+    const m256 = Math.max(0, 256 + growth256(tier.growthFactor) + empireGrowth256(state, city.seat)
+      + growthPct256(m.growthMult) + (city.growthDrift ?? 0));
     effective = foodSurplus * Math.floor(housingGrowthFactor(housing - city.population) * m256) / 256;
   }
   const growthNeeded = growthFoodNeeded(city.population);

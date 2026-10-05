@@ -5159,6 +5159,24 @@ class SimEconomy:
         self._gw_mult_cache[row] = (simbase.plane_stamp(planes), out)
         return out
 
+    def _gw_repeats_person(self, held: torch.Tensor, oc: torch.Tensor, mk: torch.Tensor) -> torch.Tensor | None:
+        """[B, RC, W] bool — `gwRepeatsPerson`: the work in each slot of a
+        holder whose row writes a NonUniquePerson figure has its person's
+        work (the same class and roster place) in an earlier slot of that
+        holder; None where no holder writes one."""
+        if not self._gw_nonunique_groups:
+            return None
+        cls = torch.where(held, self._gw_maker_class.take(oc), torch.full_like(oc, -1))
+        rep = torch.zeros_like(held)
+        for grp in self._gw_nonunique_groups:
+            for jj in range(1, len(grp)):
+                s = grp[jj]
+                r = torch.zeros_like(held[:, :, s])
+                for p in grp[:jj]:
+                    r = r | ((mk[:, :, p] == mk[:, :, s]) & (cls[:, :, p] == cls[:, :, s]))
+                rep[:, :, s] = r & (cls[:, :, s] >= 0) & (mk[:, :, s] >= 0)
+        return rep
+
     def _gw_yields(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC] culture, [B, RC] faith) double — `greatWorkYields`: the
         works' own face (a maker's raised Culture, `gwWorkCulture`), a themed
@@ -5175,6 +5193,12 @@ class SimEconomy:
         ov = self._gw_maker_culture[oc, mk.clamp(min=0, max=mw - 1)]
         ov = torch.where((mk >= 0) & (mk < mw), ov, torch.full_like(ov, -1.0))
         face = torch.where(ov >= 0, ov, self._gw_obj_culture.take(oc).double())
+        # CIV6 (Building_GreatWorks.NonUniquePersonYield): a work whose person
+        # already has one in an earlier slot of the holder pays the row's figure
+        rep = self._gw_repeats_person(held, oc, mk)
+        if rep is not None:
+            nu = torch.tensor(self._gw_slot_nonunique_yield, dtype=torch.float64, device=self.device)
+            face = torch.where(rep & (nu > 0), nu.expand_as(face), face)
         cul = (face * mult * held.double()).sum(dim=2)
         fai = (self._gw_obj_faith.take(oc) * mult * held.double()).sum(dim=2)
         return cul, fai
@@ -5198,21 +5222,11 @@ class SimEconomy:
         base = torch.where(ov >= 0, ov, self._gw_obj_tourism.take(oc)) * (held & (obj != 7)).long()
         # CIV6 (Building_GreatWorks.NonUniquePersonTourism): a work whose
         # person already has one in an earlier slot of the holder pays the
-        # row's figure (`gwRepeatsPerson`)
-        if self._gw_nonunique_groups:
-            cls = torch.where(held, self._gw_maker_class.take(oc), torch.full_like(oc, -1))
-            for grp in self._gw_nonunique_groups:
-                for jj in range(1, len(grp)):
-                    s = grp[jj]
-                    if self._gw_slot_nonunique[s] <= 0:
-                        continue
-                    rep = torch.zeros_like(held[:, :, s])
-                    for ii in range(jj):
-                        p = grp[ii]
-                        rep = rep | ((mk[:, :, p] == mk[:, :, s]) & (cls[:, :, p] == cls[:, :, s]))
-                    rep = rep & (cls[:, :, s] >= 0) & (mk[:, :, s] >= 0)
-                    base[:, :, s] = torch.where(rep, torch.full_like(base[:, :, s], self._gw_slot_nonunique[s]),
-                                                base[:, :, s])
+        # row's figure
+        rep = self._gw_repeats_person(held, oc, mk)
+        if rep is not None:
+            nu = torch.tensor(self._gw_slot_nonunique, dtype=torch.long, device=self.device)
+            base = torch.where(rep & (nu > 0), nu.expand_as(base), base)
         if printing is not None:
             pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
                              torch.ones(self.B, dtype=torch.long, device=self.device))
@@ -7578,15 +7592,20 @@ class SimEconomy:
         hf = torch.where(head > h_half, torch.ones_like(head),
                          torch.where(head > h_quarter, torch.full_like(head, 0.5),
                                      torch.where(head >= h_zero, torch.full_like(head, 0.25), torch.zeros_like(head))))
-        # ONE growth modifier, every percent on it summed (`computeCityStats`)
-        # in the game's 256ths, each truncated (`growth256`): the tier's, then
-        # `empireGrowth256` (the Migration Treaty's, then each wonder's), then
-        # `m.growthMult` (the beliefs', then the governor's — CIV6, Surplus
-        # Logistics: "+20% Growth in the city"); the product with the housing
-        # factor floored, never below none
+        # ONE growth modifier in the game's 256ths (`computeCityStats`): the
+        # amenity tier's percent truncated (`growth256`), then the city's
+        # growth accumulator — each EFFECT_ADJUST_CITY_GROWTH percent floored
+        # (`growthPct256`): `empireGrowth256` (the Migration Treaty's, then
+        # each wonder's), `m.growthMult` (the beliefs', then the governor's —
+        # CIV6, Surplus Logistics: "+20% Growth in the city"), and the residue
+        # its detaches left (`city_growth_drift`); never below none, the
+        # product with the housing factor floored
         def g256(f: torch.Tensor) -> torch.Tensor:
             return torch.trunc((f - 1.0) * 256.0)
-        em = g256(self._congress_growth(row))
+
+        def p256(f: torch.Tensor) -> torch.Tensor:
+            return torch.floor((f - 1.0) * 256.0)
+        em = p256(self._congress_growth(row))
         hg = self._wonder_growth256(self._completed_wonders(row))
         if hg is not None:
             em = em + hg
@@ -7595,7 +7614,8 @@ class SimEconomy:
             gm = gm + (self._bel_sum1("growth", row) - 1.0).unsqueeze(1)
         if self.n_governors and row < self.n_majors:
             gm = gm + self._governor_sum_less1(row, "growthMult")
-        m256 = (256.0 + g256(growth_f) + em.unsqueeze(1) + g256(gm)).clamp(min=0.0)
+        drift = self.city_growth_drift[:, row, : self.RC].double()
+        m256 = (256.0 + g256(growth_f) + em.unsqueeze(1) + p256(gm) + drift).clamp(min=0.0)
         eff = surplus * torch.floor(hf * m256) / 256.0
         eff = torch.where(surplus > 0, eff, surplus)
         need = self._growth_needed(pop)

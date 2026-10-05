@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
-import { seatOf } from '../../../cpu/core/seats';
+import { citiesOf, seatOf } from '../../../cpu/core/seats';
+import { growthDetachResidue, growthPct256 } from '../../../cpu/core/city';
 import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
 import { seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
@@ -74,6 +75,23 @@ describe('world congress', () => {
     state.turn = CONGRESS_INTERVAL * 2;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
+  });
+
+  it('a session ends the Migration Treaty: its target\'s cities keep the growth residue', () => {
+    const state = newGame(1);
+    medieval(state);
+    state.congress = [{ res: CONGRESS_MIGRATION, outcome: 0, target: 0 }];
+    const mine = citiesOf(state, 0);
+    expect(mine.length).toBeGreaterThan(0);
+    // +20% attaches as floor(51.2) = 51 and detaches as floor(-51.2) = -52
+    expect(growthPct256(congressGrowthMult(state, 0))).toBe(51);
+    expect(growthDetachResidue(congressGrowthMult(state, 0))).toBe(-1);
+    expect(growthPct256(0.8)).toBe(-52);
+    state.turn = CONGRESS_INTERVAL * 2;
+    worldCongress(state);
+    expect(state.congressSessions).toBe(1);
+    for (const c of mine) expect(c.growthDrift).toBe(-1);
+    for (const c of citiesOf(state, 1)) expect(c.growthDrift ?? 0).toBe(0);
   });
 
   it('a pre-Modern session runs the two-slot slate, spends NO favor, and pays every winning-combo voter', () => {

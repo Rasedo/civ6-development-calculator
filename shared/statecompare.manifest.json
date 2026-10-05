@@ -2406,6 +2406,17 @@
           "note": "the unconverted group's pressure: 50 a citizen at founding, grown only by a citizen the city gains following no religion."
         },
         {
+          "name": "growthDrift",
+          "compare": "exact",
+          "covers": [
+            "City.growthDrift"
+          ],
+          "planes": [
+            "city_growth_drift"
+          ],
+          "note": "the residue the city's growth accumulator keeps, in 256ths: each growth percent detached leaves its floored attach plus its floored detach."
+        },
+        {
           "name": "freePressure",
           "compare": "milli",
           "covers": [

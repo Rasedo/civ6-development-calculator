@@ -32,7 +32,7 @@ import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
 import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
-import { cityCentreYields, cityPlotBonus, cityYieldCtx, luxuryAmenities, luxuryHoldings } from '../core/city';
+import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
@@ -58,12 +58,12 @@ import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { YIELD_KEYS } from '../../world/types';
-import { GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GREAT_PEOPLE, gpEffectOf } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
 } from '../data/greatWorks';
-import { CONGRESS_RESOLUTIONS, UDT_DISTRICTS } from '../data/seats';
+import { CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIGRATION, CONGRESS_RESOLUTIONS, UDT_DISTRICTS } from '../data/seats';
 import { CONGRESS_CURRENCIES } from '../core/congress';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
@@ -367,6 +367,9 @@ export interface History {
   levied: Map<string, number>;
   /** culture expansions by the city's centre plot (a capture keeps them) */
   cultureTaken: Map<number, number>;
+  /** the residue each city's growth accumulator keeps, in 256ths, by its
+   *  centre plot (`City.growthDrift`, `foldGrowthDrift`) */
+  growthDrift: Map<number, number>;
   /** Builders each player has gained: a Builder id new at t+1 */
   builders: Map<number, number>;
   /** Great People each player has spent, by class: a Great Person unit of
@@ -510,7 +513,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -953,6 +956,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const k of [...h.routeSeen.keys()]) if (!live.has(k)) h.routeSeen.delete(k);
   for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
+  if (h.last) foldGrowthDrift(h, h.last, rec);
   foldDominance(h, rec);
   h.beforeThat = h.before;
   h.before = h.last;
@@ -1313,6 +1317,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       foodBox: num(c.food),
       cultureBox: num(c.culture),
       tilesAcquired: history?.cultureTaken.get(center) ?? 0,
+      ...(history?.growthDrift.get(center) ? { growthDrift: history.growthDrift.get(center) } : {}),
       nextPlot: num(c.nextPlot),
       focus: 'balanced',
       queue: [],
@@ -1422,6 +1427,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
+  spentPersonGaps(ctx, rec, cityByKey, history);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
   // the units
@@ -2114,6 +2120,24 @@ function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boole
  * exactly where `a` left them. The next record then carries two turn starts
  * at once, so neither pair is a one-turn step for that player.
  */
+/** the cities, by `${owner}:${id}`, whose own turn start the record pair
+ *  missed while their owner's other cities moved: the same size, a food
+ *  surplus and culture to bank, and neither box moved — the record caught the
+ *  turn part way through its owner's cities, and the next pair banks two
+ *  turns at once (runs/h1_duelw1108 t148: Rome grows, Aquileia and Mediolanum
+ *  hold still, then bank +0.84 / +6.3 on a surplus of 0.42 / 3.15) */
+export function citiesNotStarted(a: TurnRecord, b: TurnRecord): Set<string> {
+  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
+  const out = new Set<string>();
+  for (const c1 of b.cities) {
+    const k = `${c1.owner}:${c1.id}`;
+    const c0 = before.get(k);
+    if (!c0 || c0.pop !== c1.pop || !(num(c0.foodSurplus) > 0) || !(num(c0.cultureYield) > 0)) continue;
+    if (num(c1.food) === num(c0.food) && num(c1.culture) === num(c0.culture)) out.add(k);
+  }
+  return out;
+}
+
 export function notStarted(a: TurnRecord, b: TurnRecord): Set<number> {
   const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const moving = new Map<number, boolean>();
@@ -2215,6 +2239,67 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
     out.push({ res, outcome, target });
   }
   return { list: out, gaps };
+}
+
+/**
+ * CIV6 (MODIFIER_PLAYER_CITIES_ADJUST_BUILDING_YIELD_CHANGE, `GP_BUILDING_YIELDS`):
+ * a spent Great Person pays a building row in every city of its player for
+ * good (Hypatia's Libraries, Newton's Universities, Leonardo's Workshops ...),
+ * and the record names no person, only the class spent (`History.gpSpent`).
+ * A city holding the row's building, whose owner has spent a person of the
+ * class whose era the world has reached, carries a `gp-unknown` gap on the
+ * readers of that yield.
+ */
+function spentPersonGaps(ctx: Ctx, rec: TurnRecord, cityByKey: Map<string, City>, history?: History): void {
+  const worldEra = Math.max(0, ...rec.players.filter((q) => bool(q.major)).map((q) => num(q.era)));
+  for (const [pid, spent] of history?.gpSpent ?? []) {
+    for (const [cls, k] of spent) {
+      if (k <= 0) continue;
+      for (const person of GREAT_PEOPLE[cls]) {
+        if (person.era > worldEra) continue;
+        const perm = gpEffectOf(person).perm ?? {};
+        for (const row of GP_BUILDING_YIELDS) {
+          if (!perm[row.perm]) continue;
+          for (const c of rec.cities) {
+            if (c.owner !== pid || !cityByKey.get(`${c.owner}:${c.id}`)?.buildings.includes(row.building)) continue;
+            ctx.scopeCity = `${c.owner}:${c.id}`;
+            gap(ctx, 'gp-unknown', `${person.id} ${row.yield}`);
+          }
+        }
+      }
+    }
+  }
+  ctx.scopeCity = undefined;
+}
+
+/**
+ * CIV6 (the city's growth accumulator, DLL 0x1b6180 / 0x1b62d0): a session
+ * of the World Congress ends the standing resolutions, and a Migration
+ * Treaty's growth percent detaches from every city its target held, each
+ * keeping the residue (`growthDetachResidue`), latched by the city's centre
+ * plot so a capture keeps it. A session is a table naming a new entry, or
+ * one whose entries differ from the record before's.
+ */
+function foldGrowthDrift(h: History, prev: TurnRecord, rec: TurnRecord): void {
+  const entries = (t: unknown): (DumpResolution & { IsNew?: boolean })[] => (t && typeof t === 'object'
+    ? Object.entries(t as Record<string, unknown>).filter(([k, v]) => /^\d+$/.test(k) && !!v && typeof v === 'object')
+      .map(([, v]) => v as DumpResolution & { IsNew?: boolean })
+    : []);
+  const was = entries(prev.congress);
+  const now = entries(rec.congress);
+  const sig = (l: DumpResolution[]) => l.map((e) => `${e.Type}:${e.ChosenLabel}:${e.ChosenThing}`).sort().join('|');
+  if (!now.some((e) => e.IsNew === true) && sig(was) === sig(now)) return;
+  const W = rec.head.W;
+  for (const e of was) {
+    if (resolutionByHash().get(e.Type) !== CONGRESS_MIGRATION || typeof e.ChosenThing !== 'string') continue;
+    const pid = Number(e.ChosenThing);
+    const residue = growthDetachResidue(e.ChosenLabel === 'A' || e.ChosenLabel === 'А' ? CONGRESS_GROWTH_A : CONGRESS_GROWTH_B);
+    for (const c of prev.cities) {
+      if (c.owner !== pid) continue;
+      const k = c.y * W + c.x;
+      h.growthDrift.set(k, (h.growthDrift.get(k) ?? 0) + residue);
+    }
+  }
 }
 
 /** the install's promotion classes this engine names shorter */

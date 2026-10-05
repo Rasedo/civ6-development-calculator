@@ -20,7 +20,8 @@ import { PROJECT_LIST } from '../data/projects';
 import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
-import { isCiv, seatOf, tileSeat, unitsOf } from './seats';
+import { citiesOf, isCiv, seatOf, tileSeat, unitsOf } from './seats';
+import { growthDetachResidue } from './city';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
@@ -493,6 +494,13 @@ export function congressSession(state: GameState, worldEra: number,
   // a session whose slate was never announced (the FIRST one, or an
   // announcement that found nothing eligible) draws its own, now
   if (slate[0] === -1 && slate[1] === -1) draw();
+  // the standing Migration Treaty detaches from its target's cities, each
+  // keeping the residue its growth percent leaves (`City.growthDrift`)
+  const migration = congressEffect(state, CONGRESS_MIGRATION);
+  if (migration) {
+    const residue = growthDetachResidue(congressGrowthMult(state, migration.target));
+    for (const c of citiesOf(state, migration.target)) c.growthDrift = (c.growthDrift ?? 0) + residue;
+  }
   state.congress = [];
   [slate[0], slate[1]].filter((r) => r >= 0)
     .forEach((res, slot) => runResolution(state, res, slot, recorded, voters));

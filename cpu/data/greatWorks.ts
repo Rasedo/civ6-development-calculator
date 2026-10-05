@@ -143,10 +143,12 @@ interface GreatWorkHolderDef {
   /** a building id (`BUILDINGS`) or a wonder id (`BUILT_WONDERS`) */
   id: string;
   wonder: boolean;
-  /** each slot row; `nonUniqueTourism` (Building_GreatWorks.NonUniquePersonTourism)
-   *  is what a work pays in place of its own when a work by the same person
-   *  stands in an earlier slot of the holder, 0 where the row writes none */
-  slots: readonly { type: number; count: number; nonUniqueTourism?: number }[];
+  /** each slot row; `nonUniqueTourism` / `nonUniqueYield`
+   *  (Building_GreatWorks.NonUniquePersonTourism / NonUniquePersonYield) are
+   *  the Tourism and Culture a work pays in place of its own when a work by
+   *  the same person stands in an earlier slot of the holder, 0 where the
+   *  row writes none */
+  slots: readonly { type: number; count: number; nonUniqueTourism?: number; nonUniqueYield?: number }[];
   theme: number;
 }
 
@@ -158,6 +160,7 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots'),
     'slots.0.nonUniqueTourism': xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NonUniquePersonTourism'),
+    'slots.0.nonUniqueYield': xml('Building_GreatWorks', 'BuildingType=BUILDING_PALACE&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NonUniquePersonYield'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_PALACE', 'BuildingType')] },
   },
   TEMPLE: {
@@ -177,6 +180,7 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ART', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'GreatWorkSlotType')] },
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'NumSlots'),
     'slots.0.nonUniqueTourism': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'NonUniquePersonTourism'),
+    'slots.0.nonUniqueYield': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ART&GreatWorkSlotType=GREATWORKSLOT_ART', 'NonUniquePersonYield'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ART', 'BuildingType')] },
   },
   ARCHAEOLOGICAL_MUSEUM: {
@@ -184,6 +188,7 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ARTIFACT', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'GreatWorkSlotType')] },
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'NumSlots'),
     'slots.0.nonUniqueTourism': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'NonUniquePersonTourism'),
+    'slots.0.nonUniqueYield': xml('Building_GreatWorks', 'BuildingType=BUILDING_MUSEUM_ARTIFACT&GreatWorkSlotType=GREATWORKSLOT_ARTIFACT', 'NonUniquePersonYield'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_MUSEUM_ARTIFACT', 'BuildingType')] },
   },
   BROADCAST_CENTER: {
@@ -249,6 +254,7 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_ART', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'GreatWorkSlotType')] },
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'NumSlots'),
     'slots.0.nonUniqueTourism': xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'NonUniquePersonTourism'),
+    'slots.0.nonUniqueYield': xml('Building_GreatWorks', 'BuildingType=BUILDING_HERMITAGE&GreatWorkSlotType=GREATWORKSLOT_ART', 'NonUniquePersonYield'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_HERMITAGE', 'BuildingType')] },
   },
   ST_BASILS_CATHEDRAL: {
@@ -268,6 +274,7 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
     'slots.0.type': { derived: 'the engine slot code for the install GREATWORKSLOT_PALACE', inputs: [xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'GreatWorkSlotType')] },
     'slots.0.count': xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NumSlots'),
     'slots.0.nonUniqueTourism': xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NonUniquePersonTourism'),
+    'slots.0.nonUniqueYield': xml('Building_GreatWorks', 'BuildingType=BUILDING_APADANA&GreatWorkSlotType=GREATWORKSLOT_PALACE', 'NonUniquePersonYield'),
     theme: { derived: 'the engine THEMING code; the install writes a theming requirement set rather than a column', inputs: [xml('Buildings', 'BuildingType=BUILDING_APADANA', 'BuildingType')] },
   },
 };
@@ -278,11 +285,11 @@ const GW_HOLDER_SRC: Record<string, SrcMap> = {
  *  no object restriction, and the Apadana's is two GREATWORKSLOT_PALACE
  *  slots, which take any object. */
 const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
-  { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1, nonUniqueTourism: 1 }], theme: GW_THEME_NONE },
+  { id: 'PALACE', wonder: false, slots: [{ type: GWS_PALACE, count: 1, nonUniqueTourism: 1, nonUniqueYield: 1 }], theme: GW_THEME_NONE },
   { id: 'TEMPLE', wonder: false, slots: [{ type: GWS_RELIC, count: 1 }], theme: GW_THEME_NONE },
   { id: 'AMPHITHEATER', wonder: false, slots: [{ type: GWS_WRITING, count: 2 }], theme: GW_THEME_NONE },
-  { id: 'MUSEUM', wonder: false, slots: [{ type: GWS_ART, count: 3, nonUniqueTourism: 1 }], theme: GW_THEME_ART },
-  { id: 'ARCHAEOLOGICAL_MUSEUM', wonder: false, slots: [{ type: GWS_ARTIFACT, count: 3, nonUniqueTourism: 1 }], theme: GW_THEME_ARTIFACT },
+  { id: 'MUSEUM', wonder: false, slots: [{ type: GWS_ART, count: 3, nonUniqueTourism: 1, nonUniqueYield: 1 }], theme: GW_THEME_ART },
+  { id: 'ARCHAEOLOGICAL_MUSEUM', wonder: false, slots: [{ type: GWS_ARTIFACT, count: 3, nonUniqueTourism: 1, nonUniqueYield: 1 }], theme: GW_THEME_ARTIFACT },
   { id: 'BROADCAST_CENTER', wonder: false, slots: [{ type: GWS_MUSIC, count: 1 }], theme: GW_THEME_NONE },
   { id: 'CATHEDRAL', wonder: false, slots: [{ type: GWS_CATHEDRAL, count: 1 }], theme: GW_THEME_NONE },
   { id: 'NATIONAL_HISTORY_MUSEUM', wonder: false, slots: [{ type: GWS_PALACE, count: 4 }], theme: GW_THEME_NONE },
@@ -290,9 +297,9 @@ const RAW_GW_HOLDERS: readonly GreatWorkHolderDef[] = [
   { id: 'MONT_ST_MICHEL', wonder: true, slots: [{ type: GWS_RELIC, count: 2 }], theme: GW_THEME_NONE },
   { id: 'BOLSHOI_THEATRE', wonder: true, slots: [{ type: GWS_WRITING, count: 1 }, { type: GWS_MUSIC, count: 1 }], theme: GW_THEME_NONE },
   { id: 'OXFORD_UNIVERSITY', wonder: true, slots: [{ type: GWS_WRITING, count: 2 }], theme: GW_THEME_NONE },
-  { id: 'HERMITAGE', wonder: true, slots: [{ type: GWS_ART, count: 4, nonUniqueTourism: 2 }], theme: GW_THEME_NONE },
+  { id: 'HERMITAGE', wonder: true, slots: [{ type: GWS_ART, count: 4, nonUniqueTourism: 2, nonUniqueYield: 3 }], theme: GW_THEME_NONE },
   { id: 'ST_BASILS_CATHEDRAL', wonder: true, slots: [{ type: GWS_RELIC, count: 3 }], theme: GW_THEME_NONE },
-  { id: 'APADANA', wonder: true, slots: [{ type: GWS_PALACE, count: 2, nonUniqueTourism: 1 }], theme: GW_THEME_NONE },
+  { id: 'APADANA', wonder: true, slots: [{ type: GWS_PALACE, count: 2, nonUniqueTourism: 1, nonUniqueYield: 1 }], theme: GW_THEME_NONE },
   { id: 'BROADWAY', wonder: true, slots: [{ type: GWS_WRITING, count: 1 }, { type: GWS_MUSIC, count: 2 }], theme: GW_THEME_NONE },
   { id: 'SYDNEY_OPERA_HOUSE', wonder: true, slots: [{ type: GWS_MUSIC, count: 3 }], theme: GW_THEME_NONE },
   // declares no slot of its own; a Great Person opens its row (`GW_GP_EXTRA_SLOTS`)
@@ -336,6 +343,8 @@ interface GreatWorkSlotDef {
   extraRank: number;
   /** its row's NonUniquePersonTourism, 0 none */
   nonUniqueTourism: number;
+  /** its row's NonUniquePersonYield, 0 none */
+  nonUniqueYield: number;
 }
 
 function buildLayout(): GreatWorkSlotDef[] {
@@ -350,11 +359,12 @@ function buildLayout(): GreatWorkSlotDef[] {
         seen.add(o);
       }
       const nu = s.nonUniqueTourism ?? 0;
-      for (let i = 0; i < s.count; i++) out.push({ holder: hi, type: s.type, extraRank: -1, nonUniqueTourism: nu });
+      const ny = s.nonUniqueYield ?? 0;
+      for (let i = 0; i < s.count; i++) out.push({ holder: hi, type: s.type, extraRank: -1, nonUniqueTourism: nu, nonUniqueYield: ny });
       const widest = [...EXTRA_SLOT_ROWS, ...GW_GP_EXTRA_SLOTS]
         .filter((r) => r.holder === h.id && r.type === s.type)
         .reduce((m, r) => Math.max(m, r.amount), 0);
-      for (let i = 0; i < widest; i++) out.push({ holder: hi, type: s.type, extraRank: i, nonUniqueTourism: nu });
+      for (let i = 0; i < widest; i++) out.push({ holder: hi, type: s.type, extraRank: i, nonUniqueTourism: nu, nonUniqueYield: ny });
     }
   });
   return out;
