@@ -36,6 +36,7 @@ import { cityAppealResolver, cityGovernorEffects, cityGovernorEstablished, cityG
 import { GWO_NAMES, type GreatWorkObject } from '../data/greatWorks';
 import { WATER_WORKS_HOUSING, WATER_WORKS_AMENITIES } from '../data/governors';
 import type { AdjacencyRule } from '../data/districts';
+import { seatWonders } from './wonders';
 export interface Unlocks {
   improvements: Set<string>;
   districts: Set<string>;
@@ -2161,6 +2162,19 @@ export interface YieldCtx {
    *  their tiles pay no resource yield to it (`hiddenResourcesFor`). Absent
    *  (the seatless base context) hides nothing. */
   hiddenResources?: ReadonlySet<string>;
+  /** CIV6 (MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY): the adjacency rules
+   *  this seat's complete wonders hand its districts, by type
+   *  (`wonderAdjacency`). Absent adds none. */
+  wonderAdjacency?: Partial<Record<DistrictId, AdjacencyRule[]>>;
+}
+
+/** the adjacency rules seat `seat`'s complete wonders hand its districts */
+export function wonderAdjacency(state: GameState, seat: number): Partial<Record<DistrictId, AdjacencyRule[]>> {
+  const out: Partial<Record<DistrictId, AdjacencyRule[]>> = {};
+  for (const w of seatWonders(state, seat)) {
+    for (const r of w.def.effects?.districtAdjacency ?? []) (out[r.district] ??= []).push(r.rule);
+  }
+  return out;
 }
 
 const NO_PROMOS: ReadonlySet<string> = new Set<string>();
@@ -2181,6 +2195,7 @@ export function makeYieldCtx(state: GameState, seat: number, mods?: Modifiers): 
     offHomeContinent: (t) => !onHomeContinent(state, seat, t.index),
     foundedTerrains: founded,
     hiddenResources: hiddenResourcesFor(state, seat),
+    wonderAdjacency: wonderAdjacency(state, seat),
     govPromosAt: cityGovernorPromoResolver(state, seat),
   };
 }

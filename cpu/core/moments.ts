@@ -23,7 +23,7 @@ import { addEraScore } from './eras';
 import { isCiv, seatOf } from './seats';
 import { isExplored } from './fog';
 import { makeYieldCtx } from './effects';
-import { buildingVariantAdjacency, effectiveAdjacency } from './yields';
+import { baseAdjacency, buildingVariantAdjacency, onOrNextToShallowWater } from './yields';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
@@ -139,15 +139,22 @@ export function recordMoment(state: GameState, seat: number, k: number): void {
 }
 
 /** CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): major `seat` records the
- *  district of `type` its `city` completed on `tileIndex` when the
- *  adjacency it pays there reaches its row's bonus — the seat's first such
+ *  district of `type` its `city` completed on `tileIndex` when its yield
+ *  there before any percent reaches its row's bonus — the seat's first such
  *  district of the type. */
 export function districtMoment(state: GameState, seat: number, city: City, tileIndex: number, type: DistrictId): void {
   const k = HIGH_ADJACENCY_KEY[type];
   if (k === undefined || !isCiv(seat) || (seatOf(state, seat)?.moments ?? []).includes(k)) return;
   const row = MOMENT_HIGH_ADJACENCY.find((r) => r.district === type)!;
   const ctx = makeYieldCtx(state, seat);
-  const adj = effectiveAdjacency(ctx, state.map.tiles[tileIndex], type, buildingVariantAdjacency(ctx.mods.civ, city, type));
+  const tile = state.map.tiles[tileIndex];
+  // the district's yield before any percent (GameCore District::GetYield
+  // 0x249850 unscaled, read by the handler 0x312c00): its adjacency, and
+  // the flat yields a district takes — Nan Madol's Culture beside the water
+  let adj = baseAdjacency(ctx, tile, type, buildingVariantAdjacency(ctx.mods.civ, city, type));
+  if (DISTRICTS[type].adjacencyYield === 'culture' && ctx.mods.waterDistrictCulture && onOrNextToShallowWater(ctx.map, tile)) {
+    adj += ctx.mods.waterDistrictCulture;
+  }
   if (adj >= row.min) recordMoment(state, seat, k);
 }
 

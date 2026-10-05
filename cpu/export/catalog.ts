@@ -71,7 +71,7 @@ const STATIC_ADJ_SRC = new Set<AdjacencySource>([
 
 /** does neighbour `n` answer static source `src` */
 function staticMatch(src: AdjacencySource, n: Tile): boolean {
-  return src === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN' && !naturalWonderAt(n)
+  return src === 'MOUNTAIN' ? n.elevation === 'MOUNTAIN'
     : src === 'RAINFOREST' ? n.feature === 'RAINFOREST'
     : src === 'WOODS' ? n.feature === 'WOODS'
     : src === 'REEF' ? n.feature === 'REEF'

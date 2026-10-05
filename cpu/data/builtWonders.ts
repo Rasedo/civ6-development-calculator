@@ -16,6 +16,7 @@ import type { DistrictId, FeatureId, GreatPersonClass, ImprovementId, TerrainId,
 import type { SlotKind } from './policies';
 import { GAME_SPEED, scaleByGameSpeed } from './constants';
 import { xml, type SrcMap } from './provenance';
+import type { AdjacencyRule } from './districts';
 
 export interface BuiltWonderDef {
   id: string;
@@ -167,6 +168,10 @@ export interface BuiltWonderDef {
     spreadCharges?: number;
     /** Extra build charges on every Builder the owner trains. */
     buildCharges?: number;
+    /** CIV6 (MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY, Machu Picchu): an
+     *  adjacency rule every district of the type in the owner's cities
+     *  takes, in the district's own adjacency yield. */
+    districtAdjacency?: { district: DistrictId; rule: AdjacencyRule }[];
     /** CIV6 (Mausoleum at Halicarnassus): "All Engineers have an additional
      *  charge. (Applies to both existing Great Engineers and Military
      *  Engineers.)" — so it is paid once to the live ones AND at creation. */
@@ -880,12 +885,30 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       id: 'MACHU_PICCHU', name: 'Machu Picchu', code: 'MP', cost: 400,
       requiresTech: 'ENGINEERING', placement: { onMountain: true },
       cityYields: { gold: 4 },
-      description: '+4 gold. On a Mountain.',
+      // one MOUNTAIN rule per district stands for the install's five
+      // modifiers a district (one per mountain terrain, Amount 1 each)
+      effects: {
+        districtAdjacency: [
+          { district: 'COMMERCIAL_HUB', rule: { source: 'MOUNTAIN', amount: 1 } },
+          { district: 'INDUSTRIAL_ZONE', rule: { source: 'MOUNTAIN', amount: 1 } },
+          { district: 'THEATER_SQUARE', rule: { source: 'MOUNTAIN', amount: 1 } },
+        ],
+      },
+      description: '+4 gold; Commercial Hubs, Industrial Zones and Theater Squares of the owner take +1 adjacency per adjacent Mountain. On a Mountain.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_MACHU_PICCHU', 'Cost', { scale: GAME_SPEED }),
         requiresTech: xml('Buildings', 'BuildingType=BUILDING_MACHU_PICCHU', 'PrereqTech', { expect: 'TECH_ENGINEERING' }),
         'cityYields.gold': xml('Building_YieldChanges', 'BuildingType=BUILDING_MACHU_PICCHU&YieldType=YIELD_GOLD', 'YieldChange'),
+        'effects.districtAdjacency.0.district': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_COMMERCIALHUB_GRASSMOUNTAIN_GOLD&Name=DistrictType', 'Value', { expect: 'DISTRICT_COMMERCIAL_HUB' }),
+        'effects.districtAdjacency.0.rule.source': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_COMMERCIALHUB_GRASSMOUNTAIN_GOLD&Name=TerrainType', 'Value', { expect: 'TERRAIN_GRASS_MOUNTAIN' }),
+        'effects.districtAdjacency.0.rule.amount': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_COMMERCIALHUB_GRASSMOUNTAIN_GOLD&Name=Amount', 'Value'),
+        'effects.districtAdjacency.1.district': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_INDUSTRIALZONE_GRASSMOUNTAIN_PRODUCTION&Name=DistrictType', 'Value', { expect: 'DISTRICT_INDUSTRIAL_ZONE' }),
+        'effects.districtAdjacency.1.rule.source': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_INDUSTRIALZONE_GRASSMOUNTAIN_PRODUCTION&Name=TerrainType', 'Value', { expect: 'TERRAIN_GRASS_MOUNTAIN' }),
+        'effects.districtAdjacency.1.rule.amount': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_INDUSTRIALZONE_GRASSMOUNTAIN_PRODUCTION&Name=Amount', 'Value'),
+        'effects.districtAdjacency.2.district': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_THEATER_GRASSMOUNTAIN_CULTURE&Name=DistrictType', 'Value', { expect: 'DISTRICT_THEATER' }),
+        'effects.districtAdjacency.2.rule.source': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_THEATER_GRASSMOUNTAIN_CULTURE&Name=TerrainType', 'Value', { expect: 'TERRAIN_GRASS_MOUNTAIN' }),
+        'effects.districtAdjacency.2.rule.amount': xml('ModifierArguments', 'ModifierId=MACHUPICCHU_THEATER_GRASSMOUNTAIN_CULTURE&Name=Amount', 'Value'),
         'placement.onMountain': { derived: 'true where every Building_ValidTerrains row of the wonder is a MOUNTAIN terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_MACHU_PICCHU', 'TerrainType')] },
       },
     }),

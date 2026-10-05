@@ -694,6 +694,68 @@ fraction bits (every amount is written `<< 8`).
   origin's owner dominates the destination's. Not modelled (AUDIT C-94
   BUILD).
 
+## H-1: the district adjacency — READ
+
+Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 ->
+0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum
+0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk
+0x7aaf80 calls the per-row 0x365ae0 itself.
+
+- 0x365720 (player, city, district type, yield, plot): the district row's
+  vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0,
+  SUMMED AS INTEGERS; then the player's modifier-added adjacencies
+  (0x1cb470: MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY and kin, entries of
+  0x30 bytes: terrain, feature, river +8, adjacent district +9, appeal
+  +0xc, TilesRequired +0x14, amount +0x18), each entry's count × amount
+  truncated by `idiv` TilesRequired on its own and added.
+- 0x365ae0, one row (column map from the loader 0xa57930's SELECT: flag
+  byte +0xc0 = AdjacentNaturalWonder 1, AdjacentResource 2, AdjacentRiver 4,
+  AdjacentSeaResource 8, AdjacentWonder 0x10, OtherDistrictAdjacent 0x20,
+  Self 0x40; +0x1c YieldChange, +0x18 TilesRequired, +0xc8 AdjacentDistrict,
+  +0xd0 AdjacentFeature, +0xd8 AdjacentImprovement, +0x100 AdjacentTerrain,
+  +0x20 AdjacentResourceClass): 0 unless the row's yield is the one asked
+  and 0x367010 admits it (YieldChange ≠ 0, PrereqTech / PrereqCivic held,
+  ObsoleteTech / ObsoleteCivic not, the row not in the civ's or leader's
+  ExcludedAdjacencies). A fixed-point accumulator (8 fractional bits) takes
+  YieldChange once for Self and once for a river on the district's own plot
+  (+0x37), then for each of the six neighbours YieldChange per clause it
+  answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT
+  (0x50a690 with the player's team; artifacts excluded) for
+  AdjacentResource, on water for AdjacentSeaResource, by class name for
+  AdjacentResourceClass; a wonder (0x81330); OtherDistrictAdjacent: the
+  neighbour's owner (+0x1c) is the player, its district (0x810d0) is not
+  InternalOnly (Districts +0xe1 bit 4 — the Wonder district), is complete
+  (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88,
+  0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone;
+  AdjacentFeature (+0x3c); AdjacentImprovement (+0x44) not pillaged (+0x4d
+  bit 0); AdjacentDistrict: that type, complete (0x811b0) and not pillaged
+  (0x811f0), WHOEVER OWNS IT. After the six: divided by TilesRequired when
+  over 1 (0x3640e0, fixed point) and `sar 8` — floor(n · YieldChange /
+  TilesRequired) per row.
+- The city's walk 0x7aaf80 shifts each row's integer back to fixed point
+  and applies the adjacency percent per row (0x7a6690) before adding it.
+- District::GetYield 0x249850 (yield, percent flag): 0 while pillaged;
+  else 0x366df0's adjacency + the district's flat yield bucket (+0x2f0) +
+  its appeal rows (+0x458: yield, minimum appeal, amount); the percent only
+  when asked.
+- The high-adjacency moments, handler 0x312c00 at a district's
+  completion: per district type (Campus 0x675dbc7a, Commercial Hub,
+  Harbor, Holy Site, Industrial Zone, Theater Square) GetYield(that
+  district, its yield, no percent) ≥ 3 / 4 / 4 / 3 / 4 / 3, once per
+  player and type.
+
+The two recorded cases: 1104 Xian's Campus (1 Mountain, 3 Rainforest, its
+centre) 1 + floor(3/2) + floor(1/2) = 2, the game's 2 (pooling would give
+3); 1106 Handan's (2 Mountains, a Rainforest, the centre) 2 + 0 + 0 = 2. The
+centre counts as a district (not InternalOnly, complete). Machu Picchu's
+mountain rules close 1104 t143 and 1108 t187 (an Industrial Zone at 3 rows
++ 1 Mountain, the game's moment paid). Check: `tests/cpu/city/adjacency-rows.test.ts`,
+`tests/gpu/adjacency_rows_test.py`; H-1 `city.yields` 5,759 → 5,921 passes,
+`step.eraScore` 2,690 → 2,693 over the six Duels.
+
 ## DLL rules the engines contradict
 
-None known: every rule read above ships on both engines.
+Every rule read above ships on both engines but one: the high-adjacency
+moment reads District::GetYield's flat bucket (+0x2f0) and appeal rows
+(+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the Harness section's
+Moments BUILD line).

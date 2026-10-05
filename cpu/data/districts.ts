@@ -1,15 +1,12 @@
 /**
  * Districts, common to all civs. Adjacency amounts are the GATHERING STORM
- * Civilopedia's, which is the ruleset this repo models: a "+1 for every two
- * adjacent X" reads as 0.5 here and the TOTAL truncates once, in
- * `districtAdjacency` — never per source. Production cost scales with overall
- * tech/civic progress and locks in at queue time (districtCost in
- * core/game.ts); the `cost` field below is only a fallback for queue items
- * without a locked cost.
- *
- * Sources the real game has and this map cannot express are simply absent:
- * the Ley Line, the Bath, and the Lumber Mill and
- * strategic resources the Industrial Zone also reads.
+ * `Adjacency_YieldChanges` rows, one rule per row: a "+1 for every two
+ * adjacent X" reads as 0.5 here and `districtAdjacency` floors each rule's
+ * pay on its own, as the game floors each row. The Roman Bath is the
+ * Aqueduct's unique row, so the Industrial Zone's Bath_Production row is its
+ * AQUEDUCT rule. Production cost scales with overall tech/civic progress and
+ * locks in at queue time (districtCost in core/game.ts); the `cost` field
+ * below is only a fallback for queue items without a locked cost.
  */
 
 import type { PlunderRow, DistrictId, YieldKey } from '../core/types';
@@ -28,8 +25,12 @@ export type AdjacencySource =
   | 'CITY_CENTER' // per adjacent city center
   | 'HARBOR_DISTRICT' // per adjacent harbor
   | 'SEA_RESOURCE' // per adjacent water tile with a resource
-  | 'MINE' // per adjacent mine improvement (GS: +0.5 for Industrial Zone)
-  | 'QUARRY' // per adjacent quarry improvement (GS: +1 for Industrial Zone)
+  | 'MINE' // per adjacent unpillaged mine (GS: +0.5 for Industrial Zone)
+  | 'QUARRY' // per adjacent unpillaged quarry (GS: +1 for Industrial Zone)
+  | 'LUMBER_MILL' // per adjacent unpillaged lumber mill (GS: +0.5 for Industrial Zone)
+  // CIV6 (AdjacentResourceClass RESOURCECLASS_STRATEGIC): per adjacent
+  // strategic resource the owner sees
+  | 'STRATEGIC'
   // CIV6 (GS Industrial Zone): "Major bonus (+2 Production) for each adjacent
   // Aqueduct, Dam or Canal".
   | 'AQUEDUCT'
@@ -49,7 +50,7 @@ export type AdjacencySource =
   | 'ENTERTAINMENT_COMPLEX'
   | 'HOLY_SITE_DISTRICT'
   // CIV6 (Hansa): "+1 Production for each adjacent Resource" — ANY resource
-  // on land, which no base row asks for.
+  // the owner sees, land or water, which no base row asks for.
   | 'RESOURCE'
   // CIV6 (Seowon): "+4 Science" flat, and the only source that reads no
   // neighbour at all — the district's own tile.
@@ -647,6 +648,8 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       { source: 'CANAL', amount: 2 },
       { source: 'GOV_PLAZA', amount: 1 },
       { source: 'DISTRICT', amount: 0.5 },
+      { source: 'LUMBER_MILL', amount: 0.5 },
+      { source: 'STRATEGIC', amount: 1 },
     ],
     housing: 0,
     maintenance: 1,
@@ -680,6 +683,10 @@ export const DISTRICTS: Record<DistrictId, DistrictDef> = {
       'adjacency.5.amount': xml('Adjacency_YieldChanges', 'ID=Government_Production', 'YieldChange'),
       'adjacency.6.source': xml('Adjacency_YieldChanges', 'ID=District_Production', 'OtherDistrictAdjacent', { expect: 'true' }),
       'adjacency.6.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=District_Production', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=District_Production', 'TilesRequired')] },
+      'adjacency.7.source': xml('Adjacency_YieldChanges', 'ID=LumberMill_HalfProduction', 'AdjacentImprovement', { expect: 'IMPROVEMENT_LUMBER_MILL' }),
+      'adjacency.7.amount': { derived: 'YieldChange / TilesRequired — the install pays 1 per TWO neighbours where this catalog carries 0.5 per neighbour', inputs: [xml('Adjacency_YieldChanges', 'ID=LumberMill_HalfProduction', 'YieldChange'), xml('Adjacency_YieldChanges', 'ID=LumberMill_HalfProduction', 'TilesRequired')] },
+      'adjacency.8.source': xml('Adjacency_YieldChanges', 'ID=Strategic_Production', 'AdjacentResourceClass', { expect: 'RESOURCECLASS_STRATEGIC' }),
+      'adjacency.8.amount': xml('Adjacency_YieldChanges', 'ID=Strategic_Production', 'YieldChange'),
       'civVariants.0.cost': xml('Districts', 'DistrictType=DISTRICT_HANSA', 'Cost'),
       'civVariants.0.housing': xml('Districts', 'DistrictType=DISTRICT_HANSA', 'Housing'),
       'civVariants.0.amenities': xml('Districts', 'DistrictType=DISTRICT_HANSA', 'Entertainment'),

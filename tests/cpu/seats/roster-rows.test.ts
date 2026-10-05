@@ -65,8 +65,10 @@ describe('Meiji Restoration', () => {
       const beside = neighbors(state.map, hs).find((t) => t.index !== city.centerIndex && !t.district)!;
       placeDistrict(city, 'CAMPUS', beside);
       expect(getModifiers(state, 0).districtAdjacencyAdd.HOLY_SITE?.length ?? 0).toBe(civ === 'JAPAN' ? 1 : 0);
-      // the centre is an adjacent district too: +1 per neighbour holding one
-      const n = neighbors(state.map, hs).filter((t) => t.district === 'CITY_CENTER' || (t.district && t.districtComplete)).length;
+      // the centre is an adjacent district too: +1 per neighbour of the same
+      // owner holding one
+      const n = neighbors(state.map, hs).filter((t) => t.ownerSeat === hs.ownerSeat
+        && (t.district === 'CITY_CENTER' || (t.district && t.districtComplete))).length;
       return computeCityStats(state, city).breakdown.districts.faith - (civ === 'JAPAN' ? n : 0);
     };
     expect(faithOf('JAPAN')).toBe(faithOf('AMERICA'));

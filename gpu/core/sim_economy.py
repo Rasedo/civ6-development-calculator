@@ -3071,21 +3071,27 @@ class SimEconomy:
         return ((wb >= 0) & self.city_alive[:, row] & self.city_bldg[:, row, :, self._temple_bidx] & hs_ok)
 
     def _adj_district_count(self) -> torch.Tensor:
-        """[B, T] number of adjacent COMPLETED districts — the DISTRICT
-        adjacency source. Counts every MAJOR city centre (centre_slot_at —
-        those carry tile.district='CITY_CENTER' in TS) and every completed
-        specialty district (self.district). No owner filter, mirroring
-        matchesAdjacency('DISTRICT'). This and its three siblings below are
-        kept under the write counters of the planes they read; callers never
-        write into the answer."""
-        planes = (self.centre_slot_at, self.district, self.district_complete, self.neigh)
+        """[B, T] number of adjacent LIVE districts of the plot's own owner —
+        the DISTRICT adjacency source (OtherDistrictAdjacent, GameCore
+        0x365ae0: the neighbour's owner is the district's, the district
+        complete and not pillaged). Counts every MAJOR city centre
+        (centre_slot_at — those carry tile.district='CITY_CENTER' in TS) and
+        every complete unpillaged specialty district (self.district) whose
+        plot `tile_seat` names the same owner as the plot asked about,
+        mirroring matchesAdjacency('DISTRICT'). This and its three siblings
+        below are kept under the write counters of the planes they read;
+        callers never write into the answer."""
+        planes = (self.centre_slot_at, self.district, self.district_complete, self.district_pillaged,
+                  self.tile_seat, self.neigh)
         ent = self._adjd_cache
         if ent is not None and simbase.stamp_holds(ent[0], planes):
             return ent[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
-        is_d = ((self.centre_slot_at[:, nbc] >= 0) | ((self.district[:, nbc] >= 0) & self.district_complete[:, nbc])) & on_map
+        live = (self.district[:, nbc] >= 0) & self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
+        same = self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)
+        is_d = ((self.centre_slot_at[:, nbc] >= 0) | live) & same & on_map
         out = is_d.sum(dim=2)
         self._adjd_cache = (simbase.plane_stamp(planes), out)
         return out
@@ -3106,17 +3112,21 @@ class SimEconomy:
     def _adj_harbor_count(self) -> torch.Tensor:
         if self._harbor_idx < 0:
             return torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
-        planes = (self.district, self.district_complete, self.neigh)
-        ent = self._adjh_cache
-        if ent is not None and ent[1] == self._harbor_idx and simbase.stamp_holds(ent[0], planes):
-            return ent[2]
+        return self._adj_dtype_count(self._harbor_idx)
+
+    def _adj_dtype_count(self, di: int) -> torch.Tensor:
+        """[B, T] long — adjacent LIVE districts of type `di`, whoever owns
+        them (AdjacentDistrict: complete and not pillaged)."""
+        planes = (self.district, self.district_complete, self.district_pillaged, self.neigh)
+        ent = self._adjtc_cache.get(di)
+        if ent is not None and simbase.stamp_holds(ent[0], planes):
+            return ent[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
-        on_map = (nb >= 0).unsqueeze(0)
-        is_h = (self.district[:, nbc] == self._harbor_idx) & self.district_complete[:, nbc] & on_map
-        out = is_h.sum(dim=2)
-        self._adjh_cache = (simbase.plane_stamp(planes), self._harbor_idx, out)
-        return out
+        v = ((self.district[:, nbc] == di) & self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
+             & (nb >= 0).unsqueeze(0)).sum(dim=2)
+        self._adjtc_cache[di] = (simbase.plane_stamp(planes), v)
+        return v
 
     def _adj_dtype_complete(self, di: int) -> torch.Tensor:
         planes = (self.district, self.district_complete, self.neigh)
@@ -4310,29 +4320,28 @@ class SimEconomy:
             raw = raw + fl(self._dyn_center[di] * self._adj_center_count().to(self.dtype))
         if float(self._dyn_harbor[di]) != 0:
             raw = raw + fl(self._dyn_harbor[di] * self._adj_harbor_count().to(self.dtype))
-        if float(self._dyn_mine[di]) != 0 or float(self._dyn_quarry[di]) != 0 or float(self._dyn_aqueduct[di]) != 0:
+        if float(self._dyn_mine[di]) != 0 or float(self._dyn_quarry[di]) != 0:
             nb = self.neigh
             nbc = nb.clamp(min=0)
-            on_map = (nb >= 0).unsqueeze(0)
+            # AdjacentImprovement: an unpillaged improvement of the type
+            on_map = (nb >= 0).unsqueeze(0) & ~self.pillaged[:, nbc]
             if float(self._dyn_mine[di]) != 0:
                 cnt = ((self.improvement[:, nbc] == self._mine_iidx) & on_map).sum(dim=2)
                 raw = raw + fl(self._dyn_mine[di] * cnt.to(self.dtype))
             if float(self._dyn_quarry[di]) != 0:
                 cnt = ((self.improvement[:, nbc] == self._quarry_iidx) & on_map).sum(dim=2)
                 raw = raw + fl(self._dyn_quarry[di] * cnt.to(self.dtype))
-            if float(self._dyn_aqueduct[di]) != 0 and self._aqueduct_idx >= 0:
-                cnt = ((self.district[:, nbc] == self._aqueduct_idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
-                raw = raw + fl(self._dyn_aqueduct[di] * cnt.to(self.dtype))
-        for _amt, _src in ((self._dyn_dam, self._dam_didx),
+        for _amt, _src in ((self._dyn_aqueduct, self._aqueduct_idx),
+                           (self._dyn_dam, self._dam_didx),
                            (self._dyn_canal, self._canal_didx),
                            (self._dyn_govplaza, self._govplaza_didx)):
             if float(_amt[di]) == 0 or _src < 0:
                 continue
-            nb = self.neigh
-            nbc = nb.clamp(min=0)
-            cnt = ((self.district[:, nbc] == _src) & self.district_complete[:, nbc]
-                   & (nb >= 0).unsqueeze(0)).sum(dim=2)
-            raw = raw + fl(_amt[di] * cnt.to(self.dtype))
+            raw = raw + fl(_amt[di] * self._adj_dtype_count(_src).to(self.dtype))
+        # the rows no plane above carries (the Lumber Mill's, the strategic
+        # resources'), each counted live and floored on its own
+        for _src, _amt in self._d_dyn_adj[di]:
+            raw = raw + fl(_amt * self._adj_source_plane(_src))
         return raw
 
     def _district_adj_floor(self, di: int) -> torch.Tensor:
@@ -4517,18 +4526,23 @@ class SimEconomy:
             return cnt.to(self.dtype)
         if name == "NATURAL_WONDER":
             return (self.nwonder[:, nbc] & on_map).sum(dim=2).to(self.dtype)
+        # every resource row counts the resource whoever sees it; the seat's
+        # unseen ones come off in `_district_adj_base` (`_adj_hidden_cut`)
         _live_r = self._res_live()[:, nbc]
         if name == "SEA_RESOURCE":
             return (self.water[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
         if name == "RESOURCE":
-            return (~self.water[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
+            return (_live_r & on_map).sum(dim=2).to(self.dtype)
+        if name == "STRATEGIC":
+            _strat = self._strat_slot_of.take(self.res_id.clamp(min=0)) >= 0
+            return (_strat[:, nbc] & _live_r & on_map).sum(dim=2).to(self.dtype)
         if name == "MOUNTAIN":
-            cnt = (self.tile_mountain[:, nbc] & ~self.nwonder[:, nbc] & on_map).sum(dim=2)
-            return cnt.to(self.dtype)
-        if name == "MINE":
-            return ((self.improvement[:, nbc] == self._mine_iidx) & on_map).sum(dim=2).to(self.dtype)
-        if name == "QUARRY":
-            return ((self.improvement[:, nbc] == self._quarry_iidx) & on_map).sum(dim=2).to(self.dtype)
+            # AdjacentTerrain reads the terrain alone: a natural wonder on a
+            # mountain is a mountain to it
+            return (self.tile_mountain[:, nbc] & on_map).sum(dim=2).to(self.dtype)
+        _imap = {"MINE": self._mine_iidx, "QUARRY": self._quarry_iidx, "LUMBER_MILL": self._lumber_iidx}
+        if name in _imap:
+            return ((self.improvement[:, nbc] == _imap[name]) & ~self.pillaged[:, nbc] & on_map).sum(dim=2).to(self.dtype)
         _dmap = {"AQUEDUCT": self._aqueduct_idx, "DAM": self._dam_didx,
                  "CANAL": self._canal_didx, "GOV_PLAZA": self._govplaza_didx,
                  "COMMERCIAL_HUB": self._commhub_idx, "HOLY_SITE_DISTRICT": self._hs_idx,
@@ -4537,17 +4551,16 @@ class SimEconomy:
             _idx = _dmap[name]
             if _idx < 0:
                 return torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
-            cnt = ((self.district[:, nbc] == _idx) & self.district_complete[:, nbc] & on_map).sum(dim=2)
-            return cnt.to(self.dtype)
+            return self._adj_dtype_count(_idx).to(self.dtype)
         # everything left names a FEATURE or a TERRAIN, which `_adj_src_count`
         # already answers off the live map
         return self._adj_src_count(src)
 
-    def _district_adj_seat(self, row: int, di: int) -> torch.Tensor:
-        """[B, T] — `effectiveAdjacency`: the FLOORED adjacency of a district
-        of type `di`, times this seat's adjacencyMult for that type. TS floors
-        the raw sum first and multiplies after, so a doubled +3 is +6, never
-        floor(3.5 * 2)."""
+    def _district_adj_base(self, row: int, di: int) -> torch.Tensor:
+        """[B, T] — `baseAdjacency`: the FLOORED adjacency a district of type
+        `di` pays this seat before any percent — the catalog's rows (a unique
+        district's own), the beliefs' and wonders' rules, less the resources
+        the seat cannot see."""
         if di in self._bel_adj_srcs and row < self.n_majors:
             base = self._district_adj_belief_floor(row, di)
         else:
@@ -4557,6 +4570,57 @@ class SimEconomy:
         _var = self._variant_adj_floor(row, di)
         if _var is not None:
             base = _var
+        # CIV6 (MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY, Machu Picchu): the
+        # rules the seat's complete wonders hand the type, each floored on
+        # its own
+        if row < self.n_majors:
+            for _wd, _ws in self._wond_adj_pairs:
+                if _wd != di:
+                    continue
+                _wa = self._seat_wonder_sum(row, self._wond_dist_adj[:, di, _ws])
+                if bool(_wa.count_nonzero()):
+                    base = base + torch.floor(_wa.to(base.dtype).unsqueeze(1) * self._adj_source_plane(_ws))
+        return base - self._adj_hidden_cut(row, di)
+
+    def _adj_hidden_cut(self, row: int, di: int) -> torch.Tensor | float:
+        """[B, T] — what the resource rows of district `di` (the seat's own
+        variant's where it plays one) count for the resources this row cannot
+        see (`matchesAdjacency`'s `hidden`): each row whole, times its amount.
+        0 where the row sees every resource."""
+        hid = self._res_hidden(row)
+        if not bool(hid.count_nonzero()):
+            return 0.0
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        on = hid[:, nbc] & (nb >= 0).unsqueeze(0)
+
+        def cut(rows) -> torch.Tensor:
+            out = torch.zeros(self.B, self.T, dtype=self.dtype, device=self.device)
+            for src, amt in rows:
+                if src not in self._adj_res_srcs:
+                    continue
+                name = self._adj_src_names[src]
+                m = on & self.water[:, nbc] if name == "SEA_RESOURCE" else (
+                    on & (self._strat_slot_of.take(self.res_id.clamp(min=0)) >= 0)[:, nbc] if name == "STRATEGIC" else on)
+                out = out + float(amt) * m.sum(dim=2).to(self.dtype)
+            return out
+
+        base_rows = [(int(a["src"]), float(a["amount"])) for a in self.districts_cat[di]["adjacency"]]
+        out = cut(base_rows)
+        for civ, srcs in (self._d_variant_adj.get(di) or {}).items():
+            if row >= self.n_majors:
+                break
+            who = self._row_plays_idx(row, civ)
+            if bool(who.count_nonzero()):
+                out = torch.where(who.unsqueeze(1), cut(srcs), out)
+        return out
+
+    def _district_adj_seat(self, row: int, di: int) -> torch.Tensor:
+        """[B, T] — `effectiveAdjacency`: the FLOORED adjacency of a district
+        of type `di` (`_district_adj_base`), times this seat's adjacencyMult
+        for that type. TS floors the raw sum first and multiplies after, so a
+        doubled +3 is +6, never floor(3.5 * 2)."""
+        base = self._district_adj_base(row, di)
         mult = self._gov_mods(row)[10][:, di].unsqueeze(1)
         out = base * mult
         # a promotion column that doubles nothing for this type multiplies

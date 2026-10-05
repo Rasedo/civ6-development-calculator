@@ -1,6 +1,6 @@
 
 import { addYields, emptyYields, type GameState, type City, type Tile, type Yields, type DistrictId, type ImprovementId } from './types';
-import { citiesOf, civOf, seatOf, tileBelongsTo, civVariantOf, hiddenResourcesFor } from './seats';
+import { citiesOf, civOf, seatOf, tileBelongsTo, tileSeat, civVariantOf, hiddenResourcesFor } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
 import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
@@ -243,16 +243,27 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   return out;
 }
 
-function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
+/** a district on `n` that a neighbour's adjacency row may count: complete
+ *  and not pillaged (GameCore 0x365ae0: District +0xb08 set, +0xc88 clear) */
+const liveDistrict = (n: Tile): boolean => n.districtComplete && !n.districtPillaged;
+
+/** does `neighbor` answer `rule` for a district owned by seat `owner`;
+ *  `hidden` the resources that seat cannot see */
+function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile, owner: number, hidden?: ReadonlySet<string>): boolean {
   // CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water tile",
   // so it lends the SEA's sources and none of the ground's — the same reason
   // `submergeTile` drops the resource rather than leaving a drowned Iron seam
   // lending a neighbouring district an adjacency the ground never had.
   const terrain = ringTerrain(neighbor);
   const feature = ringFeature(neighbor);
+  // the resource as the owner sees it (GameCore 0x50a690): an unrevealed
+  // strategic is no resource to its rows
+  const res = neighbor.resource !== null && !hidden?.has(neighbor.resource) ? neighbor.resource : null;
   switch (rule.source) {
     case 'MOUNTAIN':
-      return isMountain(neighbor) && !naturalWonderAt(neighbor);
+      // AdjacentTerrain compares the plot's terrain alone: a natural wonder
+      // standing on a mountain is a mountain to it
+      return isMountain(neighbor);
     case 'RAINFOREST':
       return feature === 'RAINFOREST';
     case 'WOODS':
@@ -271,36 +282,45 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
       return naturalWonderAt(neighbor) !== null;
     case 'BUILT_WONDER':
       return neighbor.builtWonder !== null && neighbor.builtWonderComplete;
+    // OtherDistrictAdjacent: a live district of the SAME owner, a city
+    // centre among them
     case 'DISTRICT':
-      return neighbor.district !== null && neighbor.districtComplete;
+      return neighbor.district !== null && liveDistrict(neighbor) && tileSeat(neighbor) === owner;
+    // AdjacentDistrict: a live district of that type, whoever owns it
     case 'CITY_CENTER':
-      return neighbor.district === 'CITY_CENTER' && neighbor.districtComplete;
+      return neighbor.district === 'CITY_CENTER' && liveDistrict(neighbor);
     case 'HARBOR_DISTRICT':
-      return neighbor.district === 'HARBOR' && neighbor.districtComplete;
+      return neighbor.district === 'HARBOR' && liveDistrict(neighbor);
     case 'SEA_RESOURCE':
-      return isWater(neighbor) && neighbor.resource !== null;
+      return isWater(neighbor) && res !== null;
+    // AdjacentImprovement: an unpillaged improvement of that type
     case 'MINE':
-      return neighbor.improvement === 'MINE';
+      return neighbor.improvement === 'MINE' && !neighbor.pillaged;
     case 'QUARRY':
-      return neighbor.improvement === 'QUARRY';
+      return neighbor.improvement === 'QUARRY' && !neighbor.pillaged;
+    case 'LUMBER_MILL':
+      return neighbor.improvement === 'LUMBER_MILL' && !neighbor.pillaged;
     case 'AQUEDUCT':
-      return neighbor.district === 'AQUEDUCT' && neighbor.districtComplete;
+      return neighbor.district === 'AQUEDUCT' && liveDistrict(neighbor);
     case 'DAM':
-      return neighbor.district === 'DAM' && neighbor.districtComplete;
+      return neighbor.district === 'DAM' && liveDistrict(neighbor);
     case 'CANAL':
-      return neighbor.district === 'CANAL' && neighbor.districtComplete;
+      return neighbor.district === 'CANAL' && liveDistrict(neighbor);
     case 'GOV_PLAZA':
-      return neighbor.district === 'GOVERNMENT_PLAZA' && neighbor.districtComplete;
+      return neighbor.district === 'GOVERNMENT_PLAZA' && liveDistrict(neighbor);
     // the three district neighbours a UNIQUE district's own row names
     case 'COMMERCIAL_HUB':
-      return neighbor.district === 'COMMERCIAL_HUB' && neighbor.districtComplete;
+      return neighbor.district === 'COMMERCIAL_HUB' && liveDistrict(neighbor);
     case 'ENTERTAINMENT_COMPLEX':
-      return neighbor.district === 'ENTERTAINMENT_COMPLEX' && neighbor.districtComplete;
+      return neighbor.district === 'ENTERTAINMENT_COMPLEX' && liveDistrict(neighbor);
     case 'HOLY_SITE_DISTRICT':
-      return neighbor.district === 'HOLY_SITE' && neighbor.districtComplete;
-    // CIV6 (Hansa): "for each adjacent Resource" — any resource on land
+      return neighbor.district === 'HOLY_SITE' && liveDistrict(neighbor);
+    // AdjacentResource (Hansa): any resource the owner sees, land or water
     case 'RESOURCE':
-      return !isWater(neighbor) && neighbor.resource !== null;
+      return res !== null;
+    // AdjacentResourceClass RESOURCECLASS_STRATEGIC
+    case 'STRATEGIC':
+      return res !== null && RESOURCES[res].category === 'strategic';
     case 'SELF':
       return false; // handled separately (it reads no neighbour at all)
     case 'RIVER':
@@ -311,16 +331,17 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile): boolean {
 /**
  * Base adjacency bonus a district of `type` gets (or would get) on `tile`,
  * in the district's adjacency yield (policy multipliers are applied on top
- * of this by the city computation). CIV6 (`Adjacency_YieldChanges`): each
- * row pays its YieldChange per TilesRequired neighbours, WHOLE — the catalog
- * carries the share per neighbour (0.5 for TilesRequired 2), so each rule's
- * pay is floored on its own and shares of different rows never pool (H-1:
- * 1104 Xian's Campus beside a Mountain, three Rainforests and its centre
- * pays 2, 1106 Handan's beside two Mountains, a Rainforest and its centre 2).
+ * of this by the city computation). CIV6 (`Adjacency_YieldChanges`, GameCore
+ * 0x365ae0 per row, summed by 0x365720): a row adds its YieldChange for
+ * every neighbour that answers it, divides by TilesRequired and floors — the
+ * catalog carries the share per neighbour (0.5 for TilesRequired 2), so each
+ * rule's pay is floored on its own and shares of different rows never pool.
+ * The district answers to the seat owning its plot; `hidden` holds the
+ * resources that seat cannot see.
  */
 export function districtAdjacency(
   map: GameState['map'], tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = [],
-  own?: readonly AdjacencyRule[],
+  own?: readonly AdjacencyRule[], hidden?: ReadonlySet<string>,
 ): number {
   const def = DISTRICTS[type];
   // a UNIQUE district ships its OWN adjacency rows rather than adding to the
@@ -330,13 +351,14 @@ export function districtAdjacency(
   let sum = 0;
   const _parts: string[] = [];
   const around = neighbors(map, tile);
+  const owner = tileSeat(tile);
   for (const rule of [...rows, ...extra]) {
     // the river runs through the plot itself; CIV6 (Seowon): a FLAT bonus
     // that reads no neighbour at all
     let n = 0;
     if (rule.source === 'RIVER') n = hasRiver(tile) ? 1 : 0;
     else if (rule.source === 'SELF') n = 1;
-    else for (const nb of around) if (matchesAdjacency(rule, nb)) n += 1;
+    else for (const nb of around) if (matchesAdjacency(rule, nb, owner, hidden)) n += 1;
     if (n) _parts.push(`${rule.source}x${n}@${rule.amount}`);
     sum += Math.floor(n * rule.amount);
   }
@@ -347,11 +369,17 @@ export function districtAdjacency(
   return sum;
 }
 
-export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
+/** the adjacency district `type` pays its seat on `tile` before any percent:
+ *  the district's rows (a unique district's own), the rules the seat's
+ *  modifiers and wonders add, and `extra` */
+export function baseAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
   const own = DISTRICTS[type].civVariants?.find((v) => v.civ === ctx.mods.civ)?.adjacency;
-  const _base = districtAdjacency(ctx.map, tile, type, [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...extra], own);
-  const _mult = ctx.mods.adjacencyMult[type] ?? 1;
-  return _base * _mult;
+  const add = [...(ctx.mods.districtAdjacencyAdd?.[type] ?? []), ...(ctx.wonderAdjacency?.[type] ?? []), ...extra];
+  return districtAdjacency(ctx.map, tile, type, add, own, ctx.hiddenResources);
+}
+
+export function effectiveAdjacency(ctx: YieldCtx, tile: Tile, type: DistrictId, extra: readonly AdjacencyRule[] = []): number {
+  return baseAdjacency(ctx, tile, type, extra) * (ctx.mods.adjacencyMult[type] ?? 1);
 }
 
 /**
@@ -810,7 +838,7 @@ export function cityDistrictSum(
     // adjacent tile, which no yield channel carries.
     const near = key === 'amenities' ? DISTRICTS[d.type].amenityAdjacent : undefined;
     if (near) {
-      for (const nb of neighbors(state.map, t)) if (matchesAdjacency(near, nb)) n += near.amount;
+      for (const nb of neighbors(state.map, t)) if (matchesAdjacency(near, nb, tileSeat(t))) n += near.amount;
     }
   }
   return n;

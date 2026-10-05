@@ -460,6 +460,8 @@ const ADJ_SRC: AdjacencySource[] = [
   'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX', 'HOLY_SITE_DISTRICT', 'RESOURCE', 'SELF',
   // a natural wonder's own row (Pamukkale), named as its feature
   'PAMUKKALE',
+  // the Industrial Zone's Lumber Mill and strategic-resource rows
+  'LUMBER_MILL', 'STRATEGIC',
 ];
 
 const PLACEMENT_CODE = { aqueduct: 1, coastal: 2, encampment: 3, flat: 4, dam: 5, canal: 6 } as const;
@@ -1405,6 +1407,10 @@ export function buildRules() {
         grantEnvoys: w.effects?.grantEnvoys ?? 0,
         governorTitles: w.effects?.governorTitles ?? 0,
         faithPerFlood: w.effects?.faithPerFlood ?? 0,
+        // the adjacency rules the wonder hands its owner's districts,
+        // [nDistrict, nSource] (`wonderAdjacency`)
+        distAdj: PLACEABLE_DISTRICTS.map((d) => ADJ_SRC.map((s) => (w.effects?.districtAdjacency ?? [])
+          .filter((r) => r.district === d && r.rule.source === s).reduce((acc, r) => acc + r.rule.amount, 0))),
         dvp: w.effects?.dvp ?? 0,
         // [unit roster index, count] per grant row, in the row's order
         grantUnits: (w.effects?.grantUnits ?? []).map((g) => [Object.values(UNITS).findIndex((u) => u.id === g.unit), g.count]),

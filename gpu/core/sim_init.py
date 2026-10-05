@@ -1520,6 +1520,12 @@ class SimInit:
             # CIV6 `Coast`: land beside the sea, read live (`coastal_land`)
             self._wond_coastland = [bool(int(w["coastLand"])) for w in self._wond_rows]
             self._wond_faithflood = torch.tensor([float(w["faithPerFlood"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
+            # the adjacency rules a wonder hands its owner's districts,
+            # [nW, district, source] (`wonderAdjacency`); the (district,
+            # source) pairs any wonder names
+            self._wond_dist_adj = torch.tensor([w["distAdj"] for w in self._wond_rows], dtype=torch.float64, device=device)
+            self._wond_adj_pairs = [(int(d), int(s)) for d, s in
+                                    (self._wond_dist_adj.abs().sum(dim=0) > 0).nonzero(as_tuple=False).tolist()]
             self._wond_dvp = torch.tensor([int(w["dvp"]) for w in self._wond_rows], dtype=torch.long, device=device)  # [nW] DVP paid at completion
             # units granted FREE at completion: [nW, K, 2] (roster index, count)
             # per grant row in the row's order, padded (-1, 0)
@@ -2448,7 +2454,23 @@ class SimInit:
                             for d in self.districts_cat]
         self._d_amen_adj_any = any(s >= 0 and a != 0 for s, a in self._d_amen_adj)
         self._mine_iidx = 1   # IMPROVEMENT_IDS: FARM=0, MINE=1, LUMBER_MILL=2, QUARRY=3, ...
+        self._lumber_iidx = 2
         self._quarry_iidx = 3
+        # the catalog rows no plane or `_dyn_*` amount carries — the Lumber
+        # Mill's and the strategic resources' — counted live per row
+        # (`_adj_source_plane`) and floored on their own
+        _dyn_names = ("LUMBER_MILL", "STRATEGIC")
+        self._d_dyn_adj = [[(int(a["src"]), float(a["amount"])) for a in d["adjacency"]
+                            if self._adj_src_names[int(a["src"])] in _dyn_names]
+                           for d in self.districts_cat]
+        # the resource sources a seat's unseen resources come off
+        # (`_adj_hidden_cut`): each row whole, so the cut is exact
+        self._adj_res_srcs = {i for i, n in enumerate(self._adj_src_names)
+                              if n in ("SEA_RESOURCE", "RESOURCE", "STRATEGIC")}
+        for _d in self.districts_cat:
+            for _a in _d["adjacency"]:
+                assert int(_a["src"]) not in self._adj_res_srcs or float(_a["amount"]).is_integer(), (
+                    f"a fractional resource adjacency on {_d['id']}: _adj_hidden_cut cannot take it off whole")
         _govs = rules.governments
         _pols = rules.policies
         self._ngov = len(_govs)
@@ -4330,11 +4352,11 @@ class SimInit:
         self._bidx = torch.arange(B, device=device)
         self._inf_f = torch.tensor(float("inf"), dtype=dtype, device=device)
         # (plane stamp, [B,T]) — the neighbour counts `_adj_district_count`,
-        # `_adj_center_count`, `_adj_harbor_count` (and its district index),
+        # `_adj_center_count`, per type `_adj_dtype_count` (the Harbor's among them)
         # and per type `_adj_dtype_complete`
         self._adjd_cache = None
         self._adjc_cache = None
-        self._adjh_cache = None
+        self._adjtc_cache: dict = {}
         self._adjt_cache: dict = {}
         self._adj_src_cache: dict = {}   # src -> (plane stamp, (feature, terrain), [B,T]) — `_adj_src_count`
         # (base|bel, ...) -> (the recorded reads, the result) — the floored
