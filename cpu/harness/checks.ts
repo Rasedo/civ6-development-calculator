@@ -34,7 +34,7 @@ import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
 import { buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
-import { buildingCostIn } from '../core/rules';
+import { buildingCostIn, buildingFullCost } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
@@ -293,23 +293,17 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         if (!id) continue;
         // a pillaged building's row: the game's cost reader answers the full
         // price (runs/h1_duelw1104, Xian's Library t41-53: 45, gold 180), not
-        // the repair the engine prices, so neither check has a reading
-        if (buildingPillaged(city, id)) {
-          for (const check of ['buy.buildingCost', 'buy.buildingGold']) {
-            out.push({ turn, check, subject, ok: true, skip: 'pillaged: the reader answers the full price' });
-          }
-          continue;
-        }
+        // the repair the engine prices
+        const ours = buildingPillaged(city, id) ? buildingFullCost(state, city, id) : buildingCostIn(state, city, id);
         // a Flood Barrier is priced off the city's Coastal Lowland plots, which
         // the record does not carry (the importer's map has only the engine's
         // own derivation of them)
         if (BUILDINGS[id]?.floodBarrier) {
-          const ours = buildingCostIn(state, city, id);
           const ok = near(ours, num(cost), 0.5);
           out.push({ turn, check: 'buy.buildingCost', subject, ok, game: num(cost), ours,
             ...(ok ? {} : { gaps: [...(gapsFor(buyGaps, 'buy.buildingCost').gaps ?? []), 'coastal lowland'], state: { building: id } }) });
         } else {
-          buyPush(`buy.buildingCost`, near(buildingCostIn(state, city, id), num(cost), 0.5), num(cost), buildingCostIn(state, city, id), { building: id });
+          buyPush(`buy.buildingCost`, near(ours, num(cost), 0.5), num(cost), ours, { building: id });
         }
         // a building the seat cannot buy with Gold has no gold price to check:
         // a row with no PurchaseYield, and the walls a Valletta suzerain buys
@@ -349,10 +343,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         // cost reader answers the price it locked at placement (runs/h1_duelw1105:
         // Xian's Holy Site t30-33 at 39 while the fresh price climbed to 41, and
         // pillaged t44-63 at the same 39; Mediolanum's finished Dam t153-161 at
-        // 157), which the importer reads into the queue rather than the engine
-        // pricing it
+        // 157): the engine's price at the first record it stood, itself left
+        // out (`History.districtLocked`)
         if (city.districts.some((d) => d.type === id)) {
-          out.push({ turn, check: 'buy.districtCost', subject, ok: true, skip: 'standing in the city: the cost locked at placement' });
+          const locked = imp.districtLocked.get(`${c.owner}:${c.id}:${idx}`);
+          if (locked === undefined) {
+            out.push({ turn, check: 'buy.districtCost', subject, ok: true, skip: 'standing in the city: placed before the records priced it' });
+          } else {
+            buyPush('buy.districtCost', near(locked, num(cost), 0.5), num(cost), locked, { district: id, locked: true });
+          }
           continue;
         }
         const dc = districtSiteCost(state, s, id, unlocks);
@@ -426,7 +425,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const go = amounts(game.OriginYields);
     const cut = origin ? routeYieldCut(state, owner, origin) : null;
     const oo = cut ? YIELD_KEYS.map((k) => round3(cut[k])) : null;
-    const st = { course: route.course?.length ?? 0, posts: s.tradingPosts ?? [] };
+    const st = { course: route.course ?? [], posts: s.tradingPosts ?? [] };
     out.push({ turn, check: 'route.originYields', subject, ok: !!oo && oo.every((v, i) => near(v, go[i], 0.05)), game: go, ours: oo, state: st });
     const dSeat = route.toCs !== undefined ? -1 : (route.toSeat ?? owner);
     const dy = routeDestYields(state, owner, route);

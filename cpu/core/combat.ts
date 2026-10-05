@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnU
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -1059,10 +1059,30 @@ function cityBaseSeat(city: City): number {
   return isFreeSeat(city.seat) && (city.formerSeat ?? -1) >= 0 ? city.formerSeat! : city.seat;
 }
 
+/** A float32 value cut to 1/256 as the DLL converts one (0x522630): its
+ *  whole part, and its fraction times 256 truncated to a byte. */
+function fixed256(x: number): number {
+  const v = Math.fround(x);
+  const whole = Math.trunc(v);
+  return whole * 256 + (Math.trunc(Math.fround(Math.fround(v - whole) * 256)) & 0xff);
+}
+
+/** THE WOUNDED LAW (0x522630): the Combat, in 1/256, a unit `damagePct`
+ *  percent wounded loses — COMBAT_WOUNDED_DAMAGE_MULTIPLIER less its
+ *  `reductionPct` share, times the damage percent, each percent taken as a
+ *  float32 product with 0.01 cut to 1/256 (`fixed256`). */
+export function woundedLoss256(damagePct: number, reductionPct = 0): number {
+  const pct = (p: number) => fixed256(Math.fround(Math.fround(p) * Math.fround(0.01)));
+  const full = WOUNDED_DAMAGE_MULTIPLIER * 256;
+  const left = full - Math.floor((full * pct(reductionPct)) / 256);
+  return Math.floor((left * pct(damagePct)) / 256);
+}
+
 /**
  * THE GARRISON TERM — what a military unit of the holder standing on the
- * centre adds: max(0, its Combat - damage / 10 - `base`), measured on the
- * preview (`GARRISON_HP_PER_CS`). A Corps or an Army garrisons with its
+ * centre adds: max(0, its Combat less its wounded loss (`woundedLoss256`,
+ * none for a chassis that suffers no wound penalty) - `base`), in 1/256
+ * (0x24a180). A Corps or an Army garrisons with its
  * formation's strength on that Combat (runs/h1_duelw1107, Taiyuan: a
  * Pike and Shot Army on a base of 55 added 17 t177-182, a Line Infantry
  * Corps 20 t183-211 and Army 27 t212-235). A ship in the city garrisons it as a land
@@ -1074,7 +1094,8 @@ function garrisonCS(state: GameState, city: City, base: number): number {
   let best = 0;
   for (const u of unitsAt(state, city.centerIndex)) {
     if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
-    const g = Math.max(0, ((UNITS[u.type]?.combat ?? 0) + formationCS(u)) - (UNIT_HP - u.hp) / GARRISON_HP_PER_CS - base);
+    const loss = woundedLoss256(Math.trunc(((UNIT_HP - u.hp) * 100) / UNIT_HP), UNITS[u.type]?.noWoundPenalty ? 100 : 0);
+    const g = Math.max(0, ((UNITS[u.type]?.combat ?? 0) + formationCS(u)) - loss / 256 - base);
     if (g > best) best = g;
   }
   return best;
@@ -1096,7 +1117,9 @@ export function wallsStrength(city: { buildings: string[] }): number {
  * - the holder's base (`holderStrength`);
  * - `Districts.CityStrengthModifier` over the city's complete, unpillaged
  *   districts (`DistrictDef.cityStrength`);
- * - each wall building's own strength (`wallsStrength`);
+ * - each wall building's own strength (`wallsStrength`) while the perimeter
+ *   stands (`outerPool` above 0: runs/h1_duelw1108, Xi'an 3 lower t97-111
+ *   behind a breached wall);
  * - the Palace's +3 where the city holds it (a city-state's city does);
  * - the garrison term (`garrisonCS`). The Encampment asks without it
  *   (`garrisoned` false) — CIV6: it fights "similar to the parent City
@@ -1109,7 +1132,7 @@ export function wallsStrength(city: { buildings: string[] }): number {
  */
 export function centreStrength(state: GameState, city: City, garrisoned = true): number {
   const base = holderStrength(state, cityBaseSeat(city));
-  let n = base + wallsStrength(city);
+  let n = base + (outerPool(state, city) > 0 ? wallsStrength(city) : 0);
   for (const d of city.districts) {
     const t = state.map.tiles[d.tileIndex];
     if (t.districtComplete && !t.districtPillaged) n += DISTRICTS[d.type].cityStrength;

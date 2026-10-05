@@ -11,9 +11,10 @@ import { seatAccumulators } from '../../../cpu/core/seatTurn';
 
 // CULTURE victory. Real Civ 6 (Gathering Storm): a civ's VISITING
 // tourists come from the lifetime tourism it has sent TO EACH RIVAL (each
-// cell divided by nCivs * 200 on its own) and its DOMESTIC tourists from its
-// lifetime CULTURE (divided by 100); a civ wins the moment its visiting
-// tourists exceed EVERY other civ's domestic tourists.
+// cell divided by nCivs * 200 on its own, capped by the rival's citizens),
+// and its DOMESTIC tourists are its citizens — lifetime CULTURE over 100 —
+// less the tourists the others draw from it; a civ wins the moment its
+// visiting tourists exceed EVERY other civ's domestic tourists.
 //
 // MEASURED gate-unreachable: across the 24 scripted seeds at 250 turns the
 // best any civ manages is a gap of -12 (visiting peaks at 7, domestic reaches
@@ -73,7 +74,7 @@ describe('culture victory', () => {
     const civSeat = (state.seats[(0) + 1] as Seat);
     sendTo(seatOf(state, 0)!, 1, 4, 2);
     seatOf(state, 0)!.cultureTotal = cultureFor(1);
-    civSeat.cultureTotal = cultureFor(4); // 4 visiting vs 4 domestic — not a win
+    civSeat.cultureTotal = cultureFor(8); // 4 visiting vs 8 - 4 domestic — not a win
     endTurn(state);
     expect(state.victoryType).not.toBe(5);
     expect(state.gameOver).toBe(false);
@@ -119,7 +120,8 @@ describe('culture victory', () => {
     own.tourismTo[1] = div - 1;
     own.tourismTo[2] = div - 1;
     own.cultureTotal = cultureFor(1);
-    for (const civSeat of split.seats.slice(1)) civSeat.cultureTotal = 0;
+    split.seats[1].cultureTotal = cultureFor(1);
+    split.seats[2].cultureTotal = 0;
     endTurn(split);
     expect(split.victoryType).not.toBe(5); // 0 + 0 visiting, and 0 > 0 is false
 
@@ -128,9 +130,10 @@ describe('culture victory', () => {
     mine.tourismTo = [];
     mine.tourismTo[1] = 2 * div - 2; // the same total, one address
     mine.cultureTotal = cultureFor(1);
-    for (const civSeat of whole.seats.slice(1)) civSeat.cultureTotal = 0;
+    whole.seats[1].cultureTotal = cultureFor(1);
+    whole.seats[2].cultureTotal = 0;
     endTurn(whole);
-    expect(whole.victoryType).toBe(5); // 1 visiting > 0 domestic
+    expect(whole.victoryType).toBe(5); // 1 visiting > 1 - 1 and 0 domestic
   });
 
   it('a CITYLESS civ cannot win on tourism it banked while alive', () => {

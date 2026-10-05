@@ -2,10 +2,11 @@
 tests/cpu/victory/culture-victory.test.ts.
 
 Real Civ 6 (Gathering Storm) scores two tourist populations: VISITING tourists,
-which a civ attracts with its lifetime TOURISM (divided by nCivs * 200), and
-DOMESTIC tourists, which it holds from its lifetime CULTURE (divided by 100). A
-civ wins the moment its visiting tourists exceed EVERY other civ's domestic
-tourists.
+which a civ draws with its lifetime TOURISM toward each rival (divided by
+nCivs * 200, capped by the rival's citizens), and DOMESTIC tourists, its
+citizens — lifetime CULTURE divided by 100 — less the tourists the others draw
+from it. A civ wins the moment its visiting tourists exceed EVERY other civ's
+domestic tourists.
 
 The gate cannot reach a culture win: every tourism source ships, but a
 driven game never closes the visiting-vs-domestic gap, so scripted parity
@@ -57,39 +58,38 @@ def main() -> None:
         return float(k * per_domestic)
 
     def victor(tour, cul, alive_civs=None):
-        """Drive _culture_victor directly on planted totals. tour/cul are
-        per-seat lists (index 0 = seat 0); a row's whole total is planted in
-        ONE rival's cell, which the per-rival floor reads the same way it
-        would read a lifetime scalar."""
+        """Drive _culture_victor directly on planted totals: `tour` maps a
+        (from, to) cell to its tourism, `cul` is per seat (index 0 = seat 0)."""
         s = _sim(1)
         s.civ_tourism_to.zero_()
         s.civ_tourism_rel_to.zero_()
+        for (frm, to), v in tour.items():
+            s.civ_tourism_to[:, frm, to] = int(v)
         for row in range(s.n_majors):
-            s.civ_tourism_to[:, row, (row + 1) % s.n_majors] = int(tour[row])
             s.civ_culture[:, row] = cul[row]
             if row and alive_civs is not None and not alive_civs[row - 1]:
                 s.city_alive[:, row] = False
         return int(s._culture_victor()[0]), s
 
     # --- 1) seat 0 out-touring every civ WINS ------------------------------
-    w, _ = victor([tourism_for(5)] + [0] * (sim.n_majors - 1), [culture_for(1)] + [culture_for(4)] * (sim.n_majors - 1))
+    rest = [0.0] * (sim.n_majors - 2)
+    w, _ = victor({(0, 1): tourism_for(5)}, [culture_for(1), culture_for(4)] + rest)
     assert w == 0, f"seat 0 should win the culture victory, got civ {w}"
 
     # --- 2) a civ out-touring everyone is the DEFEAT direction -----------
-    tour = [0] * (sim.n_majors)
-    tour[1] = tourism_for(9)
-    cul = [culture_for(3)] + [culture_for(1)] * (sim.n_majors - 1)
+    tour = {(1, 0): tourism_for(9)}
+    cul = [culture_for(3), culture_for(1)] + rest
     w, _ = victor(tour, cul)
-    assert w == 1, f"civ 0 should win, got civ {w}"
+    assert w == 1, f"civ 1 should win, got civ {w}"
 
     # --- 3) EQUAL counts do not win (strictly greater) ---------------------
-    w, _ = victor([tourism_for(4)] + [0] * (sim.n_majors - 1), [culture_for(1)] + [culture_for(4)] * (sim.n_majors - 1))
+    w, _ = victor({(0, 1): tourism_for(4)}, [culture_for(1), culture_for(8)] + rest)
     assert w == -1, f"equal visiting/domestic must NOT win, got civ {w}"
 
     # --- 4) it must beat EVERY other civ ----------------------------------
     if sim.n_majors >= 3:
         cul = [culture_for(1)] + [culture_for(2), culture_for(9)] + [0.0] * (sim.n_majors - 3)
-        w, _ = victor([tourism_for(6)] + [0] * (sim.n_majors - 1), cul)
+        w, _ = victor({(0, 1): tourism_for(3), (0, 2): tourism_for(3)}, cul)
         assert w == -1, f"beating only one civ must NOT win, got civ {w}"
 
     # --- 5) the divisor scales with the number of civs ---------------------
@@ -100,9 +100,8 @@ def main() -> None:
     assert raw // (3 * per_visitor) == 4, "a 3-civ game must dilute the same tourism to 4"
 
     # --- 6) a CITYLESS civ cannot win -------------------------------------
-    tour = [0] * (sim.n_majors)
-    tour[1] = tourism_for(9)
-    cul = [culture_for(3)] + [culture_for(1)] * (sim.n_majors - 1)
+    tour = {(1, 0): tourism_for(9)}
+    cul = [culture_for(3), culture_for(1)] + rest
     w, _ = victor(tour, cul, alive_civs=[False] + [True] * (sim.n_majors - 2))
     assert w != 1, "a civ with no cities must not win on banked tourism"
 

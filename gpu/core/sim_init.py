@@ -5,6 +5,25 @@ from .simbase import _MUTABLE  # noqa: F401 — private names do not ride a star
 from . import simbase
 
 
+def _wounded_loss_table(mult: int) -> list[int]:
+    """`woundedLoss256` for every damage percent 0..100 with no reduction:
+    the wounded law (0x522630) in 1/256, each percent a float32 product with
+    0.01 cut to 1/256 (whole part, fraction times 256 truncated to a byte)."""
+    def f32(v: float) -> torch.Tensor:
+        return torch.tensor(v, dtype=torch.float32)
+
+    def fixed(x: torch.Tensor) -> int:
+        whole = torch.trunc(x)
+        return int(whole) * 256 + (int(torch.trunc((x - whole) * f32(256.0))) & 0xFF)
+
+    def pct(p: int) -> int:
+        return fixed(f32(float(p)) * f32(0.01))
+
+    full = mult * 256
+    left = full - (full * pct(0)) // 256
+    return [(left * pct(d)) // 256 for d in range(101)]
+
+
 class SimInit:
 
     def __init__(self, fixtures: list[dict], rules: Rules, device: str = "cpu", dtype=torch.float64):
@@ -225,6 +244,8 @@ class SimInit:
         # each foreign civ separately, through its own summed modifier
         self.civ_tourism_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
         self.civ_tourism_rel_to = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.long, device=device)
+        # cultural dominance per (from, to) major pair — `updateCulturalDominance`
+        self.civ_dominant = torch.zeros(B, self.n_majors, self.n_majors, dtype=torch.bool, device=device)
         # the RESOLVED suzerain contest (-1 none) and the minor's own research
         # record — `resolveSuzerain` / `minorResearch` storage
         self.citystate_suzerain = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -1834,6 +1855,7 @@ class SimInit:
         self._tour_pct_rows = [tuple(int(x) for x in r) for r in rr["tourismPctRows"]]
         self._enl_cidx = int(rr["enlightenmentCidx"])
         self._culture_per_tourist = int(rr["culturePerDomesticTourist"])
+        self._route_dom_gold = int(rr["routeGoldCulturalDominance"])
         self._tech_era = torch.tensor(rr["techEra"] or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr["civicEra"] or [0], dtype=torch.long, device=device)
         # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
@@ -2844,7 +2866,6 @@ class SimInit:
         self._trade_water_refuel = int(_tr["waterRefuel"])
         self._trade_dest_refuel = int(_tr["destRefuel"])
         self._trade_cost_step = int(_tr["costStep"])
-        self._trade_cost_switch = int(_tr["costSwitch"])
         self._trade_cost_rail = int(_tr["costRail"])
         self._trade_cost_route = int(_tr["costRoute"])
         self._trade_cost_water = int(_tr["costWater"])
@@ -3067,7 +3088,7 @@ class SimInit:
         self._walls_tier_hp = torch.tensor([int(x) for x in rules.combat["wallsTierHp"]], dtype=torch.long, device=device)
         self._b_walls_cs = rules.b_walls_cs.to(device)  # [NB] each walls row's strength (`wallsStrength`)
         # a city centre's standing terms beside its base and walls
-        # (`_centre_strength`): the Palace's, the garrison term's damage scale
+        # (`_centre_strength`): the Palace's, the garrison term's wounded loss
         # (`_garrison_cs`), a minor's per envoy
         self._palace_city_cs = int(rules.combat["palaceCityCs"])
         # the holder's base: max(the start era's melee, the best melee
@@ -3075,7 +3096,8 @@ class SimInit:
         self._city_start_melee_major = int(rules.combat["cityStartMeleeMajor"])
         self._city_start_melee_minor = int(rules.combat["cityStartMeleeMinor"])
         self._city_base_melee_cut = int(rules.combat["cityBaseMeleeCut"])
-        self._garrison_hp_per_cs = float(rules.combat["garrisonHpPerCs"])
+        self._wounded_loss = torch.tensor(_wounded_loss_table(int(rules.combat["woundedDamageMultiplier"])),
+                                          dtype=torch.long, device=device)
         self._envoy_city_cs = int(rules.combat["envoyCityCs"])
         self._walls_tier_urban = int(rules.combat["wallsTierUrban"])
         self._urban_def_tech = int(rules.combat["urbanDefensesTech"])

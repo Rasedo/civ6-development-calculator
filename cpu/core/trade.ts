@@ -29,7 +29,7 @@ import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congres
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
 import { dedicationEvent, goldenDedication } from './eras';
-import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC } from '../data/seats';
+import { DED_COINAGE, COINAGE_INTL_GOLD_PER_SPEC, TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE } from '../data/seats';
 
 import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { srcConst, xml } from '../data/provenance';
@@ -889,6 +889,9 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
       }
       out.gold += routePostGold(state, seat, civCity.centerIndex);
       out.gold += routeLengthGold(state, seat, route);
+      // a route from a seat culturally dominant over the destination's
+      // (Trade_Manager 0x54c6c0)
+      if (gpOwner?.culturallyDominant?.[route.toSeat]) out.gold += TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE;
       // CIV6 (Amsterdam): the destination's own luxuries pay this seat's route
       out.gold += routeDestLuxuryGold(state, seat, civCity);
       // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_TO_OTHERS): "This

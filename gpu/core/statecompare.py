@@ -616,6 +616,8 @@ SEAT = {
         [int(sim.civ_tourism_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
     "tourismReligiousTo": lambda sim, b, rows: [
         [int(sim.civ_tourism_rel_to[b, c, o]) if o != c else 0 for o in _civ_seats(sim)] for c in rows],
+    "culturallyDominant": lambda sim, b, rows: [
+        [int(bool(sim.civ_dominant[b, c, o])) for o in _civ_seats(sim)] for c in rows],
     "unitsAcquired": lambda sim, b, rows: [
         [x for i, n in enumerate(sim.civ_unit_acq[b, c].tolist()) if n > 0 for x in (i, n)]
         for c in rows],

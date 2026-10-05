@@ -629,7 +629,9 @@ export function loyaltyPerTurn(state: GameState, city: City, amenityTierName: st
 
 /**
  * Apply a turn of loyalty to `city` (called from endTurn with the stats it
- * already computed). Returns true when the city has hit 0 and must flip.
+ * already computed). Returns true when the city has hit 0 and must flip. A
+ * capital moves by the same law (runs/h1_duelw1108: Rome 100 -> 78 -> 56 ->
+ * 74 -> 95 t215-219 under two Indie concerts) and never flips.
  */
 export function applyLoyalty(state: GameState, city: City, amenityTierName: string, hasGovernor = false,
   starving = false): boolean {
@@ -639,13 +641,13 @@ export function applyLoyalty(state: GameState, city: City, amenityTierName: stri
   const phoen = getModifiers(state, city.seat).coastalHomeLoyal
     && isCoastalLand(state.map, state.map.tiles[city.centerIndex])
     && onHomeContinent(state, city.seat, city.centerIndex);
-  if (city.isCapital || wonderLoyaltyAura(state, city) || phoen) {
+  if (wonderLoyaltyAura(state, city) || phoen) {
     city.loyalty = LOYALTY_MAX;
     return false;
   }
   const next = (city.loyalty ?? LOYALTY_MAX) + loyaltyPerTurn(state, city, amenityTierName, hasGovernor, starving);
   city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
-  return city.loyalty <= 0;
+  return !city.isCapital && city.loyalty <= 0;
 }
 
 /** CIV6 (Eleanor, EFFECT_ADJUST_PLAYER_SKIP_FREE_CITY_STEP): does a city

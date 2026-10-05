@@ -441,6 +441,17 @@
           ]
         },
         {
+          "name": "culturallyDominant",
+          "compare": "exact",
+          "covers": [
+            "Seat.culturallyDominant"
+          ],
+          "planes": [
+            "civ_dominant"
+          ],
+          "note": "a vector over civ seats: 1 where this seat is culturally dominant over that one."
+        },
+        {
           "name": "governorAppointed",
           "compare": "exact",
           "covers": [

@@ -577,16 +577,17 @@ class SimPhase:
         # CIV6 (Mediterranean Colonies): "Coastal cities founded by Phoenicia
         # and located on the same continent as the Phoenician Capital are 100%
         # Loyal."
-        cap = self.city_is_cap[bidx, row, col] | self._wonder_loyalty_aura(row, here)
+        cap = self._wonder_loyalty_aura(row, here)
         if pre["phoen"] is not None:
             cap = cap | (pre["phoen"]
                          & self.coastal_land.gather(1, here.unsqueeze(1)).squeeze(1)
                          & self._on_home_continent(row, here))
         # f64 intermediates, stored at the PLANE's dtype (an f32 sim keeps an
-        # f32 loyalty plane).
+        # f32 loyalty plane). A capital moves by the same law and never flips.
         self.city_loyalty[bidx, row, col] = torch.where(
             upd & cap, torch.full_like(nxt, lmax), nxt).to(self.city_loyalty.dtype)
-        return upd & ~cap & (self.city_loyalty[bidx, row, col] <= 0)
+        return (upd & ~cap & ~self.city_is_cap[bidx, row, col]
+                & (self.city_loyalty[bidx, row, col] <= 0))
 
     def _citizen_pressure_from(self, here: torch.Tensor, row: int) -> torch.Tensor:
         """[B] f64 — the CITIZEN pressure row `row`'s cities put on tile `here`
@@ -2245,6 +2246,7 @@ class SimPhase:
         bank(self.civ_tourism, _nat_gen)
         bank(self.civ_tourism_rel, _rel_t)
         self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t, _late)
+        self._update_cultural_dominance(row, active)
         # POLICY TREATY outcome A pays every seat holding the named card, on
         # top of the government tier, the (Treaty-Organization-weighted)
         # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance

@@ -205,6 +205,10 @@ def test_garrison_walls(sim) -> None:
     bare = float(sim._centre_strength(r, c, False)[B0])
     for bi in walls[:2]:
         sim.city_bldg[B0, row, 0, bi] = True
+    # the walls count while the perimeter stands
+    sim.city_outer_hp[B0, row, 0] = 0
+    assert float(sim._centre_strength(r, c, False)[B0]) == bare
+    sim.city_outer_hp[B0, row, 0] = int(sim._walls_max_at(r, c)[B0])
     assert float(sim._centre_strength(r, c, False)[B0]) == bare + 6
     ctr = int(sim.city_center[B0, row, 0])
     g = int(sim.military_at[B0, ctr])
@@ -219,7 +223,7 @@ def test_garrison_walls(sim) -> None:
     comb = float(sim._type_combat[int(sim.unit_type[B0, g])])
     add = float(sim._centre_strength(r, c)[B0]) - float(sim._centre_strength(r, c, False)[B0])
     assert add == max(0.0, comb - 2.5 - base), (add, comb, base)
-    print("  9 garrison and walls OK")
+    print("  9 garrison and walls OK — the walls behind a standing perimeter only")
 
 
 def test_progress_prices(sim) -> None:

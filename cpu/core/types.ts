@@ -709,6 +709,9 @@ export interface Seat {
    *  civilization, and the international modifiers are per pair. */
   tourismTo?: number[];
   tourismReligiousTo?: number[];
+  /** the rival seats (index = seat) this seat is culturally dominant over
+   *  (`updateCulturalDominance`) */
+  culturallyDominant?: boolean[];
   /** how many copies of each chassis this seat has ever acquired, keyed by
    *  unit id — what a `costStep` price progression counts. */
   unitsAcquired?: Record<string, number>;

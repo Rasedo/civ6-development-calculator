@@ -37,7 +37,9 @@ import { tileYields } from '../core/yields';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
-import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS } from '../data/seats';
+import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
+import { BOOST_FRACTION } from '../data/boosts';
+import { updateCulturalDominance } from '../core/seatTurn';
 import { addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -124,6 +126,9 @@ export interface Imported {
   /** every live trade route of the record, on its owner's `tradeRoutes`,
    *  beside the game's route table it came from */
   routes: { owner: number; route: TradeRoute; game: Record<string, unknown> }[];
+  /** the engine's price each standing district held when it was placed, by
+   *  `${gamePlayer}:${gameCityId}:${district row}` (`History.districtLocked`) */
+  districtLocked: Map<string, number>;
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -409,6 +414,9 @@ export interface History {
   momentsWorld: number[];
   /** the first record each live trade route was seen in, by `routeKey` */
   routeSeen: Map<string, number>;
+  /** the plots each live route's Trader stood on, record by record, by
+   *  `routeKey` (a plot repeated is kept once) */
+  trail: Map<string, number[]>;
   /** the Trading Posts each player holds, by centre plot: both ends of
    *  every route that left the records while its Trader lived on (a route
    *  run to its end; a plundered route takes its Trader with it) */
@@ -423,6 +431,24 @@ export interface History {
   /** the competitions each player took the podium's top of, [competition,
    *  0 gold (the top tier alone) / 1 the top tier shared] */
   podium: Map<number, [number, number][]>;
+  /** each major's lifetime culture as the game counts it (`Seat.cultureTotal`):
+   *  every gain of civic progress — a turn's culture while a civic is
+   *  chosen, the culture held while none is once one is, a boost's share of
+   *  a civic not yet held (PlayerCulture 0x3a1fb0) — and the culture held */
+  culture: Map<number, number>;
+  cultureHeld: Map<number, number>;
+  /** each major's tourism banked toward each major it has met, by `p:o`
+   *  (`Seat.tourismTo`): the record's tourism through the pair's route and
+   *  government terms of `tourismIntlPct` */
+  tourismTo: Map<string, number>;
+  /** the majors each major is culturally dominant over (`updateCulturalDominance`) */
+  dominant: Map<number, Set<number>>;
+  /** the districts a city quoted while they did not stand in it, by
+   *  `${gamePlayer}:${gameCityId}:${district row}`, and the price each locked
+   *  at placement: the engine's at the first record it stood, itself left
+   *  out of the city */
+  districtQuoted: Set<string>;
+  districtLocked: Map<string, number>;
 }
 
 interface PolicySlots {
@@ -477,8 +503,61 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 export function newHistory(): History {
   return { firstTurn: -1, last: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
-    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), podium: new Map() };
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
+    competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
+    dominant: new Map(), districtQuoted: new Set(), districtLocked: new Map() };
+}
+
+/** The record's cultural dominance by the engine's rule, each major in id
+ *  order as each major's turn takes it, on the history's banks. */
+function foldDominance(h: History, rec: TurnRecord): void {
+  const majors = rec.players.filter((p) => bool(p.major)).sort((a, b) => a.id - b.id);
+  const seats = majors.map((p, i) => {
+    const s = emptySeat(i);
+    s.cultureTotal = h.culture.get(p.id) ?? 0;
+    s.tourismTo = majors.map((o) => h.tourismTo.get(`${p.id}:${o.id}`) ?? 0);
+    s.culturallyDominant = majors.map((o) => h.dominant.get(p.id)?.has(o.id) ?? false);
+    return s;
+  });
+  majors.forEach((p, i) => {
+    updateCulturalDominance(seats, seats[i]);
+    h.dominant.set(p.id, new Set(majors.filter((_o, j) => seats[i].culturallyDominant![j]).map((o) => o.id)));
+  });
+}
+
+/** Fold one record's culture and tourism into the history's lifetime banks:
+ *  `prev`'s yields land by `rec`, a boost `rec` shows first lands at once. */
+function foldCultureTourism(h: History, prev: TurnRecord, rec: TurnRecord, cat: Catalog): void {
+  const majors = prev.players.filter((p) => bool(p.major));
+  const routed = new Set(recordRoutes(prev).map((r) => `${r.OriginCityPlayer}:${r.DestinationCityPlayer}`));
+  const govOf = (p: DumpPlayer) => strip(cat.governments[num(p.government)] ?? '', 'GOVERNMENT_');
+  for (const p of majors) {
+    const cy = num(p.cultureYield);
+    if (num(p.civic) >= 0) {
+      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + (h.cultureHeld.get(p.id) ?? 0) + cy);
+      h.cultureHeld.set(p.id, 0);
+    } else {
+      h.cultureHeld.set(p.id, (h.cultureHeld.get(p.id) ?? 0) + cy);
+    }
+    const q = rec.players.find((x) => x.id === p.id);
+    const was = p.civicBoosts ?? '';
+    const now = q?.civicBoosts ?? '';
+    for (let k = 0; k < now.length; k++) {
+      if (now[k] !== '1' || was[k] === '1' || (q?.civics ?? '')[k] === '1') continue;
+      const cost = CIVICS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.cost ?? 0;
+      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + Math.round(cost * BOOST_FRACTION));
+    }
+    const met = new Set((p.met ?? []).map(num));
+    for (const o of majors) {
+      if (o.id === p.id || !met.has(o.id)) continue;
+      let pct = routed.has(`${p.id}:${o.id}`) ? TOURISM_ROUTE_PCT : 0;
+      const ga = govOf(p);
+      const gb = govOf(o);
+      if (ga !== gb) pct -= ((GOV_INTOLERANCE[ga] ?? 0) + (GOV_INTOLERANCE[gb] ?? 0)) * TOURISM_GOV_MULT;
+      const k = `${p.id}:${o.id}`;
+      h.tourismTo.set(k, (h.tourismTo.get(k) ?? 0) + Math.floor(num(p.tourism) * Math.max(0, 100 + pct) / 100));
+    }
+  }
 }
 
 /** The copies of a progressive chassis a player's price quotes stand at: the
@@ -853,9 +932,19 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const k = routeKey(r);
     live.add(k);
     if (!h.routeSeen.has(k)) h.routeSeen.set(k, rec.turn);
+    const u = rec.units.find((x) => x.owner === r.TraderUnitPlayer && x.id === r.TraderUnitID);
+    if (u) {
+      const trail = h.trail.get(k) ?? [];
+      const at = u.y * W + u.x;
+      if (trail[trail.length - 1] !== at) trail.push(at);
+      h.trail.set(k, trail);
+    }
   }
   h.congressBefore = h.last ? h.last.congress : rec.congress;
   for (const k of [...h.routeSeen.keys()]) if (!live.has(k)) h.routeSeen.delete(k);
+  for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
+  if (h.last) foldCultureTourism(h, h.last, rec, cat);
+  foldDominance(h, rec);
   h.last = rec;
 }
 
@@ -974,6 +1063,16 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     seatOfPlayer.set(p.id, i);
     playerOfSeat.set(i, p.id);
   });
+  // lifetime culture, the tourism banks and cultural dominance the history
+  // folded (`foldCultureTourism`, `foldDominance`)
+  if (history) {
+    majors.forEach((p, i) => {
+      const seat = state.seats[i];
+      seat.cultureTotal = history.culture.get(p.id) ?? 0;
+      seat.tourismTo = majors.map((o) => history.tourismTo.get(`${p.id}:${o.id}`) ?? 0);
+      seat.culturallyDominant = majors.map((o) => history.dominant.get(p.id)?.has(o.id) ?? false);
+    });
+  }
   const minorOfPlayer = new Map<number, CityState>();
   minors.forEach((p, k) => {
     const seat = seatOfCityState(k);
@@ -1367,13 +1466,46 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (importQueue(ctx, state, dumpOfCity.get(city)!, city)) queueProgressRead = true;
   }
   const readBack = importFloodCounts(rec, state, cityByKey.values());
+  if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
     congressGaps, congressOf, queueProgressRead, readBack, routes,
+    districtLocked: history?.districtLocked ?? new Map(),
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
   };
+}
+
+/** The prices the record's standing districts locked at placement
+ *  (`History.districtLocked`): a district the city quoted before it stood
+ *  locks the engine's price at the first record it stands, itself left out
+ *  of the city. */
+function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cityByKey: Map<string, City>,
+  h: History): void {
+  for (const c of rec.cities) {
+    const city = cityByKey.get(`${c.owner}:${c.id}`);
+    const s = city ? seatOf(state, city.seat) : undefined;
+    if (!city || !s) continue;
+    let unlocks: ReturnType<typeof computeUnlocks> | null = null;
+    for (const [kind, idx] of c.buy) {
+      if (kind !== 'D') continue;
+      const id = engineRowOf(cat, 'district', idx) as DistrictId | null;
+      if (!id) continue;
+      const key = `${c.owner}:${c.id}:${idx}`;
+      const at = city.districts.findIndex((d) => d.type === id);
+      if (at < 0) {
+        h.districtLocked.delete(key);
+        h.districtQuoted.add(key);
+        continue;
+      }
+      if (h.districtLocked.has(key) || !h.districtQuoted.has(key)) continue;
+      unlocks ??= computeUnlocks(state, city.seat);
+      const [placed] = city.districts.splice(at, 1);
+      h.districtLocked.set(key, districtSiteCost(state, s, id, unlocks));
+      city.districts.splice(at, 0, placed);
+    }
+  }
 }
 
 /**
@@ -1482,6 +1614,8 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     const made = routeOfRecord(r, state, cityByKey, minorOfPlayer);
     if (!made) continue;
     const { owner, route } = made;
+    const trail = history?.trail.get(routeKey(r));
+    if (trail) route.course = trailCourse(state, owner.seat, route.course ?? [], trail);
     const seen = history?.routeSeen.get(routeKey(r));
     if (seen !== undefined) {
       route.createdTurn = seen;
@@ -1489,6 +1623,72 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     }
     (owner.tradeRoutes ??= []).push(route);
     out.push({ owner: owner.seat, route, game: r });
+  }
+  return out;
+}
+
+/**
+ * A route's course as its Trader walked it: the plots of the last whole leg
+ * it ran between the route's two cities, or of the leg it is on, the rest
+ * of the way the engine's (`tradeCourse`) from the furthest plot the Trader
+ * reached; consecutive plots the records saw apart are joined the engine's
+ * way. The engine's own course where the Trader stood on nothing off it.
+ */
+function trailCourse(state: GameState, seat: number, course: number[], seen: number[]): number[] {
+  if (course.length < 2 || seen.every((at) => course.includes(at))) return course;
+  const origin = course[0];
+  const dest = course[course.length - 1];
+  const dist = (a: number, b: number) => {
+    const ta = state.map.tiles[a];
+    const tb = state.map.tiles[b];
+    return hexDistance(state.map, ta.col, ta.row, tb.col, tb.row);
+  };
+  // a route begins at its origin; a Trader that turned in a city between
+  // two records stood in it: two plots apart, both beside one of the
+  // route's cities
+  const trail = seen[0] === origin || seen[0] === dest ? [seen[0]] : [origin, seen[0]];
+  for (let i = 1; i < seen.length; i++) {
+    const a = seen[i - 1];
+    const b = seen[i];
+    for (const end of [origin, dest]) {
+      if (a !== end && b !== end && dist(a, b) > 1 && dist(a, end) === 1 && dist(b, end) === 1) trail.push(end);
+    }
+    trail.push(b);
+  }
+  const ends: number[] = [];
+  trail.forEach((at, i) => { if (at === origin || at === dest) ends.push(i); });
+  const lastEnd = ends.length ? ends[ends.length - 1] : -1;
+  // the last whole leg, origin first
+  let whole: number[] | null = null;
+  for (let k = ends.length - 1; k > 0; k--) {
+    const a = ends[k - 1];
+    const b = ends[k];
+    if (trail[a] === trail[b]) continue;
+    const leg = trail.slice(a, b + 1);
+    whole = trail[a] === origin ? leg : leg.reverse();
+    break;
+  }
+  const part = trail.slice(lastEnd + 1);
+  const outbound = lastEnd < 0 || trail[lastEnd] === origin;
+  const join = (a: number, b: number): number[] => {
+    if (whole) {
+      const i = whole.indexOf(a);
+      const j = whole.indexOf(b);
+      if (i >= 0 && j > i) return whole.slice(i, j + 1);
+    }
+    return tradeCourse(tradeReach(state, seat, a), b) ?? [a, b];
+  };
+  let stops: number[];
+  if (part.length === 0) stops = whole ?? course;
+  else if (outbound) stops = [origin, ...part, dest];
+  else stops = [origin, ...part.reverse(), dest];
+  const out: number[] = [stops[0]];
+  for (let i = 1; i < stops.length; i++) {
+    const a = out[out.length - 1];
+    const b = stops[i];
+    if (a === b) continue;
+    if (dist(a, b) === 1) out.push(b);
+    else out.push(...join(a, b).slice(1));
   }
   return out;
 }

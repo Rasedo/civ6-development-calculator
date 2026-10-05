@@ -363,16 +363,10 @@ export const CITY_BASE_MELEE_CUT = srcConst('combat.cityBaseMeleeCut', 10, {
   note: 'the Civilopedia\'s "strongest melee unit built by your civilization, minus 10"',
 });
 
-/** THE GARRISON TERM: a military unit of the holder on the centre adds what
- *  its Combat, less one point per this many hit points of damage, stands
- *  above the holder's base — max(0, Combat - damage / 10 - base), nothing
- *  when it is no stronger (`garrisonCS`). The Civilopedia: "the strongest
- *  melee unit built by your civilization, minus 10, or ... the Combat
- *  Strength of a garrisoned military unit". */
-export const GARRISON_HP_PER_CS = srcConst('combat.garrisonHpPerCs', 10, {
-  lab: 'runs/garrison_scale_20260926T081246Z.jsonl and runs/h1_duelw1103_20260927T190654Z.jsonl',
-  note: 'base 55: an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0, 10, 25, 50, 75, 90; a Warrior (20) and a Musketman (55) add 0 at every damage; in the harness Duel 1103, Rome t22-26 a wounded Warrior, a Galley 30 on 20, a Caravel 66, a Battleship 73',
-});
+/** The Combat a wholly wounded unit loses (the wounded law 0x522630,
+ *  `woundedLoss256`). */
+export const WOUNDED_DAMAGE_MULTIPLIER = srcConst('combat.woundedDamageMultiplier', 10,
+  gp('COMBAT_WOUNDED_DAMAGE_MULTIPLIER'));
 /** a city-state's centre, per envoy it holds from every major together */
 export const ENVOY_CITY_CS = srcConst('combat.envoyCityCs', 1, gp('COMBAT_STRENGTH_FROM_ENVOYS'));
 

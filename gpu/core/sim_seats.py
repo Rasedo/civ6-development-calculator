@@ -7869,44 +7869,60 @@ class SimSeats:
         if per >= self._era_moment_min and self._wond_n and int(self._wond_erascore.sum()) > 0:
             self.era_score[:, row] = self.era_score[:, row] + cnt * self._seat_wonder_sum(row, self._wond_erascore)
 
+    def _tourists_drawn(self) -> torch.Tensor:
+        """`touristsDrawn` over every pair: [B, from, to] the tourists a major
+        draws from another (PlayerCulture 0x394fa0). Each raw count is the
+        bank over TOURISM_TOURISM_TO_MOVE_CITIZEN, then over the number of
+        majors; where the raw counts toward a major exceed its citizens
+        (`_seat_citizens`), each is scaled by citizens over their sum."""
+        n = self.n_majors
+        bank = self.civ_tourism_to + self.civ_tourism_rel_to  # [B, n, n]
+        raw = torch.div(torch.div(bank, self._tourism_per_visitor, rounding_mode="floor"), n,
+                        rounding_mode="floor")
+        eye = torch.eye(n, dtype=torch.bool, device=self.device).unsqueeze(0)
+        raw = torch.where(eye, torch.zeros_like(raw), raw)
+        demand = raw.sum(dim=1, keepdim=True)  # [B, 1, to]
+        cit = self._seat_citizens().unsqueeze(1)  # [B, 1, to]
+        scaled = torch.div(raw * cit, demand.clamp(min=1), rounding_mode="floor")
+        return torch.where(cit < demand, scaled, raw)
+
+    def _seat_citizens(self) -> torch.Tensor:
+        """`seatCitizens` per major, [B, n]: lifetime culture over
+        TOURISM_CULTURE_PER_CITIZEN, milli-rounded before the floor."""
+        return torch.div(js_round(self.civ_culture[:, :self.n_majors] * 1000).long(), 1000 * self._culture_per_tourist,
+                         rounding_mode="floor")
+
+    def _tourist_counts(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """(visiting [B, n], domestic [B, n]) — `visitingTourists` and
+        `domesticTourists`: what a major draws from the others, and its
+        citizens less what the others draw from it."""
+        drawn = self._tourists_drawn()
+        return drawn.sum(dim=2), self._seat_citizens() - drawn.sum(dim=1)
+
+    def _update_cultural_dominance(self, row: int, active: torch.Tensor) -> None:
+        """`updateCulturalDominance`'s twin (0x393af0): the row dominates each
+        other major whose domestic tourists its visiting tourists exceed,
+        stops below them, keeps its flag at equal."""
+        vis, dom = self._tourist_counts()
+        v = vis[:, row].unsqueeze(1)  # [B, 1]
+        cur = self.civ_dominant[:, row]
+        new = torch.where(v > dom, torch.ones_like(cur), torch.where(v < dom, torch.zeros_like(cur), cur))
+        new[:, row] = False
+        self.civ_dominant[:, row] = torch.where(active.unsqueeze(1), new, cur)
+
     def _culture_victor(self) -> torch.Tensor:
         """The `cultureVictor` mirror: [B] the lowest seat id whose VISITING
-        tourists exceed EVERY other seat's DOMESTIC tourists; -1 none.
-
-        visiting(c) sums, over each rival o, the tourism c has already banked
-        TOWARD o — every international modifier is spent at bank time, so this
-        read is a division and nothing else:
-        (civ_tourism_to[c, o] + civ_tourism_rel_to[c, o])
-            // (nCivs * TOURISM_PER_VISITOR_PER_CIV), floored per rival.
-        domestic = lifetime culture // CULTURE_PER_DOMESTIC_TOURIST.
-
-        Both floor to whole tourists, so the comparison is integer-exact and
-        zero-draw. Culture is milli-rounded BEFORE the floor (the bankruptcy
-        convention) so a sub-milli float drift cannot move a tourist count.
-        A cityless seat cannot win."""
+        tourists exceed EVERY other seat's DOMESTIC tourists
+        (`_tourist_counts`); -1 none. A cityless seat cannot win."""
         B, dev = self.B, self.device
         n_civs = self.n_majors
-        vis_div = n_civs * self._tourism_per_visitor
-        nrow = self.n_majors
-        alive = [self.city_alive[:, row].any(dim=1) for row in range(nrow)]
-        cul = [self.civ_culture[:, row] for row in range(nrow)]
-        domestic = [
-            torch.div(js_round(c * 1000).long(), 1000 * self._culture_per_tourist, rounding_mode="floor")
-            for c in cul
-        ]
+        vis, dom = self._tourist_counts()
         winner = torch.full((B,), -1, dtype=torch.long, device=dev)
         for c in range(n_civs):
-            ok = alive[c]
-            vis = torch.zeros(B, dtype=torch.long, device=dev)
+            ok = self.city_alive[:, c].any(dim=1)
             for o in range(n_civs):
-                if o == c:
-                    continue
-                vis = vis + torch.div(self.civ_tourism_to[:, c, o] + self.civ_tourism_rel_to[:, c, o],
-                                      vis_div, rounding_mode="floor")
-            for o in range(n_civs):
-                if o == c:
-                    continue
-                ok = ok & (vis > domestic[o])
+                if o != c:
+                    ok = ok & (vis[:, c] > dom[:, o])
             winner = torch.where((winner < 0) & ok, torch.full_like(winner, c), winner)
         return winner
 
@@ -8967,6 +8983,12 @@ class SimSeats:
             # the destination's Trading Post gold (`_route_post_gold`)
             _dctr = self.city_center.gather(1, _rx).gather(2, _col).squeeze(2)  # [B, K]
             gold_i = gold_i + self._route_post_gold(row, _dctr).double()
+            # a route from a row culturally dominant over the destination's
+            # (Trade_Manager 0x54c6c0)
+            if row < self.n_majors:
+                _nm = self.n_majors
+                _dom = self.civ_dominant[:, row].gather(1, dr.clamp(max=_nm - 1)) & (dr < _nm)
+                gold_i = gold_i + self._route_dom_gold * _dom.double()
             # CIV6 (Amsterdam): "+1 Gold for each Luxury resource at the
             # destination" of an international route.
             if self._suz_c_dest_lux >= 0:
@@ -12345,9 +12367,10 @@ class SimSeats:
                      seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:
         """[B] f64 — `garrisonCS`, THE GARRISON TERM: a military unit of the
         holder on the centre, a hull included, adds max(0, its Combat and its
-        formation's strength - damage / 10 - `base`), associated as TS writes
-        it. An aircraft and a passenger
-        are no garrison; the tile seats one military unit."""
+        formation's strength less its wounded loss in 1/256 (`_wounded_loss`,
+        none for a chassis with no wound penalty) - `base`), associated as TS
+        writes it. An aircraft and a passenger are no garrison; the tile seats
+        one military unit."""
         bidx = self._bidx
         ctr = self.city_center[bidx, hrow, hcol.clamp(min=0)].clamp(min=0)
         gslot = self.military_at[bidx, ctr]
@@ -12355,9 +12378,12 @@ class SimSeats:
         gty = self.unit_type[bidx, gs0].clamp(min=0, max=self.NU - 1)
         gar = ((gslot >= 0) & (self.unit_seat[bidx, gs0] == seat)
                & ~self.unit_emb[bidx, gs0])
-        dmg = (int(self.rules.combat["unitHp"]) - self.unit_hp[bidx, gs0]).to(torch.float64)
+        hp_max = int(self.rules.combat["unitHp"])
+        dpct = torch.div((hp_max - self.unit_hp[bidx, gs0]).long() * 100, hp_max, rounding_mode="trunc")
+        loss = self._wounded_loss.take(dpct.clamp(min=0, max=100))
+        loss = torch.where(self._type_no_wound.take(gty), torch.zeros_like(loss), loss)
         form = self._formation_cs.take(self.unit_formation[bidx, gs0].clamp(min=0, max=self._form_max))
-        g = ((self._type_combat.take(gty) + form).to(torch.float64) - dmg / self._garrison_hp_per_cs
+        g = ((self._type_combat.take(gty) + form).to(torch.float64) - loss.to(torch.float64) / 256
              - base.to(torch.float64)).clamp(min=0)
         return torch.where(gar, g, torch.zeros_like(g))
 
@@ -12368,7 +12394,8 @@ class SimSeats:
         city-state's row with its one column 0): the holder's base
         (`_holder_strength`), `Districts.CityStrengthModifier` over the city's
         complete, unpillaged districts counted per instance off the tile plane
-        (`_dist_counts`' rule), each wall building's strength, the Palace's +3 where
+        (`_dist_counts`' rule), each wall building's strength while the perimeter
+        stands, the Palace's +3 where
         the city holds it (`_palace_at`: a capital, a minor's city), the
         garrison term (`_garrison_cs`) — left out where `garrisoned` is False
         (the Encampment) — and a city-state's +1 per envoy it holds
@@ -12381,7 +12408,9 @@ class SimSeats:
         seat = self._ROW_SEAT.take(hrow)
         base = self._holder_strength(hrow, hcol)
         # each wall building built adds its own strength (`wallsStrength`)
-        cs = base + (self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1)
+        # while the perimeter stands (`outerPool` above 0)
+        _pool = torch.minimum(self.city_outer_hp[bidx, hrow, hc0].long(), self._walls_max_at(hrow, hc0).long())
+        cs = base + (self.city_bldg[bidx, hrow, hc0].long() * self._b_walls_cs.unsqueeze(0)).sum(dim=1) * (_pool > 0).long()
         live = ((self.tile_seat == seat.unsqueeze(1))
                 & (self.tile_city == self.city_id[bidx, hrow, hc0].unsqueeze(1))
                 & (self.district >= 0) & self.district_complete & ~self.district_pillaged)

@@ -373,9 +373,11 @@ describe('the Trader unit', () => {
     expect(route.walkTile).toBe(across.centerIndex);
   });
 
-  // a land<->water switch away from a centre needs a TradeEmbark district
-  // at one end (0x558db0), caps the range at 1, and a refuelling district
-  // tops it up (0x5579b0): an inland city reaches the sea through its Harbor
+  // a step between land and water needs a TradeEmbark district at one end
+  // (0x558db0); a district plot is neither land nor water to the switch test
+  // (0x558300), so the step onto the Harbor caps nothing and costs no switch,
+  // and the Harbor refuels the sea leg (0x5579b0): an inland city reaches the
+  // sea through its Harbor
   it('an inland city embarks only at a Harbor, which refuels its sea leg', () => {
     const state = makeState(makeMap(30, 8));
     state.sandbox = true;
@@ -390,11 +392,11 @@ describe('the Trader unit', () => {
     const reach = tradeReach(state, 0, origin.centerIndex);
     const course = tradeCourse(reach, across.centerIndex)!;
     expect(course).toContain(ht.index);
-    // the switch onto the Harbor leaves nothing; the Harbor refuels 30 onto water
-    expect(reach.left[ht.index]).toBe(0);
+    // three land steps leave 12 on the Harbor; the Harbor refuels 30 onto water
+    expect(reach.left[ht.index]).toBe(12);
     expect(reach.left[tileAtCoords(state.map, 10, 4).index]).toBe(29);
-    // the switch onto it, away from a refuelling district, is dear
-    expect(reach.g[ht.index]).toBeGreaterThan(10000);
+    // the step onto it is no switch: no switch cost
+    expect(reach.g[ht.index]).toBeLessThan(10000);
   });
 
   // 0x5579b0: the DESTINATION city's own TradeEmbark district refuels to 3

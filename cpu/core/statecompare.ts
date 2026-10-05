@@ -455,6 +455,7 @@ const SEAT: Record<string, Extractor> = {
   tourRate: overSeats((s) => s.tourRate ?? 0),
   tourismTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismTo?.[seat] ?? 0))),
   tourismReligiousTo: overSeats((s, st) => perCiv(st, (seat) => (seat === s.seat ? 0 : s.tourismReligiousTo?.[seat] ?? 0))),
+  culturallyDominant: overSeats((s, st) => perCiv(st, (seat) => (s.culturallyDominant?.[seat] ? 1 : 0))),
   // the copies of each chassis this seat has ever acquired, flattened as
   // [unit index, count] pairs in ascending index — only a chassis with a
   // `costStep` is ever counted, so the list stays short.

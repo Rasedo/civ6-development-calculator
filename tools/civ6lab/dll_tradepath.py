@@ -9,8 +9,9 @@ plots with coordinates, terrain class, route and district).
 THE RANGE (0x5579b0), fixed point 1/256, per edge from -> to:
     r = the from-node's range left (the origin node starts at
         TRADE_ROUTE_BASE_RANGE 15 + the player's +0x1b0 modifier)
-    a land<->water switch (0x558300: from land and to water, or the reverse)
-        caps r at 1 before the step
+    a land<->water switch (0x558300: from land and to water, or the reverse;
+        a plot holding a TradeEmbark district answers neither land nor water,
+        so a step onto or off one is no switch) caps r at 1 before the step
     a from-plot holding a TradeEmbark district (City Centre, Harbor, Royal
         Navy Dockyard, Cothon; Districts byte +0xe1 bit 7) of the ORIGIN city
         or of a city holding the player's trading post RE-FUELS r to
@@ -24,6 +25,9 @@ THE RANGE (0x5579b0), fixed point 1/256, per edge from -> to:
 THE COST (0x558970), per step, in 1/100ths of a move:
     100
     + 10000 for a land<->water switch not made at a refuelling district
+      (never paid: a land<->water edge needs a TradeEmbark district on one of
+      its plots, which makes it no switch; runs/h1_duelw1108 t182, Rome's
+      Trader 618 -> its Harbor 617 -> Ocean)
     + 0 onto a city centre, or a mountain with a tunnel (portal)
     + 10 on a route of the best route type (the highest PlacementValue:
          Railroad), + 50 on any other route
@@ -67,10 +71,10 @@ def water(tok: str) -> bool:
 
 
 def walk(tokens: list[str]) -> tuple[bool, list[tuple[str, int]]]:
-    """(ok, legs): legs are (domain, steps) between refuels. City centres are
-    neutral for the switch (their district answers neither land nor water);
-    a centre refuels when it is the origin or carries the origin player's
-    active post ('t')."""
+    """(ok, legs): legs are (domain, steps) between refuels. City centres and
+    Harbors are neutral for the switch (their district answers neither land
+    nor water); a centre refuels when it is the origin or carries the origin
+    player's active post ('t')."""
     rem = BASE
     legs: list[tuple[str, int]] = []
     leg_dom, leg_n = "land", 0
@@ -78,7 +82,7 @@ def walk(tokens: list[str]) -> tuple[bool, list[tuple[str, int]]]:
     for i in range(len(tokens) - 1):
         a, b = tokens[i], tokens[i + 1]
         r = rem
-        switch = ("C" not in a and "C" not in b) and (water(a) != water(b))
+        switch = not ({"C", "H"} & (set(a) | set(b))) and (water(a) != water(b))
         if switch and r > 1:
             r = 1
         if "C" in a and (i == 0 or "t" in a):
@@ -98,7 +102,8 @@ def token(p: str) -> str:
     """a trade_path plot "x:y:K/ROUTE/DISTRICT" as a sweep token"""
     k = p.split(":")[2].split("/")
     t = "w" if k[0] in ("c", "O") else "l"
-    return t + ("C" if "CITY_CENTER" in k else "")
+    embark = any(d in k for d in ("HARBOR", "ROYAL_NAVY_DOCKYARD", "COTHON"))
+    return t + ("C" if "CITY_CENTER" in k else "H" if embark else "")
 
 
 def main() -> None:

@@ -833,12 +833,18 @@ export function fitEncampOuter(state: GameState, city: City): void {
  * live price never reshuffles the wire.
  */
 export function buildingCostIn(state: GameState, city: City, id: string): number {
-  const def = effectiveBuilding(civOf(state, city.seat), id);
-  if (!def) return 0;
-  const full = def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
+  const full = buildingFullCost(state, city, id);
   // CIV6 (PILLAGE_BUILDING_REPAIR_PERCENT 25): a building standing pillaged
   // is REPAIRED for that share of its price
   return buildingPillaged(city, id) ? Math.round((full * PILLAGE_BUILDING_REPAIR_PERCENT) / 100) : full;
+}
+
+/** A building's price to build it whole in `city`, pillaged or not: its
+ *  seat's row, a Flood Barrier's off the city's lowlands. */
+export function buildingFullCost(state: GameState, city: City, id: string): number {
+  const def = effectiveBuilding(civOf(state, city.seat), id);
+  if (!def) return 0;
+  return def.floodBarrier ? floodBarrierCost(state, city) : def.cost;
 }
 
 /** building ids some tech or civic unlocks — the rows `computeUnlocks` can ever grant */

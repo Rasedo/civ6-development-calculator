@@ -379,9 +379,11 @@ def poke_seat0_golden(rules, path):
 
 
 def poke_capital_immunity(rules, path):
-    """f. A capital that ranks LOWEST (so it IS governor-picked) still pins at
-    LOYALTY_MAX — on both seat families (the civ path through _seat_phase,
-    seat 0 through the same loyalty bodies driven at row 0)."""
+    """f. A capital that ranks LOWEST (so it IS governor-picked) moves by the
+    loyalty law like any city and never flips (runs/h1_duelw1108: Rome 100 ->
+    78 -> 56 -> 74 -> 95 under two Indie concerts) — on both seat families
+    (the civ path through _seat_phase, seat 0 through the same loyalty bodies
+    driven at row 0)."""
     lmax = float(rules.seats.get("loyaltyMax", 100))
     # a civ capital
     sim = build(rules, path)
@@ -391,7 +393,9 @@ def poke_capital_immunity(rules, path):
     sim.city_loyalty[0, r + 1, cap] = 5.0                 # lowest → would be picked
     _grant_titles(sim, r + 1, 1)
     sim._seat_phase()
-    assert float(sim.city_loyalty[0, r + 1, cap]) == lmax, f"a governor-picked civ capital must pin at {lmax}"
+    got = float(sim.city_loyalty[0, r + 1, cap])
+    assert 5.0 < got <= lmax, f"a governor-picked civ capital must climb from 5 by the law, got {got}"
+    assert bool(sim.city_alive[0, r + 1, cap]) and bool(sim.city_is_cap[0, r + 1, cap]), "the capital flipped"
 
     # the seat-0 capital
     sim2 = build(rules, path)
@@ -402,8 +406,9 @@ def poke_capital_immunity(rules, path):
     sim2._governor_phase(0, sim2.civ_alive[:, 0] & sim2.city_alive[:, 0].any(dim=1))
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     apply_loyalty_row(sim2, tier)
-    assert float(sim2.city_loyalty[0, 0, pcap]) == lmax, f"a governor-picked seat-0 capital must pin at {lmax}"
-    print(f"  f capital immunity OK (governor-picked capitals pin at {lmax}, both engines)")
+    got2 = float(sim2.city_loyalty[0, 0, pcap])
+    assert 5.0 < got2 <= lmax, f"a governor-picked seat-0 capital must climb from 5 by the law, got {got2}"
+    print(f"  f capital OK (governor-picked capitals climb by the law to {got} / {got2}, never flip)")
 
 
 def poke_governor_improvements(rules, path):

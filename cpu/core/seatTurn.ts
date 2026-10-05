@@ -11,7 +11,7 @@ import { seatGovernment, slottedPolicyIndices } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS } from '../data/policies';
 import { growthFoodNeeded } from '../data/constants';
-import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT } from '../data/seats';
+import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/seats';
 import { seatWonderFlag } from './wonders';
 import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
@@ -88,6 +88,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   s.tourism = (s.tourism ?? 0) + natGeneral;
   s.tourismReligious = (s.tourismReligious ?? 0) + natReligious;
   bankTourismPerRival(state, s, natGeneral, natReligious, late);
+  updateCulturalDominance(state.seats, s);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernment(state, seat), suzerainCount(state, seat),
                              policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
@@ -196,5 +197,62 @@ function bankTourismPerRival(
     s.tourismTo[o] = (s.tourismTo[o] ?? 0) + Math.floor(gen * Math.max(0, 100 + pct) / 100);
     s.tourismReligiousTo[o] = (s.tourismReligiousTo[o] ?? 0)
       + Math.floor(religious * Math.max(0, 100 + relPct) / 100);
+  }
+}
+
+/** A seat's citizens (PlayerCulture 0x3a1fb0): lifetime culture over
+ *  TOURISM_CULTURE_PER_CITIZEN, floored. Culture is milli-rounded before the
+ *  floor so a sub-milli float drift cannot move a count across engines. */
+export function seatCitizens(s: Seat): number {
+  return Math.floor(Math.round((s.cultureTotal ?? 0) * 1000) / 1000 / CULTURE_PER_DOMESTIC_TOURIST);
+}
+
+/** The tourists `p`'s banked tourism toward `o` would move, before `o`'s
+ *  citizens cap them (0x399b90's term): the bank over
+ *  TOURISM_TOURISM_TO_MOVE_CITIZEN, then over the number of majors. */
+function rawTourists(seats: readonly Seat[], p: Seat, o: number): number {
+  const bank = (p.tourismTo?.[o] ?? 0) + (p.tourismReligiousTo?.[o] ?? 0);
+  return Math.floor(Math.floor(bank / TOURISM_PER_VISITOR_PER_CIV) / seats.length);
+}
+
+/** The tourists `p` draws from `o` among the majors `seats` (0x394fa0): its
+ *  raw count, scaled by `o`'s citizens over every major's raw count toward
+ *  `o` when those exceed the citizens. */
+export function touristsDrawn(seats: readonly Seat[], p: Seat, o: Seat): number {
+  if (p.seat === o.seat) return 0;
+  const raw = rawTourists(seats, p, o.seat);
+  let demand = 0;
+  for (const q of seats) if (q.seat !== o.seat) demand += rawTourists(seats, q, o.seat);
+  const cit = seatCitizens(o);
+  return cit < demand ? Math.floor(raw * cit / Math.max(demand, 1)) : raw;
+}
+
+/** A seat's DOMESTIC tourists (the staycationers, +0x10b0): its citizens
+ *  less every tourist the other majors draw from it. */
+export function domesticTourists(seats: readonly Seat[], o: Seat): number {
+  let taken = 0;
+  for (const p of seats) taken += touristsDrawn(seats, p, o);
+  return seatCitizens(o) - taken;
+}
+
+/** A seat's VISITING tourists (0x39bee0): the tourists it draws from every
+ *  other major. */
+export function visitingTourists(seats: readonly Seat[], p: Seat): number {
+  let n = 0;
+  for (const o of seats) n += touristsDrawn(seats, p, o);
+  return n;
+}
+
+/** Cultural dominance (0x393af0), on the seat's own turn after its tourism
+ *  lands: the seat dominates each other major whose domestic tourists its
+ *  visiting tourists exceed, stops below them, and keeps its flag at equal. */
+export function updateCulturalDominance(seats: readonly Seat[], s: Seat): void {
+  const v = visitingTourists(seats, s);
+  s.culturallyDominant ??= [];
+  for (const o of seats) {
+    if (o.seat === s.seat) continue;
+    const d = domesticTourists(seats, o);
+    if (v > d) s.culturallyDominant[o.seat] = true;
+    else if (v < d) s.culturallyDominant[o.seat] = false;
   }
 }

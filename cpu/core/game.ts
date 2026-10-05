@@ -24,11 +24,11 @@ import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } f
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
 import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
-import { commitProduction } from './seatTurn';
+import { commitProduction, domesticTourists, visitingTourists } from './seatTurn';
 import { completedWonders, seatWonderFlag } from './wonders';
 import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
-import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
+import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
 import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
@@ -1538,46 +1538,20 @@ function diplomaticVictor(state: GameState): number {
  * lifetime TOURISM — and a civ wins the moment its visiting tourists exceed
  * EVERY other civ's domestic tourists.
  *
- * CIV6 (Victory): "The visiting tourists from each opponent are calculated
- * as the total amount of Tourism you've sent to them over the entire game,
- * divided by (200 * number of civs)", and a civ is culturally dominant over
- * an opponent when its COMBINED visiting total beats that opponent's
- * domestic count. Both halves of the per-rival bank already carry their
- * international modifiers from the accrual (`bankTourismPerRival`).
- *
- * Both counts floor to whole tourists, so this is integer-exact and zero-draw.
+ * The counts are the game's own (`visitingTourists`, `domesticTourists`):
+ * REQUIREMENT_TOURISTS_EXCEED_STAYCATIONERS, a civ's visiting tourists above
+ * every other civ's domestic ones. Integer-exact and zero-draw.
  *
  * Returns the winning SEAT id, or -1. A civ
  * with NO cities cannot win (a dead civ attracts nobody); the ascending scan
- * breaks ties toward the lowest id, and the > comparison means two civs can
- * never both qualify against each other.
+ * breaks ties toward the lowest id.
  */
 function cultureVictor(state: GameState): number {
-  const nCivs = state.seats.length;
-  const visitDiv = nCivs * TOURISM_PER_VISITOR_PER_CIV;
-  const alive = state.seats.map((sx) => sx.cities.length > 0);
-  const culture = state.seats.map((sx) => sx.cultureTotal ?? 0);
-  // Milli-rounded before the floor: culture is a non-dyadic float accumulator,
-  // so a sub-milli drift must not move a tourist count across engines (the
-  // GS bankruptcy-test convention).
-  const domestic = culture.map((c) => Math.floor(Math.round(c * 1000) / 1000 / CULTURE_PER_DOMESTIC_TOURIST));
-  for (let c = 0; c < nCivs; c++) {
-    if (!alive[c]) continue;
-    const sx = state.seats[c];
-    let visiting = 0;
-    for (let o = 0; o < nCivs; o++) {
-      if (o === c) continue;
-      visiting += Math.floor(((sx.tourismTo?.[o] ?? 0) + (sx.tourismReligiousTo?.[o] ?? 0)) / visitDiv);
-    }
-    let all = true;
-    for (let o = 0; o < nCivs; o++) {
-      if (o === c) continue;
-      if (visiting <= domestic[o]) {
-        all = false;
-        break;
-      }
-    }
-    if (all) return c;
+  const domestic = state.seats.map((sx) => domesticTourists(state.seats, sx));
+  for (const sx of state.seats) {
+    if (sx.cities.length === 0) continue;
+    const visiting = visitingTourists(state.seats, sx);
+    if (state.seats.every((o, i) => o.seat === sx.seat || visiting > domestic[i])) return sx.seat;
   }
   return -1;
 }

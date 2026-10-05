@@ -1097,6 +1097,10 @@ export const TOURISM_RELIGIOUS_PENALTY_PCT = srcConst('seats.tourismReligiousPen
   gp('TOURISM_DIFFERENT_RELIGION_REDUCTION'));
 export const CULTURE_PER_DOMESTIC_TOURIST = srcConst('seats.culturePerDomesticTourist', 100,
   gp('TOURISM_CULTURE_PER_CITIZEN'));
+/** The Gold a route pays its origin when the origin's owner is culturally
+ *  dominant over the destination's (Trade_Manager 0x54c6c0). */
+export const TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE = srcConst('seats.routeGoldCulturalDominance', 4,
+  gp('TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE'));
 /** CIV6 (Tourism): "Holy Cities generate +8 Religious Tourism per turn" —
  *  paid to the holy city's CURRENT owner. */
 export const HOLY_CITY_TOURISM = srcConst('seats.holyCityTourism', 8,

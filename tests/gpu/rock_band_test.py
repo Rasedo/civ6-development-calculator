@@ -226,9 +226,10 @@ def test_culture_victor(rules) -> None:
     for o in range(1, n):
         sim.civ_tourism_to[0, 0, o] = div - 1        # one short, every cell
     assert int(sim._culture_victor()[0]) == -1, "sub-tourist cells added up to a win"
-    sim.civ_tourism_to[0, 0, 1] = 2 * div            # 2 visiting from one rival
+    sim.civ_tourism_to[0, 0, 1] = 2 * div            # 2 raw tourists toward one rival
+    sim.civ_culture[0, 1] = 2 * sim._culture_per_tourist   # its 2 citizens, both drawn
     assert int(sim._culture_victor()[0]) == 0, "a seat past every domestic count did not win"
-    sim.civ_culture[0, 1] = 2 * sim._culture_per_tourist   # 2 domestic: not STRICTLY beaten
+    sim.civ_culture[0, 1] = 4 * sim._culture_per_tourist   # 4 - 2 domestic: not STRICTLY beaten
     assert int(sim._culture_victor()[0]) == -1, "an equal count won"
     print(f"  culture victor OK: each cell floors at {div}, the bar is strictly greater")
 

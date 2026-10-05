@@ -442,9 +442,16 @@ virtual +0x40 holds (a district stands there, unread), they read the plot
 info's word +0x14 through 0x81240 — argument 0 tests bit 1, 1 bit 2, 2 bit 4:
 land = bit 4 and not bit 1, water = bit 1 and not bit 4; a plot carrying
 both (or neither) is neither land nor water, so the 10000 switch cannot fire
-on it. Without a district: land = not water (0x834d0). Open: which of those
+on it. Without a district: land = not water (0x834d0). Unread: which of those
 bits a City Centre's, a Harbor's and a Canal's plot carry (who writes word
-+0x14), and so whether the engines' "no switch at a centre" holds.
++0x14). Recorded (runs/h1_duelw1108 t182–211): Rome's Trader to Shenyang walks
+618 (land) -> its Harbor 617 -> Ocean, a path the 10000 would forbid against
+a 21-plot coast path, so a TradeEmbark district's plot is neither land nor
+water: a step onto or off one is no switch. The range callback's refuel
+(0x5579b0) needs the FROM plot to hold the refuelling district, so the
+switch cost could only fire on a land<->water step with no TradeEmbark
+district at either end, which the node test (0x558db0) refuses: the engines
+walk no switch at all (`walk` / `_trade_reach`).
 
 ## C-49 tail: the storm's start plot — READ
 
@@ -687,12 +694,50 @@ fraction bits (every amount is written `<< 8`).
   index 1 through the destination, own and foreign apart: a foreign post
   pays TRADING_POST_GOLD_IN_FOREIGN_CITY, an own one the player's own
   bonus (Rome's All Roads Lead to Rome +1, the destination's post too).
-- Cultural dominance: 0x393af0 sets a pair's flag when the player's
-  tourists visiting the other exceed the other's domestic tourists
-  (+0x10b0; equal keeps the flag); 0x54c6c0 adds
+- PlayerCulture's turn (0x396860), a major's: the culture lands (lifetime
+  culture +0x1050, 24.8, grows by every gain of civic progress, 0x3a1fb0 —
+  a boost's share included; culture with no civic chosen is held at +0xb40
+  until one is), then per other player it has met (0x3daaf0) the tourism
+  toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists
+  refreshed (0x39f610), then 0x393af0 the dominance, then the visiting
+  total is stored (+0x1118).
+- A seat's citizens: (lifetime culture >> 8) / TOURISM_CULTURE_PER_CITIZEN
+  100. Raw tourists p draws from o: ((bank >> 8) / TOURISM_TOURISM_TO_MOVE_
+  CITIZEN 200) / the number of majors (+0x10d0). Drawn (0x394fa0): the raw
+  count, or raw x citizens(o) / demand when o's citizens fall below the
+  demand — every met player's raw count toward o (0x399b90). Domestic
+  tourists (+0x10b0, "staycationers"): citizens less what the others draw
+  (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta).
+  Visiting (0x39bee0): the sum of what the player draws from each other.
+- Cultural dominance 0x393af0, per met other player: visiting > the other's
+  domestic sets the pair's flag, < clears it, equal keeps it. 0x54c6c0 adds
   TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose
-  origin's owner dominates the destination's. Not modelled (AUDIT C-94
-  BUILD).
+  origin's owner dominates the destination's (`updateCulturalDominance` /
+  `_update_cultural_dominance`, `Seat.culturallyDominant` / `civ_dominant`;
+  the culture victory reads the same counts, `visitingTourists` /
+  `domesticTourists`). 1108 Jiaodong -> Rome +4 from its first record t200.
+- CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE (gp +0xec, 25): 0x1a1640
+  raises a player's great-work identity pressure (+0x588, + Great Works x
+  +0x1aec) at a plot whose owner it dominates by 25%, before the distance
+  falloff (gp +0xf0). No engine term matched yet (AUDIT C-94 BUILD).
+
+## C-94: the wounded law and the garrison — READ
+
+- 0x522630, the Combat a wounded unit loses, 24.8: m = COMBAT_WOUNDED_DAMAGE_
+  MULTIPLIER (gp +0x238, 10) << 8, less m x the unit's reduction percent
+  (+0x1868, the Samurai's NoReduction); times the damage percent (damage x
+  100 / COMBAT_MAX_HIT_POINTS) >> 8. Each percent is a float32 product with
+  0.01f cut to 1/256 (the whole part << 8, the fraction x 256 truncated to a
+  byte): 82 damage -> 209/256 -> 2090/256 lost, not 8.2. Callers: the
+  district preview, the unit-vs-unit strength (DAMAGED_UNIT_DESC), the air
+  strikes (`woundedLoss256`, `_wounded_loss`).
+- The centre's garrison term (0x24a180): FP(Combat incl. formation,
+  0x56dc90) less the wounded loss, less the base, where positive (H-1 1108
+  Jiaodong 30.8359375 = 29 + 36 - 26 - 2090/256).
+- The walls' term: each wall building's OuterDefenseStrength (+0x44) and
+  the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the
+  district's outer damage (+0x8d8) below its outer maximum — a breached
+  perimeter pays none (1108 Xi'an 3 lower t97-111, `centreStrength`).
 
 ## H-1: the district adjacency — READ
 
@@ -755,7 +800,17 @@ mountain rules close 1104 t143 and 1108 t187 (an Industrial Zone at 3 rows
 
 ## DLL rules the engines contradict
 
-Every rule read above ships on both engines but one: the high-adjacency
-moment reads District::GetYield's flat bucket (+0x2f0) and appeal rows
-(+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the Harness section's
-Moments BUILD line).
+- The wounded law (0x522630) on a unit's strength in a fight: the engines'
+  `woundPenalty` / its GPU twin round 10 - HP/10 (AUDIT C-94 BUILD); the
+  garrison term reads the law.
+- CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE's 0x1a1640 term (AUDIT
+  C-94 BUILD).
+- Lifetime culture (0x3a1fb0) grows by every gain of civic progress, a
+  boost's share included, and not by culture held with no civic chosen: the
+  engines' `cultureTotal` / `civ_culture` sum the culture yield (AUDIT C-94
+  BUILD; the H-1 importer folds the game's rule).
+- The high-adjacency moment reads District::GetYield's flat bucket (+0x2f0)
+  and appeal rows (+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the
+  Harness section's Moments BUILD line).
+
+Every other rule read above ships on both engines.

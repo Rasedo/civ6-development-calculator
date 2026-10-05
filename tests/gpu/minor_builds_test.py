@@ -331,6 +331,10 @@ def test_the_minor_encampment_fights_as_its_centre(rules, path) -> None:
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
     sim.city_bldg[B0, row, 0, anc] = True
+    # the walls count while the centre's perimeter stands
+    _rr = torch.full((sim.B,), row, dtype=torch.long)
+    _cc = torch.zeros(sim.B, dtype=torch.long)
+    sim.city_outer_hp[B0, row, 0] = int(sim._walls_max_at(_rr, _cc)[B0])
     tt = torch.full((sim.B,), et, dtype=torch.long)
     d, _hrow, hcol, wtier, held = sim._encamp_terms(tt)
     csx = torch.full((sim.B,), s, dtype=torch.long)

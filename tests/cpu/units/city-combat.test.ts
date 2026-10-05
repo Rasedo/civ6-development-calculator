@@ -8,7 +8,7 @@ import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { ENCAMPMENT_HP, FORMATION_CS, UNITS, WALLS_HP } from '../../../cpu/data/units';
-import { PALACE_CITY_CS, GARRISON_HP_PER_CS, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
+import { PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
 import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/core/types';
@@ -18,14 +18,14 @@ import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/
 // for the perimeter.
 
 describe('the wound penalty', () => {
-  it('CIV6: round(10 - HP/10) — 30 HP loses 7, 1 HP loses 10', () => {
+  it('CIV6: round(10 - HP/10) вЂ” 30 HP loses 7, 1 HP loses 10', () => {
     expect(woundPenalty({ hp: 100 })).toBe(0);
     expect(woundPenalty({ hp: 30 })).toBe(7);
     expect(woundPenalty({ hp: 1 })).toBe(10);
     expect(woundPenalty({ hp: 0 })).toBe(10);
   });
 
-  it('rounds rather than trailing off — every CS term is an integer now', () => {
+  it('rounds rather than trailing off вЂ” every CS term is an integer now', () => {
     for (let hp = 0; hp <= 100; hp++) expect(Number.isInteger(woundPenalty({ hp }))).toBe(true);
     expect(woundPenalty({ hp: 95 })).toBe(1); // 10 - 9.5 = 0.5 rounds up
     expect(woundPenalty({ hp: 94 })).toBe(1);
@@ -60,7 +60,7 @@ describe('the outer-defense perimeter', () => {
     expect(cityDamageSplit(0, WALLS_HP, 40, 'melee')).toEqual({ wall: 0, centre: 40 });
   });
 
-  it('both shares come out of the SAME roll — a hit damages perimeter and centre at once', () => {
+  it('both shares come out of the SAME roll вЂ” a hit damages perimeter and centre at once', () => {
     const s = cityDamageSplit(0.4 * WALLS_HP, WALLS_HP, 30, 'melee');
     expect(s.wall).toBeGreaterThan(0);
     expect(s.centre).toBeGreaterThan(1);
@@ -254,7 +254,7 @@ describe("a city centre's standing strength", () => {
   }
 
   // runs/city_defense_preview_c38s2_era*: max(the start era's melee, the
-  // best melee fielded) - 10 — an Ancient major's base is 10
+  // best melee fielded) - 10 вЂ” an Ancient major's base is 10
   it("stands on max(the start era's melee, the best melee) - 10; the capital adds the Palace", () => {
     const { state, capital, city } = scene();
     expect([CITY_START_MELEE_MAJOR, CITY_BASE_MELEE_CUT]).toEqual([20, 10]);
@@ -287,16 +287,17 @@ describe("a city centre's standing strength", () => {
 
   // runs/garrison_scale_20260926T081246Z.jsonl: base 55 (a Line Infantry 65
   // less 10), an Infantry (75) adds 20, 19, 17.5, 15, 12.5, 11 at damage 0,
-  // 10, 25, 50, 75, 90 — Combat less a point per 10 damage, above the base
+  // 10, 25, 50, 75, 90 as the preview rounds them вЂ” Combat less the wounded
+  // law (`woundedLoss256`) in 1/256, above the base
   it('the garrison adds what its Combat less its wounds stands above the base', () => {
     const { state, city } = scene();
     const inf = spawnUnit(state, 'INFANTRY', city.centerIndex, 1)!;
-    expect(GARRISON_HP_PER_CS).toBe(10);
+    expect(WOUNDED_DAMAGE_MULTIPLIER).toBe(10);
     // the strongest melee on its own centre adds exactly the cut
     expect(centreStrength(state, city)).toBe(65 + 10);
     state.seats.find((s) => s.seat === 1)!.bestMeleeCS = 65;
     const read = [100, 90, 75, 50, 25, 10].map((hp) => { inf.hp = hp; return centreStrength(state, city); });
-    expect(read).toEqual([75, 74, 72.5, 70, 67.5, 66]);
+    expect(read).toEqual([75, 74.0234375, 72.5, 70, 67.5, 66.015625]);
     // the Encampment reads without it
     expect(centreStrength(state, city, false)).toBe(55);
   });
