@@ -271,14 +271,14 @@ describe('the heal a lost source denies', () => {
     expect(unit.hp).toBeGreaterThan(40);
   });
 
-  it('the BARBARIANS keep no bank and are not held to it', () => {
+  it('the BARBARIANS keep no bank, and never heal by resting', () => {
     const { state } = resState('HORSES', null, 'HORSEBACK_RIDING');
     const t = tileAtCoords(state.map, 2, 2);
     const u = spawnUnit(state, 'HORSEMAN', t.index, BARB_SEAT)!;
     u.hp = 40;
     expect(civHasStrategic(state, BARB_SEAT, 'HORSES')).toBe(false);
     refreshUnits(state);
-    expect(u.hp).toBeGreaterThan(40);
+    expect(u.hp).toBe(40);
   });
 });
 

@@ -386,6 +386,12 @@ export const CAPTURE_BASE_STRENGTH_DIFF = srcConst('combat.captureBaseDiff', 20,
 /** the hit points a captured unit arrives with — STYLIZED, no source */
 export const CAPTURED_UNIT_HP = srcConst('combat.capturedHp', 25,
   { stylized: 'the hit points a captured unit arrives with; the install publishes none' });
+/** the Gold a barbarian outpost pays the unit's owner who disperses it: the
+ *  improvement's DispersalGold through the game speed (DLL 0x52e970 ->
+ *  0x5254d0, CostMultiplier / 100 truncated; runs/h1_duelw1116 China t6
+ *  +25 online) */
+export const CAMP_DISPERSAL_GOLD = srcConst('combat.campDispersalGold', scaleByGameSpeed(50),
+  xml('Improvements', 'ImprovementType=IMPROVEMENT_BARBARIAN_CAMP', 'DispersalGold', { scale: GAME_SPEED }));
 
 /** Each citizen contributes these yields directly (Civ 6). */
 export const CITIZEN_SCIENCE = srcConst('citizenScience', 0.5, {

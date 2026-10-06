@@ -70,7 +70,6 @@ class Static:
     NC: int
     NB: int
     NU: int
-    max_cities: int
     unit_slots: int
     spec_keep: int
     units: list
@@ -180,7 +179,6 @@ def _static(rules, width: int, height: int, wrap_x: bool, n_majors: int, n_citys
         device=device, T=T, neigh=neigh, ring2=ring2, pair_dist=pair_dist,
         n_majors=n_majors, S=n_citystates, RC=int(seats["citySlots"]),
         NT=len(rules.t_cost), NC=len(rules.c_cost), NB=NB, NU=NU,
-        max_cities=int(seats["maxCities"]),
         unit_slots=simbase.UNIT_SLOTS, spec_keep=simbase.SPEC_KEEP, units=units,
         unit_base=unit_base, district_base=district_base, form_base=form_base, prod_w=form_base + 2 * NU,
         scaffold=[districts[int(p["idx"])]["id"] for p in place],

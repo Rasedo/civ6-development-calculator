@@ -67,8 +67,8 @@ describe('Hwarang', () => {
   it('pays 3% per promotion the governor has earned, its first included', () => {
     const plain = culture(PLAIN, 0);
     expect(plain).toBeGreaterThan(0);
-    expect(culture(leaderRow('SEONDEOK'), 0)).toBeCloseTo(plain * 1.03, 9);
-    expect(culture(leaderRow('SEONDEOK'), 0b11)).toBeCloseTo(plain * 1.09, 9);
+    expect(culture(leaderRow('SEONDEOK'), 0)).toBeCloseTo(plain * 1.03, 2); // to 1/256: the percent in 24.8 fixed point
+    expect(culture(leaderRow('SEONDEOK'), 0b11)).toBeCloseTo(plain * 1.09, 2);
   });
 
   it('pays nothing while the governor is still establishing, or to another row', () => {
@@ -191,8 +191,8 @@ describe('Righteousness of the Faith', () => {
     };
     const plainHeld = yieldsOf(PLAIN, true);
     const held = yieldsOf(leaderRow('SALADIN'), true);
-    expect(held.culture).toBeCloseTo(plainHeld.culture * 1.1, 9);
-    expect(held.science).toBeCloseTo(plainHeld.science * 1.1, 9);
+    expect(held.culture).toBeCloseTo(plainHeld.culture * 1.1, 2); // to 1/256: the percent in 24.8 fixed point
+    expect(held.science).toBeCloseTo(plainHeld.science * 1.1, 2);
     const plainBare = yieldsOf(PLAIN, false);
     expect(yieldsOf(leaderRow('SALADIN'), false).culture).toBeCloseTo(plainBare.culture, 9);
   });

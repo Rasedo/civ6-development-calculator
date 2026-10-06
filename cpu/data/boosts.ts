@@ -18,7 +18,9 @@ import { type SrcMap } from './provenance';
 
 export type BoostCheck =
   | { kind: 'building'; id: string; count: number }
-  | { kind: 'improvement'; id: ImprovementId; count: number; onResource?: boolean }
+  /** improvements on the seat's own plots: of `id`, or of any kind with no
+   *  `id` (BOOST_TRIGGER_HAVE_X_IMPROVEMENTS / _NUM_IMPROVED_TILES) */
+  | { kind: 'improvement'; id?: ImprovementId; count: number; onResource?: boolean }
   | { kind: 'district'; type?: DistrictId; count: number; distinctTypes?: boolean }
   | { kind: 'cityPop'; pop: number }
   | { kind: 'totalPop'; pop: number }
@@ -26,12 +28,20 @@ export type BoostCheck =
   | { kind: 'tech'; id: string }
   | { kind: 'greatPeople'; count: number; class?: GreatPersonClass }
   | { kind: 'anyWonderBuilt' }
-  | { kind: 'nearNaturalWonder' }
+  /** BOOST_TRIGGER_FIND_NATURAL_WONDER: a natural wonder plot the seat has revealed */
+  | { kind: 'naturalWonderFound' }
   | { kind: 'policies'; count: number }
   /** BOOST_TRIGGER_HAVE_ALLIANCE_LEVEL_X: an alliance with any major at
    *  `level` or above */
   | { kind: 'alliance'; level: number }
-  | { kind: 'cities'; count: number };
+  | { kind: 'cities'; count: number }
+  /** BOOST_TRIGGER_CREATE_PANTHEON / _FOUND_RELIGION */
+  | { kind: 'pantheon' }
+  | { kind: 'religion' }
+  /** BOOST_TRIGGER_MEET_X_CITY_STATES */
+  | { kind: 'metCityStates'; count: number }
+  /** BOOST_TRIGGER_MAINTAIN_X_TRADE_ROUTES */
+  | { kind: 'tradeRoutes'; count: number };
 
 interface BoostDef {
   desc: string;
@@ -46,17 +56,17 @@ export const BOOST_FRACTION = 0.4;
 const RAW_BOOSTS: Record<string, BoostDef> = {
   IRRIGATION: { desc: 'Farm a resource.', check: { kind: 'improvement', id: 'FARM', count: 1, onResource: true } },
   WRITING: { desc: 'Meet another civilization. (manual)' },
-  ASTROLOGY: { desc: 'Own a tile adjacent to a natural wonder.', check: { kind: 'nearNaturalWonder' } },
+  ASTROLOGY: { desc: 'Find a natural wonder.', check: { kind: 'naturalWonderFound' } },
   SAILING: { desc: 'Found a city on the coast.', check: { kind: 'coastalCity' } },
   MASONRY: { desc: 'Build a quarry.', check: { kind: 'improvement', id: 'QUARRY', count: 1 } },
   BRONZE_WORKING: { desc: 'Kill 3 barbarians. (manual)' },
   WHEEL: { desc: 'Mine a resource.', check: { kind: 'improvement', id: 'MINE', count: 1, onResource: true } },
   CELESTIAL_NAVIGATION: { desc: 'Improve 2 sea resources.', check: { kind: 'improvement', id: 'FISHING_BOATS', count: 2 } },
-  CURRENCY: { desc: 'Make a trade route. (manual)' },
+  CURRENCY: { desc: 'Make a trade route.', check: { kind: 'tradeRoutes', count: 1 } },
   HORSEBACK_RIDING: { desc: 'Build a pasture.', check: { kind: 'improvement', id: 'PASTURE', count: 1 } },
   MATHEMATICS: { desc: 'Build 3 specialty districts.', check: { kind: 'district', count: 3 } },
   CONSTRUCTION: { desc: 'Build a Water Mill.', check: { kind: 'building', id: 'WATER_MILL', count: 1 } },
-  ENGINEERING: { desc: 'Build ancient walls. (manual)' },
+  ENGINEERING: { desc: 'Build ancient walls.', check: { kind: 'building', id: 'ANCIENT_WALLS', count: 1 } },
   APPRENTICESHIP: { desc: 'Build 3 mines.', check: { kind: 'improvement', id: 'MINE', count: 3 } },
   MILITARY_ENGINEERING: { desc: 'Build an Aqueduct.', check: { kind: 'district', type: 'AQUEDUCT', count: 1 } },
   EDUCATION: { desc: 'Earn a Great Scientist.', check: { kind: 'greatPeople', count: 1, class: 'SCIENTIST' } },
@@ -84,16 +94,17 @@ const RAW_BOOSTS: Record<string, BoostDef> = {
   STEAM_POWER: { desc: 'Build 2 Shipyards.', check: { kind: 'building', id: 'SHIPYARD', count: 2 } },
   REFINING: { desc: 'Build 2 Oil Wells.', check: { kind: 'improvement', id: 'OIL_WELL', count: 2 } },
 
-  CRAFTSMANSHIP: { desc: 'Improve 3 tiles.', check: { kind: 'improvement', id: 'FARM', count: 3 } },
+  CRAFTSMANSHIP: { desc: 'Improve 3 tiles.', check: { kind: 'improvement', count: 3 } },
   FOREIGN_TRADE: { desc: 'Discover a second continent. (manual)' },
-  MILITARY_TRADITION: { desc: 'Clear a barbarian outpost. (manual)' },
+  // the camp's clear lands it (`clearCampFor`, BOOST_TRIGGER_CLEAR_CAMP)
+  MILITARY_TRADITION: { desc: 'Clear a barbarian outpost.' },
   STATE_WORKFORCE: { desc: 'Build any specialty district.', check: { kind: 'district', count: 1 } },
   EARLY_EMPIRE: { desc: 'Grow your civilization to 6 population.', check: { kind: 'totalPop', pop: 6 } },
-  MYSTICISM: { desc: 'Found a pantheon. (manual)' },
+  MYSTICISM: { desc: 'Found a pantheon.', check: { kind: 'pantheon' } },
   GAMES_AND_RECREATION: { desc: 'Research Construction.', check: { kind: 'tech', id: 'CONSTRUCTION' } },
-  POLITICAL_PHILOSOPHY: { desc: 'Meet 3 city-states. (manual)' },
+  POLITICAL_PHILOSOPHY: { desc: 'Meet 3 city-states.', check: { kind: 'metCityStates', count: 3 } },
   DRAMA_AND_POETRY: { desc: 'Build a world wonder.', check: { kind: 'anyWonderBuilt' } },
-  THEOLOGY: { desc: 'Found a religion. (manual)' },
+  THEOLOGY: { desc: 'Found a religion.', check: { kind: 'religion' } },
   RECORDED_HISTORY: { desc: 'Build 2 Campuses.', check: { kind: 'district', type: 'CAMPUS', count: 2 } },
   NAVAL_TRADITION: { desc: 'Build a Harbor.', check: { kind: 'district', type: 'HARBOR', count: 1 } },
   FEUDALISM: { desc: 'Build 6 farms.', check: { kind: 'improvement', id: 'FARM', count: 6 } },

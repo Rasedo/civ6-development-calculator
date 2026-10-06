@@ -72,9 +72,10 @@ def every(sim) -> torch.Tensor:
 
 
 def set_envoys(sim, s: int, n: int) -> None:
-    """The RAW store, all of it on one seat — the count the rule reads."""
+    """n envoys past the first, all on one seat: the first one's plot is the
+    founding ring's, so the RAW store the rule reads holds n + 1."""
     sim.seat_citystate_envoys[B0, :, s] = 0
-    sim.seat_citystate_envoys[B0, 0, s] = n
+    sim.seat_citystate_envoys[B0, 0, s] = n + 1
 
 
 def candidates(sim, s: int):
@@ -137,19 +138,20 @@ def test_slope(rules) -> None:
     assert plots(sim, s) == base_p + 16, f"sixteen envoys took {plots(sim, s) - base_p} plots"
     assert int(sim.citystate_suzerain[B0, s]) == 0, "sixteen envoys from one seat hold no suzerainty"
 
-    # ...and a TIE, which leaves nobody suzerain, pays exactly the same four
+    # ...and a TIE, which leaves nobody suzerain, pays the same one plot per
+    # envoy past the first
     sim2 = build(rules)
     s2 = a_minor(sim2)
     row2 = sim2._CITY_MINOR0 + s2
     b_p, b_a = plots(sim2, s2), int(sim2.city_acquired[B0, row2, 0])
     sim2.seat_citystate_envoys[B0, :, s2] = 0
-    half = (b_a + 4) // 2
+    half = (b_a + 6) // 2
     sim2.seat_citystate_envoys[B0, 0, s2] = half
-    sim2.seat_citystate_envoys[B0, min(1, sim2.n_majors - 1), s2] = (b_a + 4) - half
+    sim2.seat_citystate_envoys[B0, min(1, sim2.n_majors - 1), s2] = (b_a + 6) - half
     sim2._cs_resolve_suzerain()
     sim2._minor_envoy_tiles(every(sim2))
-    assert plots(sim2, s2) == b_p + 4, "a split record pays a different slope"
-    if sim2.n_majors > 1 and half * 2 == b_a + 4 and half >= suz_min:
+    assert plots(sim2, s2) == b_p + 5, "a split record pays a different slope"
+    if sim2.n_majors > 1 and half * 2 == b_a + 6 and half >= suz_min:
         assert int(sim2.citystate_suzerain[B0, s2]) == -1, "a tie left a suzerain"
     print(f"  2 slope OK — +1 plot per envoy to sixteen (base {base_p} plots)")
 
@@ -284,7 +286,7 @@ def test_games(rules) -> None:
     a0 = [int(sim.city_acquired[b, row, 0]) for b in range(2)]
     for b in range(2):
         sim.seat_citystate_envoys[b, :, s] = 0
-        sim.seat_citystate_envoys[b, 0, s] = a0[b] + 2
+        sim.seat_citystate_envoys[b, 0, s] = a0[b] + 3  # two past the first
     sim._minor_envoy_tiles(torch.tensor([True, False]))
     assert plots(sim, s, 0) == p0[0] + 2, "the landed game claimed nothing"
     assert plots(sim, s, 1) == p0[1], "a game with no envoy write claimed ground"

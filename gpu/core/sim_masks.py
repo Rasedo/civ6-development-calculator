@@ -124,11 +124,13 @@ class SimMasks:
             pos, bi, cnt = tab["building"]
             pred[:, pos] = (self.city_bldg[:, row][:, :, bi] & alive.unsqueeze(2)).sum(dim=1) >= cnt
         if tab["improvement"] is not None:
-            # a GLOBAL tile scan — TS walks state.map.tiles with no owner
-            # filter (pillaged still counts), so one formula serves every
-            # seat.
+            # the improvements on the row's OWN plots (pillaged still counts):
+            # of the row's kind, or of any kind where it names none (-1)
             pos, ii, cnt = tab["improvement"]
-            on = (self.improvement.unsqueeze(2) == ii) & (~tab["imp_res"] | (self.res_priority > 0).unsqueeze(2))
+            imp = self.improvement.unsqueeze(2)
+            mine = (self.tile_seat == int(self._ROW_SEAT[row])).unsqueeze(2)
+            on = mine & (imp >= 0) & ((ii < 0) | (imp == ii)) \
+                & (~tab["imp_res"] | (self.res_priority > 0).unsqueeze(2))
             pred[:, pos] = on.sum(dim=1) >= cnt
         if tab["cityPop"] is not None:
             pos, need, _ = tab["cityPop"]
@@ -155,8 +157,10 @@ class SimMasks:
                 p = (self.gp_earned.sum(dim=1) if brow["cls"] < 0 else self.gp_earned[:, brow["cls"]]) >= brow["count"]
             elif kind == "anyWonderBuilt":
                 p = self.built_wonder_complete.any(dim=1)
-            elif kind == "nearNaturalWonder":
-                p = ((self.tile_seat == row) & self.wonder_near).any(dim=1)
+            elif kind == "naturalWonderFound":
+                # BOOST_TRIGGER_FIND_NATURAL_WONDER: a natural wonder plot revealed
+                seen = self.seat_explored[:, row] if self.fog_of_war else torch.ones_like(self.nwonder)
+                p = (self.nwonder & seen).any(dim=1)
             elif kind == "district":
                 # The CITY REGISTRY is the list TS walks (`c.districts` of
                 # citiesOf(seat)), gated on the TILE's districtComplete. A
@@ -196,6 +200,19 @@ class SimMasks:
                 if not self._npol:
                     continue
                 p = self._gov_mods(row)[4].sum(dim=1) >= brow["count"]
+            elif kind == "pantheon":
+                # BOOST_TRIGGER_CREATE_PANTHEON / _FOUND_RELIGION
+                p = self.civ_pantheon_done[:, row].clone()
+            elif kind == "religion":
+                p = self.civ_religion_done[:, row].clone()
+            elif kind == "metCityStates":
+                # BOOST_TRIGGER_MEET_X_CITY_STATES: the living minors met
+                if not self.S:
+                    continue
+                p = (self.seat_citystate_met[:, row, :self.S] & self.citystate_alive[:, :self.S]).sum(dim=1) >= brow["count"]
+            elif kind == "tradeRoutes":
+                # BOOST_TRIGGER_MAINTAIN_X_TRADE_ROUTES
+                p = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1) >= brow["count"]
             else:
                 continue
             pred[:, i] = p
@@ -3458,7 +3475,7 @@ class SimMasks:
                               ranged=t if ranged else ~t)
 
     def _clear_camp_at(self, mask: torch.Tensor, tile: torch.Tensor, seat: torch.Tensor, row) -> None:
-        """A non-barbarian unit entering a camp tile clears it: +50 gold to
+        """A non-barbarian unit entering a camp tile clears it: its dispersal Gold to
         ITS seat (`seat` is a [B] ABSOLUTE seat — `clearCampFor` banks to
         `seatOf(unit.seat)`) and the camp list splices left (order matters for
         later garrison loops).
@@ -3495,6 +3512,14 @@ class SimMasks:
                     _one[b] = 1
                     self._add_era_score(_s, int(self._mom["campNear" if _near else "camp"]), _one)
                 self.civ_treasury[b, _s] += float(reward)
+                # CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's
+                # inspiration at the clear (`grantBoost`)
+                _mt = int(self.rules.combat["campBoostCivic"])
+                if _mt >= 0 and not bool(self.civ_civics[b, _s, _mt]) and not bool(self.civ_civic_boosted[b, _s, _mt]):
+                    self.civ_civic_boosted[b, _s, _mt] = True
+                    _one = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _one[b] = 1
+                    self._dedication_event(_s, 2, _one)
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
                 # you capture a barbarian outpost" — a civilization's trait,
                 # so a major's clear alone; the install maps the camp to a

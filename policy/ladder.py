@@ -232,7 +232,7 @@ STYLE_KNOBS = {
     "peace_appetite": 1.0,  # multiplies the sue rate in pick_war
     "war_ratio": 1.3,       # the strength edge a declaration wants
     "war_kind": None,       # None = the cheapest casus belli held; "own" = the leader's buffed kind when allowed
-    "city_cap": None,       # None = the rules' maxCities
+    "city_cap": 6,          # the cities the driver settles toward (the engine caps founding at maxCities)
     "dist_pref": None,      # a district id the scaffold rotation starts from
     "tier_order": None,     # None = PROD_PRIORITY
     "cards": None,          # None = draw at the CARD_*_SHAREs; "greedy" / "legacy" / "military" pins it

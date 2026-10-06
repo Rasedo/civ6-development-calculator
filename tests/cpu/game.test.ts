@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { seatOf, tileCity, tileSeat } from '../../cpu/core/seats';
-import { CIV_LEVELS } from '../../cpu/data/civLevels';
 import { tilesWithin } from '../../world/hex';
 import { canPlaceDistrict, makeMap, makeState, seededGame, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from './helpers';
 import { growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, maxSpecialtyDistricts } from '../../cpu/data/constants';
@@ -73,18 +72,15 @@ describe('founding cities', () => {
   });
 
   // CIV6 (CivilizationLevels.StartingTilesForCity): FULL_CIV 6, CITY_STATE 5
-  it('a city-state starts with its centre and five of the ring, a civ with all six', () => {
+  it('a city-state starts as a civ does: size 1 on its centre and the whole ring', () => {
     const state = seededGame(4242, 1, 1);
     const cs = state.cityStates[0];
     expect(cs).toBeDefined();
     const mine = state.map.tiles.filter((t) => tileSeat(t) === cs.seat);
     const centre = state.map.tiles[cs.centerIndex];
-    const ring = tilesWithin(state.map, centre.col, centre.row, 1).filter((t) => t.index !== cs.centerIndex).sort((a, b) => a.index - b.index);
-    expect(CIV_LEVELS.CITY_STATE.startingTilesForCity).toBe(5);
-    expect(CIV_LEVELS.FULL_CIV.startingTilesForCity).toBe(6);
-    expect(mine.length).toBe(1 + Math.min(ring.length, CIV_LEVELS.CITY_STATE.startingTilesForCity));
-    // the unclaimed one is the ring's HIGHEST tile index, the order both engines share
-    if (ring.length === 6) expect(tileSeat(ring[ring.length - 1])).not.toBe(cs.seat);
+    const ring = tilesWithin(state.map, centre.col, centre.row, 1).filter((t) => t.index !== cs.centerIndex);
+    expect(cs.population).toBe(1);
+    expect(mine.length).toBe(1 + ring.length);
   });
 
   it('enforces minimum city distance but not own-territory', () => {

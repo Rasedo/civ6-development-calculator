@@ -1,9 +1,9 @@
 
 import { dedicationEvent } from './eras';
-import { seatOf, citiesOf, tileOwnedByCiv, allianceLevelWith } from './seats';
+import { seatOf, citiesOf, tileSeat, allianceLevelWith } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
-import type { GameState, ResearchState } from './types';
-import { neighbors } from '../../world/hex';
+import type { GameState, ResearchState, Seat } from './types';
+import { isExplored } from './fog';
 import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
 import { getModifiers, slottedPolicyIndices } from './effects';
 import { DISTRICTS } from '../data/districts';
@@ -43,9 +43,13 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       return n >= check.count;
     }
     case 'improvement': {
+      // the seat's OWN plots (runs/h1_duelw1115: China holds one improvement
+      // through t17 and reads no Craftsmanship inspiration while the map
+      // holds three Farms by t7)
       let n = 0;
       for (const t of state.map.tiles) {
-        if (t.improvement !== check.id) continue;
+        if (tileSeat(t) !== seat || !t.improvement) continue;
+        if (check.id && t.improvement !== check.id) continue;
         if (check.onResource && !t.resource) continue;
         n++;
       }
@@ -81,12 +85,10 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
     }
     case 'anyWonderBuilt':
       return state.map.tiles.some((t) => t.builtWonderComplete);
-    case 'nearNaturalWonder':
-      return state.map.tiles.some(
-        (t) =>
-          tileOwnedByCiv(t, seat) &&
-          (naturalWonderAt(t) !== null || neighbors(state.map, t).some((n) => naturalWonderAt(n) !== null)),
-      );
+    case 'naturalWonderFound':
+      // a natural wonder plot the seat has revealed (runs/h1_duelw1115 Rome's
+      // inspiration at t4, owning no plot beside one)
+      return state.map.tiles.some((t) => naturalWonderAt(t) !== null && isExplored(state, seat, t.index));
     case 'policies': {
       // the cards the seat CHOSE (a driver decision, the stored set) — the
       // GPU's `_seat_slotted` count
@@ -97,7 +99,25 @@ function checkSatisfied(state: GameState, seat: number, check: BoostCheck): bool
       return citiesOf(state, seat).length >= check.count;
     case 'alliance':
       return state.seats.some((o) => o.seat !== seat && allianceLevelWith(state, seat, o.seat) >= check.level);
+    case 'pantheon':
+      return !!seatOf(state, seat)?.religion.pantheon;
+    case 'religion':
+      return !!seatOf(state, seat)?.religion.founded;
+    case 'metCityStates':
+      return (state.cityStates ?? []).filter((cs) => cs.met.includes(seat)).length >= check.count;
+    case 'tradeRoutes':
+      return ((seatOf(state, seat) as Seat | undefined)?.tradeRoutes?.length ?? 0) >= check.count;
   }
+}
+
+/** A boost an EVENT lands at once (Military Tradition's camp clear,
+ *  BOOST_TRIGGER_CLEAR_CAMP): marked unless researched or marked already,
+ *  the dedication's era score with it, as `detectBoosts` lands one. */
+export function grantBoost(state: GameState, seat: number, id: string): void {
+  const research = seatOf(state, seat)?.research;
+  if (!research || research.boosted.includes(id) || research.techs.includes(id) || research.civics.includes(id)) return;
+  research.boosted.push(id);
+  dedicationEvent(state, seat, TECHS[id] ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE);
 }
 
 export function isBoosted(state: GameState, id: string, seat: number): boolean {

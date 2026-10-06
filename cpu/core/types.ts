@@ -192,6 +192,12 @@ export interface ResearchState {
    *  `techProgress` — so the two are a partition, never a sum. */
   techRetained: Record<string, number>;
   civicRetained: Record<string, number>;
+  /** CIV6 (m_xResearchOverflow / m_xCulturalOverflow): the pool a completion
+   *  left with nothing current, set aside when the next item is picked and
+   *  paid in with the next turn's Science / Culture (runs/h1_duelw1116 China
+   *  t6→t8: Pottery done at 13 of 12, Mining reads 0 then 4 at +3) */
+  techOverflow?: number;
+  civicOverflow?: number;
 }
 
 export interface GovernmentState {

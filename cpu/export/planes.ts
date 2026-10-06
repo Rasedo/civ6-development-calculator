@@ -50,7 +50,7 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     id: cityState.id,
     type: CITY_STATE_TYPES.indexOf(cityState.type),
     center: cityState.centerIndex,
-    pop: 3,
+    pop: cityState.population,
     suzCode: suzCodeOf(cityState.name),
     // the IMPROVEMENT this minor's suzerain may build, by roster index. The
     // catalog names the minor and the seeder draws which minors a map holds,

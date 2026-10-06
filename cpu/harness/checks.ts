@@ -116,7 +116,8 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
 
 /** the checks a worked plot's yields feed — its Food the loyalty a starving
  *  city loses too: an unseen event draw on it is their gap alone */
-const EVENT_DRAW_READERS = new Set(['city.yields', 'city.centreYields', 'city.foodSurplus', 'step.growth', 'city.loyaltyPerTurn', 'step.loyalty']);
+const EVENT_DRAW_READERS = new Set(['city.yields', 'city.centreYields', 'city.foodSurplus', 'step.growth', 'city.loyaltyPerTurn', 'step.loyalty',
+  'step.minorGrowth']);
 
 /** the checks no plot of the city's feeds: a dropped row on one of its plots,
  *  or a dropped resource of its seat's, is no gap of theirs */
@@ -1063,6 +1064,32 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
           { followersBefore: c.religions, majority: num(c.majorityReligion) });
       }
     }
+  }
+
+  // A CITY-STATE'S GROWTH on its own turn (`minorGrowth`): its city as
+  // record t holds it, the buildings and districts record t+1 shows landed
+  // first, as a major's production lands before its growth
+  for (const [cs, c] of imp.dumpOfMinor) {
+    const k = `${c.owner}:${c.id}`;
+    const next = after.get(k);
+    const subject = subjectOf(c);
+    const skip = !next || acts.cityChanged.has(k) ? 'city changed hands or vanished'
+      : late.has(c.owner) || lateCities.has(k) ? 'a turn start missing from a record' : null;
+    if (skip || !next) {
+      out.push({ turn, check: 'step.minorGrowth', subject, ok: true, skip: skip ?? 'no t+1' });
+      continue;
+    }
+    const city = minorCity(cs);
+    const undo = landProduction(state, cat, city, next, a.head.W, false);
+    const st = computeCityStats(state, city);
+    const before = { pop: city.population, food: city.foodBox };
+    seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
+    undo(false);
+    const ok = city.population === next.pop && near(city.foodBox, num(next.food), 0.05);
+    out.push({ turn, check: 'step.minorGrowth', subject, ok, game: [next.pop, num(next.food)], ours: [city.population, round3(city.foodBox)],
+      ...gapsFor(cityGaps(imp, c), 'step.minorGrowth'),
+      ...(ok ? {} : { state: { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus), needed: st.growthNeeded,
+        housing: st.housing, tier: st.amenities.tier.name } }) });
   }
 
   out.push(...eraChecks(a, b, cat, late, history, prev));

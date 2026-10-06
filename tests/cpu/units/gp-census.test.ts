@@ -385,13 +385,13 @@ describe('the standing channels', () => {
     addSeatPerm(seat, GP_ABILITY.GP_IBN_KHALDUN.perm!);
     const happy = computeCityStats(state, city).total;
     // summed with the Happy tier's own +10%
-    expect(happy.science).toBeCloseTo(base.science * 1.12 / 1.1, 9);
+    expect(happy.science).toBeCloseTo(base.science * 1.12 / 1.1, 2); // to 1/256: the percent in 24.8 fixed point
     expect(happy.food).toBe(base.food);
     while (computeCityStats(state, city).amenities.tier.name !== 'Ecstatic' && n < 20) raise(++n);
     addSeatPerm(seat, { happyYieldPct: -2, ecstaticYieldPct: -4 });
     const e0 = computeCityStats(state, city).total;
     addSeatPerm(seat, { happyYieldPct: 2, ecstaticYieldPct: 4 });
-    expect(computeCityStats(state, city).total.culture).toBeCloseTo(e0.culture * 1.24 / 1.2, 9);
+    expect(computeCityStats(state, city).total.culture).toBeCloseTo(e0.culture * 1.24 / 1.2, 2);
   });
 
   it('Irene and Adam Smith: a Governor Title each, Smith\'s 500 Gold (ScaleByGameSpeed); Piero de\' Bardi\'s Gold and Envoy', () => {

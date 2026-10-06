@@ -67,7 +67,7 @@ import { promiseIncursion } from './grievance';
 import { PROMISE_DIG } from '../data/promises';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -1846,8 +1846,10 @@ export function refreshUnits(state: GameState): void {
     // Real Civ 6: a unit heals only if it
     // spent NO movement since its last refresh (the heal runs before the
     // reset below, so any move/attack/build blocks it) — +20 in a friendly
-    // city (barbs: on their camp), +15 in own territory, +10 on neutral
-    // ground, +5 on foreign-owned land.
+    // city, +15 in own territory, +10 on neutral ground, +5 on foreign-owned
+    // land. A barbarian never heals by resting (runs/h1_duelw1103–1118: 5,099
+    // turns a damaged barbarian stood still unhealed, 1,544 of them on its
+    // camp; its every gain a pillage's).
     // "spent no MP" is measured against what this unit was GRANTED
     // last refresh, not against its type's base moves — the aura's +1 MP makes
     // the granted pool vary per turn. A unit that has never been refreshed
@@ -1855,7 +1857,7 @@ export function refreshUnits(state: GameState): void {
     const grantedLast = grantedMoves(state, unit);
     // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
     // have no continuous access to Iron Mines, those Swordsmen won't be able to
-    // Heal." A minor or the barbarians keep no bank and are not held to it.
+    // Heal." A minor keeps no bank and is not held to it.
     const need = UNITS[unit.type]?.requiresResource;
     const starved = !!need && isCiv(unit.seat)
       && !civHasStrategic(state, unit.seat, need);
@@ -1890,9 +1892,8 @@ export function refreshUnits(state: GameState): void {
     // stationed on a City Center, Aerodrome, Airstrip, or Aircraft Carrier" —
     // a fighter out on patrol heals only by Ground Crews' clause.
     const patrolBar = unit.patrol !== undefined && !promoFlag(unit, 'HEAL_AFTER_ACTION');
-    if (rested && !starved && !healBlocked && !patrolBar) {
+    if (rested && !starved && !healBlocked && !patrolBar && unit.seat !== BARB_SEAT) {
       const home = ownGround;
-      const onCamp = seatOf(state, unit.seat)?.camps.includes(unit.tileIndex) ?? false;
       const religious = (UNITS[unit.type]?.religiousStrength ?? 0) > 0;
       const naval = !!UNITS[unit.type]?.naval;
       const table = religious ? religiousHeal(state, unit, yctx(unit.seat))
@@ -1901,7 +1902,6 @@ export function refreshUnits(state: GameState): void {
         : home && (tile.district === 'CITY_CENTER'
           || state.cityStates.some((c) => c.centerIndex === tile.index)) ? 20
         : home ? 15
-        : onCamp ? 20
         : tileSeat(tile) === NO_SEAT ? 10
         : 5;
       // CIV6 (MILITARY_EMERGENCY_MEMBER_HEALING_REWARD, MEDIC_INCREASE_HEAL_RATE,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MP_SCALE, damageExponent, damageOf } from '../../../cpu/data/constants';
+import { CAMP_DISPERSAL_GOLD, MP_SCALE, damageExponent, damageOf } from '../../../cpu/data/constants';
 import { BARB_SEAT, emptySeat, isBarbSeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import type { CityState } from '../../../cpu/core/types';
 import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, orderUnit } from '../helpers';
@@ -97,7 +97,8 @@ describe('combat', () => {
     expect(state.units.some((u) => u.id === def.id)).toBe(false);
     expect(atk.tileIndex).toBe(campTile.index);
     expect(state.barbSeat.camps.length).toBe(0);
-    expect(seatOf(state, 0)!.treasury).toBe(gold + 50);
+    expect(seatOf(state, 0)!.treasury).toBe(gold + CAMP_DISPERSAL_GOLD);
+    expect(CAMP_DISPERSAL_GOLD).toBe(25); // DispersalGold 50 at the online speed
   });
 
   // NAVAL barbarians. Two invariants the GPU mirror got

@@ -12,7 +12,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { minorLevyReturn, minorPhase, minorPower } from '../../../cpu/core/minorBuild';
-import { computeCityStats } from '../../../cpu/core/city';
+import { computeCityStats, withPercent256 } from '../../../cpu/core/city';
 import { levyGoldCost, levyUnits } from '../../../cpu/core/phase';
 import { buildingPillaged, pillageBuilding } from '../../../cpu/core/yields';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -59,8 +59,8 @@ describe("the minor's city rides the yield walk", () => {
     const bare = computeCityStats(state, minorCity(cs));
     // nothing but its citizens and its Palace pays Science yet, scaled by the
     // amenity tier exactly as a major's would be
-    expect(bare.total.science).toBeCloseTo(
-      (5 * CITIZEN_SCIENCE + BUILDINGS.PALACE.yields!.science!) * bare.amenities.tier.yieldFactor, 9);
+    expect(bare.total.science).toBe(
+      withPercent256(5 * CITIZEN_SCIENCE + BUILDINGS.PALACE.yields!.science!, bare.amenities.tier.yieldFactor - 1));
     expect(bare.total.food).toBeGreaterThan(0);
     expect(bare.total.production).toBeGreaterThan(0);
     minorDistrict(state, cs, 'CAMPUS', 1);

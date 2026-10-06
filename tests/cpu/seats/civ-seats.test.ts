@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
+import { MAX_CITIES_PER_SEAT } from '../../../cpu/data/seats';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
@@ -353,8 +354,8 @@ describe('conquest keeps infrastructure', () => {
   it('a full empire RAZES instead of keeping infrastructure (scorched earth unchanged)', () => {
     const state = makeState();
     state.unitsMode = true;
-    // Six cities → the capture slot cap razes instead of transferring.
-    for (let i = 0; i < 6; i++) {
+    // A seat at the city cap → a capture razes instead of transferring.
+    for (let i = 0; i < MAX_CITIES_PER_SEAT; i++) {
       seatOf(state, 0)!.cities.push({
         id: seatOf(state, 0)!.nextCityId++,
         seat: 0,

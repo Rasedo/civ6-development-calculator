@@ -28,8 +28,8 @@ function addSeat(state: GameState, seat: number): Seat {
   return s;
 }
 
-/** The minor seated exactly as the game seats one — `placeCityStateAt`, whose
- *  StartingTilesForCity claim is the SIX the measured equation counts. */
+/** The minor seated exactly as the game seats one — `placeCityStateAt`, its
+ *  centre and the whole first ring. */
 function scene(): { state: GameState; cs: CityState } {
   const state = makeState(makeMap(24, 24));
   addSeat(state, 0);
@@ -44,13 +44,13 @@ function plots(state: GameState, cs: CityState): number {
 }
 
 describe('the install says a minor may annex with received influence', () => {
-  it('is the one class of player that can, and the six it starts with', () => {
+  it('is the one class of player that can, and the seven plots it is founded on', () => {
     expect(CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence).toBe(true);
     expect(CIV_LEVELS.FULL_CIV.canAnnexTilesWithReceivedInfluence).toBe(false);
     expect(CIV_LEVELS.FREE_CITIES.canAnnexTilesWithReceivedInfluence).toBe(false);
     expect(CIV_LEVELS.TRIBE.canAnnexTilesWithReceivedInfluence).toBe(false);
     const { state, cs } = scene();
-    expect(plots(state, cs)).toBe(6);
+    expect(plots(state, cs)).toBe(7);
     // ...and the culture box still buys nothing: the two columns are disjoint
     expect(CIV_LEVELS.CITY_STATE.canAnnexTilesWithCulture).toBe(false);
   });
@@ -61,10 +61,10 @@ describe('one plot per envoy RECEIVED', () => {
     const { state, cs } = scene();
     addEnvoys(state, cs, 0, 3);
     expect(plots(state, cs)).toBe(9);
-    expect(cs.tilesAcquired).toBe(3);
+    expect(cs.tilesAcquired).toBe(2);
     addEnvoys(state, cs, 0, 1);
     expect(plots(state, cs)).toBe(10);
-    expect(cs.tilesAcquired).toBe(4);
+    expect(cs.tilesAcquired).toBe(3);
   });
 
   it('holds `plots = envoys + 6` with no cap through sixteen', () => {
@@ -116,13 +116,14 @@ describe('the border rule keeps its own refusals', () => {
     for (const i of taken) {
       expect(tileSeat(state.map.tiles[i])).toBe(0);
     }
-    // still exactly four plots, taken from what was free
-    expect(cs.tilesAcquired).toBe(4);
+    // still exactly three plots past the founding ring, taken from what was free
+    expect(cs.tilesAcquired).toBe(3);
     expect(plots(state, cs)).toBe(10);
   });
 
   it('claims one of the lowest-cost plots of the city rule, plot by plot', () => {
     const { state, cs } = scene();
+    addEnvoys(state, cs, 0, 1); // the first envoy's plot is the founding ring's
     for (let n = 0; n < 5; n += 1) {
       const ties = borderBestPlots(state, minorCity(cs));
       expect(ties.length).toBeGreaterThan(0);
@@ -138,7 +139,7 @@ describe('the border rule keeps its own refusals', () => {
     cs.envoys[0] = 1;                    // a spy's Fabricate Scandal
     addEnvoys(state, cs, 0, 1);          // back to 2, still under the mark
     expect(plots(state, cs)).toBe(10);
-    expect(cs.tilesAcquired).toBe(4);
+    expect(cs.tilesAcquired).toBe(3);
     addEnvoys(state, cs, 0, 3);          // 5 — one past the mark
     expect(plots(state, cs)).toBe(11);
   });

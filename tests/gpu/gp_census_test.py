@@ -341,7 +341,8 @@ def test_channels(rules, path, R) -> None:
     e1 = p.walk()[B0, 0]
     assert float(e1[0]) == float(e0[0]), "Food takes none of it"
     # summed with the Ecstatic tier's own +20%
-    assert abs(float(e1[4]) - float(e0[4]) * 1.24 / 1.2) < 1e-9, "+4% Culture at Ecstatic"
+    # to 1/256: the percent in the game's 24.8 fixed point (`withPercent256`)
+    assert abs(float(e1[4]) - float(e0[4]) * 1.24 / 1.2) < 1 / 256, "+4% Culture at Ecstatic"
     print("  5 Ibn Khaldun OK — +4% on the non-Food yields of an Ecstatic city")
 
     # the Governor Title; Giovanni's Bank

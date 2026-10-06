@@ -117,6 +117,7 @@ describe('the SEAT majority and its four readers', () => {
     expect(majorityReligionOf(state, 0)).toBe(-1);
     expect(majorityReligionOf(state, 1)).toBe(-1);             // no cities at all
     const cs = placeCityStateAt(state, 0, 'CS0', 'religious', tileAtCoords(state.map, 9, 9).index);
+    Object.assign(cs, { population: 3, unconvertedPressure: 150 }); // a minor grown to size 3
     cs.religionPressure = [0, 400];                            // pop 3: 2 followers of 1, 1 unconverted
     expect(majorityReligionOf(state, cs.seat)).toBe(1);
     cs.religionPressure = [0, 100];                            // 100 vs the engine's 150: 1-2, the unconverted

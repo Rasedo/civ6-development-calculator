@@ -394,13 +394,14 @@ class SimMinors:
         tribe — the one column of that table only a minor owns, and the reason
         its culture box banks and claims nothing. Measured on one minor over
         fifteen readings on a SINGLE turn, so nothing but the envoys moved:
-        exactly +1 owned plot per envoy received, `plots = envoys + 6` (the six
-        the minor is seated with), no cap through sixteen, and the suzerain
-        contest does not change the slope.
+        exactly +1 owned plot per envoy received, `plots = envoys + 6`, no cap
+        through sixteen, and the suzerain contest does not change the slope. A
+        minor is founded on seven plots, so its first envoy takes none
+        (`envoyTiles`).
 
         The LEDGER is `city_acquired` itself — the `tilesAcquired` twin — so
         the rule needs no counter of its own: a minor's box buys nothing, so
-        every tile that counter holds was bought by an envoy. The count it
+        every tile that counter holds was bought by an envoy past the first. The count it
         claims up to is the RAW store, `seat_citystate_envoys` and never
         `_envoys_here`, because a governor POSTING is not an envoy RECEIVED.
         Claiming up to the count rather than on each delta is what makes the
@@ -424,7 +425,7 @@ class SimMinors:
                 continue
             # a dead minor receives nothing; a negative difference (a removal)
             # claims nothing and gives nothing back
-            want = (env[:, s] - self.city_acquired[bidx, row, col]) * (self.citystate_alive[:, s] & games).long()
+            want = (env[:, s] - 1 - self.city_acquired[bidx, row, col]) * (self.citystate_alive[:, s] & games).long()
             if not bool((want > 0).count_nonzero()):
                 continue
             center = self.city_center[bidx, row, col]

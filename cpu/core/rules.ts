@@ -15,6 +15,7 @@ import { FEATURES, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { DISTRICTS } from '../data/districts';
 import { GOVERNMENTS } from '../data/policies';
+import { MAX_CITIES_PER_SEAT } from '../data/seats';
 import { seatGovernment } from './effects';
 import { cityLowlands, floodBarrierCost } from './climate';
 import { BUILDINGS, type BuildingDef, buildingVariantFor, buildingsForDistrict, effectiveBuilding } from '../data/buildings';
@@ -47,7 +48,7 @@ function gates(state: GameState, seat: number): Unlocks | null {
 /**
  * May `seat` found a city on this tile? ONE rule, asked per seat.
  *
- * The city cap is SIX for every seat (fixed GPU slots), spacing is a flat
+ * The city cap is MAX_CITIES_PER_SEAT for every seat, spacing is a flat
  * CITY_MIN_DIST from EVERY existing centre — own, foreign or city-state — and
  * foreign territory is closed. A refused planned site drops while the settler
  * stays banked, mirroring the GPU's site consumption.
@@ -56,7 +57,7 @@ export function canFoundCity(state: GameState, tileIndex: number, seat: number):
   const tile = state.map.tiles[tileIndex];
   // CIV6 (Isolationism): "Can't train or buy Settlers nor settle new cities."
   if (getModifiers(state, seat).noSettlers) return no('Isolationism forbids new cities.');
-  if (citiesOf(state, seat).length >= 6) return no('Cannot govern more cities (6 max).');
+  if (citiesOf(state, seat).length >= MAX_CITIES_PER_SEAT) return no(`Cannot govern more cities (${MAX_CITIES_PER_SEAT} max).`);
   if (!isExplored(state, seat, tileIndex)) return no('Unexplored — send a unit to scout it first.');
   if (isWater(tile)) return no('Cities must be founded on land.');
   if (isImpassable(tile)) return no('Impassable terrain.');

@@ -136,7 +136,8 @@ describe('world wonders', () => {
     const base = computeCityStats(state, city);
     standWonder(state, city, 'RUHR_VALLEY', river.index);
     const boosted = computeCityStats(state, city);
-    expect(boosted.total.production).toBeCloseTo(base.total.production * 1.2, 5);
+    // the percent in the game's 24.8 fixed point (`withPercent256`): to 1/256
+    expect(boosted.total.production).toBeCloseTo(base.total.production * 1.2, 2);
 
     const growthBefore = boosted.effectiveFoodSurplus;
     const hg = tileAtCoords(state.map, 8, 9);

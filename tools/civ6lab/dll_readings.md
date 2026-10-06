@@ -1313,6 +1313,50 @@ and a National Park's Tourism (1109 Handan t225-241) read the park's
 appeal before the Conservation term until t242 — the same cache. LAB lines.
 `tileAppeal` / `_tile_appeal`.
 
+## H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ
+
+- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's
+  Production twice through 0x1c5350: A with the head's id (the Production
+  toward the item), B with none (the city's plain Production). With an item
+  at the head it adds A plus the stored overflow (`m_xProductionOverflow`,
+  +0x1f4, 0x16f1db) and clears the overflow (0x16f31b); on a completion the
+  overflow becomes min(A, B) − (cost − progress before the step) (0x16f3bf:
+  B under the remainder → 0, else the smaller less the remainder), the
+  carried overflow not counted, and waits for the next step. With nothing
+  queued the step adds B to the overflow (0x16f62d → 0x0ac650). Records:
+  1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on
+  5 a turn; 1117 Xi'an's Scout done at 16 of 15, the Builder 0 at t7 and 6 at
+  t8. Engines: `City.productionBank` / `city_prod_bank`.
+- The research and civic overflows (`m_xResearchOverflow`, serializer
+  0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the
+  records fit the production rule's shape — a completion's remainder is held
+  apart and paid in with the next turn's yield (1116 China: Pottery done at 13
+  of 12, Mining 0 at t7 and 4 at t8 on 3; Code of Laws done at 11.58 of 10,
+  Craftsmanship 0 at t10, 3.18 at t11). Engines: `techOverflow` /
+  `civicOverflow`, `civ_tech_ovf` / `civ_civic_ovf`.
+- A citizen's yield share (0x1cbd10): population << 8 times
+  SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide
+  by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 — Culture 0.3 a
+  citizen reads 76/256 at size 1, 153/256 at 2, 230/256 at 3, 307/256 at 4
+  (1115 / 1116 Xi'an 1.296875, 1.59765625, 1.8984375, 4.19921875). A city
+  yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16
+  Production at −10% reads 14.40234375 (floor would read 14.3984375).
+  Engines: `citizenYield256`, `withPercent256` and their GPU spellings.
+- A barbarian outpost's dispersal (0x52e970): the improvement's DispersalGold
+  (row +0x38) plus the clearer's `m_axGoldDispersalChange` >> 8, through the
+  game speed (0x5254d0, CostMultiplier / 100 truncated), to the unit's owner:
+  25 online (1116 China t6 +25). Engines: `CAMP_DISPERSAL_GOLD`.
+- The pantheon's price (0x340c90, at the game's setup): 0x5254d0 of
+  RELIGION_PANTHEON_MIN_FAITH (gp +0x5cc), stored at +0x128: 12 online (1116
+  China 15 → 3 at t15). Engines: `PANTHEON_FAITH_COST`.
+- A unit's heal (0x538040, a vtable slot of the turn's unit manager): gated on
+  the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the
+  owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's
+  no-neutral / no-foreign flags +0x2f0 / +0x290 of +0x12e8). The barbarians'
+  gate is not found: that a barbarian never heals by resting is a record fit
+  (5,099 unhealed still turns over the sixteen duels, its gains all pillage
+  heals; AUDIT C-94 LAB).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

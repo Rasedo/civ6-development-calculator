@@ -32,18 +32,20 @@ import { NO_SEAT } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice } from '../core/game';
-import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, paveGround,
+import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, paveGround,
   placeSeatDistrict, sueForPeace, transferCity } from '../core/phase';
-import { declareWarOnCityState, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
+import { declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements } from '../core/rules';
-import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit } from '../core/units';
-import { availableCivicsIn, availableTechsIn, computeUnlocks, goldPrice } from '../core/effects';
+import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, grantedMoves } from '../core/units';
+import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
+  unlockedPolicyIds } from '../core/effects';
+import { congressPolicyBlocked } from '../core/congress';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield } from '../core/economy';
 import { chargeUnitResource } from '../core/stockpile';
 import { applyTrainingGrants, clearCampFor } from '../core/combat';
 import { goodyMoment, pantheonMoment } from '../core/eras';
 import { revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { civsAtWar, cityStateOfSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, setWar, BARB_SEAT } from '../core/seats';
+import { civsAtWar, cityStateOfSeat, isCityStateSeat, seatOf, setTileOwner, setWar, BARB_SEAT } from '../core/seats';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
@@ -52,6 +54,7 @@ import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
 import { PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
 import { UNITS, UNIT_HP } from '../data/units';
+import { MP_SCALE } from '../data/constants';
 import { fireFeature } from '../data/disasters';
 import type { Catalog, DumpCity, TurnRecord } from './record';
 import { num, bool } from './record';
@@ -132,7 +135,7 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   const def = UNITS[type];
   const unit: Unit = {
     id: ctx.state.nextUnitId++, type, seat, tileIndex: u.y * ctx.W + u.x,
-    movesLeft: num(u.moves), movesFull: num(u.maxMoves), hp: UNIT_HP - num(u.damage),
+    movesLeft: num(u.moves) * MP_SCALE, movesFull: num(u.maxMoves) * MP_SCALE, hp: UNIT_HP - num(u.damage),
     charges: def.charges !== undefined ? num(u.buildCharges) || num(u.spreadCharges) || def.charges : null,
     xp: num(u.xp), level: num(u.level),
     ...(num(u.formation) > 0 ? { formation: num(u.formation) } : {}),
@@ -280,10 +283,10 @@ function policyIds(ctx: Ctx, d: PolicyDecision): { gid: string | null; ids: stri
 }
 
 /** THE PENDING POLICIES. A government or card set the next record shows was
- *  slotted at the start of turn between the two records, after the purse and
- *  before the culture (runs/h1_duelw1116 China t9: God King's Faith banked,
- *  its Gold not), whichever player's: each goes on the wire, which the
- *  engine's turn lands at that point (`applySeatPolicies`). */
+ *  slotted at the start of turn between the two records, after the civics
+ *  and before the faith (runs/h1_duelw1116 China t9: God King's Faith
+ *  banked, its Gold not), whichever player's: each goes on the wire, which
+ *  the engine's turn lands at that point (`applySeatPolicies`). */
 function stagePolicies(ctx: Ctx, ds: Decision[]): PolicyDecision[] {
   const staged = ds.filter((d): d is PolicyDecision => d.kind === 'policies');
   const turn: Record<number, SeatActionRecord> = {};
@@ -305,12 +308,23 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
     const s = seatOf(ctx.state, seatOfP(ctx, d.player));
     if (!s) continue;
     const { gid, ids } = policyIds(ctx, d);
-    const same = (!gid || s.government.chosen === gid) && [...s.government.policies].sort().join() === [...ids].sort().join();
+    // the cards as a set: the stored layout holds its empty slots as null
+    const cards = (xs: readonly (string | null)[]) => xs.filter((x): x is string => !!x).sort().join();
+    const govOk = !gid || s.government.chosen === gid;
+    const same = govOk && cards(s.government.policies) === cards(ids);
+    let why: string | undefined;
     if (!same) {
+      const gov = seatGovernment(ctx.state, s.seat);
+      const open = gov ? unlockedPolicyIds(s.research, congressPolicyBlocked(ctx.state), inDarkAge(ctx.state, s.seat), s.government.held, gov)
+        : new Set<string>();
+      why = !govOk ? `government ${gid} not adopted (in ${s.government.chosen})`
+        : ids.some((id) => !open.has(id)) ? `a card not unlocked: ${ids.filter((id) => !open.has(id)).join(',')}`
+          : !fitPolicies(governmentSlots(ctx.state, s.seat), ids) ? 'the set does not fit the slots'
+            : 'the unlock unaffordable';
       if (gid) s.government.chosen = gid as typeof s.government.chosen;
-      s.government.policies = ids as typeof s.government.policies;
+      s.government.policies = fitPolicies(governmentSlots(ctx.state, s.seat), ids) ?? ids;
     }
-    count(ctx, 'policies', same ? 'applied' : 'fallback', d.player);
+    count(ctx, 'policies', same ? 'applied' : 'fallback', d.player, why);
   }
   ctx.state.seatActions = {};
 }
@@ -321,28 +335,12 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
   const settler = d.unit ? unitOf(ctx, d.unit) : undefined;
   if (minor) {
     ctx.pendingMinors.delete(d.player);
-    // the engine seats its city-states at setup (`placeCityStateAt`) and has
-    // no founding step for one: the founding's outcome is the record's — its
-    // size, boxes, plots and the centre's ground
+    // a city-state's founding (`placeCityStateAt`, the engine's setup step)
     const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot);
     Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research });
     state.cityStates.sort((a, b) => a.id - b.id);
-    const read = ctx.next.minorOfPlayer.get(d.player);
-    if (read) {
-      Object.assign(placed, { population: read.population, foodBox: read.foodBox, cultureBox: read.cultureBox, nextPlot: read.nextPlot,
-        unconvertedPressure: read.unconvertedPressure });
-      for (const t of state.map.tiles) {
-        const r = ctx.next.state.map.tiles[t.index];
-        if (t.ownerSeat === placed.seat && r.ownerSeat !== placed.seat) setTileOwner(t, NO_SEAT);
-        if (r.ownerSeat === placed.seat) setTileOwner(t, placed.seat);
-      }
-      const centre = state.map.tiles[d.plot];
-      centre.feature = ctx.next.state.map.tiles[d.plot].feature;
-      centre.improvement = null;
-    }
-    markCityCentre(state.map.tiles[d.plot]);
     if (settler) disbandUnit(state, settler.id);
-    count(ctx, 'found:minor', 'fallback', d.player);
+    count(ctx, 'found:minor', 'applied');
     return;
   }
   const seat = seatOfP(ctx, d.player);
@@ -441,7 +439,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'worked': {
-        const city = cityAt(state, d.city);
+        // a city-state's citizens are its script's decision as a major's
+        // are its player's
+        const minor = state.cityStates.find((x) => x.centerIndex === d.city);
+        const city = cityAt(state, d.city) ?? (minor ? minorCity(minor) : undefined);
         if (!city) break;
         for (const t of state.map.tiles) if (t.ownerSeat === city.seat && t.ownerCity === city.id) t.locked = false;
         for (const q of d.plots) {
@@ -502,6 +503,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         }
         s.religion.pantheon = id;
         if (!state.claimedPantheons.includes(id)) state.claimedPantheons.push(id);
+        if (!had) {
+          grantPantheonUnit(state, s.seat, id);
+          matchNewUnits(ctx, b);
+        }
         count(ctx, 'pantheon', paid ? 'applied' : 'fallback', d.player);
         break;
       }
@@ -684,7 +689,7 @@ function syncUnits(ctx: Ctx, b: TurnRecord): void {
       revealAround(ctx.state, u.seat, at, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
     }
     u.tileIndex = at;
-    u.movesLeft = num(r.moves);
+    u.movesLeft = num(r.moves) * MP_SCALE;
     u.embarked = bool(r.embarked) || undefined;
     if (UNITS[u.type]?.charges !== undefined) u.charges = num(r.buildCharges) || num(r.spreadCharges) || u.charges;
   }
@@ -1021,7 +1026,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   for (const [pid, cs] of first.minorOfPlayer) {
     if (cs.centerIndex >= 0) continue;
     ctx.pendingMinors.set(pid, cs);
-    state.cityStates = state.cityStates.filter((c) => c !== cs);
   }
   const held = new Map<string, number>();
   const broken = new Set<string>();
@@ -1051,6 +1055,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (seed !== undefined) state.rngState = seed;
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
+    // what each unit did in its player's actions of the turn, which the
+    // turn's heal and fortification read: one that stood on its plot and
+    // fought nobody rested, any other spent its moves. A record's moves do
+    // not tell (runs/h1_duelw1118 China's Warrior reads 0 moves fortified,
+    // healing +10 at t7 and t8; 1116 Auckland's reads 2)
+    const fought = new Set(ds.flatMap((d) => (d.kind === 'combat' ? [d.unit] : [])));
+    const was = new Map(a.units.map((u) => [`${u.owner}:${u.id}`, u.y * ctx.W + u.x]));
+    for (const r of b.units) {
+      const key = `${r.owner}:${r.id}`;
+      const u = unitOf(ctx, key);
+      if (!u) continue;
+      const rested = was.get(key) === r.y * ctx.W + r.x && !fought.has(key);
+      u.movesLeft = rested ? grantedMoves(state, u) : 0;
+    }
     try {
       endTurn(state);
     } catch (e) {

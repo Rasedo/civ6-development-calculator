@@ -553,15 +553,16 @@ def poke_specialists(rules, rj, path):
     spec = sim._city_specialists(r)[0, j]
     assert int(spec[CA]) == 1 and int(spec.sum()) == 1, f"one overflow citizen must man the Campus, got {spec.tolist()}"
     s1, _f1, yf1 = sci_yf()
+    # each read takes its percent in the game's 24.8 fixed point: a delta to 2/256
     exp = (2.0 + cit_sci) * yf0
-    assert abs((s1 - s0) - exp) < 1e-9, f"specialist science delta {s1 - s0} != {exp}"
+    assert abs((s1 - s0) - exp) < 2 / 256, f"specialist science delta {s1 - s0} != {exp}"
 
     # the TOP building upgrades the specialist (+1 science) and adds a slot
     lab_sci = float(rj["buildings"][LAB]["yields"][3])  # exported 6-vector, science at 3
     sim.city_bldg[0, r, j, LAB] = True
     s2, _f2, yf2 = sci_yf()
     assert yf2 == yf1, "amenity tier moved on adding the Lab"
-    assert abs((s2 - s1) - (lab_sci + 1.0) * yf1) < 1e-9, (
+    assert abs((s2 - s1) - (lab_sci + 1.0) * yf1) < 2 / 256, (
         f"RESEARCH_LAB tier delta {s2 - s1} != building {lab_sci} + spec +1, x yf {yf1}"
     )
 
@@ -591,7 +592,7 @@ def poke_specialists(rules, rj, path):
     assert int(sim._city_specialists(r)[0, j][HS]) == 1, "the Temple slot keeps the priest"
     wb_faith = float(rj["buildings"][wb]["yields"][5])  # faith at 5
     # the toggle drops the building's own faith AND one tier on the priest
-    assert abs((f3 - f4) - (wb_faith + 1.0) * yf3) < 1e-9, (
+    assert abs((f3 - f4) - (wb_faith + 1.0) * yf3) < 2 / 256, (
         f"worship tier delta {f3 - f4} != building {wb_faith} + priest tier 1, x yf {yf3}"
     )
 

@@ -1,12 +1,13 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, QueueItem, Yields } from './types';
-import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
+import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
 import { tilesWithin, hexDistance } from '../../world/hex';
+import { FEATURES } from '../../world/features';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
 import { drawBorderPlot, acquireTile } from './city';
@@ -36,26 +37,22 @@ export function placeCityStateAt(
     name,
     type,
     centerIndex,
-    population: 3,
-    unconvertedPressure: ATHEISM_PRESSURE_PER_POP * 3,
+    population: 1,
+    unconvertedPressure: ATHEISM_PRESSURE_PER_POP,
     envoys: {},
     met: [],
     suzerain: -1,
   };
-  // CIV6 (CivilizationLevels.StartingTilesForCity, CITY_STATE 5): a minor
-  // starts with FIVE of its six ring tiles. WHICH five the DLL does not
-  // publish; the ring is taken in ascending tile index, the order both
-  // engines already use for every founding extra (Mother Russia).
-  let want = CIV_LEVELS.CITY_STATE.startingTilesForCity;
-  const ring = tilesWithin(state.map, tile.col, tile.row, 1)
-    .filter((t) => t.index !== centerIndex)
-    .sort((a, b) => a.index - b.index);
-  for (const t of ring) {
-    if (want <= 0) break;
-    if (tileSeat(t) === NO_SEAT) {
-      setTileOwner(t, seatOfCityState(cityState.id));
-      want -= 1;
-    }
+  // CIV6: a city-state's founding is a major's — a city of one citizen on
+  // its centre and the whole first ring (runs/h1_duelw1103–1118: 48 of 48
+  // city-states founded at t2 hold size 1 and all six ring plots; the
+  // install's CITY_STATE StartingTilesForCity 5 is not what they show), the
+  // centre's improvement and removable feature cleared
+  markCityCentre(tile);
+  tile.improvement = null;
+  if (tile.feature && FEATURES[tile.feature].removable) tile.feature = null;
+  for (const t of tilesWithin(state.map, tile.col, tile.row, 1)) {
+    if (t.index !== centerIndex && tileSeat(t) === NO_SEAT) setTileOwner(t, seatOfCityState(cityState.id));
   }
   setTileOwner(tile, seatOfCityState(cityState.id));
   state.cityStates.push(cityState);
@@ -182,13 +179,16 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
  * the one column of that table only a minor owns, and the reason a minor's
  * culture box banks and claims nothing. Measured on one minor over fifteen
  * readings on a single turn, so nothing but the envoys moved: EXACTLY +1
- * owned plot per envoy received, `plots = envoys + 6` — the six
- * `placeCityStateAt` starts with — no cap through sixteen, and the suzerain
- * contest does not change the slope.
+ * owned plot per envoy received, `plots = envoys + 6`, no cap through
+ * sixteen, and the suzerain contest does not change the slope. A minor is
+ * founded on seven plots (`placeCityStateAt`), so its first envoy takes none
+ * (runs/h1_duelw1103–1118: a minor with one envoy holds seven plots in all
+ * sixteen, and plots − envoys reads 6 on 7,232 of the 11,787 city-state
+ * rows, the mode in every duel).
  *
  * The LEDGER is `tilesAcquired` itself, so the rule needs no counter of its
  * own: a minor's box buys nothing, so every tile that record counts was
- * bought by an envoy. Claiming UP TO the count rather than on each delta is
+ * bought by an envoy past the first. Claiming UP TO the count rather than on each delta is
  * what makes the measured equation an invariant, and it settles the one case
  * the lab did not reach — an envoy REMOVED (a spy's Fabricate Scandal) takes
  * no ground back, and buys nothing new until the count passes its own mark.
@@ -201,7 +201,7 @@ export function addEnvoys(state: GameState, cityState: CityState, seat: number, 
 export function envoyTiles(state: GameState, cityState: CityState): void {
   if (!CIV_LEVELS.CITY_STATE.canAnnexTilesWithReceivedInfluence) return;
   const city = minorCity(cityState);
-  let want = envoysReceived(cityState) - city.tilesAcquired;
+  let want = envoysReceived(cityState) - 1 - city.tilesAcquired;
   while (want > 0) {
     const next = drawBorderPlot(state, city);
     if (next === null) break; // the border rule's own refusal: nothing free is in reach

@@ -66,7 +66,13 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 export type { CivId, LeaderId } from '../../world/roster';
 export { CIV_IDS, CIV_LEADERS } from '../../world/roster';
 
-export const MAX_CITIES_PER_SEAT = 6;
+/** The cities a seat may FOUND, and the count at which a conquest razes.
+ *  Civ 6 caps neither: this is the engines' capacity bound, under the
+ *  per-seat storage (CITY_SLOTS_PER_SEAT) so loyalty flips keep headroom,
+ *  and over the recordings (runs/h1_duelw1103–1118: China's 13 in 1110 the
+ *  most one seat held). The GPU sizes a seat's trade-route slots off it. */
+export const MAX_CITIES_PER_SEAT = srcConst('seats.maxCities', 16,
+  { stylized: 'a capacity bound, not a Civ 6 rule — the game caps no seat; above the recordings\' most (13), under the storage width (24)' });
 /** City COLUMNS a seat is observed and decided over — the same width for every
  * seat. Larger than MAX_CITIES_PER_SEAT because settling caps at that number
  * but loyalty flips do NOT: `transferCity` razes at the cap only on conquest,

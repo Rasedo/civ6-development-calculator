@@ -27,13 +27,12 @@ class SimStep:
         # every city's (`healCities`)
         if self.units_mode:
             cap = self.rules.combat["unitHp"]
-            for _pre in ("barb", "major"):
-                _hp = getattr(self, f"{_pre}_unit_hp")
-                _hp.copy_(torch.where(
-                    getattr(self, f"{_pre}_unit_alive") & ~self._heal_blocked(_pre)
-                    & ~self._res_starved(_pre),
-                    (_hp + self._seat_heal(_pre)).clamp(max=cap), _hp,
-                ))
+            # a barbarian never heals by resting (`refreshUnits`)
+            _hp = self.major_unit_hp
+            _hp.copy_(torch.where(
+                self.major_unit_alive & ~self._heal_blocked("major") & ~self._res_starved("major"),
+                (_hp + self._seat_heal("major")).clamp(max=cap), _hp,
+            ))
             for _pre in ("barb", "major"):
                 _alive = getattr(self, f"{_pre}_unit_alive")
                 _typ = getattr(self, f"{_pre}_unit_type")

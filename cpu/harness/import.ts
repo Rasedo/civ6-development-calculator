@@ -51,7 +51,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
-import { emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { MP_SCALE, emptyStockpile, scaleByGameSpeed } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -1817,6 +1817,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.unconvertedPressure = unconvertedPressure;
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
+      // its citizens pinned as a major's are: the minor's walk works the
+      // game's plots
+      for (const q of c.worked) if (q !== center && !tiles[q].district) tiles[q].locked = true;
       continue;
     }
     const holder = seatOf(state, seat);
@@ -1930,6 +1933,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     ctx.scopeSeat = undefined;
   }
 
+  // a city-state the record holds no city for (not yet founded, or taken) is
+  // no engine city-state: the engine holds a minor only while its city stands
+  state.cityStates = state.cityStates.filter((cs) => cs.centerIndex >= 0);
   // the game's `GetTokensReceived` counts an established governor's envoys
   // (Amani's 2 arrive the turn she establishes and leave with her), which the
   // engine adds on top of its store (`envoysWith`): the store is the count
@@ -1977,8 +1983,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       type: id,
       seat,
       tileIndex: u.y * W + u.x,
-      movesLeft: num(u.moves),
-      movesFull: num(u.maxMoves),
+      // the record counts whole moves, the engine quarter points
+      movesLeft: num(u.moves) * MP_SCALE,
+      movesFull: num(u.maxMoves) * MP_SCALE,
       hp: UNIT_HP - num(u.damage),
       charges: def.charges !== undefined ? num(u.buildCharges) || num(u.spreadCharges) || def.charges : null,
       xp: num(u.xp),

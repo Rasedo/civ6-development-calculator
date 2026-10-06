@@ -1016,9 +1016,10 @@ class SimPhase:
         growth).
 
         Only the HEAD accrues — a deeper entry keeps whatever hammers it
-        already holds and waits — and a completion SHIFTS the queue, so CIV6's
-        overflow carries onto the item behind it. Nothing but an empty queue
-        banks: with somewhere item-shaped to put them, the hammers go there.
+        already holds and waits — and a completion SHIFTS the queue. The
+        city's overflow store (`city_prod_bank`) takes a completion's overflow
+        and an empty queue's Production, and the next step pays it into the
+        head.
 
         `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
         a caller with one city (every direct test) may leave it out."""
@@ -1040,6 +1041,10 @@ class SimPhase:
         # the head's PLOT, read before the shift takes it away
         qt0 = self.city_qtile[bidx, row, col, 0].clone()
         has_q = act & (cur >= 0)
+        # CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds the
+        # turn's Production to its overflow store
+        _bk0 = self.city_prod_bank[bidx, row, col]
+        self.city_prod_bank[bidx, row, col] = torch.where(act & (cur < 0), _bk0 + prod.to(_bk0.dtype), _bk0)
         if not bool(has_q.count_nonzero()):
             return
         # ONE multiplier, assembled in phase.ts's own order and applied once:
@@ -1381,18 +1386,17 @@ class SimPhase:
         done = has_q & (self.city_progress[bidx, row, col, 0] >= cost)
         if not bool(done.count_nonzero()):
             return
-        # queue.shift() — the head goes BEFORE completeQueueItem runs, and the
-        # item behind it moves up carrying the hammers it had already earned.
-        ovf = (self.city_progress[bidx, row, col, 0] - cost).clamp(min=0)
+        # CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
+        # smaller of the Production toward the item and the city's plain
+        # Production, less what the item still lacked before this step (the
+        # bank paid in not counted), never below 0. It goes to the city's
+        # overflow store, which the next step pays into whatever heads the
+        # queue then: one completion per city per turn.
+        ovf = (torch.minimum(prod, raw) - (cost - prog).clamp(min=0)).clamp(min=0)
+        # queue.shift() — the head goes BEFORE completeQueueItem runs
         self._q_pop(row, col, done)
-        # CIV6: the overflow carries into the next item. Only a queue that ran
-        # EMPTY has nowhere to put it, and that is the one case it banks.
-        nxt = self.city_current[bidx, row, col, 0] >= 0
-        carry = done & nxt
-        _hp = self.city_progress[bidx, row, col, 0]
-        self.city_progress[bidx, row, col, 0] = torch.where(carry, _hp + ovf, _hp)
         _bk = self.city_prod_bank[bidx, row, col]
-        self.city_prod_bank[bidx, row, col] = torch.where(done & ~nxt, _bk + ovf, _bk)
+        self.city_prod_bank[bidx, row, col] = torch.where(done, _bk + ovf.to(_bk.dtype), _bk)
         ctr = self.city_center[bidx, row, col]
 
         # CIV6 (Citadel of God): "Gain Faith equal to 25% of the construction
@@ -2186,7 +2190,9 @@ class SimPhase:
                 co = (curt >= 0) & (done_o | (self.civ_cur_tech[:, _o] == curt))
                 sci_sum = sci_sum + torch.where(
                     _r3a & co, self._al_r3_sci_pct * self.civ_sci_rate[:, _o], torch.zeros_like(sci_sum))
-        bank(self.civ_tech_prog, sci_sum)
+        # ...with the overflow a completion set aside (`_select_research`)
+        bank(self.civ_tech_prog, sci_sum + self.civ_tech_ovf[:, row])
+        self.civ_tech_ovf[:, row] = torch.where(active, torch.zeros_like(sci_sum), self.civ_tech_ovf[:, row])
         bank(self.seat_science_total, sci_sum)
         tech_done = torch.zeros(B, dtype=torch.bool, device=dev)
         # CIV6 (EFFECT_GRANT_UNIT_IN_CITY): the roster's free unit at a
@@ -2243,13 +2249,9 @@ class SimPhase:
                 self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
                                  torch.full((B,), _gu, dtype=torch.long, device=dev))
 
-        # THE PENDING POLICIES: the record's government and slotted cards.
-        carried = self._seat_policy_apply(row, active)
-
-        # CULTURE, off the cities as the shortfall and the policies left them;
-        # the tourism, favor and grievance tallies; then the civics it
-        # completes.
-        total = read((self.seat_shortfall[:, row] != short0) | carried, total)
+        # CULTURE, off the cities as the shortfall left them; the tourism,
+        # favor and grievance tallies; then the civics it completes.
+        total = read(self.seat_shortfall[:, row] != short0, total)
         cul_sum = foreign_followers(4, alliance_route(4, city_sum(total, 4)))
         self.civ_cul_rate[:, row] = torch.where(active, cul_sum, self.civ_cul_rate[:, row])
         for _o in range(NMa):
@@ -2312,7 +2314,8 @@ class SimPhase:
         # once, on its lower seat.
         self._grievance_held_capitals(row)
         self._grievance_decay(row)
-        bank(self.civ_civic_prog, cul_sum)
+        bank(self.civ_civic_prog, cul_sum + self.civ_civic_ovf[:, row])
+        self.civ_civic_ovf[:, row] = torch.where(active, torch.zeros_like(cul_sum), self.civ_civic_ovf[:, row])
         bank(self.civ_culture, cul_sum)
         _gov_before = self._adopted_gov(row)[0] if self._ngov else None
         _slots_before = self._seat_policy_slots(row) if self._ngov else None
@@ -2353,6 +2356,9 @@ class SimPhase:
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
             # a CHANGE carries the slotted cards over
             self._carry_policies(row, _gov_on & (_adopted != _gov_before), _slots_before)
+        # THE PENDING POLICIES: the record's government and slotted cards,
+        # after the civics the turn completed (`applySeatPolicies`).
+        carried = self._seat_policy_apply(row, active)
         # every district type's count of completed specialty districts, taken
         # when a technology or civic completes — before the cities produce
         _disc_at = tech_done | civic_done
@@ -2363,8 +2369,8 @@ class SimPhase:
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
 
-        # FAITH, off the cities as the civics left them.
-        total = read(civic_done, total)
+        # FAITH, off the cities as the civics and the policies left them.
+        total = read(civic_done | carried, total)
         _f_base = city_sum(total, 5)
         faith_sum = alliance_route(5, _f_base)
         _f_all = faith_sum.clone()
@@ -2773,10 +2779,36 @@ class SimPhase:
         self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
         self.pantheon_claimed_n.add_(popen.long())
         self.civ_pantheon_done[:, row] = self.civ_pantheon_done[:, row] | popen
+        if bool(popen.count_nonzero()) and self._bel_any:
+            self._grant_pantheon_unit(row, popen)
         # `pantheonMoment`: FIRST_IN_WORLD when no other major holds one
         _oth = torch.cat((self.civ_pantheon_done[:, :row], self.civ_pantheon_done[:, row + 1:self.n_majors]), dim=1).any(dim=1)
         self._add_era_score(row, self._moment_pantheon_first, (popen & ~_oth).long())
         self._add_era_score(row, self._moment_pantheon, (popen & _oth).long())
+
+    def _grant_pantheon_unit(self, row: int, picked: torch.Tensor) -> None:
+        """CIV6 (MODIFIER_PLAYER_GRANT_UNIT_IN_CAPITAL, RunOnce: Religious
+        Settlements' Settler, Fertility Rites' Builder): the unit the pantheon
+        just picked grants in the capital — the city on the capital tile, else
+        the row's first live city (`capitalCityOf`) — a previous copy to its
+        price (`grantPantheonUnit`)."""
+        cu = self._bel["pan"]["capU"].take(self.civ_pantheon[:, row] + 1)
+        alive = self.city_alive[:, row]
+        want = picked & (cu >= 0) & alive.any(dim=1)
+        if not bool(want.count_nonzero()):
+            return
+        cap = self.civ_cap_tile[:, row]
+        ctr = self.city_center[:, row]
+        on_cap = alive & (ctr == cap.unsqueeze(1))
+        col = torch.where(on_cap.any(dim=1), on_cap.long().argmax(dim=1), alive.long().argmax(dim=1))
+        at = ctr.gather(1, col.unsqueeze(1)).squeeze(1)
+        for u_i in sorted(set(int(x) for x in cu[want].tolist())):
+            landed = self._spawn_unit(row, want & (cu == u_i), at, u_i)
+            self._gen_ver += 1
+            if u_i == self._settler_idx:
+                self.civ_settlers_trained[:, row] = self.civ_settlers_trained[:, row] + landed.long()
+            if u_i == self._builder_idx:
+                self.civ_builders_trained[:, row] = self.civ_builders_trained[:, row] + landed.long()
 
     def _can_found(self, row: int) -> torch.Tensor:
         """[B] `canFoundReligion`: no seat ban, no religion yet, a pantheon, a

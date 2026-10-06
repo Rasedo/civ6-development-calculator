@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnU
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -64,12 +64,12 @@ import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the s
 import { gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
 import { warWearinessBattle, warWearinessLaunch } from './weariness';
 import { unitKillEvent, campMoment } from './eras';
+import { grantBoost } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
-const CAMP_CLEAR_REWARD = 50;
 export const MAX_BARB_PER_CAMP = 3;
 
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
@@ -82,7 +82,11 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   // the outpost was the BARBARIANS' — theirs is the civilization buried here
   markAntiquitySite(state, tileIndex, BARB_SEAT);
   const clearer = seatOf(state, unit.seat);
-  if (clearer) clearer.treasury += CAMP_CLEAR_REWARD;
+  if (clearer) clearer.treasury += CAMP_DISPERSAL_GOLD;
+  // CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's inspiration, a
+  // major's at the clear (runs/h1_duelw1116 China: the camp cleared at t6,
+  // the inspiration read at t7)
+  if (clearer && isCiv(unit.seat)) grantBoost(state, unit.seat, 'MILITARY_TRADITION');
   // CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture
   // a barbarian outpost" — the install maps the camp to a goody hut outright,
   // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`).

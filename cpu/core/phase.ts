@@ -109,7 +109,7 @@ const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
 import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
-import { acceptDeal, dealPhase, setDealOffer } from './deals';
+import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
@@ -141,6 +141,20 @@ export function warTargets(state: GameState, seat: number): number[] {
   const minors: number[] = [];
   for (let i = 0; i < (state.cityStateMax ?? 0); i++) minors.push(seatOfCityState(i));
   return majors.concat(minors);
+}
+
+/** CIV6 (MODIFIER_PLAYER_GRANT_UNIT_IN_CAPITAL, RunOnce: Religious
+ *  Settlements' Settler, Fertility Rites' Builder): the unit a pantheon
+ *  grants in the seat's capital as it is chosen — a previous copy to the
+ *  unit's price (runs/h1_duelw1116 China: the Settler at t14, the next one
+ *  priced 55 from t16). `_grant_pantheon_unit` is the twin. */
+export function grantPantheonUnit(state: GameState, seat: number, pantheon: string): void {
+  const unit = PANTHEONS[pantheon]?.effects.capitalUnit;
+  const cap = unit ? capitalCityOf(state, seat) : undefined;
+  const s = seatOf(state, seat) as Seat | undefined;
+  if (!unit || !cap || !s || !spawnUnit(state, unit, cap.centerIndex, seat)) return;
+  if (unit === 'SETTLER') s.settlersTrained = (s.settlersTrained ?? 0) + 1;
+  if (unit === 'BUILDER') s.buildersTrained += 1;
 }
 
 export function nextCityName(actor: Seat): string {
@@ -1527,9 +1541,15 @@ export function assertCityRegistryCoherent(state: GameState): void {
 
 /**
  * THE PENDING POLICIES: the record's government and slotted cards, applied
- * in the seat's start of turn after its gold, upkeep and bankruptcy and
- * before its culture (tools/civ6lab/turn_order_civ6.md: `GE.PolicyChanged`
- * after gold and science, before the civic, 17 blocks).
+ * in the seat's start of turn after its culture and the civics it completes
+ * and before its faith — an AI's government and cards land as the civic
+ * that opens them completes (runs/h1_duelw1103–1118: 539 of 581 policy
+ * changes fall in a pair that completes a civic; 1116 China t9→t10: Code of
+ * Laws completes and Chiefdom's Survey and God King land, God King's Faith
+ * banked and its Gold not; 1115 China t16→t17: Craftsmanship completes and
+ * the cards change with no Gold paid). A human's pending changes publish
+ * before the civic instead (tools/civ6lab/turn_order_civ6.md:
+ * `GE.PolicyChanged` after gold and science, 17 blocks).
  */
 export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatActionRecord): void {
   // THE POLICY UNLOCK: outside the free window a change of government or of
@@ -2676,8 +2696,8 @@ export function seatPhase(state: GameState): void {
 
     // THE SEAT'S ECONOMY, before its cities. CIV6: each player's start of
     // turn banks its science (a technology completing takes effect at once),
-    // then its gold, upkeep and bankruptcy, then its pending policies, its
-    // culture and civics, its faith and its Great Person points, and only then
+    // then its gold, upkeep and bankruptcy, then its culture and civics, its
+    // pending policies, its faith and its Great Person points, and only then
     // walks its cities, which read the result — a technology's +1 Production
     // lands the turn it completes, a shortfall's amenity penalty the same turn
     // (tools/civ6lab/turn_order_civ6.md; runs/turnorder/armT_*, armB_*,
@@ -2685,7 +2705,7 @@ export function seatPhase(state: GameState): void {
     // step, in city order: the science as the turn opened (Maya 6.3047, not
     // the shortfall's 5.5508), the gold after the techs (Egypt +39.047 with
     // Cartography's Fishing Boats, not +36.848), the culture after the
-    // shortfall and the policies, the faith after the civics. A read is taken
+    // shortfall, the faith after the civics and the policies. A read is taken
     // again only where a step between has moved what the cities yield: a
     // technology, the shortfall or the policies, a civic.
     const grantedNow: string[] = []; // the roster's technology grants, spawned after the upkeep
@@ -2777,7 +2797,9 @@ export function seatPhase(state: GameState): void {
     // The RESEARCH PICK arrives on the wire (applySeatActionRecord). A seat
     // with no pick banks progress with no current tech — the same wait the
     // GPU's `cur_tech == -1` already models.
-    rsr.techProgress += sciSum;
+    // ...with the overflow a completion set aside (`selectResearch`)
+    rsr.techProgress += sciSum + (rsr.techOverflow ?? 0);
+    rsr.techOverflow = 0;
     // LIFETIME science — the cultureTotal pattern, beside the stream add.
     // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
     // lump grants (applyLumpGrant, goody maps) add to the same field.
@@ -2835,13 +2857,9 @@ export function seatPhase(state: GameState): void {
       if (cap) spawnUnit(state, id, cap.centerIndex, actor.seat);
     }
 
-    // THE PENDING POLICIES: the record's government and slotted cards.
-    const policiesMoved = !!rec && ((rec.government !== null && rec.government !== undefined) || !!rec.policies);
-    if (rec) applySeatPolicies(state, actor, rec);
-
-    // CULTURE, off the cities as the shortfall and the policies left them;
+    // CULTURE, off the cities as the shortfall left them;
     // the tourism, favor and grievance tallies; then the civics it completes.
-    if ((actor.goldShortfall ?? 0) !== shortfallBefore || policiesMoved) yields = readYields();
+    if ((actor.goldShortfall ?? 0) !== shortfallBefore) yields = readYields();
     let culSum = foreignFollowers('culture', allianceRoute('culture', citySum(yields, 'culture')));
     actor.culRate = culSum;
     for (const o of state.seats) {
@@ -2854,7 +2872,8 @@ export function seatPhase(state: GameState): void {
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes
     seatAccumulators(state, actor.seat, rGovIds);
-    rsr.civicProgress += culSum;
+    rsr.civicProgress += culSum + (rsr.civicOverflow ?? 0);
+    rsr.civicOverflow = 0;
     // LIFETIME culture — the same per-turn sum, banked separately
     // because civicProgress is SPENT by every completed civic. Real Civ 6
     // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
@@ -2882,12 +2901,18 @@ export function seatPhase(state: GameState): void {
     const _govNow = seatGovernment(state, actor.seat);
     actor.government.held |= governmentBit(_govNow);
     if (_govNow && _govNow !== _govBefore) carryPolicies(state, actor.seat, _slotsBefore);
+
+    // THE PENDING POLICIES: the record's government and slotted cards, after
+    // the civics the turn completed (`applySeatPolicies`).
+    const policiesMoved = !!rec && ((rec.government !== null && rec.government !== undefined) || !!rec.policies);
+    if (rec) applySeatPolicies(state, actor, rec);
+
     // every district type's count of completed specialty districts, taken
     // when a technology or civic completes — before the cities produce
     if (techDone || civicDone) refreshDistrictDiscount(state, actor.seat);
 
-    // FAITH, off the cities as the civics left them.
-    if (civicDone) yields = readYields();
+    // FAITH, off the cities as the civics and the policies left them.
+    if (civicDone || policiesMoved) yields = readYields();
     const _fBase = citySum(yields, 'faith');
     let faithSum = allianceRoute('faith', _fBase);
     const _fAll = faithSum;
@@ -2919,6 +2944,7 @@ export function seatPhase(state: GameState): void {
         state.claimedPantheons.push(pick);
         pantheonMoment(state, actor.seat);
         actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
+        grantPantheonUnit(state, actor.seat, pick);
         state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
       }
     }
@@ -3091,21 +3117,20 @@ export function seatPhase(state: GameState): void {
         if (q.progress >= cost) {
           civCity.queue.shift();
           completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
-          // CIV6: a completion's OVERFLOW carries into the next item. The
-          // shift has already happened, so `queue[0]` is that item; only a
-          // queue that ran EMPTY has nowhere to put the hammers, and that is
-          // the one case they bank and pay a turn late.
-          //
-          // The carry does NOT cascade: one completion per city per turn, so
-          // an overflow big enough to finish the item behind it finishes it
-          // NEXT turn. The GPU completes once per city per turn too, and a
-          // second completion here would move the DRAW COUNT — a completion
-          // can spawn a unit — against an engine that had not made it.
-          const over = q.progress - cost;
-          const next = civCity.queue[0];
-          if (next) next.progress += over;
-          else civCity.productionBank = (civCity.productionBank ?? 0) + over;
+          // CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
+          // smaller of the Production toward the item and the city's plain
+          // Production, less what the item still lacked before this step
+          // (the bank paid in not counted), never below 0. It goes to the
+          // city's overflow store, which the next step pays into whatever
+          // heads the queue then: one completion per city per turn.
+          const lacked = Math.max(0, cost - progressBefore);
+          const made = Math.min(production * _em, production);
+          if (made > lacked) civCity.productionBank = (civCity.productionBank ?? 0) + made - lacked;
         }
+      } else if (!q) {
+        // CIV6 (City_BuildQueue 0x16f050): a city with nothing queued adds
+        // the turn's Production to its overflow store
+        civCity.productionBank = (civCity.productionBank ?? 0) + production;
       }
     }
     const grown = new Map<number, CityStats>();

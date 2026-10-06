@@ -1142,9 +1142,9 @@ class SimSeats:
     def _seat_policy_apply(self, row: int, active: torch.Tensor) -> torch.Tensor:
         """`applySeatPolicies` — THE PENDING POLICIES: the record's government
         and slotted cards for seat row `row`, applied in the seat's start of
-        turn after its gold, upkeep and bankruptcy and before its culture
-        (tools/civ6lab/turn_order_civ6.md: `GE.PolicyChanged` after gold and
-        science, before the civic). The stash drains either way. Returns [B]
+        turn after its culture and the civics it completes and before its
+        faith, as an AI's land with the civic that opens them. The stash
+        drains either way. Returns [B]
         the games whose record carried either arm, where the cities' yields
         are read again."""
         policies = self._driven_policies.pop(row, None)
@@ -3314,11 +3314,11 @@ class SimSeats:
         is False nothing moves. Where it is True and the pick DIFFERS from what
         the seat is researching, the progress pool is parked under the outgoing
         item and the incoming item's parked value replaces it. With NOTHING
-        current the pool is a completion's unowned overflow and the pick adds
-        it to the loaded value — CIV6 carries overflow into the next research.
-        A re-statement of the current pick is a no-op, so a record that repeats
-        itself cannot round-trip the pool through the map and lose it to a
-        rounding step.
+        current the pool is a completion's unowned overflow and the pick sets
+        it aside (`civ_tech_ovf` / `civ_civic_ovf`), which the seat's next
+        turn pays in. A re-statement of the current pick is a no-op, so a
+        record that repeats itself cannot round-trip the pool through the map
+        and lose it to a rounding step.
         """
         cur = self.civ_cur_civic[:, row] if is_civic else self.civ_cur_tech[:, row]
         pool = self.civ_civic_prog[:, row] if is_civic else self.civ_tech_prog[:, row]
@@ -3333,8 +3333,9 @@ class SimSeats:
         want_c = want.clamp(min=0).unsqueeze(1)
         loaded = park.gather(1, want_c).squeeze(1)
         park.scatter_(1, want_c, torch.where(move, torch.zeros_like(loaded), loaded).unsqueeze(1))
-        keep = torch.where(had, torch.zeros_like(pool), pool)
-        new_pool = torch.where(move, loaded + keep, pool)
+        ovf = self.civ_civic_ovf if is_civic else self.civ_tech_ovf
+        ovf[:, row] = torch.where(move & ~had, ovf[:, row] + pool, ovf[:, row])
+        new_pool = torch.where(move, loaded, pool)
         new_cur = torch.where(move, want.clamp(min=0), cur)
         if is_civic:
             self.civ_civic_prog[:, row] = new_pool

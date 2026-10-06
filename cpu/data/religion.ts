@@ -3,7 +3,7 @@
  * Worship, Founder, Enhancer).
  *
  * SOURCING SWEEP. VERIFIED CORRECT against the Civ 6 sources:
- * PANTHEON_FAITH_COST = 25 (25 Faith on Standard speed) and
+ * PANTHEON_FAITH_COST (RELIGION_PANTHEON_MIN_FAITH through the speed) and
  * RELIGION_PRESSURE_RANGE = 10 (a dominant religion pressures cities within
  * 10 tiles).
  *
@@ -21,6 +21,7 @@
 import type { DistrictId, GreatPersonClass, ResourceCategory, Yields } from '../core/types';
 import type { AdjacencyRule } from './districts';
 import { srcConst, xml, type SrcMap } from './provenance';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 
 export interface BeliefEffects {
   /** extra ADJACENCY rules one district type reads while this belief is held
@@ -34,6 +35,9 @@ export interface BeliefEffects {
    *  every city banks toward its borders (the DLL's border turn scales the
    *  culture banked, never the price) */
   borderExpansionPct?: number;
+  /** MODIFIER_PLAYER_GRANT_UNIT_IN_CAPITAL (RunOnce): the unit the belief
+   *  grants in the capital when chosen, a previous copy to its price */
+  capitalUnit?: string;
   growthMult?: number;
   gppFlat?: Partial<Record<GreatPersonClass, number>>;
   workEthic?: boolean;
@@ -179,8 +183,12 @@ const BELIEF_SRC: Readonly<Record<string, SrcMap>> = {
   RELIGIOUS_SETTLEMENTS: {
     'effects.borderExpansionPct':
       xml('ModifierArguments', 'ModifierId=RELIGIOUS_SETTLEMENTS_CULTUREBORDER&Name=Amount', 'Value'),
+    'effects.capitalUnit':
+      xml('ModifierArguments', 'ModifierId=RELIGIOUS_SETTLEMENTS_SETTLER_MODIFIER&Name=UnitType', 'Value', { expect: 'UNIT_SETTLER' }),
   },
   FERTILITY_RITES: {
+    'effects.capitalUnit':
+      xml('ModifierArguments', 'ModifierId=FERTILITY_RITES_BUILDER_MODIFIER&Name=UnitType', 'Value', { expect: 'UNIT_BUILDER' }),
     'effects.growthMult': {
       derived: '1 + Amount/100 — the install writes the percentage (10), the catalog the multiplier',
       inputs: [xml('ModifierArguments', 'ModifierId=FERTILITY_RITES_GROWTH&Name=Amount', 'Value')],
@@ -424,11 +432,11 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
     B('GOD_OF_CRAFTSMEN', 'God of Craftsmen', '+1 production from improved strategic resources.', {
       improvementOnResource: { category: 'strategic', yields: { production: 1 } },
     }),
-    B('RELIGIOUS_SETTLEMENTS', 'Religious Settlements', 'Border expansion rate is 15% faster.', {
-      borderExpansionPct: 15,
+    B('RELIGIOUS_SETTLEMENTS', 'Religious Settlements', 'When chosen receive a Settler in your capital. Border expansion rate is 15% faster.', {
+      borderExpansionPct: 15, capitalUnit: 'SETTLER',
     }),
-    B('FERTILITY_RITES', 'Fertility Rites', '+10% growth in all cities.', {
-      growthMult: 1.1,
+    B('FERTILITY_RITES', 'Fertility Rites', 'When chosen receive a Builder in your capital. City growth rate is 10% higher.', {
+      growthMult: 1.1, capitalUnit: 'BUILDER',
     }),
     B('DIVINE_SPARK', 'Divine Spark', '+1 great person point from Holy Sites (Prophet), Campuses (Scientist) and Theater Squares (Artist).', {
       gppFlat: { PROPHET: 1, SCIENTIST: 1, ARTIST: 1 },
@@ -649,7 +657,11 @@ export const RELIGION_NAMES = [
   'Orthodoxy', 'Protestantism', 'Shinto', 'Sikhism', 'Taoism', 'Zoroastrianism',
 ];
 
-export const PANTHEON_FAITH_COST = 25;
+/** CIV6 (RELIGION_PANTHEON_MIN_FAITH 25): the Faith a pantheon costs, through
+ *  the game speed at setup (DLL 0x340c90 -> 0x5254d0, CostMultiplier / 100
+ *  truncated; runs/h1_duelw1116 China's pantheon at 12 Faith, t14) */
+export const PANTHEON_FAITH_COST = srcConst('religion.pantheonMinFaith', scaleByGameSpeed(25),
+  xml('GlobalParameters', 'Name=RELIGION_PANTHEON_MIN_FAITH', 'Value', { scale: GAME_SPEED }));
 
 /** CIV6 (GlobalParameters.xml, RELIGION_SPREAD_ADJACENT_CITY_DISTANCE 10):
  * every city FOLLOWING a religion presses every city within this many tiles

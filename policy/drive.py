@@ -98,9 +98,9 @@ def _prod_ctx(st, blocks: dict, cities: dict, seat: int, turn: int) -> dict:
     static data, not state."""
     ctx = blocks["ctx"]
     n_cities = ctx[:, 0].long()
-    # ONE city cap for every seat — the ladder's maxCities heuristic
+    # the style's settling target (STYLE_KNOBS city_cap)
     style = _seat_style(seat)
-    cap = st.max_cities if style["city_cap"] is None else int(style["city_cap"])
+    cap = int(style["city_cap"])
     nS = len(st.scaffold)
     # WHICH district to place is a decision, and the driver rotates it so
     # the whole scaffold is reached rather than only its head; a style's

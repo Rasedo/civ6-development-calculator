@@ -548,6 +548,9 @@ class SimInit:
             # the project production percent research completions banked
             ("research_project_pct", torch.long, 0),
             ("influence", dtype, 0), ("tech_prog", dtype, 0),
+            # the overflow a completion set aside, paid in with the next
+            # turn's Science / Culture (`ResearchState.techOverflow`)
+            ("tech_ovf", dtype, 0), ("civic_ovf", dtype, 0),
             ("treasury", dtype, 0),
             # LIFETIME raw carbon. Signed: Carbon Recapture takes it below 0.
             ("co2", dtype, 0), ("co2_turn", dtype, 0),
@@ -1398,6 +1401,7 @@ class SimInit:
                 # international route out of a following ORIGIN city
                 "intlWorship": torch.tensor([0.0] + [float(x["intlWorship"]) for x in _rows], dtype=torch.float64, device=device),
                 "borderPct": torch.tensor([0.0] + [float(x["borderPct"]) for x in _rows], dtype=torch.float64, device=device),
+                "capU": torch.tensor([-1] + [int(x["capU"]) for x in _rows], dtype=torch.long, device=device),
                 "growth": torch.tensor([1.0] + [x["growth"] for x in _rows], dtype=torch.float64, device=device),
                 "gpp": torch.tensor([[0] * _ng] + [x["gpp"] for x in _rows], dtype=torch.long, device=device),
                 "we": torch.tensor([0.0] + [float(x["we"]) for x in _rows], dtype=torch.float64, device=device),
@@ -4778,7 +4782,7 @@ class SimInit:
         self._row_level = _row_level
         # CIV6 (StartingTilesForCity, FULL_CIV 6): `_found_city_at`'s direction
         # walk claims the whole first ring, which is six tiles — the column is
-        # an invariant here, not a count to stop at; a minor's FIVE arrive on the
+        # an invariant here, not a count to stop at; a minor's ring arrives on the
         # wire's `ownerSeatInit` (TS `placeCityStateAt` claims them).
         assert int(_lvl["FULL_CIV"]["startingTilesForCity"]) == 6, "the founding claim is the first ring"
         # the one column that forks a live rule: a full civ's culture box buys

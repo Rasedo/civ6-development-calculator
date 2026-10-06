@@ -648,6 +648,8 @@ SEAT = {
     "currentCivic": _civ_scalar("civ_cur_civic"),
     "techProgress": _civ_scalar("civ_tech_prog"),
     "civicProgress": _civ_scalar("civ_civic_prog"),
+    "techOverflow": _civ_scalar("civ_tech_ovf"),
+    "civicOverflow": _civ_scalar("civ_civic_ovf"),
     # one LIST per row (the `wars` shape) — flattening across rows would hand
     # row k a single element while the TS side folds the whole table-order
     # vector under that key

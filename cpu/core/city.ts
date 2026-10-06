@@ -937,6 +937,25 @@ export function growthPct256(factor: number): number {
   return Math.floor((factor - 1) * 256);
 }
 
+/** A citizen yield share (SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP) of a
+ *  city's population in the game's 24.8 fixed point (DLL 0x1cbd10:
+ *  population << 8 times the percent, over 100 << 8, an integer divide):
+ *  0.3 Culture a citizen reads 76/256 at size 1, 153/256 at size 2. */
+export function citizenYield256(population: number, share: number): number {
+  return Math.floor(population * Math.round(share * 100) * 256 / 100) / 256;
+}
+
+/** A city yield under its one modifier in the game's 24.8 fixed point
+ *  (GameAttribute::Value 0xaa740): base + base × percent / 100, the divide
+ *  truncating toward zero (runs/h1_duelw1108 Xi'an t95: 16 Production at
+ *  −10% reads 14.40234375; Handan t105: 2329/256 Culture at +5% reads
+ *  2445/256). */
+export function withPercent256(base: number, pct: number): number {
+  const raw = Math.floor(base * 256);
+  const mod = Math.round(pct * 100 * 256);
+  return (raw + Math.trunc(Math.floor(raw * mod / 256) / 100)) / 256;
+}
+
 /** What detaching a growth percent leaves in the accumulator: its attach
  *  plus its detach, −1 where the percent is no whole number of 256ths. */
 export function growthDetachResidue(factor: number): number {
@@ -1610,8 +1629,8 @@ export function computeCityStats(
   const trade = cityTradeYields(state, city);
 
   const citizens = emptyYields();
-  citizens.science = city.population * CITIZEN_SCIENCE;
-  citizens.culture = city.population * CITIZEN_CULTURE;
+  citizens.science = citizenYield256(city.population, CITIZEN_SCIENCE);
+  citizens.culture = citizenYield256(city.population, CITIZEN_CULTURE);
   // a citizen with no plot and no slot to work pays Gold
   citizens.gold = Math.max(0, city.population - specialistTotal - worked.length) * UNASSIGNED_CITIZEN_GOLD;
 
@@ -1783,7 +1802,7 @@ export function computeCityStats(
       for (const k of Object.keys(mult) as YieldKey[]) pct[k] += (mult[k] ?? 1) - 1;
     }
   }
-  for (const k of YIELD_KEYS) total[k] *= 1 + pct[k];
+  for (const k of YIELD_KEYS) total[k] = withPercent256(total[k], pct[k]);
   const maintenance = cityMaintenance(state, city);
   total.gold -= maintenance;
 

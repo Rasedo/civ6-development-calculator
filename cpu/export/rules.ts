@@ -317,7 +317,7 @@ import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDE
 import { CULTURE_BOMB_ROWS, SLOT_CONVERT_ROWS, SLOT_FAVOR_ROWS, PLAZA_DISTRICT_PROD_ROWS, GREAT_WORK_LOYALTY_ROWS, PARK_APPEAL_ROWS, TRADE_GAIN_TILE_ROWS, GOVERNOR_XP_ROWS, CONQUEST_FORMATION_ROWS, SPY_PROMO_ROWS, WONDER_CHARGE_ROWS, WONDER_ERA_BOOST_ROWS, WONDER_ERA_PROD_ROWS, WONDER_TOURISM_ROWS, RIVER_CROSS_PROD_ROWS, IMMEDIATE_POST_ROWS, DIPLO_VIS_ROWS, WAR_BANS, WAR_BAN_ROWS, TOURISM_FAVOR_ROWS, EMERGENCY_FAVOR_ROWS, GOLDEN_DEDICATION_ROWS, INTL_ROUTE_TERRAIN_ROWS, GOLDEN_ROUTE_CAPACITY_ROWS, PROGRESS_TRADE_ROWS, RELIGION_AMENITY_ROWS, ALL_FOLLOWER_BELIEFS_ROWS, CAMP_GOODY_ROWS, FEATURE_APPEAL_ROWS, ALLIANCE_SHARED_VIS_ROWS, ROUTE_PRESSURE_ROWS, FOREIGN_FOLLOWER_YIELD_ROWS, GP_GUARANTEE_ROWS, FAITH_PURCHASE_DISTRICT_ROWS, START_BOOST_ROWS, POST_COMBAT_LOYALTY_ROWS, LEVY_ROWS, DOMESTIC_ROUTE_LOYALTY_ROWS, INCOMING_ROUTE_YIELD_ROWS, COPY_CLASSES, EXTRA_UNIT_COPY_ROWS, UNIT_POP_COST_ROWS, CONQUEST_POP_ROWS, NOT_FOUNDED_CHANNELS, NOT_FOUNDED_ROWS, EXTRA_DISTRICT_ROWS, CITY_TILES_ROWS, BOOST_PCT_ROWS, BUILDING_PREREQ_ROWS, DISTRICT_PREREQ_ROWS, WAR_WEARINESS_ROWS, PEACEFUL_FOUNDER_ROWS, YIELD_PER_SUZERAIN_ROWS, GOVERNOR_TITLE_GRANT_ROWS, GP_REFUND_ROWS, EVICT_PCT_ROWS, SEAT_BANS, OCEAN_ACCESS_ROWS, GOVERNOR_TITLE_YIELD_ROWS, GPP_BUILDING_ROWS, GP_FAVOR_ROWS, START_TECH_ROWS, SEAT_BAN_ROWS, WORSHIP_ROWS, DISTRICT_UNIT_ROWS, WORK_IMPASSABLE_ROWS, TERRAIN_ADJ_YIELD_ROWS, ROUTE_TERRAIN_ROWS, GOVERNOR_YIELD_ROWS, GOVERNOR_LOYALTY_ROWS, GARRISON_LOYALTY_ROWS, FORMATION_ROWS, HAPPY_YIELD_ROWS, HAPPY_GPP_ROWS, POLICY_SLOT_ROWS, POST_COMBAT_YIELD_ROWS, CENTER_ADJ_ROWS, GREAT_WORK_YIELD_ROWS, GPP_CLASS_ROWS, POWERED_YIELD_ROWS, STOCKPILE_RATE_ROWS, STOCKPILE_CAP_ROWS, UNIT_CHARGE_ROWS, TILE_COST_ROWS, FARM_TERRAIN_ROWS, ROUTE_IMPROVEMENT_ROWS, GRANT_UNIT_ROWS, SPY_CAPACITY_ROWS, CAPITAL_ROWS } from '../data/civilizations';
 import { AMENITY_TIERS, CITY_POP_PER_AMENITY, amenityTierIndex, CIVIC_UNLOCK_MAX_COST, CIVIC_UNLOCK_PER_TURN_DROP, CIVIC_UNLOCK_MIN_COST, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../data/constants';
 import { CIV_LEVELS, CIV_LEVEL_ORDER } from '../data/civLevels';
-import { ANARCHY_TURNS, GAME_COST_ESCALATION, TRADE_COURSE_MAX } from '../data/constants';
+import { ANARCHY_TURNS, CAMP_DISPERSAL_GOLD, GAME_COST_ESCALATION, TRADE_COURSE_MAX } from '../data/constants';
 import { FREE_CITY_PAIR_CLASS } from '../data/seats';
 
 // CIV6 (Pillaging): the shared plunder-kind enum — 0 none, 1 heal, 2 gold,
@@ -343,6 +343,7 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   bldgH: centerBuildings.map((b) => def.effects.buildingHousing?.[b.id] ?? 0),  // [NB]
   intlWorship: def.effects.intlRouteGoldPerWorship ?? 0,  // Religious Community (GS)
   borderPct: def.effects.borderExpansionPct ?? 0,
+  capU: def.effects.capitalUnit ? Object.keys(UNITS).indexOf(def.effects.capitalUnit) : -1,  // the unit granted in the capital
   growth: def.effects.growthMult ?? 1,
   gpp: GP_CLASSES.map((c) => def.effects.gppFlat?.[c] ?? 0),
   we: def.effects.workEthic ? 1 : 0,
@@ -400,16 +401,21 @@ for (const [id, def] of Object.entries(BOOSTS)) {
   else if (c.kind === 'totalPop') row = { kind: 'totalPop', pop: c.pop };
   else if (c.kind === 'coastalCity') row = { kind: 'coastalCity' };
   else if (c.kind === 'cities') row = { kind: 'cities', count: c.count };
+  else if (c.kind === 'pantheon') row = { kind: 'pantheon' };
+  else if (c.kind === 'religion') row = { kind: 'religion' };
+  else if (c.kind === 'metCityStates') row = { kind: 'metCityStates', count: c.count };
+  else if (c.kind === 'tradeRoutes') row = { kind: 'tradeRoutes', count: c.count };
   else if (c.kind === 'tech') {
     const t = techIdx.get(c.id);
     if (t !== undefined) row = { kind: 'tech', t };
-  } else if (c.kind === 'nearNaturalWonder') row = { kind: 'nearNaturalWonder' };
+  } else if (c.kind === 'naturalWonderFound') row = { kind: 'naturalWonderFound' };
   else if (c.kind === 'improvement') {
     // Improvement eurekas for every improvement in the roster: an
     // unexported row fires in TS only and forks the GPU's research stream
     // on the boosted cost (seed 9066 t57, MASONRY's quarry eureka).
-    const imp = IMPROVEMENT_IDS.indexOf(c.id);
-    if (imp >= 0) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
+    const imp = c.id ? IMPROVEMENT_IDS.indexOf(c.id) : -1;
+    // imp -1: an improvement of any kind
+    if (imp >= 0 || !c.id) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
   } else if (c.kind === 'anyWonderBuilt') {
     row = { kind: 'anyWonderBuilt' };
   } else if (c.kind === 'district') {
@@ -1891,7 +1897,9 @@ export function buildRules() {
       barbCavalryRanged: 12,
       barbHorseRes: RESOURCE_IDS.indexOf('HORSES'), // a camp with this within barbHorseRange is a CAVALRY outpost
       barbHorseRange: BARB_HORSE_RANGE,
-      campClearReward: 50,
+      campClearReward: CAMP_DISPERSAL_GOLD,
+      // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
+      campBoostCivic: civicIdx.get('MILITARY_TRADITION') ?? -1,
       // COMBAT: the single-precision factor e^(x/256) per exponent x in
       // 1/256ths over ±DAMAGE_EXPONENT_REACH (`damageFactor`, the function
       // damageRoll's `damageOf` calls), the exponent's k, and the roll's

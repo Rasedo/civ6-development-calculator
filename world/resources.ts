@@ -2,10 +2,8 @@
  * Map resources (a curated base-game subset). `improvement` is the improvement
  * that works the resource.
  *
- * SOURCING SWEEP: the BONUS-resource yields were checked
- * against the Civilization wiki resource list and are ALL CORRECT as written —
- * Wheat, Rice, Cattle, Sheep and Bananas at +1 Food, Stone and Deer at
- * +1 Production. No change was needed.
+ * SOURCING SWEEP: every row's `yields` is the layered install's
+ * Resource_YieldChanges (Base <- Expansion1 <- Expansion2), all 46 rows.
  *
  * ONE SOURCED RESIDUAL found in the same pass: real Civ 6 gives RICE and WHEAT
  * an ADDITIONAL +1 Food when the city has a working WATER MILL. This model
@@ -14,7 +12,6 @@
  * bonus. Recorded rather than fixed: it is a yield change needing its own gated
  * round, and both engines would have to add the term at the same position.
  *
- * The LUXURY and STRATEGIC rows below are NOT yet swept.
  */
 
 import type { Elevation, ImprovementId, ResourceCategory, TerrainId, Tile, YieldKey, Yields } from './types';
@@ -89,7 +86,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
 
   WINE: { id: 'WINE', name: 'Wine', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   COTTON: { id: 'COTTON', name: 'Cotton', category: 'luxury', yields: { gold: 3 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, okFeatures: ['FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
-  SILK: { id: 'SILK', name: 'Silk', category: 'luxury', yields: { gold: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['WOODS'] },
+  SILK: { id: 'SILK', name: 'Silk', category: 'luxury', yields: { culture: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['WOODS'] },
   DYES: { id: 'DYES', name: 'Dyes', category: 'luxury', yields: { faith: 1 }, improvement: 'PLANTATION', terrains: ['PLAINS', 'GRASSLAND'], elevations: FLAT, requiresFeature: ['RAINFOREST', 'WOODS'] },
   SPICES: { id: 'SPICES', name: 'Spices', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['PLAINS'], elevations: FLAT, requiresFeature: ['RAINFOREST'] },
   SUGAR: { id: 'SUGAR', name: 'Sugar', category: 'luxury', yields: { food: 2 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'DESERT'], elevations: FLAT, requiresFeature: ['MARSH', 'FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
@@ -98,7 +95,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
   TOBACCO: { id: 'TOBACCO', name: 'Tobacco', category: 'luxury', yields: { faith: 1 }, improvement: 'PLANTATION', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, noFeature: true },
   INCENSE: { id: 'INCENSE', name: 'Incense', category: 'luxury', yields: { faith: 1 }, improvement: 'PLANTATION', terrains: ['DESERT', 'PLAINS'], elevations: FLAT, noFeature: true },
   FURS: { id: 'FURS', name: 'Furs', category: 'luxury', yields: { food: 1, gold: 1 }, improvement: 'CAMP', terrains: ['TUNDRA'], elevations: ANY },
-  IVORY: { id: 'IVORY', name: 'Ivory', category: 'luxury', yields: { food: 1, production: 1 }, improvement: 'CAMP', terrains: ['PLAINS', 'DESERT'], elevations: FLAT, noFeature: true },
+  IVORY: { id: 'IVORY', name: 'Ivory', category: 'luxury', yields: { production: 1, gold: 1 }, improvement: 'CAMP', terrains: ['PLAINS', 'DESERT'], elevations: FLAT, noFeature: true },
   TRUFFLES: { id: 'TRUFFLES', name: 'Truffles', category: 'luxury', yields: { gold: 3 }, improvement: 'CAMP', terrains: ['GRASSLAND', 'PLAINS'], elevations: FLAT, requiresFeature: ['WOODS', 'MARSH', 'RAINFOREST'] },
   DIAMONDS: { id: 'DIAMONDS', name: 'Diamonds', category: 'luxury', yields: { gold: 3 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA'], elevations: HILLS, noFeature: true },
   SILVER: { id: 'SILVER', name: 'Silver', category: 'luxury', yields: { gold: 3 }, improvement: 'MINE', terrains: ['DESERT', 'TUNDRA'], elevations: ANY, noFeature: true },

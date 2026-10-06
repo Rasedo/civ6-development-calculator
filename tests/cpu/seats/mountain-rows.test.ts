@@ -101,8 +101,8 @@ describe('the Toqui', () => {
     };
     const plain = cultureOf(seatRow('AMERICA'), true, true);
     expect(cultureOf(seatRow('MAPUCHE'), false, true)).toBeCloseTo(plain, 9); // no governor, no row
-    expect(cultureOf(seatRow('MAPUCHE'), true, true)).toBeCloseTo(plain * 1.05, 9);
-    expect(cultureOf(seatRow('MAPUCHE'), true, false)).toBeCloseTo(plain * 1.15, 9);
+    expect(cultureOf(seatRow('MAPUCHE'), true, true)).toBeCloseTo(plain * 1.05, 2); // to 1/256: the percent in 24.8 fixed point
+    expect(cultureOf(seatRow('MAPUCHE'), true, false)).toBeCloseTo(plain * 1.15, 2);
   });
 
   it('sends +4 Loyalty to its own cities within 9 tiles of a governed one', () => {

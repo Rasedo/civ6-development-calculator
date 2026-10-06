@@ -530,6 +530,8 @@ const SEAT: Record<string, Extractor> = {
   currentCivic: overSeats((s) => idx(CIVIC_IDX, s.research.civic)),
   techProgress: overSeats((s) => s.research.techProgress),
   civicProgress: overSeats((s) => s.research.civicProgress),
+  techOverflow: overSeats((s) => s.research.techOverflow ?? 0),
+  civicOverflow: overSeats((s) => s.research.civicOverflow ?? 0),
   // PARKED progress, in table order — the GPU side is a plane of the same
   // width, so order is where the two representations meet.
   techRetained: overSeats((s) => [...TECH_IDX.keys()].map((id) => s.research.techRetained[id] ?? 0)),

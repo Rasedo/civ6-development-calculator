@@ -766,6 +766,26 @@
           ]
         },
         {
+          "name": "techOverflow",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.techOverflow"
+          ],
+          "planes": [
+            "civ_tech_ovf"
+          ]
+        },
+        {
+          "name": "civicOverflow",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.civicOverflow"
+          ],
+          "planes": [
+            "civ_civic_ovf"
+          ]
+        },
+        {
           "name": "techRetained",
           "compare": "milli",
           "covers": [

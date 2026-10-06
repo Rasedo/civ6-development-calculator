@@ -5650,16 +5650,9 @@ class SimEconomy:
         """What this pool's units heal — the refreshUnits rule.
 
         ONE rule for every seat: this seat's own city centre 20, its own land
-        15, its own CAMP 20, neutral ground 10, anyone else's land 5. A HULL
-        reads the naval table instead (`navalHeal`).
-
-        It reads as three rules only if you look at which terms are non-empty
-        per class. A major holds no camps, so its camp term never fires; the
-        barbarians hold no land, so their `home` term never does. That is data,
-        not a class branch.
-
-        `seat` is a tensor because a civ seat's varies per slot; for the other
-        two pools `torch.full_like` keeps it the same expression."""
+        15, neutral ground 10, anyone else's land 5. A HULL reads the naval
+        table instead (`navalHeal`). `seat` is a tensor because a civ seat's
+        varies per slot."""
         t = getattr(self, f"{pre}_unit_tile").clamp(min=0)
         seat = getattr(self, f"{pre}_unit_seat")
         here = self.tile_seat.gather(1, t)
@@ -5671,7 +5664,6 @@ class SimEconomy:
         if self.S:
             center = center | ((self.citystate_center.unsqueeze(2) == t.unsqueeze(1))
                                & self.citystate_alive.unsqueeze(2)).any(dim=1)
-        camp = (self.camp_tile.unsqueeze(2) == t.unsqueeze(1)).any(dim=1) if pre == "barb" else None
         heal = torch.where(home & center, torch.full_like(t, 20),
                torch.where(home, torch.full_like(t, 15),
                torch.where(here != NO_SEAT, torch.full_like(t, 5), torch.full_like(t, 10))))
@@ -5713,8 +5705,6 @@ class SimEconomy:
             _hf = self._type_heal_friendly.take(getattr(self, f"{pre}_unit_type").clamp(min=0))
             _ally = home | self._ground_allied(seat, here)
             heal = torch.where(_hf & ~_ally, torch.zeros_like(heal), heal)
-        if camp is not None:
-            heal = torch.where(camp & ~home, torch.full_like(t, 20), heal)
         heal = heal + self._emergency_heal_mp(pre, seat, here) + self._chaplain_heal(pre) \
             + _gp_heal.to(heal.dtype)
         # a RELIGIOUS unit heals by its own rule and by nothing above it
@@ -6770,15 +6760,13 @@ class SimEconomy:
         single column.
 
         TS fills SIX buckets and sums them in ONE order — tiles, districts,
-        buildings, citizens, bonuses, trade — then scales once by 1 + every
-        percent summed (the amenity tier on the five non-food columns,
-        m.yieldMult, each wonder's cityYieldMult), then `total.gold -=
-        maintenance`. That order is LOAD BEARING. CITIZEN_CULTURE is 0.3, the one non-dyadic term in the whole
-        walk, so every add on the culture column is position-sensitive to a ulp
-        and a ulp of culture flips a border-growth ceil. Everything else is
-        integer- or dyadic-valued, which f64 sums exactly at any association —
-        so the order INSIDE a bucket is free, and each bucket accumulates on
-        its own before joining the total once, exactly as TS does.
+        buildings, citizens, bonuses, trade — then takes every percent summed
+        (the amenity tier on the five non-food columns, m.yieldMult, each
+        wonder's cityYieldMult) once in the game's 24.8 fixed point, then
+        `total.gold -= maintenance`. Every term is integer- or dyadic-valued
+        (the citizen shares are cut to 256ths), which f64 sums exactly at any
+        association, and each bucket accumulates on its own before joining
+        the total once, exactly as TS does.
 
         The walk runs in f64 on every row; row 0's f32 lane casts on return.
 
@@ -7375,15 +7363,13 @@ class SimEconomy:
                 bld_y[:, :, _gy] = bld_y[:, :, _gy] + _ga * _gw.double().unsqueeze(1) * _byo[:, :, _gk].double() * alivef
 
         # ================= bucket 4: CITIZENS ===============================
-        # THE non-dyadic term (CITIZEN_CULTURE = 0.3), so its POSITION is the
-        # walk's one real association constraint: after districts+buildings,
-        # before bonuses+trade. It sits INSIDE the tier, where computeCityStats
-        # puts it — Civ 6 applies the Amenities modifier to the city's whole
-        # non-food output.
+        # It sits INSIDE the tier, where computeCityStats puts it — Civ 6
+        # applies the Amenities modifier to the city's whole non-food output.
         citz = zeros6.clone()
         popf = pop.double()
-        citz[:, :, 3] = self.rules.citizen_science * popf
-        citz[:, :, 4] = self.rules.citizen_culture * popf
+        # each share in the game's 24.8 fixed point (`citizenYield256`)
+        citz[:, :, 3] = torch.floor(popf * round(self.rules.citizen_science * 100) * 256 / 100) / 256
+        citz[:, :, 4] = torch.floor(popf * round(self.rules.citizen_culture * 100) * 256 / 100) / 256
         # a citizen with no plot and no slot to work pays Gold, one left idle
         # with them
         citz[:, :, 2] = self.rules.unassigned_citizen_gold * (pop - spec_d.sum(dim=2) - take.sum(dim=2)).clamp(min=0).double()
@@ -7556,7 +7542,12 @@ class SimEconomy:
                 if compw is not None:
                     pct = pct + torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
                 pct = pct + torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
-        total = total * (1.0 + pct)
+        # CIV6 (GameAttribute::Value 0xaa740): base + base x percent / 100 in
+        # the game's 24.8 fixed point, the divide truncating toward zero
+        # (`withPercent256`)
+        _raw = torch.floor(total * 256)
+        _mod = torch.round(pct * 25600)
+        total = (_raw + torch.trunc(torch.floor(_raw * _mod / 256) / 100)) / 256
         # total.gold -= cityMaintenance. `maint` is the housing body's first
         # half handed in by a caller that needs its second half too (the
         # city-stats snapshot): the body reads nothing the walk writes, so
