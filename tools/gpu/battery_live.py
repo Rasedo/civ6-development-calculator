@@ -17,6 +17,9 @@ removed when it ends. It does two jobs:
              recorded as a clean measurement
 
 A missing or unreadable file is `normal`.
+
+Both files are the MAIN checkout's, also when the battery runs in a git
+worktree: one box, one owner's switch, one battery at a time.
 """
 from __future__ import annotations
 
@@ -27,8 +30,26 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE = ROOT / ".claude" / "state" / "battery.json"
-MODE = ROOT / ".claude" / "mode"
+
+
+def main_checkout(root: Path) -> Path:
+    """The main checkout a git worktree belongs to (its `.git` is a file
+    naming <main>/.git/worktrees/<name>), else `root` itself: the box has
+    one owner's mode and one running battery, whichever tree launches it."""
+    git = root / ".git"
+    try:
+        if git.is_file():
+            gitdir = Path(git.read_text(encoding="utf-8").split("gitdir:", 1)[1].strip())
+            if gitdir.parent.name == "worktrees":
+                return gitdir.parents[2]
+    except (OSError, IndexError):
+        pass
+    return root
+
+
+MAIN = main_checkout(ROOT)
+STATE = MAIN / ".claude" / "state" / "battery.json"
+MODE = MAIN / ".claude" / "mode"
 MODES = ("normal", "build", "measure")
 HEARTBEAT_S = 15.0
 
