@@ -18,8 +18,12 @@ witness (`h1_starts.lua`, armed by `play`) `starts` (per player the last turn
 its PlayerTurnStarted and PlayerTurnStartComplete fired, read before the
 dump; `startsMoved: true` when one fired while it read) and `witness` (each
 player's state at those two points of its block, for the record's turn and
-the one before). The catalogs (index -> type name) go once to
-`<out>.cat.json`.
+the one before), and from the action log (`h1_actions.lua`, armed by `play`)
+`actions`: every game event logged since the previous record — [seq, turn,
+event, args...] for unit moves, operations and combat, city production,
+purchases and tiles, research, civics, policies, governments, governors,
+beliefs, envoys, routes, wars and deals. The catalogs (index -> type name)
+go once to `<out>.cat.json`.
 
 `play` passes turns one at a time and dumps after each until `--turns` more
 turns are recorded or the wall `--deadline` is near; it is resumable — run it
@@ -113,9 +117,28 @@ def wait_started(t: Tuner, lp: int, turn: int, limit: float, log, first: float =
     return False
 
 
+def actions(t: Tuner, mode: str, timeout: float = 60.0) -> dict:
+    """The action log (`h1_actions.lua`): `arm` installs its InGame
+    listeners (once per game), `read` returns and clears the rows logged
+    since the last read — [seq, turn, event, args...] per game event."""
+    out = t.run(IG, lua("h1_actions.lua", ZMODE=mode), timeout=timeout)
+    got: dict = {"list": None}
+    for ln in out:
+        try:
+            o = json.loads(ln)
+        except ValueError:
+            continue
+        if o.get("k") == "actions":
+            got["list"], got["dropped"] = o["list"], o.get("dropped", 0)
+        elif o.get("k") == "actions_status":
+            got["status"] = o
+    return got
+
+
 def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
     """One turn's record, and the catalog when `cat`."""
     before = lab.turn(t)
+    acts = actions(t, "read", timeout)
     st = starts(t, "read", timeout)
     gc_lines = t.run(GC, lua("h1_dump_gc.lua"), timeout=timeout)
     ig_lines = t.run(IG, lua("h1_dump_ig.lua", cat), timeout=timeout)
@@ -164,6 +187,12 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
                 by_city.setdefault((p[6], p[19]), []).append(y * len(row) + x)
     for c in rec["cities"]:
         c["plots"] = by_city.get((c["owner"], c["id"]), [])
+    # the game events logged since the last record (`h1_actions.lua`): what
+    # every player did between the two photographs
+    if acts.get("list") is not None:
+        rec["actions"] = acts["list"]
+        if acts.get("dropped"):
+            rec["actionsDropped"] = acts["dropped"]
     # whose turn start the record holds (`h1_starts.lua`), read before the
     # dump; a start that ran while it read is flagged
     if st.get("armed"):
@@ -216,6 +245,7 @@ def cmd_play(a, t: Tuner) -> int:
         # the witness listens from here on (once per game; a loaded game arms
         # afresh) — the turn starts before this call ran are not witnessed
         st = starts(t, "arm")
+        actions(t, "arm")
         if now not in done:
             # the seat's own turn start runs before its record is read
             if lp >= 0 and st.get("armed") and start_complete(st, lp) == now - 1:
