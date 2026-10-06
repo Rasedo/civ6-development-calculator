@@ -295,9 +295,14 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
     // already has one in an earlier slot of the holder pays the row's figure
     const nu = GW_LAYOUT[w.slot]!.nonUniqueTourism;
     const own = nu && gwRepeatsPerson(works, w) ? nu : gwWorkTourism(w);
-    t += own * (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1)
-      * (w.obj === GWO_ARTIFACT ? artifact : 1) * scale[w.obj]!
-      * (omult?.[w.obj] ?? 1) * mult[w.slot]!;
+    // the object type's scaling (PRINTING's, a card's) and a themed
+    // holder's bonus are percents on the base, SUMMED: a themed Art Museum
+    // under Heritage Tourism pays its Religious works 3x, not 4x
+    // (runs/h1_duelw1112 Beijing and Guangzhou, 3 themed works each, +9
+    // over the product from the card's adoption at t216)
+    const scaled = (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1) * scale[w.obj]!;
+    t += own * (w.obj === GWO_ARTIFACT ? artifact : 1) * (omult?.[w.obj] ?? 1)
+      * (scaled + mult[w.slot]! - 1);
   }
   return t;
 }

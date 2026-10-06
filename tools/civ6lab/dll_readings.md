@@ -750,6 +750,25 @@ engines' `routeLengthGold` / `_route_length_gold`). The route's path is laid
 once, when the route begins: the harness keeps the course the first record
 carrying a route laid (`History.routeCourse`).
 
+## H-1: the citizen pressure term — PARTLY READ
+
+0x1a1ae0 (City_CulturalIdentity.cpp) turns a city's own and foreign
+citizen pressure (24.8 fixed point, gathered by the plot walk 0x6aef0 over
+CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot
+functor 0x19b090) into its loyalty term: both 0 → 0; own 0 → −MAX_LOYALTY;
+foreign 0 → +MAX_LOYALTY; else r = hi / lo in 24.8 (0x16e940), clamped
+into [NEUTRAL_RATIO, MAX_RATIO] (gp +0x480 / +0x478, floats cut to 1/256);
+t = (r − NEUTRAL_RATIO) / (MAX_RATIO − NEUTRAL_RATIO) in 24.8; the term
+NEUTRAL_LOYALTY + (MAX_LOYALTY − NEUTRAL_LOYALTY)·t >> 8 (gp +0x474 /
++0x47c, ints << 8), clamped into [NEUTRAL, MAX], times −1.0 when the
+foreign side is larger (`pressureTerm` / `_pressure_term`). A byte argument
+returns the raw own − foreign instead. Not read: the distance falloff the
+walk's entries take; the engines' floor(256·(10 − d)/10) per city, each
+city's product floored, is a fit (AUDIT C-94 LAB): runs/h1_duelw1112 Yiyang
+t192 reads 0.546875 (own 971/256, foreign 918/256 → r 270/256) where the
+reals read 0.411; recorded terms 2,036 → 2,092 of 2,097 (1112), 2,038 →
+2,092 of 2,114 (1106), 1,619 → 1,751 of 1,843 (1110).
+
 ## H-1: the annex, the purchase and the stored next plot — READ
 
 0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city

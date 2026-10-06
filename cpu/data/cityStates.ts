@@ -45,7 +45,7 @@ export const CITY_STATE_TYPE_DISTRICT: Record<CityStateType, DistrictId> = {
  */
 export type SuzEffect =
   | 'xpDouble'          // Kabul
-  | 'cavalryHills'      // Preslav
+  | 'militaryBuildingLoyalty' // Preslav
   | 'regionalReach'     // Mexico City
   | 'worksScience'      // Anshan
   | 'csRouteYields'     // Kumasi
@@ -70,7 +70,7 @@ export type SuzEffect =
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
-  'xpDouble', 'cavalryHills', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
+  'xpDouble', 'militaryBuildingLoyalty', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
   'wallsFullDamage',
   // the three whose whole perk is "your Builders can build X improvements",
@@ -87,8 +87,11 @@ export const SUZ_EFFECTS: SuzEffect[] = [
 export const CARDIFF_HARBOR_POWER = 2;
 /** Kabul: "Your units receive double experience from battles they initiate." */
 export const KABUL_XP_MULT = 2;
-/** Preslav: "+5 Strength when fighting on hill tiles" (light and heavy cavalry). */
-export const PRESLAV_HILL_CS = 5;
+/** CIV6 (Expansion1_Leaders.xml, the three MINOR_CIV_PRESLAV_*_IDENTITY_BONUS
+ *  rows): `MODIFIER_PLAYER_CITIES_ADJUST_IDENTITY_PER_TURN` Amount 2, one row
+ *  per Encampment building requirement set (`MILITARISTIC_BUILDING_ROWS`) —
+ *  "+2 Loyalty per turn in cities for each Encampment district building". */
+export const PRESLAV_BUILDING_LOYALTY = 2;
 /** Mexico City: "Regional effects ... reach 3 tiles farther." */
 export const REGIONAL_REACH_BONUS = 3;
 /** Anshan: "+2 Science from each Great Work of Writing. +1 Science from each
@@ -187,7 +190,11 @@ export const HONG_KONG_PROJECT_PCT = 20;
  *  60% off. The gate is the modifier's own DOMAIN_LAND; the trait text says
  *  "land combat or support units", which the DLL alone could tell apart. */
 export const NGAZARGAMU_PURCHASE_PCT = 20;
-export const NGAZARGAMU_BUILDINGS: readonly (readonly string[])[] = [
+/** The three Encampment building requirement sets the militaristic
+ *  suzerains (Ngazargamu, Preslav) pay a row each on —
+ *  BUILDING_IS_BARRACKS_STABLE_MILITARITIC_CITY_STATE (TEST_ANY),
+ *  BUILDING_IS_ARMORY, BUILDING_IS_MILITARY_ACADEMY. */
+export const MILITARISTIC_BUILDING_ROWS: readonly (readonly string[])[] = [
   ['BARRACKS', 'STABLE'], ['ARMORY'], ['MILITARY_ACADEMY'],
 ];
 
@@ -244,7 +251,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Akkad: { name: 'Akkad', type: 'militaristic', bonus: "Melee and anti-cavalry units' attacks do full damage to the city's walls.", suz: 'wallsFullDamage' },
   Kabul: { name: 'Kabul', type: 'militaristic', bonus: 'Your units receive double experience from battles they initiate.', suz: 'xpDouble' },
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', suz: 'landPurchaseDiscount' },
-  Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'Your light and heavy cavalry units have +5 Strength when fighting on Hills tiles.', suz: 'cavalryHills' },
+  Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'You receive +2 Loyalty per turn in cities for each Encampment district building.', suz: 'militaryBuildingLoyalty' },
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },

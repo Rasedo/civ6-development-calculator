@@ -22,6 +22,7 @@ import {
   type WorkCity,
 } from '../../../cpu/core/greatWorks';
 import type { City, GameState } from '../../../cpu/core/types';
+import { seatOf } from '../../../cpu/core/seats';
 
 /** A city with a completed Theater Square + Amphitheater (2 writing slots). */
 function cityWithAmphitheater() {
@@ -194,6 +195,19 @@ describe('Great Works', () => {
     for (const obj of [GWO_RELIGIOUS, GWO_SCULPTURE, GWO_RELIGIOUS]) placeGreatWork(state, mixed, { obj, maker: k++, era: -1, seat: 0 });
     expect(holderThemed(state, workContext(state, mixed), mixed, museum)).toBe(false);
     expect(greatWorkYields(state, mixed).culture).toBe(GWO_CULTURE[GWO_RELIGIOUS]! * 3);
+  });
+
+  it("a card's scaling and the theming bonus are percents on the base, summed", () => {
+    // runs/h1_duelw1112 Beijing and Guangzhou: a themed Art Museum of three
+    // Religious works under Heritage Tourism pays each 3x its base, not 4x
+    const state = makeState();
+    seatOf(state, 0)!.government.chosen = 'CHIEFDOM';
+    seatOf(state, 0)!.research.civics.push('CULTURAL_HERITAGE');
+    seatOf(state, 0)!.government.policies = [null, 'HERITAGE_TOURISM'];
+    const city = { seat: 0, buildings: ['MUSEUM'] } as unknown as City;
+    for (const maker of [0, 1, 3]) placeGreatWork(state, city, { obj: ARTIST_WORKS[maker]![0]!, maker, era: -1, seat: 0 });
+    expect(holderThemed(state, workContext(state, city), city, holder('MUSEUM'))).toBe(true);
+    expect(greatWorkTourism(state, city, false)).toBe(GWO_TOURISM[GWO_RELIGIOUS]! * 3 * (2 + THEMING_MULT - 1));
   });
 
   it("a Hermitage art slot sits outside the museum's own theming", () => {

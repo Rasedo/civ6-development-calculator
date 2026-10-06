@@ -225,6 +225,15 @@ def main() -> None:
     stand("BORDER_CONTROL_TREATY", 1, 1)
     assert int(sim2._congress_culture_bomb_seat()[0]) == -1
     assert bool(sim2._congress_border_frozen(1)[0]) and not bool(sim2._congress_border_frozen(0)[0])
+    # the frozen seat's culture turn banks nothing and draws nothing
+    if bool(sim2.city_alive[0, 1, 0]):
+        _c0 = torch.zeros(sim2.B, dtype=torch.long)
+        _act = sim2.city_alive[:, 1, 0].clone()
+        sim2.city_cbox[0, 1, 0] = 3.0
+        sim2.city_next_plot[0, 1, 0] = 7
+        sim2._seat_border_growth(1, _c0, _act, torch.full((sim2.B,), 100.0, dtype=torch.float64))
+        assert float(sim2.city_cbox[0, 1, 0]) == 3.0 and int(sim2.city_next_plot[0, 1, 0]) == 7, \
+            "a frozen seat banked culture or drew a plot"
 
     if sim2.S:
         ct = int(sim2.citystate_type[0, 0])

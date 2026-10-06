@@ -3,7 +3,7 @@ import type { Seat } from '../../../cpu/core/types';
 import { citiesOf, seatOf } from '../../../cpu/core/seats';
 import { growthDetachResidue, growthPct256 } from '../../../cpu/core/city';
 import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
-import { seatPhase, worldCongress } from '../../../cpu/core/phase';
+import { cityBorderGrowth, seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
 import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION, UDT_DISTRICTS } from '../../../cpu/data/seats';
 import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
@@ -333,6 +333,21 @@ describe('world congress: the wider slate', () => {
     expect(congressCultureBombSeat(state)).toBe(-1);
     expect(congressBorderFrozen(state, 1)).toBe(true);
     expect(congressBorderFrozen(state, 0)).toBe(false);
+  });
+
+  it("Border Control's frozen seat banks no border culture and draws no plot", () => {
+    const state = newGame(1);
+    const city = citiesOf(state, 1)[0]!;
+    city.cultureBox = 3;
+    city.nextPlot = 7;
+    state.congress = [{ res: CONGRESS_BORDER_CONTROL, outcome: 1, target: 1 }];
+    cityBorderGrowth(state, city, 1, 100);
+    expect(city.cultureBox).toBe(3);
+    expect(city.nextPlot).toBe(7);
+    state.congress = [];
+    cityBorderGrowth(state, city, 1, 1);
+    expect(city.cultureBox).toBe(4);
+    expect(city.nextPlot).not.toBe(7);
   });
 
   it('Treaty Organization and Sovereignty key on the city-state TYPE', () => {

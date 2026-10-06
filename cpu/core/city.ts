@@ -625,7 +625,7 @@ function nonLuxuryAmenities(
     regionalAmenities +
     wonderRegionalAmenities(state, city) +
     wonderCityFlat(state, city, 'cityAmenities') +
-    wonderImprovementAmenities(state, city) +
+    wonderLakeAmenities(state, city) +
     improvementAmenities(state, city) +
     m.amenitiesAll +
     // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
@@ -937,24 +937,33 @@ function wonderCityFlat(state: GameState, city: City,
   return n;
 }
 
-/** Amenities from the improvements around a wonder that pays per improvement
- *  (Temple of Artemis counts Camps, Pastures and Plantations within 4). */
-function wonderImprovementAmenities(state: GameState, city: City): number {
+/** Amenities a city's own wonder pays per Lake tile around it (Huey
+ *  Teocalli), measured from the wonder tile. */
+function wonderLakeAmenities(state: GameState, city: City): number {
   let n = 0;
   for (const w of completedWonders(state, city)) {
     const lake = w.def.effects?.amenityPerLake;
-    if (lake) {
-      const t = state.map.tiles[w.tileIndex];
-      for (const near of tilesWithin(state.map, t.col, t.row, lake.range)) if (near.terrain === 'LAKE') n += 1;
-    }
-    const rule = w.def.effects?.amenityPerImprovement;
-    if (!rule) continue;
+    if (!lake) continue;
     const t = state.map.tiles[w.tileIndex];
-    for (const near of tilesWithin(state.map, t.col, t.row, rule.range)) {
-      if (near.improvement && (rule.improvements as readonly string[]).includes(near.improvement)) n += 1;
-    }
+    for (const near of tilesWithin(state.map, t.col, t.row, lake.range)) if (near.terrain === 'LAKE') n += 1;
   }
   return n;
+}
+
+/** Every complete wonder whose aura raises the amenity of the improvements
+ *  around it, whoever holds it. */
+function improvementAmenityAuras(state: GameState) {
+  const holders = state.freeSeat ? [...state.seats, state.freeSeat] : state.seats;
+  const out: { tile: Tile; improvements: readonly string[]; range: number }[] = [];
+  for (const h of holders) {
+    for (const c of h.cities) {
+      for (const w of completedWonders(state, c)) {
+        const rule = w.def.effects?.amenityPerImprovement;
+        if (rule) out.push({ tile: state.map.tiles[w.tileIndex], improvements: rule.improvements, range: rule.range });
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -967,15 +976,23 @@ function wonderImprovementAmenities(state: GameState, city: City): number {
  * standing beside water — the RING, so a drowned neighbour counts as the sea
  * it now is, and a river edge counts as well (a TEST_ANY over coast, river
  * and lake).
+ * CIV6 (TEMPLE_ARTEMIS_{CAMP,PASTURE,PLANTATION}_AMENITY, the same
+ * MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY on the improvement, behind
+ * REQUIREMENT_PLOT_ADJACENT_BUILDING_TYPE_MATCHES within 4): +1 for a Camp,
+ * Pasture or Plantation within the Temple of Artemis' reach — paid to the
+ * city that owns the improvement, whoever holds the wonder.
  */
 function improvementAmenities(state: GameState, city: City): number {
   let n = 0;
+  const auras = improvementAmenityAuras(state);
   for (const t of state.map.tiles) {
     if (!t.improvement || t.pillaged || !tileBelongsTo(t, city)) continue;
     const def = IMPROVEMENTS[t.improvement as ImprovementId];
     n += def?.amenity ?? 0;
     const wet = def?.amenityAdjacentWater ?? 0;
     if (wet && (hasRiver(t) || neighbors(state.map, t).some((nb) => isWater(nb)))) n += wet;
+    if (auras.some((a) => a.improvements.includes(t.improvement!)
+      && hexDistance(state.map, a.tile.col, a.tile.row, t.col, t.row) <= a.range)) n += 1;
   }
   return n;
 }

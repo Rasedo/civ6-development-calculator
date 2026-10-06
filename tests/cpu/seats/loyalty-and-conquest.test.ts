@@ -261,13 +261,12 @@ describe('loyalty', () => {
     const rival = civ.cities[0];
     rival.population = 10;
     const me = seatOf(state, 0)!;
-    // own: the border city's citizens at its own centre (weight 10); foreign:
-    // the rival's ten, 4 out (weight 6)
-    const pt = (ownEach: number, foreignEach: number): number => {
-      const own = border.population * ownEach * 10;
-      const foreign = rival.population * foreignEach * 6;
-      return pressureTerm(own, foreign);
-    };
+    // own: the border city's citizens at its own centre (weight 1); foreign:
+    // the rival's ten, 4 out (weight 0.6, floored to 153/256) — each city's
+    // product in 256ths, floored
+    const side = (n: number, each: number, w: number): number => Math.floor((n * each * 256 * w) / 256) / 256;
+    const pt = (ownEach: number, foreignEach: number): number =>
+      pressureTerm(side(border.population, ownEach, 256), side(rival.population, foreignEach, 153));
     const rest = loyaltyDelta(state, border, 'Content') - pt(1, 1);
     const off = (ownEach: number, foreignEach: number): number =>
       loyaltyDelta(state, border, 'Content') - rest - pt(ownEach, foreignEach);

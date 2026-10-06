@@ -49,13 +49,13 @@ def drop(sim, s: int = 0) -> None:
 def main() -> None:
     sim = build()
     assert sim.S > 0, "fixture has no city-states"
-    assert min(sim._suz_c_xp, sim._suz_c_hill, sim._suz_c_reach,
+    assert min(sim._suz_c_xp, sim._suz_c_mil_loy, sim._suz_c_reach,
                sim._suz_c_works, sim._suz_c_route, sim._suz_c_holy) >= 0, "a suz code is missing from the rules"
 
     # ---- the suzerain-holding predicate, incl. the strict contest ----------
     hold(sim, 0, sim._suz_c_xp)
     assert bool(sim._suz_effect(0, sim._suz_c_xp)[0])
-    assert not bool(sim._suz_effect(0, sim._suz_c_hill)[0])
+    assert not bool(sim._suz_effect(0, sim._suz_c_mil_loy)[0])
     assert not bool(sim._suz_effect(1, sim._suz_c_xp)[0])
     sim.seat_citystate_envoys[0, 1, 0] = 3  # a tie leaves no suzerain
     sim._eff_version += 1
@@ -68,21 +68,29 @@ def main() -> None:
     assert mults == [sim._suz_xp_mult_k, 1, 1], mults
     print("kabul ok")
 
-    # ---- Preslav: +5 CS for cavalry fighting on hills ----------------------
-    hold(sim, 0, sim._suz_c_hill)
-    cav_idx = int(sim._type_cavalry.long().argmax())
-    assert bool(sim._type_cavalry[cav_idx])
-    foot_idx = int((~sim._type_cavalry).long().argmax())
-    hill_t = int(sim.hills[0].long().argmax())
-    assert bool(sim.hills[0, hill_t])
-    flat_t = int((~sim.hills[0]).long().argmax())
-    one = lambda ty, ti: int(sim._cav_hill_cs(torch.tensor([0]), torch.tensor([ty]), torch.tensor([ti]))[0])
-    assert one(cav_idx, hill_t) == sim._suz_hill_cs
-    assert one(cav_idx, flat_t) == 0
-    assert one(foot_idx, hill_t) == 0
-    assert int(sim._cav_hill_cs(torch.tensor([1]), torch.tensor([cav_idx]), torch.tensor([hill_t]))[0]) == 0
+    # ---- Preslav: loyalty per Encampment building row ---------------------
+    pcol = int(sim.city_alive[0, 0].long().argmax())
+    _pb = sim.city_bldg[0, 0, pcol]
+    for _b in [int(x) for x in sim._suz_mil_bldg.reshape(-1).tolist() if int(x) >= 0]:
+        _pb[_b] = False
+    _bx, _cx = torch.tensor([0]), torch.tensor([pcol])
+    hold(sim, 0, sim._suz_c_xp)  # a loyalty-inert code
+    base = float(sim._standing_loyalty(0, _bx, _cx)[0])
+    hold(sim, 0, sim._suz_c_mil_loy)
+    assert float(sim._standing_loyalty(0, _bx, _cx)[0]) == base, "no building, no loyalty"
+    _pb[int(sim._suz_mil_bldg[0, 0])] = True
+    if int(sim._suz_mil_bldg[0, 1]) >= 0:
+        _pb[int(sim._suz_mil_bldg[0, 1])] = True  # the OTHER half of the same row
+    _pb[int(sim._suz_mil_bldg[1, 0])] = True
+    _pb[int(sim._suz_mil_bldg[2, 0])] = True
+    with_s = float(sim._standing_loyalty(0, _bx, _cx)[0])
+    hold(sim, 0, sim._suz_c_xp)
+    without = float(sim._standing_loyalty(0, _bx, _cx)[0])
+    assert with_s - without == 3 * sim._suz_bldg_loyalty, (with_s, without)
+    assert sim._suz_bldg_loyalty == 2.0, "Preslav is +2 Loyalty a building row"
+    for _b in [int(x) for x in sim._suz_mil_bldg.reshape(-1).tolist() if int(x) >= 0]:
+        _pb[_b] = False
     drop(sim)
-    assert one(cav_idx, hill_t) == 0
     print("preslav ok")
 
     # ---- Anshan: science per Great Work of Writing / Relic / Artifact ------
@@ -302,7 +310,7 @@ def main() -> None:
     assert sim._suz_gpp_bldg.shape[0] == sim.civ_gpp.shape[2], "a GP class has no Bologna row"
     assert bool((sim._suz_gpp_bldg >= 0).any(dim=1).all()), "a GP class names no building"
     # the three Encampment rows, Barracks OR Stable sharing one
-    assert sim._suz_buy_bldg.shape[0] == 3, "Ngazargamu has three building rows"
+    assert sim._suz_mil_bldg.shape[0] == 3, "Ngazargamu has three building rows"
     print("suzerain magnitudes ok — nine rules, every code resolved")
 
     # --- Buenos Aires counts resources that STILL EXIST --------------------
@@ -360,17 +368,17 @@ def main() -> None:
     # Ngazargamu: one row per Encampment building, Barracks OR Stable sharing one
     hold(sim, 0, sim._suz_c_land_buy)
     _bl = sim.city_bldg[0, 0, 0]
-    _bi = [int(x) for x in sim._suz_buy_bldg.reshape(-1).tolist() if int(x) >= 0]
+    _bi = [int(x) for x in sim._suz_mil_bldg.reshape(-1).tolist() if int(x) >= 0]
     for _b in _bi:
         _bl[_b] = False
     assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "an empty city pays full price"
-    _bl[int(sim._suz_buy_bldg[0, 0])] = True
+    _bl[int(sim._suz_mil_bldg[0, 0])] = True
     assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "one row is 20% off"
-    if int(sim._suz_buy_bldg[0, 1]) >= 0:
-        _bl[int(sim._suz_buy_bldg[0, 1])] = True  # the OTHER half of the same row
+    if int(sim._suz_mil_bldg[0, 1]) >= 0:
+        _bl[int(sim._suz_mil_bldg[0, 1])] = True  # the OTHER half of the same row
         assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "the pair is ONE row"
-    _bl[int(sim._suz_buy_bldg[1, 0])] = True
-    _bl[int(sim._suz_buy_bldg[2, 0])] = True
+    _bl[int(sim._suz_mil_bldg[1, 0])] = True
+    _bl[int(sim._suz_mil_bldg[2, 0])] = True
     assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.4) < 1e-12, "three rows are 60% off"
     drop(sim)
     assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "the discount outlived the suzerainty"

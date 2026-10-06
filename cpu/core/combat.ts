@@ -22,7 +22,7 @@ import { DISTRICTS } from '../data/districts';
 import { pillagePlunder } from './economy';
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { governorSum, governorTileSum, cityGovernorEffects } from './governors';
-import { CITY_STATE_MAX_HP, KABUL_XP_MULT, PRESLAV_HILL_CS } from '../data/cityStates';
+import { CITY_STATE_MAX_HP, KABUL_XP_MULT } from '../data/cityStates';
 import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
@@ -155,7 +155,7 @@ export function chassisFlankMult(u: { type: string }): number {
 /**
  * EVERY POSITION-DEPENDENT UNIQUE-UNIT CLAUSE, in one composer. Each term is
  * one UnitAbilities.xml ability, and each is read at the tile the unit FIGHTS
- * FROM — the same tile `cavalryHillCS` and `generalAuraCS` read. `ranged` says
+ * FROM — the same tile `generalAuraCS` reads. `ranged` says
  * the unit is defending against a ranged strike, which one clause needs.
  */
 export function chassisAbilityCS(
@@ -727,15 +727,6 @@ export function religionDefenseCS(state: GameState, defender: Unit, defTileIndex
   return bonus;
 }
 
-/** CIV 6, Preslav's suzerain: "Your light and heavy cavalry units have +5
- *  Strength when fighting on hill tiles." The tile is the unit's OWN — the
- *  ground it fights from, attacking or defending. */
-export function cavalryHillCS(state: GameState, unit: Unit, tileIndex: number): number {
-  if (!UNITS[unit.type]?.cavalry) return 0;
-  if (state.map.tiles[tileIndex]?.elevation !== 'HILLS') return 0;
-  return suzerainEffect(state, unitSeat(unit), 'cavalryHills') ? PRESLAV_HILL_CS : 0;
-}
-
 /** The Combat Strength an embarked unit of this seat defends at — the owner's
  *  technological era, which `civEraIndex` already measures the way the page
  *  does ("the first technology or civic of that era"). */
@@ -856,7 +847,6 @@ export function defenderCS(state: GameState, defender: Unit, defTileIndex: numbe
     }) + // the promotions this unit chose — an embarked defender took the flat override above
     (vs ? holdTheLineCS(state, defender, defTileIndex, vs.attacker.type) : 0) +
     religionDefenseCS(state, defender, defTileIndex) + // enhancer adders (unit-vs-unit — every defenderCS caller is one; city strikes assemble inline without them)
-    cavalryHillCS(state, defender, defTileIndex) + // Preslav's suzerain
     chassisAbilityCS(state, defender, defTileIndex,
       { defendingRanged: vs ? !vs.melee : false, foeType: vs?.attacker.type }) +
     generalAuraCS(state, defender, defTileIndex) + // Great General/Admiral aura
@@ -1452,7 +1442,6 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
     (isCiv(attacker.seat)
       ? religionAttackCS(state, attacker, targetIndex)
       : 0) +
-    cavalryHillCS(state, attacker, attacker.tileIndex) + // Preslav's suzerain
     chassisAbilityCS(state, attacker, attacker.tileIndex, { vsDistrict: true }) +
     generalAuraCS(state, attacker, attacker.tileIndex) +
     gdrBeamCS(state, attacker) + // the beam "applies to both melee and ranged attacks"
@@ -1859,7 +1848,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
         tile: from,
       })
       + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
-      + religionAttackCS(state, attacker, targetIndex) + cavalryHillCS(state, attacker, attacker.tileIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+      + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
       + classMatchupCS(attacker.type, defender.type)
       + emergencyAttackCS(state, attacker.seat, defender.seat)
       + barbarianCombatCS(state, attacker.seat, defender.seat)

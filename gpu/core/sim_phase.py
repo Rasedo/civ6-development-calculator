@@ -516,14 +516,19 @@ class SimPhase:
         for the side that presses harder; an unopposed side is MAX_LOYALTY,
         nobody pressing 0."""
         mx, mr, nl, nr = (float(x) for x in self.rules.seats["loyaltyPress"])
-        own, foreign = own.double(), foreign.double()
-        hi = torch.maximum(own, foreign)
-        lo = torch.minimum(own, foreign)
-        r = hi / lo.clamp(min=1e-300)
-        mag = torch.where(lo <= 0, torch.full_like(hi, mx),
-                          (nl + ((mx - nl) * (r - nr)) / (mr - nr)).clamp(max=mx))
-        mag = torch.where((hi <= 0) | (own == foreign), torch.zeros_like(mag), mag)
-        return torch.where(own > foreign, mag, -mag)
+        # 24.8 fixed point, as the DLL's 0x1a1ae0 holds every term
+        o = torch.round(own.double() * 256).long()
+        f = torch.round(foreign.double() * 256).long()
+        hi = torch.maximum(o, f)
+        lo = torch.minimum(o, f)
+        maxl, neul = round(mx * 256), round(nl * 256)
+        maxr, neur = round(mr * 256), round(nr * 256)
+        r = torch.div(hi * 256, lo.clamp(min=1), rounding_mode="floor").clamp(min=neur, max=maxr)
+        t = torch.div((r - neur) * 256, maxr - neur, rounding_mode="floor")
+        mag = (neul + torch.div((maxl - neul) * t, 256, rounding_mode="floor")).clamp(min=neul, max=maxl)
+        mag = torch.where(lo <= 0, torch.full_like(mag, maxl), mag)
+        mag = torch.where((hi <= 0) | (o == f), torch.zeros_like(mag), mag)
+        return torch.where(o > f, mag, -mag).double() / 256
 
     def _seat_city_loyalty(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            tier: torch.Tensor, gov: torch.Tensor, starve: torch.Tensor,
@@ -542,16 +547,14 @@ class SimPhase:
         others = others | self.city_alive[:, self.FREE_ROW].any(dim=1)
         here = self.city_center[bidx, row, col].clamp(min=0)
         loy_gov = self._ungoverned_loyalty(row) if pre["nogov_on"] else pre["z"]
-        d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].to(F)
-        # each citizen presses at base + capital + its seat's age (`citizenPressure`)
+        d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].long().reshape(B, nrow, self.RC)
+        # each citizen presses at base + capital + its seat's age, weighted
+        # (CUTOFF - d) / CUTOFF, all in 24.8 fixed point (`citizenPressure`)
         each = (self._citizen_press_base
                 + self._citizen_press_cap * self.city_is_cap[:, :nrow].double()
                 + pre["age_p"].unsqueeze(2))
         cits = (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0)
-        w = ((rng + 1 - d).clamp(min=0)
-             * (cits * each).reshape(B, -1)
-             * self.city_alive[:, :nrow].reshape(B, -1).double())
-        sub = w.reshape(B, nrow, self.RC).sum(dim=2)
+        sub = self._pressure_fixed(d, cits, each, self.city_alive[:, :nrow], rng).sum(dim=2)
         own = sub[:, row]
         foreign = (sub * pre["keep"]).sum(dim=1)
         # CIV6: a Free City's citizens press on their neighbours like any other
@@ -597,13 +600,23 @@ class SimPhase:
         citizens press at the base."""
         rng = int(self.rules.seats["loyaltyRange"])
         ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
-        d = self.pair_dist[here.unsqueeze(1), ctr].to(torch.float64)
+        d = self.pair_dist[here.unsqueeze(1), ctr].long()
         pop = (self.city_pop[:, row].double() - self._emergency_pressure_cut(row).unsqueeze(1)).clamp(min=0)
         each = self._citizen_press_base + self._citizen_press_cap * self.city_is_cap[:, row].double()
         if row < self.n_majors:
             each = each + self._age_pressure.take(self.civ_age[:, row]).unsqueeze(1)
-        w = (rng + 1 - d).clamp(min=0) * (pop * each) * self.city_alive[:, row].double()
-        return w.sum(dim=1)
+        return self._pressure_fixed(d, pop, each, self.city_alive[:, row], rng).sum(dim=1)
+
+    def _pressure_fixed(self, d: torch.Tensor, cits: torch.Tensor, each: torch.Tensor,
+                        alive: torch.Tensor, rng: int) -> torch.Tensor:
+        """f64, the shape of `d` — each city's citizen pressure in pressure
+        units, the DLL's 24.8 fixed point (`citizenPressure`): the weight
+        floor(256·(CUTOFF − d) / CUTOFF), CUTOFF = rng + 1, nothing past rng;
+        each city's product floor(cits · each₂₅₆ · w / 256)."""
+        cut = rng + 1
+        w = torch.div(256 * (cut - d), cut, rounding_mode="floor") * ((d <= rng) & alive).long()
+        raw = torch.div(torch.round(cits).long() * torch.round(each * 256).long() * w, 256, rounding_mode="floor")
+        return raw.double() / 256
 
     def _skips_free_city(self, row: int) -> torch.Tensor:
         """[B] bool — CIV6 (Eleanor, EFFECT_ADJUST_PLAYER_SKIP_FREE_CITY_STEP):

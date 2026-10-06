@@ -290,6 +290,24 @@ def main() -> None:
         "a Mine outside the city pays nothing"
     print("  Ruhr Valley OK — a Mine and a Quarry the city owns, pillage and ownership gated")
 
+    # --- 13b) Temple of Artemis: +1 on the improvement, to the city owning it
+    s13b = build(rules, paths[0])
+    ctr13b = int(s13b.city_center[0, 0, 0])
+    wt13b = plant(s13b, 0, 0, artemis)
+    camp_i = int(rows[artemis]["amenImp"][0])
+    near13b = [int(t) for t in (s13b.city_slot_at(0)[0] == 0).nonzero(as_tuple=True)[0].tolist()
+               if t not in (ctr13b, wt13b) and int(s13b.district[0, t]) < 0 and int(s13b.built_wonder[0, t]) < 0
+               and int(s13b.pair_dist[wt13b, t]) <= 4]
+    assert near13b, "the fixture city owns no plain tile within 4 of the wonder"
+    base13b = float(s13b._improvement_amenities(0)[0, 0])
+    s13b.improvement[0, near13b[0]] = camp_i
+    s13b._eff_version += 1
+    assert float(s13b._improvement_amenities(0)[0, 0]) == base13b + 1, "a Camp in reach pays its city +1"
+    s13b.pillaged[0, near13b[0]] = True
+    assert float(s13b._improvement_amenities(0)[0, 0]) == base13b, "a pillaged Camp pays nothing"
+    assert float(s13b._wonder_lake_amenities(0)[0, 0]) == 0.0, "the holding city takes nothing of its own"
+    print("  Temple of Artemis OK — the Camp's own +1, paid where the Camp stands")
+
     # --- 14) the Oracle: every district in ITS city, +2 of its own type -----
     s14 = build(rules, paths[0])
     cls14 = next(c for c in range(s14._gp_nc) if int(s14._gp_class_district[c]) >= 0)

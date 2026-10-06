@@ -5218,24 +5218,29 @@ class SimEconomy:
         if rep is not None:
             nu = torch.tensor(self._gw_slot_nonunique, dtype=torch.long, device=self.device)
             base = torch.where(rep & (nu > 0), nu.expand_as(base), base)
+        # the object type's scaling as a percent [B, RC, slots]: PRINTING
+        # doubling a Work of Writing's, and (Heritage Tourism, Satellite
+        # Broadcasts) the seat's cards (EFFECT_ADJUST_CITY_TOURISM's
+        # ScalingFactor)
+        scl = torch.full_like(base, 100)
         if printing is not None:
             pm = torch.where(printing, torch.full((self.B,), self._gw_printing_mult, dtype=torch.long, device=self.device),
                              torch.ones(self.B, dtype=torch.long, device=self.device))
-            base = torch.where(obj == 5, base * pm.reshape(-1, 1, 1), base)
+            scl = torch.where(obj == 5, scl * pm.reshape(-1, 1, 1), scl)
         _am = 100 + self._gp_perm(row, "artifactTourismPct").long()               # [B]
         if bool((_am != 100).count_nonzero()):
             base = torch.where(obj == 4, base * _am.reshape(-1, 1, 1) // 100, base)  # 4 = GWO_ARTIFACT
-        # CIV6 (Heritage Tourism, Satellite Broadcasts): the seat's cards scale
-        # one object type's tourism (EFFECT_ADJUST_CITY_TOURISM's ScalingFactor)
         if row < self.n_majors:
             _gs = self._gov_mods(row)[12]["gwscale"]
             if bool((_gs != 1).count_nonzero()):
                 _sc = (_gs * 100).round().long()                                  # [B, 8]
                 _f = _sc.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)
-                base = base * _f // 100
+                scl = scl * _f // 100
         if km is not None:
             base = base * km.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)  # by object type
-        return (base * self._gw_slot_mult(row)).sum(dim=2)
+        # the scaling and a themed holder's bonus are percents on the base,
+        # SUMMED (`greatWorkTourism`)
+        return (base * (scl + (self._gw_slot_mult(row) - 1) * 100) // 100).sum(dim=2)
 
     def _gw_tourism_relic(self, row: int) -> torch.Tensor:
         """[B, RC] long — `relicTourism`: what the Relics pay, a themed holder

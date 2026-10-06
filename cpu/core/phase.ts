@@ -27,7 +27,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainProjectMult } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, setMet, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
@@ -381,38 +381,59 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
  *  affects cities within 9 tiles, but is 10% less effective per tile
  *  distant." Each city's citizens — its population less its owner's
  *  `emergencyPressureCut`, never below 0 — press at base + capital + age
- *  each, weighted by `LOYALTY_RANGE + 1 - d`: ten times the pedia's 10%
- *  steps, a scale the pressure term's ratio cancels. */
+ *  each, weighted by (CUTOFF − d) / CUTOFF (CUTOFF = LOYALTY_RANGE + 1,
+ *  CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF), all in the DLL's 24.8 fixed
+ *  point: the weight floored to 256ths, each city's product floored
+ *  (runs/h1_duelw1112 Yiyang t192: own 3.79, foreign 3.59 in 256ths read
+ *  the game's 0.546875 where the reals read 0.411; the H-1 duels' recorded
+ *  terms 2,036 -> 2,092 of 2,097 on 1112, 2,038 -> 2,092 of 2,114 on 1106,
+ *  1,619 -> 1,751 of 1,843 on 1110). The sum is in pressure units. */
 function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
-  let sub = 0;
+  const cutoff = LOYALTY_RANGE + 1;
+  let raw = 0;
   for (const c of cities) {
     const t = state.map.tiles[c.centerIndex];
     const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) {
       const each = CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat);
-      sub += Math.max(0, c.population - emergencyPressureCut(state, c.seat)) * each * (LOYALTY_RANGE + 1 - d);
+      const w = Math.floor((FIXED_ONE * (cutoff - d)) / cutoff);
+      const cits = Math.max(0, c.population - emergencyPressureCut(state, c.seat));
+      raw += Math.floor((cits * Math.round(each * FIXED_ONE) * w) / FIXED_ONE);
     }
   }
-  return sub;
+  return raw / FIXED_ONE;
 }
 
+/** The DLL's fixed point: 24.8, one unit 256 raw. */
+const FIXED_ONE = 256;
+
 /** The own-against-foreign pressure term. CIV6
- *  (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*): the stronger side over
- *  the weaker is a ratio r, and the term is NEUTRAL_LOYALTY + (MAX_LOYALTY −
- *  NEUTRAL_LOYALTY)·(r − NEUTRAL_RATIO) / (MAX_RATIO − NEUTRAL_RATIO), at most
- *  MAX_LOYALTY, positive when the city's own side presses harder — 10·(own −
- *  foreign) / min(own, foreign) clamped at ±20 (runs/h1_duelw1104, median
- *  error 0.06 over 324 rows). A side with no pressure at all against one with
- *  some is the full MAX_LOYALTY; nobody pressing is 0. `_pressure_term` is the
- *  GPU twin. */
+ *  (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*; the DLL's 0x1a1ae0, all
+ *  in 24.8 fixed point): the stronger side over the weaker is a ratio r =
+ *  hi / lo floored to 256ths, clamped into [NEUTRAL_RATIO, MAX_RATIO]; t =
+ *  (r − NEUTRAL_RATIO) / (MAX_RATIO − NEUTRAL_RATIO) floored to 256ths; the
+ *  term is NEUTRAL_LOYALTY + (MAX_LOYALTY − NEUTRAL_LOYALTY)·t floored,
+ *  clamped into [NEUTRAL_LOYALTY, MAX_LOYALTY], negated when the foreign side
+ *  presses harder. A side with no pressure at all against one with some is
+ *  the full MAX_LOYALTY; nobody pressing is 0. `own` and `foreign` are
+ *  `citizenPressure` sums, whole 256ths. `_pressure_term` is the GPU twin. */
 export function pressureTerm(own: number, foreign: number): number {
-  const hi = Math.max(own, foreign);
-  const lo = Math.min(own, foreign);
-  if (hi <= 0 || own === foreign) return 0;
-  const mag = lo <= 0 ? LOYALTY_PRESS_MAX_LOYALTY : Math.min(LOYALTY_PRESS_MAX_LOYALTY,
-    LOYALTY_PRESS_NEUTRAL_LOYALTY + ((LOYALTY_PRESS_MAX_LOYALTY - LOYALTY_PRESS_NEUTRAL_LOYALTY)
-      * (hi / lo - LOYALTY_PRESS_NEUTRAL_RATIO)) / (LOYALTY_PRESS_MAX_RATIO - LOYALTY_PRESS_NEUTRAL_RATIO));
-  return own > foreign ? mag : -mag;
+  const o = Math.round(own * FIXED_ONE);
+  const f = Math.round(foreign * FIXED_ONE);
+  const hi = Math.max(o, f);
+  const lo = Math.min(o, f);
+  if (hi <= 0 || o === f) return 0;
+  const maxL = LOYALTY_PRESS_MAX_LOYALTY * FIXED_ONE;
+  const neuL = LOYALTY_PRESS_NEUTRAL_LOYALTY * FIXED_ONE;
+  let mag = maxL;
+  if (lo > 0) {
+    const maxR = Math.round(LOYALTY_PRESS_MAX_RATIO * FIXED_ONE);
+    const neuR = Math.round(LOYALTY_PRESS_NEUTRAL_RATIO * FIXED_ONE);
+    const r = Math.min(maxR, Math.max(neuR, Math.floor((hi * FIXED_ONE) / lo)));
+    const t = Math.floor(((r - neuR) * FIXED_ONE) / (maxR - neuR));
+    mag = Math.min(maxL, Math.max(neuL, neuL + Math.floor(((maxL - neuL) * t) / FIXED_ONE)));
+  }
+  return (o > f ? mag : -mag) / FIXED_ONE;
 }
 
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
@@ -464,7 +485,10 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  * than a block inside the seat loop.
  *
  * CIV6 (Border Control Treaty, outcome B): "Target player's borders cannot
- * grow via Culture." The box still FILLS; nothing is bought.
+ * grow via Culture." The target's culture turn does NOTHING: its boxes bank
+ * no culture and its cities draw no next plot, a stored one standing
+ * (runs/h1_duelw1112, Rome's seat t142-181: every box held to the digit,
+ * Ravenna's stored plot kept until a purchase cleared it, none drawn after).
  */
 /**
  * The Culture a city's border box takes this turn: the city as its growth
@@ -496,12 +520,12 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
  * ENVOY channel instead (`CanAnnexTilesWithReceivedInfluence`).
  */
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
+  if (congressBorderFrozen(state, seat)) return;
   const pct = governorSum(state, city, (e) => e.borderExpansionPct) + getModifiers(state, seat).borderExpansionPct;
   city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
-  const frozen = congressBorderFrozen(state, seat) || !civLevelOf(seat).canAnnexTilesWithCulture;
   const cost = borderGrowthCost(city.tilesAcquired);
   const ctx = makeYieldCtx(state, seat);
-  if (!frozen && city.cultureBox >= cost) {
+  if (civLevelOf(seat).canAnnexTilesWithCulture && city.cultureBox >= cost) {
     city.cultureBox -= cost;
     const stored = city.nextPlot ?? -1;
     const plot = stored >= 0 && !tileClaimed(state.map.tiles[stored]) ? stored : drawBorderPlot(state, city, ctx);
@@ -580,7 +604,8 @@ export function standingLoyalty(state: GameState, city: City): number {
     n += mods.loyaltyWithGarrison;
   }
   // CIV6 (Automated Workforce): "-5 Loyalty per turn in your cities."
-  return n + governorLoyaltyAura(state, city) + mods.loyaltyAll + religionLoyalty(state, city);
+  return n + governorLoyaltyAura(state, city) + mods.loyaltyAll + religionLoyalty(state, city)
+    + suzerainBuildingLoyalty(state, city);
 }
 
 /** CIV6 (IDENTITY_PER_TURN_FROM_RELIGION_MATCHING_FOUNDED /

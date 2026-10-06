@@ -407,7 +407,7 @@ class SimInit:
         _suz = rules.citystate["suz"]
         _sfx = list(_suz["effects"])
         self._suz_c_xp = _sfx.index("xpDouble") if "xpDouble" in _sfx else -1
-        self._suz_c_hill = _sfx.index("cavalryHills") if "cavalryHills" in _sfx else -1
+        self._suz_c_mil_loy = _sfx.index("militaryBuildingLoyalty") if "militaryBuildingLoyalty" in _sfx else -1
         self._suz_c_reach = _sfx.index("regionalReach") if "regionalReach" in _sfx else -1
         self._suz_c_works = _sfx.index("worksScience") if "worksScience" in _sfx else -1
         self._suz_c_route = _sfx.index("csRouteYields") if "csRouteYields" in _sfx else -1
@@ -428,7 +428,7 @@ class SimInit:
         self._suz_c_land_buy = _sfx.index("landPurchaseDiscount") if "landPurchaseDiscount" in _sfx else -1
         self._suz_c_bonus_amen = _sfx.index("bonusAmenities") if "bonusAmenities" in _sfx else -1
         self._suz_xp_mult_k = int(_suz["xpMult"])
-        self._suz_hill_cs = int(_suz["hillCs"])
+        self._suz_bldg_loyalty = float(_suz["buildingLoyalty"])
         self._suz_reach_bonus = int(_suz["reachBonus"])
         self._suz_writing_sci = float(_suz["writingScience"])
         self._suz_relic_sci = float(_suz["relicScience"])
@@ -450,10 +450,11 @@ class SimInit:
         self._suz_route_tile_fx = int(_suz["routePathTileGoldFx"])
         self._suz_proj_pct = float(_suz["projectPct"])
         self._suz_buy_pct = float(_suz["purchasePct"])
-        _pb = _suz["purchaseBuildingIdx"]
+        _pb = _suz["militaryBuildingIdx"]
         _pbw = max(max((len(x) for x in _pb), default=1), 1)
-        # [rows, w] Encampment building indices; a ROW pays once (Barracks OR Stable)
-        self._suz_buy_bldg = torch.tensor(
+        # [rows, w] Encampment building indices Ngazargamu and Preslav pay
+        # on; a ROW pays once (Barracks OR Stable)
+        self._suz_mil_bldg = torch.tensor(
             [list(x) + [-1] * (_pbw - len(x)) for x in _pb], dtype=torch.long, device=device)
         self._suz_bonus_amen = int(_suz["bonusAmenities"])
         # Auckland: (yield, amount, terrain, own-era floor) plot rows

@@ -72,6 +72,24 @@ def add_seat0_city(sim, col: int, tile: int, pop: int, loy: float) -> None:
     sim.civ_next_city_id[0, 0] += 1
 
 
+def press_term(own: float, foreign: float, mx: float, mr: float, nl: float, nr: float) -> float:
+    """`pressureTerm` in the DLL's 24.8 fixed point: r = hi / lo floored to
+    256ths and clamped to [nr, mr], t = (r - nr) / (mr - nr) floored, the
+    term nl + (mx - nl) * t floored, clamped to [nl, mx], signed."""
+    o, f = round(own * 256), round(foreign * 256)
+    hi, lo = max(o, f), min(o, f)
+    if hi <= 0 or o == f:
+        return 0.0
+    maxl, neul, maxr, neur = round(mx * 256), round(nl * 256), round(mr * 256), round(nr * 256)
+    if lo <= 0:
+        mag = maxl
+    else:
+        r = min(maxr, max(neur, hi * 256 // lo))
+        t = (r - neur) * 256 // (maxr - neur)
+        mag = min(maxl, max(neul, neul + (maxl - neul) * t // 256))
+    return (mag if o > f else -mag) / 256
+
+
 def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     """Closed-form applyLoyalty for seat-0 city c: every source city's
     citizens press at base + capital + its seat's age each (the Loyalty
@@ -84,27 +102,26 @@ def recon_seat0_next(sim, c: int, tier_idx_c: int, picked: bool) -> float:
     sc = int(sim.city_center[0, 0, c])
 
     def row_press(row: int) -> float:
-        sub = 0.0
+        # each city in 24.8 fixed point: weight floor(256 (CUTOFF - d) / CUTOFF)
+        sub = 0
         for j in range(sim.RC):
             if not bool(sim.city_alive[0, row, j]):
                 continue
-            w = max(0.0, rng + 1 - float(sim.pair_dist[sc, int(sim.city_center[0, row, j])]))
+            d = int(sim.pair_dist[sc, int(sim.city_center[0, row, j])])
+            if d > rng:
+                continue
+            w = 256 * (rng + 1 - d) // (rng + 1)
             each = (sim._citizen_press_base
                     + (sim._citizen_press_cap if bool(sim.city_is_cap[0, row, j]) else 0.0)
                     + ap[int(sim.civ_age[0, row])])
-            sub += float(sim.city_pop[0, row, j]) * each * w
-        return sub
+            sub += int(sim.city_pop[0, row, j]) * round(each * 256) * w // 256
+        return sub / 256
 
     own_eff = row_press(0)
     for_eff = sum(row_press(row) for row in range(1, sim.n_majors))
     # `pressureTerm`: the stronger side over the weaker, linear from the
     # neutral ratio to the max ratio, capped
-    hi, lo = max(own_eff, for_eff), min(own_eff, for_eff)
-    if hi <= 0 or own_eff == for_eff:
-        press = 0.0
-    else:
-        mag = mx if lo <= 0 else min(mx, nl + ((mx - nl) * (hi / lo - nr)) / (mr - nr))
-        press = mag if own_eff > for_eff else -mag
+    press = press_term(own_eff, for_eff, mx, mr, nl, nr)
     amen = float(sim._loyalty_amenity[tier_idx_c])
     gov = sim._gov_loy if picked else 0.0
     if bool(sim.city_is_cap[0, 0, c]):

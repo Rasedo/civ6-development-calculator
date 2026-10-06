@@ -103,6 +103,9 @@ export interface Imported {
   tilesUnknown: Set<number>;
   /** cities the game holds no next plot for (`History.nextPlotUnheld`) */
   nextPlotUnheld: Set<number>;
+  /** each city as the record of the turn before showed it, by
+   *  `${gamePlayer}:${gameCityId}` (empty without that record) */
+  cityBefore: Map<string, DumpCity>;
   /** the gaps met importing each seat (its research, government, policies,
    *  pantheon, its religion's beliefs) and each plot (a feature, resource or
    *  improvement dropped) */
@@ -464,10 +467,13 @@ export interface History {
   /** the majors each major is culturally dominant over (`updateCulturalDominance`) */
   dominant: Map<number, Set<number>>;
   /** the districts a city quoted while they did not stand in it, by
-   *  `${gamePlayer}:${gameCityId}:${district row}`, and the price each locked
-   *  at placement: the engine's at the first record it stood, itself left
+   *  `${gamePlayer}:${gameCityId}:${district row}`, the engine's price for
+   *  each at the latest record it did not stand, and the price each locked
+   *  at placement: the engine's at the record before the first it stood
+   *  (that record's turn placed it), else at that first record, itself left
    *  out of the city */
   districtQuoted: Set<string>;
+  districtPriced: Map<string, { turn: number; price: number }>;
   districtLocked: Map<string, number>;
   /** the floods the records' `events` named, by `${turn}:${RandomEvents
    *  index}`, each with the plot it started on; null where no record carried
@@ -549,7 +555,7 @@ export function newHistory(): History {
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null };
+    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null };
 }
 
 /** Fold a record's `events` into the history: the floods (each with its
@@ -1607,6 +1613,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     districtLocked: history?.districtLocked ?? new Map(),
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
+    cityBefore: prevCities,
   };
 }
 
@@ -1634,12 +1641,26 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
     // Rome's Industrial Zone bought t123 at 112, quoted again at 112 from
     // its pillage at t184)
     const prefix = `${c.owner}:${c.id}:`;
+    const human = bool(rec.players.find((p) => p.id === c.owner)?.human);
     for (const key of h.districtQuoted) {
       if (!key.startsWith(prefix) || h.districtLocked.has(key)) continue;
       const idx = Number(key.slice(prefix.length));
       const id = engineRowOf(cat, 'district', idx) as DistrictId | null;
-      const at = id ? city.districts.findIndex((d) => d.type === id) : -1;
-      if (!id || at < 0) continue;
+      if (!id) continue;
+      const at = city.districts.findIndex((d) => d.type === id);
+      const was = h.districtPriced.get(key);
+      if (at < 0) {
+        // not standing: this record's price, the lock should its turn place it
+        if (was?.turn !== rec.turn) {
+          unlocks ??= computeUnlocks(state, city.seat);
+          h.districtPriced.set(key, { turn: rec.turn, price: districtSiteCost(state, s, id, unlocks) });
+        }
+        continue;
+      }
+      if (was?.turn === rec.turn - 1 && human) {
+        h.districtLocked.set(key, was.price);
+        continue;
+      }
       unlocks ??= computeUnlocks(state, city.seat);
       const [placed] = city.districts.splice(at, 1);
       h.districtLocked.set(key, districtSiteCost(state, s, id, unlocks));
@@ -2396,6 +2417,13 @@ function resolutionByHash(): Map<number, number> {
  * Diplomatic Victory resolution stands outside the engine's table. Every
  * entry the importer cannot place is returned as a gap.
  */
+/** The World Congress table a record holds, in this import's seat space —
+ *  the next record's, for a step a session opening between the two reads. */
+export function congressOfRecord(rec: TurnRecord, cat: Catalog, imp: Imported): NonNullable<GameState['congress']> {
+  return importCongress(rec.congress, rec, cat, imp.state, imp.religionSeat,
+    (pid) => imp.seatOfPlayer.get(pid) ?? NO_SEAT).list;
+}
+
 function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: GameState, religionSeat: Map<number, number>,
   seatOfGame: (pid: number) => number): { list: NonNullable<GameState['congress']>; gaps: string[] } {
   if (!table || typeof table !== 'object') return { list: [], gaps: [] };

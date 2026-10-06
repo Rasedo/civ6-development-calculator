@@ -32,6 +32,30 @@ describe('world wonders', () => {
     expect(canPlaceWonder(state, city, 'HANGING_GARDENS', dry.index, 0).ok).toBe(true);
   });
 
+  it("the Temple of Artemis raises the improvement's own amenity, paid to the city that owns it", () => {
+    // CIV6 (TEMPLE_ARTEMIS_*_AMENITY, MODIFIER_SINGLE_CITY_ADJUST_IMPROVEMENT_AMENITY
+    // within 4 of the wonder): runs/h1_duelw1112 t146, Beijing holds the
+    // wonder and one Camp, Guangzhou the other — +1 Improvements each
+    const { state, city } = sandboxCity();
+    const other = foundCity(state, tileAtCoords(state.map, 13, 8).index, 0).city!;
+    const wt = tileAtCoords(state.map, 9, 8);
+    const camp = tileAtCoords(state.map, 12, 8);
+    camp.ownerSeat = 0;
+    camp.ownerCity = other.id;
+    camp.improvement = 'CAMP';
+    // the wonder stands beside a Camp of its own city
+    const own = tileAtCoords(state.map, 10, 8);
+    own.ownerSeat = 0;
+    own.ownerCity = city.id;
+    own.improvement = 'CAMP';
+    const have = () => [computeCityStats(state, city).amenities.have, computeCityStats(state, other).amenities.have];
+    const before = have();
+    standWonder(state, city, 'TEMPLE_OF_ARTEMIS', wt.index);
+    expect(have()).toEqual([before[0] + 1, before[1] + 1]);
+    camp.pillaged = true;
+    expect(have()).toEqual([before[0] + 1, before[1]]);
+  });
+
   it('the Mountain, Lake, coast and unmodeled grounds', () => {
     const { state, city } = sandboxCity();
     const t = tileAtCoords(state.map, 9, 8);

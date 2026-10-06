@@ -195,8 +195,11 @@ export function momentKeysHeld(state: GameState, seat: number): number[] {
   }
   const tier = GOVERNMENT_LIST.find((g) => g.id === s.government.chosen)?.tier ?? 0;
   if (GOV_TIER_KEY[tier] >= 0) out.add(GOV_TIER_KEY[tier]);
+  // a unit held by levy is the city-state's: its keys are no unit this seat
+  // created (runs/h1_duelw1112 China: the levy's ship at t56, its own first
+  // ship's UNIT_CREATED_FIRST_DOMAIN_SEA_IN_WORLD at t70)
   for (const u of state.units) {
-    if (u.seat !== seat) continue;
+    if (u.seat !== seat || u.leviedFrom !== undefined) continue;
     for (const k of UNIT_KEYS[u.type] ?? []) out.add(k);
   }
   for (const t of map.tiles) {

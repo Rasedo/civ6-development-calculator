@@ -3,13 +3,14 @@ import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner } from '../
 import { makeMap, makeState, settleAt, tileAtCoords, holdWorks } from '../helpers';
 import { endTurn } from '../../../cpu/core/game';
 import { spawnUnit } from '../../../cpu/core/units';
-import { meleeAttack, cavalryHillCS, defenderCS } from '../../../cpu/core/combat';
-import { suzerainEffect, regionalReach } from '../../../cpu/core/cityStates';
+import { meleeAttack } from '../../../cpu/core/combat';
+import { suzerainEffect, regionalReach, suzerainBuildingLoyalty } from '../../../cpu/core/cityStates';
+import { standingLoyalty } from '../../../cpu/core/phase';
 import { computeCityStats } from '../../../cpu/core/city';
 import { cityTradeYields } from '../../../cpu/core/trade';
 import {
   KABUL_XP_MULT,
-  PRESLAV_HILL_CS,
+  PRESLAV_BUILDING_LOYALTY,
   REGIONAL_REACH_BONUS,
   ANSHAN_WRITING_SCIENCE,
   ANSHAN_RELIC_SCIENCE,
@@ -55,7 +56,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     const state = makeState(makeMap(20, 20));
     const kabul = addNamedCs(state, 'Kabul', 'militaristic', 3, 3, { 0: 3 });
     expect(suzerainEffect(state, 0, 'xpDouble')).toBe(true);
-    expect(suzerainEffect(state, 0, 'cavalryHills')).toBe(false);
+    expect(suzerainEffect(state, 0, 'militaryBuildingLoyalty')).toBe(false);
     expect(suzerainEffect(state, 1, 'xpDouble')).toBe(false);
     kabul.envoys = { 0: 3, 1: 3 }; // a tie leaves no suzerain
     expect(suzerainEffect(state, 0, 'xpDouble')).toBe(false);
@@ -77,22 +78,21 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     expect(run(true)).toBe(base * KABUL_XP_MULT);
   });
 
-  it('Preslav pays +5 CS to cavalry FIGHTING ON hill tiles', () => {
+  it('Preslav pays loyalty per Encampment building row in its suzerain\'s cities', () => {
     const state = makeState(makeMap(20, 20));
-    state.unitsMode = true;
-    settleAt(state, tileAtCoords(state.map, 3, 9).index);
+    const city = settleAt(state, tileAtCoords(state.map, 3, 9).index);
     addNamedCs(state, 'Preslav', 'militaristic', 17, 17, { 0: 3 });
-    const hill = tileAtCoords(state.map, 12, 9);
-    hill.elevation = 'HILLS';
-    const knight = spawnUnit(state, 'KNIGHT', hill.index, 0)!;
-    const foot = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, 0)!;
-    expect(cavalryHillCS(state, knight, hill.index)).toBe(PRESLAV_HILL_CS);
-    expect(cavalryHillCS(state, knight, foot.tileIndex)).toBe(0); // flat ground
-    expect(cavalryHillCS(state, foot, hill.index)).toBe(0); // not cavalry
-    // the defender term rides defenderCS
-    const withSuz = defenderCS(state, knight, hill.index);
+    expect(suzerainBuildingLoyalty(state, city)).toBe(0);
+    city.buildings.push('BARRACKS');
+    expect(suzerainBuildingLoyalty(state, city)).toBe(PRESLAV_BUILDING_LOYALTY);
+    city.buildings.push('STABLE'); // one requirement set with the Barracks
+    expect(suzerainBuildingLoyalty(state, city)).toBe(PRESLAV_BUILDING_LOYALTY);
+    city.buildings.push('ARMORY', 'MILITARY_ACADEMY');
+    const withSuz = standingLoyalty(state, city);
+    expect(suzerainBuildingLoyalty(state, city)).toBe(3 * PRESLAV_BUILDING_LOYALTY);
     state.cityStates[0].envoys = {};
-    expect(defenderCS(state, knight, hill.index)).toBe(withSuz - PRESLAV_HILL_CS);
+    expect(suzerainBuildingLoyalty(state, city)).toBe(0);
+    expect(standingLoyalty(state, city)).toBe(withSuz - 3 * PRESLAV_BUILDING_LOYALTY);
   });
 
   it('Mexico City stretches regional district effects by 3', () => {

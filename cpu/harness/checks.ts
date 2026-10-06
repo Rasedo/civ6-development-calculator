@@ -26,6 +26,7 @@
  * report can separate a clean failure from one an unimported row explains.
  */
 import type { City, CityState, GameState, Tile, Unit } from '../core/types';
+import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
@@ -50,7 +51,7 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, congressOfRecord, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
 } from './import';
 import {
@@ -60,7 +61,7 @@ import {
 } from '../core/eras';
 import { LARGEST_KEY, districtMoment, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
 import { citiesOf, isCiv } from '../core/seats';
-import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
+import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId } from './aliases';
@@ -264,6 +265,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     // (bought) until that step; else -1 is no plot left to claim
     if (num(c.nextPlot) < 0 && imp.nextPlotUnheld.has(city.centerIndex)) {
       out.push({ turn, check: 'city.nextPlot', subject, ok: true, skip: 'no next plot held' });
+    } else if (congressBorderFrozen(state, city.seat)) {
+      // a Border Control Treaty's target draws no plot: it holds what it
+      // held the turn before, or nothing once a plot was gained since
+      const was = imp.cityBefore.get(`${c.owner}:${c.id}`);
+      if (!was) out.push({ turn, check: 'city.nextPlot', subject, ok: true, skip: 'no record before' });
+      else {
+        const held = c.plots.length > was.plots.length ? -1 : num(was.nextPlot);
+        push('city.nextPlot', num(c.nextPlot) === held, num(c.nextPlot), held);
+      }
     } else {
       const ties = borderBestPlots(state, city);
       push('city.nextPlot', num(c.nextPlot) < 0 ? ties.length === 0 : ties.includes(num(c.nextPlot)), num(c.nextPlot), ties);
@@ -547,8 +557,10 @@ export function diffActions(a: TurnRecord, b: TurnRecord): Actions {
 /**
  * The players whose every city with culture coming in holds its border box
  * exactly across the pair while its food moves: the game banked no border
- * culture for the whole seat that turn (runs/h1_duelw1103, the autoplayed
- * seat 0, every city t82-101), a state the record carries no reader for.
+ * culture for the whole seat that turn. A Border Control Treaty the next
+ * record shows is that state, and the step runs it (`cityBorderGrowth`);
+ * what stays a skip is a hold no record reads: runs/h1_duelw1103's seat 0
+ * t82-101, recorded before the records carried the World Congress.
  */
 function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
   const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
@@ -668,6 +680,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const lateCities = new Set([...citiesNotStarted(a, b), ...(prev ? citiesNotStarted(prev, a) : [])]);
   const held = bordersHeld(a, b);
   const imp = importTurn(a, cat, history);
+  const congressNext = congressOfRecord(b, cat, imp);
   const state = imp.state;
   const after = new Map(b.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const settlerIdx = cat.units.indexOf('UNIT_SETTLER');
@@ -827,7 +840,15 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
       const culture = cultureAfterGrowth(state, city, before.pop, st);
+      // the culture turn reads the session the next record shows: a Border
+      // Control Treaty holds the target's boxes from the pair it opens on
+      // through the pair before its successor (runs/h1_duelw1112 Ravenna:
+      // held 141 -> 142, banked 181 -> 182)
+      const congressWas = state.congress;
+      state.congress = congressNext;
       cityBorderGrowth(state, city, seat, culture);
+      const frozen = congressBorderFrozen(state, seat);
+      state.congress = congressWas;
       if (granted) city.population += grant;
       const gainedOurs = [...boughtPlots, ...state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id
         && !plotsBefore.has(t.index)).map((t) => t.index)];
@@ -835,7 +856,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         // the culture reads a village's citizen given in the turn
         : outside && !!next && next.pop > c.pop && villagers.has(c.owner) ? 'a village gave the city a citizen'
         : imp.tilesUnknown.has(city.centerIndex) ? 'expansions before the record'
-        : held.has(c.owner) ? 'the seat banked no border culture' : null);
+        : held.has(c.owner) && !frozen ? 'the seat banked no border culture' : null);
       if (borderSkip || !next) out.push({ turn, check: 'step.border', subject, ok: true, skip: borderSkip ?? 'no t+1' });
       else {
         const same = gainedOurs.length === gainedGame.length && gainedOurs.every((q) => gainedGame.includes(q));
@@ -979,6 +1000,9 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
         if (!type) continue;
         of(c.owner).events.push([`district ${type}`, (st, seat) => {
           const city = st.seats[seat]?.cities.find((q) => q.centerIndex === k);
+          // the completion site's two payouts (`completeQueueItem`): the
+          // Monumentality dedication's, then the district's moment
+          if (type !== 'CITY_CENTER') dedicationEvent(st, seat, DED_MONUMENTALITY);
           if (city) districtMoment(st, seat, city, tile, type);
         }]);
       }

@@ -161,6 +161,21 @@ def main() -> None:
     assert float(cul[0, 0]) == 3 * 3 * 2
     km = torch.ones(s.B, s._gw_obj_tourism.numel(), dtype=torch.long)  # per object type
     assert int(s._gw_tourism_general(0, None, km)[0, 0]) == 2 * 3 * 2, "the themed museum doubles its tourism too"
+    # a card scaling the type x2 (Heritage Tourism) SUMS with the theming:
+    # 3x the base, not 4x (`greatWorkTourism`)
+    _orig = s._gov_mods
+
+    def _scaled(row):
+        m = list(_orig(row))
+        m12 = dict(m[12])
+        gs = m12["gwscale"].clone()
+        gs[:, SCULPTURE] = 2.0
+        m12["gwscale"] = gs
+        m[12] = m12
+        return m
+    s._gov_mods = _scaled
+    assert int(s._gw_tourism_general(0, None, km)[0, 0]) == 2 * 3 * 3, "the card and the theming sum"
+    s._gov_mods = _orig
     # the Archaeological Museum: one era, three civilizations
     s = fresh(rules, path)
     s.city_bldg[0, 0, 0, arch] = True

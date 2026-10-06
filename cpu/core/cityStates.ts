@@ -15,7 +15,7 @@ import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, NGAZARGAMU_BUILDINGS, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -407,9 +407,23 @@ export function suzerainProjectMult(state: GameState, seat: number): number {
  *  Stable answer one row between them. */
 export function suzerainLandPurchaseMult(state: GameState, seat: number, city: City): number {
   if (!suzerainEffect(state, seat, 'landPurchaseDiscount')) return 1;
+  return Math.max(0, 1 - (NGAZARGAMU_PURCHASE_PCT / 100) * militaryBuildingRows(city));
+}
+
+/** How many of the Encampment building requirement sets the city meets —
+ *  Barracks or Stable answer one row between them. */
+function militaryBuildingRows(city: City): number {
   let rows = 0;
-  for (const any of NGAZARGAMU_BUILDINGS) if (any.some((b) => city.buildings.includes(b))) rows += 1;
-  return Math.max(0, 1 - (NGAZARGAMU_PURCHASE_PCT / 100) * rows);
+  for (const any of MILITARISTIC_BUILDING_ROWS) if (any.some((b) => city.buildings.includes(b))) rows += 1;
+  return rows;
+}
+
+/** CIV6 (Preslav): "You receive +2 Loyalty per turn in cities for each
+ *  Encampment district building" — `PRESLAV_BUILDING_LOYALTY` per row the
+ *  city meets, in the suzerain's own cities. */
+export function suzerainBuildingLoyalty(state: GameState, city: City): number {
+  if (!suzerainEffect(state, city.seat, 'militaryBuildingLoyalty')) return 0;
+  return PRESLAV_BUILDING_LOYALTY * militaryBuildingRows(city);
 }
 
 export function assignEnvoy(state: GameState, cityStateId: number, seat: number): RuleResult {

@@ -238,9 +238,10 @@ def test_free_city_loyalty_and_join(rules, path) -> None:
     here = torch.tensor([centre])
     own = float(sim._citizen_pressure_from(here, F)[B0])
     pulls = [float(sim._citizen_pressure_from(here, r)[B0]) for r in range(sim.n_majors)]
-    # a Normal-age rival's 30 citizens, not in its capital, 4 away: 1 each at weight 6
+    # a Normal-age rival's 30 citizens, not in its capital, 4 away: 1 each at
+    # weight floor(256 * 6 / 10) = 153 in 256ths; the Free City's own one at 1
     assert int(sim.civ_age[B0, 1]) == 1 and not bool(sim.city_is_cap[B0, 1, rcol])
-    assert own == 10.0 and pulls[1] == 30 * 6, (own, pulls)
+    assert own == 1.0 and pulls[1] == 30 * 153 / 256, (own, pulls)
     # the old owner's capital is still inside range 9 of the city it lost
     assert pulls[0] > 0 and pulls[0] < pulls[1], pulls
     foreign = sum(pulls)
@@ -249,11 +250,12 @@ def test_free_city_loyalty_and_join(rules, path) -> None:
     sim._free_cities_phase()
     loy = float(sim.city_loyalty[B0, F, col])
     # +10 base, the pressure term (`pressureTerm`: the stronger side over the
-    # weaker, 10 per unit of ratio past 1, capped at 20), and what stands in it
-    # (the Monument's +1)
-    hi, lo = max(own, foreign), min(own, foreign)
-    mag = 20.0 if lo <= 0 else min(20.0, 0.0 + (20.0 * (hi / lo - 1.0)) / 2.0)
-    press = 0.0 if own == foreign else (mag if own > foreign else -mag)
+    # weaker, 10 per unit of ratio past 1, capped at 20, in 24.8 fixed point),
+    # and what stands in it (the Monument's +1)
+    o, f = round(own * 256), round(foreign * 256)
+    hi, lo = max(o, f), min(o, f)
+    mag = 20 * 256 if lo <= 0 else min(20 * 256, 20 * 256 * ((min(768, max(256, hi * 256 // lo)) - 256) * 256 // 512) // 256)
+    press = 0.0 if o == f else (mag if o > f else -mag) / 256
     assert abs(loy - min(100.0, max(0.0, 90.0 + 10.0 + press + built))) < 1e-9, (loy, built, press)
     race = sim.city_free_press[B0, F, col]
     assert [float(x) for x in race[:sim.n_majors]] == pulls, (race.tolist(), pulls)
@@ -321,7 +323,7 @@ def test_heal_and_pressure(rules, path) -> None:
     spot = spot_at(sim, centre, 4)
     got = sim._found_city_at(0, torch.tensor([True]), torch.tensor([spot]))
     assert bool(got[B0])
-    assert float(sim._citizen_pressure_from(torch.tensor([spot]), F)[B0]) == 20 * 6
+    assert float(sim._citizen_pressure_from(torch.tensor([spot]), F)[B0]) == 20 * 153 / 256  # 20 citizens, 4 away
     # a whole turn runs clean with a Free City on the map, and it persists
     for _ in range(3):
         sim.step()

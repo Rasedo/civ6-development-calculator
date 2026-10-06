@@ -5579,14 +5579,20 @@ class SimSeats:
         on = self._suz_effect(row, self._suz_c_land_buy)
         if not bool(on.count_nonzero()):
             return out
-        rows = torch.zeros(bl.shape[0], bl.shape[1], dtype=torch.float64, device=self.device)
-        for r in range(self._suz_buy_bldg.shape[0]):
-            idx = [int(x) for x in self._suz_buy_bldg[r].tolist() if int(x) >= 0]
-            if not idx:
-                continue
-            rows = rows + bl[:, :, idx].any(dim=2).double()
+        rows = self._mil_bldg_rows(bl)
         return torch.where(on.unsqueeze(1),
                            (1.0 - (self._suz_buy_pct / 100.0) * rows).clamp(min=0.0), out)
+
+    def _mil_bldg_rows(self, bl: torch.Tensor) -> torch.Tensor:
+        """[..] f64 — how many Encampment building requirement sets each city
+        meets, `bl` its [.., NB] building plane: Barracks or Stable answer one
+        row between them (`militaryBuildingRows`)."""
+        rows = torch.zeros(bl.shape[:-1], dtype=torch.float64, device=self.device)
+        for r in range(self._suz_mil_bldg.shape[0]):
+            idx = [int(x) for x in self._suz_mil_bldg[r].tolist() if int(x) >= 0]
+            if idx:
+                rows = rows + bl[..., idx].any(dim=-1).double()
+        return rows
 
     def _unit_near(self, tiles: torch.Tensor, hi: int, *, lo: int = 0,
                    seat: torch.Tensor | None = None, same_seat: bool = True,
@@ -5616,8 +5622,7 @@ class SimSeats:
                             foe_type: torch.Tensor | None = None,
                             vs_district: bool = False) -> torch.Tensor:
         """`chassisAbilityCS`'s twin, [B] long — every position-dependent
-        unique-unit clause, read at the tile the unit FIGHTS FROM, exactly
-        where `_cav_hill_cs` is read. Each `if` below is one UnitAbilities.xml
+        unique-unit clause, read at the tile the unit FIGHTS FROM. Each `if` below is one UnitAbilities.xml
         ability; a build whose roster carries none of a clause skips it."""
         ti = types.clamp(min=0, max=self.NU - 1)
         tl = tiles.clamp(min=0)
@@ -5743,23 +5748,6 @@ class SimSeats:
                       & (d <= self._park_cs_range))
                 out = out + torch.where(on & pk.any(dim=1), a, torch.zeros_like(a))
         return out
-
-    def _cav_hill_cs(self, seat: torch.Tensor, types: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
-        """`cavalryHillCS`'s twin, [B] long. CIV6 (Preslav's suzerain): "Your
-        light and heavy cavalry units have +5 Strength when fighting on hill
-        tiles." The tile is the unit's OWN — the ground it fights from,
-        attacking or defending. Barbarians and empty (-1) seats score 0."""
-        if self._suz_c_hill < 0 or self.S == 0:
-            return torch.zeros_like(tiles)
-        ok = (seat >= 0) & (seat < self.n_majors)
-        s0 = torch.where(ok, seat, torch.zeros_like(seat))
-        assert seat.shape[0] == self.B, (
-            f"_cav_hill_cs: a NARROWED seat ({tuple(seat.shape)}) with no `rows` — the gather "
-            f"below is over GAMES and would read batch rows 0..n-1 instead (B={self.B})")
-        suz = self._suz_effect_rows(self._suz_c_hill).gather(1, s0.unsqueeze(1)).squeeze(1) & ok
-        cav = self._type_cavalry.take(types.clamp(min=0, max=self.NU - 1))
-        hill = self.hills.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
-        return self._suz_hill_cs * (suz & cav & hill).long()
 
     def _suz_xp_mult(self, seat: torch.Tensor,
                      rows: torch.Tensor | None = None) -> torch.Tensor:
@@ -6559,6 +6547,13 @@ class SimSeats:
             match, mismatch = self._religion_loyalty
             term = mismatch + (match - mismatch) * (fol == row).double()
             out = out + (founded & (fol >= 0)).double() * term
+        # CIV6 (Preslav): "You receive +2 Loyalty per turn in cities for each
+        # Encampment district building" (`suzerainBuildingLoyalty`)
+        if self._suz_c_mil_loy >= 0 and row < self.n_majors:
+            on = self._suz_effect(row, self._suz_c_mil_loy)[bidx]
+            if bool(on.count_nonzero()):
+                rows = self._mil_bldg_rows(self.city_bldg[bidx, row, col])
+                out = out + on.double() * rows * self._suz_bldg_loyalty
         return out
 
     def _roster_loyalty_aura(self, row: int) -> torch.Tensor:
@@ -9603,13 +9598,13 @@ class SimSeats:
             return torch.zeros(self.B, self.RC, dtype=per_wonder.dtype, device=self.device)
         return (compw.to(per_wonder.dtype) * per_wonder.reshape(1, 1, -1)).sum(dim=2)
 
-    def _wonder_improvement_amenities(self, row: int) -> torch.Tensor:
-        """[B, cols] f64 — `wonderImprovementAmenities`: +1 amenity to the
-        HOLDING city per matching improvement within the wonder's reach,
+    def _wonder_lake_amenities(self, row: int) -> torch.Tensor:
+        """[B, cols] f64 — `wonderLakeAmenities`: +1 amenity to the HOLDING
+        city per Lake tile within the wonder's reach (Huey Teocalli),
         measured from the WONDER TILE like every other wonder aura."""
         cols = self.RC
         z = torch.zeros(self.B, cols, dtype=torch.float64, device=self.device)
-        if not self._wond_n or not (self._wond_amen_imp or self._wond_amen_lake):
+        if not self._wond_n or not self._wond_amen_lake:
             return z
         wreg = self.city_wonder[:, row, :cols]  # [B, cols, nW] tile per wonder
         # +1 per Lake tile within the reach, the wonder's own plot included
@@ -9621,17 +9616,25 @@ class SimSeats:
             near = self.pair_dist[wt.clamp(min=0)] <= _rng  # [B, cols, T]
             lake = (self.terrain == self._terr_lake).unsqueeze(1)
             z = z + (near & lake).sum(dim=2).double() * has.double()
+        return z
+
+    def _improvement_amenity_auras(self) -> list[tuple[torch.Tensor, list[int]]]:
+        """Per wonder whose aura raises the amenity of the improvements around
+        it (Temple of Artemis): its reach [B, T] bool — every tile within range
+        of its complete plot, whoever holds it (a world wonder stands once a
+        game) — and the improvement indices it pays (`improvementAmenityAuras`)."""
+        out: list[tuple[torch.Tensor, list[int]]] = []
+        if not self._wond_n or not self._wond_amen_imp:
+            return out
         for _wi, _imps, _rng in self._wond_amen_imp:
-            wt = wreg[:, :, _wi]
+            wt = self.city_wonder[:, :, :, _wi].reshape(self.B, -1)
             has = (wt >= 0) & self.built_wonder_complete.gather(1, wt.clamp(min=0))
             if not bool(has.count_nonzero()):
                 continue
-            near = self.pair_dist[wt.clamp(min=0)] <= _rng  # [B, cols, T]
-            ok = torch.zeros_like(self.improvement, dtype=torch.bool)
-            for _i in _imps:
-                ok = ok | (self.improvement == _i)
-            z = z + (near & ok.unsqueeze(1)).sum(dim=2).double() * has.double()
-        return z
+            tile = torch.where(has, wt, torch.full_like(wt, -1)).max(dim=1).values  # [B]
+            near = (self.pair_dist[tile.clamp(min=0)] <= _rng) & (tile >= 0).unsqueeze(1)
+            out.append((near, _imps))
+        return out
 
     def _improvement_amenities(self, row: int) -> torch.Tensor:
         """[B, RC] f64 — `improvementAmenities`: what this seat's own
@@ -9642,15 +9645,25 @@ class SimSeats:
         ADJACENT_TO_WATER_REQUIREMENTS): `_imp_water_amenity`, for standing
         beside water — the requirement set's TEST_ANY: a river edge of its
         own, or any water neighbour. The neighbour test reads `self.water`,
-        which a drowned tile joins."""
+        which a drowned tile joins. CIV6 (TEMPLE_ARTEMIS_*_AMENITY): +1 for a
+        Camp, Pasture or Plantation within the Temple of Artemis' reach."""
         z = torch.zeros(self.B, self.RC, dtype=torch.float64, device=self.device)
+        auras = self._improvement_amenity_auras()
+        if not self._imp_amenity_any and not auras:
+            return z
+        sl = self.city_slot_at(row)                                   # [B, T]
+        live = (self.improvement >= 0) & ~self.pillaged & (sl >= 0)
+        for near, imps in auras:
+            ok = torch.zeros_like(live)
+            for _i in imps:
+                ok = ok | (self.improvement == _i)
+            pay = (live & ok & near).double()
+            z = z.scatter_add(1, sl.clamp(min=0), pay)
         if not self._imp_amenity_any:
             return z
         nb = self.neigh
         nbc = nb.clamp(min=0)
         wet = self.tile_river | (self.water[:, nbc] & (nb >= 0).unsqueeze(0)).any(dim=2)
-        sl = self.city_slot_at(row)                                   # [B, T]
-        live = (self.improvement >= 0) & ~self.pillaged & (sl >= 0)
         for k, (amt, wamt) in enumerate(zip(self._imp_amenity, self._imp_water_amenity)):
             if amt <= 0 and wamt <= 0:
                 continue
@@ -10532,7 +10545,7 @@ class SimSeats:
         if _wregam is not None:
             have = have + _wregam
         have = have + self._city_wonder_flat(row, self._wond_cityamen)[:, :cols]
-        have = have + self._wonder_improvement_amenities(row)
+        have = have + self._wonder_lake_amenities(row)
         have = have + self._improvement_amenities(row)
         extra = None
         if self._seat_has_beliefs(row):
@@ -10821,7 +10834,8 @@ class SimSeats:
             ch = self.civ_gov_chosen[:, row]
             tier = torch.where(ch >= 0, self._gov_tier.take(ch.clamp(min=0)), torch.zeros_like(ch))
             self._moment_scatter(held, self._mk_gov_tier.take(tier).unsqueeze(1))
-        ua = self.major_unit_alive & (self.major_unit_seat == row)
+        # a unit held by levy is the city-state's (`momentKeysHeld`)
+        ua = self.major_unit_alive & (self.major_unit_seat == row) & ~self.major_unit_levied
         uk = self._mk_unit[self.major_unit_type.clamp(min=0)]
         self._moment_scatter(held, torch.where(ua.unsqueeze(2), uk, torch.full_like(uk, -1)))
         imp = self.improvement
@@ -11372,10 +11386,12 @@ class SimSeats:
         `col` is the city's column, a [B] tensor because row 0 walks its
         columns in a per-batch order.
 
-        BORDER CONTROL outcome B and a class of player that cannot annex with
-        culture (`CivilizationLevels`: a city-state, the Free Cities player)
-        bank the culture and buy nothing, and still draw."""
+        A class of player that cannot annex with culture (`CivilizationLevels`:
+        a city-state, the Free Cities player) banks the culture and buys
+        nothing, and still draws. BORDER CONTROL outcome B's target does
+        nothing at all: no culture banked, no plot drawn."""
         bidx = self._bidx
+        act = act & ~self._congress_border_frozen(row)
         # CIV6 (Land Acquisition, Religious Settlements): the border-expansion
         # percents scale the culture banked. A CITY-STATE's row appoints
         # nobody and holds no beliefs, so both are asked only of a major.
@@ -11395,7 +11411,7 @@ class SimSeats:
         cid = self.city_id[bidx, row, col]
         if bool(self._row_annex_culture[row]):
             cost = self._border_cost(self.city_acquired[bidx, row, col])
-            ready = act & ~self._congress_border_frozen(row) & (self.city_cbox[bidx, row, col] >= cost)
+            ready = act & (self.city_cbox[bidx, row, col] >= cost)
             if bool(ready.count_nonzero()):
                 self.city_cbox[bidx, row, col] = torch.where(
                     ready, self.city_cbox[bidx, row, col] - cost.to(box.dtype), self.city_cbox[bidx, row, col])
@@ -11871,10 +11887,8 @@ class SimSeats:
             # found none and score 0.
             if major:
                 atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
-            atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], here).to(atk_e.dtype)
             atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], here, foe_type=d_type).to(atk_e.dtype)
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_barb, neg, d_seat_m), tgt).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat_m, d_type, ttc).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat_m, d_type, ttc, foe_type=a_type[:, u]).to(def_e.dtype))
             # Great General / Admiral aura. Attacker keyed on its own tile `here`
             # (a CIV attacker gets its civ's aura; a BARB has none); defender
@@ -13062,7 +13076,6 @@ class SimSeats:
         if major:
             atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
             atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tc).to(atk_e.dtype)
-            atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
             atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
             atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], a_tile[:, u], atk_naval).to(atk_e.dtype)
         # the district is a CITY target to the roster's rows, as `assaultAtkCS` reads it
@@ -13675,7 +13688,6 @@ class SimSeats:
                  + self._assault_promo_cs(a_type[:, u], a_promos, a_tile[:, u])
                  - self._atk_pens(a_type[:, u], a_promos, a_tile[:, u], tgt, a_emb[:, u]))
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], a_type[:, u], a_tile[:, u]).to(atk_e.dtype)
         atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], a_tile[:, u], vs_district=True).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(hrow, -1), a_seat[:, u])
@@ -13888,7 +13900,6 @@ class SimSeats:
                  + self._assault_promo_cs(at0, a_promos, here)
                  - self._atk_pens(at0, a_promos, here, tgt, a_emb[:, u]))
         atk_e = atk_e + self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype)
-        atk_e = atk_e + self._cav_hill_cs(a_seat[:, u], at0, a_tile[:, u]).to(atk_e.dtype)
         atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], at0, a_tile[:, u], vs_district=True).to(atk_e.dtype)
         aura_civ = torch.where(a_seat[:, u] == BARB_SEAT,
                                torch.full_like(a_seat[:, u], -1), a_seat[:, u])
@@ -14270,7 +14281,6 @@ class SimSeats:
                 if not barb:
                     atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
                 def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
                 def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
                 # the attacker's own position clauses — a Varu or Toa beside the
                 # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
@@ -14492,7 +14502,6 @@ class SimSeats:
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._cav_hill_cs(d_seat, d_type, ttc).to(def_e.dtype))
             def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at0).to(def_e.dtype))
             # the attacker's own position clauses — a Varu or Toa beside the
             # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
