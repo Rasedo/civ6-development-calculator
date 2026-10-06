@@ -284,7 +284,8 @@ OUT({k = "congress", resolutions = P(function() return Game.GetWorldCongress():G
 -- the random event of this turn and the last (floods, eruptions, storms,
 -- droughts …), as the climate screen reads them: [turn, RandomEvents index,
 -- current plot, start plot, fertility added, tiles damaged, population lost,
--- units lost]
+-- units lost, river id (-1 none), volcano id, natural-wonder volcano id,
+-- start turn, end turn, current direction]
 local events = {}
 for t = turn - 1, turn do
   local okv, ev = pcall(function() return GameRandomEvents.GetEventsForTurn(t) end)
@@ -292,7 +293,10 @@ for t = turn - 1, turn do
     events[#events + 1] = {t, ev.RandomEvent, P(function() return ev.CurrentLocation end),
       P(function() return ev.StartLocation end), P(function() return ev.FertilityAdded end),
       P(function() return ev.TilesDamaged end), P(function() return ev.PopLost end),
-      P(function() return ev.UnitsLost end)}
+      P(function() return ev.UnitsLost end), P(function() return ev.River end),
+      P(function() return ev.Volcano end), P(function() return ev.NaturalWonderVolcano end),
+      P(function() return ev.StartTurn end), P(function() return ev.EndTurn end),
+      P(function() return ev.CurrentDirection end)}
   end
 end
 OUT({k = "events", list = events})
