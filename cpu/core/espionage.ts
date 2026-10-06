@@ -42,7 +42,7 @@ import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
 import { governorSum } from './governors';
 import { floodRiver, floodSeverity } from './disasters';
-import { nextRandom } from './rand';
+import { randRange, randWeighted } from './rand';
 import { drawPromoOffer, promoFlag, promoValue, promoValueFor } from './promotions';
 import { disbandUnit, spawnUnit } from './units';
 import { congressPactBanned, congressPactLevels } from './congress';
@@ -453,24 +453,65 @@ export const MISSION_FAIL_MUST_ESCAPE = 3;
 export const MISSION_CAPTURED = 4;
 export const MISSION_KILLED = 5;
 
+/** the 3d6's count of each sum (`SPY_ROLL_DICE` dice of `SPY_ROLL_FACES`):
+ *  the table both espionage rolls weigh their bands by (GameCore_XP2
+ *  0xf02c70: 0, 0, 0, 1, 3, 6, ... of 216) */
+export const DICE_COUNTS: readonly number[] = (() => {
+  let c = [1];
+  for (let d = 0; d < SPY_ROLL_DICE; d++) {
+    const n = new Array<number>(c.length + SPY_ROLL_FACES).fill(0);
+    c.forEach((x, s) => { for (let f = 1; f <= SPY_ROLL_FACES; f++) n[s + f] += x; });
+    c = n;
+  }
+  return c;
+})();
+
+/** the dice's count over sums lo..hi (0x52b5c0) */
+function diceBand(lo: number, hi: number): number {
+  let n = 0;
+  for (let r = Math.max(0, lo); r <= Math.min(DICE_COUNTS.length - 1, hi); r++) n += DICE_COUNTS[r];
+  return n;
+}
+
+const clampTo = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+
 /**
- * CIV6 (measured with `tools/civ6lab/spy_probe.lua` over the tuner
- * socket): every mission is ONE roll R of 3d6 read against a threshold
- * T = BaseProbability - k, in six bands by the margin d = R - T:
- *   d >= 2 success undetected; d in {0, 1} success, must escape;
- *   d = -1 fail undetected; d in {-3, -2} fail, must escape;
- *   d in {-5, -4} captured; d <= -6 killed.
- * The game's tables are floor(p x 256)/256 of exactly these bands (base 13,
- * k = 2: 66/61/32/54/29/11 of 256).
+ * A MISSION's six bands as the game weighs them (GameCore_XP2_Release.dll
+ * 0x52b8f0, `tools/civ6lab/dll_readings.md` "C-16"): the needed roll is
+ * T = t + 2, t the threshold (`missionThreshold`, the pursuing counterspy's
+ * term added), and each band the 3d6 count over its sums, ascending — killed
+ * 3 .. a1 − 1, captured a1 .. a2 − 1, fail-must-escape a2 .. a3 − 1,
+ * fail-undetected a3 .. a4 − 1, success-must-escape a4 .. a5 − 1,
+ * success-undetected a5 .. 18 — with a5 = T, a4 = T − 2, a3 = T − 3,
+ * a2 = T − 5, a1 = T − 7, each held to its window (8..18, 7..17, 6..16,
+ * 5..15, 4..14), so no band is ever certain or impossible. Measured
+ * (`tools/civ6lab/spy_probe.lua`): base 13, k = 2 reads 66/61/32/54/29/11 of
+ * 256 — 56/52/27/46/25/10 of 216 here. The weights in the draw's order
+ * (killed first); the band at weight index i is outcome 5 − i.
  */
-export function missionOutcome(r: number, t: number): number {
-  const d = r - t;
-  if (d >= 2) return MISSION_SUCCESS_UNDETECTED;
-  if (d >= 0) return MISSION_SUCCESS_MUST_ESCAPE;
-  if (d === -1) return MISSION_FAIL_UNDETECTED;
-  if (d >= -3) return MISSION_FAIL_MUST_ESCAPE;
-  if (d >= -5) return MISSION_CAPTURED;
-  return MISSION_KILLED;
+export function missionWeights(t: number): number[] {
+  const T = t + 2;
+  const a5 = clampTo(T, 8, 18);
+  const a4 = clampTo(T - 2, 7, 17);
+  const a3 = clampTo(T - 3, 6, 16);
+  const a2 = clampTo(T - 5, 5, 15);
+  const a1 = clampTo(T - 7, 4, 14);
+  return [diceBand(3, a1 - 1), diceBand(a1, a2 - 1), diceBand(a2, a3 - 1), diceBand(a3, a4 - 1),
+    diceBand(a4, a5 - 1), diceBand(a5, 18)];
+}
+
+/** "Rolling Espionage Result" for a mission (0x52b2a0): ONE weighted draw
+ *  over `missionWeights`, the outcome (`MISSION_*`). `_mission_draw` is the
+ *  twin. */
+export function missionDraw(state: GameState, t: number): number {
+  return 5 - randWeighted(state, missionWeights(t));
+}
+
+/** An ESCAPE's three bands (0x52b090): killed 3 .. v − 3, caught v − 2 ..
+ *  v − 1, away v .. 18, the 3d6 count over each, in that order. */
+export function escapeWeights(v: number): number[] {
+  const c = SPY_ESCAPE_CAPTURE_BAND;
+  return [diceBand(3, v - c - 1), diceBand(v - c, v - 1), diceBand(v, 18)];
 }
 
 /** T = BaseProbability - k, k = SPY_ROLL_LEVEL_BASE + the level the mission
@@ -479,13 +520,6 @@ export function missionOutcome(r: number, t: number): number {
  *  promotion's +2 on its own operation likewise. */
 export function missionThreshold(def: SpyMissionDef, lvl: number): number {
   return (def.baseProbability ?? 0) - (SPY_ROLL_LEVEL_BASE + lvl);
-}
-
-/** the 3d6 — one draw per die, mirrored draw for draw on both engines. */
-function missionRoll(state: GameState): number {
-  let r = 0;
-  for (let i = 0; i < SPY_ROLL_DICE; i++) r += Math.floor(nextRandom(state) * SPY_ROLL_FACES) + 1;
-  return r;
 }
 
 /** The level a mission at a MINOR rolls with: no city, so no Gain Sources
@@ -519,7 +553,7 @@ function resolveMission(state: GameState, unit: Unit, m: number): void {
   const post = counterspyPursuing(state, here.seat.seat, here.city, unit.tileIndex);
   const guard = post ? SPY_COUNTERSPY_ROLL + SPY_COUNTERSPY_LEVEL_ROLL * spyLevel(post) : 0;
   const out = def.certain ? MISSION_SUCCESS_UNDETECTED
-    : missionOutcome(missionRoll(state) - guard, missionThreshold(def, lvl));
+    : missionDraw(state, missionThreshold(def, lvl) + guard);
   // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation run in
   // the city is the spying the promise forbids, whatever its outcome
   if (def.offensive) promiseIncursion(state, here.seat.seat, unit.seat, PROMISE_SPY, 1);
@@ -568,7 +602,7 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
   const minor = spyMinorAt(state, unit.tileIndex);
   if (!minor) return;
   const lvl = minorMissionLevel(state, unit, m);
-  const out = missionOutcome(missionRoll(state), missionThreshold(def, lvl));
+  const out = missionDraw(state, missionThreshold(def, lvl));
   if (out <= MISSION_SUCCESS_MUST_ESCAPE) {
     if (m === SPY_M_FABRICATE_SCANDAL) {
       const k = SPY_SCANDAL_ENVOYS_BASE + SPY_SCANDAL_PER_LEVEL * lvl;
@@ -596,10 +630,11 @@ function resolveMinorMission(state: GameState, unit: Unit, m: number, def: SpyMi
  * (`policeCover`); the target v is the install's base less a level term per
  * level above the first (Ace Driver "+4 levels" among them), +4 when the
  * police cover the route taken, and no counterspy term — ResolveEscape
- * passes none (GameCore_XP2_Release.dll 0x52ce40). One 3d6: the spy gets
- * away at v or over; on v − 2 .. v − 1 it is caught, "imprisoned, but not
- * killed" where a MAJOR runs the prison — a minor keeps no cell, so its
- * catch ends the career — and below that it is killed.
+ * passes none (GameCore_XP2_Release.dll 0x52ce40). One "Rolling Espionage
+ * Result" (0x52aea0): ONE weighted draw over the escape's bands
+ * (`escapeWeights`) — away at v or over; on v − 2 .. v − 1 caught,
+ * "imprisoned, but not killed" where a MAJOR runs the prison — a minor keeps
+ * no cell, so its catch ends the career — and below that killed.
  */
 function spyEscape(state: GameState, unit: Unit,
                    districts: { type: string; tileIndex: number }[], jailer: number): void {
@@ -614,8 +649,8 @@ function spyEscape(state: GameState, unit: Unit,
   const v = SPY_ESCAPE_BASE
     - SPY_ESCAPE_LEVEL * (spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL'))
     - (guessed ? SPY_ESCAPE_POLICE : 0);
-  const r = missionRoll(state);
-  if (r >= v) {
+  const band = randWeighted(state, escapeWeights(v));
+  if (band === 2) {
     const home = citiesOf(state, unit.seat).find((c) => c.isCapital)
       ?? citiesOf(state, unit.seat)[0];
     if (!home) {
@@ -627,7 +662,7 @@ function spyEscape(state: GameState, unit: Unit,
     unit.spyTurns = route.turns;
     return;
   }
-  if (jailer >= 0 && r >= v - SPY_ESCAPE_CAPTURE_BAND) {
+  if (jailer >= 0 && band === 1) {
     spyCaptured(state, unit, jailer);
     return;
   }
@@ -640,14 +675,7 @@ function spyEscape(state: GameState, unit: Unit,
  *  air 4. */
 function policeCover(state: GameState, offered: readonly (typeof SPY_ESCAPE_ROUTES)[number][]): (typeof SPY_ESCAPE_ROUTES)[number] {
   const longest = Math.max(...SPY_ESCAPE_ROUTES.map((r) => r.turns));
-  let total = 0;
-  for (const r of offered) total += longest - r.turns + 1;
-  let pick = Math.floor(nextRandom(state) * total);
-  for (const r of offered) {
-    pick -= longest - r.turns + 1;
-    if (pick < 0) return r;
-  }
-  return offered[offered.length - 1];
+  return offered[randWeighted(state, offered.map((r) => longest - r.turns + 1))];
 }
 
 /** The catch — from the roll's own CAPTURED band or an escape's. The capture
@@ -741,7 +769,7 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       // current World Era", and the mission "pillages the Neighborhood
       // district to prevent Spies from completing it in rapid succession."
       const span = SPY_PARTISANS_MAX - SPY_PARTISANS_MIN + 1;
-      const n = SPY_PARTISANS_MIN + Math.floor(nextRandom(state) * span);
+      const n = SPY_PARTISANS_MIN + randRange(state, span);
       const chassis = partisanChassis(state);
       if (chassis) for (let i = 0; i < n; i++) spawnUnit(state, chassis, city.centerIndex, BARB_SEAT);
       pillageDistrict(state, city, 'NEIGHBORHOOD');

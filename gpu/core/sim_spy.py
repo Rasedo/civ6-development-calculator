@@ -382,40 +382,48 @@ class SimSpy:
     M_SUCCESS_UNDETECTED, M_SUCCESS_MUST_ESCAPE, M_FAIL_UNDETECTED = 0, 1, 2
     M_FAIL_MUST_ESCAPE, M_CAPTURED, M_KILLED = 3, 4, 5
 
-    @staticmethod
-    def _mission_outcome(r: int, t: int) -> int:
-        """`missionOutcome`'s twin. CIV6 (measured in the live game over the tuner
-        socket): every mission is ONE roll R of 3d6 read against
-        T = BaseProbability - k, in six bands by the margin d = R - T:
-        d >= 2 success undetected; {0, 1} success, must escape; -1 fail
-        undetected; {-3, -2} fail, must escape; {-5, -4} captured; <= -6
-        killed. The game's tables are floor(p x 256)/256 of these bands."""
-        d = r - t
-        if d >= 2:
-            return 0
-        if d >= 0:
-            return 1
-        if d == -1:
-            return 2
-        if d >= -3:
-            return 3
-        if d >= -5:
-            return 4
-        return 5
+    def _dice_band(self, lo: int, hi: int) -> int:
+        """the dice's count over sums lo..hi (0x52b5c0, `diceBand`)"""
+        c = self._dice_counts
+        return sum(c[r] for r in range(max(0, lo), min(len(c) - 1, hi) + 1))
+
+    def _mission_weights(self, t: int) -> list[int]:
+        """`missionWeights` — a mission's six bands as the game weighs them
+        (0x52b8f0): the needed roll T = t + 2, each band the 3d6 count over
+        its sums, ascending (killed first), the band edges T, T - 2, T - 3,
+        T - 5, T - 7 each held to its window (8..18, 7..17, 6..16, 5..15,
+        4..14). The band at weight index i is outcome 5 - i."""
+        T = t + 2
+
+        def cl(x: int, lo: int, hi: int) -> int:
+            return min(hi, max(lo, x))
+        a5, a4, a3 = cl(T, 8, 18), cl(T - 2, 7, 17), cl(T - 3, 6, 16)
+        a2, a1 = cl(T - 5, 5, 15), cl(T - 7, 4, 14)
+        db = self._dice_band
+        return [db(3, a1 - 1), db(a1, a2 - 1), db(a2, a3 - 1), db(a3, a4 - 1), db(a4, a5 - 1), db(a5, 18)]
+
+    def _escape_weights(self, v: int) -> list[int]:
+        """`escapeWeights` — an escape's three bands (0x52b090): killed 3 ..
+        v - band - 1, caught v - band .. v - 1, away v .. 18."""
+        c = self._spy_escape_capture_band
+        return [self._dice_band(3, v - c - 1), self._dice_band(v - c, v - 1), self._dice_band(v, 18)]
+
+    def _weighted_one(self, b: int, w: list[int]) -> int:
+        """ONE weighted draw (`_rand_weighted`) over `w` in game `b` alone."""
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+        wt = torch.tensor(w, dtype=torch.long, device=self.device).unsqueeze(0).expand(self.B, -1)
+        return int(self._rand_weighted(one, wt)[b])
+
+    def _mission_draw(self, b: int, t: int) -> int:
+        """`missionDraw` — "Rolling Espionage Result" (0x52b2a0): ONE weighted
+        draw over the mission's bands, the outcome (`M_*`)."""
+        return 5 - self._weighted_one(b, self._mission_weights(t))
 
     def _mission_threshold(self, m: int, lvl: int) -> int:
         """`missionThreshold`'s twin: T = baseProbability - (SPY_ROLL_LEVEL_BASE
         + the level the mission rolls with) — a fresh Recruit reads k = 2."""
         return int(self._spy_missions[m]["baseProbability"]) - (self._spy_roll_level_base + lvl)
-
-    def _mission_roll(self, b: int) -> int:
-        """the 3d6 — one draw per die, `missionRoll`'s twin draw for draw"""
-        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        one[b] = True
-        r = 0
-        for _ in range(self._spy_roll_dice):
-            r += int(self._next_random(one)[b] * self._spy_roll_faces) + 1
-        return r
 
     def _spy_effective_level(self, row: int, b: int, v: int, m: int, hr: int, hc: int) -> int:
         """`effectiveLevel`'s twin: the spy's level, Gain Sources' +2 while the
@@ -462,7 +470,7 @@ class SimSpy:
         guard = (self._spy_counterspy_roll + self._spy_counterspy_level_roll
                  * min(int(self.unit_spy_level[b, post]), self._spy_max_level)) if post >= 0 else 0
         out = (self.M_SUCCESS_UNDETECTED if bool(mdef["certain"])
-               else self._mission_outcome(self._mission_roll(b) - guard, self._mission_threshold(m, lvl)))
+               else self._mission_draw(b, self._mission_threshold(m, lvl) + guard))
         if mdef["offensive"]:
             # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_SPY): an offensive operation
             # run in the city is the spying the promise forbids, whatever its
@@ -517,7 +525,7 @@ class SimSpy:
         if cs < 0:
             return
         lvl = self._spy_minor_level(row, b, v, m)
-        out = self._mission_outcome(self._mission_roll(b), self._mission_threshold(m, lvl))
+        out = self._mission_draw(b, self._mission_threshold(m, lvl))
         if out <= self.M_SUCCESS_MUST_ESCAPE:
             if m == self._spy_m_scandal:
                 k = self._spy_scandal_base + self._spy_scandal_per_level * lvl
@@ -548,10 +556,11 @@ class SimSpy:
         level term per level above the first (Ace Driver "+4 levels" among
         them), +4 when the police cover the route taken, and no counterspy
         term — ResolveEscape passes none (GameCore_XP2_Release.dll 0x52ce40).
-        One 3d6: the spy gets away at v or over; on v - 2 .. v - 1 it is
-        caught, "imprisoned, but not killed" where a MAJOR runs the prison — a
-        minor keeps no cell, so its catch ends the career — and below that it
-        is killed (`spyEscape`)."""
+        One "Rolling Espionage Result" (0x52aea0): ONE weighted draw over the
+        escape's bands (`_escape_weights`) — away at v or over; on v - 2 ..
+        v - 1 caught, "imprisoned, but not killed" where a MAJOR runs the
+        prison — a minor keeps no cell, so its catch ends the career — and
+        below that killed (`spyEscape`)."""
         rr = hr if hr >= 0 else self._CITY_MINOR0 + max(cs, 0)
         cc = hc if hr >= 0 else 0
         rrT = torch.full((1, 1), rr, dtype=torch.long, device=self.device)
@@ -565,21 +574,14 @@ class SimSpy:
         # `policeCover`: ONE draw over the offered routes, weighted by the
         # longest TravelTime - the route's own + 1 ("Police Exit Covered")
         longest = max(int(r["turns"]) for r in self._spy_escape_routes)
-        total = sum(longest - int(r["turns"]) + 1 for r in offered)
-        pick = int(self._next_random(one)[b] * total)
-        cover = offered[-1]
-        for r in offered:
-            pick -= longest - int(r["turns"]) + 1
-            if pick < 0:
-                cover = r
-                break
+        cover = offered[self._weighted_one(b, [longest - int(r["turns"]) + 1 for r in offered])]
         guessed = cover is route
         v_esc = (self._spy_escape_base
                  - self._spy_escape_level * (int(self.unit_spy_level[b, v])
                                              + self._spy_promo_sum(b, v, "SPY_ESCAPE_LEVEL"))
                  - (self._spy_escape_police if guessed else 0))
-        roll = self._mission_roll(b)
-        if roll >= v_esc:
+        band = self._weighted_one(b, self._escape_weights(v_esc))
+        if band == 2:
             cap = self.city_is_cap[b, row]
             alv = self.city_alive[b, row]
             if not bool(alv.count_nonzero()):
@@ -590,7 +592,7 @@ class SimSpy:
             self.unit_spy_target[b, v] = int(self.city_center[b, row, slot])
             self.unit_spy_turns[b, v] = route["turns"]
             return
-        if hr >= 0 and roll >= v_esc - self._spy_escape_capture_band:
+        if hr >= 0 and band == 1:
             self._spy_captured(row, b, v, hr)
             return
         self.unit_alive[b, v] = False
@@ -662,7 +664,7 @@ class SimSpy:
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
             span = self._spy_partisans_max - self._spy_partisans_min + 1
-            n = self._spy_partisans_min + int(self._next_random(one)[b] * span)
+            n = self._spy_partisans_min + int(self._rand_range(one, span)[b])
             chassis = int(self._partisan_chassis()[b])
             if chassis >= 0:
                 ctr = self.city_center[b, hr, hc].expand(self.B)

@@ -4,7 +4,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots, volcanoRoll } from '../../../cpu/core/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_TURNS, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
@@ -351,7 +351,7 @@ describe('the flood reaches the whole river', () => {
     expect(riverReach(state.map, off).map((t) => t.index)).toEqual([off.index]);
   });
 
-  it('a flood starts on its river\'s upstream-most floodplain: the one farthest from the mouth', () => {
+  it('a flood starts on its river\'s mouth-most floodplain and walks the river from there', () => {
     const board = (mouthEast: boolean | null) => {
       const state = makeState(makeMap(16, 16));
       const [a, b, c, d, e] = riverUnder(state.map, tileAtCoords(state.map, 3, 4), 5);
@@ -359,18 +359,21 @@ describe('the flood reaches the whole river', () => {
       if (mouthEast !== null) (mouthEast ? neighborTile(state.map, e, 0)! : neighborTile(state.map, a, 3)!).terrain = 'COAST';
       return { state, b, d };
     };
-    // the sea beside the east end: the west floodplain is upstream-most
+    // the sea beside the east end: the east floodplain is mouth-most, and the
+    // flood walks the river from it
     const east = board(true);
-    expect(floodRivers(east.state.map).map((r) => r.start.index)).toEqual([east.b.index]);
-    // the sea beside the west end: the east one
+    expect(floodRivers(east.state.map).map((r) => r.start.index)).toEqual([east.d.index]);
+    expect(riverReach(east.state.map, east.b).map((t) => t.index)[0]).toBe(east.d.index);
+    // the sea beside the west end: the west one
     const west = board(false);
-    expect(floodRivers(west.state.map).map((r) => r.start.index)).toEqual([west.d.index]);
+    expect(floodRivers(west.state.map).map((r) => r.start.index)).toEqual([west.b.index]);
     // no water anywhere: the lowest-index floodplain
     const inland = board(null);
     expect(floodRivers(inland.state.map).map((r) => r.start.index)).toEqual([inland.b.index]);
-    // the whole river floods from any start
+    // the whole river floods in one order from any of its plots
     expect(riverReach(west.state.map, west.d).map((t) => t.index))
       .toEqual(riverReach(west.state.map, west.b).map((t) => t.index));
+    expect(riverReach(west.state.map, west.d)[0]).toBe(west.b);
   });
 
   it('one flood takes every floodplain along its river together', () => {
@@ -748,19 +751,17 @@ describe('the turn\'s one random event', () => {
       if (t.volcano) t.elevation = 'MOUNTAIN';
     }
     const state = makeState(map);
-    // turn 1: no event draw, so the phase draws the roll and its pick alone
-    state.turn = 1;
     const count = () => map.tiles.filter((t) => t.volcanoActive).length;
     expect(count()).toBe(0);
     for (let i = 1; i <= 5; i++) {
-      disasterPhase(state);
+      volcanoRoll(state);
       expect(count()).toBe(i);
     }
     expect(map.tiles.some((t) => !t.volcano && t.volcanoActive)).toBe(false);
     // every one active: the share is 100, one goes back to sleep a turn
     for (const t of map.tiles) if (t.volcano) t.volcanoActive = true;
     const all = count();
-    disasterPhase(state);
+    volcanoRoll(state);
     expect(count()).toBe(all - 1);
     // four volcanoes, all dormant: D = 500 // 8 = 62, (70 - 0) x 4 = 280
     // reaches 200, so D // 2 = 31 — one wake in 31 turns
@@ -768,15 +769,23 @@ describe('the turn\'s one random event', () => {
     const vs = [small.tiles[41], small.tiles[97], small.tiles[213], small.tiles[355]];
     for (const t of vs) { t.volcano = true; t.elevation = 'MOUNTAIN'; }
     const s2 = makeState(small);
-    s2.turn = 1;
     const N = 6200;
     let woke = 0;
     for (let i = 0; i < N; i++) {
       for (const t of vs) t.volcanoActive = false;
-      disasterPhase(s2);
+      volcanoRoll(s2);
       woke += vs.filter((t) => t.volcanoActive).length;
     }
     expect(Math.abs(woke / N - 1 / 31)).toBeLessThan(0.008);
+    // a volcano no major has revealed has no name: with none named, no draw
+    // (0x335040 reads the named count first)
+    for (const t of vs) t.volcanoActive = false;
+    s2.unitsMode = true;
+    s2.fogOfWar = true;
+    for (const s of s2.seats) s.explored = new Array(small.tiles.length).fill(0);
+    const s0 = s2.rngState;
+    volcanoRoll(s2);
+    expect(s2.rngState).toBe(s0);
   });
 
   it('a drought is seven plots for its Duration at the game speed (2 or 5 turns online)', () => {

@@ -2,7 +2,7 @@
 import type { GameState, GreatPersonClass, Seat } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpChargesOf, gpCost } from '../data/greatPeople';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { congressGppFactor } from './congress';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -60,7 +60,7 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
     state.gpOffer[i] = -2;
     return;
   }
-  const at = pool[Math.floor(nextRandom(state) * pool.length)];
+  const at = pool[randRange(state, pool.length)];
   state.gpOffer[i] = at;
   state.gpPrice[i] = gpCost(cls, roster[at].era, worldEraIndex(state));
 }
@@ -313,7 +313,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
         (id) => !o.research.techs.includes(id) && !o.research.boosted.includes(id),
       );
       if (pool.length === 0) continue;
-      const pick = pool[Math.floor(nextRandom(state) * pool.length)];
+      const pick = pool[randRange(state, pool.length)];
       if (pick) o.research.boosted.push(pick);
     }
   }

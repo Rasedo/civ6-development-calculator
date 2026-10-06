@@ -2585,12 +2585,9 @@ class SimPhase:
         has_pool = e_ok.any(dim=1)
         e_pick = e_ok.long().argmax(dim=1)
         pool = uncl & (p_eras.reshape(1, -1) == e_pick.unsqueeze(1))
-        rp = self._next_random(need & has_pool)
-        n_open = pool.sum(dim=1)
-        k = torch.floor(rp * n_open.to(torch.float64)).to(torch.long)
-        cum = pool.long().cumsum(dim=1)
-        sel = pool & (cum == (k + 1).unsqueeze(1))
-        pid = sel.long().argmax(dim=1)
+        # "Generating a random new Great Person" (0x2f94d0): ONE uniform
+        # draw over the earliest era's candidates
+        pid = self._pick_live(need & has_pool, pool)[1]
         dr = (need & has_pool).nonzero(as_tuple=True)[0]
         self.gp_offer[dr, cls] = pid[dr]
         self.gp_price[:, cls] = torch.where(
@@ -2721,8 +2718,8 @@ class SimPhase:
                     pool = (~self.civ_techs[b, o] & ~self.civ_tech_boosted[b, o]).nonzero(as_tuple=True)[0]
                     if pool.numel() == 0:
                         continue
-                    k = int(self._next_random(one)[b] * pool.numel())
-                    self.civ_tech_boosted[b, o, int(pool[min(k, pool.numel() - 1)])] = True
+                    k = int(self._rand_range(one, pool.numel())[b])
+                    self.civ_tech_boosted[b, o, int(pool[k])] = True
         guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
         if guidx < 0:
             return

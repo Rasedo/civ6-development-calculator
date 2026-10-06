@@ -16,7 +16,7 @@
  * it cannot step. With no weighted plot there is no second draw.
  */
 import type { GameState, Tile, Unit } from './types';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { tileSeat } from './seats';
 import { stepUnit, tileFreeForUnit, unitIsMilitary } from './units';
 import { UNITS } from '../data/units';
@@ -44,7 +44,7 @@ function walkerGround(state: GameState, t: Tile, seat: number): boolean {
 
 /** The step table's draw: the first k whose running per-mille sum exceeds it. */
 function drawStep(state: GameState, steps: readonly number[]): number {
-  const x = Math.floor(nextRandom(state) * 1000);
+  const x = randRange(state, 1000);
   let run = 0;
   for (let k = 0; k < steps.length; k++) {
     run += steps[k];
@@ -80,7 +80,7 @@ export function walkUnit(
   let total = 0;
   for (const t of ring) total += weight(t);
   if (total <= 0) return;
-  const pick = Math.floor(nextRandom(state) * total);
+  const pick = randRange(state, total);
   let run = 0;
   let target: Tile = ring[0];
   for (const t of ring) {

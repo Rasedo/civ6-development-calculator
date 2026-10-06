@@ -35,7 +35,7 @@ import { unitPromoRows, xpToNextLevel } from './promotions';
 import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
  *  are DRAWN AT RANDOM. One draw per grant over the rows available at that
@@ -45,7 +45,7 @@ function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic'
   for (let i = 0; i < n; i++) {
     const open = kind === 'tech' ? availableTechsIn(rsr) : availableCivicsIn(rsr);
     if (open.length === 0) return; // the tree is exhausted
-    const next = open[Math.floor(nextRandom(state) * open.length)];
+    const next = open[randRange(state, open.length)];
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);

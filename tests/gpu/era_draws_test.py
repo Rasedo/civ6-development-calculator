@@ -6,9 +6,10 @@
 Scripted parity proves the two engines agree; these pokes prove the RULES,
 because the gate reaches each of them only by accident:
 
-  1. `_nth_open` — the shared "k-th open column" pick every restored draw
-     goes through. Its TS twin indexes a FILTERED list, so k must count only
-     open columns and the answer must be the k-th of THOSE.
+  1. `_pick_live` — the shared uniform pick every restored draw goes
+     through: ONE integer draw over the open columns (TS `arr[randRange(state,
+     arr.length)]` over a FILTERED list), so k counts only open columns and
+     the answer is the k-th of THOSE.
   2. `_grant_free_research` — Oxford and the Bolshoi draw AT RANDOM over the
      rows available at that moment, spend exactly one number per grant, and
      spend none where nothing is available.
@@ -46,26 +47,30 @@ def build(rules, path, b: int = 3):
                                                       device="cpu", dtype=torch.float64), _STATIC)
 
 
-def test_nth_open(rules, path) -> None:
+def _draw(state: int, mx: int) -> tuple[int, int]:
+    """the game's draw (`randRange`): the next state and its value"""
+    s = (state * 1103515245 + 12345) & 0xFFFFFFFF
+    return s, ((s >> 16) * mx) >> 16
+
+
+def test_pick_live(rules, path) -> None:
     sim = build(rules, path)
     open_m = torch.tensor([
         [False, True, False, True, True],   # open columns 1, 3, 4
         [True, False, False, False, False],  # only column 0
         [False, False, False, False, False],  # nothing open
     ], device=sim.device)
-    # the k-th OPEN column for k = 0, 1, 2 -> 1, 3, 4
-    for k, want in enumerate((1, 3, 4)):
-        rnd = torch.full((3,), (k + 0.5) / 3.0, dtype=torch.float64, device=sim.device)
-        got = int(sim._nth_open(open_m, rnd)[0])
-        assert got == want, f"draw {k}/3 picked column {got}, want {want}"
-    # a draw of exactly 1.0 is impossible (the generator is [0, 1)), but the
-    # top of the range must still land on the LAST open column
-    top = torch.full((3,), 1.0 - 1e-12, dtype=torch.float64, device=sim.device)
-    assert int(sim._nth_open(open_m, top)[0]) == 4
-    assert int(sim._nth_open(open_m, top)[1]) == 0
-    # a row with nothing open answers 0; its caller is what masks the write
-    assert int(sim._nth_open(open_m, top)[2]) == 0
-    print("  _nth_open OK: the k-th OPEN column, not the k-th column")
+    every = torch.ones(3, dtype=torch.bool, device=sim.device)
+    for seed in (1, 2, 3, 77, 4242):
+        sim.rng_state[:] = seed
+        drew, col = sim._pick_live(every, open_m)
+        s1, k = _draw(seed, 3)
+        assert int(col[0]) == (1, 3, 4)[k], (seed, int(col[0]), k)
+        assert int(col[1]) == 0
+        # one draw where something is open, none where nothing is
+        assert int(sim.rng_state[0]) == s1 and int(sim.rng_state[1]) == _draw(seed, 1)[0]
+        assert int(sim.rng_state[2]) == seed and not bool(drew[2])
+    print("  _pick_live OK: one integer draw, the k-th OPEN column, not the k-th column")
 
 
 def test_free_research(rules, path) -> None:
@@ -183,7 +188,7 @@ def main() -> None:
     assert paths, "no fixtures — run `npm run seed && npm run export` first"
     p = paths[0]
     print(f"era_draws_test on {p.name}:")
-    test_nth_open(rules, p)
+    test_pick_live(rules, p)
     test_free_research(rules, p)
     test_era_inspirations(rules, p)
     test_dig_civilization(rules, p)

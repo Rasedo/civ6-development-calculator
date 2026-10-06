@@ -3,14 +3,14 @@ import type { City, CityState, GameState, StormRecord, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
+import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIRECTION_TYPES } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
-import { nextRandom, randRange } from './rand';
+import { randRange, randWeighted } from './rand';
 import { fogActive, isExplored } from './fog';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, campTiles } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -29,10 +29,10 @@ import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_H
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
 import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
 import { TURN_LIMIT } from './game';
-import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
-import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
+import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
+import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
-import { STORM_EVENTS, STORM_DISC, STORM_UNIT_ROWS, stormFamilyAt, windWeights, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
+import { STORM_EVENTS, STORM_ROWS, WIND_ROWS, STORM_UNIT_ROWS, stormFamilyAt, gameLatitude, stormFootprintOffsets, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
 import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
@@ -310,8 +310,13 @@ export function riverOfPlots(map: GameMap): Int32Array {
 }
 
 /**
- * Every Floodplains tile ALONG one river: the river `start` belongs to
- * (`riverOfPlots`).
+ * Every Floodplains tile ALONG one river — the river `start` belongs to
+ * (`riverOfPlots`) — in the order a flood from `start` walks them: the
+ * river's Floodplains list (0xa2aa30 → 0xa2aca0) is read from the river's
+ * mouth up, its first plot the flood's start (`tools/civ6lab/dll_readings.md`
+ * "H-1: the random events' draws": 39 of 39 floods on runs/h1_duelw1116, 25
+ * of 25 on 1115); this map's rivers keep no laying order, so the plots go
+ * in the river's flood order (`floodRanks`).
  *
  * CIV6 (Flood): "The level of the water rises, flooding all Floodplains tiles
  * found along the River, and then recedes on the next turn." One severity for
@@ -321,8 +326,50 @@ export function riverReach(map: GameMap, start: Tile): Tile[] {
   const river = riverOfPlots(map);
   const r = river[start.index];
   if (r < 0) return [start];
-  const out = map.tiles.filter((t: Tile) => river[t.index] === r && isFloodplains(t.feature));
+  const rank = floodRanks(map);
+  const far = map.tiles.length;
+  const at = (t: Tile) => (rank[t.index] >= 0 ? rank[t.index] : far);
+  const out = map.tiles.filter((t: Tile) => river[t.index] === r && isFloodplains(t.feature))
+    .sort((a, b) => at(a) - at(b) || a.index - b.index);
   return out.length ? out : [start];
+}
+
+/**
+ * Each plot's place in its river's flood order, -1 on a plot no flood list
+ * holds: from the river's flood start (`floodRivers`) outward over the
+ * river's own plots (`riverOfPlots`), step by step, its Floodplains plots
+ * ranked by steps, ties to the lower index, any the walk misses last; a lone
+ * Floodplains plot 0.
+ * Static; the exporter ships it as the `fo` plane.
+ */
+const rankCache = new WeakMap<readonly Tile[], number[]>();
+export function floodRanks(map: GameMap): number[] {
+  const hit = rankCache.get(map.tiles);
+  if (hit) return hit;
+  const river = riverOfPlots(map);
+  const out = new Array<number>(map.tiles.length).fill(-1);
+  for (const fr of floodRivers(map)) {
+    const r = river[fr.start.index];
+    if (r < 0) {
+      out[fr.start.index] = 0;
+      continue;
+    }
+    const dist = new Map<number, number>([[fr.start.index, 0]]);
+    const queue = [fr.start];
+    for (let i = 0; i < queue.length; i++) {
+      for (const n of neighbors(map, queue[i])) {
+        if (river[n.index] !== r || dist.has(n.index)) continue;
+        dist.set(n.index, dist.get(queue[i].index)! + 1);
+        queue.push(n);
+      }
+    }
+    const far = map.tiles.length;
+    map.tiles.filter((t) => river[t.index] === r && isFloodplains(t.feature))
+      .sort((a, b) => (dist.get(a.index) ?? far) - (dist.get(b.index) ?? far) || a.index - b.index)
+      .forEach((t, i) => { out[t.index] = i; });
+  }
+  rankCache.set(map.tiles, out);
+  return out;
 }
 
 /**
@@ -361,19 +408,11 @@ export function floodWeights(degrees: number): number[] {
   return FLOOD_WEIGHT.map((w, sev) => warmedWeight(occTenths(w), FLOOD_CIPD[sev], degrees));
 }
 
-/** A flood that no draw chose — the spy's breached Dam: ONE draw names the
- *  severity by the flood rows' weights at the world's warming. */
+/** A flood that no draw chose — the spy's breached Dam: ONE weighted draw
+ *  (`randWeighted`) names the severity by the flood rows' integer weights at
+ *  the world's warming. */
 export function floodSeverity(state: GameState): number {
-  const w = floodWeights(warmingDegrees(state));
-  let total = 0;
-  for (const x of w) total += x;
-  const at = nextRandom(state) * total;
-  let cum = 0;
-  for (let i = 0; i < w.length; i++) {
-    cum += w[i];
-    if (at < cum) return i;
-  }
-  return w.length - 1;
+  return randWeighted(state, floodWeights(warmingDegrees(state)));
 }
 
 /** A river a flood may strike: the plot its flood STARTS on and every plot
@@ -424,11 +463,13 @@ function riverRevealed(state: GameState, river: FloodRiver): boolean {
 }
 
 /**
- * The plot a river's flood starts on — MEASURED (`runs/event_history_*`, 447 of 447 floods):
- * the FIRST plot of the river's floodplain list. This map's river model keeps
- * no flow direction, so the first plot is read as the river's UPSTREAM-MOST
- * Floodplains plot: the one farthest, in steps across river edges, from the
- * river's plots that touch the map's water as made (its mouth), ties to the
+ * The plot a river's flood starts on — the FIRST plot of the river's
+ * Floodplains list (MEASURED, `runs/event_history_*`, 447 of 447 floods),
+ * which the game reads from the river's mouth up (0xa2aa30 → 0xa2aca0;
+ * `tools/civ6lab/dll_readings.md` "H-1: the random events' draws"): this
+ * map's river model keeps no flow, so the first plot is the river's
+ * MOUTH-MOST Floodplains plot — the one nearest, in steps across river edges,
+ * to the river's plots that touch the map's water as made, ties to the
  * lowest index. A river touching no water, and a lone Floodplains plot, start
  * on their lowest-index Floodplains plot.
  */
@@ -449,13 +490,13 @@ function floodStart(map: GameMap, river: readonly Tile[]): Tile {
     }
   }
   let best: Tile | null = null;
-  let far = -1;
+  let near = Infinity;
   for (const u of [...river].sort((a, b) => a.index - b.index)) {
     if (!isFloodplains(u.feature)) continue;
-    const du = dist.get(u.index) ?? 0;
-    if (du > far) {
+    const du = dist.get(u.index) ?? Infinity;
+    if (best === null || du < near) {
       best = u;
-      far = du;
+      near = du;
     }
   }
   return best!;
@@ -588,19 +629,21 @@ interface ReactorSite {
 }
 
 /**
- * May a Meteor Shower strike this plot? CIV6 (`RandomEvent_Terrains`) its
- * Plains, Grassland, Snow or Desert, flat or hills and above the sea;
- * (`AvoidTerritory`) nobody's plot; and room for the Meteor Site it leaves —
- * bare or under a feature the site stands on (`Improvement_ValidFeatures`),
- * no improvement, Tribal Village, Meteor Site or barbarian outpost there
- * already. `_meteor_cands` is the twin.
+ * The ground a Meteor Shower's start test admits (the one-off predicate
+ * 0x28ec10, `tools/civ6lab/dll_readings.md` "C-74: the one-off start"): its
+ * `RandomEvent_Terrains` — Plains, Grassland, Snow or Desert, flat or hills —
+ * above the sea and not impassable; the event lists no feature, so any
+ * feature passes (runs/h1_duelw1116 t243: a Floodplains plot).
  */
-export function meteorCandidate(t: Tile, camps: ReadonlySet<number>): boolean {
-  if (isWater(t) || t.submerged || t.elevation === 'MOUNTAIN') return false;
-  if (!METEOR_TERRAINS.includes(t.terrain)) return false;
-  if (t.feature !== null && !METEOR_FEATURES.includes(t.feature)) return false;
-  if (METEOR_AVOIDS_TERRITORY && tileSeat(t) >= 0) return false;
-  return !t.improvement && !t.goodyHut && !t.meteor && !t.district && !t.builtWonder && !camps.has(t.index);
+export function meteorGround(t: Tile): boolean {
+  return !isWater(t) && !isImpassable(t) && METEOR_TERRAINS.includes(t.terrain);
+}
+
+/** May a Meteor Shower strike this plot? Its ground (`meteorGround`) and,
+ *  by `AvoidTerritory`, nobody's plot (0x28ec10's owner test). `_meteor_cands`
+ *  is the twin. */
+export function meteorCandidate(t: Tile): boolean {
+  return meteorGround(t) && (!METEOR_AVOIDS_TERRITORY || tileSeat(t) < 0);
 }
 
 /** May fire row `row` start on this plot — a live plot of its feature above
@@ -683,34 +726,48 @@ export function droughtStart(state: GameState): Tile | undefined {
 
 /**
  * THE VOLCANO ROLL — ONE roll a turn for the whole map ("Active Volcano Roll",
- * GameCore_XP2 0x335040; `tools/civ6lab/dll_volcano.py`). V the volcanoes, A
- * the active ones, W the volcanic wonders standing (always active); the active
- * share pct = 100·(A + W) // (V + W) and D = `VOLCANO_ROLL_TURNS` // (2V).
- * Below `PERCENT_VOLCANOES_ACTIVE`: D //= (70 − pct)·V // 100 when that
- * product reaches 200, and rand(D) = 0 wakes ONE dormant volcano, drawn
- * uniformly in ascending tile order ("Choose Active Volcano Roll"); at or
- * above it, with an active volcano, rand(D) = 0 puts ONE active volcano to
- * sleep, drawn the same way. `_volcano_roll` is the twin.
+ * GameCore_XP2 0x335040; `tools/civ6lab/dll_readings.md` "C-74: the volcano
+ * roll's gate"). V the volcanoes, N the NAMED ones (`volcanoNamed`; the
+ * count 0xa1d2b0(true), entries whose name is set), A the active ones, W the
+ * volcanic wonders standing (always active); the active share pct =
+ * 100·(A + W) // (V + W) and D = `VOLCANO_ROLL_TURNS` // (2V). No named
+ * volcano, no draw. Below `PERCENT_VOLCANOES_ACTIVE`, while a named volcano
+ * sleeps: D //= (70 − pct)·N // 100 when that product reaches 200, and
+ * rand(D) = 0 wakes ONE sleeping named volcano, drawn uniformly in ascending
+ * tile order ("Choose Active Volcano Roll"); at or above it, with an active
+ * volcano, rand(D) = 0 puts ONE active volcano to sleep, drawn the same way.
+ * `_volcano_roll` is the twin.
  */
-function volcanoRoll(state: GameState): void {
+export function volcanoRoll(state: GameState): void {
   const volcanoes = state.map.tiles.filter((t) => t.volcano);
   const v = volcanoes.length;
-  if (v === 0) return;
+  const named = volcanoes.filter((t) => volcanoNamed(state, t));
+  if (v === 0 || named.length === 0) return;
   const w = new Set(ERUPTION_WONDER.filter((f): f is string => !!f && state.map.tiles.some((t) => t.feature === f))).size;
   const active = volcanoes.filter((t) => t.volcanoActive);
   const pct = Math.floor((100 * (active.length + w)) / (v + w));
   let d = Math.floor(VOLCANO_ROLL_TURNS / (2 * v));
   const wake = pct < PERCENT_VOLCANOES_ACTIVE;
   if (wake) {
-    const x = (PERCENT_VOLCANOES_ACTIVE - pct) * v;
+    if (named.length - active.length <= 0) return;
+    const x = (PERCENT_VOLCANOES_ACTIVE - pct) * named.length;
     if (x >= 200) d = Math.floor(d / Math.floor(x / 100));
   } else if (active.length === 0) {
     return;
   }
   if (randRange(state, d) !== 0) return;
-  const from = wake ? volcanoes.filter((t) => !t.volcanoActive) : active;
+  const from = wake ? named.filter((t) => !t.volcanoActive) : active;
   const t = from[randRange(state, from.length)];
   t.volcanoActive = wake;
+}
+
+/** Has this volcano a name — has a major revealed its plot? (LAB: the
+ *  volcano entry's name field +8, which the roll's counts and its choice
+ *  read, read as set on a major's first sight.) With no fog every volcano
+ *  is named. `_volcano_named` is the twin. */
+function volcanoNamed(state: GameState, t: Tile): boolean {
+  if (!fogActive(state)) return true;
+  return state.seats.some((s) => isCiv(s.seat) && isExplored(state, s.seat, t.index));
 }
 
 /** The sites every row can strike this turn. A storm, a drought, the meteor
@@ -739,7 +796,6 @@ function eventSites(state: GameState): EventSites {
   }
   reactors.sort((a, b) => a.city.centerIndex - b.city.centerIndex);
   const volcanoes = map.tiles.filter((t) => t.volcano && t.volcanoActive).map((t) => [t]);
-  const camps = campTiles(state);
   return {
     flood: floodRivers(map).filter((r) => riverRevealed(state, r)),
     eruption: ERUPTION_WONDER.map((w) => {
@@ -748,7 +804,7 @@ function eventSites(state: GameState): EventSites {
       return plots.length ? [plots] : [];
     }),
     accident: ACCIDENT_MIN_TURN.map((gate) => reactors.filter((r) => (r.city.reactorAge ?? 0) >= gate)),
-    meteor: map.tiles.filter((t) => meteorCandidate(t, camps)),
+    meteor: map.tiles.filter((t) => meteorCandidate(t)),
     fire: FIRE_START_FEATURE.map((_f, row) => map.tiles.filter((t) => fireCandidate(t, row))),
   };
 }
@@ -833,12 +889,7 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       return;
     }
     case 'storm': {
-      const ev = STORM_EVENTS[row.sev];
-      const center = stormStart(state, ev);
-      if (!center) return;
-      state.stormSerial = (state.stormSerial ?? 0) + 1;
-      (state.storms ??= []).push({ id: state.stormSerial, event: row.sev, at: center.index, left: ev.duration, struck: [] });
-      log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
+      stormBirth(state, row.sev, strip);
       return;
     }
     case 'drought': {
@@ -853,8 +904,14 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       return;
     }
     case 'meteor': {
+      // the one-off birth (0x291a20): its plot, then its strike at age 0
+      // (0x2867f0) — no yield row; its two damage rows (IMPROVEMENT_PILLAGED,
+      // DISTRICT_PILLAGED at 101) draw once each on a plot that holds
+      // neither
       const at = pick(state, sites.meteor);
       if (!at) return;
+      randRange(state, 100);
+      randRange(state, 100);
       at.meteor = true;
       log(state, `Meteor shower at (${at.col}, ${at.row}) — a Meteor Site lies there.`);
       return;
@@ -862,93 +919,121 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
     case 'fire': {
       const at = pick(state, sites.fire[row.sev]);
       if (!at) return;
-      ignite(at, state.turn);
+      fireBirth(state, at, row.sev);
       log(state, `Fire at (${at.col}, ${at.row}).`);
       return;
     }
   }
 }
 
-/** A plot catches fire on turn `start`, its own clock: its Woods or
- *  Rainforest becomes the burning form (`RandomEvent_Yields` Turn 0, Amount
- *  0 — burning pays nothing). */
-function ignite(t: Tile, start: number): void {
-  const row = FIRE_START_FEATURE.indexOf(t.feature ?? '');
-  t.feature = FIRE_BURNING_FEATURE[row] as Tile['feature'];
-  t.fireStart = start;
-}
-
 /**
- * THE FIRES' TURN, after the draw: every plot on fire, on its own clock
- * (`age` = turns since the plot caught). SPREAD first: each plot burning at
- * an age in `FIRE_SPREAD_TURNS` — the list taken before any spreads, so a
- * plot caught this turn does not spread this turn — draws once per adjacent
- * live plot of its own fire's feature (and of the other fire's where
- * `FIRE_SPREAD_CROSS` says so), in direction order, and at `FIRE_SPREAD_P`
- * sets it burning from this turn. Then each plot on fire, in ascending order: a
- * BURNING plot takes the rows whose turns hold its age — its improvement and
- * district pillaged (an owned plot alone), its civilians killed and its land
- * units struck, each on its own UNIT_DAMAGE_LAND draw (`unitDamageDraws`),
- * and at `FIRE_POP_TURN` one citizen of the owning city — then at
- * `FIRE_BURNT_TURN` turns burnt, +1 Food; a
- * BURNT plot at `FIRE_REGROW_TURN` regrows its feature, +1 Production, and
- * the record goes. A plot whose fire's feature is gone keeps no record.
+ * A NEW FIRE of row `row` on `t` (the event's start 0x334d30 → 0x291a20):
+ * its record — the plot's own clock (`Tile.fireStart`) and its place among
+ * the live fires (`Tile.fireSeq`) — then its first strike at age 0
+ * (`fireStrike`). A fire the draw starts and one a fire spreads to alike.
  */
-function fireTurn(state: GameState): void {
+export function fireBirth(state: GameState, t: Tile, row: number): void {
+  state.fireSerial = (state.fireSerial ?? 0) + 1;
+  t.fireStart = state.turn;
+  t.fireSeq = state.fireSerial;
+  fireStrike(state, t, row, 0);
+}
+
+/**
+ * ONE FIRE STRIKE (the one-off strike 0x2867f0) on the fire's plot at its
+ * age (turn − start), `tools/civ6lab/dll_readings.md` "C-74: the fire":
+ * unless the plot is water or impassable, each `RandomEvent_Yields` row whose
+ * Turn is the age draws ONE "Boosted Yield Chance" rand(100), landing at or
+ * under its Percentage (100: always) — Turn 0 the burning form, Turn 2
+ * (`FIRE_BURNT_TURN`) the burnt form and +1 Food, Turn 6 (`FIRE_REGROW_TURN`)
+ * the feature back, +1 Production, and the record goes; then each
+ * `RandomEvent_Damages` row (XML order) whose turns hold the age draws ONE
+ * "Pillage Improvement Chance" rand(100) under its Percentage — the 101 rows
+ * always land: IMPROVEMENT_PILLAGED and DISTRICT_PILLAGED (an owned plot),
+ * POPULATION_LOSS (age `FIRE_POP_TURN`), UNIT_KILLED_CIVILIAN and
+ * UNIT_DAMAGE_LAND (`FIRE_DAMAGE_TURNS`, each land unit its own draw), and
+ * SPREAD at `FIRE_SPREAD_P` on `FIRE_SPREAD_TURNS`: every neighbour, in
+ * DirectionTypes order, standing on the row's own live feature starts a fire
+ * of its own (`fireBirth`). `_fire_strike` is the twin.
+ */
+function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
   const map = state.map;
-  const spreading = map.tiles.filter((t) => {
-    if (t.fireStart === undefined || !FIRE_BURNING_FEATURE.includes(t.feature ?? '')) return false;
-    const age = state.turn - t.fireStart;
-    return age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1];
-  });
-  for (const t of spreading) {
-    const own = FIRE_BURNING_FEATURE.indexOf(t.feature ?? '');
-    for (const n of neighbors(map, t)) {
-      const row = FIRE_START_FEATURE.indexOf(n.feature ?? '');
-      if (row < 0 || !fireCandidate(n, row) || (row !== own && !FIRE_SPREAD_CROSS[own])) continue;
-      if (nextRandom(state) < FIRE_SPREAD_P) ignite(n, state.turn);
+  if (!barren(t)) {
+    if (age === 0) {
+      randRange(state, 100);
+      t.feature = FIRE_BURNING_FEATURE[row] as Tile['feature'];
+    } else if (age === FIRE_BURNT_TURN) {
+      randRange(state, 100);
+      t.feature = FIRE_BURNT_FEATURE[row] as Tile['feature'];
+      fertilize(state, t);
+    } else if (age === FIRE_REGROW_TURN) {
+      randRange(state, 100);
+      t.feature = FIRE_START_FEATURE[row] as Tile['feature'];
+      t.fireStart = undefined;
+      t.fireSeq = undefined;
+      silt(state, t, 'fertilityProd');
     }
   }
-  for (const t of map.tiles) {
-    if (t.fireStart === undefined) continue;
-    const age = state.turn - t.fireStart;
-    const burning = FIRE_BURNING_FEATURE.indexOf(t.feature ?? '');
-    const burnt = FIRE_BURNT_FEATURE.indexOf(t.feature ?? '');
-    if (burning >= 0) {
-      if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
-        // the improvement and district rows need an owned plot, the unit
-        // rows do not (the applier 0x336a50)
-        if (tileSeat(t) >= 0) {
-          scorch(state, t);
-          pillageDistrict(state, t);
-        }
-        const land = unitDamageDraws(state, t, false, FIRE_DMG[0], FIRE_DMG[1]);
-        strikeUnits(state, t, tileSeat(t), { land, naval: null, civ: true }, null);
-      }
-      if (age === FIRE_POP_TURN) losePopulation(state, t);
-      if (age >= FIRE_BURNT_TURN) {
-        t.feature = FIRE_BURNT_FEATURE[burning] as Tile['feature'];
-        fertilize(state, t);
-      }
-    } else if (burnt >= 0) {
-      if (age >= FIRE_REGROW_TURN) {
-        t.feature = FIRE_START_FEATURE[burnt] as Tile['feature'];
-        t.fireStart = undefined;
-        if (fertilityLive(state) && !isWater(t) && t.elevation !== 'MOUNTAIN') {
-          t.fertilityProd += 1;
-        }
-      }
-    } else {
-      t.fireStart = undefined;
+  const owner = tileSeat(t);
+  if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
+    randRange(state, 100);
+    if (owner >= 0) scorch(state, t);
+    randRange(state, 100);
+    if (owner >= 0) pillageDistrict(state, t);
+  }
+  if (age === FIRE_POP_TURN) {
+    randRange(state, 100);
+    if (owner >= 0) losePopulation(state, t);
+  }
+  if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
+    randRange(state, 100);
+    strikeUnits(state, t, owner, { land: null, naval: null, civ: true }, null);
+    randRange(state, 100);
+    strikeUnits(state, t, owner, { land: unitDamageDraws(state, t, false, FIRE_DMG[0], FIRE_DMG[1]), naval: null, civ: false }, null);
+  }
+  if (age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1]
+      && randRange(state, 100) < Math.round(FIRE_SPREAD_P * 100)) {
+    for (const d of DIRECTION_TYPES) {
+      const n = neighborTile(map, t, d);
+      if (n && n.fireStart === undefined && fireCandidate(n, row)) fireBirth(state, n, row);
     }
   }
 }
 
+/** Which fire row a plot's fire is, by the feature it burns as or was
+ *  burnt as; -1 when its feature is neither. */
+function fireRowOf(t: Tile): number {
+  const f = t.feature ?? '';
+  const burning = FIRE_BURNING_FEATURE.indexOf(f);
+  return burning >= 0 ? burning : FIRE_BURNT_FEATURE.indexOf(f);
+}
+
 /**
- * A DROUGHT of severity `sev` centred on `center`: its footprint is the first
- * `DROUGHT_HEXES` slots of `STORM_DISC`, water skipped, each plot in the
- * disc's order (`droughtTile`). Its record (`GameState.droughts`) keeps the
- * footprint and its turns (`DROUGHT_TURNS`).
+ * THE FIRES' TURN (the one-off tick 0x289430), after the storms' walks: each
+ * live fire, in the order they began (`Tile.fireSeq`; the list taken before
+ * any strikes, so a fire started this turn waits for the next), strikes at
+ * its age (`fireStrike`). A plot whose fire's feature is gone keeps no record.
+ */
+export function fireTurn(state: GameState): void {
+  const live = state.map.tiles.filter((t) => t.fireStart !== undefined)
+    .sort((a, b) => (a.fireSeq ?? 0) - (b.fireSeq ?? 0));
+  for (const t of live) {
+    const row = fireRowOf(t);
+    if (row < 0) {
+      t.fireStart = undefined;
+      t.fireSeq = undefined;
+      continue;
+    }
+    fireStrike(state, t, row, state.turn - t.fireStart!);
+  }
+}
+
+/**
+ * A DROUGHT of severity `sev` centred on `center`: its footprint
+ * (`stormFootprint`, `DROUGHT_HEXES`), water skipped, each plot in the
+ * footprint's order (`droughtTile`; the drought's strike 0x286530). Its
+ * record (`GameState.droughts`) keeps the footprint and its turns
+ * (`DROUGHT_TURNS`).
  */
 export function drought(state: GameState, center: Tile, sev: number, strip: boolean): void {
   const turns = DROUGHT_TURNS[sev];
@@ -963,36 +1048,35 @@ export function drought(state: GameState, center: Tile, sev: number, strip: bool
 }
 
 /**
- * ONE drought plot at severity `sev`. ONE draw, always, whatever stands there.
- * The plot dries for the row's turns; a listed improvement is pillaged
- * (SPECIFIC_IMPROVEMENT_PILLAGED 100) and, at the row's
- * SPECIFIC_IMPROVEMENT_DESTROYED chance, taken away instead; a warmed world
- * strips the plot's silt.
+ * ONE drought plot at severity `sev` (0x286530): each `RandomEvent_Damages`
+ * row of the severity in XML order draws ONE "Pillage Improvement Chance"
+ * rand(100), whatever stands there — EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED
+ * (`DROUGHT_DESTROY_P`) takes a listed improvement away, then both rows'
+ * SPECIFIC_IMPROVEMENT_PILLAGED 100 pillages it. The plot dries for the
+ * row's turns; a warmed world strips the plot's silt.
  */
 function droughtTile(state: GameState, t: Tile, sev: number, turns: number, strip: boolean): void {
-  const rDestroy = nextRandom(state);
-  t.droughtTurns = Math.max(t.droughtTurns, turns);
-  if (t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t)) {
-    t.pillaged = true;
-    if (rDestroy < DROUGHT_DESTROY_P[sev]) destroyImprovement(state, t);
+  const listed = () => !!t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t);
+  if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100) < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
+    destroyImprovement(state, t);
   }
+  randRange(state, 100);
+  if (listed()) t.pillaged = true;
+  t.droughtTurns = Math.max(t.droughtTurns, turns);
   if (strip) defertilize(t);
 }
-
-/** The DLL's neighbour order an eruption walks: NE, E, SE, SW, W, NW. */
-const ERUPTION_DIRS = [DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW] as const;
 
 /**
  * The NEIGHBOURS an eruption strikes: each of `plots` (a volcano's one plot,
  * or a natural wonder's) in ascending order, its six on-map neighbours in
- * `ERUPTION_DIRS` order — a plot two wonder plots share taken twice, a
+ * DirectionTypes order (`DIRECTION_TYPES`) — a plot two wonder plots share taken twice, a
  * wonder plot beside another taken too (the natural-wonder eruption 0xa22150
  * walks each plot's six; the eruption itself skips what it does not reach).
  */
 export function eruptionRing(map: GameMap, plots: readonly Tile[]): Tile[] {
   const out: Tile[] = [];
   for (const p of [...plots].sort((a, b) => a.index - b.index)) {
-    for (const d of ERUPTION_DIRS) {
+    for (const d of DIRECTION_TYPES) {
       const n = neighborTile(map, p, d);
       if (n) out.push(n);
     }
@@ -1076,16 +1160,19 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
   log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
 }
 
+/** a `RandomEvent_Damages` DamageType the shared applier (0x336a50) takes */
+type DamageKind = FloodDamageRow['kind'] | 'UNIT_DAMAGE_NAVAL';
+
 /**
- * ONE landed damage row `kind` of an eruption or a flood on one plot, through
- * the shared applier (0x336a50): the improvement, district, building and
- * population rows need an OWNED plot, the unit and city rows do not.
- * UNIT_DAMAGE_LAND draws once per land unit on the plot (`unitDamageDraws`);
- * no eruption or flood row names UNIT_DAMAGE_NAVAL, so a hull is untouched.
+ * ONE landed damage row `kind` of an event on one plot, through the shared
+ * applier (0x336a50): the improvement, district, building and population
+ * rows need an OWNED plot, the unit and city rows do not. UNIT_DAMAGE_LAND
+ * (NAVAL) draws once per land (naval) unit on the plot (`unitDamageDraws`);
  * CITY_GARRISON and CITY_WALLS draw the row's band `lo` + rand(`hi` − `lo`)
- * where a city centre stands.
+ * where a city centre stands. A storm passes its row `ev` for its roster's
+ * unit terms (`stormSpares`, `stormExtraPct`).
  */
-function eventDamage(state: GameState, tile: Tile, kind: FloodDamageRow['kind'], lo: number, hi: number): void {
+function eventDamage(state: GameState, tile: Tile, kind: DamageKind, lo: number, hi: number, ev: StormEvent | null = null): void {
   const owner = tileSeat(tile);
   const owned = owner >= 0;
   switch (kind) {
@@ -1095,10 +1182,13 @@ function eventDamage(state: GameState, tile: Tile, kind: FloodDamageRow['kind'],
     case 'BUILDING_PILLAGED': if (owned) pillageTileBuildings(state, tile); return;
     case 'POPULATION_LOSS': if (owned) losePopulation(state, tile); return;
     case 'UNIT_KILLED_CIVILIAN':
-      strikeUnits(state, tile, owner, { land: null, naval: null, civ: true }, null);
+      strikeUnits(state, tile, owner, { land: null, naval: null, civ: true }, ev);
       return;
     case 'UNIT_DAMAGE_LAND':
-      strikeUnits(state, tile, owner, { land: unitDamageDraws(state, tile, false, lo, hi), naval: null, civ: false }, null);
+      strikeUnits(state, tile, owner, { land: unitDamageDraws(state, tile, false, lo, hi), naval: null, civ: false }, ev);
+      return;
+    case 'UNIT_DAMAGE_NAVAL':
+      strikeUnits(state, tile, owner, { land: null, naval: unitDamageDraws(state, tile, true, lo, hi), civ: false }, ev);
       return;
     case 'CITY_GARRISON':
     case 'CITY_WALLS': {
@@ -1131,8 +1221,9 @@ export function ageReactors(cities: readonly City[]): void {
 
 /**
  * A NUCLEAR ACCIDENT at one severity, in one city — MEASURED over 225 forced
- * accidents. ONE draw per `RandomEvent_Damages` row of the severity, in the
- * install's order (`ACCIDENT_ROWS`), each row's draw deciding that row, and
+ * accidents. ONE "Pillage Improvement Chance" rand(100) per
+ * `RandomEvent_Damages` row of the severity, in the install's order
+ * (`ACCIDENT_ROWS`; 0x2d33a0), landing under the row's Percentage, and
  * right after UNIT_DAMAGE_LAND when it fires one more per land unit on the
  * plot: that unit's damage (`unitDamageDraws`). Every accident pillages the
  * Power Plant with no draw, Reinforced Materials or not: the accident
@@ -1158,15 +1249,15 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   const roll = new Map<string, number>();
   let land: Map<number, number> | null = null;
   for (const kind of ACCIDENT_ROWS[sev]) {
-    const r = nextRandom(state);
+    const r = randRange(state, 100);
     roll.set(kind, r);
     // the row's applier draws right after it, one per land unit on the plot
-    if (kind === 'UNIT_DAMAGE_LAND' && r < ACCIDENT_LAND_P[sev] && t) {
+    if (kind === 'UNIT_DAMAGE_LAND' && r < Math.round(ACCIDENT_LAND_P[sev] * 100) && t) {
       land = unitDamageDraws(state, t, false, ACCIDENT_DMG_LO[sev], ACCIDENT_DMG_HI[sev]);
     }
   }
   // a row the severity does not carry never fires
-  const fires = (kind: string, p: number) => (roll.get(kind) ?? 1) < p;
+  const fires = (kind: string, p: number) => (roll.get(kind) ?? 100) < Math.round(p * 100);
   if (t) {
     t.falloutTurns = Math.max(t.falloutTurns ?? 0, ACCIDENT_FALLOUT[sev]);
     pillageHeld({ city }, 'NUCLEAR_POWER_PLANT');
@@ -1184,6 +1275,14 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   log(state, `Nuclear accident in ${city.name} — severity ${sev}.`);
 }
 
+/**
+ * THE TURN'S RANDOM-EVENT STEP (Game_RandomEvents 0x338710, `tools/civ6lab/
+ * dll_readings.md` "C-74", "C-93"), from `RANDOM_EVENT_START_TURN` on: the
+ * live droughts' tick, every live storm's walk (`stormsTurn`), every live
+ * fire's turn (`fireTurn`; 0x288f40: 0x2876c0, 0x28ecd0, then 0x289430),
+ * the volcano roll, then the turn's one random event with its own draws —
+ * the last draws before the first player's turn.
+ */
 export function disasterPhase(state: GameState): void {
   const map = state.map;
   const strip = desertificationLive(state);
@@ -1199,20 +1298,14 @@ export function disasterPhase(state: GameState): void {
     state.droughts = state.droughts.filter((d) => d.left > 0);
   }
 
-  // CIV6: the live storms walk and strike first, then the volcano roll, then
-  // the turn's random event and its effects — a new storm's footprint at its
-  // strike plot among them (tools/civ6lab/turn_order_civ6.md: `Storm
-  // Direction` opens 67 of 76 turns, `Active Volcano Roll` after it 76 of 76,
-  // `Random Event Roll` after that 190 of 190).
-  stormsTurn(state, [...(state.storms ?? [])], strip);
-  volcanoRoll(state);
-  // CIV6 (RANDOM_EVENT_START_TURN): no event fires before its first turn, and
-  // no draw is spent
+  // CIV6 (RANDOM_EVENT_START_TURN): before its first turn the step takes no
+  // draw at all
   if (state.turn >= RANDOM_EVENT_START_TURN) {
+    stormsTurn(state, strip);
+    fireTurn(state);
+    volcanoRoll(state);
     randomEvent(state, strip);
-    stormsTurn(state, (state.storms ?? []).filter((s) => STORM_EVENTS[s.event].duration === s.left), strip);
   }
-  fireTurn(state);
   // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
   // phase's LOWEST victim civilization asks for aid — resolved once at the
   // end, so the order the two engines walk the turn's events cannot pick a
@@ -1223,59 +1316,88 @@ export function disasterPhase(state: GameState): void {
 }
 
 /**
- * The turn of each storm in `live` (records in the order they began, the
- * list taken BEFORE any of them moves). CIV6 (`RandomEvents`, Duration 3 /
- * Movement 8; Game_Climate 0x28ecd0 over m_aStorms): a storm lives three
- * turns. ENTRY: its footprint strikes the strike plot. Every later turn the
- * centre walks (`stormWalk`), its footprint striking at every step; on the
- * storm's LAST turn (turn − start + 1 ≥ Duration) at `STORM_LAST_TURN_PCT` of
- * the damage and fertility rows' chances. A storm strikes each plot once
- * (`StormRecord.struck`). A record whose turns run out leaves the list.
+ * The walk of each live storm (records in the order they began; Game_Climate
+ * 0x28ecd0 over m_aStorms): a storm walks on the two turns after its birth,
+ * the second — its last, turn − start + 1 ≥ Duration — at
+ * `STORM_LAST_TURN_PCT` of its rows' chances (`stormWalk`). A record whose
+ * turns run out leaves the list.
  */
-function stormsTurn(state: GameState, live: readonly StormRecord[], strip: boolean): void {
-  for (const s of live) {
+function stormsTurn(state: GameState, strip: boolean): void {
+  for (const s of state.storms ?? []) {
     const ev = STORM_EVENTS[s.event];
-    const age = ev.duration - s.left; // 0 entry, 1.. the walking turns
-    const pct = age + 1 >= ev.duration ? STORM_LAST_TURN_PCT : 100;
-    if (age === 0) stormTurn(state, s, ev, strip, pct);
-    else stormWalk(state, s, ev, strip, pct);
+    const age = ev.duration - s.left;
+    stormWalk(state, s, age + 1 >= ev.duration ? STORM_LAST_TURN_PCT : 100, strip);
     s.left -= 1;
   }
   if (state.storms) state.storms = state.storms.filter((s) => s.left > 0);
 }
 
+/** The `PrevailingWinds` rows (XML order, `WIND_ROWS`) whose latitude band
+ *  holds this row's game latitude (`gameLatitude`; both ends inclusive, so
+ *  at 60, 30, 5, 0, −5, −30, −60 two bands pool). */
+function windRowsAt(row: number, height: number): typeof WIND_ROWS {
+  const lat = gameLatitude(row, height);
+  return WIND_ROWS.filter((w) => w.lo <= lat && lat <= w.hi);
+}
+
 /**
  * THE STORM'S WALK (Game_Climate 0x28ecd0, one step 0x28c500 "Storm
- * Direction", `tools/civ6lab/dll_readings.md` "the storm's walk"): `STORM_MOVEMENT`
- * points a turn. Each step is ONE weighted draw over the headings of the
- * `PrevailingWinds` bands at the centre's CURRENT latitude (`windWeights`)
- * whose neighbour exists — `pick` in [0, their sum) names the first heading
- * whose cumulative weight exceeds it, in the hex order E NE NW W SW SE — and
- * the storm moves there whatever the terrain, another storm's centre
- * included: the step costs `STORM_STEP_COST_ON` onto the storm's own terrain
- * (`stormFamilyAt`, hurricanes the Ocean alone), `STORM_STEP_COST_OFF`
- * elsewhere, and the walk ends for the turn when the drawn step costs more
- * than is left. Each step strikes the footprint at the new centre
- * (`stormTurn`, at `pct` of the rows' chances).
+ * Direction"): `STORM_MOVEMENT` points a turn. Each step is ONE weighted draw
+ * (`randWeighted`) over the `PrevailingWinds` rows at the centre's current
+ * latitude (`windRowsAt`) whose neighbour that way exists (`DIRECTION_TYPES`)
+ * — none, no draw — and the storm moves there whatever the terrain, another
+ * storm's centre included: the step costs `STORM_STEP_COST_ON` onto the
+ * storm's own terrain (`stormFamilyAt`), `STORM_STEP_COST_OFF` elsewhere, and
+ * a drawn step costing more than is left ends the walk, its draw spent. Each
+ * step strikes the footprint at the new centre (`stormStrike` at `pct`).
+ * Then a "Storm Direction Preview" (`stormPreview`). `_storm_walk` is the twin.
  */
-export function stormWalk(state: GameState, s: StormRecord, ev: StormEvent, strip: boolean, pct: number): void {
+export function stormWalk(state: GameState, s: StormRecord, pct: number, strip: boolean): void {
   const map = state.map;
+  const ev = STORM_EVENTS[s.event];
   let left = STORM_MOVEMENT;
   for (;;) {
-    const center = map.tiles[s.at];
-    const w = windWeights(center.row, map.height).map((x, d) => (neighborTile(map, center, d) ? x : 0));
-    const total = w.reduce((a, b) => a + b, 0);
-    if (total === 0) break;
-    let pick = randRange(state, total);
-    let d = 0;
-    while (d < 5 && pick >= w[d]) { pick -= w[d]; d++; }
-    const dest = neighborTile(map, center, d)!;
-    const cost = stormFamilyAt(dest) === ev.family ? STORM_STEP_COST_ON : STORM_STEP_COST_OFF;
+    const c = map.tiles[s.at];
+    const rows = windRowsAt(c.row, map.height)
+      .map((w) => ({ to: neighborTile(map, c, DIRECTION_TYPES[w.dir]), weight: w.weight }))
+      .filter((r) => r.to);
+    if (!rows.length) break;
+    const to = rows[randWeighted(state, rows.map((r) => r.weight))].to!;
+    const cost = stormFamilyAt(to) === ev.family ? STORM_STEP_COST_ON : STORM_STEP_COST_OFF;
     if (cost > left) break;
     left -= cost;
-    s.at = dest.index;
-    stormTurn(state, s, ev, strip, pct);
+    s.at = to.index;
+    stormStrike(state, s, pct, strip);
   }
+  stormPreview(state, s.at);
+}
+
+/** "Storm Direction Preview" (0x28d1f0): one weighted draw over the
+ *  `PrevailingWinds` rows at the plot's latitude, whatever lies that way —
+ *  the heading the game shows; the engine keeps none of it. */
+function stormPreview(state: GameState, at: number): void {
+  const rows = windRowsAt(state.map.tiles[at].row, state.map.height);
+  if (rows.length) randWeighted(state, rows.map((r) => r.weight));
+}
+
+/**
+ * A NEW STORM of row `e` (0x291a20): its start plot (`stormStart`), the
+ * "Storm Direction Preview", its name (ONE draw over the naming player's
+ * citizen names, 0x28d400 — the engine keeps no name), then its first strike
+ * at full strength on a COPY of the record: the record keeps an empty struck
+ * list, so its first walk strikes its birth plots again. It walks the next
+ * `duration` − 1 turns.
+ */
+export function stormBirth(state: GameState, e: number, strip: boolean): void {
+  const ev = STORM_EVENTS[e];
+  const center = stormStart(state, ev);
+  if (!center) return;
+  stormPreview(state, center.index);
+  randRange(state, 1);
+  state.stormSerial = (state.stormSerial ?? 0) + 1;
+  (state.storms ??= []).push({ id: state.stormSerial, event: e, at: center.index, left: ev.duration - 1, struck: [] });
+  stormStrike(state, { id: 0, event: e, at: center.index, left: 0, struck: [] }, 100, strip);
+  log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
 }
 
 /** [8] the storm rows' weights on a map of `area` plots at `degrees` of
@@ -1285,20 +1407,58 @@ export function stormWeights(degrees: number, area: number): number[] {
   return STORM_EVENTS.map((ev) => warmedWeight(mapScaled(ev.weight, area), ev.cipd, degrees));
 }
 
-/** The first `hexes` slots of `STORM_DISC` around a centre, on-map ones only,
- *  in the disc's canonical order. */
+/** A storm's (or a drought's) footprint around `center`, on-map plots in the
+ *  strike's order (`stormFootprintOffsets`). */
 export function stormFootprint(map: GameMap, center: Tile, hexes: number): Tile[] {
-  return tilesAtOffsets(map, center.col, center.row, STORM_DISC.slice(0, hexes));
+  return tilesAtOffsets(map, center.col, center.row, stormFootprintOffsets(hexes));
 }
 
-/** ONE strike of a storm's footprint around its centre: each plot the storm
- *  has not yet struck (`StormRecord.struck`, the storm's own list), in the
- *  footprint's order, at `pct` of the rows' chances. */
-function stormTurn(state: GameState, s: StormRecord, ev: StormEvent, strip: boolean, pct: number): void {
+/** a plot no event yield lands on: water, or impassable (a mountain, an
+ *  impassable natural wonder) */
+function barren(t: Tile): boolean {
+  return isWater(t) || isImpassable(t);
+}
+
+/**
+ * ONE STORM STRIKE (0x286f80) at the storm's centre, at `pct` of its rows:
+ * every footprint plot the storm has not yet struck (`StormRecord.struck`)
+ * is struck (`stormPlot`) and joins the struck list. `_storm_strike` is the
+ * twin.
+ */
+export function stormStrike(state: GameState, s: StormRecord, pct: number, strip: boolean): void {
+  const ev = STORM_EVENTS[s.event];
   for (const t of stormFootprint(state.map, state.map.tiles[s.at], ev.hexes)) {
     if (s.struck.includes(t.index)) continue;
+    stormPlot(state, t, s.event, pct, strip);
     s.struck.push(t.index);
-    stormTile(state, t, ev, strip, pct);
+  }
+}
+
+/**
+ * ONE plot of a strike by storm row `e` at `pct` of its rows (0x286f80): each
+ * `RandomEvent_Damages` row (XML order, `STORM_ROWS`) draws ONE rand(100)
+ * against Percentage × pct // 100 — the row's CoastalLowlandPercentage on a
+ * coastal-lowland plot — a landed row applied at once through the shared
+ * applier (`eventDamage`, its unit rolls straight after); then, past Phase
+ * IV, the plot loses its silt (`defertilize`), else off water and impassable
+ * plots each `RandomEvent_Yields` row draws one rand(100) against
+ * Percentage × pct // 100, +1 of its yield where it falls under.
+ * `_storm_plot` is the twin.
+ */
+export function stormPlot(state: GameState, t: Tile, e: number, pct: number, strip: boolean): void {
+  const ev = STORM_EVENTS[e];
+  const rows = STORM_ROWS[e];
+  const lowland = (t.lowland ?? 0) > 0;
+  for (const row of rows.dmg) {
+    const chance = row.lowland >= 0 && lowland ? row.lowland : Math.floor((row.pct * pct) / 100);
+    if (randRange(state, 100) < chance) eventDamage(state, t, row.kind as DamageKind, row.lo, row.hi, ev);
+  }
+  if (strip) defertilize(t);
+  else if (!barren(t)) {
+    for (const row of rows.yields) {
+      if (randRange(state, 100) >= Math.floor((row.pct * pct) / 100)) continue;
+      silt(state, t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
+    }
   }
 }
 
@@ -1321,64 +1481,4 @@ function stormExtraPct(state: GameState, unitSeat: number, owner: number, ev: St
     if (r.effect === 'doubleOpposing' && r.event === ev.id && rowIsFor(r, civ, leader)) pct += r.amount;
   }
   return pct;
-}
-
-/**
- * ONE storm turn on one footprint tile.
- *
- * TEN draws per tile, always, whatever stands there — one per damage column
- * plus the two yields. Order: improvement pillaged, improvement destroyed,
- * district pillaged, buildings pillaged, population, civilian killed, land
- * share, naval share, food, production; then one per unit of each domain
- * whose share struck (`unitDamageDraws`). The improvement, district,
- * building and population rows need an owned plot, the unit rows do not.
- *
- * READINGS shared with the GPU twin: a domain's `Percentage` is one roll per
- * tile for ALL that domain's units on it; an embarked unit is its chassis'
- * domain; an air unit or a spy holds no tile and is neither domain; a city
- * centre on the footprint takes nothing (no storm row names CITY_GARRISON or
- * CITY_WALLS); BUILDING_PILLAGED is its own per-tile roll.
- */
-export function stormTile(state: GameState, tile: Tile, ev: StormEvent, strip: boolean, pct = 100): void {
-  const rPill = nextRandom(state);
-  const rDestroy = nextRandom(state);
-  const rDistrict = nextRandom(state);
-  const rBldgS = nextRandom(state);
-  const rPop = nextRandom(state);
-  const rCivilian = nextRandom(state);
-  const rLand = nextRandom(state);
-  const rNaval = nextRandom(state);
-  const rFood = nextRandom(state);
-  const rProd = nextRandom(state);
-
-  const owner = tileSeat(tile);
-  // the improvement, district, building and population rows need an OWNED
-  // plot; the unit rows do not (the applier 0x336a50); every row's chance,
-  // the fertility rows' too, at `pct` of its Percentage truncated to a whole
-  // percent (0x286f80: the storm's last turn halves them)
-  const owned = owner >= 0;
-  const lowland = (tile.lowland ?? 0) > 0;
-  const k = (p: number) => Math.floor(Math.round(p * 100) * pct / 100) / 100;
-  const pillP = k(lowland && ev.lowlandPill > 0 ? ev.lowlandPill : ev.impPill);
-  const distP = k(lowland && ev.lowlandDist > 0 ? ev.lowlandDist : ev.distPill);
-  if (owned && rPill < pillP) scorch(state, tile);
-  if (owned && rDestroy < k(ev.impDest)) destroyImprovement(state, tile);
-  if (owned && rDistrict < distP) pillageDistrict(state, tile);
-  if (owned && rBldgS < k(ev.bldgPill)) pillageTileBuildings(state, tile);
-  if (owned && rPop < k(ev.pop)) losePopulation(state, tile);
-  // one draw per unit of each domain the share struck, the land row's first
-  const land = rLand < k(ev.landP) ? unitDamageDraws(state, tile, false, ev.landLo, ev.landHi) : null;
-  const naval = rNaval < k(ev.navalP) ? unitDamageDraws(state, tile, true, ev.navalLo, ev.navalHi) : null;
-  strikeUnits(state, tile, owner, { land, naval, civ: rCivilian < k(ev.civKill) }, ev);
-  // FERTILITY, each yield its own roll — or, past Phase IV, the reverse:
-  // CIV6 "all Storms and Droughts now start removing fertility from tiles
-  // instead of adding it".
-  if (strip) {
-    defertilize(tile);
-    return;
-  }
-  if (rFood < k(ev.fertFood)) fertilize(state, tile);
-  if (rProd < k(ev.fertProd) && fertilityLive(state) && !isWater(tile) && tile.elevation !== 'MOUNTAIN') {
-    tile.fertilityProd += 1;
-  }
 }

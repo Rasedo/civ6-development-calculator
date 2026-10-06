@@ -31,7 +31,7 @@ import { isTechComplete, isCivicComplete, makeYieldCtx, getModifiers, type Yield
 import { effectiveAdjacency, buildingVariantAdjacency, darkBuildings, gameEraIndex } from './yields';
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
@@ -1471,7 +1471,9 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   const bits = concertVenueBits(state, unit.tileIndex);
   const rollLevel = Math.min(ROCK_BAND_MAX_LEVEL, Math.max(1, level + promoValueFor(unit, 'BAND_LEVEL', bits)));
   const odds = ROCK_BAND_TIER_ODDS[rollLevel - 1];
-  const roll = Math.floor(nextRandom(state) * 1000);
+  // "Rolling Concert Result" (0x535830): one weighted draw over the tier
+  // odds, which sum to 1000
+  const roll = randRange(state, 1000);
   let acc = 0;
   let tier = odds.length - 1;
   for (let i = 0; i < odds.length; i++) {
@@ -2184,14 +2186,14 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
         !owner.research.boosted.includes(id)
         && !(p.kind === 'techBoost' ? owner.research.techs : owner.research.civics).includes(id));
       for (let i = 0; i < amount && pool.length; i++) {
-        owner.research.boosted.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
+        owner.research.boosted.push(pool.splice(randRange(state, pool.length), 1)[0]);
       }
       break;
     }
     case 'tech': {
       const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
       for (let i = 0; i < amount && pool.length; i++) {
-        owner.research.techs.push(pool.splice(Math.floor(nextRandom(state) * pool.length), 1)[0]);
+        owner.research.techs.push(pool.splice(randRange(state, pool.length), 1)[0]);
       }
       break;
     }

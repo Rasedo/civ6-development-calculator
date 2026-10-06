@@ -11,9 +11,9 @@ import type { GameMap, Tile } from '../../world/types';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
-import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_HEXES, DROUGHT_SPACING, stormFamilyAt } from '../data/disasters';
+import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, DROUGHT_SPACING, gameLatitude, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
-import { droughtCandidate } from '../core/disasters';
+import { droughtCandidate, stormFootprint } from '../core/disasters';
 
 /** GlobalParameters MAP_MAX_FLOODPLAIN_SIZE / MAP_MIN_FLOODPLAIN_SIZE as the
  *  map scripts pass them to TerrainBuilder.GenerateFloodplains
@@ -208,38 +208,9 @@ function offsetPlot(map: GameMap, t: Tile, dq: number, dr: number): Tile | undef
   return map.tiles[row * map.width + col];
 }
 
-/** A STORM's FOOTPRINT at `at`, as the strike walks it (0x28d6b0): the centre;
- *  Hexes 3 adds its NORTHEAST and NORTHWEST neighbours; 7 its six
- *  neighbours in DirectionTypes order; 19 every axial offset (dq, dr) of
- *  -2..2 within two plots, dq outer — the centre among them again (the
- *  strike's struck list skips it). */
-export function stormFootprint(map: GameMap, at: Tile, hexes: number): Tile[] {
-  const out: Tile[] = [at];
-  const add = (t: Tile | undefined) => { if (t) out.push(t); };
-  if (hexes === 3) {
-    add(offsetPlot(map, at, DIR_DQ[0], DIR_DR[0]));
-    add(offsetPlot(map, at, DIR_DQ[5], DIR_DR[5]));
-  } else if (hexes === 7) {
-    for (let d = 0; d < 6; d++) add(offsetPlot(map, at, DIR_DQ[d], DIR_DR[d]));
-  } else if (hexes === 19) {
-    for (let dq = -2; dq <= 2; dq++) {
-      for (let dr = -2; dr <= 2; dr++) {
-        if ((dq < 0) === (dr < 0) ? Math.abs(dq) + Math.abs(dr) > 2 : Math.max(Math.abs(dq), Math.abs(dr)) > 2) continue;
-        add(offsetPlot(map, at, dq, dr));
-      }
-    }
-  }
-  return out;
-}
-
 /** a storm's `RandomEvent_Terrains` (0x28eab0) */
 export function stormTerrain(ev: number, t: Tile): boolean {
   return stormFamilyAt(t) === STORM_EVENTS[ev].family;
-}
-
-/** the game's latitude of a map row (0x69d80): -90 + 180 × (100y // H) // 100 */
-export function gameLatitude(row: number, height: number): number {
-  return -90 + Math.floor((180 * Math.floor((100 * row) / height)) / 100);
 }
 
 /** A live storm as the replay keeps it (the game's m_aStorms record). */
@@ -476,11 +447,13 @@ export function eruptionDraws(rng: Civ6Random, map: GameMap, plots: readonly Til
  * plot `droughtCandidate` admits — `centres` the live city centres, `live`
  * the plots the live storms have struck — each weighing 1 + min(its hex
  * distance to the nearest live drought's last footprint plot (`ends`),
- * `DROUGHT_SPACING`); then one draw on each land plot of its footprint. The
- * start plot's index, -1 where no plot qualifies (no draw).
+ * `DROUGHT_SPACING`); then the strike 0x286530: on each land plot of its
+ * footprint one draw per `RandomEvent_Damages` row of severity `sev`
+ * (EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED, then SPECIFIC_IMPROVEMENT_
+ * PILLAGED). The start plot's index, -1 where no plot qualifies (no draw).
  */
-export function droughtDraws(rng: Civ6Random, map: GameMap, centres: ReadonlySet<number>, live: ReadonlySet<number>,
-  ends: readonly Tile[]): number {
+export function droughtDraws(rng: Civ6Random, map: GameMap, sev: number, centres: ReadonlySet<number>,
+  live: ReadonlySet<number>, ends: readonly Tile[]): number {
   const cands: Tile[] = [];
   const weights: number[] = [];
   for (const t of map.tiles) {
@@ -492,7 +465,11 @@ export function droughtDraws(rng: Civ6Random, map: GameMap, centres: ReadonlySet
   }
   if (!cands.length) return -1;
   const at = cands[pickWeighted(rng, weights, 'Pick Drought Start Plot')];
-  for (const t of stormFootprint(map, at, DROUGHT_HEXES)) if (!isWater(t)) rng.get(100, 'Pillage Improvement Chance');
+  const rows = DROUGHT_DESTROY_P[sev] > 0 ? 2 : 1;
+  for (const t of stormFootprint(map, at, DROUGHT_HEXES)) {
+    if (isWater(t)) continue;
+    for (let r = 0; r < rows; r++) rng.get(100, 'Pillage Improvement Chance');
+  }
   return at.index;
 }
 

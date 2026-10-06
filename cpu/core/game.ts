@@ -44,7 +44,7 @@ import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
 import { CIVICS } from '../data/civics';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
@@ -1691,7 +1691,7 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
     for (let i = 0; i < n; i++) {
       const open = pool();
       if (open.length === 0) return;            // "if available" — no draw at all
-      onto.push(open[Math.floor(nextRandom(state) * open.length)]);
+      onto.push(open[randRange(state, open.length)]);
     }
   };
   draw(techs, () => Object.values(TECHS)
@@ -1721,7 +1721,7 @@ function eraInspirations(state: GameState): void {
       (c) => c.era === era && !rsr.civics.includes(c.id) && !rsr.boosted.includes(c.id),
     );
     if (open.length === 0) continue;
-    rsr.boosted.push(open[Math.floor(nextRandom(state) * open.length)].id);
+    rsr.boosted.push(open[randRange(state, open.length)].id);
     dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
   }
 }

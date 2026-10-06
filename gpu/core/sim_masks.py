@@ -238,6 +238,16 @@ class SimMasks:
         s = self._lcg_step(mask)
         return ((s >> 16) * (torch.as_tensor(mx, device=self.device).long() & 0xFFFF)) >> 16
 
+    def _rand_weighted(self, mask: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+        """The game's weighted picker (0x287c00) in the games of `mask` over
+        each game's integer weights `w` [B, K]: ONE draw over their total, the
+        first entry whose running sum passes it; -1 past them all or where the
+        mask is off ([B] int64). TS `randWeighted` is the twin."""
+        at = self._rand_range(mask, w.sum(dim=1))
+        past = w.cumsum(dim=1) > at.unsqueeze(1)
+        idx = past.long().argmax(dim=1)
+        return torch.where(mask & past.any(dim=1), idx, torch.full_like(idx, -1))
+
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None,
                      parts: tuple[torch.Tensor, ...] | None = None) -> torch.Tensor:
         if k in WW_BATTLE_KEYS:

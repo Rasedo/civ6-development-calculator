@@ -220,15 +220,14 @@ def main() -> None:
     order(sim, row, v, sim._A_SPY_MISSION + sim._spy_m_sabotage)
     for _ in range(int(sim.unit_spy_turns[B0, v]) - 1):
         sim._tick_spies(row)
-    # the roll is the measured 3d6 (tests/gpu/spy_test.py `seek_band`): walk
-    # seeds until the resolving tick's roll SUCCEEDS unseen
+    # the roll is one weighted draw over the 3d6 bands (tests/gpu/spy_test.py
+    # `seek_band`): walk seeds until the resolving tick's roll SUCCEEDS unseen
     _t = sim._mission_threshold(sim._spy_m_sabotage, sim._spy_effective_level(row, B0, v, sim._spy_m_sabotage, foe, theirs))
     _one = torch.zeros(sim.B, dtype=torch.bool)
     _one[B0] = True
     for _seed in range(1, 20000):
         sim.rng_state[B0] = _seed
-        _r = sum(int(sim._next_random(_one)[B0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
-        if sim._mission_outcome(_r, _t) == sim.M_SUCCESS_UNDETECTED:
+        if sim._mission_draw(B0, _t) == sim.M_SUCCESS_UNDETECTED:
             sim.rng_state[B0] = _seed
             break
     else:
@@ -264,12 +263,16 @@ def main() -> None:
     t5 = sim._mission_threshold(sim._spy_m_sabotage, lvl5)
     seed5 = None
     for _seed in range(1, 20000):
-        sim.rng_state[B0] = _seed
-        _r = sum(int(sim._next_random(_one)[B0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
-        if _r == t5 + 3:          # unguarded success unseen; a Recruit post (3) leaves 0, success seen;
-            seed5 = _seed         # one level up (4) leaves -1, fail unseen
+        outs = []
+        for tt in (t5, t5 + 3, t5 + 4):
+            sim.rng_state[B0] = _seed
+            outs.append(sim._mission_draw(B0, tt))
+        # unguarded success unseen; a Recruit post (3) a success seen; one
+        # level up (4) a fail unseen
+        if outs == [sim.M_SUCCESS_UNDETECTED, sim.M_SUCCESS_MUST_ESCAPE, sim.M_FAIL_UNDETECTED]:
+            seed5 = _seed
             break
-    assert seed5 is not None, f"no seed in 20000 rolls T+3 against T={t5}"
+    assert seed5 is not None, f"no seed in 20000 lands the three bands against T={t5}"
 
     def sabotage() -> bool:
         sim.city_bldg_pillaged[B0, foe, theirs, wk] = False

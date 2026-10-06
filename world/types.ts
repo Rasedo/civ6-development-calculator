@@ -285,11 +285,14 @@ export interface Tile {
   fertilitySci?: number;
   fertilityCul?: number;
   droughtTurns: number;
-  /** CIV6 (`RandomEvent_Yields`, the pack's fires): the turn the FIRE this
-   *  plot belongs to began — the event's clock, which a plot the fire spreads
-   *  to shares. The plot burns, is burnt at the fire's Turn 2 and regrows at
-   *  its Turn 6, when the record goes. Absent = no fire. */
+  /** CIV6 (`RandomEvent_Yields`, the pack's fires): the turn the FIRE on this
+   *  plot began — each plot a fire spreads to starts a fire of its own. The
+   *  plot burns, is burnt at the fire's Turn 2 and regrows at its Turn 6,
+   *  when the record goes. Absent = no fire. */
   fireStart?: number;
+  /** the fire's place in the order the live fires began (`GameState.
+   *  fireSerial` at its start): the order their turns run in. */
+  fireSeq?: number;
   /** CIV6 (IMPROVEMENT_METEOR_GOODY): a METEOR SITE a shower left here, taken
    *  by the first civilization unit to enter it. */
   meteor?: boolean;

@@ -4,8 +4,9 @@
  * (`StartWitness.seed`), the draws between the barbarians' completed start
  * of turn T-1 and the first player's start of turn T end with the turn's
  * random-event step (`tools/civ6lab/dll_readings.md`, "H-1: the random
- * events' draws"): each live storm's walk, the volcano roll, the event roll
- * and the new event's own draws (`eventDraws.ts`). The step is placed at the
+ * events' draws", "C-74: the fire"): each live storm's walk, each live fire's
+ * turn, the volcano roll, the event roll and the new event's own draws
+ * (`eventDraws.ts`). The step is placed at the
  * end of those draws, and a start counts only where the replay reproduces
  * what the records place without the yields: a new storm's start plot, a
  * storm's plot after its first walk. Then the draws decide each struck plot's
@@ -16,15 +17,16 @@
 
 import type { GameMap, Tile } from '../../world/types';
 import { UNITS } from '../data/units';
-import { DROUGHT_HEXES, ERUPTION_ROWS, ERUPTION_WEIGHT, ERUPTION_WONDER, FIRE_START_FEATURE, FIRST_TIME_OCCURRENCE_BOOST, FLOOD_WEIGHT, STANDARD_MAP_AREA, STORM_EVENTS } from '../data/disasters';
-import { fireCandidate } from '../core/disasters';
+import { DROUGHT_HEXES, ERUPTION_ROWS, ERUPTION_WEIGHT, ERUPTION_WONDER, FIRE_BURNT_TURN, FIRE_DAMAGE_TURNS, FIRE_DMG, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_START_FEATURE, FIRST_TIME_OCCURRENCE_BOOST, FLOOD_WEIGHT, STANDARD_MAP_AREA, STORM_EVENTS } from '../data/disasters';
+import { fireCandidate, meteorGround, stormFootprint } from '../core/disasters';
 import { isWater } from '../../world/query';
+import { neighbors } from '../../world/hex';
 import { unitDomain } from '../core/units';
 import { plotAt, P, num, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, recordMap } from './import';
 import { drawsBetween, type Civ6Random } from './civ6Random';
 import {
-  droughtDraws, eruptionDraws, floodDraws, floodplainList, newOutcome, replayAtEnd, stormBirth, stormFootprint, stormStartPlots, stormWalk,
+  droughtDraws, eruptionDraws, floodDraws, floodplainList, newOutcome, replayAtEnd, stormBirth, stormStartPlots, stormWalk,
   type EventOutcome, type StormState, type StruckPlot,
 } from './eventDraws';
 
@@ -39,7 +41,7 @@ const STORM_WALKS = 2;
 export interface ReplayedEvent {
   /** `${start turn}:${RandomEvents index}` */
   key: string;
-  family: 'flood' | 'storm' | 'eruption' | 'drought' | 'fire' | 'sea';
+  family: 'flood' | 'storm' | 'eruption' | 'drought' | 'fire' | 'sea' | 'meteor';
   /** the turns whose draws placed it (a storm's birth and its walks) */
   turns: number[];
 }
@@ -65,8 +67,6 @@ const DROUGHTS = ['RANDOM_EVENT_DROUGHT_MAJOR', 'RANDOM_EVENT_DROUGHT_EXTREME'];
 /** the fires, each with the feature it starts on */
 const FIRE_EVENTS = ['RANDOM_EVENT_FOREST_FIRE', 'RANDOM_EVENT_JUNGLE_FIRE'];
 const FIRE_EVENT_FEATURE = ['WOODS', 'RAINFOREST'];
-/** the draws a fire's birth takes after its start plot (LAB: not read in the DLL) */
-const FIRE_BIRTH_DRAWS = 6;
 
 /** the volcano roll's draws between the walks and the event roll: one, or
  *  none (the roll's gate 0x335040 is not read to the end), or two (a woken
@@ -260,14 +260,16 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
         });
         parts.push((rng, step) => {
           const live = new Set(step.st.flatMap((s) => [...s.struck]));
-          const start = droughtDraws(rng, map, centres, live, ends);
+          const start = droughtDraws(rng, map, DROUGHTS.indexOf(name), centres, live, ends);
           return start === at;
         });
       } else if (FIRE_EVENTS.includes(name)) {
         // a fire: one uniform draw over the plots of its feature
-        // (`fireCandidate`, ascending), then FIRE_BIRTH_DRAWS more — a LAB fit,
-        // 5 of 5 fires on 1116 land their recorded start plot with exactly
-        // six draws after the pick
+        // (`fireCandidate`, ascending), then its birth strike at age 0 (the
+        // one-off strike 0x2867f0): the Turn 0 yield row's "Boosted Yield
+        // Chance", then the five damage rows whose turns hold 0 (the pillage
+        // pair, the citizen, the civilians, the land units — each land unit's
+        // own roll straight after its row, which always lands at 101)
         const at = num(e[3]);
         const row = FIRE_START_FEATURE.indexOf(FIRE_EVENT_FEATURE[FIRE_EVENTS.indexOf(name)]);
         const cands = map.tiles.filter((t) => fireCandidate(t, row));
@@ -277,7 +279,25 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
         }
         parts.push((rng) => {
           const pick = cands[rng.get(cands.length, 'Pick One Off Start Plot')].index;
-          for (let i = 0; i < FIRE_BIRTH_DRAWS; i++) rng.get(100, 'fire birth draw');
+          rng.get(100, 'Boosted Yield Chance');
+          for (let i = 0; i < 5; i++) rng.get(100, 'Pillage Improvement Chance');
+          for (let i = 0; i < ctx(pick).landUnits; i++) rng.get(51, 'Random Event Unit Damage Roll');
+          return pick === at;
+        });
+      } else if (name === 'RANDOM_EVENT_METEOR_SHOWER') {
+        // the meteor: one uniform draw over the plots it may strike — its
+        // ground (`meteorGround`), nobody's in the record before — ascending,
+        // then its strike's two damage rows (2 of 2 meteors land: 1115 t135,
+        // 1116 t243)
+        const at = num(e[3]);
+        const cands = map.tiles.filter((t) => meteorGround(t) && (plotAt(before, t.index)[P.owner] as number) < 0);
+        if (!cands.length) {
+          if (at >= 0) unsupported = `${name} t${T}: the record's plot is no candidate`;
+          continue;
+        }
+        parts.push((rng) => {
+          const pick = cands[rng.get(cands.length, 'Pick One Off Start Plot')].index;
+          for (let i = 0; i < 2; i++) rng.get(100, 'Pillage Improvement Chance');
           return pick === at;
         });
       } else if (name.startsWith('RANDOM_EVENT_SEA_LEVEL_RISE')) {
@@ -289,6 +309,28 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
       }
     }
     if (unsupported) { fail(unsupported); continue; }
+    // the live fires' turns (the one-off tick 0x289430), in the order they
+    // began: each its strike's rows at its age (`fireStrike`). A SPREAD that
+    // lands starts a fire on each plot beside of the fire's own feature: the
+    // replay places none of their births, so a landing beside a fire the
+    // record starts this turn fails the start; one the record shows lighting
+    // nothing is let stand (1115 t141: a landing beside a Rainforest that
+    // did not burn)
+    const fires = [...first.values()].filter((e) => FIRE_EVENTS.includes(names[e[1]] ?? '') && num(e[3]) >= 0
+      && T - e[0] >= 1 && T - e[0] <= FIRE_REGROW_TURN).sort((x, y) => x[0] - y[0]);
+    const lit = new Set(news.filter((e) => FIRE_EVENTS.includes(names[e[1]] ?? '')).map((e) => num(e[3])));
+    const catches = (f: EventRow) => neighbors(map, map.tiles[num(f[3])]).some((n) => lit.has(n.index));
+    const fireTurns = (rng: Civ6Random, step: Step) => {
+      for (const f of fires) {
+        const age = T - f[0];
+        if (age === FIRE_BURNT_TURN || age === FIRE_REGROW_TURN) rng.get(100, 'Boosted Yield Chance');
+        if (age < FIRE_DAMAGE_TURNS[0] || age > FIRE_DAMAGE_TURNS[1]) continue;
+        for (let i = 0; i < 4; i++) rng.get(100, 'Pillage Improvement Chance');
+        for (let i = 0; i < ctx(num(f[3])).landUnits; i++) rng.get(FIRE_DMG[1] - FIRE_DMG[0], 'Random Event Unit Damage Roll');
+        if (age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1]
+            && rng.get(100, 'Pillage Improvement Chance') < Math.round(FIRE_SPREAD_P * 100) && catches(f)) step.bornOk = false;
+      }
+    };
     // the step, on each volcano-roll reading, the one the last turn used first
     const tryModes: VolcanoDraws[] = [volcano, ...([1, 0, 2] as VolcanoDraws[]).filter((v) => v !== volcano)];
     let chosen: { k: number; value: Step } | undefined;
@@ -304,6 +346,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
       const replay = (rng: Civ6Random): Step => {
         const step: Step = { st: live.map((s) => ({ ...s.storm, struck: new Set(s.storm.struck) })), out: newOutcome(), soil: new Map(), bornOk: true, roll: -1 };
         for (const s of step.st) stormWalk(rng, map, s, T, ctx, step.out);
+        fireTurns(rng, step);
         for (let i = 0; i < v; i++) rng.get(EVENT_ROLL_TOTAL, 'Active Volcano Roll');
         step.roll = rng.get(EVENT_ROLL_TOTAL, 'Random Event Roll');
         for (let i = 0; i < extra; i++) rng.get(100, 'unrecorded unit roll');
@@ -471,6 +514,7 @@ function familyOf(name: string): ReplayedEvent['family'] {
   if (DROUGHTS.includes(name)) return 'drought';
   if (FIRE_EVENTS.includes(name)) return 'fire';
   if (name.startsWith('RANDOM_EVENT_SEA_LEVEL_RISE')) return 'sea';
+  if (name === 'RANDOM_EVENT_METEOR_SHOWER') return 'meteor';
   return 'eruption';
 }
 

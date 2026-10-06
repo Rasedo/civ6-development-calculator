@@ -16,8 +16,9 @@ Proven here:
     past the seat's research, in its nearest city, burning no fuel;
   * THE FIRE: a plot burns, is burnt at its fire's Turn 2 (+1 Food) and
     regrows at Turn 6 (+1 Production) with its chop planes and the adjacency
-    it lends restored exactly; it spreads on its turns 1-2, each caught plot
-    on its own clock, and a Forest Fire never into Rainforest; it
+    it lends restored exactly; each turn's strike draws its rows (0x2867f0);
+    it spreads on its turns 1-2 to every live Woods beside it at once, each
+    caught plot a fire of its own, and a Forest Fire never into Rainforest; it
     pillages, kills civilians and strikes land units 50-101 on turns 0-2 and
     costs one citizen on turn 0; while it lasts the plot takes no Lumber Mill,
     city, district or wonder, and lends the fire's Appeal;
@@ -68,6 +69,19 @@ def draws(s0: int, s1: int) -> int:
         if _lcg_n(s0, n) == s1 & 0xFFFFFFFF:
             return n
     raise AssertionError("more than 64 draws")
+
+
+def fire_draws(age: int, units: int) -> int:
+    """the draws a Forest Fire's strike takes at `age` with nothing to spread
+    to (0x2867f0): the yield row whose Turn is the age (0, 2, 6), then the
+    damage rows whose turns hold it — the pillage pair, the citizen at 0, the
+    civilians and the land units at 0-2 (each land unit its own roll), SPREAD
+    at 1-2"""
+    yld = int(age in (0, 2, 6))
+    dmg = (4 + units) if age <= 2 else 0
+    pop = int(age == 0)
+    spread = int(1 <= age <= 2)
+    return yld + dmg + pop + spread
 
 
 def land_units(sim, tiles) -> int:
@@ -133,23 +147,16 @@ def main() -> None:
     assert bool(cand.any()), "the fixture offers the meteor nowhere"
     assert not bool((cand & (sim.tile_seat[B0] >= 0)).any()), "AvoidTerritory"
     assert not bool((cand & (sim.water[B0] | sim.tile_mountain[B0])).any())
-    assert not bool((cand & ((sim.improvement[B0] >= 0) | sim.tile_goody[B0])).any())
-    live_f = (sim.feat_id[B0] >= 0) & ~sim.feat_stripped[B0]
-    ok_f = torch.zeros_like(live_f)
-    for f in sim._meteor_fids:
-        ok_f |= sim.feat_id[B0] == f
-    assert not bool((cand & live_f & ~ok_f).any()), "only Woods, Rainforest or Marsh stand under a site"
+    # the start test (0x28ec10) reads no improvement and, the event listing
+    # none, no feature: a Tribal Village is no bar
     t = int(cand.nonzero()[0][0])
     sim.tile_goody[B0, t] = True
-    assert not bool(sim._meteor_cands()[B0, t])
+    assert bool(sim._meteor_cands()[B0, t])
     sim.tile_goody[B0, t] = False
-    sim.tile_meteor[B0, t] = True
-    assert not bool(sim._meteor_cands()[B0, t])
-    sim.tile_meteor[B0, t] = False
     print(f"  2 meteor envelope OK — {int(cand.sum())} plots nobody owns")
 
     # 3 — ONE site at weight 6: with the rest zeroed every draw strikes, and
-    # spends the event draw and the plot's pick
+    # spends the event draw, the plot's pick and its strike's two damage rows
     only(sim, "meteor")
     strip = sim._desertification_live()
     for _ in range(20):
@@ -159,8 +166,8 @@ def main() -> None:
         assert int(sim.tile_meteor[B0].sum()) == 1
         hit = int(sim.tile_meteor[B0].nonzero()[0][0])
         assert bool(cand[hit])
-        assert draws(s0, int(sim.rng_state[B0])) == 2
-    print("  3 meteor draw OK — one site, the event draw and the plot's pick")
+        assert draws(s0, int(sim.rng_state[B0])) == 4
+    print("  3 meteor draw OK — one site, the event draw, the plot's pick and its strike's two rows")
 
     # 4 — the site's grant: one past the seat's research, at its nearest city,
     # burning no fuel
@@ -224,8 +231,16 @@ def main() -> None:
     appeal0 = sim._tile_appeal()[B0].clone()
     prod0, food0 = float(sim._rcy_globals()["p_plane"][B0, w]), float(sim._eff_food()[B0, w])
     start = 40
-    rows, tiles = torch.tensor([B0]), torch.tensor([w])
-    sim._ignite(rows, tiles, torch.tensor([start]))
+    tiles = torch.full((sim.B,), w, dtype=torch.long)
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[B0] = True
+    f0 = int(sim.fertility[B0, w])
+    p0 = int(sim.fertility_prod[B0, w])
+    sim.turn = start
+    s0 = int(sim.rng_state[B0])
+    units = land_units(sim, [w])
+    sim._fire_birth(one, tiles, 1)
+    assert draws(s0, int(sim.rng_state[B0])) == fire_draws(0, units), "the birth strike"
     assert int(sim.feat_id[B0, w]) == burning and int(sim.fire_start[B0, w]) == start
     # the burning plot yields its terrain alone: the Woods' +1 Production goes
     woods_prod = float(sim._feat_cat_y[woods, 1])
@@ -239,16 +254,12 @@ def main() -> None:
     for n in sim.neigh[w].tolist():
         if n >= 0 and int(sim.appeal_over[B0, n]) == -999:
             assert int(ap[n]) == int(appeal0[n]) - int(sim.appeal_feat[B0, w]) + sim._fire_appeal, "the fire's Appeal"
-    f0 = int(sim.fertility[B0, w])
-    p0 = int(sim.fertility_prod[B0, w])
-    for age in range(0, 7):
+    for age in range(1, 7):
         sim.turn = start + age
         s0 = int(sim.rng_state[B0])
         units = land_units(sim, [w])
         sim._fire_turn()
-        # one band draw per land unit on the plot while it burns (turns 0, 1,
-        # 2), none after
-        assert draws(s0, int(sim.rng_state[B0])) == (units if age <= 2 else 0), age
+        assert draws(s0, int(sim.rng_state[B0])) == fire_draws(age, units), age
         want = burning if age < 2 else burnt if age < 6 else woods
         assert int(sim.feat_id[B0, w]) == want, (age, int(sim.feat_id[B0, w]))
     assert int(sim.fertility[B0, w]) == min(3, f0 + 1), "+1 Food when burnt"
@@ -275,11 +286,13 @@ def main() -> None:
     assert int(sim.major_unit_tile[B0, war]) == w
     sim.major_unit_hp[B0, war] = 1000
     bld = put(sim, 0, "BUILDER", w)
-    sim._ignite(rows, tiles, torch.tensor([start]))
     hp = 1000
     for age in range(0, 4):
         sim.turn = start + age
-        sim._fire_turn()
+        if age == 0:
+            sim._fire_birth(one, tiles, 1)
+        else:
+            sim._fire_turn()
         hit = hp - int(sim.major_unit_hp[B0, war])
         hp = int(sim.major_unit_hp[B0, war])
         if age <= 2:
@@ -292,8 +305,9 @@ def main() -> None:
     assert not bool(sim.major_unit_alive[B0, bld]), "a civilian is killed"
     print("  6 fire damage OK — the band on turns 0-2, the civilian, the Lumber Mill, one citizen")
 
-    # 7 — the spread: each adjacent live Woods catches at 50% on the burning
-    # plot's turns 1 and 2, one draw per candidate neighbour; a caught plot
+    # 7 — the spread: on the burning plot's turns 1 and 2 its SPREAD row
+    # draws once and at 50% every adjacent live Woods catches at once, each a
+    # fire of its own whose birth strike draws straight after; a caught plot
     # burns on its ignition turn and the next, is burnt four turns and is
     # Woods again at ignition + 6, on its own clock
     caught = ring = 0
@@ -307,18 +321,19 @@ def main() -> None:
             sim.feat_id[B0, n] = woods
             sim.feat_stripped[B0, n] = False
         sim._eff_version += 1
-        sim._ignite(rows, tiles, torch.tensor([start]))
         sim.turn = start
-        s0 = int(sim.rng_state[B0])
-        sim._fire_turn()
-        assert draws(s0, int(sim.rng_state[B0])) == land_units(sim, [w]), "turn 0 spreads nothing"
+        sim._fire_birth(one, tiles, 1)
+        assert all(int(sim.fire_start[B0, n]) < 0 for n in nb), "turn 0 spreads nothing"
         sim.turn = start + 1
         s0 = int(sim.rng_state[B0])
+        units_w = land_units(sim, [w])
+        units_n = {n: land_units(sim, [n]) for n in nb}
         sim._fire_turn()
         burning_now = [n for n in nb if int(sim.feat_id[B0, n]) == burning]
-        # one spread draw per neighbour, then one band draw per land unit on
-        # each burning plot
-        assert draws(s0, int(sim.rng_state[B0])) == len(nb) + land_units(sim, [w] + burning_now)
+        # the spread lights every candidate at once or none
+        assert burning_now in ([], nb), burning_now
+        assert draws(s0, int(sim.rng_state[B0])) == fire_draws(1, units_w) + sum(
+            fire_draws(0, units_n[n]) for n in burning_now)
         seen = set()
         prev = {n: int(sim.fire_start[B0, n]) for n in nb}
         for n in nb:
@@ -350,25 +365,28 @@ def main() -> None:
         sim.feat_id[B0, n] = sim._fire_start_fid[0]
         sim.feat_stripped[B0, n] = False
     sim._eff_version += 1
-    sim._ignite(rows, tiles, torch.tensor([start]))
     for age in range(0, 4):
         sim.turn = start + age
         s0 = int(sim.rng_state[B0])
         units = land_units(sim, [w])
-        sim._fire_turn()
-        assert draws(s0, int(sim.rng_state[B0])) == (units if age <= 2 else 0), age
+        if age == 0:
+            sim._fire_birth(one, tiles, 1)
+        else:
+            sim._fire_turn()
+        assert draws(s0, int(sim.rng_state[B0])) == fire_draws(age, units), age
     assert all(int(sim.feat_id[B0, n]) == sim._fire_start_fid[0] and int(sim.fire_start[B0, n]) < 0 for n in nb)
     print(f"  7 fire spread OK — {caught}/{ring} neighbours caught, each on its own clock; no Rainforest from a Forest Fire")
 
     # 8 — a two-plot wonder's eruption: each plot's six neighbours in the
-    # DLL's order (NE, E, SE, SW, W, NW), a shared one twice
+    # DLL's DirectionTypes order (the game's NE, E, SE, SW, W, NW), a shared
+    # one twice
     sim = fresh(rules, path, slot=5)
     a = next(x for x in range(sim.T) if all(n >= 0 for n in sim.neigh[x].tolist()))
     b = int(sim.neigh[a][0])
     plots = torch.zeros(sim.B, sim.T, dtype=torch.bool)
     plots[B0, a] = plots[B0, b] = True
     ring8 = [n for n in sim._eruption_ring(torch.ones(sim.B, dtype=torch.bool), plots)[B0].tolist() if n >= 0]
-    order = list(sim._ERUPTION_DIRS)
+    order = list(sim._DIRECTION_TYPES)
     lo8, hi8 = min(a, b), max(a, b)
     assert ring8 == [int(sim.neigh[lo8][d]) for d in order] + [int(sim.neigh[hi8][d]) for d in order]
     assert len(ring8) == 12 and len(set(ring8)) == 10 and ring8.count(a) == 1 and ring8.count(b) == 1
@@ -402,7 +420,7 @@ def main() -> None:
     sim._erupt = spy
     sim._random_event(sim._desertification_live())
     assert got and got[0][0] and got[0][2] == 4, f"Vesuvius's row did not fire: {got}"
-    want9 = [int(sim.neigh[v][d]) for d in sim._ERUPTION_DIRS]
+    want9 = [int(sim.neigh[v][d]) for d in sim._DIRECTION_TYPES]
     assert [n for n in got[0][1] if n >= 0] == [n for n in want9 if n >= 0], "its ring is its plot's neighbours"
     print(f"  9 Vesuvius OK — plot {v} on seed9027, its MEGACOLOSSAL row erupts it")
 

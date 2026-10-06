@@ -624,13 +624,13 @@ class SimMinors:
         for r, drawn in enumerate(self._mb_drawn):
             if not drawn:
                 continue
-            k = torch.floor(self._next_random(fresh) * sl).long()
+            k = self._rand_range(fresh, sl)
             self.citystate_build_from[:, s, r] = torch.where(
                 fresh, self._mb_from[r][typ, k], self.citystate_build_from[:, s, r])
-        k = torch.floor(self._next_random(fresh) * sl).long()
+        k = self._rand_range(fresh, sl)
         self.citystate_army_cap[:, s] = torch.where(fresh, self._mb_cap_slots[k], self.citystate_army_cap[:, s])
         nb = int(self._mb_buy_slots.numel())
-        k = torch.floor(self._next_random(fresh) * nb).long().clamp(max=nb - 1)
+        k = self._rand_range(fresh, nb)
         self.citystate_builder_buy[:, s] = torch.where(fresh, self._mb_buy_slots[k], self.citystate_builder_buy[:, s])
 
     def _minor_trainable(self, s: int, naval: bool = False) -> torch.Tensor:
@@ -1208,8 +1208,8 @@ class SimMinors:
             if bool(elig.count_nonzero()):
                 elig = elig & ~self._minor_trains_builder(s) & self._minor_builder_work(s)
             if bool(elig.count_nonzero()):
-                r = self._next_random(elig)
-                buy = elig & (torch.floor(r * 1000).long() < self.citystate_builder_buy[:, s])
+                r = self._rand_range(elig, 1000)
+                buy = elig & (r < self.citystate_builder_buy[:, s])
                 if bool(buy.count_nonzero()):
                     landed = self._minor_spawn(s, buy, torch.full((B,), self._builder_idx, dtype=torch.long,
                                                                   device=dev))
@@ -1232,8 +1232,8 @@ class SimMinors:
         lt = self.citystate_loss_turn[:, s]
         recent = (lt >= 0) & ((int(self.turn) - lt) <= self._mb_loss_turns)
         rate = torch.where(recent, bp * self._mb_loss_mult, bp)
-        r = self._next_random(gate)
-        go = gate & (torch.floor(r * 10000).long() < rate)
+        r = self._rand_range(gate, 10000)
+        go = gate & (r < rate)
         if not bool(go.count_nonzero()):
             return
         gm = go & monk
@@ -1270,8 +1270,8 @@ class SimMinors:
                 & self._afford(self.citystate_treasury[:, s], price))
         if not bool(elig.count_nonzero()):
             return
-        r = self._next_random(elig)
-        go = elig & (torch.floor(r * 10000).long() < self._mb_naval_bp)
+        r = self._rand_range(elig, 10000)
+        go = elig & (r < self._mb_naval_bp)
         if bool(go.count_nonzero()):
             landed = self._minor_spawn(s, go, ui)
             self.citystate_treasury[:, s] -= torch.where(landed, price, torch.zeros_like(price))
@@ -1355,8 +1355,7 @@ class SimMinors:
             cur = self.unit_tile.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0)
             hp = self.unit_hp.gather(1, g.unsqueeze(1)).squeeze(1)
             cum = steps_of(hp).cumsum(dim=1)  # [B, 4]
-            r = self._next_random(on)
-            x = torch.floor(r * 1000).long()
+            x = self._rand_range(on, 1000)
             kstep = (cum <= x.unsqueeze(1)).sum(dim=1).clamp(max=cum.shape[1] - 1)
             go = on & (kstep > 0)
             if not bool(go.count_nonzero()):
@@ -1367,8 +1366,7 @@ class SimMinors:
             go = go & (total > 0)
             if not bool(go.count_nonzero()):
                 continue
-            r2 = self._next_random(go)
-            pick = torch.floor(r2 * total.double()).long()
+            pick = self._rand_range(go, total)
             target = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=T - 1)
             moving = go & (cur != target)
             for step in range(int(kstep.max())):
@@ -1658,12 +1656,11 @@ class SimMinors:
             go = act & (n > 0)
             if not bool(go.count_nonzero()):
                 continue
-            r1 = self._next_random(go)
-            build = go & (torch.floor(r1 * 1000) < self._mb_builder_rate)
+            r1 = self._rand_range(go, 1000)
+            build = go & (r1 < self._mb_builder_rate)
             if not bool(build.count_nonzero()):
                 continue
-            r2 = self._next_random(build)
-            pick = torch.floor(r2 * n.double()).long()
+            pick = self._rand_range(build, n)
             hit = cand & (cand.long().cumsum(dim=1) == (pick + 1).unsqueeze(1))
             flat = hit.long().argmax(dim=1)
             tt = torch.div(flat, K, rounding_mode="floor")

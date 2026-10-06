@@ -97,8 +97,8 @@ export const RANDOM_EVENT_START_TURN = srcConst('disasters.randomEventStartTurn'
   xml('GlobalParameters', 'Name=RANDOM_EVENT_START_TURN', 'Value'));
 
 /** DROUGHT_MAJOR / DROUGHT_EXTREME: weights 23 / 5, each counted once; the
- *  footprint is `Hexes` 7 (the first seven `STORM_DISC` slots, the centre and
- *  its ring) and the dry spell lasts `Duration` 5 / 10 at the game's speed
+ *  footprint is `Hexes` 7 (`stormFootprintOffsets`: the centre and its ring
+ *  in DirectionTypes order) and the dry spell lasts `Duration` 5 / 10 at the game's speed
  *  (`DROUGHT_TURNS`). */
 const drought = (ev: string, col: string) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${ev}`, col);
 export const DROUGHT_WEIGHT = srcConst('disasters.droughtWeight', [23, 5] as const, {
@@ -223,26 +223,11 @@ interface ShieldPlot {
 
 /**
  * THE EIGHT STORMS, one row each from the install's `RandomEvents`,
- * `RandomEvent_Terrains`, `RandomEvent_Frequencies` (MODERATE),
- * `RandomEvent_Damages` and `RandomEvent_Yields`, in the `RandomEvents` table
- * order. Every percentage is the row's own; a damage column the row lacks is
- * ZERO, not inherited. `weight` is OccurrencesPerGame, the row's weight in the
- * turn's one draw, counted once. `hexes` is the footprint (the first N slots of the
- * canonical radius-2 disc, `STORM_DISC`), `duration` the turns it persists.
- *
- * CIV6 (`RandomEvent_Damages`, `Percentage` beside `MinHP`/`MaxHP`): the share
- * of a domain's units the storm hits, and the inclusive damage band. A row
- * without a UNIT_DAMAGE_* column damages nobody. `CoastalLowlandPercentage`
- * on the hurricane rows replaces the base percentage on a coastal-lowland
- * tile (`Tile.lowland`).
- *
- * CIV6 (`RandomEvent_Yields`): the storm rows carry FeatureType FEATURE_ICE,
- * which the file's own comment calls "the equivalent of no feature here
- * since Feature type is a primary key" — the rows are not feature-keyed, so
- * each is the chance of +1 of its yield on every land tile of the footprint,
- * the flood's reading of the same column. The blizzard rows are shipped as
- * the table has them (food 10/20%) though the row's EffectString labels it
- * NO_FERTILITY; the table is the data the game reads.
+ * `RandomEvent_Terrains` and `RandomEvent_Frequencies` (MODERATE), in the
+ * `RandomEvents` table order. `weight` is OccurrencesPerGame, the row's weight
+ * in the turn's one draw, counted once; `hexes` the footprint
+ * (`stormFootprintOffsets`), `duration` the turns it persists. Each row's
+ * `RandomEvent_Damages` and `RandomEvent_Yields` rows are `STORM_ROWS`.
  */
 type StormFamily = 'BLIZZARD' | 'DUST_STORM' | 'TORNADO' | 'HURRICANE';
 /** the wire's family code: `sf` on the tile planes, `family` on each row */
@@ -254,74 +239,11 @@ export const STORM_FAMILIES: readonly StormFamily[] = srcConst('disasters.stormF
       'RandomEventType')],
   }) as readonly StormFamily[];
 
-/**
- * CIV6 (`Expansion2_RandomEvents.xml`, `<PrevailingWinds>`): 22 rows giving a
- * WEIGHTED heading per latitude band, the heading a storm's walk draws each
- * step from (the walk is measured, ask 16). Eight bands, both ends
- * inclusive, by signed degree (north positive, `windWeights`); each row's six
- * weights are in the hex direction order E, NE, NW, W, SW, SE (`AXIAL_DIRS`).
- *   60..90    NW 1  W 2  SW 2        -5..0     W 1   SW 1
- *   30..60    NE 2  E 2  SE 1        -30..-5   NW 1  W 2   SW 2
- *   5..30     NW 2  W 2  SW 1        -60..-30  NE 1  E 2   SE 2
- *   0..5      NW 1  W 1              -90..-60  NW 2  W 2   SW 1
- */
-export const WIND_BAND_LO: readonly number[] = srcConst('disasters.windBandLo',
-  [60, 30, 5, 0, -5, -30, -60, -90], {
-    derived: 'the distinct `PrevailingWinds.MinimumLatitude` values, descending',
-    inputs: [xml('PrevailingWinds', 'MinimumLatitude=60&DirectionType=DIRECTION_WEST',
-      'MinimumLatitude')],
-  });
-/** each band's `MaximumLatitude`, in `WIND_BAND_LO`'s order */
-export const WIND_BAND_HI: readonly number[] = srcConst('disasters.windBandHi',
-  [90, 60, 30, 5, 0, -5, -30, -60], {
-    derived: 'each band\'s `PrevailingWinds.MaximumLatitude`, in WIND_BAND_LO\'s order',
-    inputs: [xml('PrevailingWinds', 'MinimumLatitude=60&DirectionType=DIRECTION_WEST', 'MaximumLatitude'),
-      xml('PrevailingWinds', 'MinimumLatitude=-90&DirectionType=DIRECTION_WEST', 'MaximumLatitude')],
-  });
-/** one band's six weights, in the engine's E, NE, NW, W, SW, SE order */
-const WIND_DIRS = ['EAST', 'NORTHEAST', 'NORTHWEST', 'WEST', 'SOUTHWEST', 'SOUTHEAST'] as const;
-const windRow = (i: number, lo: number, w: readonly number[]): readonly number[] =>
-  srcConst(`disasters.winds.${i}`, w, {
-    derived: `the \`PrevailingWinds\` rows with MinimumLatitude ${lo}, their DirectionType Weight `
-      + 'laid out in the engine hex order E, NE, NW, W, SW, SE; a direction the band has no row '
-      + 'for reads 0 — so a 0 here is an ABSENT row and a weight a present one',
-    inputs: WIND_DIRS.map((d, k) => xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_${d}`,
-      'Weight', w[k] === 0 ? { absent: true } : undefined)),
-  });
-export const PREVAILING_WINDS: readonly (readonly number[])[] = [
-  windRow(0, 60, [0, 0, 1, 2, 2, 0]), //  60..90
-  windRow(1, 30, [2, 2, 0, 0, 0, 1]), //  30..60
-  windRow(2, 5, [0, 0, 2, 2, 1, 0]), //   5..30
-  windRow(3, 0, [0, 0, 1, 1, 0, 0]), //   0..5
-  windRow(4, -5, [0, 0, 0, 1, 1, 0]), //  -5..0
-  windRow(5, -30, [0, 0, 1, 2, 2, 0]), // -30..-5
-  windRow(6, -60, [2, 1, 0, 0, 0, 2]), // -60..-30
-  windRow(7, -90, [0, 0, 2, 2, 1, 0]), // -90..-60
-];
-
-/**
- * A map row's LATITUDE for the winds (Game_Climate 0x69d80, `tools/civ6lab/
- * dll_readings.md` "the storm's walk"): the game's lat = Bottom + (Top − Bottom) ×
- * (100y // H) // 100, Top 90 and Bottom −90, y the game's row. The engine's
- * rows are the game's y (`world@1`) with the game's north and south
- * directions swapped (the game's NE is the engine's SE), and the
- * `PrevailingWinds` table is its own north-south mirror, so the engine reads
- * the rows by name at the mirrored latitude 90 − 180 × (100 row // H) // 100.
- */
-export function windLatitude(row: number, height: number): number {
-  return 90 - Math.floor((180 * Math.floor((100 * row) / height)) / 100);
-}
-
-/** The six heading weights a storm's step draws from at `row`: every
- *  `PrevailingWinds` band whose latitudes hold the row's (`windLatitude`),
- *  both ends inclusive — a boundary latitude pools two bands (0x28c500). */
-export function windWeights(row: number, height: number): number[] {
-  const lat = windLatitude(row, height);
-  const out = [0, 0, 0, 0, 0, 0];
-  PREVAILING_WINDS.forEach((w, i) => {
-    if (WIND_BAND_LO[i] <= lat && lat <= WIND_BAND_HI[i]) for (let d = 0; d < 6; d++) out[d] += w[d];
-  });
-  return out;
+/** the game's latitude of a map row (Game_Climate 0x69d80, `tools/civ6lab/
+ *  dll_readings.md` "the storm's walk"): Bottom + (Top − Bottom) × (100y //
+ *  H) // 100, Top 90 and Bottom −90, y the game's row — this grid's row. */
+export function gameLatitude(row: number, height: number): number {
+  return -90 + Math.floor((180 * Math.floor((100 * row) / height)) / 100);
 }
 
 /** a storm's step onto its own `RandomEvent_Terrains` costs this much of
@@ -339,15 +261,13 @@ export const STORM_LAST_TURN_PCT = srcConst('disasters.stormLastTurnPct', 50, {
   lab: '(GameCore_XP2 0x286f80, tools/civ6lab/dll_readings.md): 100% of the rows\' Percentage, 50% on the last turn',
 });
 
-/** CIV6 (`RandomEvents`, `Movement="8"` on every storm row — MEASURED,
- *  ask 16): the unit steps a storm's centre walks in its movement
- *  turn and again as it dissipates, each step's heading drawn from
- *  `PREVAILING_WINDS` at the centre's current latitude. */
+/** CIV6 (`RandomEvents`, `Movement="8"` on every storm row): the points a
+ *  storm's walk spends a turn (0x28ecd0), each step drawn from `WIND_ROWS`
+ *  at the centre's current latitude. */
 export const STORM_MOVEMENT = srcConst('disasters.stormMovement', 8,
   xml('RandomEvents', 'RandomEventType=RANDOM_EVENT_HURRICANE_CAT_4', 'Movement',
-    { note: 'every storm row carries Movement 8; what the number MEANS — unit steps of the '
-      + 'centre\'s walk, drawn from PREVAILING_WINDS — is the lab reading (ask 16, '
-      + 'measured 2026-09-13)' }));
+    { note: 'every storm row carries Movement 8; the walk spends it at 1 a step onto the storm\'s '
+      + 'terrain and 2 elsewhere (GameCore_XP2 0x28c500)' }));
 
 export interface StormEvent {
   id: string;
@@ -364,51 +284,11 @@ export interface StormEvent {
   cipd: number;
   hexes: number;
   duration: number;
-  impPill: number;
-  impDest: number;
-  distPill: number;
-  /** BUILDING_PILLAGED — ONE roll per tile, darkening every building of the
-   *  district standing there. A column of its own: a flood pillages the
-   *  district at 50 and its buildings at 100. */
-  bldgPill: number;
-  pop: number;
-  civKill: number;
-  landP: number;
-  navalP: number;
-  landLo: number;
-  landHi: number;
-  navalLo: number;
-  navalHi: number;
-  /** CoastalLowlandPercentage on IMPROVEMENT_PILLAGED / DISTRICT_PILLAGED; 0 = none */
-  lowlandPill: number;
-  lowlandDist: number;
-  fertFood: number;
-  fertProd: number;
 }
 
-/**
- * PROVENANCE for one storm row (cpu/data/provenance.ts). Every magnitude is an
- * install column; the ones this catalog holds as a FRACTION are `derived` from
- * the install's PERCENTAGE, because the checker compares in the catalog's own
- * units and cannot divide. A damage row the install does not carry reads 0
- * here, which is the row's absence rather than a value.
- */
-const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
+/** PROVENANCE for one storm row (cpu/data/provenance.ts). */
+const stormSrc = (id: string): SrcMap => {
   const ev = `RandomEventType=RANDOM_EVENT_${id}`;
-  const dmg = (kind: string, col = 'Percentage') =>
-    xml('RandomEvent_Damages', `${ev}&DamageType=${kind}`, col);
-  const pct = (kind: string, col = 'Percentage') => ({
-    derived: `Percentage/100 - the install writes the share as a percentage, this catalog as a `
-      + `fraction; no ${kind} row at all reads 0`,
-    inputs: [dmg(kind, col)],
-  });
-  const fert = (y: string) => ({
-    derived: 'Percentage/100 of the RandomEvent_Yields row; no row at all reads 0',
-    inputs: [xml('RandomEvent_Yields', `${ev}&YieldType=${y}`, 'Percentage')],
-  });
-  const band = (kind: string, col: 'MinHP' | 'MaxHP', live: boolean) => (live
-    ? dmg(kind, col)
-    : { derived: `0 - the install row carries no ${kind} row`, inputs: [dmg(kind, col)] });
   return {
     family: {
       derived: 'the engine family of the install RandomEvents row - the two Severity rows of one '
@@ -421,58 +301,22 @@ const stormSrc = (id: string, d: Partial<StormEvent>): SrcMap => {
     weight: xml('RandomEvent_Frequencies',
       `${ev}&RealismSettingType=REALISM_SETTING_MODERATE`, 'OccurrencesPerGame'),
     cipd: xml('RandomEvents', ev, 'ChanceIncreasePerDegree'),
-    impPill: pct('IMPROVEMENT_PILLAGED'),
-    impDest: pct('IMPROVEMENT_DESTROYED'),
-    distPill: pct('DISTRICT_PILLAGED'),
-    bldgPill: pct('BUILDING_PILLAGED'),
-    pop: pct('POPULATION_LOSS'),
-    civKill: pct('UNIT_KILLED_CIVILIAN'),
-    landP: pct('UNIT_DAMAGE_LAND'),
-    navalP: pct('UNIT_DAMAGE_NAVAL'),
-    landLo: band('UNIT_DAMAGE_LAND', 'MinHP', !!d.landP),
-    landHi: band('UNIT_DAMAGE_LAND', 'MaxHP', !!d.landP),
-    navalLo: band('UNIT_DAMAGE_NAVAL', 'MinHP', !!d.navalP),
-    navalHi: band('UNIT_DAMAGE_NAVAL', 'MaxHP', !!d.navalP),
-    lowlandPill: pct('IMPROVEMENT_PILLAGED', 'CoastalLowlandPercentage'),
-    lowlandDist: pct('DISTRICT_PILLAGED', 'CoastalLowlandPercentage'),
-    fertFood: fert('YIELD_FOOD'),
-    fertProd: fert('YIELD_PRODUCTION'),
   };
 };
 
 const storm = (
   id: string, family: StormFamily, severity: 1 | 2, perGame: number, cipdPct: number, hexes: number,
-  d: Partial<StormEvent>,
-): StormEvent => ({
-  id, family, severity, weight: perGame, cipd: cipdPct, hexes, duration: 3,
-  src: stormSrc(id, d),
-  impPill: 0, impDest: 0, distPill: 0, bldgPill: 0, pop: 0, civKill: 0,
-  landP: 0, navalP: 0, landLo: 0, landHi: 0, navalLo: 0, navalHi: 0,
-  lowlandPill: 0, lowlandDist: 0, fertFood: 0, fertProd: 0, ...d,
-});
+): StormEvent => ({ id, family, severity, weight: perGame, cipd: cipdPct, hexes, duration: 3, src: stormSrc(id) });
 
 export const STORM_EVENTS: readonly StormEvent[] = [
-  storm('BLIZZARD_SIGNIFICANT', 'BLIZZARD', 1, 8, 0, 7,
-    { impDest: 0.25, impPill: 0.5, distPill: 0.15, bldgPill: 0.4, fertFood: 0.1 }),
-  storm('BLIZZARD_CRIPPLING', 'BLIZZARD', 2, 2, 50, 19,
-    { impDest: 0.5, impPill: 1, distPill: 0.5, bldgPill: 1, pop: 0.15, civKill: 0.2,
-      landP: 1, landLo: 40, landHi: 60, navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.2 }),
-  storm('DUST_STORM_GRADIENT', 'DUST_STORM', 1, 8, 0, 3,
-    { impDest: 0.35, impPill: 0.75, distPill: 0.2, bldgPill: 0.6, fertFood: 0.1, fertProd: 0.2 }),
-  storm('DUST_STORM_HABOOB', 'DUST_STORM', 2, 2, 50, 7,
-    { impDest: 0.75, impPill: 1, distPill: 0.75, bldgPill: 1, pop: 0.2, civKill: 0.2,
-      landP: 1, landLo: 40, landHi: 60, navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.2, fertProd: 0.3 }),
-  storm('TORNADO_FAMILY', 'TORNADO', 1, 15, 0, 1,
-    { impDest: 0.35, impPill: 0.75, distPill: 0.2, bldgPill: 0.6 }),
-  storm('TORNADO_OUTBREAK', 'TORNADO', 2, 3, 50, 3,
-    { impDest: 0.75, impPill: 1, distPill: 0.75, bldgPill: 1, pop: 0.2, civKill: 0.2,
-      landP: 1, landLo: 40, landHi: 60, navalP: 1, navalLo: 40, navalHi: 60 }),
-  storm('HURRICANE_CAT_4', 'HURRICANE', 1, 15, 0, 7,
-    { impDest: 0.25, impPill: 0.5, distPill: 0.15, bldgPill: 0.4, lowlandPill: 1, lowlandDist: 1,
-      navalP: 0.6, navalLo: 40, navalHi: 60, fertFood: 0.3 }),
-  storm('HURRICANE_CAT_5', 'HURRICANE', 2, 3, 50, 19,
-    { impDest: 0.5, impPill: 1, distPill: 0.5, bldgPill: 1, lowlandDist: 1, pop: 0.15, civKill: 0.2,
-      landP: 1, landLo: 40, landHi: 60, navalP: 1, navalLo: 60, navalHi: 80, fertFood: 0.45, fertProd: 0.15 }),
+  storm('BLIZZARD_SIGNIFICANT', 'BLIZZARD', 1, 8, 0, 7),
+  storm('BLIZZARD_CRIPPLING', 'BLIZZARD', 2, 2, 50, 19),
+  storm('DUST_STORM_GRADIENT', 'DUST_STORM', 1, 8, 0, 3),
+  storm('DUST_STORM_HABOOB', 'DUST_STORM', 2, 2, 50, 7),
+  storm('TORNADO_FAMILY', 'TORNADO', 1, 15, 0, 1),
+  storm('TORNADO_OUTBREAK', 'TORNADO', 2, 3, 50, 3),
+  storm('HURRICANE_CAT_4', 'HURRICANE', 1, 15, 0, 7),
+  storm('HURRICANE_CAT_5', 'HURRICANE', 2, 3, 50, 19),
 ];
 
 /** CIV6 (`RandomEvent_Terrains`): where each family STARTS — blizzards on
@@ -491,20 +335,30 @@ export function stormFamilyAt(t: { terrain: string; elevation: string; submerged
 }
 
 /**
- * The radius-2 disc as axial (dq, dr) offsets in ONE canonical order shared
- * by both engines: the centre, then ring 1, then ring 2, each ring in
- * ascending tile index (dr, then dq). A storm's footprint is the first
- * `hexes` slots of it — 1, 3, 7 or 19 — an off-map slot simply absent.
+ * A STORM's (or a drought's) FOOTPRINT as axial (dq, dr) offsets from its
+ * centre, in the order the strike walks it (GameCore_XP2 0x28d6b0): the
+ * centre; Hexes 3 adds its NORTHEAST and NORTHWEST neighbours; 7 its six
+ * neighbours in DirectionTypes order (NORTHEAST, EAST, SOUTHEAST, SOUTHWEST,
+ * WEST, NORTHWEST); 19 every offset of −2..2 within two plots, dq outer and
+ * dr inner — the centre among them again (the strike's struck list skips it).
+ * The game's y grows with this grid's row, so the game's NORTHEAST (0, +1)
+ * is this grid's SOUTHEAST (`DIRECTION_TYPES`).
  */
-export const STORM_DISC: readonly (readonly [number, number])[] = (() => {
-  const out: [number, number][] = [];
-  for (let dq = -2; dq <= 2; dq++) {
-    for (let dr = Math.max(-2, -dq - 2); dr <= Math.min(2, -dq + 2); dr++) out.push([dq, dr]);
+export function stormFootprintOffsets(hexes: number): readonly (readonly [number, number])[] {
+  const ring: [number, number][] = [[0, 1], [1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1]];
+  if (hexes >= 19) {
+    const out: [number, number][] = [[0, 0]];
+    for (let dq = -2; dq <= 2; dq++) {
+      for (let dr = -2; dr <= 2; dr++) {
+        if (Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr)) <= 2) out.push([dq, dr]);
+      }
+    }
+    return out;
   }
-  const ring = ([q, r]: readonly [number, number]) => Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r));
-  out.sort((a, b) => ring(a) - ring(b) || a[1] - b[1] || a[0] - b[0]);
-  return out;
-})();
+  if (hexes >= 7) return [[0, 0], ...ring];
+  if (hexes >= 3) return [[0, 0], ring[0], ring[5]];
+  return [[0, 0]];
+}
 
 /**
  * CIV6 (MODIFIER_PLAYER_ADJUST_RANDOM_EVENT_NO_UNIT_DAMAGE, COLLECTION_OWNER,
@@ -704,17 +558,6 @@ export const METEOR_TERRAINS: readonly string[] = srcConst('disasters.meteorTerr
       .map((t) => xml('RandomEvent_Terrains', `RandomEventType=RANDOM_EVENT_METEOR_SHOWER&TerrainType=TERRAIN_${t}`,
         'TerrainType', { expect: `TERRAIN_${t}` })),
   });
-/** CIV6 (`Improvement_ValidFeatures`): the Meteor Site the shower leaves
- *  (`RandomEvent_Improvement_Placements` IMPROVEMENT_METEOR_GOODY) stands on
- *  bare ground or under Woods, Rainforest or Marsh — any other feature (a
- *  natural wonder, Floodplains, a fire's) refuses it. */
-export const METEOR_FEATURES: readonly string[] = srcConst('disasters.meteorFeatures',
-  ['WOODS', 'RAINFOREST', 'MARSH'], {
-    derived: 'the Improvement_ValidFeatures rows of IMPROVEMENT_METEOR_GOODY as engine features '
-      + '(FEATURE_FOREST is WOODS, FEATURE_JUNGLE is RAINFOREST)',
-    inputs: ['FOREST', 'JUNGLE', 'MARSH'].map((f) => xml('Improvement_ValidFeatures',
-      `ImprovementType=IMPROVEMENT_METEOR_GOODY&FeatureType=FEATURE_${f}`, 'FeatureType', { expect: `FEATURE_${f}` })),
-  });
 /** CIV6 (`RandomEvents.AvoidTerritory`): the meteor falls outside every
  *  player's borders — "in the space between player territories" (the
  *  Environmental Effects pedia). The site's IMPROVEMENT_PILLAGED and
@@ -796,23 +639,18 @@ export const FIRE_REGROW_TURN = srcConst('disasters.fireRegrowTurn', 6, {
   derived: 'the Turn of each fire row\'s YIELD_PRODUCTION Amount 1 row, which puts FEATURE_JUNGLE / FEATURE_FOREST back',
   inputs: fireYield(6, 'Amount', () => '1'),
 });
-/** SPREAD 50, MinTurn 1 / MaxTurn 2: on the event's turns 1 and 2 each plot
- *  burning catches every adjacent live Woods or Rainforest at 50% — "The
- *  flames will spread to any adjacent forest or jungle" (LOC_TUTORIAL_FOREST_
- *  FIRES), "Spreads to adjacent Woods or Rainforest" (the Climate screen). */
+/** SPREAD 50, MinTurn 1 / MaxTurn 2: on the fire's turns 1 and 2 its plot
+ *  draws once, and at 50% every adjacent plot the fire's own start test
+ *  admits (its own feature: a Forest Fire takes Woods, a Jungle Fire
+ *  Rainforest) starts a fire of the same row there (the applier 0x33b580 →
+ *  0x339960 → the event's start 0x334d30). runs/c74s3_fire_20260926T133940Z
+ *  .jsonl and runs/c74s3_fire2_20260926T134425Z.jsonl: no Rainforest beside
+ *  five Forest Fires ever burned, and the Woods caught all at once in 2 of 5. */
 export const FIRE_SPREAD_P = srcConst('disasters.fireSpreadP', 0.5, {
   derived: 'Percentage/100 of each fire row\'s SPREAD damage row', inputs: fireDmg('SPREAD', 'Percentage'),
 });
 export const FIRE_SPREAD_TURNS = srcConst('disasters.fireSpreadTurns', [1, 2] as const, {
   derived: 'the SPREAD row\'s MinTurn and MaxTurn', inputs: [...fireDmg('SPREAD', 'MinTurn'), ...fireDmg('SPREAD', 'MaxTurn')],
-});
-/** per fire row, JUNGLE then FOREST: 1 where the fire spreads into the
- *  other row's feature too, 0 where it spreads into its own alone — a Forest
- *  Fire never spreads into Rainforest; a Jungle Fire takes both, as the
- *  Climate screen's "Spreads to adjacent Woods or Rainforest" reads. */
-export const FIRE_SPREAD_CROSS = srcConst('disasters.fireSpreadCross', [1, 0] as const, {
-  lab: 'runs/c74s3_fire_20260926T133940Z.jsonl and runs/c74s3_fire2_20260926T134425Z.jsonl',
-  note: 'five Forest Fires with three Rainforest neighbours each: no Rainforest plot ever burned, while the Woods neighbours caught in 2 of 5',
 });
 /** The burning plot's damage rows, every one at Percentage 101 — no roll: an
  *  improvement and a district pillaged, a civilian killed and the land units

@@ -1037,6 +1037,16 @@ class SimInit:
         self._spy_travel_max = int(_sp["travelMax"])
         self._spy_roll_dice = int(_sp["rollDice"])
         self._spy_roll_faces = int(_sp["rollFaces"])
+        # the dice's count of each sum (`DICE_COUNTS`, 0xf02c70): the table
+        # both espionage rolls weigh their bands by
+        _dc = [1]
+        for _ in range(self._spy_roll_dice):
+            _n = [0] * (len(_dc) + self._spy_roll_faces)
+            for _s, _x in enumerate(_dc):
+                for _f in range(1, self._spy_roll_faces + 1):
+                    _n[_s + _f] += _x
+            _dc = _n
+        self._dice_counts: list[int] = _dc
         self._spy_roll_level_base = int(_sp["rollLevelBase"])
         self._spy_counterspy_roll = int(_sp["counterspyRoll"])
         self._spy_counterspy_level_roll = int(_sp["counterspyLevelRoll"])
@@ -1941,12 +1951,6 @@ class SimInit:
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)
-        # `STORM_DISC`: the radius-2 disc in ONE canonical order shared with
-        # TS — centre, ring 1, ring 2, each ring in ascending tile index (dr,
-        # then dq); a storm's footprint is its first `hexes` slots
-        _d2 = [tuple(o) for o in tiles_within_offsets(2).tolist()]
-        _d2.sort(key=lambda o: (max(abs(o[0]), abs(o[1]), abs(o[0] + o[1])), o[1], o[0]))
-        self._storm_offs = torch.tensor(_d2, dtype=torch.long).to(device)  # [19, 2]
         ids = [u["id"] for u in rules.units]
         self._archaeologist_idx = ids.index("ARCHAEOLOGIST") if "ARCHAEOLOGIST" in ids else -1
         self._naturalist_idx = next((i for i, u in enumerate(rules.units) if bool(u["naturalist"])), -1)
@@ -1954,6 +1958,8 @@ class SimInit:
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # each plot's place in its river's flood order (`floodRanks`), -1 off
+        self.flood_rank = torch.tensor([[t.get("fo", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # the GROUND a drought may start on (`droughtTerrain`); the live start
         # plots are this, featureless and above water (`_drought_cands`)
         self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
@@ -2970,11 +2976,10 @@ class SimInit:
         self._flood_cipd = [float(x) for x in _ds["floodCipd"]]
         self._drought_cipd = [float(x) for x in _ds["droughtCipd"]]
         self._fire_cipd = [float(x) for x in _ds["fireCipd"]]
-        # THE METEOR SHOWER (`meteorCandidate`): the terrain and feature ids a
-        # site stands on, whether it keeps off every border, and the Heavy
+        # THE METEOR SHOWER (`meteorCandidate`): the terrain ids it falls on,
+        # whether it keeps off every border, and the Heavy
         # Cavalry line its site grants from, (unit, tech, civic) in line order
         self._meteor_terrains = [int(x) for x in _ds["meteorTerrains"] if int(x) >= 0]
-        self._meteor_fids = [int(x) for x in _ds["meteorFeatures"] if int(x) >= 0]
         self._meteor_avoids_territory = bool(_ds["meteorAvoidsTerritory"])
         self._meteor_line = [(int(u), int(t), int(c)) for u, t, c in _ds["meteorGrantLine"]]
         # THE FIRES, per row JUNGLE then FOREST (`fireTurn`): the feature ids
@@ -2988,8 +2993,6 @@ class SimInit:
         self._fire_regrow_turn = int(_ds["fireRegrowTurn"])
         self._fire_spread_p = float(_ds["fireSpreadP"])
         self._fire_spread_turns = [int(x) for x in _ds["fireSpreadTurns"]]
-        # per row: 1 where the fire spreads into the other row's feature too
-        self._fire_spread_cross = [int(x) for x in _ds["fireSpreadCross"]]
         self._fire_damage_turns = [int(x) for x in _ds["fireDamageTurns"]]
         self._fire_pop_turn = int(_ds["firePopTurn"])
         self._fire_dmg = [int(x) for x in _ds["fireDmg"]]
@@ -3055,7 +3058,7 @@ class SimInit:
         self._soil_replaces = [int(x) for x in _ds["soilReplaces"] if int(x) >= 0]
         self._er_on_volcano = [bool(x) for x in _ds["eruptionOnVolcano"]]
         self._er_wonder_fid = [int(x) for x in _ds["eruptionWonderFid"]]
-        # a drought's turns by severity, and its footprint's `STORM_DISC` slots
+        # a drought's turns by severity, and its footprint's Hexes (`_foot_offs`)
         self._drought_duration = torch.tensor([int(x) for x in _ds["droughtDuration"]], dtype=torch.long, device=device)
         self._drought_hexes = int(_ds["droughtHexes"])
         # the improvement rows a drought pillages and bars while it lasts, its
@@ -3071,19 +3074,39 @@ class SimInit:
         self._st_family = [int(e["family"]) for e in _st]
         self._st_weight = [float(e["weight"]) for e in _st]
         self._st_cipd = [float(e["cipd"]) for e in _st]
-        # CIV6 (`PrevailingWinds`, `PREVAILING_WINDS`): the weighted heading per
-        # latitude band, [8 bands, 6 hex directions E NE NW W SW SE], each band's
-        # latitudes; and every tile's pooled weights (`windWeights`: the row's
-        # latitude `windLatitude`, every band holding it, both ends inclusive)
-        _ww = torch.tensor([[int(v) for v in b] for b in _ds["winds"]], dtype=torch.long, device=device)
-        _wlo = [int(x) for x in _ds["windBandLo"]]
-        _whi = [int(x) for x in _ds["windBandHi"]]
-        _wr = torch.arange(self.T, device=device) // self.W
-        _lat = 90 - torch.div(180 * torch.div(100 * _wr, self.H, rounding_mode="floor"), 100, rounding_mode="floor")
-        self._wind_pool = torch.zeros(self.T, 6, dtype=torch.long, device=device)  # [T, 6]
-        for _bi in range(len(_wlo)):
-            _in = (_lat >= _wlo[_bi]) & (_lat <= _whi[_bi])
-            self._wind_pool += _in.long().unsqueeze(1) * _ww[_bi].unsqueeze(0)
+        # CIV6 (`PrevailingWinds`, XML order, `WIND_ROWS`): every tile's rows
+        # at its game latitude (`windRowsAt`: -90 + 180 x (100 row // H) // 100,
+        # both ends inclusive) in table order — each row's grid direction
+        # (`DIRECTION_TYPES`, -1 pads) and weight (0 pads), [T, K]
+        _wrows = [[int(v) for v in r] for r in _ds["windRows"]]
+        _per_row: list[list[tuple[int, int]]] = []
+        for _r in range(self.H):
+            _lat = -90 + (180 * ((100 * _r) // self.H)) // 100
+            _per_row.append([(d, w) for lo, hi, d, w in _wrows if lo <= _lat <= hi])
+        _K = max(1, max(len(x) for x in _per_row))
+        _wd = torch.full((self.H, _K), -1, dtype=torch.long)
+        _wwt = torch.zeros(self.H, _K, dtype=torch.long)
+        for _r, _rows in enumerate(_per_row):
+            for _i, (_d, _w) in enumerate(_rows):
+                _wd[_r, _i] = _d
+                _wwt[_r, _i] = _w
+        _rowof = torch.arange(self.T) // self.W
+        self._wind_dir = _wd[_rowof].to(device)   # [T, K]
+        self._wind_w = _wwt[_rowof].to(device)    # [T, K]
+        # a footprint's axial offsets in the strike's order, by Hexes
+        # (`stormFootprintOffsets`): one tensor per Hexes value, each kept as
+        # one object so `tiles_from_offsets` caches its windows
+        self._foot_offs: dict[int, torch.Tensor] = {
+            int(h): torch.tensor([[int(a), int(b)] for a, b in offs], dtype=torch.long, device=device)
+            for h, offs in _ds["stormFootprints"]}
+        # each storm row's RandomEvent_Damages rows in XML order, (kind,
+        # Percentage, CoastalLowlandPercentage or -1, MinHP, MaxHP), and its
+        # RandomEvent_Yields rows, (plane 0 Food / 1 Production, Percentage)
+        # (`STORM_ROWS`)
+        self._st_dmg_rows: list[list[tuple[str, int, int, int, int]]] = [
+            [(str(r[0]), int(r[1]), int(r[2]), int(r[3]), int(r[4])) for r in rows] for rows in _ds["stormDamageRows"]]
+        self._st_yield_rows: list[list[tuple[int, int]]] = [
+            [(int(r[0]), int(r[1])) for r in rows] for rows in _ds["stormYieldRows"]]
         self._st_movement = int(_ds["stormMovement"])  # `STORM_MOVEMENT`: points a turn's walk spends
         # a step's cost onto the storm's own terrain and onto any other, and the
         # damage rows' percent on the storm's last turn
@@ -3092,20 +3115,9 @@ class SimInit:
         self._st_last_pct = int(_ds["stormLastTurnPct"])
         self._st_family_t = torch.tensor(self._st_family, dtype=torch.long, device=device)
 
-        def _stf(k: str) -> torch.Tensor:
-            return torch.tensor([float(e[k]) for e in _st], dtype=torch.float64, device=device)
-
         def _sti(k: str) -> torch.Tensor:
             return torch.tensor([int(e[k]) for e in _st], dtype=torch.long, device=device)
         self._st_hexes, self._st_duration = _sti("hexes"), _sti("duration")
-        self._st_imp_pill, self._st_imp_dest, self._st_dist_pill = _stf("impPill"), _stf("impDest"), _stf("distPill")
-        self._st_bldg_pill = _stf("bldgPill")
-        self._st_pop, self._st_civ_kill = _stf("pop"), _stf("civKill")
-        self._st_land_p, self._st_naval_p = _stf("landP"), _stf("navalP")
-        self._st_land_lo, self._st_land_hi = _sti("landLo"), _sti("landHi")
-        self._st_naval_lo, self._st_naval_hi = _sti("navalLo"), _sti("navalHi")
-        self._st_low_pill, self._st_low_dist = _stf("lowlandPill"), _stf("lowlandDist")
-        self._st_fert_food, self._st_fert_prod = _stf("fertFood"), _stf("fertProd")
         # [civ, leaderRow, eventIdx, effect (0 noDamage / 1 doubleOpposing), amount]
         # — `STORM_UNIT_ROWS`, Divine Wind's hurricanes and Mother Russia's blizzards
         self._storm_unit_rows: list[tuple[int, int, int, int, int]] = [
@@ -4623,9 +4635,13 @@ class SimInit:
         # the random-event rows (a bit per `_event_rows` index) that have
         # fired on the site keyed on each plot (`Tile.eventFired`)
         self.tile_event_fired = torch.zeros(B, T, dtype=torch.long, device=dev)
-        # the turn the FIRE a plot belongs to began, -1 none (`Tile.fireStart`),
-        # and a METEOR SITE on the plot (`Tile.meteor`)
+        # the turn the FIRE on a plot began, -1 none (`Tile.fireStart`), its
+        # place in the order the live fires began, -1 none (`Tile.fireSeq`),
+        # each game's last fire serial (`GameState.fireSerial`), and a METEOR
+        # SITE on the plot (`Tile.meteor`)
         self.fire_start = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.fire_seq = torch.full((B, T), -1, dtype=torch.long, device=dev)
+        self.fire_serial = torch.zeros(B, dtype=torch.long, device=dev)
         self.tile_meteor = torch.zeros(B, T, dtype=torch.bool, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)

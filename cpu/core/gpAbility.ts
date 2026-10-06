@@ -30,7 +30,7 @@ import { scaleByGameSpeed } from '../data/constants';
 import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { dedicationEvent } from './eras';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { spawnUnit, disbandUnit, bestUnlockedOfClass, unitFullMoves, unitsAt, unitStackSlot } from './units';
 import { fitEncampOuter, repairDrip, urbanDefensesFit, wallsMax } from './rules';
 import { BUILDINGS } from '../data/buildings';
@@ -200,7 +200,7 @@ export function boostRandom(
       return e >= lo && e <= hi && !held.includes(d.id) && !rsr.boosted.includes(d.id);
     });
     if (pool.length === 0) return; // nothing open — the stream is not spent
-    const pick = pool[Math.floor(nextRandom(state) * pool.length)];
+    const pick = pool[randRange(state, pool.length)];
     rsr.boosted.push(pick.id);
     dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
   }
@@ -217,7 +217,7 @@ function freeTechs(state: GameState, seat: number, n: number): void {
       (d) => !rsr.techs.includes(d.id) && d.prereqs.every((p) => rsr.techs.includes(p)),
     );
     if (open.length === 0) return;
-    const pick = open[Math.floor(nextRandom(state) * open.length)];
+    const pick = open[randRange(state, open.length)];
     if (pick.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     rsr.techs.push(pick.id);
     delete rsr.techRetained[pick.id];

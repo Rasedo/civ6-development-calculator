@@ -652,10 +652,9 @@ class SimGp:
                 continue
             openm = band & ~done[:, :nk] & ~boosted[:, :nk]
             hit = want & openm.any(dim=1)
-            rnd = self._next_random(hit)
             if not bool(hit.count_nonzero()):
                 continue
-            pick = self._nth_open(openm, rnd)
+            pick = self._pick_live(hit, openm)[1]
             r = hit.nonzero(as_tuple=True)[0]
             boosted[r, pick[r]] = True
             self._dedication_event(

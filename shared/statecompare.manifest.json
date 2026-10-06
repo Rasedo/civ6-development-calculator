@@ -3125,7 +3125,20 @@
           "planes": [
             "fire_start"
           ],
-          "note": "the turn the fire this plot belongs to began, -1 when none: the plot burns, is burnt at its Turn 2 and regrows at its Turn 6."
+          "note": "the turn the fire on this plot began, -1 when none: the plot burns, is burnt at its Turn 2 and regrows at its Turn 6."
+        },
+        {
+          "name": "fireSeq",
+          "compare": "exact",
+          "covers": [
+            "Tile.fireSeq",
+            "GameState.fireSerial"
+          ],
+          "planes": [
+            "fire_seq",
+            "fire_serial"
+          ],
+          "note": "the fire's place in the order the live fires began, -1 when none — the serial handed out at its start, the order the fires' turns run in."
         },
         {
           "name": "featureId",

@@ -157,10 +157,11 @@ RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights
   // 100 in float32.
 - What wakes a volcano (`dll_volcano.py`): ONE roll a turn for the map.
   pct = active share over the volcanoes AND volcanic wonders; D = N // (2V);
-  below PercentVolcanoesActive (MODERATE 70): D //= ((70 − pct)·V // 100)
-  when that is ≥ 2, and rand(D) = 0 wakes one dormant volcano drawn
-  uniformly ("Choose Active Volcano Roll"); at or above 70 the same roll
-  puts one ACTIVE volcano to sleep ("Choose Inactive Volcano Roll").
+  below PercentVolcanoesActive (MODERATE 70): D //= ((70 − pct)·V' // 100)
+  when that is ≥ 2, V' the NAMED volcanoes, and rand(D) = 0 wakes one
+  dormant named volcano drawn uniformly ("Choose Active Volcano Roll"); at
+  or above 70 the same roll puts one ACTIVE volcano to sleep ("Choose
+  Inactive Volcano Roll"); the gate below ("C-74: the volcano roll's gate").
   On the Duel games: 2 sleeps observed where the engines keep a volcano
   active; the wake count fits an effective N of 500 (expected 15.3 wakes
   against 15, 2.7 sleeps against 2; logL −93.8) and not 250 (31.1 wakes,
@@ -178,7 +179,7 @@ RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights
   candidate, 34 / 34 droughts that found no plot had none (without the
   river clause 16 / 34, without the water clause 23 / 34). `Spacing` is this
   distance weight, the storm and one-off pickers take the same form.
-- The fire spread: no labelled draw found (not among the 224 draw sites).
+- The fire's draws: "C-74: the fire" below (the strike 0x2867f0, SPREAD).
 
 ## C-93: the great person draw
 
@@ -302,8 +303,8 @@ What the records cannot show and the replay allows for: a unit that came
 and went on a struck plot between the records (0–2 draws before the yields),
 draws after the event (1116 t91: two). The volcano roll does not run every
 turn (1116 t6, t8: a one-draw gap; some walk turns fit only without it):
-its gate's counts (vtable +0x68 with true / false, the choice skipping
-entries whose +8 is −1) are not read to the end — a LAB line.
+its gate counts the NAMED volcanoes ("C-74: the volcano roll's gate"). A
+fire's birth draws as "C-74: the fire" reads.
 
 ## Tools added for these readings
 
@@ -1112,6 +1113,143 @@ Cocoa included). The engines: `luxuryAmenities` / `_luxury_amenities`.
   t208–209; the ten duels' buy.districtCost +161, 1110 −6 where the record
   caught China mid-turn) — `refreshDistrictDiscount`, a LAB line.
 
+## C-74: the random-event step's order — READ
+
+0x338710 (gated whole: turn ≥ [0x5b8] − 1 + the start turn, a game option
+0x72ce2afb first): 0x288f40 — the droughts' tick 0x2876c0 (no draw), every
+live storm's walk 0x28ecd0, then (a tail jump) every live one-off's turn
+0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw),
+0x33a280, "Random Event Roll" (0x287c00, over the vector at +0x128, never
+empty: the empty slot rides it), the event 0x334d30, then the history's
+update 0x2910d0 (no draw). Before the start turn nothing draws, the volcano
+roll included. The engines (`disasterPhase` / `_disaster_phase`) run this
+order: `stormsTurn`, `fireTurn`, `volcanoRoll`, `randomEvent`, each new
+event's own draws inside it. 0x33a280's draws: unread (no labelled site in
+it; the replay on 1115 / 1116 places every event without one).
+
+## C-74: the fire — READ
+
+The one-off birth (0x291a20's one-off arm): "Pick One Off Start Plot"
+0x288020 (skipped when the plot is handed in and passes 0x28ec10, the
+event's own start test), the naming 0x28c0d0 (no draw), the record
+(+0x988, stride 0x40) and its index pushed on the live list (+0xa00) when
+Duration > 1, then the strike 0x2867f0 at age 0. The strike, per plot of
+the record (a fire is Hexes 1: its plot): unless the plot is water
+(0x834d0) or impassable (byte +0x3a bit 3), each `RandomEvent_Yields` row
+whose Turn (+0x30, gated by +0x2c) is the age draws ONE "Boosted Yield
+Chance" rand(100) and lands at or under its Percentage (`jg`: roll ≤
+Percentage; 100 always) — ReplaceFeature (+0x50 bit 0) paints the row's
+feature, 0xa190d0 adds its Amount; then each `RandomEvent_Damages` row whose
+MinTurn / MaxTurn (+0x48 / +0x40, gated by +0x44 / +0x3c) hold the age draws
+ONE "Pillage Improvement Chance" rand(100) under its Percentage (the
+CoastalLowlandPercentage +0x38 on a lowland plot) and lands through
+0x336a50. A forest or jungle fire at age 0: the Turn 0 yield row and five
+damage rows (the pillage pair, the citizen, the civilians, the land units —
+each land unit its own roll in the applier), six draws: the five of five
+fires the replay placed on runs/h1_duelw1116 with no unit on the plot. Age
+1: five (no yield row, no citizen; SPREAD joins); age 2: the Turn 2 row and
+the same five; ages 3-5 none; age 6 the Turn 6 row. The tick 0x289430 walks
+a COPY of the live list each turn, so a fire started inside it waits for the
+next turn; a record past start + Duration (9) leaves (0x291870).
+
+SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1
+(0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start
+test 0x28ec10 (its RandomEvent_Features row: a Forest Fire Woods, a Jungle
+Fire Rainforest) and the spacing 0x290030 — starts the SAME event there
+(0x334d30), its own record and clock, its own birth strike straight away.
+So one 50% roll a fire-turn lights every eligible neighbour at once: the
+lab's "2 of 5 fires spread, each lighting every Woods neighbour at once, 1-2
+turns after the origin" (runs/c74s3_fire*), and no Rainforest caught from a
+Forest Fire. The engines' rule that a Jungle Fire spreads into Woods
+(the Climate screen's text) dies with this reading: no recorded case has a
+Jungle Fire beside Woods — a LAB line. The neighbour order 0x6b1b0 walks is
+not read (the engines take DirectionTypes order; it moves only which birth's
+unit rolls come first).
+
+## C-74: the one-off start — READ
+
+"Pick One Off Start Plot" 0x288020 walks every plot in index order and keeps
+those 0x28aa00 passes with the event's +0x30 (1 for the one-offs: the plot
+alone) under the predicate 0x28ec10 (the functor 0xd267d0's call, 0x292e10):
+with AvoidTerritory (+0xc8 bit 1) the plot unowned (its info +0x1c is 0xff);
+with +0xc8 bit 4 a test 0x81120 on the plot's info (unread; no recorded case
+needs it); the terrain in the event's RandomEvent_Terrains (0x28eab0), the
+feature in its RandomEvent_Features (0x28e740: a fire's own feature; the
+meteor lists none and any feature passes); not impassable. ONE uniform draw
+over the count. Then the strike 0x2867f0 at age 0: a meteor's two damage
+rows (IMPROVEMENT_PILLAGED, DISTRICT_PILLAGED at 101, no turns) draw once
+each, no yield row. Replayed: both recorded meteors land their plot with the
+pick over the record-before's unowned plots of the terrain list and two
+draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 t243
+of 109 — a Floodplains plot, which the engines' Meteor Site feature list
+refused). The engines (`meteorCandidate` / `_meteor_cands`) follow; the
+improvement, village, district and feature bars they kept die.
+
+## C-74: the drought's strike — READ
+
+0x286530 (from 0x291a20's drought arm): per plot of the stored footprint
+(the land plots), each `RandomEvent_Damages` row with turns holding the age
+draws ONE "Pillage Improvement Chance" rand(100) under its Percentage —
+MAJOR's SPECIFIC_IMPROVEMENT_PILLAGED, EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED
+then SPECIFIC_IMPROVEMENT_PILLAGED: one draw a plot or two. Then, when the
+climate's fertility-loss value (+0x750) is above 0, 0xa1c0c0: per yield
+type, "Remove Fertility Chance" (0xa19bd0) — on a plot holding that yield's
+event fertility c > 0, x = min(value, 100) × c, one rand(100) < x mod 100
+removes x // 100 + 1, else x // 100. The engines draw the rows; the strip
+phase's per-yield draws are a LAB line (the value at +0x750 is unread).
+
+## C-74: the volcano roll's gate — READ
+
+0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b)
+0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only
+those whose name field (+8) is set; +0x50 0xa1d310 the active percent over
+the volcanoes and the volcanic wonders (+0x218), 100 with none; +0x58
+0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's
+turns (0x339020): no draw when the named count N' is 0 or N is 0; D = N //
+(2 × all volcanoes); below PercentVolcanoesActive, no draw unless N' −
+active > 0, then D //= (target − pct) × N' // 100 when that is ≥ 200; at or
+above it, no draw without an active volcano. "Choose Active Volcano Roll"
+0xa20f20 draws rand(N' − active) and walks the entries skipping the active
+and the unnamed. On runs/h1_duelw1116 t6 and t8 the replay needed no roll:
+no volcano named yet. LAB: what sets the name — the engines read it as a
+major's first sight of the plot (`volcanoNamed` / `_volcano_named`).
+
+## C-16: the espionage roll's bands — READ
+
+"Rolling Espionage Result" draws ONE weighted pick (0x287c00) over six
+weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed
+roll T (0x529b60, the pursuing counterspy's term in it): a5 = clamp(T, 8,
+18), a4 = clamp(T − 2, 7, 17), a3 = clamp(T − 3, 6, 16), a2 = clamp(T − 5, 5,
+15), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of
+216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured),
+a2..a3−1 (fail, must escape), a3..a4−1 (fail, undetected), a4..a5−1 (success,
+must escape), a5..18 (success, undetected) — killed first in the draw. The
+engines' threshold t is T − 2 (`missionWeights` / `_mission_weights`); the
+lab's tables (base 13, k = 2: 66/61/32/54/29/11 of 256; base 16:
+11/29/24/61/61/66) are these bands' floor(count × 256 / 216). An escape
+(0x52aea0, table 0x52b090): killed 3..v−3, caught v−2..v−1, away v..18, the
+other three weights 0. Before this reading the engines rolled three dice
+(three draws); the clamps (no band certain or impossible) are new to them.
+"Police Exit Covered" is one weighted pick over the offered routes (weights
+as read in C-16); "Spy EscapeRoute" 0x81d360 is the AI's route choice, which
+the driver makes.
+
+## H-1: the start of a player's turn — the border pick (witnesses)
+
+Between a player's PlayerTurnStarted and PlayerTurnStartComplete seeds the
+game draws once per city whose next-plot tie list is not empty ("GetNextBuyablePlot
+picker", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on
+runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249
+turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one
+more: a quest's draw after it), the barbarians and the Free Cities none. The
+tie list runs in the scorer's walk over the plots within 5 of the centre,
+axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying
+each start's picks from the `pre` seed over the record's ties lands the
+record's next plot on 449 of 452 multi-plot ties of runs/h1_duelw1116 in that
+order, 207 in index order; with single ties, 1,315 of 1,335 picks (the rest
+a plot bought after the start). The engines draw it as `randRange(ties)` /
+`_rand_range` over that order (`borderBestPlots`, `drawBorderPlot`,
+`_seat_border_draw`); the harness's `city.nextPlotDraw` replays it.
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

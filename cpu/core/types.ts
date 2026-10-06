@@ -388,7 +388,7 @@ export interface StormRecord {
 }
 
 /** A live DROUGHT (Game_Climate m_aDroughts): its footprint's plots in
- *  `STORM_DISC` order and the turns it has left. */
+ *  strike order (`stormFootprint`) and the turns it has left. */
 export interface DroughtRecord {
   plots: number[];
   left: number;
@@ -486,6 +486,8 @@ export interface GameState {
   turn: number;
   /** the last storm serial handed out (`StormRecord.id`) */
   stormSerial?: number;
+  /** the last fire serial handed out (`Tile.fireSeq`) */
+  fireSerial?: number;
   /** the live STORMS (Game_Climate m_aStorms), in the order they began */
   storms?: StormRecord[];
   /** the live DROUGHTS (Game_Climate m_aDroughts), in the order they began */

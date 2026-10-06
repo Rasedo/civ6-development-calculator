@@ -3,7 +3,8 @@
 // Game.GetRandNum / Game.GetRandomSeed over the tuner).
 import { describe, expect, it } from 'vitest';
 import { Civ6Random, drawsBetween, lcgStep, pickWeighted } from '../../../cpu/harness/civ6Random';
-import { floodplainList, stormFootprint } from '../../../cpu/harness/eventDraws';
+import { floodplainList } from '../../../cpu/harness/eventDraws';
+import { stormFootprint } from '../../../cpu/core/disasters';
 import type { GameMap, Tile } from '../../../world/types';
 
 const s32 = (x: number) => x | 0;

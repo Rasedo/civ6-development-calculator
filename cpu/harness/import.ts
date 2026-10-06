@@ -36,7 +36,7 @@ import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, lux
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { eruptionRing, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
-import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT } from '../data/disasters';
+import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
@@ -665,7 +665,7 @@ function eventSlots(map: GameMap, name: string, cur: number, start: number, walk
   }
   const storm = STORM_EVENTS.find((s) => s.id === ev);
   if (storm) {
-    const channels = ([[storm.fertFood, 'fertility'], [storm.fertProd, 'fertilityProd']] as const).filter(([p]) => p > 0).map(([, c]) => c);
+    const channels = [...new Set(STORM_ROWS[STORM_EVENTS.indexOf(storm)].yields.map((r) => (r.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd') as EventChannel))];
     const a = at(start) ?? at(cur);
     const b = at(cur) ?? a;
     if (!channels.length) return { slots: [], exact: true };

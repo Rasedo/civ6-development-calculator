@@ -1061,7 +1061,7 @@ _MUTABLE = [
     "storm_event", "storm_at", "storm_left",  # the live STORM records: row, centre, turns left
     "storm_id", "storm_struck", "storm_serial",  # each one's serial and struck plots, the counter
     "drought_left", "drought_plots",  # the live DROUGHT records: turns left, footprint
-    "fire_start",  # the turn a plot's FIRE began, -1 none
+    "fire_start", "fire_seq", "fire_serial",  # each plot's FIRE: its start turn and its place among the live fires, -1 none; the counter
     "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in
     "tile_goody",  # TRIBAL VILLAGES: claimed and gone
     "district_pillaged",  # raided-dark districts (tile plane, reclaim-safe)

@@ -12,7 +12,7 @@ export const WONDER_TOURISM_BASE = 2;
 import { cityTradeYields } from './trade';
 import { hasRiver, isWater, naturalWonderAt } from '../../world/query';
 import { revealAround } from './fog';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
@@ -839,8 +839,11 @@ export function seenResourceAt(state: GameState, seat: number): (t: Tile) => boo
 }
 
 /** The plots culture growth would claim next: every candidate at the lowest
- *  `borderPlotCost`, in tile-index order. The game draws one of them. A
- *  candidate is unowned, and the roster's plot rows
+ *  `borderPlotCost`, in the order the scorer walks them — the plots within
+ *  reach of the centre, axial dq outer and dr inner (`tilesWithin`; 0x1aa7f0:
+ *  the picker's draw lands its game's plot on 449 of 452 multi-plot ties
+ *  replayed from the runs/h1_duelw1116 witnesses, against 207 in tile-index
+ *  order). The game draws one of them. A candidate is unowned, and the roster's plot rows
  *  (MODIFIER_PLAYER_ADJUST_PLOT_YIELD, COLLECTION_PLAYER_PLOT_YIELDS) pay
  *  only the seat's OWN plots, so the cost reads none of them
  *  (runs/h1_duelw1109 t137-149: Guangzhou's pick skips Auckland's coast). */
@@ -851,16 +854,18 @@ export function borderBestPlots(state: GameState, city: City, ctx?: YieldCtx): n
   const camps = campTiles(state);
   let best = Infinity;
   let out: number[] = [];
-  for (const i of borderCandidates(state, city).sort((a, b) => a - b)) {
+  for (const i of borderCandidates(state, city)) {
     const c = borderPlotCost(state, city, state.map.tiles[i], yctx, seen, camps);
     if (c < best) { best = c; out = [i]; } else if (c === best) out.push(i);
   }
   return out;
 }
 
-/** The first of `borderBestPlots`: the plot a gold purchase offers. */
+/** The lowest-index plot of `borderBestPlots`: the plot a gold purchase
+ *  offers. */
 export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): number | null {
-  return borderBestPlots(state, city, ctx)[0] ?? null;
+  const ties = borderBestPlots(state, city, ctx);
+  return ties.length ? Math.min(...ties) : null;
 }
 
 /** CIV6 (the "GetNextBuyablePlot picker"): ONE draw among `borderBestPlots`,
@@ -868,7 +873,7 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
 export function drawBorderPlot(state: GameState, city: City, ctx?: YieldCtx): number | null {
   const ties = borderBestPlots(state, city, ctx);
   if (ties.length === 0) return null;
-  return ties[Math.floor(nextRandom(state) * ties.length)];
+  return ties[randRange(state, ties.length)];
 }
 
 /** A plot joins the city: its owner, and the seat's sight of it. A purchase

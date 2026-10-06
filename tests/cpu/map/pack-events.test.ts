@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { setTileOwner } from '../../../cpu/core/seats';
-import { disasterPhase, eventRows, erupt, eruptionRing, meteorCandidate } from '../../../cpu/core/disasters';
+import { disasterPhase, eventRows, erupt, eruptionRing, meteorCandidate, fireBirth, fireTurn } from '../../../cpu/core/disasters';
 import { STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { TURN_LIMIT } from '../../../cpu/core/game';
 import {
@@ -14,7 +14,7 @@ import { claimMeteorSite, classLine, meteorGrantUnit, spawnUnit, terrainMp } fro
 import { featureDefense } from '../../../cpu/core/combat';
 import { tileAppeal } from '../../../cpu/core/appeal';
 import { tileYields } from '../../../cpu/core/yields';
-import { DIR_E, DIR_NE, DIR_NW, DIR_SE, DIR_SW, DIR_W, hexDistance, neighborTile, neighbors } from '../../../world/hex';
+import { DIR_E, DIRECTION_TYPES, hexDistance, neighborTile, neighbors } from '../../../world/hex';
 import { FEATURES } from '../../../world/features';
 import { WONDERS } from '../../../world/wonders';
 import { generateMap } from '../../../world/mapgen';
@@ -62,35 +62,30 @@ describe('the Meteor Shower', () => {
     return { state, c, plots };
   };
 
-  it('strikes nobody\'s bare or wooded Plains, Grassland, Snow or Desert, and nothing else', () => {
+  it('strikes nobody\'s Plains, Grassland, Snow or Desert, any feature but an impassable one (0x28ec10)', () => {
     const { state, c } = island();
-    const none = new Set<number>();
-    expect(meteorCandidate(c, none)).toBe(true);
+    expect(meteorCandidate(c)).toBe(true);
     c.feature = 'WOODS';
-    expect(meteorCandidate(c, none)).toBe(true);
+    expect(meteorCandidate(c)).toBe(true);
+    // the event lists no feature: Floodplains passes (runs/h1_duelw1116 t243)
     c.feature = 'FLOODPLAINS';
-    expect(meteorCandidate(c, none)).toBe(false);
-    c.feature = 'BURNT_WOODS';
-    expect(meteorCandidate(c, none)).toBe(false);
+    expect(meteorCandidate(c)).toBe(true);
     c.feature = null;
     c.terrain = 'TUNDRA';
-    expect(meteorCandidate(c, none)).toBe(false);
+    expect(meteorCandidate(c)).toBe(false);
     c.terrain = 'SNOW';
-    expect(meteorCandidate(c, none)).toBe(true);
+    expect(meteorCandidate(c)).toBe(true);
     c.elevation = 'MOUNTAIN';
-    expect(meteorCandidate(c, none)).toBe(false);
+    expect(meteorCandidate(c)).toBe(false);
     c.elevation = 'HILLS';
-    expect(meteorCandidate(c, none)).toBe(true);
+    expect(meteorCandidate(c)).toBe(true);
     setTileOwner(c, 0);
-    expect(meteorCandidate(c, none)).toBe(false);
+    expect(meteorCandidate(c)).toBe(false);
     setTileOwner(c, -1);
+    // the start test reads no improvement: a Tribal Village is no bar
     c.goodyHut = true;
-    expect(meteorCandidate(c, none)).toBe(false);
-    c.goodyHut = false;
-    expect(meteorCandidate(c, new Set([c.index]))).toBe(false);
-    c.meteor = true;
-    expect(meteorCandidate(c, none)).toBe(false);
-    expect(meteorCandidate(state.map.tiles[0], none)).toBe(false);
+    expect(meteorCandidate(c)).toBe(true);
+    expect(meteorCandidate(state.map.tiles[0])).toBe(false);
   });
 
   it('is ONE site at its area-scaled weight however many plots it may strike, and leaves one Meteor Site', () => {
@@ -158,17 +153,15 @@ describe('the fires', () => {
     for (const t of stand) t.feature = 'WOODS';
     return { state, c, stand };
   };
-  /** a fire lit by hand on turn `start`; the scenes below run turns before
-   *  `RANDOM_EVENT_START_TURN`, so the phase spends no draw and the fires'
-   *  own turn is all that runs */
-  const light = (t: Tile, start: number) => {
-    t.feature = 'BURNING_WOODS';
-    t.fireStart = start;
+  /** a Forest Fire born on `t` on turn `start` (its birth strike at age 0) */
+  const light = (state: GameState, t: Tile, start: number) => {
+    state.turn = start;
+    fireBirth(state, t, 1);
   };
+  /** the fires' own turn on `turn` */
   const phaseAt = (state: GameState, turn: number) => {
-    expect(turn).toBeLessThan(RANDOM_EVENT_START_TURN);
     state.turn = turn;
-    disasterPhase(state);
+    fireTurn(state);
   };
   const T0 = -50;
 
@@ -178,8 +171,7 @@ describe('the fires', () => {
     for (const t of stand.slice(1)) t.feature = null;
     const ctx = bareCtx(state.map);
     const woodsProd = tileYields(ctx, c).production;
-    light(c, T0);
-    phaseAt(state, T0);
+    light(state, c, T0);
     expect(c.feature).toBe('BURNING_WOODS');
     expect(tileYields(ctx, c).production).toBe(woodsProd - 1);
     phaseAt(state, T0 + 1);
@@ -199,20 +191,26 @@ describe('the fires', () => {
     expect(tileYields(ctx, c).production).toBe(woodsProd + 1);
   });
 
-  it('spreads to each adjacent Woods at 50% on its turns 1 and 2, each caught plot on its own clock', () => {
+  it('spreads at 50% on its turns 1 and 2 to every adjacent Woods at once, each caught plot a fire of its own', () => {
     const N = 200;
     let caught = 0;
     let ring = 0;
     for (let i = 0; i < N; i++) {
       const { state, c, stand } = woodsBoard();
       state.rngState = 1000 + i;
-      light(c, T0);
+      light(state, c, T0);
+      // turn 0: nothing spreads
+      expect(stand.slice(1).every((t) => t.feature === 'WOODS')).toBe(true);
       const seen = new Set<Tile>();
-      for (let turn = T0; turn <= T0 + 14; turn++) {
+      for (let turn = T0 + 1; turn <= T0 + 14; turn++) {
         const before = new Map(stand.map((t) => [t, t.fireStart]));
         phaseAt(state, turn);
-        // turn 0: nothing spreads
-        if (turn === T0) expect(stand.slice(1).every((t) => t.feature === 'WOODS')).toBe(true);
+        // the centre's spread lights every live Woods beside it at once
+        if (c.fireStart !== undefined && stand.slice(1).some((t) => t.fireStart === turn && before.get(t) === undefined)
+            && turn - T0 <= 2) {
+          const fresh = stand.slice(1).filter((t) => t.fireStart === turn);
+          expect(fresh.length).toBeGreaterThan(0);
+        }
         for (const t of stand) {
           if (t.fireStart === undefined) {
             expect(t.feature).toBe('WOODS');
@@ -241,8 +239,8 @@ describe('the fires', () => {
       const { state, c, stand } = woodsBoard();
       state.rngState = 2000 + i;
       for (const t of stand.slice(1)) t.feature = 'RAINFOREST';
-      light(c, T0);
-      for (let turn = T0; turn <= T0 + 3; turn++) phaseAt(state, turn);
+      light(state, c, T0);
+      for (let turn = T0 + 1; turn <= T0 + 3; turn++) phaseAt(state, turn);
       expect(stand.slice(1).every((t) => t.feature === 'RAINFOREST' && t.fireStart === undefined)).toBe(true);
     }
   });
@@ -259,8 +257,7 @@ describe('the fires', () => {
     const w = spawnUnit(state, 'WARRIOR', c.index, 0)!;
     w.hp = 1000;
     const b = spawnUnit(state, 'BUILDER', c.index, 0)!;
-    light(c, T0);
-    phaseAt(state, T0);
+    light(state, c, T0);
     expect(c.pillaged).toBe(true);
     expect(c.improvement).toBe('LUMBER_MILL');
     expect(state.units.some((u) => u.id === b.id)).toBe(false);
@@ -340,10 +337,10 @@ describe('the natural wonders\' eruptions', () => {
     expect(ring.length).toBe(12);
     expect(new Set(ring.map((t) => t.index)).size).toBe(8 + 2);
     expect(ring.filter((t) => t === a || t === b)).toHaveLength(2);
-    // NE, E, SE, SW, W, NW from the lower-index plot
+    // the game's NE, E, SE, SW, W, NW (DirectionTypes) from the lower-index plot
     const first = [a, b].sort((x, y) => x.index - y.index)[0];
     expect(ring.slice(0, 6).map((t) => t.index)).toEqual(
-      [DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW].map((d) => neighborTile(state.map, first, d)!.index));
+      DIRECTION_TYPES.map((d) => neighborTile(state.map, first, d)!.index));
   });
 
   it('Eyjafjallajokull and Vesuvius erupt on their own rows while the wonder stands, one site each', () => {

@@ -23,6 +23,20 @@ export function randRange(state: GameState, max: number): number {
   return ((step(state) >>> 16) * (max & 0xffff)) >>> 16;
 }
 
+/** the game's weighted picker (Utilities_WeightedVector, 0x287c00): ONE draw
+ *  over the weights' total, the first entry whose running sum passes it; -1
+ *  past them all. `_rand_weighted` is the twin. */
+export function randWeighted(state: GameState, weights: readonly number[]): number {
+  let total = 0;
+  for (const w of weights) total += w;
+  let v = randRange(state, total);
+  for (let i = 0; i < weights.length; i++) {
+    v -= weights[i];
+    if (v < 0) return i;
+  }
+  return -1;
+}
+
 /** one step read as a fraction in [0, 1) */
 export function nextRandom(state: GameState): number {
   return step(state) / 4294967296;

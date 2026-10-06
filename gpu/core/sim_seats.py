@@ -6682,8 +6682,7 @@ class SimSeats:
             cnt = int(live.sum())
             if cnt <= 0:
                 break
-            k = int(float(self._next_random(one)[b]) * cnt)
-            k = min(k, cnt - 1)
+            k = int(self._rand_range(one, cnt)[b])
             col = int(live.nonzero().flatten()[k])
             live[col] = False
             got.append(col)
@@ -6928,7 +6927,7 @@ class SimSeats:
         """One kind's half of `grantEraBoosts`: `n` draws per game from the
         UNEARNED rows of `era`. A game whose pool is empty takes NO draw at
         all — TS returns out of its loop there, so the rng must not move for
-        it either, which is what masking `_next_random` gives."""
+        it either, which is what masking `_rand_range` gives."""
         if not bool(m.count_nonzero()) or int(n.max()) <= 0:
             return
         k = min(era_of.numel(), held.shape[2], boosted.shape[2])
@@ -6942,8 +6941,7 @@ class SimSeats:
             want = want & (cnt > 0)          # "if available" — no pool, no draw
             if not bool(want.count_nonzero()):
                 break
-            r = self._next_random(want)
-            pick = torch.floor(r * cnt.clamp(min=1).double()).long()
+            pick = self._rand_range(want, cnt)
             # the pick-th OPEN column, in ascending index — TS indexes its
             # filtered array the same way
             rank = open_.long().cumsum(dim=1) - 1
@@ -7432,8 +7430,7 @@ class SimSeats:
             want = hit & openm.any(dim=1)
             if not bool(want.count_nonzero()):
                 return
-            rnd = self._next_random(want)
-            pick = self._nth_open(openm, rnd)
+            pick = self._pick_live(want, openm)[1]
             r = want.nonzero(as_tuple=True)[0]
             boosted[r, pick[r]] = True
             self._dedication_event(row, self._ded_pen_brush, want.long())
@@ -7890,10 +7887,9 @@ class SimSeats:
                 pre = self._prereq_c if is_civic else self._prereq_t
                 avail = self._available_mask(done, pre, self._c_repeat if is_civic else self._t_repeat)
                 hit = want & avail.any(dim=1)
-                rnd = self._next_random(hit)
                 if not bool(hit.count_nonzero()):
                     continue
-                pick = self._nth_open(avail, rnd)
+                pick = self._pick_live(hit, avail)[1]
                 r = hit.nonzero(as_tuple=True)[0]
                 if is_civic:
                     self.civ_civics[r, row, pick[r]] = True
@@ -7908,17 +7904,6 @@ class SimSeats:
                     self.civ_cur_tech[:, row] = torch.where(hit & (cur == pick), torch.full_like(cur, -1), cur)
                     self._urban_defenses_fit(row, hit & (pick == self._urban_def_tech))
                 self._eff_version += 1
-
-    def _nth_open(self, open_m: torch.Tensor, rnd: torch.Tensor) -> torch.Tensor:
-        """[B] — the column a uniform draw picks out of `open_m` [B, N]: the
-        k-th True in column order, k = floor(rnd * (how many are True)). The
-        TS twin indexes a FILTERED list, so the count is the list length and
-        the cumulative sum is the position inside it. Rows with nothing open
-        answer column 0; their caller masks the write."""
-        n_open = open_m.long().sum(dim=1)
-        k = torch.floor(rnd * n_open.to(torch.float64)).to(torch.long)
-        cum = open_m.long().cumsum(dim=1)
-        return (open_m & (cum == (k + 1).unsqueeze(1))).long().argmax(dim=1)
 
     def _era_inspirations(self, adv: torch.Tensor) -> None:
         """CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
@@ -7935,10 +7920,9 @@ class SimSeats:
         for row in range(self.n_majors):
             open_m = want & ~self.civ_civics[:, row, :ncv] & ~self.civ_civic_boosted[:, row, :ncv]
             hit = self._suz_effect(row, self._suz_c_era) & open_m.any(dim=1) & adv
-            rnd = self._next_random(hit)
             if not bool(hit.count_nonzero()):
                 continue
-            pick = self._nth_open(open_m, rnd)
+            pick = self._pick_live(hit, open_m)[1]
             r = hit.nonzero(as_tuple=True)[0]
             self.civ_civic_boosted[r, row, pick[r]] = True
             self._dedication_event(row, self._ded_pen_brush, hit.long())
@@ -11393,8 +11377,9 @@ class SimSeats:
     def _seat_border_draw(self, row: int, center: torch.Tensor, cid: torch.Tensor,
                           mask: torch.Tensor) -> torch.Tensor:
         """[B] long — `drawBorderPlot`'s twin: ONE draw among the lowest-cost
-        candidates in tile-index order, for every game in `mask` with any;
-        -1, and no draw, where nothing is in reach (or outside `mask`)."""
+        candidates in the scorer's order (the `_off5` window: axial dq outer,
+        dr inner — `borderBestPlots`), for every game in `mask` with any; -1,
+        and no draw, where nothing is in reach (or outside `mask`)."""
         out = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
         if not bool(mask.count_nonzero()):
             return out
@@ -11404,11 +11389,9 @@ class SimSeats:
         tie = ok & (cost == cost.min(dim=1, keepdim=True).values)
         n = tie.sum(dim=1)
         has = mask & (n > 0)
-        r = self._next_random(has)
-        k = torch.floor(r * n.to(torch.float64)).to(torch.long)
-        tk = torch.where(tie, tiles, torch.full_like(tiles, 1 << 40))
-        rank = ((tk.unsqueeze(1) < tk.unsqueeze(2)) & tie.unsqueeze(1)).sum(dim=2)
-        pick = (tie & (rank == k.unsqueeze(1))).long().argmax(dim=1)
+        # "GetNextBuyablePlot picker" (0x1ab1c0): one draw over the ties
+        k = self._rand_range(has, n)
+        pick = (tie & (tie.long().cumsum(dim=1) == (k + 1).unsqueeze(1))).long().argmax(dim=1)
         return torch.where(has, tiles.gather(1, pick.unsqueeze(1)).squeeze(1), out)
 
     def _seat_border_growth(self, row: int, col: torch.Tensor, act: torch.Tensor, cul_c: torch.Tensor) -> None:
@@ -12335,7 +12318,7 @@ class SimSeats:
         promos = self.unit_promos.gather(1, s1)
         venue = self._concert_venue(tc.unsqueeze(1), utype, promos).squeeze(1)
         bits = self._venue_bits(tc.unsqueeze(1))
-        roll = (self._next_random(mask) * 1000).long()
+        roll = self._rand_range(mask, 1000)
         lvl = self.unit_band_level.gather(1, s1).squeeze(1).clamp(min=1, max=self._band_max_level)
         # CIV6 (Album Cover Art, Arena Rock, ...): "+N level when performing
         # at <venue kind>" — the tier ROLL reads the raised level; the band's

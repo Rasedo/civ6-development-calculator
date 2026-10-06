@@ -51,6 +51,7 @@ import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
+import { Civ6Random, drawsBetween } from './civ6Random';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, congressOfRecord, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
@@ -161,6 +162,53 @@ function citiesOfImport(imp: Imported): { city: City; dump: DumpCity; minor: boo
   return out;
 }
 
+/**
+ * THE START'S BORDER PICKS, replayed from the witnesses' generator states
+ * (`tools/civ6lab/dll_readings.md` "H-1: the start of a player's turn"):
+ * between a player's PlayerTurnStarted (`pre`) and PlayerTurnStartComplete
+ * (`post`) the game draws once per city whose next-plot tie list is not
+ * empty, in the player's city order ("GetNextBuyablePlot picker",
+ * `drawBorderPlot`). Where the draws between the two seeds are exactly those
+ * picks, each city's pick is the generator's draw over its ties
+ * (`borderBestPlots` on the record's state), held as the record's next plot.
+ * Each player's start is the latest the record witnessed: the record's own
+ * turn for the seat it was taken on, the turn before for the players after
+ * it. By the city's `owner:id`: the pick and the record's plot, or why the
+ * start was not replayed.
+ */
+function startBorderPicks(rec: TurnRecord, state: GameState, imp: Imported): Map<string, { pick: number; game: number; ties: number[] } | string> {
+  const out = new Map<string, { pick: number; game: number; ties: number[] } | string>();
+  const byKey = new Map<string, City>();
+  const dumpOf = new Map<string, DumpCity>();
+  for (const [city, c] of imp.dumpOfCity) {
+    byKey.set(`${c.owner}:${c.id}`, city);
+    dumpOf.set(`${c.owner}:${c.id}`, c);
+  }
+  const latest = new Map<number, number>();
+  for (const w of rec.witness ?? []) latest.set(w.player, Math.max(latest.get(w.player) ?? -1, w.turn));
+  const wit = (rec.witness ?? []).filter((w) => w.turn === latest.get(w.player));
+  for (const post of wit.filter((w) => w.point === 'post')) {
+    const pre = wit.find((w) => w.point === 'pre' && w.player === post.player);
+    const a = typeof pre?.seed === 'number' ? pre.seed : undefined;
+    const b = typeof post.seed === 'number' ? post.seed : undefined;
+    const keys = post.cities.map((c) => `${post.player}:${num(c.id)}`);
+    const why = (reason: string) => { for (const k of keys) out.set(k, reason); };
+    if (a === undefined || b === undefined) { why('no witness seed'); continue; }
+    const cities = keys.map((k) => byKey.get(k));
+    if (cities.some((c) => !c)) { why('a city the import does not hold'); continue; }
+    const ties = cities.map((c) => (congressBorderFrozen(state, c!.seat) ? [] : borderBestPlots(state, c!)));
+    const picks = ties.filter((t) => t.length > 0).length;
+    if (drawsBetween(a, b, 4096) !== picks) { why('the start drew besides the picks'); continue; }
+    const rng = new Civ6Random(a);
+    post.cities.forEach((_c, i) => {
+      if (!ties[i].length) { out.set(keys[i], 'no plot in reach'); return; }
+      const pick = ties[i][rng.get(ties[i].length, 'GetNextBuyablePlot picker')];
+      out.set(keys[i], { pick, game: num(dumpOf.get(keys[i])!.nextPlot), ties: ties[i] });
+    });
+  }
+  return out;
+}
+
 function subjectOf(c: DumpCity): string {
   return `city ${c.owner}:${c.id} ${strip(c.name, 'LOC_CITY_NAME_')}`;
 }
@@ -168,6 +216,7 @@ function subjectOf(c: DumpCity): string {
 export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = importTurn(rec, cat)): CheckResult[] {
   const out: CheckResult[] = [];
   const state = imp.state;
+  const startPicks = startBorderPicks(rec, state, imp);
   const turn = rec.turn;
   // every reader takes the congress the game holds now, but a city's
   // amenities stand as its seat's last turn left them (`congressOf`)
@@ -304,6 +353,13 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       const g = [...(gapsFor(gaps, 'city.nextPlot').gaps ?? []), ...draws];
       out.push({ turn, check: 'city.nextPlot', subject, ok, game: num(c.nextPlot), ours: ties, ...(g.length ? { gaps: g } : {}) });
     }
+    // the start's pick, drawn on the game's generator from the witness seed
+    const sp = startPicks.get(`${c.owner}:${c.id}`);
+    if (sp === undefined) out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no witness' });
+    else if (typeof sp === 'string') out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: sp });
+    else if (sp.game < 0 && imp.nextPlotUnheld.has(city.centerIndex)) {
+      out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no next plot held' });
+    } else push('city.nextPlotDraw', sp.pick === sp.game, sp.game, sp.pick, { ties: sp.ties });
     // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
     {

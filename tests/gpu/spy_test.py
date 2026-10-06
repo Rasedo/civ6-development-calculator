@@ -82,11 +82,10 @@ def seek_band(sim, want, t: int, start: int = 1) -> int:
     one[0] = True
     for seed in range(start, start + 20000):
         sim.rng_state[0] = seed
-        r = sum(int(sim._next_random(one)[0] * sim._spy_roll_faces) + 1 for _ in range(sim._spy_roll_dice))
-        if sim._mission_outcome(r, t) in want:
+        if sim._mission_draw(0, t) in want:
             sim.rng_state[0] = seed
             return seed
-    raise AssertionError(f"no seed in 20000 lands a 3d6 in bands {sorted(want)} against T={t}")
+    raise AssertionError(f"no seed in 20000 lands the roll in bands {sorted(want)} against T={t}")
 
 
 def city_threshold(sim, row, w, m, hr, hc) -> int:

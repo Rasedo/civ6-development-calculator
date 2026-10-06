@@ -196,7 +196,8 @@ export const SPY_SURVEILLANCE_REACH = srcConst('eras.espionage.surveilReach', 1,
 // (the police guess, then the score against the base, below).
 // ---------------------------------------------------------------------------
 /** CIV6 (measured, `tools/civ6lab/spy_probe.lua`): every mission
- *  is ONE roll of 3d6 read against `baseProbability - k`, and a fresh
+ *  reads 3d6 against `baseProbability - k` — the game draws ONE weighted pick
+ *  over the dice's counts of six bands (`missionWeights`) — and a fresh
  *  Recruit — the install's level 1, this engine's level 0 — reads k = 2
  *  before any level term (`LevelProbChange` 1 per level). */
 const spyRoll = {

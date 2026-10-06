@@ -1068,6 +1068,7 @@ TILE = {
     "fertilityCul": _tile("fertility_cul"),
     "droughtTurns": _tile("drought"),
     "fireStart": _tile("fire_start"),
+    "fireSeq": _tile("fire_seq"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),
     "flooded": lambda sim, b, rows: sim.tile_flooded[b].long().numpy(),

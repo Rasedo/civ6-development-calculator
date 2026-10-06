@@ -36,6 +36,12 @@ export const DIR_W = 3;
 export const DIR_SW = 4;
 export const DIR_SE = 5;
 
+/** Civ 6's DirectionTypes in the DLL's order — NORTHEAST, EAST, SOUTHEAST,
+ *  SOUTHWEST, WEST, NORTHWEST (GameCore_XP2 0xeff670 / 0xeff688) — as this
+ *  grid's directions: the game's y grows the way this grid's row does, so
+ *  the game's north is this grid's south. */
+export const DIRECTION_TYPES: readonly number[] = [DIR_SE, DIR_E, DIR_NE, DIR_NW, DIR_W, DIR_SW];
+
 export function oppositeDir(d: number): number {
   return (d + 3) % 6;
 }

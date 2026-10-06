@@ -5,6 +5,7 @@
  * file is engine-side and exists solely to ship the catalogs to the GPU.
  */
 
+import { DIRECTION_TYPES } from '../../world/hex';
 import { TURN_LIMIT, DISTRICT_SPECIALTY_COST, DISTRICT_TECH_K, districtK, districtDiscountPct } from '../core/game';
 import { eraUnitOfClass } from '../core/phase';
 import { PRESERVE_APPEAL_HOUSING } from '../core/appeal';
@@ -12,7 +13,7 @@ import { CONGRESS_CURRENCIES } from '../core/congress';
 import { BIOSPHERE_POWER_MULT, IMPROVEMENTS, SEASIDE_RESORT_MIN_APPEAL, PARK_MIN_APPEAL, PARK_AMENITIES_OWNER,
   PARK_AMENITIES_NEAR, PARK_AMENITY_CITIES } from '../data/improvements';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, RELIGIOUS_HEAL_PER_FAITH, unitIsMilitary, classLine } from '../core/units';
-import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY, METEOR_GRANT_CLASS, FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG, FIRE_APPEAL } from '../data/disasters';
+import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY, METEOR_GRANT_CLASS, FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG, FIRE_APPEAL } from '../data/disasters';
 import { NUCLEAR_DEVICES, FALLOUT_DAMAGE, NUKE_ROBOT_DAMAGE, NUKE_COVER_RANGE, FALLOUT_CLEAN_CHARGES, NUKE_CARRIERS, NUKE_AA_SUPPORT, NUKE_AA_WOUND, NUKE_SILO_DEFENSE, NUKE_SUB_DEFENSE, NUKE_INTERCEPT_DAMAGE } from '../data/nuclear';
 import type { PlunderRow, ImprovementId } from '../core/types';
 import { featureDefense } from '../core/combat';
@@ -50,7 +51,7 @@ import { MAX_BARB_PER_CAMP, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTI
 import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, isLightCavalry, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, SETTLER_COST_STEP, BUILDER_COST_STEP } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FEATURE_SIGHT_THROUGH, ELEVATION_SIGHT, SIGHT_MAX } from '../data/sight';
-import { PREVAILING_WINDS, WIND_BAND_LO, WIND_BAND_HI, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, STORM_MOVEMENT, FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, ERUPTION_WEIGHT, SOIL_REPLACES, ERUPTION_WONDER,DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, DROUGHT_SHIELD_DISTRICTS, DROUGHT_SHIELD_IMPROVEMENTS, ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, RANDOM_EVENT_START_TURN, ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P, FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
+import { WIND_ROWS, STORM_ROWS, stormFootprintOffsets, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, STORM_MOVEMENT, FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, ERUPTION_WEIGHT, SOIL_REPLACES, ERUPTION_WONDER,DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, DROUGHT_SHIELD_DISTRICTS, DROUGHT_SHIELD_IMPROVEMENTS, ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, RANDOM_EVENT_START_TURN, ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P, FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
 import {
   CLIMATE_PHASES, DEFORESTATION_BANDS, CO2_PER_POINT, CO2_PER_DEGREE, UNIT_CARBON_SHARE,
   UNIT_CARBON_RESOURCE_SHARE, ADVANCED_POWER_CELLS_SHARE, ADVANCED_POWER_CELLS_TECH,
@@ -1639,7 +1640,6 @@ export function buildRules() {
       // and the Heavy Cavalry line its site grants from, [unit, tech, civic]
       // per unit in line order (`meteorGrantUnit`)
       meteorTerrains: METEOR_TERRAINS.map((t) => TERRAIN_IDS.indexOf(t)),
-      meteorFeatures: METEOR_FEATURES.map((f) => featIdx.get(f) ?? -1),
       meteorAvoidsTerritory: METEOR_AVOIDS_TERRITORY ? 1 : 0,
       meteorGrantLine: classLine(METEOR_GRANT_CLASS).map((id) => [
         Object.keys(UNITS).indexOf(id),
@@ -1657,7 +1657,6 @@ export function buildRules() {
       fireRegrowTurn: FIRE_REGROW_TURN,
       fireSpreadP: FIRE_SPREAD_P,
       fireSpreadTurns: [...FIRE_SPREAD_TURNS],
-      fireSpreadCross: [...FIRE_SPREAD_CROSS],
       fireDamageTurns: [...FIRE_DAMAGE_TURNS],
       firePopTurn: FIRE_POP_TURN,
       fireDmg: [...FIRE_DMG],
@@ -1731,7 +1730,8 @@ export function buildRules() {
         if (f === undefined) throw new Error(`eruptionWonderFid: ${w} is not in the feature roster`);
         return f;
       }),
-      // a drought's turns by severity, and its footprint's `STORM_DISC` slots
+      // a drought's turns by severity, and its footprint's `Hexes`
+      // (`stormFootprints`)
       droughtDuration: [...DROUGHT_TURNS],
       droughtHexes: DROUGHT_HEXES,
       // the improvement rows a drought pillages and bars (`IMPROVEMENT_IDS`
@@ -1745,14 +1745,21 @@ export function buildRules() {
       // `family` is the `STORM_FAMILIES` index the tile plane `sf` speaks
       // `src` (provenance) is the one column that must NOT ride the spread
       storms: STORM_EVENTS.map((ev) => ({ ...ev, family: STORM_FAMILIES.indexOf(ev.family), src: undefined })),
-      // CIV6 (`PrevailingWinds`): [8 latitude bands][6 hex directions E NE NW W SW SE]
-      winds: PREVAILING_WINDS.map((b) => [...b]),
-      // each band's latitudes, both ends inclusive (`windWeights`)
-      windBandLo: [...WIND_BAND_LO],
-      windBandHi: [...WIND_BAND_HI],
+      // each storm row's RandomEvent_Damages rows in XML order, [kind,
+      // Percentage, CoastalLowlandPercentage (-1 none), MinHP, MaxHP], and its
+      // RandomEvent_Yields rows, [plane (0 Food / 1 Production), Percentage]
+      // (`STORM_ROWS`)
+      stormDamageRows: STORM_ROWS.map((r) => r.dmg.map((d) => [d.kind, d.pct, d.lowland, d.lo, d.hi])),
+      stormYieldRows: STORM_ROWS.map((r) => r.yields.map((y) => [y.yield === 'YIELD_FOOD' ? 0 : 1, y.pct])),
+      // a footprint's axial offsets in the strike's order, by Hexes 1 / 3 / 7
+      // / 19 (`stormFootprintOffsets`)
+      stormFootprints: [1, 3, 7, 19].map((h) => [h, stormFootprintOffsets(h).map((o) => [...o])]),
+      // CIV6 (`PrevailingWinds`, XML order): [MinimumLatitude, MaximumLatitude,
+      // the grid direction of its DirectionType (`DIRECTION_TYPES`), Weight]
+      windRows: WIND_ROWS.map((w) => [w.lo, w.hi, DIRECTION_TYPES[w.dir], w.weight]),
       stormMovement: STORM_MOVEMENT,
       // a step's cost onto the storm's own terrain and any other, the damage
-      // rows' percent on its last turn (`stormWalk`, `stormTurn`)
+      // rows' percent on its last turn (`stormWalk`, `stormsTurn`)
       stormStepCostOn: STORM_STEP_COST_ON,
       stormStepCostOff: STORM_STEP_COST_OFF,
       stormLastTurnPct: STORM_LAST_TURN_PCT,

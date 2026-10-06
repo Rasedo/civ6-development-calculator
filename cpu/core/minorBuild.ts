@@ -51,7 +51,7 @@ import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
 import { FREE_SEAT, civsAtWar, hiddenResourcesFor, majorityReligionOf, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestMelee, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { landWalker, walkUnit } from './walker';
 import { worldEraIndex } from './eras';
@@ -287,7 +287,7 @@ export function minorPurchases(state: GameState, cityState: CityState): void {
       && minorBuilderWork(state, cityState)) {
     const price = purchaseStep(builderCost(state, cityState.seat) * GOLD_PURCHASE_MULT);
     if (goldAffordable(cityState.treasury, price)
-      && Math.floor(nextRandom(state) * 1000) < (cityState.builderBuyRate ?? 0)) {
+      && randRange(state, 1000) < (cityState.builderBuyRate ?? 0)) {
       const u = spawnUnit(state, 'BUILDER', cityState.centerIndex, cityState.seat);
       if (u) {
         applyTrainingGrants(state, minorCity(cityState), u);
@@ -337,7 +337,7 @@ function minorBuyMilitary(state: GameState, cityState: CityState, units: Unit[])
   const monk = minorMonkOk(state, cityState) && goldAffordable(cityState.faith, monkPrice);
   if (!monk && !goldAffordable(cityState.treasury, MINOR_MILITARY_BUY_FLOOR)) return;
   const recent = cityState.lossTurn !== undefined && state.turn - cityState.lossTurn <= MINOR_LOSS_BUY_TURNS;
-  if (Math.floor(nextRandom(state) * 10000) >= (recent ? bp * MINOR_LOSS_BUY_MULT : bp)) return;
+  if (randRange(state, 10000) >= (recent ? bp * MINOR_LOSS_BUY_MULT : bp)) return;
   if (monk) {
     const u = spawnUnit(state, 'WARRIOR_MONK', cityState.centerIndex, cityState.seat);
     if (u) {
@@ -370,7 +370,7 @@ function minorBuyNaval(state: GameState, cityState: CityState): void {
   if (!id) return;
   const price = purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
   if (!goldAffordable(cityState.treasury, price)) return;
-  if (Math.floor(nextRandom(state) * 10000) >= MINOR_NAVAL_BUY_BP) return;
+  if (randRange(state, 10000) >= MINOR_NAVAL_BUY_BP) return;
   const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
   if (!u) return;
   applyTrainingGrants(state, minorCity(cityState), u);
@@ -444,8 +444,8 @@ function minorBuilders(state: GameState, cityState: CityState): void {
   for (const u of builders) {
     const picks = minorImprovementPicks(state, cityState, u);
     if (picks.length === 0) continue;
-    if (Math.floor(nextRandom(state) * 1000) >= MINOR_BUILDER_RATE_PERMILLE) continue;
-    const [ti, imp] = picks[Math.floor(nextRandom(state) * picks.length)];
+    if (randRange(state, 1000) >= MINOR_BUILDER_RATE_PERMILLE) continue;
+    const [ti, imp] = picks[randRange(state, picks.length)];
     const tile = state.map.tiles[ti];
     u.tileIndex = ti;
     tile.improvement = imp;
@@ -479,9 +479,9 @@ export function minorImprovementPicks(state: GameState, cityState: CityState, bu
 export function minorPlan(state: GameState, cityState: CityState): void {
   if (cityState.armyCap !== undefined) return;
   cityState.buildFrom = MINOR_BUILD_ROWS.map((row) =>
-    (row.from ? row.from[cityState.type][Math.floor(nextRandom(state) * MINOR_BUILD_SLOTS)] : 0));
-  cityState.armyCap = MINOR_ARMY_CAP_SLOTS[Math.floor(nextRandom(state) * MINOR_BUILD_SLOTS)];
-  cityState.builderBuyRate = MINOR_BUILDER_BUY_SLOTS[Math.floor(nextRandom(state) * MINOR_BUILDER_BUY_SLOTS.length)];
+    (row.from ? row.from[cityState.type][randRange(state, MINOR_BUILD_SLOTS)] : 0));
+  cityState.armyCap = MINOR_ARMY_CAP_SLOTS[randRange(state, MINOR_BUILD_SLOTS)];
+  cityState.builderBuyRate = MINOR_BUILDER_BUY_SLOTS[randRange(state, MINOR_BUILDER_BUY_SLOTS.length)];
 }
 
 /** The land (or, with `naval`, the naval) military chassis a research

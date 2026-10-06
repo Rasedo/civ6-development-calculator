@@ -13,9 +13,8 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import {
   spyDestinations, beginTravel, beginMission, missionOffered, tickSpies, spyCity, cityCounterLevels,
-  missionThreshold,
+  missionThreshold, missionDraw, MISSION_SUCCESS_UNDETECTED, MISSION_SUCCESS_MUST_ESCAPE, MISSION_FAIL_UNDETECTED,
 } from '../../../cpu/core/espionage';
-import { nextRandom } from '../../../cpu/core/rand';
 import { spyHeldWith } from '../../../cpu/core/deals';
 import { promoRows } from '../../../cpu/data/promotions';
 import {
@@ -32,9 +31,10 @@ import { PILLAGE_BUILDING_REPAIR_PERCENT } from '../../../cpu/data/constants';
 import { hexDistance } from '../../../world/hex';
 import type { City, GameState, QueueItem } from '../../../cpu/core/types';
 
-/** a seed whose first three d6 draws sum to 18: the measured 3d6 succeeds
- *  UNDETECTED at every threshold a scene below rolls against. */
-const WINS = 634;
+/** a seed whose first draw over the 216 outcomes is the last: the mission's
+ *  weighted roll lands its top band, success UNDETECTED, at every threshold
+ *  a scene below rolls against. */
+const WINS = 144;
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 function spyBit(id: string): number {
   const k = promoRows('ESPIONAGE').findIndex((p) => p.id === id);
@@ -173,17 +173,14 @@ describe('the counterspy defends the district it stands on and the adjacent ones
     // 3 + EnemyLevelProbChange 1 x (the post's level - 1)
     expect(SPY_COUNTERSPY_ROLL).toBe(3);
     expect(SPY_COUNTERSPY_LEVEL_ROLL).toBe(1);
-    // a seed whose 3d6 lands exactly 3 over Siphon Funds' fresh threshold:
-    // success undetected unguarded; a Recruit post (3) leaves 0, a success
-    // that must escape; a post one level up (4) leaves -1, fail undetected
+    // a seed whose one weighted roll lands success undetected unguarded; a
+    // Recruit post (3) a success that must escape; a post one level up (4)
+    // fail undetected
     const t = missionThreshold(SPY_MISSIONS[SPY_M_SIPHON_FUNDS], 0);
+    const at = (seed: number, tt: number) => missionDraw({ rngState: seed } as GameState, tt);
     let seed = 1;
-    for (;; seed++) {
-      const probe = { rngState: seed } as GameState;
-      let r = 0;
-      for (let i = 0; i < 3; i++) r += Math.floor(nextRandom(probe) * 6) + 1;
-      if (r === t + 3) break;
-    }
+    while (!(at(seed, t) === MISSION_SUCCESS_UNDETECTED && at(seed, t + 3) === MISSION_SUCCESS_MUST_ESCAPE
+      && at(seed, t + 4) === MISSION_FAIL_UNDETECTED)) seed++;
     const run = (guardLevel: number | null) => {
       const { state, theirs } = spyState();
       const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', 1);
@@ -228,7 +225,9 @@ describe('the counterspy defends the district it stands on and the adjacent ones
         state.rngState = seed;
         expect(beginMission(state, spy, SPY_M_SIPHON_FUNDS)).toBe(true);
         for (let i = 0; i < turnsOf(SPY_M_SIPHON_FUNDS); i++) tickSpies(state, 0);
-        if (spyHeldWith(state, 0, 1) === 1) {
+        // a catch by the roll's own band rewards the pursuer (an escape's
+        // catch rewards nobody)
+        if (spyHeldWith(state, 0, 1) === 1 && (low.spyLevel ?? 0) + (high.spyLevel ?? 0) > 2) {
           caught = true;
           // the finder 0x52ac80 takes the FIRST post within 1 of the plot
           expect(low.spyLevel).toBe(1);
