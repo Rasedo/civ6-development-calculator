@@ -64,7 +64,7 @@ import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { YIELD_KEYS } from '../../world/types';
-import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, type GreatPersonDef } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_CLASS_DISTRICT, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -520,7 +520,7 @@ export interface History {
  *  Person unit of its claimant and class new in that record), the plot that
  *  unit last stood on, and the turn the records first lacked the unit — its
  *  charges spent. A person listed with no new unit to carry it was spent
- *  before the record. */
+ *  before the record, on its site in the city it spawned in (`spentAtSpawn`). */
 interface RecruitedPerson {
   player: number;
   cls: string;
@@ -848,8 +848,9 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
       && !before.has(`${u.owner}:${u.id}`) && !bound.has(`${u.owner}:${u.id}`));
     const key = unit ? `${unit.owner}:${unit.id}` : null;
     if (key) bound.add(key);
-    const at = unit ? unit.y * W + unit.x : -1;
-    h.people.set(ind, { player, cls: name, unit: key, at, spent: unit ? null : rec.turn, city: cityOwning(rec, at, player) });
+    const seen = unit ? rec : h.last ?? rec;
+    const at = unit ? unit.y * W + unit.x : spentAtSpawn(seen, cat, player, name, ind);
+    h.people.set(ind, { player, cls: name, unit: key, at, spent: unit ? null : rec.turn, city: cityOwning(seen, at, player) });
   }
   for (const p of h.people.values()) {
     if (p.spent !== null || p.unit === null) continue;
@@ -860,6 +861,38 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
     } else p.spent = rec.turn;
   }
   return true;
+}
+
+/**
+ * CIV6 (Game_GreatPeople spawn location, DLL 0x2f6500): a land great person
+ * appears on the centre of its player's most populous city holding a
+ * completed district of the class's own (`GreatPersonClasses.DistrictType`;
+ * the first such city in the player's list on a tie), else on the capital's
+ * centre. A person the records never saw as a unit was recruited and spent
+ * between two records: its charge went to its activation site in that spawn
+ * city — the city's district the person needs, or its centre for a City
+ * Center person. The plot, read off the record before; -1 for a sea person
+ * or a site the spawn city does not hold. (The spawn rule holds for 152 of
+ * 154 newly listed units standing on one of their player's city centres,
+ * runs/h1_duelw1109 .. 1116; the two misses had spent their moves.)
+ */
+function spentAtSpawn(rec: TurnRecord, cat: Catalog, player: number, cls: string, ind: number): number {
+  const person = personOf(cat, ind);
+  const klass = cls as GreatPersonClass;
+  if (!person || klass === 'ADMIRAL' || !GP_CLASS_DISTRICT[klass]) return -1;
+  const holds = (c: TurnRecord['cities'][number], id: DistrictId) => c.districts.find((d) =>
+    d[3] === true && d[4] !== true && engineRowOf(cat, 'district', d[0] as number) === id);
+  let spawn: TurnRecord['cities'][number] | undefined;
+  for (const c of rec.cities) {
+    if (c.owner !== player || !holds(c, GP_CLASS_DISTRICT[klass])) continue;
+    if (!spawn || num(c.pop) > num(spawn.pop)) spawn = c;
+  }
+  spawn ??= rec.cities.find((c) => c.owner === player && bool(c.capital));
+  if (!spawn) return -1;
+  const site = gpSiteOf(person);
+  if (site.site !== 'district') return -1;
+  const d = site.district === 'CITY_CENTER' ? spawn.districts[0] : holds(spawn, site.district);
+  return d ? (d[2] as number) * rec.head.W + (d[1] as number) : -1;
 }
 
 /** The id of `player`'s city owning plot `at` in `rec`, -1 where none does. */
@@ -972,6 +1005,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const [i, g] of h.replay?.gains.get(rec.turn) ?? []) {
     const acc = h.eventYields.get(i) ?? [0, 0, 0, 0];
     h.eventYields.set(i, acc.map((v, k) => v + g[k]));
+  }
+  // a plot the replay's candidate starts lay differently: which ran is not
+  // recorded, so its draw is the plot's gap from then on
+  for (const i of h.replay?.unsure.get(rec.turn) ?? []) {
+    if (!h.eventDraws.has(i)) h.eventDraws.set(i, new Set());
+    h.eventDraws.get(i)!.add(`t${rec.turn} start unknown`);
   }
   // a person spent by this record: a resource it reveals moves its owner's
   // plots this turn
@@ -2899,8 +2938,9 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
  * happiness yields ...), invented luxuries, the spend itself
  * (`Seat.gpActivated`), and the city and district channels on the plot the
  * person's unit last stood on — the city owning it, else the capital. A
- * person spent before any record showed its unit has no plot: a city or
- * district channel of its is the seat's `gp-site` gap. A person outside the
+ * person spent before any record showed its unit stood on its spawn city's
+ * site (`spentAtSpawn`); one with no such plot carries a city or district
+ * channel as the seat's `gp-site` gap. A person outside the
  * roster is the seat's `gp-person` gap.
  */
 function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<number, RecruitedPerson>,

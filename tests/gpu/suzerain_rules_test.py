@@ -371,17 +371,17 @@ def main() -> None:
     _bi = [int(x) for x in sim._suz_mil_bldg.reshape(-1).tolist() if int(x) >= 0]
     for _b in _bi:
         _bl[_b] = False
-    assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "an empty city pays full price"
+    assert float(sim._suz_land_buy_off(0)[0, 0]) == 0.0, "an empty city pays full price"
     _bl[int(sim._suz_mil_bldg[0, 0])] = True
-    assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "one row is 20% off"
+    assert float(sim._suz_land_buy_off(0)[0, 0]) == 20.0, "one row is 20% off"
     if int(sim._suz_mil_bldg[0, 1]) >= 0:
         _bl[int(sim._suz_mil_bldg[0, 1])] = True  # the OTHER half of the same row
-        assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.8) < 1e-12, "the pair is ONE row"
+        assert float(sim._suz_land_buy_off(0)[0, 0]) == 20.0, "the pair is ONE row"
     _bl[int(sim._suz_mil_bldg[1, 0])] = True
     _bl[int(sim._suz_mil_bldg[2, 0])] = True
-    assert abs(float(sim._suz_land_buy_mult(0)[0, 0]) - 0.4) < 1e-12, "three rows are 60% off"
+    assert float(sim._suz_land_buy_off(0)[0, 0]) == 60.0, "three rows are 60% off"
     drop(sim)
-    assert float(sim._suz_land_buy_mult(0)[0, 0]) == 1.0, "the discount outlived the suzerainty"
+    assert float(sim._suz_land_buy_off(0)[0, 0]) == 0.0, "the discount outlived the suzerainty"
     print("ngazargamu ok — 20% a row, the pair sharing one, gone with the suzerainty")
 
     # Hunza's gold: floor(n x 51 + 25) / 256 over the course's n plots

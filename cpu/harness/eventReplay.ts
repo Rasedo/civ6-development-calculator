@@ -16,13 +16,15 @@
 
 import type { GameMap, Tile } from '../../world/types';
 import { UNITS } from '../data/units';
-import { ERUPTION_ROWS, ERUPTION_WEIGHT, ERUPTION_WONDER, FIRST_TIME_OCCURRENCE_BOOST, FLOOD_WEIGHT, STANDARD_MAP_AREA, STORM_EVENTS } from '../data/disasters';
+import { DROUGHT_HEXES, ERUPTION_ROWS, ERUPTION_WEIGHT, ERUPTION_WONDER, FIRE_START_FEATURE, FIRST_TIME_OCCURRENCE_BOOST, FLOOD_WEIGHT, STANDARD_MAP_AREA, STORM_EVENTS } from '../data/disasters';
+import { fireCandidate } from '../core/disasters';
+import { isWater } from '../../world/query';
 import { unitDomain } from '../core/units';
 import { plotAt, P, num, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, recordMap } from './import';
 import { drawsBetween, type Civ6Random } from './civ6Random';
 import {
-  eruptionDraws, floodDraws, floodplainList, newOutcome, replayAtEnd, stormBirth, stormStartPlots, stormWalk,
+  droughtDraws, eruptionDraws, floodDraws, floodplainList, newOutcome, replayAtEnd, stormBirth, stormFootprint, stormStartPlots, stormWalk,
   type EventOutcome, type StormState, type StruckPlot,
 } from './eventDraws';
 
@@ -37,7 +39,7 @@ const STORM_WALKS = 2;
 export interface ReplayedEvent {
   /** `${start turn}:${RandomEvents index}` */
   key: string;
-  family: 'flood' | 'storm' | 'eruption';
+  family: 'flood' | 'storm' | 'eruption' | 'drought' | 'fire' | 'sea';
   /** the turns whose draws placed it (a storm's birth and its walks) */
   turns: number[];
 }
@@ -50,12 +52,21 @@ export interface EventReplay {
   gains: Map<number, Map<number, number[]>>;
   /** each witnessed turn's outcome: `ok`, or why the step was not placed */
   turns: Map<number, string>;
+  /** by T, the plots whose fertility the starts that reproduce the step lay
+   *  differently, or that a storm laid after such a turn: `gains` holds the
+   *  latest start's */
+  unsure: Map<number, number[]>;
 }
 
 type EventRow = number[];
 
 const FLOODS = ['RANDOM_EVENT_FLOOD_MODERATE', 'RANDOM_EVENT_FLOOD_MAJOR', 'RANDOM_EVENT_FLOOD_1000_YEAR'];
-const NO_DRAW_EVENTS = ['RANDOM_EVENT_DROUGHT_MAJOR', 'RANDOM_EVENT_DROUGHT_EXTREME'];
+const DROUGHTS = ['RANDOM_EVENT_DROUGHT_MAJOR', 'RANDOM_EVENT_DROUGHT_EXTREME'];
+/** the fires, each with the feature it starts on */
+const FIRE_EVENTS = ['RANDOM_EVENT_FOREST_FIRE', 'RANDOM_EVENT_JUNGLE_FIRE'];
+const FIRE_EVENT_FEATURE = ['WOODS', 'RAINFOREST'];
+/** the draws a fire's birth takes after its start plot (LAB: not read in the DLL) */
+const FIRE_BIRTH_DRAWS = 6;
 
 /** the volcano roll's draws between the walks and the event roll: one, or
  *  none (the roll's gate 0x335040 is not read to the end), or two (a woken
@@ -137,7 +148,7 @@ interface Step {
 }
 
 export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventReplay {
-  const result: EventReplay = { events: new Map(), gains: new Map(), turns: new Map() };
+  const result: EventReplay = { events: new Map(), gains: new Map(), turns: new Map(), unsure: new Map() };
   const names = cat.randomEvents ?? [];
   const byTurn = new Map(recs.map((r) => [r.turn, r]));
   const seeds = new Map<string, number>();
@@ -165,6 +176,8 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
   // the list each river was found to hold
   const riverHolds = new Map<number, string>();
   let live: { storm: StormState; key: string }[] = [];
+  // the events a turn with an unknown start drew for
+  const doubtful = new Set<string>();
   let volcano: VolcanoDraws = 1;
   const turns = [...byTurn.keys()].sort((a, b) => a - b);
   for (const T of turns) {
@@ -221,7 +234,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
         }
         parts.push((rng, step) => {
           step.born = stormBirth(rng, map, storm, T, ctx, step.out);
-          step.bornOk = step.born?.at === at && step.born.added === num(e[4]);
+          step.bornOk = step.born?.at === at && step.born.added === num(e[4]) && (e[13] === undefined || step.born.dir === num(e[13]));
           return step.bornOk;
         });
       } else if (eruption >= 0 && name.startsWith('RANDOM_EVENT_VOLCANO')) {
@@ -234,8 +247,42 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
           for (const [i, g] of soil) { addGain(step.soil, i, g); n += g[0] + g[1] + g[2] + g[3]; }
           return n === num(e[4]);
         });
-      } else if (NO_DRAW_EVENTS.includes(name) && num(e[3]) < 0) {
+      } else if (DROUGHTS.includes(name) && num(e[3]) < 0) {
         // a drought that found no start plot draws nothing after the roll
+        continue;
+      } else if (DROUGHTS.includes(name)) {
+        const at = num(e[3]);
+        const centres = new Set(before.cities.map((c) => c.y * before.head.W + c.x));
+        const ends = [...first.values()].filter((x) => DROUGHTS.includes(names[x[1]] ?? '') && x[0] < T && num(x[12]) >= T
+          && map.tiles[num(x[3])]).map((x) => {
+          const plots = stormFootprint(map, map.tiles[num(x[3])], DROUGHT_HEXES).filter((t) => !isWater(t));
+          return plots[plots.length - 1];
+        });
+        parts.push((rng, step) => {
+          const live = new Set(step.st.flatMap((s) => [...s.struck]));
+          const start = droughtDraws(rng, map, centres, live, ends);
+          return start === at;
+        });
+      } else if (FIRE_EVENTS.includes(name)) {
+        // a fire: one uniform draw over the plots of its feature
+        // (`fireCandidate`, ascending), then FIRE_BIRTH_DRAWS more — a LAB fit,
+        // 5 of 5 fires on 1116 land their recorded start plot with exactly
+        // six draws after the pick
+        const at = num(e[3]);
+        const row = FIRE_START_FEATURE.indexOf(FIRE_EVENT_FEATURE[FIRE_EVENTS.indexOf(name)]);
+        const cands = map.tiles.filter((t) => fireCandidate(t, row));
+        if (!cands.length) {
+          if (at >= 0) unsupported = `${name} t${T}: the record's plot is no candidate`;
+          continue;
+        }
+        parts.push((rng) => {
+          const pick = cands[rng.get(cands.length, 'Pick One Off Start Plot')].index;
+          for (let i = 0; i < FIRE_BIRTH_DRAWS; i++) rng.get(100, 'fire birth draw');
+          return pick === at;
+        });
+      } else if (name.startsWith('RANDOM_EVENT_SEA_LEVEL_RISE')) {
+        // the sea's rise draws nothing after the roll (2 of 2 rises on 1116
+        // close their step on the witness this way)
         continue;
       } else {
         unsupported = `${name} t${T}: its draws are not modelled`;
@@ -245,6 +292,8 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
     // the step, on each volcano-roll reading, the one the last turn used first
     const tryModes: VolcanoDraws[] = [volcano, ...([1, 0, 2] as VolcanoDraws[]).filter((v) => v !== volcano)];
     let chosen: { k: number; value: Step } | undefined;
+    const alts: Step[] = [];
+    let slackUsed = 0;
     // draws the records cannot show (a unit that came and went on a struck
     // plot) fall in a flood's or an eruption's damage pass, before its yields
     const struckEvent = news.some((e) => FLOODS.includes(names[e[1]] ?? '') || (names[e[1]] ?? '').startsWith('RANDOM_EVENT_VOLCANO'));
@@ -267,20 +316,38 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog): EventRe
         return c.value.roll >= lo && c.value.roll < hi;
       }) && c.value.st.every((s, i) => {
         const row = (after.events as EventRow[] | undefined)?.find((x) => `${x[0]}:${x[1]}` === live[i].key);
-        return !row || (num(row[2]) === s.at && num(row[4]) === s.added);
+        return !row || (num(row[2]) === s.at && num(row[4]) === s.added && (row[13] === undefined || num(row[13]) === s.dir));
       }));
-      if (fits.length) {
+      // the unrecorded draws are a last resort: a start needing more of them
+      // than the chosen one is no candidate
+      if (chosen && extra + tail > slackUsed) break;
+      for (const f of fits) alts.push(f.value);
+      if (fits.length && !chosen) {
         chosen = fits[0];
+        slackUsed = extra + tail;
         if (live.length) volcano = v;
-        break;
       }
     }
     if (!chosen) { fail('no start reproduces the step'); continue; }
     result.turns.set(T, 'ok');
     const step = chosen.value;
-    for (const [i, [f, p]] of step.out.gains) addGain(step.soil, i, [f, p, 0, 0]);
+    for (const s of alts) for (const [i, [f, p]] of s.out.gains) addGain(s.soil, i, [f, p, 0, 0]);
     const g = step.soil;
     if (g.size) result.gains.set(T, g);
+    // the plots where the starts that reproduce the step lay different
+    // fertility, and every plot a storm whose earlier turn was so lays: the
+    // draws before the step are not recorded, so which start ran is not known
+    const inherited = live.some((s) => doubtful.has(s.key));
+    const plots = new Set<number>();
+    for (const s of alts) for (const i of s.soil.keys()) plots.add(i);
+    const unsure = [...plots].filter((i) => inherited || alts.some((s) => (s.soil.get(i) ?? []).join() !== (g.get(i) ?? []).join()));
+    const walks = (s: Step) => s.st.map((x) => `${x.at}:${[...x.struck].sort((p, q) => p - q).join()}`).join('|')
+      + `|${s.born ? `${s.born.at}:${[...s.born.struck].join()}` : ''}`;
+    if (unsure.length) result.unsure.set(T, unsure);
+    if (unsure.length || alts.some((s) => walks(s) !== walks(step))) {
+      for (const s of live) doubtful.add(s.key);
+      for (const e of news) doubtful.add(`${e[0]}:${e[1]}`);
+    }
     for (const s of live) mark(s.key, 'storm', T, g);
     for (const e of news) {
       const key = `${e[0]}:${e[1]}`;
@@ -401,6 +468,9 @@ function rollBands(first: Map<string, EventRow>, names: readonly string[], rec: 
 function familyOf(name: string): ReplayedEvent['family'] {
   if (FLOODS.includes(name)) return 'flood';
   if (STORM_EVENTS.some((s) => `RANDOM_EVENT_${s.id}` === name)) return 'storm';
+  if (DROUGHTS.includes(name)) return 'drought';
+  if (FIRE_EVENTS.includes(name)) return 'fire';
+  if (name.startsWith('RANDOM_EVENT_SEA_LEVEL_RISE')) return 'sea';
   return 'eruption';
 }
 

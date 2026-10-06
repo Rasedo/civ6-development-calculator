@@ -192,6 +192,24 @@ random person of a class from the first chronological era. The 9 turn-opening
 draws are that queue or a grant's replacement at another seat's turn end —
 not separated here. The victory / turn-limit order: unread.
 
+## H-1: the great person's spawn — READ
+
+The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70
+its district, +0x98 its unit) and the unit's domain (0xadd590 on unit info
++0x1c). A land unit (domain 2): walk the player's cities (+0x12f0 -> +0xd8,
+list order); a city holding the class's district (0x1aec20 on city +0x1a48
+with (district, true, 0) — completed) and of greater population (+0x588,
+strict >, so the first city wins a tie) takes the spawn, on its centre
+(+0x158); none, the capital's centre (0x36f460), else the player's start
+plot (+0x1398). A sea unit (domain 0) walks the player's districts, the
+most populous city's water district plot. Confirmed on runs/h1_duelw1109 ..
+1116: 152 of 154 newly listed units standing on one of their player's city
+centres stand on the predicted city's (the two misses had spent their
+moves). The importer
+(`spentAtSpawn`) takes a person spent before any record showed its unit
+to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the
+city's Districts housing part 3 -> 5 in the next record agrees).
+
 ## H-1: the draws per event (`dll_rng.py`)
 
 One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.

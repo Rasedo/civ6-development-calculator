@@ -402,12 +402,12 @@ export function suzerainProjectMult(state: GameState, seat: number): number {
   return suzerainEffect(state, seat, 'projectProduction') ? 1 + HONG_KONG_PROJECT_PCT / 100 : 1;
 }
 
-/** CIV6 (Ngazargamu): land units are `NGAZARGAMU_PURCHASE_PCT` cheaper to buy
- *  with gold PER Encampment building standing in the buying city — Barracks or
- *  Stable answer one row between them. */
-export function suzerainLandPurchaseMult(state: GameState, seat: number, city: City): number {
-  if (!suzerainEffect(state, seat, 'landPurchaseDiscount')) return 1;
-  return Math.max(0, 1 - (NGAZARGAMU_PURCHASE_PCT / 100) * militaryBuildingRows(city));
+/** CIV6 (Ngazargamu): the whole percent a land unit is cheaper to buy in
+ *  `city` — `NGAZARGAMU_PURCHASE_PCT` PER Encampment building standing in the
+ *  buying city, Barracks or Stable one row between them; at most 100. */
+export function suzerainLandPurchaseOffPct(state: GameState, seat: number, city: City): number {
+  if (!suzerainEffect(state, seat, 'landPurchaseDiscount')) return 0;
+  return Math.min(100, NGAZARGAMU_PURCHASE_PCT * militaryBuildingRows(city));
 }
 
 /** How many of the Encampment building requirement sets the city meets —

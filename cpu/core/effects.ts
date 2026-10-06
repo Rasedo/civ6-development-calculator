@@ -1882,11 +1882,14 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
 
 /** CIV6 (Democracy, GOVERNMENTBONUS_GOLD_PURCHASES): the percent off every
  *  GOLD purchase — a building, a unit, a settler — applied
- *  where the purchase is priced and paid. READING: not an upgrade, a tile or a
- *  patronage. Then the five-step floor. `_gold_price` is the twin. */
-export function goldPrice(state: GameState, seat: number, price: number): number {
-  const d = getModifiers(state, seat).goldBuyDiscountPct;
-  return purchaseStep(d ? price * (1 - d / 100) : price);
+ *  where the purchase is priced and paid, summed with the item's own percents
+ *  off (`offPct`: Ngazargamu — runs/h1_duelw1116 t249-250, Xian's Mechanized
+ *  Infantry at 1300 under Democracy and three rows quotes 325, 15 + 60 off).
+ *  READING: not an upgrade, a tile or a patronage. Then the five-step floor.
+ *  `_gold_price` is the twin. */
+export function goldPrice(state: GameState, seat: number, price: number, offPct = 0): number {
+  const d = getModifiers(state, seat).goldBuyDiscountPct + offPct;
+  return purchaseStep(d ? price * Math.max(0, 1 - d / 100) : price);
 }
 
 /** CIV6 (PURCHASE_DIVISOR 5, measured live — lab 2 scene G, 302 of 302 priced

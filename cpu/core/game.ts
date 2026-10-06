@@ -18,7 +18,7 @@ import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlan
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { minorCity, suzerainEffect, suzerainLandPurchaseMult } from './cityStates';
+import { minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
@@ -651,13 +651,7 @@ export function unitBuyOffPct(state: GameState, seat: number, unitType: string, 
   const eb = rel?.founded && rel.enhancer ? ENHANCER_BELIEFS[rel.enhancer]?.effects : undefined;
   let off = eb?.unitBuyOffPct?.[unitType] ?? 0;
   if (unitType === 'GURU') off += seatWonderSum(state, seat, 'guruBuyOffPct');
-  // the domain-wide row passes over the chassis bought with Faith alone
-  // (runs/h1_duelw1103 Jiaodong t190-210: its Rock Band at full price beside
-  // its land units at 20% a row off)
-  const def = UNITS[unitType];
-  if (city && unitIsLandDomain(unitType) && !def?.faithOnly && !def?.naturalist) {
-    off += Math.round((1 - suzerainLandPurchaseMult(state, seat, city)) * 100);
-  }
+  if (city) off += ngazargamuOffPct(state, seat, unitType, city);
   return off;
 }
 
@@ -733,7 +727,14 @@ export function unitBuyBase(state: GameState, unitType: string, cost: number): n
   return m === 1 ? cost : Math.round(cost * m) / m;
 }
 
-export function unitPurchaseCost(state: GameState, unitType: string, seat: number, city?: City): number {
+/** The gold price `seat` pays for a unit bought in `city`: its purchase cost
+ *  with the city's percent off summed into the seat's. */
+export function unitGoldPrice(state: GameState, unitType: string, seat: number, city: City): number {
+  return goldPrice(state, seat, unitPurchaseCost(state, unitType, seat), ngazargamuOffPct(state, seat, unitType, city));
+}
+
+/** A unit's gold purchase cost before any percent off. */
+export function unitPurchaseCost(state: GameState, unitType: string, seat: number): number {
   const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat)
     : unitBuyBase(state, unitType, UNITS[unitType]?.cost ?? 0);
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
@@ -743,9 +744,19 @@ export function unitPurchaseCost(state: GameState, unitType: string, seat: numbe
   // Engineer, the Drone, the Supply Convoy and the Anti-Air Gun at half with
   // every combat unit; the Builder, Settler, Trader, Spy and Naturalist not)
   const merc = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_GOLD) : 1;
-  // CIV6 (Ngazargamu): 20% off per Encampment building in the BUYING city
-  const suz = city && unitIsLandDomain(unitType) ? suzerainLandPurchaseMult(state, seat, city) : 1;
-  return base * GOLD_PURCHASE_MULT * m * merc * suz * landUnitPriceMult(state, seat, unitType);
+  return base * GOLD_PURCHASE_MULT * m * merc * landUnitPriceMult(state, seat, unitType);
+}
+
+/** CIV6 (Ngazargamu, MODIFIER_PLAYER_CITIES_ADJUST_UNITS_PURCHASE_COST,
+ *  UnitDomain DOMAIN_LAND): the percent off a unit bought in `city` — a land
+ *  unit of a military formation, the support chassis with the combat ones;
+ *  the civilians pay full price (runs/h1_duelw1116 Xian t188-250, three rows:
+ *  the Builder 260 at Cost 65 and the Trader 260 at 65 beside the Mechanized
+ *  Infantry 520 at 1300 and the Supply Convoy 360 at 900; runs/h1_duelw1103
+ *  Jiaodong t190-210: its Rock Band at full price beside its land units at 20%
+ *  a row off). */
+function ngazargamuOffPct(state: GameState, seat: number, unitType: string, city: City): number {
+  return unitIsLandDomain(unitType) && mercenaryUnit(unitType) ? suzerainLandPurchaseOffPct(state, seat, city) : 0;
 }
 
 /** Buy a settler with gold (cost scales like trained settlers). The unit

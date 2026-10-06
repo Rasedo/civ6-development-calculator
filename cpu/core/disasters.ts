@@ -605,7 +605,7 @@ export function meteorCandidate(t: Tile, camps: ReadonlySet<number>): boolean {
 
 /** May fire row `row` start on this plot — a live plot of its feature above
  *  the sea? The same test is the spread's (`fireTurn`). */
-function fireCandidate(t: Tile, row: number): boolean {
+export function fireCandidate(t: Tile, row: number): boolean {
   return t.feature === FIRE_START_FEATURE[row] && !t.submerged;
 }
 

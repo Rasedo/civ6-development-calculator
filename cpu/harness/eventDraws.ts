@@ -8,11 +8,12 @@
  */
 
 import type { GameMap, Tile } from '../../world/types';
-import { neighborTile } from '../../world/hex';
+import { hexDistance, neighborTile } from '../../world/hex';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
-import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, stormFamilyAt } from '../data/disasters';
+import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_HEXES, DROUGHT_SPACING, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
+import { droughtCandidate } from '../core/disasters';
 
 /** GlobalParameters MAP_MAX_FLOODPLAIN_SIZE / MAP_MIN_FLOODPLAIN_SIZE as the
  *  map scripts pass them to TerrainBuilder.GenerateFloodplains
@@ -253,6 +254,9 @@ export interface StormState {
   struck: Set<number>;
   /** the yields its strikes have added (the event's FertilityAdded) */
   added: number;
+  /** the direction its last "Storm Direction Preview" drew (a DirectionTypes
+   *  index, the event's recorded direction), -1 where no row was drawn */
+  dir: number;
 }
 
 /** What one turn's draws laid on the map. */
@@ -327,10 +331,12 @@ function windsAt(map: GameMap, t: Tile): { plot: Tile | undefined; weight: numbe
 }
 
 /** "Storm Direction Preview" (0x28d1f0): one weighted draw over the rows at
- *  the plot's latitude, whatever lies that way */
-function stormPreview(rng: Civ6Random, map: GameMap, at: number): void {
-  const rows = windsAt(map, map.tiles[at]);
-  if (rows.length) pickWeighted(rng, rows.map((r) => r.weight), 'Storm Direction Preview');
+ *  the plot's latitude, whatever lies that way; the row's direction, -1
+ *  where the latitude holds none */
+function stormPreview(rng: Civ6Random, map: GameMap, at: number): number {
+  const lat = gameLatitude(map.tiles[at].row, map.height);
+  const rows = WIND_ROWS.filter((w) => w.lo <= lat && lat <= w.hi);
+  return rows.length ? rows[pickWeighted(rng, rows.map((r) => r.weight), 'Storm Direction Preview')].dir : -1;
 }
 
 /**
@@ -358,8 +364,8 @@ export function stormBirth(rng: Civ6Random, map: GameMap, ev: number, turn: numb
   ctx: (plot: number) => StruckPlot, out: EventOutcome): StormState | undefined {
   const plots = stormStartPlots(map, ev);
   if (!plots.length) return undefined;
-  const storm: StormState = { event: ev, start: turn, at: plots[rng.get(plots.length, 'Pick Storm Start Plot')].index, struck: new Set(), added: 0 };
-  stormPreview(rng, map, storm.at);
+  const storm: StormState = { event: ev, start: turn, at: plots[rng.get(plots.length, 'Pick Storm Start Plot')].index, struck: new Set(), added: 0, dir: -1 };
+  storm.dir = stormPreview(rng, map, storm.at);
   rng.get(1, 'storm name');
   // the record is stored before this strike, which marks a copy: the stored
   // storm's struck list starts empty
@@ -393,7 +399,7 @@ export function stormWalk(rng: Civ6Random, map: GameMap, storm: StormState, turn
     storm.at = to.index;
     stormStrike(rng, map, storm, pct, ctx, out);
   }
-  stormPreview(rng, map, storm.at);
+  storm.dir = stormPreview(rng, map, storm.at);
 }
 
 /** an eruption row's damage rows in XML order: each kind with its chance in
@@ -464,6 +470,32 @@ export function eruptionDraws(rng: Civ6Random, map: GameMap, plots: readonly Til
  *  event's own draws — the last things the turn draws). Every start where,
  *  run there, the replay takes exactly the draws left to the witness, the
  *  latest first. */
+/**
+ * A NEW DROUGHT's draws (`droughtStart` / `drought` in core/disasters.ts):
+ * "Pick Drought Start Plot" (0x287e80), one weighted draw over every map
+ * plot `droughtCandidate` admits — `centres` the live city centres, `live`
+ * the plots the live storms have struck — each weighing 1 + min(its hex
+ * distance to the nearest live drought's last footprint plot (`ends`),
+ * `DROUGHT_SPACING`); then one draw on each land plot of its footprint. The
+ * start plot's index, -1 where no plot qualifies (no draw).
+ */
+export function droughtDraws(rng: Civ6Random, map: GameMap, centres: ReadonlySet<number>, live: ReadonlySet<number>,
+  ends: readonly Tile[]): number {
+  const cands: Tile[] = [];
+  const weights: number[] = [];
+  for (const t of map.tiles) {
+    if (!droughtCandidate(map, t, centres, live)) continue;
+    let d: number = DROUGHT_SPACING;
+    for (const e of ends) d = Math.min(d, hexDistance(map, t.col, t.row, e.col, e.row));
+    cands.push(t);
+    weights.push(1 + d);
+  }
+  if (!cands.length) return -1;
+  const at = cands[pickWeighted(rng, weights, 'Pick Drought Start Plot')];
+  for (const t of stormFootprint(map, at, DROUGHT_HEXES)) if (!isWater(t)) rng.get(100, 'Pillage Improvement Chance');
+  return at.index;
+}
+
 export function replayAtEnd<T>(from: number, draws: number, replay: (rng: Civ6Random) => T): { k: number; value: T }[] {
   const states = [from >>> 0];
   for (let i = 0; i < draws; i++) states.push(lcgStep(states[i]));

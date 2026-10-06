@@ -35,7 +35,7 @@ import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitPurchaseCost, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
+import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn, buildingFullCost } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
@@ -391,7 +391,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         }
         const price = id === 'SETTLER'
           ? goldPrice(state, city.seat, settlerCost(state, city.seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, city.seat))
-          : goldPrice(state, city.seat, unitPurchaseCost(state, id, city.seat, city));
+          : unitGoldPrice(state, id, city.seat, city);
         buyPush(`buy.unitGold`, price === num(gold), num(gold), price, { unit: id });
       } else if (kind === 'D') {
         const id = engineRowOf(cat, 'district', idx) as DistrictId | null;

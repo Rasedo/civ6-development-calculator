@@ -17,7 +17,7 @@ import { tradeCourse, tradeReach } from './tradePath';
 import { isExplored } from './fog';
 import {
   buildingFaithCost, faithBuyableClass, faithBuysLandUnits, goldAffordable, naturalistCost, rockBandCost,
-  settlerCost, tilePurchaseCost, unitFaithCost, unitFaithPrice, unitPurchaseCost, unitsAcquired, wallsGoldBlocked, buildingPurchaseCost } from './game';
+  settlerCost, tilePurchaseCost, unitFaithCost, unitFaithPrice, unitGoldPrice, unitsAcquired, wallsGoldBlocked, buildingPurchaseCost } from './game';
 import { goldenDedication, monumentalityBuyMult } from './eras';
 import { builderCost, goldBuyableUnits, purchaseSpotBlocked, trainableUnits } from './units';
 import { hasMet, isSuzerain } from './cityStates';
@@ -319,11 +319,11 @@ export function buyContext(state: GameState, seat: number): BuyContext {
   out.settler_ok = spawn.population >= 2
     && !purchaseSpotBlocked(state, spawn, seat, 'SETTLER')
     && goldAffordable(treasury, goldPrice(state, seat, settlerCost(state, seat) * GOLD_PURCHASE_MULT * monumentalityBuyMult(state, seat)));
-  // kind 2, the gold military unit — under two per city, `unitPurchaseCost`
+  // kind 2, the gold military unit — under two per city, `unitGoldPrice`
   // being the price the applier charges
   out.unit_ok = armyCount(state, actor) < cities.length * 2
     && goldBuyableUnits(state, seat).some((def) => !purchaseSpotBlocked(state, spawn, seat, def.id)
-      && goldAffordable(treasury, goldPrice(state, seat, unitPurchaseCost(state, def.id, seat, spawn))));
+      && goldAffordable(treasury, unitGoldPrice(state, def.id, seat, spawn)));
   // kind 3, the tile — the FIRST city with a border pick names it, and an
   // unaffordable pick ends the search. The seat's whole yield context, as the
   // applier's own pick reads it.

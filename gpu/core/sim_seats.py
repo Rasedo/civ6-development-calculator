@@ -2072,22 +2072,23 @@ class SimSeats:
             # THE FAITH RUNG sells the same class out of the other purse. The
             # SCOUT skip below is the GOLD ladder's own preference, not a rule,
             # so it does not reach here.
-            _ngz_f = self._suz_land_buy_mult(row).gather(1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
+            _ngz_f = self._suz_land_buy_off(row).gather(1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
             return mil & self._afford(self.civ_faith[:, row].unsqueeze(1),
                                       self._faith_price(row, js_round(self._unit_buy_base() * self.rules.faith_purchase_mult),
-                                                        self._ngz_off(_ngz_f)))
+                                                        _ngz_f))
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
         # MERCENARY COMPANIES moves the GOLD price of a MILITARY unit, and
         # every column offered here is one.
         merc = self._congress_unit_cost_mult(self._cur_gold).unsqueeze(1)
         # CIV6 (Ngazargamu): the BUYING city's Encampment buildings discount a
-        # land unit's gold price. Every column offered here is a land unit.
-        _ngz = self._suz_land_buy_mult(row).gather(
+        # land unit's gold price, its percent summed into the seat's. Every
+        # column offered here is a land unit.
+        _ngz = self._suz_land_buy_off(row).gather(
             1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
         afford = self._afford(self.civ_treasury[:, row].unsqueeze(1),
                               self._gold_price(row, self._unit_buy_base() * self.rules.gold_purchase_mult
-                                               * merc * _ngz * self._land_unit_price_mult(row)))
+                                               * merc * self._land_unit_price_mult(row), _ngz))
         return mil & afford
 
     def _seat_tile_unclaimed(self, tc: torch.Tensor) -> torch.Tensor:
@@ -2440,10 +2441,6 @@ class SimSeats:
             off = off + self._seat_wonder_sum(row, self._wond_guru_off)
         return off
 
-    def _ngz_off(self, mult: torch.Tensor) -> torch.Tensor:
-        """`unitBuyOffPct`'s city half: Ngazargamu's multiplier as percent off."""
-        return torch.round((1 - mult) * 100)
-
     def _seat_levy_candidate(self, row: int, active: torch.Tensor):
         """Buy-kind 7: the LEVY candidate — the RULE half only (this seat
         suzerain, the army not already levied and standing, the price
@@ -2772,8 +2769,8 @@ class SimSeats:
                     self._raise_best_melee(row, landed_u, pick_ty)
                     price_u =self._gold_price(row, self._unit_buy_base().gather(1, pick_ty.clamp(min=0).unsqueeze(1)).squeeze(1) * mult
                                                * self._congress_unit_cost_mult(self._cur_gold)
-                                               * self._suz_land_buy_mult(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1)
-                                               * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
+                                               * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1),
+                                               self._suz_land_buy_off(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1))
                     self.civ_treasury[:, row] = torch.where(landed_u, self.civ_treasury[:, row] - price_u, self.civ_treasury[:, row])
                     for _ui, _sl, _c in self._res_slot_units:
                         self._charge_unit_resource(row, landed_u & (pick_ty == _ui), _ui)
@@ -2980,7 +2977,7 @@ class SimSeats:
             bu = ub.clamp(min=0, max=self.NU - 1)
             cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row), faith=True)
             price_u = self._faith_price(row, js_round(self._unit_buy_base().gather(1, bu.unsqueeze(1)).squeeze(1) * self.rules.faith_purchase_mult),
-                                        self._ngz_off(self._suz_land_buy_mult(row)[bidx, ju]))
+                                        self._suz_land_buy_off(row)[bidx, ju])
             buy_u = (active & ext & (uj >= 0) & (ub >= 0) & self.city_alive[bidx, row, ju]
                      & self._seat_faith_unit_grant(row) & cand_u[bidx, bu]
                      & self._afford(self.civ_faith[:, row], price_u))
@@ -5586,13 +5583,14 @@ class SimSeats:
         peace = ~self.war[:, row, : self.n_majors].any(dim=1)
         return (self._suz_effect(row, self._suz_c_sci_peace) & peace).double() * self._suz_sci_pct
 
-    def _suz_land_buy_mult(self, row: int, cols: slice | None = None) -> torch.Tensor:
-        """`suzerainLandPurchaseMult`'s twin, [B, RC] f64. CIV6 (Ngazargamu):
-        a land unit is `purchasePct` cheaper per Encampment building row the
-        BUYING city holds — Barracks and Stable are one row between them."""
+    def _suz_land_buy_off(self, row: int, cols: slice | None = None) -> torch.Tensor:
+        """`suzerainLandPurchaseOffPct`'s twin, [B, RC] f64. CIV6 (Ngazargamu):
+        a land unit is `purchasePct` percent cheaper per Encampment building
+        row the BUYING city holds — Barracks and Stable are one row between
+        them — at most 100."""
         sl = cols if cols is not None else slice(None)
         bl = self.city_bldg[:, row, sl]  # [B, C, NB]
-        out = torch.ones(bl.shape[0], bl.shape[1], dtype=torch.float64, device=self.device)
+        out = torch.zeros(bl.shape[0], bl.shape[1], dtype=torch.float64, device=self.device)
         if self._suz_c_land_buy < 0:
             return out
         on = self._suz_effect(row, self._suz_c_land_buy)
@@ -5600,7 +5598,7 @@ class SimSeats:
             return out
         rows = self._mil_bldg_rows(bl)
         return torch.where(on.unsqueeze(1),
-                           (1.0 - (self._suz_buy_pct / 100.0) * rows).clamp(min=0.0), out)
+                           (self._suz_buy_pct * rows).clamp(max=100.0), out)
 
     def _mil_bldg_rows(self, bl: torch.Tensor) -> torch.Tensor:
         """[..] f64 — how many Encampment building requirement sets each city

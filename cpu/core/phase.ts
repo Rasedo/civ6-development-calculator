@@ -63,7 +63,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, unitProdCostMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitPurchaseCost, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, unitProdCostMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -3257,7 +3257,7 @@ export function seatPhase(state: GameState): void {
           // trained onto the centre earlier this turn blocks the buy
           // (9027 t196 spilled a Warrior to a neighbour on TS alone)
           if (purchaseSpotBlocked(state, buyCity, actor.seat, def.id)) continue;
-          if (!goldAffordable(actor.treasury ?? 0, goldPrice(state, actor.seat, unitPurchaseCost(state, def.id, actor.seat, buyCity)))) continue;
+          if (!goldAffordable(actor.treasury ?? 0, unitGoldPrice(state, def.id, actor.seat, buyCity))) continue;
           if (def.combat > pickCombat) {
             pickCombat = def.combat;
             pickId = def.id;
@@ -3265,7 +3265,7 @@ export function seatPhase(state: GameState): void {
         }
         if (pickId) {
           const spawnCity = actor.cities.find((c) => c.isCapital) ?? actor.cities[0];
-          const price = goldPrice(state, actor.seat, unitPurchaseCost(state, pickId, actor.seat, spawnCity));
+          const price = unitGoldPrice(state, pickId, actor.seat, spawnCity);
           const u = spawnUnit(state, pickId, spawnCity.centerIndex, actor.seat);
           if (u) {
             actor.treasury = (actor.treasury ?? 0) - price;

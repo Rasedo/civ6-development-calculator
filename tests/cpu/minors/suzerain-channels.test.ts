@@ -8,12 +8,12 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
-import { getModifiers } from '../../../cpu/core/effects';
+import { getModifiers, goldPrice } from '../../../cpu/core/effects';
 import { cityDistrictYields, onOrNextToShallowWater } from '../../../cpu/core/yields';
 import { luxuryAmenities } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
-import { unitPurchaseCost } from '../../../cpu/core/game';
-import { suzerainProjectMult, suzerainLandPurchaseMult } from '../../../cpu/core/cityStates';
+import { unitGoldPrice, unitPurchaseCost } from '../../../cpu/core/game';
+import { suzerainProjectMult, suzerainLandPurchaseOffPct } from '../../../cpu/core/cityStates';
 import { routeChainGold, routeLengthGold, routeDestLuxuryGold } from '../../../cpu/core/trade';
 import {
   CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING,
@@ -204,23 +204,20 @@ describe("Hong Kong's projects and Ngazargamu's barracks", () => {
 
   it('takes 20% off a land unit per Encampment building in the buying city', () => {
     const { state, city } = scene();
-    const full = unitPurchaseCost(state, 'WARRIOR', 0, city);
+    const full = unitPurchaseCost(state, 'WARRIOR', 0);
     suzerainOf(state, 'landPurchaseDiscount');
-    expect(suzerainLandPurchaseMult(state, 0, city)).toBe(1);
+    expect(suzerainLandPurchaseOffPct(state, 0, city)).toBe(0);
     city.buildings.push('BARRACKS');
-    expect(suzerainLandPurchaseMult(state, 0, city))
-      .toBeCloseTo(1 - NGAZARGAMU_PURCHASE_PCT / 100, 9);
+    expect(suzerainLandPurchaseOffPct(state, 0, city)).toBe(NGAZARGAMU_PURCHASE_PCT);
     city.buildings.push('ARMORY', 'MILITARY_ACADEMY');
     // three rows, 60% off — Barracks and Stable answer ONE row between them
-    expect(suzerainLandPurchaseMult(state, 0, city))
-      .toBeCloseTo(1 - 3 * NGAZARGAMU_PURCHASE_PCT / 100, 9);
+    expect(suzerainLandPurchaseOffPct(state, 0, city)).toBe(3 * NGAZARGAMU_PURCHASE_PCT);
     city.buildings.push('STABLE');
-    expect(suzerainLandPurchaseMult(state, 0, city))
-      .toBeCloseTo(1 - 3 * NGAZARGAMU_PURCHASE_PCT / 100, 9);
-    expect(unitPurchaseCost(state, 'WARRIOR', 0, city))
-      .toBeCloseTo(full * (1 - 3 * NGAZARGAMU_PURCHASE_PCT / 100), 6);
-    // a NAVAL chassis is outside the modifier's DOMAIN_LAND gate
-    expect(unitPurchaseCost(state, 'GALLEY', 0, city))
-      .toBeCloseTo(unitPurchaseCost(state, 'GALLEY', 0), 9);
+    expect(suzerainLandPurchaseOffPct(state, 0, city)).toBe(3 * NGAZARGAMU_PURCHASE_PCT);
+    expect(unitGoldPrice(state, 'WARRIOR', 0, city)).toBe(goldPrice(state, 0, full, 3 * NGAZARGAMU_PURCHASE_PCT));
+    // a NAVAL chassis is outside the modifier's DOMAIN_LAND gate, a civilian
+    // outside its military formations
+    expect(unitGoldPrice(state, 'GALLEY', 0, city)).toBe(goldPrice(state, 0, unitPurchaseCost(state, 'GALLEY', 0)));
+    expect(unitGoldPrice(state, 'BUILDER', 0, city)).toBe(goldPrice(state, 0, unitPurchaseCost(state, 'BUILDER', 0)));
   });
 });

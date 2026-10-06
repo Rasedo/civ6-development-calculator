@@ -227,14 +227,19 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     }
   }
 
+  // CIV6 (Torres del Paine): the terrain yields double ONCE, however many of
+  // the wonder's plots the tile touches (runs/h1_duelw1116 Beijing, plots 721
+  // and 809 beside both of its plots: plains 2/2, forest 2/3)
+  let doubled = false;
   for (const n of neighbors(ctx.map, tile)) {
     const wf = naturalWonderAt(n);
     if (!wf) continue;
     const w = FEATURES[wf];
     if (!w) continue;
     if (w.adjacentYields) addYields(out, w.adjacentYields);
-    if (w.doublesAdjacentTerrain) addYields(out, terrainYields(tile));
+    if (w.doublesAdjacentTerrain) doubled = true;
   }
+  if (doubled) addYields(out, terrainYields(tile));
 
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.fertilityProd > 0) out.production += tile.fertilityProd;

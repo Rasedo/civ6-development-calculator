@@ -3910,15 +3910,19 @@ class SimEconomy:
         d = float(self.rules.purchase_divisor)
         return torch.floor(price.to(torch.float64) / d) * d
 
-    def _gold_price(self, row: int, price: torch.Tensor) -> torch.Tensor:
+    def _gold_price(self, row: int, price: torch.Tensor, off: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6 (Democracy, GOVERNMENTBONUS_GOLD_PURCHASES): the percent
         off every GOLD purchase — a building, a unit, a settler
-        — applied where the purchase is priced and paid. READING: not an
-        upgrade, a tile or a patronage. Then the five-step floor. `goldPrice`'s
-        twin; `price` [B] or [B/1, N]."""
-        f = 1 - self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64) / 100
-        price = price * (f.reshape(-1, *([1] * (price.dim() - 1))) if price.dim() > 1 else f)
-        return self._purchase_step(price)
+        — applied where the purchase is priced and paid, summed with the
+        item's own percents off (`off`, broadcast against `price`: Ngazargamu).
+        READING: not an upgrade, a tile or a patronage. Then the five-step
+        floor. `goldPrice`'s twin; `price` [B] or [B/1, N]."""
+        d = self._gov_mods(row)[12]["goldbuydisc"].to(torch.float64)
+        if price.dim() > 1:
+            d = d.reshape(-1, *([1] * (price.dim() - 1)))
+        if off is not None:
+            d = d + off
+        return self._purchase_step(price * (1 - d / 100).clamp(min=0))
 
     def _faith_price(self, row: int, price: torch.Tensor, off: torch.Tensor | None = None) -> torch.Tensor:
         """CIV6 (Theocracy, GOVERNMENTBONUS_FAITH_PURCHASES): the percent
