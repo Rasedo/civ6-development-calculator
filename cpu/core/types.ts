@@ -105,6 +105,10 @@ export interface City {
    * has pinned into each district, by PLACEABLE_DISTRICTS index; -1 where the
    * automatic rule decides. `Tile.locked` is the same choice for plots. */
   specialistPref?: number[];
+  /** CITIZEN ASSIGNMENT, the third choice: citizens the player leaves on
+   *  neither a plot nor a slot. The walk works population less specialists
+   *  less these, and each pays its Gold (`UNASSIGNED_CITIZEN_GOLD`). */
+  idleCitizens?: number;
   focus: FocusId;
   queue: QueueItem[];
   isCapital: boolean;

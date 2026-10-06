@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { DistrictId } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
 import { canPlaceDistrict, makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
 import { foundCity, endTurn, districtCost, districtDiscounted, districtScaledBase, refreshDistrictDiscount, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
@@ -111,13 +112,18 @@ describe('appeal & neighborhoods', () => {
     const map = makeMap(12, 12);
     const t = tileAtCoords(map, 5, 5);
     expect(tileAppeal(map, t)).toBe(0);
-    tileAtCoords(map, 6, 5).district = 'HOLY_SITE';
+    const done = (x: number, y: number, d: DistrictId): void => {
+      const n = tileAtCoords(map, x, y);
+      n.district = d;
+      n.districtComplete = true; // a district under construction lends nothing
+    };
+    done(6, 5, 'HOLY_SITE');
     expect(tileAppeal(map, t)).toBe(1);
-    tileAtCoords(map, 4, 5).district = 'THEATER_SQUARE';
-    tileAtCoords(map, 5, 4).district = 'ENTERTAINMENT_COMPLEX';
+    done(4, 5, 'THEATER_SQUARE');
+    done(5, 4, 'ENTERTAINMENT_COMPLEX');
     expect(tileAppeal(map, t)).toBe(3);
     // ... and the negative districts still subtract, cumulatively
-    tileAtCoords(map, 5, 6).district = 'INDUSTRIAL_ZONE';
+    done(5, 6, 'INDUSTRIAL_ZONE');
     expect(tileAppeal(map, t)).toBe(2);
   });
 

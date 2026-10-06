@@ -20,7 +20,7 @@ import { recordMoment, LARGEST_KEY, NEAR_WONDER_KEY, NEAR_FLOOD_KEY, NEAR_VOLCAN
 import {
   MOMENT_LARGEST_MARGIN, MOMENT_NEAR_RANGE, MOMENT_GP_GAME_ERA, MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF,
   MOMENT_GP_GOLD_HALF, MOMENT_GOODY, MOMENT_GOODY_MAX_ERA, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_CAMP_MAX_ERA,
-  MOMENT_CAMP_NEAR_RANGE, MOMENT_DIPLO_VP,
+  MOMENT_CAMP_NEAR_RANGE, MOMENT_DIPLO_VP, MOMENT_LEVIED,
 } from '../data/seats';
 import {
   MOMENT_ON_DESERT, MOMENT_ON_SNOW, MOMENT_ON_TUNDRA, MOMENT_NEW_CONTINENT, MOMENT_NEAR_CIV_CITY, MOMENT_NEAR_CIV_RANGE,
@@ -146,6 +146,11 @@ export function campMoment(state: GameState, seat: number, tileIndex: number): v
     return hexDistance(map, t.col, t.row, ct.col, ct.row) <= MOMENT_CAMP_NEAR_RANGE;
   });
   addEraScore(state, seat, near ? MOMENT_CAMP_NEAR : MOMENT_CAMP);
+}
+
+/** Major `seat` levied a city-state's military (`levyUnits`). */
+export function levyMoment(state: GameState, seat: number): void {
+  if (isCiv(seat)) addEraScore(state, seat, MOMENT_LEVIED);
 }
 
 /** The Diplomatic Victory resolution's points earned by major `seat`. */

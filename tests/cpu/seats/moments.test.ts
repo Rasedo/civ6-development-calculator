@@ -3,12 +3,12 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { deriveContinents } from '../../../world/query';
 import { campMoment, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
-import { CITY_SIZE_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, recordMoments } from '../../../cpu/core/moments';
+import { CITY_SIZE_KEY, FORMATION_KEY, FULL_ENCAMPMENT_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, recordMoments } from '../../../cpu/core/moments';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import {
   MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF, MOMENT_GOODY, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_TECH_ERA,
-  MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD, MOMENT_HIGH_ADJACENCY,
+  MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD, MOMENT_HIGH_ADJACENCY, MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT,
   MOMENT_FOREIGN_CAPITAL, MOMENT_NEAR_CIV_CITY, MOMENT_NEW_CONTINENT, MOMENT_ON_DESERT, MOMENT_PANTHEON,
   MOMENT_PANTHEON_FIRST, MOMENT_PLAYER_DEFEATED, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_TO_ORIGINAL_OWNER,
   MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA,
@@ -115,6 +115,23 @@ describe('the other moments', () => {
 });
 
 describe('the once moments', () => {
+  it('a Corps, a city holding every Encampment set: their keys pay once', () => {
+    const state = makeState(makeMap(20, 12));
+    const city = settleAt(state, tileAtCoords(state.map, 3, 5).index);
+    state.units.push({ id: 1, type: 'WARRIOR', seat: 0, tileIndex: city.centerIndex, movesLeft: 2, movesFull: 2, charges: 0,
+      hp: 100, xp: 0, level: 1, formation: 1 });
+    recordMoments(state);
+    expect(score(state, 0)).toBe(MOMENT_FORMATION.land[0][1]);
+    expect(seatOf(state, 0)!.moments).toContain(FORMATION_KEY[0][1]);
+    city.buildings.push('BARRACKS', 'ARMORY');
+    recordMoments(state);
+    expect(score(state, 0)).toBe(MOMENT_FORMATION.land[0][1]);
+    city.buildings.push('MILITARY_ACADEMY');
+    recordMoments(state);
+    expect(score(state, 0)).toBe(MOMENT_FORMATION.land[0][1] + MOMENT_FULL_ENCAMPMENT);
+    expect(seatOf(state, 0)!.moments).toContain(FULL_ENCAMPMENT_KEY);
+  });
+
   it('the first holder pays FIRST_IN_WORLD, the next the plain row, nobody twice', () => {
     const state = makeState(makeMap(20, 12));
     state.seats.push(emptySeat(1));

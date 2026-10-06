@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
-import { emptySeat } from '../../../cpu/core/seats';
+import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { neighbors } from '../../../world/hex';
 import { cityAppealResolver } from '../../../cpu/core/governors';
 import { tileAppeal } from '../../../cpu/core/appeal';
@@ -15,9 +15,9 @@ import type { GameState } from '../../../cpu/core/types';
  * writes it as EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER on FEATURE_JUNGLE with
  * Amount 2 — exactly the swing from -1 to +1.
  *
- * The term rides `cityAppealResolver`, which is already keyed by the tile's
- * OWNER and already threaded through every appeal consumer, so no per-seat
- * appeal plane is needed.
+ * The term rides `cityAppealResolver.lend`: Rules_Appeal reads it off the
+ * city holding the rainforest, which lends it to every plot beside it, so no
+ * per-seat appeal plane is needed.
  *
  * The GPU twin is tests/gpu/feature_appeal_test.py.
  */
@@ -29,12 +29,16 @@ function scene(row: number, n: number): { state: GameState; probe: number } {
   state.seats.push(emptySeat(1));
   state.seats[0].civ = row;
   const centre = tileAtCoords(state.map, 6, 6).index;
-  settleAt(state, centre, 0);
+  const city = settleAt(state, centre, 0);
   const probe = tileAtCoords(state.map, 7, 6).index;
   const t = state.map.tiles[probe];
-  // paint `n` of the probe's neighbours RAINFOREST
+  // paint `n` of the probe's neighbours RAINFOREST, each the city's own —
+  // Rules_Appeal reads the modifier off the city holding the rainforest
   const nb = neighbors(state.map, t);
-  for (let i = 0; i < n && i < nb.length; i++) nb[i].feature = 'RAINFOREST';
+  for (let i = 0; i < n && i < nb.length; i++) {
+    nb[i].feature = 'RAINFOREST';
+    setTileOwner(nb[i], 0, city.id);
+  }
   return { state, probe };
 }
 
@@ -85,7 +89,7 @@ describe('a seat`s own reading of an adjacent feature', () => {
     // a tile far from the city belongs to nobody
     const far = br.state.map.tiles[tileAtCoords(br.state.map, 14, 14).index];
     expect(far.ownerCity).toBeLessThan(0);
-    expect(cityAppealResolver(br.state)!(far)).toBe(0);
+    expect(cityAppealResolver(br.state)!.lend(far)).toBe(0);
     // ...and a plain seat carries no row at all
     const plain = scene(-1, 2);
     expect(getModifiers(plain.state, 0).featureAppeal.length).toBe(0);

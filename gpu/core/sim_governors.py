@@ -81,7 +81,7 @@ class SimGovernors:
         self._governor_seat(row, live)
         self._governor_tick(row, live)
         # Appointing, promoting, seating and the establishment clock all move
-        # `_gov_appeal_plane`, and `_tile_appeal` is version-cached — without
+        # `_appeal_lend_plane`, and `_tile_appeal` is version-cached — without
         # this the appeal a governor grants arrives a turn late, and the
         # Preserve band it pushes a tile into arrives with it. The fingerprint
         # keeps a quiet turn from invalidating anything.
@@ -502,23 +502,52 @@ class SimGovernors:
         which is what Forestry Management counts and stands beside."""
         return (self.feat_id >= 0) & ~self.feat_stripped & (self.improvement < 0)
 
-    def _gov_appeal_plane(self) -> torch.Tensor:
-        """[B, T] long — CIV6 (Forestry Management): "Tiles adjacent to
-        unimproved features receive +1 Appeal in this city." Summed over the
-        majors, a tile belonging to at most one of them."""
+    def _appeal_lend_plane(self) -> torch.Tensor:
+        """[B, T] long — what each tile LENDS its neighbours' appeal through
+        its OWN city (`AppealOwners.lend`, Rules_Appeal 0x513780): CIV6
+        (Forestry Management) its governor's term on a tile holding a feature
+        — a volcano included — and no improvement, and CIV6 (Amazon) the
+        seat's feature appeal rows on a tile holding that feature. Summed over
+        the majors, a tile belonging to at most one of them."""
         out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
-        if not self.n_governors:
-            return out
-        nb = self.neigh
-        beside = None
-        for r in range(self.n_majors):
-            per = self._governor_tile_sum(r, "appealNearFeature")
-            if not bool(per.count_nonzero()):
+        if self.n_governors:
+            bare = None
+            for r in range(self.n_majors):
+                per = self._governor_tile_sum(r, "appealNearFeature")
+                if not bool(per.count_nonzero()):
+                    continue
+                if bare is None:
+                    bare = (((self.feat_id >= 0) & ~self.feat_stripped) | self.volcano_at) & (self.improvement < 0)
+                out = out + torch.where(bare, per.long(), torch.zeros_like(out))
+        for _fc, _fl, _fi, _fa in self._feature_appeal_rows:
+            if _fi < 0:
                 continue
-            if beside is None:
-                _f = self._unimproved_feature()
-                beside = (_f[:, nb.clamp(min=0)] & (nb >= 0).unsqueeze(0)).any(dim=2)
-            out = out + torch.where(beside, per.long(), torch.zeros_like(out))
+            # `feat_id` keeps a chopped tile's old id; the strip flag makes
+            # this the live `n.feature` read the TS resolver does.
+            src = (self.feat_id == _fi) & ~self.feat_stripped
+            for r in range(self.n_majors):
+                _fw = self._row_is(r, _fc, _fl)
+                if not bool(_fw.count_nonzero()):
+                    continue
+                own = src & (self.tile_seat == int(self._ROW_SEAT[r])) & (self.city_slot_at(r) >= 0)
+                out = out + (own & _fw.unsqueeze(1)).long() * _fa
+        return out
+
+    def _appeal_add_civic_plane(self) -> torch.Tensor:
+        """[B, T] long — CIV6 (Features.AddCivic, Rules_Appeal 0x513d70): +1 on
+        a plot whose live feature its owner — a major or a minor — adds with
+        a civic it holds (Woods with Conservation)."""
+        out = torch.zeros(self.B, self.T, dtype=torch.long, device=self.device)
+        for _af, _ac in self._appeal_add_civic:
+            if _af < 0 or _ac < 0:
+                continue
+            here = (self.feat_id == _af) & ~self.feat_stripped
+            held = torch.zeros_like(here)
+            for r in range(self.n_majors):
+                held |= (self.tile_seat == int(self._ROW_SEAT[r])) & self.civ_civics[:, r, _ac].unsqueeze(1)
+            for s in range(self.S):
+                held |= (self.tile_seat == 100 + s) & self.citystate_civics[:, s, _ac].unsqueeze(1)
+            out = out + (here & held).long()
         return out
 
     def _governor_pass_route_gold(self, row: int) -> torch.Tensor:

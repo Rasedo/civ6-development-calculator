@@ -110,7 +110,9 @@ def main() -> None:
     def _clean(anchor: int):
         q = s2._park_cluster(torch.tensor([[anchor]], dtype=torch.long))[0, 0]
         for d in range(6):
-            if int(q[d, 0]) >= 0 and all(int(_centre[int(t)]) < 0 for t in q[d].tolist()):
+            # off every centre, and ashore: a water plot scores no appeal at all
+            if int(q[d, 0]) >= 0 and all(int(_centre[int(t)]) < 0 and not bool(s2.water[0, int(t)])
+                                         for t in q[d].tolist()):
                 return q, d
         return None
 
@@ -272,13 +274,15 @@ def main() -> None:
     print("snapshot ok")
 
     # --- the district and outpost appeal terms ----------------------------
-    # CIV6 ("Appeal"): +1 per adjacent Holy Site / Theater Square /
+    # CIV6 ("Appeal"): +1 per adjacent COMPLETE Holy Site / Theater Square /
     # Entertainment Complex, -1 per adjacent barbarian outpost.
     s6 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
     good = [i for i, v in enumerate(s6._appeal_adj.tolist()) if v > 0]
     bad = [i for i, v in enumerate(s6._appeal_adj.tolist()) if v < 0]
     assert good, "no district raises appeal — the catalog column is empty"
-    mid = int(s6.T // 2)
+    # a LAND plot below the overrides: a water plot scores no appeal at all
+    mid = next(t for t in range(int(s6.T // 2), int(s6.T))
+               if not bool(s6.water[0, t]) and int(s6.appeal_over[0, t]) == -999)
     nb = [x for x in s6.neigh[mid].tolist() if x >= 0]
     assert len(nb) >= 2, "need a tile with neighbours"
     s6.district[0, :] = -1
@@ -286,10 +290,12 @@ def main() -> None:
     s6._eff_version += 1
     base = int(s6._tile_appeal()[0, mid])
     s6.district[0, nb[0]] = good[0]
+    s6.district_complete[0, nb[0]] = True  # a district under construction lends nothing
     s6._eff_version += 1
     assert int(s6._tile_appeal()[0, mid]) == base + 1, "an adjacent good district must add +1"
     if bad:
         s6.district[0, nb[1]] = bad[0]
+        s6.district_complete[0, nb[1]] = True
         s6._eff_version += 1
         assert int(s6._tile_appeal()[0, mid]) == base, "a bad district must cancel it, cumulatively"
         s6.district[0, nb[1]] = -1

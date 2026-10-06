@@ -185,6 +185,9 @@ class SimPhase:
                 self._geo_agreements(row)
             self._seat_buy_ladder(row, active, army0)
             return active
+        # the turn's processing places every citizen the player left idle
+        # (`placeIdleCitizens`)
+        self.city_idle[:, row] = 0
         # THE TURN'S RESOURCES, before anything reads them: every improved
         # source pays into the bank, then the plants burn what they need and
         # the POWERED flag every yield reader takes is set for the turn.

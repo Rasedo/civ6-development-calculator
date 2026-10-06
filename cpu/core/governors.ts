@@ -1,8 +1,9 @@
 import { addYields, emptyYields, type City, type GameState, type Governor, type Seat, type Tile, type Yields } from './types';
 import { cityAtTile, citiesOf, isCityStateSeat, seatOf } from './seats';
-import { hexDistance, neighbors } from '../../world/hex';
+import { hexDistance } from '../../world/hex';
 import { type FeatureAppealRow } from '../data/civilizations';
 import { GP_CITY_PERM } from '../data/greatPeople';
+import { FEATURE_ADD_CIVIC } from '../data/appeal';
 import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark } from './city';
 import { cityDistrictSum, darkBuildings } from './yields';
@@ -356,12 +357,15 @@ export function governorTileMult(state: GameState, tile: Tile, pick: (e: Governo
 const APPEAL_SEAT_STRIDE = 1 << 20;
 
 /**
- * What the tile's OWNER CITY adds to its appeal — one closure over the seats'
- * cities, built once per walk.
+ * What the plots' OWNER CITIES add to appeal (`AppealOwners`) — one closure
+ * over the seats' cities, built once per walk.
  *
  * CIV6 (Alvar Aalto, Charles Correa): "This city provides +N Appeal to any
- * tile it owns"; (Forestry Management): "Tiles adjacent to unimproved features
- * receive +1 Appeal in this city."
+ * tile it owns" — the plot's own city. (Forestry Management): "Tiles
+ * adjacent to unimproved features receive +1 Appeal in this city" — GameCore
+ * Rules_Appeal 0x513780 pays it per NEIGHBOUR holding a feature and no
+ * improvement, through that neighbour's own city's governor, as it does the
+ * feature appeal rows (Amazon).
  */
 export function cityAppealResolver(state: GameState): GpAppeal {
   const k = GP_CITY_PERM.indexOf('appeal');
@@ -389,31 +393,38 @@ export function cityAppealResolver(state: GameState): GpAppeal {
     }
   }
   // CIV6 (Amazon): "Rainforest tiles provide +1 Appeal to adjacent tiles,
-  // instead of the usual -1" — a per-SEAT term over the map-global walk, and
-  // this resolver is where it belongs: it is already keyed by the tile's
-  // OWNER, already reads neighbours for the governor's own near-feature
-  // clause, and is already threaded through every appeal consumer, so the Amazon's rainforest rule
-  // needs no per-seat plane of its own. An unowned tile takes none of it,
-  // which is right for all four consumers (housing, amenities, the Seaside
-  // Resort's gold and the National Park's site all concern owned ground).
+  // instead of the usual -1" — EFFECT_ADJUST_FEATURE_APPEAL_MODIFIER on the
+  // seat's cities, which Rules_Appeal reads off the city holding the
+  // rainforest itself.
   const feat = new Map<number, readonly FeatureAppealRow[]>();
   for (const s3 of state.seats) {
     const rows = getModifiers(state, s3.seat).featureAppeal;
     if (rows.length) feat.set(s3.seat, rows);
   }
-  if (flat.size === 0 && near.size === 0 && feat.size === 0) return undefined;
-  const map = state.map;
-  return (t: Tile) => {
-    if (t.ownerCity < 0) return 0;
-    const key = t.ownerSeat * APPEAL_SEAT_STRIDE + t.ownerCity;
-    const f = near.get(key) ?? 0;
-    const nb = neighbors(map, t);
-    const beside = f > 0 && nb.some((n) => !!n.feature && !n.improvement);
-    let fa = 0;
-    for (const r of feat.get(t.ownerSeat) ?? []) {
-      fa += r.amount * nb.filter((n) => n.feature === r.feature).length;
-    }
-    return (flat.get(key) ?? 0) + (beside ? f : 0) + fa;
+  // CIV6 (Features.AddCivic): the civics each plot owner holds, a minor's own
+  // tree included (runs/h1_duelw1116 plot 1021: Auckland's Woods +1 from the
+  // turn Auckland's Conservation lands)
+  const civics = new Map<number, ReadonlySet<string>>();
+  for (const s4 of state.seats) civics.set(s4.seat, new Set(s4.research.civics));
+  for (const cs of state.cityStates ?? []) civics.set(cs.seat, new Set(cs.research?.civics));
+  const owned = (t: Tile): number => (t.ownerCity < 0 ? -1 : t.ownerSeat * APPEAL_SEAT_STRIDE + t.ownerCity);
+  return {
+    flat: (t) => {
+      const key = owned(t);
+      return key < 0 ? 0 : flat.get(key) ?? 0;
+    },
+    lend: (n) => {
+      const key = owned(n);
+      // a volcano is a feature of the game's (FEATURE_VOLCANO) the tile keeps as a flag
+      if (key < 0 || (!n.feature && !n.volcano)) return 0;
+      let a = n.improvement ? 0 : near.get(key) ?? 0;
+      for (const r of feat.get(n.ownerSeat) ?? []) if (r.feature === n.feature) a += r.amount;
+      return a;
+    },
+    addCivic: (t) => {
+      const civic = t.feature ? FEATURE_ADD_CIVIC[t.feature] : undefined;
+      return !!civic && t.ownerSeat >= 0 && !!civics.get(t.ownerSeat)?.has(civic);
+    },
   };
 }
 

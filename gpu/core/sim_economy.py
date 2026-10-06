@@ -5768,8 +5768,8 @@ class SimEconomy:
     def _res_starved(self, pre: str) -> torch.Tensor:
         """[B, U] — CIV6 (Resource, GS): "if you had acquired Iron to produce
         Swordsmen, but have no continuous access to Iron Mines, those Swordsmen
-        won't be able to Heal." ACCESS, not the bank: one owned, improved,
-        unpillaged source answers. A minor or the barbarians keep no bank and
+        won't be able to Heal." ACCESS, not the bank: one owned source handing
+        the resource over (`_res_extracting`) answers. A minor or the barbarians keep no bank and
         are not held to it."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         seat = getattr(self, f"{pre}_unit_seat")
@@ -5787,7 +5787,7 @@ class SimEconomy:
                 continue
             want = (typ == u_idx) & maj
             if mine is None:
-                provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged
+                provides = self._res_extracting()
                 rows = torch.arange(self.n_majors, device=self.device).reshape(1, -1, 1)
                 mine = self.tile_seat.unsqueeze(1) == rows                     # [B, majors, T]
                 # CIV6: no access to a resource the seat cannot see yet
@@ -6528,22 +6528,29 @@ class SimEconomy:
 
     def _tile_appeal(self) -> torch.Tensor:
         """[B, T] tile appeal, the `tileAppeal` (core/appeal.ts) mirror. TS
-        sums each NEIGHBOUR's contribution, so build a per-tile contribution
-        then gather it over `neigh`.
+        sums what each NEIGHBOUR lends, so build a per-tile part then gather
+        it over `neigh`.
 
-        `appeal_base` carries the static part (natural wonder +2, mountain +1,
-        coast/lake +1) plus the tile's t0 feature term; a chopped tile
+        `appeal_base` carries the static part (the terrain's Appeal: mountain,
+        coast / lake) plus the tile's t0 feature Appeal; a chopped tile
         subtracts `appeal_feat` via feat_stripped. The rest is live: a
-        COMPLETED built wonder +1, each district's own `_appeal_adj` column,
-        each improvement's own `_imp_appeal_adj` column, a pillaged tile -1,
-        and a BARBARIAN OUTPOST -1. Version-cached like _farmadj_count — every
-        contributing write bumps _eff_version, camps included — and when the
-        version moves, the body answers through the read-set memo
-        `_appeal_memo`, so a bump for a write it never read keeps the plane."""
-        if self._appeal_cache is not None and self._appeal_cache[0] == self._eff_version:
-            return self._appeal_cache[1]
+        COMPLETED built wonder +1, a COMPLETE district's own `_appeal_adj`
+        column and -1 while it is pillaged, each improvement's own
+        `_imp_appeal_adj` column and -1 while it is pillaged, a BARBARIAN
+        OUTPOST -1, and what the tile lends through its own city
+        (`_appeal_lend_plane`). Cached on `_eff_version` and the planes no
+        effect write bumps it for — every other contributing write bumps
+        _eff_version, camps included — and when the key moves, the body
+        answers through the read-set memo `_appeal_memo`, so a bump for a
+        write it never read keeps the plane."""
+        planes = (self.district_complete, self.district_pillaged, self.civ_civics, self.citystate_civics,
+                  self.tile_submerged)
+        c = self._appeal_cache
+        if (c is not None and c[0] == self._eff_version
+                and all(torch.equal(a, b) for a, b in zip(planes, c[2]))):
+            return c[1]
         out = simbase.memo_read(self, self._appeal_memo, 0, self._tile_appeal_read)[0]
-        self._appeal_cache = (self._eff_version, out)
+        self._appeal_cache = (self._eff_version, out, tuple(p.clone() for p in planes))
         return out
 
     def _tile_appeal_read(self) -> tuple[torch.Tensor]:
@@ -6559,12 +6566,15 @@ class SimEconomy:
                 self.improvement >= 0,
                 self._imp_appeal_adj.take(self.improvement.clamp(min=0)),
                 torch.zeros_like(contrib))
+        # a district under construction lends nothing (Rules_Appeal 0x513780);
+        # the centres are not on this plane, and lend 0 and are never pillaged
+        done = (self.district >= 0) & self.district_complete & (self.built_wonder < 0)
         if self._appeal_adj_any:
             contrib = contrib + torch.where(
-                self.district >= 0,
-                self._appeal_adj.take(self.district.clamp(min=0)),
-                torch.zeros_like(contrib))
-        contrib = contrib - self.pillaged.long()
+                done, self._appeal_adj.take(self.district.clamp(min=0)), torch.zeros_like(contrib))
+        dpill = (done & self.district_pillaged).long()
+        ipill = ((self.improvement >= 0) & self.pillaged).long()
+        contrib = contrib - dpill - ipill
         # A barbarian OUTPOST lowers its neighbours. Camps live in `camp_tile`
         # (-1 padded), the `barbSeat.camps` twin, so the tile view is built
         # here rather than stored.
@@ -6572,18 +6582,22 @@ class SimEconomy:
             _t = torch.arange(contrib.shape[1], device=self.device)
             camp_here = (self.camp_tile.unsqueeze(2) == _t.reshape(1, 1, -1)).any(dim=1)
             contrib = contrib - camp_here.long()
+        contrib = contrib + self._appeal_lend_plane()
         nb = self.neigh
         nbc = nb.clamp(min=0)
         out = (contrib[:, nbc] * (nb >= 0).unsqueeze(0).long()).sum(dim=2)  # [B, T]
-        # The ON-TILE terms (mountain +4, river/lake +1) are the tile's OWN
-        # appeal, not a neighbour contribution, so they are added AFTER the
-        # gather — the two leading lines of tileAppeal.
-        out = out + self.appeal_self
-        # CIV6 (Alvar Aalto, Charles Correa): "+N Appeal to any tile it owns".
-        # It sits BEFORE the wonder/mountain override, which the TS twin takes
-        # as an early return.
-        out = out + self._gp_appeal_plane().long() + self._gov_appeal_plane()
-        return (torch.where(self.appeal_over > -999, self.appeal_over, out),)
+        # The ON-TILE terms — its river +1, its own pillaged improvement and
+        # pillaged district -1 each, the feature its owner's civic adds +1 —
+        # are the tile's OWN appeal, added AFTER the gather.
+        out = out + self.appeal_self - ipill - dpill + self._appeal_add_civic_plane()
+        # CIV6 (Alvar Aalto, Charles Correa): "+N Appeal to any tile it owns" —
+        # under the natural wonder's 5 and the mountain's 4 too
+        flat = self._gp_appeal_plane().long()
+        out = out + flat
+        # a WATER plot scores 0, a drowned one with it — below a natural
+        # wonder's 5, which a water wonder keeps
+        out = torch.where(self.water | self.tile_submerged, torch.zeros_like(out), out)
+        return (torch.where(self.appeal_over > -999, self.appeal_over + flat, out),)
 
     def _farmadj_count(self) -> torch.Tensor:
         """[B, T] long — on a live Farm, the live Farms beside it (a pillaged
@@ -6660,7 +6674,8 @@ class SimEconomy:
 
     def _city_specialists(self, row: int, sl: slice | None = None, workable: torch.Tensor | None = None) -> torch.Tensor:
         """[B, n, nD] long — the `effectiveSpecialists` twin for ANY seat row.
-        PINNED citizens (`city_spec_pin`) go in first; then the OVERFLOW —
+        PINNED citizens (`city_spec_pin`) go in first, out of the population
+        less its idle citizens (`city_idle`); then the OVERFLOW —
         population beyond the workable pool — fills whatever slots are still
         free, in PLACEABLE_DISTRICTS order. Slots = the district's standing
         buildings, dark while the district is incomplete or pillaged. Zero-draw
@@ -6678,7 +6693,7 @@ class SimEconomy:
         slots = self._city_spec_slots(row, sl)
         # PINNED citizens first, clamped to the open slots and to population.
         pin = self.city_spec_pin[:, row, sl].clamp(min=0)
-        budget = pop.clamp(min=0) * alive.long()
+        budget = (pop - self.city_idle[:, row, sl]).clamp(min=0) * alive.long()
         # The catalog-order walk `take_i = min(cap_i, budget_i); budget_{i+1} =
         # budget_i - take_i` over non-negative caps and budget is a
         # WATER-FILLING: the running total is min(cumsum(cap), budget_0), so
@@ -6854,9 +6869,10 @@ class SimEconomy:
         self._tiebreak_key_dtype = key.dtype
         top_vals, top_idx = key.topk(M, dim=2)
         # SPECIALISTS divert the overflow citizens before tiles are taken
-        # (assignWorkedTiles runs on population - specialistTotal).
+        # (assignWorkedTiles runs on population - specialistTotal), and the
+        # citizens the player left idle take no plot either.
         spec_d = self._city_specialists(row, sl, workable=valid.sum(dim=2))
-        pop_t = pop - spec_d.sum(dim=2)
+        pop_t = (pop - spec_d.sum(dim=2) - self.city_idle[:, row, sl]).clamp(min=0)
         take = (torch.arange(M, device=dev).reshape(1, 1, M) < pop_t.unsqueeze(2)) & (top_vals > -1e17)
         takef = take.double()
         # the PICK, exposed: a divergence in WHICH tiles a city works surfaces
@@ -7368,8 +7384,9 @@ class SimEconomy:
         popf = pop.double()
         citz[:, :, 3] = self.rules.citizen_science * popf
         citz[:, :, 4] = self.rules.citizen_culture * popf
-        # a citizen with no plot and no slot to work pays Gold
-        citz[:, :, 2] = self.rules.unassigned_citizen_gold * (pop_t - take.sum(dim=2)).clamp(min=0).double()
+        # a citizen with no plot and no slot to work pays Gold, one left idle
+        # with them
+        citz[:, :, 2] = self.rules.unassigned_citizen_gold * (pop - spec_d.sum(dim=2) - take.sum(dim=2)).clamp(min=0).double()
 
         # ================= bucket 5: BONUSES ================================
         # m.cityYields to every city + m.capitalYields to the capital, summed as
@@ -7749,13 +7766,13 @@ class SimEconomy:
 
     def _res_avail_mask(self, owned: torch.Tensor, row: int = -1) -> torch.Tensor:
         """[B, NU] — `trainableUnits`' resource arm: ACCESS opens the column
-        (an owned, improved, unpillaged source), and the STOCKPILE is what pays
+        (an owned source handing it over, `_res_extracting`), and the STOCKPILE is what pays
         for the unit. A row of -1 asks the ACCESS half only."""
         B, dev = self.B, self.device
         out = torch.ones(B, self.NU, dtype=torch.bool, device=dev)
         if not self._res_unit_pairs:
             return out
-        provides = (self.res_id >= 0) & (self.improvement == self.res_imp) & ~self.pillaged & owned
+        provides = self._res_extracting() & owned
         if row >= 0:
             provides = provides & ~self._res_hidden(row)   # CIV6: no access to what you cannot see
         # one [B, P, T] test over the P (unit, resource) pairs — each unit

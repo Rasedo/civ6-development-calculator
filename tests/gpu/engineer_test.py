@@ -240,7 +240,9 @@ def main() -> None:
     sim.pillaged[0, t] = False
     sim.improvement[0, t] = -1
     sim._eff_version += 1
-    nb = [int(x) for x in sim.neigh[t].tolist() if x >= 0]
+    # the LAND neighbours below the overrides: a water plot scores no appeal at all
+    nb = [int(x) for x in sim.neigh[t].tolist()
+          if x >= 0 and not bool(sim.water[0, int(x)]) and int(sim.appeal_over[0, int(x)]) == -999]
     base = [int(sim._tile_appeal()[0, x]) for x in nb]
     sim.improvement[0, t] = AIR
     sim._eff_version += 1

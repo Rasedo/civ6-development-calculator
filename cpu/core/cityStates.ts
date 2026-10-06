@@ -412,7 +412,7 @@ export function suzerainLandPurchaseOffPct(state: GameState, seat: number, city:
 
 /** How many of the Encampment building requirement sets the city meets —
  *  Barracks or Stable answer one row between them. */
-function militaryBuildingRows(city: City): number {
+export function militaryBuildingRows(city: { buildings: readonly string[] }): number {
   let rows = 0;
   for (const any of MILITARISTIC_BUILDING_ROWS) if (any.some((b) => city.buildings.includes(b))) rows += 1;
   return rows;

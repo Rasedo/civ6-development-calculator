@@ -221,6 +221,23 @@ def main() -> None:
     assert abs((g1 - g0) - 2.0) < 1e-9, f"four unassigned citizens paid {g1 - g0}, not 2"
     print(f"  four unassigned citizens pay {g1 - g0} Gold")
 
+    # --- 8) A CITIZEN LEFT IDLE (City.idleCitizens) -------------------------
+    # one plot fewer is worked (its Gold is section 7's rule, TS-tested)
+    sim.city_pop[0, row, j] = 2
+    sim.city_idle[0, row, j] = 0
+    sim._eff_version += 1
+    pick: list = []
+    sim._seat_city_walk(row, amen_yf=one, pick=pick)
+    n_busy = int((pick[0][0, j] >= 0).sum())
+    sim.city_idle[0, row, j] = 1
+    sim._eff_version += 1
+    pick = []
+    sim._seat_city_walk(row, amen_yf=one, pick=pick)
+    n_idle = int((pick[0][0, j] >= 0).sum())
+    assert n_idle == n_busy - 1, f"an idle citizen still worked a plot: {n_busy} -> {n_idle}"
+    sim.city_idle[0, row, j] = 0
+    print(f"  an idle citizen leaves its plot ({n_busy} -> {n_idle})")
+
     print("CITIZENS OK — the pin, its two clamps, the pillage gate, the plot lock and the idle citizen's Gold")
 
 

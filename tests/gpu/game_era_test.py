@@ -151,6 +151,31 @@ def test_high_adjacency(rules, path) -> None:
     print(f"  5 high adjacency OK: a Campus at {need} pays +{pay} once, one at {need - 1} nothing")
 
 
+def test_formation_and_encampment(rules, path) -> None:
+    """6. The once keys of a Corps on a living unit and of a city holding
+    every Encampment building set (`momentKeysHeld`), in the game that holds
+    them alone."""
+    sim = build(rules, path)
+    row, j = 0, 0
+    sim.city_alive[:, row, j] = True
+    corps = int(sim._mk_formation[0, 1])
+    camp = sim._mk_full_camp
+    held = sim._moment_held(row)
+    assert not bool(held[:, corps].any()) and not bool(held[:, camp].any()), "keys held before anything stands"
+    slot = int((~sim.major_unit_alive[0]).nonzero(as_tuple=True)[0][0])
+    land = int((~sim.unit_naval).nonzero(as_tuple=True)[0][0])
+    sim.major_unit_alive[0, slot] = True
+    sim.major_unit_seat[0, slot] = row
+    sim.major_unit_type[0, slot] = land
+    sim.major_unit_formation[0, slot] = 1
+    for r in range(sim._suz_mil_bldg.shape[0]):
+        sim.city_bldg[0, row, j, int(sim._suz_mil_bldg[r, 0])] = True
+    held = sim._moment_held(row)
+    assert held[:, corps].tolist() == [True, False], f"the Corps key {held[:, corps].tolist()}"
+    assert held[:, camp].tolist() == [True, False], f"the Encampment key {held[:, camp].tolist()}"
+    print("  6 once keys OK: a Corps and a full Encampment, in their game alone")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -162,6 +187,7 @@ def main() -> None:
     test_bars(rules, p)
     test_moments(rules, p)
     test_high_adjacency(rules, p)
+    test_formation_and_encampment(rules, p)
     print("GAME_ERA OK")
 
 

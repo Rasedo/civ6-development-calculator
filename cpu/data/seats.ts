@@ -389,6 +389,8 @@ export const MOMENT_CAMP_NEAR = moment('BARBARIAN_CAMP_DESTROYED_NEAR_YOUR_CITY'
 export const MOMENT_CAMP_MAX_ERA = momentEra('BARBARIAN_CAMP_DESTROYED', 'MaximumGameEra', 'ERA_MEDIEVAL', 2);
 export const MOMENT_CAMP_NEAR_RANGE = momentText('campNearRange', 6,
   'LOC_MOMENT_BARBARIAN_CAMP_DESTROYED_NEAR_YOUR_CITY_DESCRIPTION: "A hostile barbarian camp within 6 tiles of one of your cities was destroyed by a unit."');
+/** CIV6 (PLAYER_LEVIED_MILITARY): the seat levies a city-state's military */
+export const MOMENT_LEVIED = moment('PLAYER_LEVIED_MILITARY', 1);
 /** CIV6 (PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT): "You have won the
  *  Diplomatic Victory resolution and earned Victory Points." */
 export const MOMENT_DIPLO_VP = moment('PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT', 2);
@@ -449,6 +451,22 @@ export const MOMENT_NEIGHBORHOOD = [moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FI
   moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FIRST_IN_WORLD', 3)] as const;
 export const MOMENT_SEASIDE_RESORT = [moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST', 2),
   moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST_IN_WORLD', 3)] as const;
+/** CIV6 (FORMATION_*): a seat's first Corps / Army (land), Fleet / Armada
+ *  (naval), by formation level 1 / 2 */
+export const MOMENT_FORMATION = {
+  land: [[moment('FORMATION_CORPS_FIRST', 1), moment('FORMATION_CORPS_FIRST_IN_WORLD', 2)] as const,
+    [moment('FORMATION_ARMY_FIRST', 1), moment('FORMATION_ARMY_FIRST_IN_WORLD', 2)] as const],
+  naval: [[moment('FORMATION_FLEET_FIRST', 1), moment('FORMATION_FLEET_FIRST_IN_WORLD', 2)] as const,
+    [moment('FORMATION_ARMADA_FIRST', 1), moment('FORMATION_ARMADA_FIRST_IN_WORLD', 2)] as const],
+};
+/** CIV6 (BUILDING_CONSTRUCTED_FULL_ENCAMPMENT_FIRST): a city of the seat holding
+ *  all three Encampment building requirement sets
+ *  (`MILITARISTIC_BUILDING_ROWS`) for the first time; one row */
+export const MOMENT_FULL_ENCAMPMENT = moment('BUILDING_CONSTRUCTED_FULL_ENCAMPMENT_FIRST', 3);
+/** CIV6 (CITY_POWER_GENERATED_FROM_RESOURCE_*): a city of the seat lit by
+ *  Power a plant burned a resource for, for the first time */
+export const MOMENT_POWER_FROM_RESOURCE = [moment('CITY_POWER_GENERATED_FROM_RESOURCE_FIRST', 2),
+  moment('CITY_POWER_GENERATED_FROM_RESOURCE_FIRST_IN_WORLD', 3)] as const;
 /** "Your Religion has added its final Belief and is now complete" */
 export const MOMENT_MAX_BELIEFS = [moment('BELIEF_ADDED_MAX_BELIEFS_REACHED', 3),
   moment('BELIEF_ADDED_MAX_BELIEFS_REACHED_FIRST_IN_WORLD', 4)] as const;

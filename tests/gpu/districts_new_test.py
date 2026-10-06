@@ -416,7 +416,9 @@ def main() -> None:
 
     # --- 9) appeal, the Grove, and the unowned bomb ------------------------
     s12 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-    near = next(int(t) for t in s12.neigh[a_t].tolist() if t >= 0)
+    # a LAND plot below the mountain and wonder overrides: a water plot scores 0
+    near = next(int(t) for t in s12.neigh[a_t].tolist()
+                if t >= 0 and not bool(s12.water[b, t]) and int(s12.appeal_over[b, t]) == -999)
     ap0 = int(s12._tile_appeal()[b, near])
     _put(s12, b, row, col, dam, a_t)
     assert int(s12._tile_appeal()[b, near]) - ap0 == 1, "a Dam is +1 to its neighbours"
@@ -438,7 +440,8 @@ def main() -> None:
     plane = s13._preserve_plane(row)
     assert plane is not None, "a Grove over a Preserve must build a plane"
     gy = rj["buildings"][grove]["appealYields"]  # [[breathtaking], [charming]]
-    tgt2 = next(int(t) for t in s13.neigh[a_t].tolist() if t >= 0)
+    tgt2 = next(int(t) for t in s13.neigh[a_t].tolist()
+                if t >= 0 and not bool(s13.water[b, t]) and int(s13.appeal_over[b, t]) == -999)
     top = int(s13._tile_appeal()[b, tgt2]) >= s13._appeal_bands[0]
     want = gy[0] if top else gy[1]
     assert [float(x) for x in plane[b, tgt2].tolist()] == [float(x) for x in want], \

@@ -23,7 +23,10 @@ import { addEraScore } from './eras';
 import { isCiv, seatOf } from './seats';
 import { isExplored } from './fog';
 import { makeYieldCtx } from './effects';
-import { baseAdjacency, buildingVariantAdjacency, onOrNextToShallowWater } from './yields';
+import { baseAdjacency, buildingVariantAdjacency, cityPower, onOrNextToShallowWater } from './yields';
+import { militaryBuildingRows } from './cityStates';
+import { PROJECTS } from '../data/projects';
+import { MILITARISTIC_BUILDING_ROWS } from '../data/cityStates';
 import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { UNITS } from '../data/units';
@@ -41,6 +44,7 @@ import {
   MOMENT_UNIQUE_IMPROVEMENT, MOMENT_NEIGHBORHOOD, MOMENT_SEASIDE_RESORT, MOMENT_MAX_BELIEFS,
   MOMENT_GOVERNORS_ALL, MOMENT_TRADING_POST_ALL, MOMENT_FIND_WONDER, MOMENT_FIRST_SUZERAIN,
   MOMENT_NEAR_WONDER, MOMENT_NEAR_FLOOD, MOMENT_NEAR_VOLCANO, MOMENT_LARGEST, MOMENT_HIGH_ADJACENCY,
+  MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT, MOMENT_POWER_FROM_RESOURCE,
 } from '../data/seats';
 
 type Pay = readonly [number, number];
@@ -87,6 +91,13 @@ export const IMPROVEMENT_KEY: Record<string, number> = Object.fromEntries(Object
   .filter((m) => m.uniqueTo || m.uniqueLeader || m.id === 'SEASIDE_RESORT')
   .map((m) => [m.id, m.id === 'SEASIDE_RESORT' ? add('SEASIDE_RESORT', MOMENT_SEASIDE_RESORT)
     : add(`UNIQUE_IMPROVEMENT:${m.id}`, one(MOMENT_UNIQUE_IMPROVEMENT))]));
+/** a living unit of a formation, [land, naval][formation] (-1 for none) */
+export const FORMATION_KEY: readonly (readonly number[])[] = [
+  [-1, add('FORMATION:CORPS', MOMENT_FORMATION.land[0]), add('FORMATION:ARMY', MOMENT_FORMATION.land[1])],
+  [-1, add('FORMATION:FLEET', MOMENT_FORMATION.naval[0]), add('FORMATION:ARMADA', MOMENT_FORMATION.naval[1])],
+];
+export const FULL_ENCAMPMENT_KEY = add('FULL_ENCAMPMENT', one(MOMENT_FULL_ENCAMPMENT));
+export const POWER_FROM_RESOURCE_KEY = add('POWER_FROM_RESOURCE', MOMENT_POWER_FROM_RESOURCE);
 export const MAX_BELIEFS_KEY = add('MAX_BELIEFS', MOMENT_MAX_BELIEFS);
 export const GOVERNORS_ALL_KEY = add('GOVERNORS_ALL', one(MOMENT_GOVERNORS_ALL));
 export const TRADING_POST_ALL_KEY = add('TRADING_POST_ALL', MOMENT_TRADING_POST_ALL);
@@ -192,6 +203,16 @@ export function momentKeysHeld(state: GameState, seat: number): number[] {
       const k = DISTRICT_UNIQUE_KEY[d.type];
       if (k !== undefined && DISTRICTS[d.type].civVariants?.some((v) => v.civ === civ)) out.add(k);
     }
+    if (militaryBuildingRows(c) === MILITARISTIC_BUILDING_ROWS.length) out.add(FULL_ENCAMPMENT_KEY);
+    // lit by a plant's burned resource: powered, its own supply short and no
+    // fully-powering project at the head of its queue (`resolveSeatPower`)
+    if (c.powered) {
+      const p = cityPower(state, c);
+      const head = c.queue[0];
+      if (p.supply < p.demand && !(head?.kind === 'project' && PROJECTS[head.project]?.fullyPowered)) {
+        out.add(POWER_FROM_RESOURCE_KEY);
+      }
+    }
   }
   const tier = GOVERNMENT_LIST.find((g) => g.id === s.government.chosen)?.tier ?? 0;
   if (GOV_TIER_KEY[tier] >= 0) out.add(GOV_TIER_KEY[tier]);
@@ -201,6 +222,8 @@ export function momentKeysHeld(state: GameState, seat: number): number[] {
   for (const u of state.units) {
     if (u.seat !== seat || u.leviedFrom !== undefined) continue;
     for (const k of UNIT_KEYS[u.type] ?? []) out.add(k);
+    const fk = FORMATION_KEY[UNITS[u.type]?.naval ? 1 : 0][u.formation ?? 0] ?? -1;
+    if (fk >= 0) out.add(fk);
   }
   for (const t of map.tiles) {
     if (t.ownerSeat === seat && t.improvement) {

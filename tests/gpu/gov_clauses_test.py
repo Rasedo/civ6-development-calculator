@@ -218,7 +218,7 @@ def test_forestry_management(rules, path) -> None:
     sim._eff_version += 1
     assert int(sim._unimproved_feature()[B0].sum()) == n - 1, "an improved feature still counts"
 
-    # the appeal half: only a tile of this city STANDING BESIDE a live feature.
+    # the appeal half: a plot STANDING BESIDE a live feature of this city.
     # One feature on a bare map, so "beside" means beside THIS one.
     sim.feat_id[B0, :] = -1
     sim.improvement[B0, :] = -1
@@ -228,11 +228,13 @@ def test_forestry_management(rules, path) -> None:
     live = sim._unimproved_feature()
     beside = [t for t in mine
               if t != mine[0] and any(int(x) >= 0 and bool(live[B0, int(x)]) for x in nb[t])]
-    away = [t for t in mine
-            if not any(int(x) >= 0 and bool(live[B0, int(x)]) for x in nb[t])]
+    away = [t for t in mine if t != mine[0]
+            and not any(int(x) >= 0 and bool(live[B0, int(x)]) for x in nb[t])]
     assert beside and away, "the capital's ground gives no both-sides check"
-    plane = sim._gov_appeal_plane()
-    assert int(plane[B0, beside[0]]) == int(appeal)
+    # the city's live feature LENDS the term (Rules_Appeal 0x513780); a bare
+    # plot of the city lends nothing
+    plane = sim._appeal_lend_plane()
+    assert int(plane[B0, mine[0]]) == int(appeal)
     assert int(plane[B0, away[0]]) == 0
     # and it reaches `_tile_appeal`, which is what every reader asks
     lifted = int(sim._tile_appeal()[B0, beside[0]])

@@ -193,7 +193,8 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
 
 /** WHO MANS THE SLOTS. The citizens the player PINNED (`specialistPref`, a
  * count per PLACEABLE_DISTRICTS index) go in first, clamped to the district's
- * open slots and to the city's population; then the automatic rule spends the
+ * open slots and to the city's population less its idle citizens; then the
+ * automatic rule spends the
  * OVERFLOW — population beyond the workable plots — on whatever slots are
  * still free, in PLACEABLE_DISTRICTS order. CIV6 (wiki "Specialists (Civ6)"):
  * "Specialists are also particularly useful when a city grows large later in
@@ -203,7 +204,7 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
 export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
   const slots = citySpecialistSlots(state, city);
   const out = new Map<number, number>();
-  let budget = Math.max(0, city.population);
+  let budget = Math.max(0, city.population - (city.idleCitizens ?? 0));
   PLACEABLE_DISTRICTS.forEach((type, di) => {
     const pin = city.specialistPref?.[di] ?? -1;
     if (pin <= 0 || budget <= 0) return;
@@ -281,6 +282,14 @@ export function tileScore(y: Yields, focus: FocusId): number {
  * has it in hand, and passing it keeps this the ONE place the citizen count
  * is spelled.
  */
+/** The turn's processing places every citizen the player left idle: its
+ *  stats walk works all of them again (runs/h1_duelw1108 Xi'an t207: the
+ *  record's idle citizen works a Food plot by the bank, +4 Food where the
+ *  record's surplus read 2; 1114: 41 such banks). */
+export function placeIdleCitizens(cities: readonly City[]): void {
+  for (const c of cities) c.idleCitizens = undefined;
+}
+
 export function workedTilesOf(state: GameState, city: City, ctx?: YieldCtx, spent?: number): number[] {
   const yctx = ctx ?? makeYieldCtx(state, city.seat);
   let specialistTotal = spent;
@@ -288,7 +297,7 @@ export function workedTilesOf(state: GameState, city: City, ctx?: YieldCtx, spen
     specialistTotal = 0;
     for (const n of effectiveSpecialists(state, city).values()) specialistTotal += n;
   }
-  return assignWorkedTiles(state, city, yctx, city.population - specialistTotal);
+  return assignWorkedTiles(state, city, yctx, Math.max(0, city.population - specialistTotal - (city.idleCitizens ?? 0)));
 }
 
 export function assignWorkedTiles(

@@ -14,7 +14,7 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
-import { resourceImprovement } from '../../world/resources';
+import { extractsResource, resourceImprovement } from '../../world/resources';
 import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
 import { suzerainMinorSeats } from './cityStates';
 import { getModifiers } from './effects';
@@ -75,9 +75,10 @@ function goldenMineBonus(state: GameState, seat: number, resourceId: string): nu
 }
 
 /**
- * One turn's income: every tile this seat owns that carries a strategic
- * resource under its matching, unpillaged improvement pays that resource's
- * published per-turn number. The stockpile is then clamped to the cap — a
+ * One turn's income: every tile this seat owns that hands it its strategic
+ * resource (`extractsResource`: its matching, unpillaged improvement, or a
+ * complete, unpillaged district) pays that resource's published per-turn
+ * number. The stockpile is then clamped to the cap — a
  * seat over the ceiling (its Encampment just went dark) loses the excess.
  */
 export function accrueStockpiles(state: GameState, seat: number): void {
@@ -91,18 +92,18 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   const hidden = hiddenResourcesFor(state, seat);
   const suz = suzerainMinorSeats(state, seat);
   for (const t of state.map.tiles) {
-    if (!t.resource || t.pillaged || hidden.has(t.resource)) continue;
+    if (!t.resource || hidden.has(t.resource)) continue;
     const k = strategicSlot(t.resource);
-    if (k < 0 || t.improvement !== resourceImprovement(t)) continue;
+    if (k < 0) continue;
     // CIV6 (LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): "Gain ownership of
     // all the city-state's resources" — an improved source on a suzerained
     // city-state's ground pays the suzerain the resource's own number, and
     // none of the seat's own rate rows, which read the seat's own tiles
     if (suz.has(tileSeat(t))) {
-      bk[k] += STRATEGIC_PER_TURN[t.resource];
+      if (!t.pillaged && t.improvement === resourceImprovement(t)) bk[k] += STRATEGIC_PER_TURN[t.resource];
       continue;
     }
-    if (!tileOwnedByCiv(t, seat)) continue;
+    if (!tileOwnedByCiv(t, seat) || !extractsResource(t)) continue;
     // CIV6 (Defense Logistics): "Accumulating Strategic resources gain an
     // additional +1 per turn" — per accruing tile of the governed city.
     // CIV6 (EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION_SPECIFIC_RESOURCE /

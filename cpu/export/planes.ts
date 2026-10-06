@@ -32,6 +32,7 @@ import { CITY_STATE_TYPES, CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS } from '../dat
 import { HOUSING_COASTAL, HOUSING_FRESH_WATER, HOUSING_NO_WATER, MP_SCALE } from '../data/constants';
 import { IMPROVEMENT_IDS } from '../core/unitActions';
 import { IMPROVEMENTS } from '../data/improvements';
+import { COAST_APPEAL, FEATURE_APPEAL, MOUNTAIN_APPEAL } from '../data/appeal';
 import { LUXURY_IDS, RESOURCE_IDS, TERRAIN_IDS, BUILT_WONDER_LIST, featIdx, wonderStaticOk, wonderBit, staticAdjRaw, featureAdjContribution, chopKeyCode, chopUnlockTech } from './catalog';
 
 export function buildFixture(state: GameState, world: WorldFile): object {
@@ -208,31 +209,15 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // than asking the GPU to re-derive it — one BFS, two engines.
       lw: t.lowland ?? 0,
       // tile APPEAL contributions. `tileAppeal` (core/appeal.ts)
-      // sums what each NEIGHBOUR contributes, so ship the per-tile
-      // contribution and let the GPU gather it over `neigh`. `ap` is the
-      // STATIC part (natural wonder +2, mountain +1, coast/lake +1) PLUS this
-      // tile's t0 feature term; `apf` isolates that removable-feature term so
-      // a chopped tile can subtract exactly it via feat_stripped. The rest is
-      // DYNAMIC and recomputed GPU-side (completed built wonder +1,
-      // MINE/QUARRY/OIL_WELL -1, INDUSTRIAL_ZONE/ENCAMPMENT -1).
-      ap: (() => {
-        let a = 0;
-        if (naturalWonderAt(t)) a += 2;
-        if (isMountain(t) && !naturalWonderAt(t)) a += 1;
-        if (t.terrain === 'COAST' || t.terrain === 'LAKE') a += 1;
-        if (t.feature === 'WOODS') a += 1;
-        if (t.feature === 'RAINFOREST' || t.feature === 'MARSH') a -= 1;
-        if (t.feature === 'OASIS') a += 1;
-        if (isFloodplains(t.feature)) a -= 1;
-        return a;
-      })(),
-      apf:
-        t.feature === 'WOODS' || t.feature === 'OASIS'
-          ? 1
-          : t.feature === 'RAINFOREST' || t.feature === 'MARSH' || isFloodplains(t.feature)
-            ? -1
-            : 0,
-      aps: (t.riverMask ?? 0) !== 0 || t.terrain === 'LAKE' ? 1 : 0,
+      // sums what each NEIGHBOUR lends, so ship the per-tile part and let the
+      // GPU gather it over `neigh`. `ap` is the STATIC part — the terrain's
+      // Appeal (mountain, coast / lake) PLUS this tile's t0 feature Appeal;
+      // `apf` isolates that feature term so a chopped tile subtracts exactly
+      // it via feat_stripped. The rest is DYNAMIC and recomputed GPU-side.
+      ap: (isMountain(t) ? MOUNTAIN_APPEAL : 0) + (t.terrain === 'COAST' || t.terrain === 'LAKE' ? COAST_APPEAL : 0)
+        + (t.feature ? FEATURE_APPEAL[t.feature] ?? 0 : 0),
+      apf: t.feature ? FEATURE_APPEAL[t.feature] ?? 0 : 0,
+      aps: (t.riverMask ?? 0) !== 0 ? 1 : 0,
       apo: naturalWonderAt(t) ? 5 : isMountain(t) ? 4 : -999,
       // river-edge crossing bits for the civ-seat MP walkers. The
       // GPU's neigh columns enumerate AXIAL_DIRS order (E NE NW W SW SE) —

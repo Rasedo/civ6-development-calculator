@@ -28,7 +28,7 @@
 import type { City, CityState, GameState, Tile, Unit } from '../core/types';
 import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
-import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, seatTourism, seatTourismReligious } from '../core/city';
+import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, placeIdleCitizens, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
@@ -57,7 +57,7 @@ import {
   type History, type Imported,
 } from './import';
 import {
-  ERA_BEGINS, buildingDedications, campMoment, diploVictoryMoment, enterEra, eraCountdownStep, foundingKeys,
+  ERA_BEGINS, buildingDedications, campMoment, diploVictoryMoment, levyMoment, enterEra, eraCountdownStep, foundingKeys,
   dedicationEvent, foundingMoments, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments,
   wonderMoment,
 } from '../core/eras';
@@ -903,6 +903,9 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     perSeat.set(city.seat, list);
   }
   for (const [seat, list] of perSeat) {
+    // the turn's processing places the citizens the record caught idle
+    // (`seatPhase`)
+    placeIdleCitizens(list.map(({ city }) => city));
     // the loyalty step's stats, on the turn-start cities (`landProduction`)
     const startStats = new Map(list.map(({ city }) => [city, computeCityStats(state, city)]));
     const sides: ((landed: boolean) => void)[] = [];
@@ -1221,6 +1224,25 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
     if (!p0 || !bool(p1.major) || !Array.isArray(p0.gpp) || !Array.isArray(p1.gpp)) continue;
     const spent = p1.gpp.filter((v, k) => num(v) < num(p0.gpp[k])).length;
     for (let n = gpUnits.get(p1.id) ?? 0; n < spent; n++) of(p1.id).events.push(['great person (points spent)', gp]);
+  }
+  // a city-state's military levied: a major's unit new at t+1 is a unit of
+  // the same type a city-state lost within 3 plots of it (the importer's
+  // levy reading), one moment per city-state levied
+  {
+    const live = new Set(b.units.map((u) => `${u.owner}:${u.id}`));
+    const minors = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
+    const majors = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
+    const lost = a.units.filter((u) => minors.has(u.owner) && !live.has(`${u.owner}:${u.id}`));
+    const shape = { width: W, height: b.head.H, wrapX: bool(b.head.wrapX) };
+    const levied = new Set<string>();
+    for (const u of b.units) {
+      if (before.has(`${u.owner}:${u.id}`) || !majors.has(u.owner)) continue;
+      const from = lost.find((g) => g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
+      if (from && !levied.has(`${u.owner}:${from.owner}`)) {
+        levied.add(`${u.owner}:${from.owner}`);
+        of(u.owner).events.push(['levy', levyMoment]);
+      }
+    }
   }
   // a barbarian camp gone from its plot: the major whose unit stands there
   // at t+1 destroyed it

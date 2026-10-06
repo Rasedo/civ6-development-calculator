@@ -1859,8 +1859,22 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     dumpOfCity.set(city, c);
     for (const q of c.plots) setTileOwner(tiles[q], seat, city.id);
     // the citizens: every worked plot pinned, so the engine's walk works the
-    // game's plots; the district slots take the game's specialist counts
-    for (const q of c.worked) if (q !== center && !tiles[q].district) tiles[q].locked = true;
+    // game's plots; the district slots take the game's specialist counts;
+    // the rest stand idle (runs/h1_duelw1116 Wuhan t133-179: seven citizens,
+    // six plots worked, no slot taken, the city paying the idle one's Gold)
+    let plots = 0;
+    for (const q of c.worked) {
+      if (q === center || tiles[q].district) continue;
+      tiles[q].locked = true;
+      plots += 1;
+    }
+    const idle = c.pop - plots - pins.reduce((n, p) => n + Math.max(0, p), 0);
+    if (idle > 0) {
+      city.idleCitizens = idle;
+      // the citizens the game left idle took no slot either: every district
+      // holds the specialists the record shows, none by the automatic rule
+      for (let i = 0; i < pins.length; i++) if (pins[i] < 0) pins[i] = 0;
+    }
     if (city.isCapital) holder.capitalTile = center;
     importGreatWorks(ctx, c, city);
     if (num(c.governor) >= 0 && rec.players.find((q) => q.id === c.owner)?.governors === undefined) {

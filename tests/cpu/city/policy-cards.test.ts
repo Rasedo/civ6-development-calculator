@@ -5,7 +5,7 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { applyPolicyEffects, computeUnlocks, computeAdoption, defaultModifiers, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from '../../../cpu/core/effects';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { cityBuildingYields } from '../../../cpu/core/yields';
-import { cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
+import { centreStrength, cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
 import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
 import { UNIT_ERA_INDEX, unitHasClass, UNITS } from '../../../cpu/data/units';
@@ -137,8 +137,12 @@ describe('the flat channels', () => {
     // order — retiring it with COLONIALISM is what lets BASTIONS in
     grantCivics(state, 'CODE_OF_LAWS', 'DEFENSIVE_TACTICS', 'COLONIALISM');
     expect(computeAdoption(seatOf(state, 0)!.research).policies).toContain('BASTIONS');
-    expect(cityDefenseStrength(state, city)).toBe(base + 6);
+    // the Defense half is EFFECT_ADJUST_CITY_OUTER_DEFENSE: no walls, no +6
+    expect(cityDefenseStrength(state, city)).toBe(base);
     expect(cityStrikeStrength(state, city)).toBe(base + 5);
+    city.buildings.push('ANCIENT_WALLS');
+    const walled = centreStrength(state, city);
+    expect(cityDefenseStrength(state, city)).toBe(walled + 6);
   });
 
   it('DISCIPLINE only ever runs one way', () => {

@@ -1088,7 +1088,7 @@ _MUTABLE = [
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_dominant",  # cultural dominance, per (from, to) major pair
     "civ_unit_acq",  # copies of each chassis a seat has ever acquired (the progressive price)
-    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
+    "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_idle", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
     "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",

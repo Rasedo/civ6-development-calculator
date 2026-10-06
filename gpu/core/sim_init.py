@@ -1100,6 +1100,9 @@ class SimInit:
         # automatic rule decides (City.specialistPref). Same geometry as the
         # registry above, because a pin names a district TYPE.
         self.city_spec_pin = torch.full((B, self.CITY_ROWS, civ_city_pad, nd_b4), -1, dtype=torch.long, device=device)
+        # CITIZENS LEFT IDLE, on neither a plot nor a slot (City.idleCitizens):
+        # the walk works population less specialists less these.
+        self.city_idle = torch.zeros(B, self.CITY_ROWS, civ_city_pad, dtype=torch.long, device=device)
         self.district_dead = torch.zeros(B, T, dtype=torch.bool, device=device)
         # Persistent city ids on the seat axis — the TS City.id, allocated per
         # seat from civ_next_city_id. tile_city stores THESE ids for every seat;
@@ -4293,6 +4296,9 @@ class SimInit:
         # FEATURE is worth to this seat's appeal, over the map-global walk
         self._feature_appeal_rows: list[tuple[int, int, int, int]] = [
             tuple(int(x) for x in r) for r in _uq["featureAppeal"]]  # type: ignore[misc]
+        # [featureIdx, civicIdx] — Features.AddCivic (`_appeal_add_civic_plane`)
+        self._appeal_add_civic: list[tuple[int, int]] = [
+            tuple(int(x) for x in r) for r in _uq["appealAddCivic"]]  # type: ignore[misc]
         # CIV6 (Poundmaker): this seat's alliances share MAP visibility
         self._alliance_shared_vis_rows: list[tuple[int, int]] = [
             tuple(int(x) for x in r) for r in _uq["allianceSharedVis"]]  # type: ignore[misc]
@@ -4601,6 +4607,11 @@ class SimInit:
         self._mk_beliefs = int(m["maxBeliefsKey"])
         self._mk_governors = int(m["governorsAllKey"])
         self._mk_posts = int(m["tradingPostAllKey"])
+        # [land, naval][formation] (`FORMATION_KEY`), every Encampment set, a
+        # city lit by a burned resource
+        self._mk_formation = torch.tensor(m["formationKey"], dtype=torch.long, device=device)
+        self._mk_full_camp = int(m["fullEncampmentKey"])
+        self._mk_power_res = int(m["powerFromResourceKey"])
         self._mk_found = torch.tensor(m["wonderFoundKey"] or [-1], dtype=torch.long, device=device)
         self._mk_near_nw = torch.tensor(m["nearWonderKey"] or [-1], dtype=torch.long, device=device)
         self._mk_near_flood = int(m["nearFloodKey"])

@@ -10,6 +10,7 @@ import { RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
 import { cityPlotBonus, computeCityStats } from '../../../cpu/core/city';
 import { emptyYields } from '../../../cpu/core/types';
 import { tileAppeal } from '../../../cpu/core/appeal';
+import { neighbors } from '../../../world/hex';
 import { purchaseReligiousUnit } from '../../../cpu/core/game';
 import { takePromotion, promoReady, promoAvailable, unitPromoRows, xpToNextLevel } from '../../../cpu/core/promotions';
 import type { City, GameState, Unit } from '../../../cpu/core/types';
@@ -206,18 +207,22 @@ describe('Forestry Management', () => {
     expect(computeCityStats(state, city).breakdown.tiles.gold).toBe(before + 2);
   });
 
-  it('lifts the Appeal of the city\'s tiles next to an unimproved feature', () => {
+  // CIV6 (Rules_Appeal 0x513780): each unimproved feature of the city lends
+  // the term to every plot beside it — one per such neighbour
+  it('lifts the Appeal of a plot once per unimproved feature of the city beside it', () => {
     const { state, city, woods } = woodedCity();
     const beside = tileAtCoords(state.map, 7, 8); // neighbours (6, 8)
     const away = tileAtCoords(state.map, 9, 8);
+    const n = neighbors(state.map, beside).filter((t) => woods.includes(t)).length;
+    expect(n).toBeGreaterThan(0);
     const bare = tileAppeal(state.map, beside, undefined, cityAppealResolver(state));
     const bareAway = tileAppeal(state.map, away, undefined, cityAppealResolver(state));
     seat(state, city, GOVERNOR_INDEX.REYNA, P_FORESTRY);
-    expect(tileAppeal(state.map, beside, undefined, cityAppealResolver(state))).toBe(bare + 1);
+    expect(tileAppeal(state.map, beside, undefined, cityAppealResolver(state))).toBe(bare + n);
     expect(tileAppeal(state.map, away, undefined, cityAppealResolver(state))).toBe(bareAway);
-    // improve the feature and the neighbour's lift goes with it
+    // improve one feature and its lift goes with it
     woods[0].improvement = 'LUMBER_MILL';
-    expect(tileAppeal(state.map, beside, undefined, cityAppealResolver(state))).toBe(bare + 1 - 1 + 1);
+    expect(tileAppeal(state.map, beside, undefined, cityAppealResolver(state))).toBe(bare + n - 1);
   });
 });
 

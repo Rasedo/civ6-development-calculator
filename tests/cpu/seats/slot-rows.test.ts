@@ -192,7 +192,7 @@ describe('the Roosevelt Corollary', () => {
       if (park) t.park = t.index;
       expect(cityHasPark(state, city)).toBe(park);
       const resolve = cityAppealResolver(state);
-      return resolve ? resolve(t) : 0;
+      return resolve ? resolve.flat(t) : 0;
     };
     expect(appeal(leaderRow('T_ROOSEVELT'), true)).toBe(1);
     expect(appeal(leaderRow('T_ROOSEVELT'), false)).toBe(0);

@@ -3065,6 +3065,8 @@ class SimSeats:
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_levy_seat[rows_l, sl[rows_l]] = row
                     self.citystate_levy_ends[rows_l, sl[rows_l]] = int(self.turn) + self._levy_turns
+                    # CIV6 (PLAYER_LEVIED_MILITARY): the levy's moment (`levyMoment`)
+                    self._add_era_score(row, int(self._mom["levied"]), do_l)
                     # CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY):
                     # the levy hands Envoys back (`LEVY_ROWS`)
                     for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
@@ -6870,12 +6872,11 @@ class SimSeats:
 
     def _most_advanced_strategic(self, b: int, row: int) -> int:
         """The most advanced strategic this seat can actually use: the most
-        advanced one with a live, improved source it can SEE (`_res_hidden`,
+        advanced one with a live source it can SEE (`_res_extracting`, `_res_hidden`,
         the revealing tech), falling back to slot 0. The stockpile's slot
         order IS era order. `mostAdvancedStrategic`'s twin, and the ONE model
         choice in the install's own subtype table."""
-        owned = ((self.tile_seat[b] == row) & ~self.pillaged[b]
-                 & (self.improvement[b] == self.res_imp[b]) & ~self._res_hidden(row)[b])
+        owned = ((self.tile_seat[b] == row) & self._res_extracting()[b] & ~self._res_hidden(row)[b])
         slot = 0
         for k, rid in enumerate(self._strat_rid):
             if k >= self.civ_stockpile.shape[2]:
@@ -9931,17 +9932,26 @@ class SimSeats:
                     torch.zeros_like(best_cost, dtype=torch.float64)))
         self.city_powered[:, row, :cols] = lit
 
+    def _res_extracting(self) -> torch.Tensor:
+        """[B, T] — does the plot hand its resource to its owner
+        (`extractsResource`)? CIV6 (Player_Resources 0x4aa8e0 / 0x4aaa70): a
+        complete, unpillaged district on it — a major's city centre included —
+        or else the resource's own unpillaged improvement."""
+        district = (self.centre_slot_at >= 0) | (
+            (self.district >= 0) & self.district_complete & ~self.district_pillaged)
+        return (self.res_id >= 0) & (district | ((self.improvement == self.res_imp) & ~self.pillaged))
+
     def _seat_accrue_stockpile(self, row: int) -> None:
         """One turn's resource income (`accrueStockpiles`): every tile this seat
-        owns whose strategic resource stands under its own unpillaged
-        improvement pays that resource's published number, and the bank is then
-        clamped to `_stockpile_cap`."""
+        owns that hands it its strategic resource (`_res_extracting`) pays that
+        resource's published number, and the bank is then clamped to
+        `_stockpile_cap`."""
         if self._n_strategic == 0:
             return
         # CIV6 (Resources.PrereqTech): a strategic the seat cannot see yet
-        # accrues nothing, whatever improvement stands on its tile
-        owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & ~self.pillaged
-                 & (self.improvement == self.res_imp) & ~self._res_hidden(row))
+        # accrues nothing, whatever stands on its tile
+        owned = ((self.tile_seat == int(self._ROW_SEAT[row])) & self._res_extracting()
+                 & ~self._res_hidden(row))
         bank = self.civ_stockpile[:, row]
         for k, (rid, rate) in enumerate(zip(self._strat_rid, self._strat_rate)):
             here = owned & (self.res_id == rid)
@@ -10003,6 +10013,9 @@ class SimSeats:
                                     self.city_bldg_pillaged[:, row, :cols])
             _alive = self.city_alive[:, row, :cols]
             _slot = self.city_slot_at(row)
+            # what the city has IMPROVED (`cityImprovedResourceKinds`)
+            improved = ((self.tile_seat == int(self._ROW_SEAT[row])) & ~self.pillaged
+                        & (self.improvement == self.res_imp) & ~self._res_hidden(row))
             for (_zbi, _zciv), _zamt in self._bvar_strat_type.items():
                 _zw = self._row_plays_idx(row, _zciv)
                 if not bool(_zw.count_nonzero()):
@@ -10012,7 +10025,7 @@ class SimSeats:
                 if not bool(_held.count_nonzero()):
                     continue
                 for k, rid in enumerate(self._strat_rid):
-                    _hs = torch.where(owned & (self.res_id == rid), _slot,
+                    _hs = torch.where(improved & (self.res_id == rid), _slot,
                                       torch.full_like(_slot, -1))
                     _cnt = torch.zeros(self.B, cols, dtype=torch.long, device=self.device)
                     _cnt.scatter_add_(1, _hs.clamp(min=0, max=cols - 1), (_hs >= 0).long())
@@ -10667,6 +10680,7 @@ class SimSeats:
             getattr(self, _p)[b, row, col, :] = -1
         self.city_dist_tile[b, row, col, :] = -1
         self.city_spec_pin[b, row, col, :] = -1
+        self.city_idle[b, row, col] = 0
         self.city_wonder[b, row, col, :] = -1
         self.city_bldg[b, row, col, :] = False
         self.city_bldg_pillaged[b, row, col, :] = False
@@ -10848,6 +10862,27 @@ class SimSeats:
         ua = self.major_unit_alive & (self.major_unit_seat == row) & ~self.major_unit_levied
         uk = self._mk_unit[self.major_unit_type.clamp(min=0)]
         self._moment_scatter(held, torch.where(ua.unsqueeze(2), uk, torch.full_like(uk, -1)))
+        # a living unit of a formation (`FORMATION_KEY`)
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        nav = self.unit_naval.take(ut).long()
+        form = self.major_unit_formation.clamp(min=0, max=self._mk_formation.shape[1] - 1)
+        fk = self._mk_formation[nav, form]
+        self._moment_scatter(held, torch.where(ua & (self.major_unit_formation > 0), fk, torch.full_like(fk, -1)))
+        # a city holding every Encampment building set, and a city lit by a
+        # plant's burned resource: powered, its own supply short and no
+        # fully-powering project at its queue's head (`_resolve_seat_power`)
+        cols = self.RC
+        held[:, self._mk_full_camp] |= (alive[:, :cols] & (self._mil_bldg_rows(self.city_bldg[:, row, :cols])
+                                                           == self._suz_mil_bldg.shape[0])).any(dim=1)
+        lit = self.city_powered[:, row, :cols] & alive[:, :cols]
+        if bool(lit.count_nonzero()):
+            demand, supply = self._city_power_need(row)[:2]
+            short = supply < demand
+            if self._proj_fp:
+                head = self.city_current[:, row, :cols, 0]
+                for pi in self._proj_fp:
+                    short = short & (head != self.PROJECT_BASE + pi)
+            held[:, self._mk_power_res] |= (lit & short).any(dim=1)
         imp = self.improvement
         ik = self._mk_imp.take(imp.clamp(min=0))
         self._moment_scatter(held, torch.where(own & (imp >= 0), ik, torch.full_like(ik, -1)))
@@ -11121,6 +11156,7 @@ class SimSeats:
         # the CONQUEROR manages nothing yet: TS's flipped literal carries no
         # `specialistPref`, so every slot goes back to the automatic rule.
         self.city_spec_pin[b, dst_row, col, :] = -1
+        self.city_idle[b, dst_row, col] = 0
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
         self.city_unconverted[b, dst_row, col] = old_unconv
@@ -11568,6 +11604,7 @@ class SimSeats:
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
             getattr(self, _p)[rows, row, slot, :] = -1
         self.city_spec_pin[rows, row, slot, :] = -1
+        self.city_idle[rows, row, slot] = 0
         self.city_loyalty[rows, row, slot] = 100.0
         self.city_acquired[rows, row, slot] = 0
         self.city_hp[rows, row, slot] = self.rules.combat["cityMaxHp"]
@@ -12588,7 +12625,11 @@ class SimSeats:
         h0 = hrow.clamp(max=self.n_majors - 1)
         wtier = self._walls_tier_at(hrow, hcol)
         def_cs = self._centre_strength(hrow, hcol)
-        def_cs = def_cs + torch.where(major, self._fx_at_seat("cdef", h0).to(def_cs.dtype),
+        # Bastions is EFFECT_ADJUST_CITY_OUTER_DEFENSE: paid while the
+        # perimeter stands (`outerPool` above 0)
+        hc0 = hcol.clamp(min=0)
+        _pool = torch.minimum(self.city_outer_hp[self._bidx, hrow, hc0].long(), self._walls_max_at(hrow, hc0).long())
+        def_cs = def_cs + torch.where(major & (_pool > 0), self._fx_at_seat("cdef", h0).to(def_cs.dtype),
                                       torch.zeros_like(def_cs))
         if self.n_governors:
             def_cs = def_cs + torch.where(major, self._governor_city_defense(h0, hcol).to(def_cs.dtype),

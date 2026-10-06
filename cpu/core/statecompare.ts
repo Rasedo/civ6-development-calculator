@@ -788,6 +788,7 @@ const CITY: Record<string, Extractor> = {
     });
   }),
   specialistPref: overCities((r) => PLACEABLE_DISTRICTS.map((_t, di) => r.city.specialistPref?.[di] ?? -1)),
+  idleCitizens: overCities((r) => r.city.idleCitizens ?? 0),
   queueProgress: overCities((r) => overQueue(r.city.queue, (q) => q?.progress ?? 0)),
   queueCost: overCities((r, state) => overQueue(r.city.queue, (q) => queueItemCost(state, r.city, q))),
   followedReligion: overCities((r) => r.city.followedReligion ?? -1),

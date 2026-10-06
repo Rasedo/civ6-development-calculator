@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
+import { campTiles, emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
+import { cityAppealResolver } from '../../../cpu/core/governors';
 import { makeState, settleAt, tileAtCoords, grantCivics } from '../helpers';
 import {
   spawnUnit, archaeologistExcavate, naturalistPark, parkCluster, parkClusterLegal,
@@ -144,8 +145,9 @@ describe('the Naturalist and the National Park', () => {
     const parked = state.map.tiles.filter((t) => (t.park ?? -1) >= 0);
     expect(parked.length).toBe(4);
     for (const t of parked) expect(t.park).toBe(Math.min(...parked.map((p) => p.index)));
-    // TOURISM = the total appeal of the four tiles
-    const appealSum = parked.reduce((n, t) => n + tileAppeal(state.map, t), 0);
+    // TOURISM = the total appeal of the four tiles, their owners' terms in it
+    const owners = cityAppealResolver(state);
+    const appealSum = parked.reduce((n, t) => n + tileAppeal(state.map, t, campTiles(state), owners), 0);
     expect(seatTourism(state, 0) - tourBefore).toBe(appealSum);
     // AMENITIES: 2 to the owner, 1 to the four nearest others
     const ownerCity = state.map.tiles[parked[0].index].ownerCity === city.id ? city : other;

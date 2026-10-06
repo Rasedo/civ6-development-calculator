@@ -1250,6 +1250,69 @@ order, 207 in index order; with single ties, 1,315 of 1,335 picks (the rest
 a plot bought after the start). The engines draw it as `randRange(ties)` /
 `_rand_range` over that order (`borderBestPlots`, `drawBorderPlot`,
 `_seat_border_draw`); the harness's `city.nextPlotDraw` replays it.
+
+## H-1: a plot's resource for its owner (strategic access) — READ
+
+Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0,
+the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes
+the plot's improvement (+0x44, read as none while pillaged, +0x4d bit 0)
+and, when the plot's district (0x810d0, the district at the plot's id) is
+complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not
+pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then
+answers the plot's resource (+0x40, count +0x42 > 0) when the plot's owner
+is the player, the resource's condition holds (0x4ac140, the revealing
+tech), and EITHER a district stands there — any type, the city centre
+included — OR the improvement's valid-resource list holds it. 0x4aafd0
+pays an accumulating resource `BaseExtractionRate` (+0x1c) plus
+`ImprovedExtractionRate` (+0x24) when an unpillaged improvement stands,
+else when a complete unpillaged district stands; a pillaged improvement
+pays the base alone (0 for every GS row). A Great Wall (Improvements.xml:
+no `Improvement_ValidResources` row) on Coal extracts nothing.
+Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed
+t120 before the Coal was revealed, plot 322 under a Great Wall, no mine
+anywhere — powers Beijing's Coal Power Plant (Factory +3 regional, Xi'an's
+Broadcast Center +4 Culture) from its completion t193 to the end, and bought
+an Ironclad (1 Coal) at t176. Both 3-a-turn sources fit 1116 alike (the
+ceiling binds); the DLL picks the district. 1116 city.yields 249 -> 112,
+step.border 114 -> 69; no duel moves otherwise. `extractsResource` /
+`_res_extracting` (the accrual, `civHasStrategic`, the most advanced
+strategic, the unit-access and heal-starvation masks).
+
+## H-1: the plot's Appeal — READ
+
+Rules_Appeal 0x513d70 (Lua `Plot:GetAppeal` reads the cached value through
+the plot's vtable +0x28) for a plot: the owning city's appeal term
+(+0x1800, EFFECT_ADJUST_CITY_APPEAL: Aalto, Correa, the park rows) first;
+a natural wonder (0x82e90) returns that + 5, a water terrain (0x834d0, the
+terrain row's water bit) returns 0, a mountain (terrain 2/5/8/11/14) that +
+4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete
+district while pillaged, -1 for its own pillaged improvement (+0x4d bit 0),
+then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it)
+through 0x513780, and last +1 when the plot's owner holds the civic its
+feature's row names (feature def +0xc8 -> `Features.AddCivic`: Woods with
+Conservation; the owner's tree at player +0x1310, a minor's included).
+0x513780 per neighbour n: with a city and a district at n, a wonder (n's
++0x1e) lends `Districts.Appeal` of its district once the city holds the
+building, any other district its `Districts.Appeal` once complete (+0xb08)
+and 1 less while pillaged — a district under construction lends nothing;
+then `Features.Appeal` plus the city's feature modifier (0x1b55d0 on city
++0x1788: Amazon), `Terrains.Appeal`, -1 for a pillaged improvement,
+`Improvements.Appeal`, and the city's governor's +0xc4 term (Forestry
+Management) when n holds a feature and no improvement. Records (land plots,
+game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700
+mismatching plot-turns -> 156, the rest one-turn readings and the cases
+below; Woods +1 from China's (and Auckland's) Conservation t167; the
+Torres del Paine plots of Beijing lending +1 each from Reyna's Forestry
+Management (t77) to unowned plots beside them; a Holy Site, Theater, Dam,
+Encampment or Aerodrome lending nothing while it builds. 1116 city.tourism
+78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
+Unexplained: a plot China acquired by purchase reads 0 for the rest of
+the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached
+value refreshed on events (the PLOT_APPEAL event instances), not modelled;
+and a National Park's Tourism (1109 Handan t225-241) read the park's
+appeal before the Conservation term until t242 — the same cache. LAB lines.
+`tileAppeal` / `_tile_appeal`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

@@ -48,7 +48,7 @@ import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, seatBuildingSum, swapTileOk } from './city';
+import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, placeIdleCitizens, seatBuildingSum, swapTileOk } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -112,7 +112,7 @@ import { resolveCompetition } from './competition';
 import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
-import { pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
+import { levyMoment, pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
 import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -370,6 +370,7 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
   for (const r of getModifiers(state, seat).levy) {
     if (r.envoys) seatOf(state, seat)!.envoysAvailable = (seatOf(state, seat)!.envoysAvailable ?? 0) + r.envoys;
   }
+  levyMoment(state, seat);
   state.eventLog.push(`${cityState.name} levies its army of ${army.length} to your cause.`);
   return ok;
 }
@@ -2546,6 +2547,7 @@ export function seatPhase(state: GameState): void {
       continue;
     }
 
+    placeIdleCitizens(actor.cities);
     // THE TURN'S RESOURCES, before anything reads them: every improved source
     // pays into the stockpile, then the plants burn what they need and the
     // POWERED flag every yield reader takes is set for the turn.

@@ -137,6 +137,20 @@ export function resourceImprovement(tile: Tile): ImprovementId | null {
   return def.waterImprovement && TERRAINS[tile.terrain].water ? def.waterImprovement : def.improvement;
 }
 
+/**
+ * Does this plot hand its resource to its owner? CIV6 (GameCore_XP2
+ * Player_Resources 0x4aa8e0 / 0x4aaa70): a complete, unpillaged district on
+ * the plot — any district, the city centre (never pillaged) included — or
+ * else an unpillaged improvement whose valid resources hold it; and 0x4aafd0
+ * pays an accumulating resource its ImprovedExtractionRate through either.
+ */
+export function extractsResource(tile: Tile): boolean {
+  if (!tile.resource) return false;
+  if (tile.district === 'CITY_CENTER') return true;
+  if (tile.district && tile.districtComplete && !tile.districtPillaged) return true;
+  return !tile.pillaged && tile.improvement === resourceImprovement(tile);
+}
+
 /** the LUXURY rows in catalog order — the one shared order every luxury
  *  index rides: the tile plane's `lux`, and the Congress target space. */
 export const LUXURY_IDS = Object.values(RESOURCES)

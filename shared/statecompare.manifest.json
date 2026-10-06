@@ -2334,6 +2334,17 @@
           "note": "effectiveSpecialists per PLACEABLE district: the pinned citizens plus the automatic overflow, derived live on both engines."
         },
         {
+          "name": "idleCitizens",
+          "compare": "exact",
+          "covers": [
+            "City.idleCitizens"
+          ],
+          "planes": [
+            "city_idle"
+          ],
+          "note": "the citizens the city holds on no plot and in no slot until its next turn start places them."
+        },
+        {
           "name": "specialistPref",
           "compare": "exact",
           "covers": [

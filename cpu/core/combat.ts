@@ -1137,9 +1137,12 @@ export function centreStrength(state: GameState, city: City, garrisoned = true):
 }
 
 /** What an attacker measures itself against — Bastions' "+6 City Defense
- *  Strength" half. A city-state's centre stands on `centreStrength` alone. */
+ *  Strength" half, EFFECT_ADJUST_CITY_OUTER_DEFENSE: the walls' strength, so
+ *  paid only while the perimeter stands (runs/h1_duelw1116 t97-104: Beijing
+ *  and Chengdu, no walls, read no Bastions; China's walled cities read +6).
+ *  A city-state's centre stands on `centreStrength` alone. */
 export function cityDefenseStrength(state: GameState, city: City): number {
-  return centreStrength(state, city) + getModifiers(state, city.seat).cityDefense
+  return centreStrength(state, city) + (outerPool(state, city) > 0 ? getModifiers(state, city.seat).cityDefense : 0)
     + governorSum(state, city, (e) => e.cityDefense);
 }
 

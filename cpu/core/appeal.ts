@@ -3,58 +3,81 @@
  * jungle/marsh lower it. Drives Neighborhood housing, and the
  * Seaside Resort's gold and tourism.
  *
- * CIV6 (wiki "Appeal"): every term below is the real one. A tile that IS a
- * MOUNTAIN scores a flat 4 and a NATURAL WONDER a flat 5, both unaffected by
- * their neighbours; every other tile starts at 0, takes +1 for its own river
- * or lake, and then sums its neighbours: natural wonder +2, wonder / mountain
- * / woods / coast / lake / oasis +1, rainforest / marsh / floodplains / mine /
- * quarry / oil well / industrial zone / encampment / spaceport / pillaged -1.
- * The modifiers are cumulative.
+ * CIV6 (GameCore_XP2 Rules_Appeal 0x513d70, its neighbour term 0x513780):
+ * the plot starts at its owner city's own
+ * term (`AppealOwners.flat`), and a NATURAL WONDER returns that + 5 — a water
+ * one included —, any other WATER plot 0, a
+ * MOUNTAIN that + 4. Any other plot takes +1 for its own river, -1 for its
+ * own pillaged improvement and -1 for its own complete, pillaged district,
+ * then sums its six neighbours, each lending:
+ * - a wonder: `Districts.Appeal` of DISTRICT_WONDER once it is built;
+ *   another district: its `Districts.Appeal` once COMPLETE, -1 more while
+ *   pillaged — a district under construction lends nothing;
+ * - its feature's `Features.Appeal`, its terrain's `Terrains.Appeal`
+ *   (mountain, coast), its improvement's `Improvements.Appeal`, -1 while that
+ *   improvement is pillaged, -1 for a barbarian outpost;
+ * - what its OWN city adds (`AppealOwners.lend`: the feature appeal rows,
+ *   the governor's unimproved-feature term).
+ * Last, a plot under a feature its owner's civic adds (`Features.AddCivic`:
+ * Woods with Conservation) scores +1 of its own.
  *
  * `camps` is the barbarian OUTPOST set (`campTiles`) — an outpost is stored on
  * the barbarian seat, not on its tile, so the one caller-supplied argument is
  * how the tile walk sees it. Omitting it drops the penalty, so every caller
  * passes it.
- *
- * Every DISTRICT term comes off `DistrictDef.appealAdjacent` and every
- * IMPROVEMENT term off `ImprovementDef.appealAdjacent`, so the walk never
- * names either type and a new row carries its own appeal.
- *
- * OPEN: the appeal-granting Great People.
  */
 
 import type { GameMap, ImprovementId, Tile } from './types';
 import { neighbors } from '../../world/hex';
-import { isMountain, naturalWonderAt } from '../../world/query';
-import { isFloodplains } from '../../world/features';
+import { isMountain, isWater, naturalWonderAt } from '../../world/query';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
-import { FIRE_APPEAL, fireFeature } from '../data/disasters';
+import { COAST_APPEAL, FEATURE_ADD_CIVIC, FEATURE_APPEAL, MOUNTAIN_APPEAL, WONDER_APPEAL } from '../data/appeal';
 
-/** what the tile's OWNER CITY adds to it, built by `cityAppealResolver`.
- *  Undefined when no city in the game carries either channel. */
-export type GpAppeal = ((t: Tile) => number) | undefined;
+/** what the plots' OWNER CITIES add, built by `cityAppealResolver`. */
+export interface AppealOwners {
+  /** the owner city's term on its own plot (Alvar Aalto, Charles Correa, a
+   *  National Park under Roosevelt Corollary) */
+  flat(t: Tile): number;
+  /** what a NEIGHBOUR lends through its own city: the feature appeal rows
+   *  (Amazon) and its governor's unimproved-feature term (Forestry Management) */
+  lend(n: Tile): number;
+  /** does the plot's owner hold the civic that adds its feature? */
+  addCivic(t: Tile): boolean;
+}
+export type GpAppeal = AppealOwners | undefined;
 
-export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>, gpAppeal?: GpAppeal): number {
-  if (naturalWonderAt(tile)) return 5;
-  if (isMountain(tile)) return 4;
-  let appeal = gpAppeal?.(tile) ?? 0;
-  if (tile.riverMask !== 0 || tile.terrain === 'LAKE') appeal += 1;
-  for (const n of neighbors(map, tile)) {
-    if (naturalWonderAt(n)) appeal += 2;
-    if (n.builtWonder && n.builtWonderComplete) appeal += 1;
-    if (n.feature === 'WOODS') appeal += 1;
-    if (isMountain(n) && !naturalWonderAt(n)) appeal += 1;
-    if (n.terrain === 'COAST' || n.terrain === 'LAKE') appeal += 1;
-    if (n.feature === 'OASIS') appeal += 1;
-    if (n.district) appeal += DISTRICTS[n.district].appealAdjacent;
-    if (camps?.has(n.index)) appeal -= 1;
-    if (n.feature === 'RAINFOREST' || n.feature === 'MARSH') appeal -= 1;
-    if (isFloodplains(n.feature)) appeal -= 1;
-    if (fireFeature(n.feature)) appeal += FIRE_APPEAL;
-    if (n.pillaged) appeal -= 1; // "-1 each adjacent pillaged tile"
-    if (n.improvement) appeal += IMPROVEMENTS[n.improvement as ImprovementId].appealAdjacent ?? 0;
+/** What neighbour `n` lends every plot beside it. */
+function lent(n: Tile, camps?: ReadonlySet<number>, owners?: AppealOwners): number {
+  let a = 0;
+  if (n.builtWonder) {
+    if (n.builtWonderComplete) a += WONDER_APPEAL;
+  } else if (n.district && n.districtComplete) {
+    a += DISTRICTS[n.district].appealAdjacent;
+    if (n.district !== 'CITY_CENTER' && n.districtPillaged) a -= 1;
   }
+  if (n.feature) a += FEATURE_APPEAL[n.feature] ?? 0;
+  if (isMountain(n)) a += MOUNTAIN_APPEAL;
+  if (n.terrain === 'COAST' || n.terrain === 'LAKE') a += COAST_APPEAL;
+  if (n.improvement) {
+    a += IMPROVEMENTS[n.improvement as ImprovementId].appealAdjacent ?? 0;
+    if (n.pillaged) a -= 1;
+  }
+  if (camps?.has(n.index)) a -= 1;
+  return a + (owners?.lend(n) ?? 0);
+}
+
+export function tileAppeal(map: GameMap, tile: Tile, camps?: ReadonlySet<number>, owners?: GpAppeal): number {
+  const flat = owners?.flat(tile) ?? 0;
+  if (naturalWonderAt(tile)) return flat + 5;
+  if (isWater(tile)) return 0;
+  if (isMountain(tile)) return flat + 4;
+  let appeal = flat;
+  if (tile.riverMask !== 0) appeal += 1;
+  if (tile.district && tile.district !== 'CITY_CENTER' && tile.districtComplete && tile.districtPillaged) appeal -= 1;
+  if (tile.improvement && tile.pillaged) appeal -= 1;
+  for (const n of neighbors(map, tile)) appeal += lent(n, camps, owners);
+  if (tile.feature && FEATURE_ADD_CIVIC[tile.feature] && owners?.addCivic(tile)) appeal += 1;
   return appeal;
 }
 
