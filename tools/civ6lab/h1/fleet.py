@@ -14,6 +14,11 @@ the main menu, then the engine's report over the dump (`.report.json`, `.report.
 the loop. One manifest line per game: host, seeds, dump and report paths,
 turns recorded, the end, wall time, and the report's pass / fail / skip
 counts per check. `summary` folds a manifest's reports into one table.
+The game's own draw log (Logs/RandCalls.csv: every draw's turn, range,
+value, seed and label) grows across games; the bytes a game appended are
+copied beside its dump (`.randcalls.csv`). The instances share one Logs
+folder, so with several hosts a game's slice holds the others' draws too
+(`randcallsMixed` in its manifest line).
 The instances must already stand at the main menu (`h4.py spawn` / `menu`).
 """
 from __future__ import annotations
@@ -33,6 +38,29 @@ LAB = HERE.parent
 ROOT = LAB.parents[1]
 RUNS = LAB / "runs"
 PY = sys.executable
+RANDCALLS = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI" / "Logs" / "RandCalls.csv"
+
+
+def randcalls_size() -> int:
+    try:
+        return RANDCALLS.stat().st_size
+    except OSError:
+        return 0
+
+
+def save_randcalls(start: int, out: pathlib.Path) -> int:
+    """Copy the draw log's bytes past `start` (the game's own) to `out` with
+    the log's header; the log restarting below `start` copies it whole."""
+    try:
+        data = RANDCALLS.read_bytes()
+    except OSError:
+        return 0
+    head, _, _ = data.partition(b"\n")
+    body = data[start:] if len(data) >= start else data
+    if body.startswith(head):
+        body = body[len(head) + 1:]
+    out.write_bytes(head + b"\n" + body)
+    return body.count(b"\n")
 
 
 def bounded(cmd: list[str], seconds: float, log: pathlib.Path) -> tuple[int, str]:
@@ -71,6 +99,7 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     if rc != 0:
         rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
         return rec
+    rc_start = randcalls_size()  # the new game's set-up draws are its own
     rc, tail = bounded([PY, str(LAB / "game.py"), "--host", host, "new", "--config", a.config,
                         "--map-seed", str(seed), "--game-seed", str(seed + 1000), "--wait", str(a.chunk - 10)],
                        a.chunk + 10, log)
@@ -98,6 +127,8 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     rec["turn"] = last
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
+    rec["randcalls"] = save_randcalls(rc_start, dump.with_suffix(".randcalls.csv"))
+    rec["randcallsMixed"] = a.hosts.count(",") > 0
     with lock:  # the report is CPU work; one at a time keeps the box for the games
         rc, tail = bounded(["npx.cmd" if sys.platform == "win32" else "npx", "vite-node", "cpu/harness/run.ts", "--",
                             str(dump)], a.report_timeout, log)
