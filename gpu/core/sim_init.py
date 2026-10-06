@@ -4678,10 +4678,10 @@ class SimInit:
                                         dtype=torch.long, device=dev)
         self._ice_fid = int(c["iceFid"])
         self._soil_fid = int(c["soilFid"])
-        _clear = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        for _f in self._clear_fids.tolist():
-            _clear |= self.feat_id == _f
-        self._removable_at_start = _clear.sum(dim=1)
+        # the removable features standing on the map as it was loaded, before
+        # any founding cleared a centre (`createGameFromMap`'s stamp, on the wire)
+        self._removable_at_start = torch.tensor([int(f["removableAtStart"]) for f in fixtures],
+                                                dtype=torch.long, device=dev)
         self._ice_at_start = (self.feat_id == self._ice_fid).sum(dim=1)
 
         # [points, flood band, submerge band, iceMelt, fertility, desertify]

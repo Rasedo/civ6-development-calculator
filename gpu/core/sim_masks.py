@@ -1016,9 +1016,9 @@ class SimMasks:
         `inDistrictTile` asks `!!t.district`, and a CITY CENTRE carries
         `tile.district = 'CITY_CENTER'` TS-side — so a unit standing on one IS
         in a district. The `district` plane holds only PLACEABLE districts;
-        centres live in the centre registry, which is why it is named here."""
+        centres, a city-state's among them, are `_centre_plane`'s."""
         tc = tiles.clamp(min=0).reshape(self.B, -1)
-        out = (self.district.gather(1, tc) >= 0) | (self.centre_slot_at.gather(1, tc) >= 0)
+        out = (self.district.gather(1, tc) >= 0) | self._centre_plane().gather(1, tc)
         # CIV6 (`Improvements.DefenseModifier`): "is this defensible ground" —
         # a district, or any improvement that shelters its occupant
         # (`improvementIsCover`).
@@ -3121,16 +3121,12 @@ class SimMasks:
             # under whichever ROW queued the district, and nothing clears it.
             & (self.district.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
             & (self.built_wonder.gather(1, t.unsqueeze(1)).squeeze(1) < 0)
-            # TS refuses a dig on ANY tile carrying a district, and `foundCity`
-            # sets `tile.district = 'CITY_CENTER'` (so do both capture paths).
-            # The GPU's `district` plane does NOT encode centres — they live in
-            # the seat-generic centre registry, so it is named here too.
-            & (self.centre_slot_at.gather(1, t.unsqueeze(1)).squeeze(1) < 0)  # any major's centre
-            # NOTE: a CITY-STATE centre is deliberately NOT excluded, and no
-            # term for it is computed. TS sets `tile.district = 'CITY_CENTER'`
-            # on any MAJOR's founding and on both capture paths, but never for
-            # a city-state, so `markAntiquitySite` accepts a death on a
-            # minor's centre.
+            # TS refuses a dig on ANY tile carrying a district, and every
+            # founding — a major's, a city-state's — and both capture paths
+            # set `tile.district = 'CITY_CENTER'` (`markCityCentre`). The GPU's
+            # `district` plane does NOT encode centres, so `_centre_plane`
+            # is named here too.
+            & ~self._centre_plane().gather(1, t.unsqueeze(1)).squeeze(1)
         )
         if not bool(okr.count_nonzero()):
             return

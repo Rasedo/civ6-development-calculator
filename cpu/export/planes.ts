@@ -333,6 +333,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     // order — static, so the TS rule's own answer ships (`floodRivers`)
     floodStarts: floodRivers(map).map((r) => r.start.index),
     maxCamps,
+    // the deforestation denominator, stamped off the map as it was loaded
+    // (`createGameFromMap`), before a founding clears a centre's feature
+    removableAtStart: state.removableAtStart ?? 0,
     rngInit: world.rngInit >>> 0,
     // `cityStateMax` is a genuine MAX — placement drops a city-state it
     // cannot space, so it sizes the minor rows and the roster may be

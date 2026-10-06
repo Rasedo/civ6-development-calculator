@@ -3063,15 +3063,15 @@ class SimEconomy:
         """[B, T] number of adjacent LIVE districts of the plot's own owner —
         the DISTRICT adjacency source (OtherDistrictAdjacent, GameCore
         0x365ae0: the neighbour's owner is the district's, the district
-        complete and not pillaged). Counts every MAJOR city centre
-        (centre_slot_at — those carry tile.district='CITY_CENTER' in TS) and
+        complete and not pillaged). Counts every city centre (`_centre_plane`
+        — those carry tile.district='CITY_CENTER' in TS) and
         every complete unpillaged specialty district (self.district) whose
         plot `tile_seat` names the same owner as the plot asked about,
         mirroring matchesAdjacency('DISTRICT'). This and its three siblings
         below are kept under the write counters of the planes they read;
         callers never write into the answer."""
-        planes = (self.centre_slot_at, self.district, self.district_complete, self.district_pillaged,
-                  self.tile_seat, self.neigh)
+        planes = (self.centre_slot_at, self.city_center, self.city_alive, self.district,
+                  self.district_complete, self.district_pillaged, self.tile_seat, self.neigh)
         ent = self._adjd_cache
         if ent is not None and simbase.stamp_holds(ent[0], planes):
             return ent[1]
@@ -3080,20 +3080,20 @@ class SimEconomy:
         on_map = (nb >= 0).unsqueeze(0)
         live = (self.district[:, nbc] >= 0) & self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
         same = self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)
-        is_d = ((self.centre_slot_at[:, nbc] >= 0) | live) & same & on_map
+        is_d = (self._centre_plane()[:, nbc] | live) & same & on_map
         out = is_d.sum(dim=2)
         self._adjd_cache = (simbase.plane_stamp(planes), out)
         return out
 
     def _adj_center_count(self) -> torch.Tensor:
-        planes = (self.centre_slot_at, self.neigh)
+        planes = (self.centre_slot_at, self.city_center, self.city_alive, self.neigh)
         ent = self._adjc_cache
         if ent is not None and simbase.stamp_holds(ent[0], planes):
             return ent[1]
         nb = self.neigh
         nbc = nb.clamp(min=0)
         on_map = (nb >= 0).unsqueeze(0)
-        is_c = (self.centre_slot_at[:, nbc] >= 0) & on_map
+        is_c = self._centre_plane()[:, nbc] & on_map
         out = is_c.sum(dim=2)
         self._adjc_cache = (simbase.plane_stamp(planes), out)
         return out

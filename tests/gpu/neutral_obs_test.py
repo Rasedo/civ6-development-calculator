@@ -245,7 +245,7 @@ def check_static(sim, st, twin) -> None:
         assert torch.equal(getattr(st, name), a), f"static {name} differs from the sim's"
     want = {
         "T": sim.T, "n_majors": sim.n_majors, "S": sim.S, "RC": sim.RC, "NT": sim.civ_techs.shape[2],
-        "NC": sim.civ_civics.shape[2], "NB": sim.NB, "NU": sim.NU, "max_cities": int(sim.rules.seats.get("maxCities", 6)),
+        "NC": sim.civ_civics.shape[2], "NB": sim.NB, "NU": sim.NU,
         "unit_slots": simbase.UNIT_SLOTS, "spec_keep": simbase.SPEC_KEEP,
         "unit_base": sim.UNIT_BASE, "district_base": sim.DISTRICT_BASE, "form_base": sim.FORM_BASE, "prod_w": sim.PROD_W,
         "n_wonders": sim._wond_n, "n_projects": len(sim._proj_rows),

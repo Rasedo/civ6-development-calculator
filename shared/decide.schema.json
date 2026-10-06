@@ -190,7 +190,6 @@
     ["NC", "the civic table's size"],
     ["NB", "the building table's size"],
     ["NU", "the unit table's size"],
-    ["max_cities", "the city cap the ladder settles to (`seats.maxCities`)"],
     ["unit_slots", "the most living units a seat holds (UNIT_SLOTS)"],
     ["spec_keep", "the specialist pin value that leaves a slot to the automatic rule (SPEC_KEEP)"],
     ["units", "the unit table rows (rules.json `units`), in table order"],

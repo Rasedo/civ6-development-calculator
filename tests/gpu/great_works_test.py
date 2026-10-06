@@ -125,14 +125,16 @@ def main() -> None:
     assert bool((d1 > 0).all()), "a slotted work must raise the city's culture yield"
     hold_works(sim, 0, 0, 0, WRITING, 1)
     d2 = city_totals(sim, 0)[0][:, 0, 4] - base
-    assert bool(((d2 - 2 * d1).abs() < 1e-9).all()), "the work yield must be linear (2 works = 2 x 1 work)"
+    # linear up to the walk's percent, taken in the game's 24.8 fixed point
+    # (GameAttribute::Value 0xaa740): one truncation per total
+    assert bool(((d2 - 2 * d1).abs() <= 2.0 / 256).all()), "the work yield must be linear (2 works = 2 x 1 work)"
     assert bool(((_t1[:, 0, 2] - base_g).abs() < 1e-9).all()), "a Great Work must pay NO gold"
 
     # --- a MUSIC work pays DOUBLE a writing work's culture (4 vs 2) --------
     clear_works(sim)
     hold_works(sim, 0, 0, 0, MUSIC, 1)
     dm = city_totals(sim, 0)[0][:, 0, 4] - base
-    assert bool(((dm - 2 * d1).abs() < 1e-9).all()), f"a music work must pay 2x a writing work ({float(dm[0])} vs {float(d1[0])})"
+    assert bool(((dm - 2 * d1).abs() <= 2.0 / 256).all()), f"a music work must pay 2x a writing work ({float(dm[0])} vs {float(d1[0])})"
 
     # --- MUSIC uses the BROADCAST CENTER (one slot): a Musician's 2 works
     # always leave 1 overflowing; the Amphitheater and Museum are music-blind

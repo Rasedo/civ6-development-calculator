@@ -198,8 +198,10 @@ def test_toqui(rules, path) -> None:
         return
     plain = culture("ROME", True, True)
     assert abs(culture("MAPUCHE", False, True) - plain) < 1e-9, "an ungoverned city took the row"
-    assert abs(culture("MAPUCHE", True, True) - plain * 1.05) < 1e-9, "the founded city's 5%"
-    assert abs(culture("MAPUCHE", True, False) - plain * 1.15) < 1e-9, "the conquered city's 15%"
+    # the percent lands in the game's 24.8 fixed point (GameAttribute::Value
+    # 0xaa740): equal to the float product within a 256th per truncation
+    assert abs(culture("MAPUCHE", True, True) - plain * 1.05) <= 2.0 / 256, "the founded city's 5%"
+    assert abs(culture("MAPUCHE", True, False) - plain * 1.15) <= 2.0 / 256, "the conquered city's 15%"
     print("  4 the Toqui OK — 5% founded, 15% not, and nothing without a governor")
 
 

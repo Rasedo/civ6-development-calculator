@@ -112,9 +112,11 @@ def test_hwarang(rules, path) -> None:
     plain = culture(None, None, 0, True)
     assert plain > 0, "the baseline city made no Culture"
     got = culture("KOREA", "SEONDEOK", 0, True)
-    assert abs(got - plain * 1.03) < 1e-9, f"a bare governor paid {got / plain - 1:.4f}"
+    # the percent lands in the game's 24.8 fixed point (GameAttribute::Value
+    # 0xaa740): equal to the float product within a 256th per truncation
+    assert abs(got - plain * 1.03) <= 2.0 / 256, f"a bare governor paid {got / plain - 1:.4f}"
     got2 = culture("KOREA", "SEONDEOK", 0b11, True)
-    assert abs(got2 - plain * 1.09) < 1e-9, f"two promotions paid {got2 / plain - 1:.4f}"
+    assert abs(got2 - plain * 1.09) <= 2.0 / 256, f"two promotions paid {got2 / plain - 1:.4f}"
     est = culture("KOREA", "SEONDEOK", 0b11, False)
     assert abs(est - plain) < 1e-9, "an establishing governor paid the row"
     assert abs(culture(None, None, 0b11, True) - plain) < 1e-9, "a plain seat took the row"
@@ -246,7 +248,7 @@ def test_righteousness(rules, path) -> None:
 
     plain_h = culture(None, None, True)
     held = culture("ARABIA", "SALADIN", True)
-    assert abs(held - plain_h * 1.1) < 1e-9, f"the held city paid {held / plain_h - 1:.4f}"
+    assert abs(held - plain_h * 1.1) <= 2.0 / 256, f"the held city paid {held / plain_h - 1:.4f}"
     plain_b = culture(None, None, False)
     bare = culture("ARABIA", "SALADIN", False)
     assert abs(bare - plain_b) < 1e-9, "the row paid without the building"

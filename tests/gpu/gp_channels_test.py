@@ -248,7 +248,10 @@ def main() -> None:
     # +3 through the walk's own scalings (the amenity factor, then the seat's
     # percent multipliers): the delta is 3 x a percent-shaped multiplier
     _d = (c1 - c0) / (3.0 * float(_yf[B0, 0]))
-    assert _d >= 1.0 - 1e-9 and abs(_d - round(_d, 2)) < 1e-9, f"Leonardo: a standing Workshop must pay +3 Culture, {c0} -> {c1}"
+    # (the percent is taken in the game's 24.8 fixed point, GameAttribute::Value
+    # 0xaa740, so the multiplier is percent-shaped to within a 256th per total)
+    _tol = 2.0 / 256 / (3.0 * float(_yf[B0, 0]))
+    assert _d >= 1.0 - _tol and abs(_d - round(_d, 2)) <= _tol, f"Leonardo: a standing Workshop must pay +3 Culture, {c0} -> {c1}"
     sim.city_bldg[B0, 0, 0, bidx["WORKSHOP"]] = False
     sim._bldg_version += 1
     sim._eff_version += 1
