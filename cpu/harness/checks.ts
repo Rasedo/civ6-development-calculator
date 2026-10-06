@@ -41,7 +41,7 @@ import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
-import { governorFlag } from '../core/governors';
+import { governedCityIds, governorFlag } from '../core/governors';
 import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { UNITS } from '../data/units';
@@ -175,9 +175,11 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
 
   // every plot's yields: an owned plot on its owner's context, an unowned one
   // on the base context with the resources the LOCAL player cannot see hidden
-  // (the game's plot reader answers for its viewer; an observer game has
-  // none, and its unowned resource plots are skipped); a district or wonder
-  // plot and the seam are left out
+  // (the game's plot reader answers for its viewer); a local player out of
+  // the game sees every resource (runs/h1_duelw1110: its viewer eliminated at
+  // t209, 3,217 of the 3,218 unowned resource plot-turns after it read with
+  // nothing hidden, none with every tech-revealed resource hidden); a district
+  // or wonder plot and the seam are left out
   const ctxBySeat = new Map<number, ReturnType<typeof makeYieldCtx>>();
   const localSeat = imp.seatOfPlayer.get(num(rec.head.localPlayer));
   const base = localSeat === undefined ? baseYieldCtx(state)
@@ -189,10 +191,6 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const gy = plotAt(rec, t.index)[P.yields] as number[];
     if (!Array.isArray(gy)) continue;
     let ctx = base;
-    if (t.ownerSeat < 0 && localSeat === undefined && t.resource) {
-      out.push({ turn, check: 'plot.yields', subject: `plot ${t.index}`, ok: true, skip: 'no viewer' });
-      continue;
-    }
     if (t.ownerSeat >= 0) {
       if (!ctxBySeat.has(t.ownerSeat)) ctxBySeat.set(t.ownerSeat, makeYieldCtx(state, t.ownerSeat));
       ctx = ctxBySeat.get(t.ownerSeat)!;
@@ -457,7 +455,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     // left them; a record whose cities moved since (a wonder completed in
     // the turn: 1108 Rome t102, the Pyramids' 3 in Rome's figure, 0 in the
     // seat's) holds no reading of the seat's
-    const tour = seatTourism(state, seat) + seatTourismReligious(state, seat);
+    const tour = seatTourism(state, seat, governedCityIds(seatOf(state, seat)!)) + seatTourismReligious(state, seat);
     const citySum = rec.cities.filter((c) => c.owner === pid).reduce((n, c) => n + num(c.tourism), 0);
     if (rec.cities.some((c) => c.owner === pid && c.tourism !== undefined) && citySum !== num(p.tourism)) {
       out.push({ turn, check: 'seat.tourism', subject, ok: true, skip: 'the seat figure predates its cities\'' });

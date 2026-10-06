@@ -478,32 +478,49 @@ class SimInit:
         self.hills = torch.tensor([[t.get("hl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.river_mask = torch.tensor([[int(t.get("rm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # CIV6 (Flood): "flooding all Floodplains tiles found along the River".
-        # Which river a tile is on, -1 for none — `riverReach`'s twin. Two
-        # tiles share a river when a river EDGE separates them; a river's edges
-        # are a vertex-connected chain and any two edges meeting at a vertex
-        # are consecutive edges of one common tile, so this walk covers exactly
-        # one river. Static: rivers never move.
+        # Each plot's river, -1 beside none — `riverOfPlots`' twin. A river is
+        # a chain of EDGES meeting at vertices: edge d of plot t meets t's
+        # edges d-1 and d+1 and its neighbour n_d's edges d+2 and d+4. A plot
+        # beside several rivers belongs to the one whose lowest-indexed plot
+        # is the highest. Static: rivers never move.
         _rm = self.river_mask.tolist()
         _nb = self.neigh.tolist()
         _comp = [[-1] * T for _ in range(B)]
         for _b in range(B):
-            _lbl, _next = _comp[_b], 0
+            _m = _rm[_b]
+
+            def _key(t, d, _n):
+                return _n * 6 + (d + 3) % 6 if 0 <= _n < t else t * 6 + d
+
+            _edge: dict[int, int] = {}
+            _low: list[int] = []
             for _t0 in range(T):
-                if _lbl[_t0] >= 0 or _rm[_b][_t0] == 0:
-                    continue
-                _lbl[_t0] = _next
-                _stack = [_t0]
-                while _stack:
-                    _t = _stack.pop()
-                    for _d in range(6):
-                        if not (_rm[_b][_t] >> _d) & 1:
-                            continue
+                for _d0 in range(6):
+                    if not (_m[_t0] >> _d0) & 1 or _key(_t0, _d0, _nb[_t0][_d0]) in _edge:
+                        continue
+                    _c = len(_low)
+                    _low.append(_t0)
+                    _stack = [(_t0, _d0)]
+                    while _stack:
+                        _t, _d = _stack.pop()
                         _n = _nb[_t][_d]
-                        if _n < 0 or _lbl[_n] >= 0:
+                        _k = _key(_t, _d, _n)
+                        if _k in _edge:
                             continue
-                        _lbl[_n] = _next
-                        _stack.append(_n)
-                _next += 1
+                        _edge[_k] = _c
+                        _low[_c] = min(_low[_c], _t, _n if _n >= 0 else _t)
+                        for _u, _e in ((_t, (_d + 1) % 6), (_t, (_d + 5) % 6), (_n, (_d + 2) % 6), (_n, (_d + 4) % 6)):
+                            if _u >= 0 and (_m[_u] >> _e) & 1:
+                                _stack.append((_u, _e))
+            _lbl = _comp[_b]
+            for _t in range(T):
+                for _d in range(6):
+                    if not (_m[_t] >> _d) & 1:
+                        continue
+                    _c = _edge[_key(_t, _d, _nb[_t][_d])]
+                    _cur = _lbl[_t]
+                    if _cur < 0 or _low[_c] > _low[_cur] or (_low[_c] == _low[_cur] and _c > _cur):
+                        _lbl[_t] = _c
         self.river_comp = torch.tensor(_comp, dtype=torch.long, device=device)
         self.cliff_mask = torch.tensor([[int(t.get("cm", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self._has_cliffs = bool(self.cliff_mask.count_nonzero())

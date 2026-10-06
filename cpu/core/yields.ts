@@ -282,10 +282,15 @@ function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile, owner: number, hi
       return feature === 'GEOTHERMAL_FISSURE';
     case 'PAMUKKALE':
       return feature === 'PAMUKKALE';
+    // CIV6 (Dance of the Aurora, Desert Folklore): one row for the flat
+    // terrain and one for its hills (TERRAIN_DESERT, TERRAIN_DESERT_HILLS);
+    // the mountain of that terrain answers neither (runs/h1_duelw1110,
+    // Xi'an's Holy Site beside a Desert and a Desert Mountain: 2 Faith with
+    // the Mountain's 1)
     case 'TUNDRA':
-      return terrain === 'TUNDRA';
+      return terrain === 'TUNDRA' && !isMountain(neighbor);
     case 'DESERT':
-      return terrain === 'DESERT';
+      return terrain === 'DESERT' && !isMountain(neighbor);
     case 'NATURAL_WONDER':
       return naturalWonderAt(neighbor) !== null;
     case 'BUILT_WONDER':

@@ -313,26 +313,32 @@ describe('disasters', () => {
   });
 });
 
-describe('the flood reaches the whole river', () => {
-  /** Two tiles carry a river EDGE between them when both masks hold that bit —
-   *  the mapgen writes both flanks, so a river tile chain is symmetric. */
-  function link(map: ReturnType<typeof makeMap>, a: Tile, dir: number): Tile {
-    const b = neighborTile(map, a, dir)!;
-    a.riverMask |= 1 << dir;
-    b.riverMask |= 1 << ((dir + 3) % 6);
-    return b;
+/** A river along the bottom edges of `n` tiles of one row from `start`
+ *  eastward: each tile's SW and SE edges, one vertex-connected chain (the
+ *  mapgen writes both flanks of an edge). Returns the row's tiles. */
+function riverUnder(map: ReturnType<typeof makeMap>, start: Tile, n: number): Tile[] {
+  const out: Tile[] = [];
+  let t: Tile = start;
+  for (let k = 0; k < n; k++) {
+    out.push(t);
+    for (const d of [4, 5]) {
+      t.riverMask |= 1 << d;
+      const nb = neighborTile(map, t, d);
+      if (nb) nb.riverMask |= 1 << ((d + 3) % 6);
+    }
+    t = neighborTile(map, t, 0)!;
   }
+  return out;
+}
 
+describe('the flood reaches the whole river', () => {
   it('walks the river and stops where the river does', () => {
     const state = makeState(makeMap(16, 16));
-    const a = tileAtCoords(state.map, 4, 4);
-    const b = link(state.map, a, 0);
-    const c = link(state.map, b, 0);
+    const [a, b, c, dry] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 4);
     for (const t of [a, b, c]) t.feature = 'FLOODPLAINS';
-    // a floodplain OFF the river, and a river tile that is not floodplain
+    // a floodplain OFF the river; `dry` a river tile that is not floodplain
     const off = tileAtCoords(state.map, 10, 10);
     off.feature = 'FLOODPLAINS';
-    const dry = link(state.map, c, 1);
 
     const reach = riverReach(state.map, a).map((t) => t.index);
     expect(reach).toEqual([a, b, c].map((t) => t.index).sort((x, y) => x - y));
@@ -348,11 +354,7 @@ describe('the flood reaches the whole river', () => {
   it('a flood starts on its river\'s upstream-most floodplain: the one farthest from the mouth', () => {
     const board = (mouthEast: boolean | null) => {
       const state = makeState(makeMap(16, 16));
-      const a = tileAtCoords(state.map, 3, 4);
-      const b = link(state.map, a, 0);
-      const c = link(state.map, b, 0);
-      const d = link(state.map, c, 0);
-      const e = link(state.map, d, 0);
+      const [a, b, c, d, e] = riverUnder(state.map, tileAtCoords(state.map, 3, 4), 5);
       for (const t of [b, c, d]) t.feature = 'FLOODPLAINS';
       if (mouthEast !== null) (mouthEast ? neighborTile(state.map, e, 0)! : neighborTile(state.map, a, 3)!).terrain = 'COAST';
       return { state, b, d };
@@ -375,9 +377,7 @@ describe('the flood reaches the whole river', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const a = tileAtCoords(state.map, 4, 4);
-    const b = link(state.map, a, 0);
-    const c = link(state.map, b, 0);
+    const [a, b, c] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 3);
     const off = tileAtCoords(state.map, 10, 10);
     for (const t of [a, b, c, off]) {
       t.feature = 'FLOODPLAINS';
@@ -420,12 +420,7 @@ describe('the flood\'s row walk', () => {
   const river = () => {
     const state = makeState(makeMap(16, 16));
     state.unitsMode = true;
-    const a = tileAtCoords(state.map, 4, 4);
-    const b = neighborTile(state.map, a, 0)!;
-    const c = neighborTile(state.map, b, 0)!;
-    a.riverMask |= 1 << 0;
-    b.riverMask |= (1 << 3) | (1 << 0);
-    c.riverMask |= 1 << 3;
+    const [a, b, c] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 3);
     a.terrain = 'DESERT';
     a.feature = 'FLOODPLAINS';
     b.terrain = 'GRASSLAND';

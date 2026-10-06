@@ -4235,7 +4235,9 @@ class SimEconomy:
         if fid >= 0:
             on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
         elif tid >= 0:
-            on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_submerged
+            # a TERRAIN source is its flat and hills rows: the mountain of
+            # that terrain answers neither
+            on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_mountain & ~self.tile_submerged
         else:
             on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         nb = self.neigh

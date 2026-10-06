@@ -32,6 +32,14 @@ export function governorsOf(seat: Seat): Governor[] {
   return seat.governors;
 }
 
+/** The ids of the seat's cities an appointed governor holds, seated and not
+ *  in transit. */
+export function governedCityIds(seat: Seat): Set<number> {
+  return new Set(governorsOf(seat)
+    .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0)
+    .map((g) => g.cityId));
+}
+
 /**
  * CIV6 (Governor): thirteen named civics "will grant 1 Governor Title", and
  * the Government Plaza plus each of its buildings grants one more. A pillaged

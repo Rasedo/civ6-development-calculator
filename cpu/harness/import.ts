@@ -523,6 +523,9 @@ interface RecruitedPerson {
   unit: string | null;
   at: number;
   spent: number | null;
+  /** the id of the claimant's city owning `at` in the last record the unit
+   *  stood in, -1 where no city of the claimant owned it */
+  city: number;
 }
 
 interface PolicySlots {
@@ -839,15 +842,25 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
       && !before.has(`${u.owner}:${u.id}`) && !bound.has(`${u.owner}:${u.id}`));
     const key = unit ? `${unit.owner}:${unit.id}` : null;
     if (key) bound.add(key);
-    h.people.set(ind, { player, cls: name, unit: key, at: unit ? unit.y * W + unit.x : -1, spent: unit ? null : rec.turn });
+    const at = unit ? unit.y * W + unit.x : -1;
+    h.people.set(ind, { player, cls: name, unit: key, at, spent: unit ? null : rec.turn, city: cityOwning(rec, at, player) });
   }
   for (const p of h.people.values()) {
     if (p.spent !== null || p.unit === null) continue;
     const u = live.get(p.unit);
-    if (u) p.at = u.y * W + u.x;
-    else p.spent = rec.turn;
+    if (u) {
+      p.at = u.y * W + u.x;
+      p.city = cityOwning(rec, p.at, p.player);
+    } else p.spent = rec.turn;
   }
   return true;
+}
+
+/** The id of `player`'s city owning plot `at` in `rec`, -1 where none does. */
+function cityOwning(rec: TurnRecord, at: number, player: number): number {
+  if (at < 0) return -1;
+  const plot = plotAt(rec, at);
+  return plot && num(plot[P.owner] as number) === player ? num(plot[P.ownerCity] as number) : -1;
 }
 
 /** A GreatPersonIndividuals index's engine person, or undefined. */
@@ -1017,6 +1030,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const b = before.get(k);
       if (!b || b.owner !== c.owner) {
         h.nextPlotUnheld.add(k);
+        // a city changing hands starts its border count again, a plot it
+        // gained in the same turn counted (runs/h1_duelw1110, Rome taken at
+        // t142 with no plot gained: 107 Culture the turn before, 5 on
+        // capture, then 10 and 17; runs/h1_duelw1114, the Free City of Rome
+        // taken at t197 with one plot gained: 10, then 17 and 26)
+        if (b) h.cultureTaken.set(k, Math.max(0, c.plots.length - b.plots.length));
         continue;
       }
       // the box fell on a plot gained or a next plot held: culture paid for
@@ -1878,7 +1897,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
-  if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame);
+  if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame, cityByKey);
   else spentPersonGaps(ctx, rec, cityByKey, history);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
@@ -2875,7 +2894,7 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
  * roster is the seat's `gp-person` gap.
  */
 function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<number, RecruitedPerson>,
-  seatOfGame: (pid: number) => number): void {
+  seatOfGame: (pid: number) => number, cityByKey: Map<string, City>): void {
   for (const [ind, p] of people) {
     if (p.spent === null || p.spent > rec.turn) continue;
     const seat = seatOfGame(p.player);
@@ -2901,8 +2920,13 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
       const tile = p.at >= 0 ? state.map.tiles[p.at] : undefined;
       if (!tile) gap(ctx, 'gp-site', person.id);
       else {
-        const city = s.cities.find((c) => tile.ownerSeat === seat && c.id === tile.ownerCity)
-          ?? s.cities.find((c) => c.isCapital);
+        // the city that owned the plot where the person was spent, while
+        // its claimant holds it: a city changing hands loses what the person
+        // laid in it (runs/h1_duelw1110: Ibn Khaldun spent on Rome's Campus at
+        // t123, its +2 Housing and +1 Amenity gone when China took Rome at
+        // t142); a person spent on no city of its own pays the capital
+        const city = p.city >= 0 ? cityByKey.get(`${p.player}:${p.city}`)
+          : s.cities.find((c) => c.isCapital);
         for (const [k, n] of cityPerm) {
           if (!city) continue;
           const v = (city.gpPerm ??= GP_CITY_PERM.map(() => 0));

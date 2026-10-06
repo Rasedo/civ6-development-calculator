@@ -108,11 +108,18 @@ export function hasRiver(tile: Tile): boolean {
 
 export function hasFreshWater(map: GameMap, tile: Tile): boolean {
   if (hasRiver(tile)) return true;
-  if (ringFeature(tile) === 'OASIS') return true;
+  // CIV6 (Features.xml AddsFreshWater): the Oasis, and the Crater Lake and
+  // Pamukkale beside the plot (runs/h1_duelw1110, Yiyang beside the Crater
+  // Lake: 5 Housing of water)
+  const fresh = (t: Tile): boolean => {
+    const f = ringFeature(t);
+    return f !== null && FEATURES[f]?.freshWater === true;
+  };
+  if (fresh(tile)) return true;
   // a drowned Lake or Oasis is SEA now, and the sea is not fresh
   for (const n of neighbors(map, tile)) {
     if (ringTerrain(n) === 'LAKE') return true;
-    if (ringFeature(n) === 'OASIS') return true;
+    if (fresh(n)) return true;
   }
   return false;
 }

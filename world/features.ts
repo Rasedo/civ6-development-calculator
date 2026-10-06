@@ -149,7 +149,7 @@ export const FEATURES: Record<string, FeatureDef> = {
 // (Civilization wiki, "Crater Lake (Civ6)"); Dead Sea +2 culture / +2 faith.
 const NW = { terrains: [] as TerrainId[], allowHills: false, removable: false, naturalWonder: true };
 Object.assign(FEATURES, {
-  CRATER_LAKE: { id: 'CRATER_LAKE', name: 'Crater Lake', yields: { science: 1, faith: 5 }, ...NW },
+  CRATER_LAKE: { id: 'CRATER_LAKE', name: 'Crater Lake', yields: { science: 1, faith: 5 }, ...NW, freshWater: true },
   DEAD_SEA: { id: 'DEAD_SEA', name: 'Dead Sea', yields: { faith: 2, culture: 2 }, ...NW },
   GALAPAGOS: { id: 'GALAPAGOS', name: 'Galápagos Islands', yields: {}, impassable: true, adjacentYields: { science: 2 }, ...NW },
   // CIV6 (Features.xml Feature_YieldChanges): FEATURE_BARRIER_REEF Food 3, Science 2
@@ -245,7 +245,7 @@ Object.assign(FEATURES, {
   DEVILS_TOWER: { id: 'DEVILS_TOWER', name: "Devil's Tower", yields: {}, impassable: true, adjacentYields: { faith: 1, production: 1 }, ...NW },
   GIANTS_CAUSEWAY: { id: 'GIANTS_CAUSEWAY', name: "Giant's Causeway", yields: {}, impassable: true, adjacentYields: { culture: 1 }, ...NW },
   LAKE_RETBA: { id: 'LAKE_RETBA', name: 'Lake Retba', yields: { production: 1, gold: 2, culture: 2 }, ...NW },
-  PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, ...NW },
+  PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, ...NW, freshWater: true },
 } satisfies Record<string, FeatureDef>);
 
 // THREE MORE WONDERS, appended after Pamukkale; the engines' map generator

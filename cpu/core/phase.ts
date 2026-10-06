@@ -113,7 +113,7 @@ import { acceptDeal, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
-import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governorsOf, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -1411,7 +1411,10 @@ export function transferCity(
       : civCity.population,
     foodBox: 0,
     cultureBox: 0,
-    tilesAcquired: civCity.tilesAcquired,
+    // the border count starts again: the next plot costs the first plot's
+    // price (runs/h1_duelw1110, Rome taken at t142: 107 Culture the turn
+    // before, 5 on capture, then 10 and 17)
+    tilesAcquired: 0,
     focus: 'balanced',
     queue: [],
     isCapital: false,
@@ -2687,9 +2690,7 @@ export function seatPhase(state: GameState): void {
     const econMods = getModifiers(state, actor.seat);
     // this seat's governor seats for THIS turn — persistent assignments the
     // roster already carries, read once before the walk moves any loyalty.
-    const rGovIds = new Set(governorsOf(actor)
-      .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0)
-      .map((g) => g.cityId));
+    const rGovIds = governedCityIds(actor);
     const readYields = (): CityStats['total'][] => {
       const lux = luxuryAmenities(state, actor.seat);
       const mods = getModifiers(state, actor.seat);

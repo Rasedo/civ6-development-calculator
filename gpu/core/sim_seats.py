@@ -2074,7 +2074,7 @@ class SimSeats:
             # so it does not reach here.
             _ngz_f = self._suz_land_buy_mult(row).gather(1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
             return mil & self._afford(self.civ_faith[:, row].unsqueeze(1),
-                                      self._faith_price(row, self._type_cost.double().unsqueeze(0) * self.rules.faith_purchase_mult,
+                                      self._faith_price(row, js_round(self._unit_buy_base() * self.rules.faith_purchase_mult),
                                                         self._ngz_off(_ngz_f)))
         if self._scout_idx >= 0:
             mil[:, self._scout_idx] = False
@@ -2086,7 +2086,7 @@ class SimSeats:
         _ngz = self._suz_land_buy_mult(row).gather(
             1, self._seat_buy_unit_slot(row).unsqueeze(1))  # [B, 1]
         afford = self._afford(self.civ_treasury[:, row].unsqueeze(1),
-                              self._gold_price(row, self._type_cost.double().unsqueeze(0) * self.rules.gold_purchase_mult
+                              self._gold_price(row, self._unit_buy_base() * self.rules.gold_purchase_mult
                                                * merc * _ngz * self._land_unit_price_mult(row)))
         return mil & afford
 
@@ -2770,7 +2770,7 @@ class SimSeats:
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
                         pick_ty, init_xp=xp_u, init_mp=self._train_mp_bonus(_bl_g, pick_ty, row))
                     self._raise_best_melee(row, landed_u, pick_ty)
-                    price_u =self._gold_price(row, self._type_cost.gather(0, pick_ty).double() * mult
+                    price_u =self._gold_price(row, self._unit_buy_base().gather(1, pick_ty.clamp(min=0).unsqueeze(1)).squeeze(1) * mult
                                                * self._congress_unit_cost_mult(self._cur_gold)
                                                * self._suz_land_buy_mult(row).gather(1, spawn_slot.unsqueeze(1)).squeeze(1)
                                                * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1))
@@ -2979,7 +2979,7 @@ class SimSeats:
             ju = uj.clamp(min=0, max=self.RC - 1)
             bu = ub.clamp(min=0, max=self.NU - 1)
             cand_u = self._seat_buy_unit_candidates(row, self._seat_trainable_units(row), faith=True)
-            price_u = self._faith_price(row, self._type_cost.gather(0, bu).double() * self.rules.faith_purchase_mult,
+            price_u = self._faith_price(row, js_round(self._unit_buy_base().gather(1, bu.unsqueeze(1)).squeeze(1) * self.rules.faith_purchase_mult),
                                         self._ngz_off(self._suz_land_buy_mult(row)[bidx, ju]))
             buy_u = (active & ext & (uj >= 0) & (ub >= 0) & self.city_alive[bidx, row, ju]
                      & self._seat_faith_unit_grant(row) & cand_u[bidx, bu]
@@ -4053,8 +4053,10 @@ class SimSeats:
         merc = self._congress_unit_cost_mult(self._cur_gold).unsqueeze(1)
         land = self._land_unit_price_mult(row)
 
+        buy_base = self._unit_buy_base()
+
         def price(t: torch.Tensor) -> torch.Tensor:
-            p = self._type_cost.take(t).double() * self.rules.gold_purchase_mult
+            p = buy_base.gather(1, t) * self.rules.gold_purchase_mult
             p = torch.where((self._type_combat.take(t) > 0) | self._type_support.take(t), p * merc, p)
             return p * land.gather(1, t)
 
@@ -7624,6 +7626,16 @@ class SimSeats:
             "MERCENARY_COMPANIES", (out >= 0) & (tgt == currency),
             self._c_plus100, self._c_minus50)
 
+    def _unit_buy_base(self) -> torch.Tensor:
+        """[B, NU] f64 — `unitBuyBase`'s twin: the cost a unit's purchase
+        prices from, a military chassis's under Mercenary Companies on
+        Production its Production cost rounded, the Production half taken
+        back out."""
+        cost = self._type_cost.double().unsqueeze(0).expand(self.B, -1)
+        m = self._congress_unit_cost_mult(self._cur_prod).unsqueeze(1)
+        merc = ((self._type_combat > 0) | self._type_support).unsqueeze(0)
+        return torch.where(merc & (m != 1), js_round(cost * m) / m, cost)
+
     def _congress_trade_gold(self, dseat: torch.Tensor) -> torch.Tensor:
         """f64, `dseat`-shaped — TRADE POLICY outcome A (`congressTradeGold`):
         the Gold every route another player sends into a city of the named
@@ -9392,7 +9404,7 @@ class SimSeats:
 
     def _routes_ending_at(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, RC], [B, RC]) long — every live route ENDING at each of this
-        row's cities (any sender), and the row's own DOMESTIC ones among
+        row's cities (any sender, a city-state's included), and the row's own DOMESTIC ones among
         them. Endpoints resolve by persistent id among living cities, the
         way `_seat_route_income` resolves its own."""
         cols = self.RC
@@ -9402,7 +9414,7 @@ class SimSeats:
         dom = (((rr[:, :, 0] >= 0) & (rr[:, :, 1] >= 0)).unsqueeze(2)
                & (rr[:, :, 1].unsqueeze(2) == ids.unsqueeze(1))).sum(dim=1)
         allc = dom.clone()
-        for r2 in range(self.n_majors):
+        for r2 in range(self.NS):
             if r2 == row:
                 continue
             hit = (((self.seat_routes[:, r2, :, 0] >= 0)
@@ -10947,7 +10959,6 @@ class SimSeats:
                 self._occ_clear(torch.full_like(gone, b), self.unit_tile[b, gone], gone)
                 self.unit_alive[b, gone] = False
         old_pop = int(self.city_pop[b, src_row, src_col])
-        old_acq = int(self.city_acquired[b, src_row, src_col])
         old_orig = int(self.city_orig_cap[b, src_row, src_col])
         old_founder = int(self.city_founder[b, src_row, src_col])
         old_lz = int(self.city_lasers[b, src_row, src_col])
@@ -11089,7 +11100,7 @@ class SimSeats:
         self.city_growth[b, dst_row, col] = 0  # the transfer resets foodBox...
         self.city_cbox[b, dst_row, col] = 0  # ...and cultureBox
         self.city_next_plot[b, dst_row, col] = -1
-        self.city_acquired[b, dst_row, col] = old_acq
+        self.city_acquired[b, dst_row, col] = 0  # ...and its border count
         self.city_loyalty[b, dst_row, col] = 100.0 if conquest else self._loyalty_after_cultural
         self.city_hp[b, dst_row, col] = half_hp if conquest else old_hp
         self.city_last_hit[b, dst_row, col] = 0
@@ -15040,7 +15051,8 @@ class SimSeats:
         Trade Policy's Gold on any other player's route, and from a foreign
         major Cleopatra's Gold, the destination seat's
         incoming-route rows and the city's Great Person Gold; every route of a
-        major the destination seat's improvement rows. One route at a time:
+        major the destination seat's improvement rows and its wonders' Science
+        (Sankore). One route at a time:
         only plundered routes ask."""
         n = int(hb.shape[0])
         out = torch.zeros(n, 6, dtype=torch.float64, device=self.device)
@@ -15076,6 +15088,11 @@ class SimSeats:
             if d != row and dcity >= 0:
                 y[2] += float(self._congress_trade_gold(
                     torch.full((self.B,), d, dtype=torch.long, device=self.device))[b])
+                # CIV6 (University of Sankore, SANKORE_TRADE_GAIN_SCIENCE): any
+                # other player's route in pays its destination +2 Science
+                _cw = self._completed_wonders(d)
+                if _cw is not None:
+                    y[3] += float(_cw[b, c].double() @ self._wond_routes_sci)
             foreign = major and d != row and dcity >= 0
             if foreign:
                 if bool(self._leads_vec("CLEOPATRA")[b, d]):

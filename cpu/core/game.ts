@@ -636,7 +636,8 @@ export function unitFaithPrice(state: GameState, seat: number, unitType: string,
   }
   const land = (def.combat ?? 0) > 0 && !def.naval && def.air === undefined;
   if (!def.faithOnly && unitType !== 'NATURALIST' && !land) return null;
-  return faithPrice(state, seat, unitFaithCost(unitType, unitsAcquired(state, seat, unitType)),
+  return faithPrice(state, seat,
+    Math.round(unitBuyBase(state, unitType, unitStepCost(unitType, unitsAcquired(state, seat, unitType))) * FAITH_PURCHASE_MULT),
     unitBuyOffPct(state, seat, unitType, city));
 }
 
@@ -721,8 +722,20 @@ function unitIsLandDomain(unitType: string): boolean {
   return !!d && !d.naval && d.air === undefined;
 }
 
+/** The cost a military unit's purchase prices from: under Mercenary
+ *  Companies on Production its Production cost as the game rounds it, the
+ *  Production half taken back out — a LAB fit (runs/h1_duelw1104 t242, the
+ *  Anti-Air Gun 227 -> 114 Production, 905 -> 910 Gold and 450 -> 455
+ *  Faith; runs/h1_duelw1111 t222, the Medic 185 -> 93, 625 -> 630 Gold at
+ *  15% off), every price off 2 x 114 and 2 x 93. */
+export function unitBuyBase(state: GameState, unitType: string, cost: number): number {
+  const m = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
+  return m === 1 ? cost : Math.round(cost * m) / m;
+}
+
 export function unitPurchaseCost(state: GameState, unitType: string, seat: number, city?: City): number {
-  const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat) : UNITS[unitType]?.cost ?? 0;
+  const base = unitType === 'BUILDER' ? builderCost(state, seat) : unitType === 'TRADER' ? traderCost(state, seat)
+    : unitBuyBase(state, unitType, UNITS[unitType]?.cost ?? 0);
   const m = unitType === 'BUILDER' ? monumentalityBuyMult(state, seat) : 1;
   // Mercenary Companies names a CURRENCY and moves the price of every unit of
   // a military formation bought with it, the SUPPORT chassis with the combat

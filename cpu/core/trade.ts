@@ -234,6 +234,17 @@ export function wonderRouteOriginGold(state: GameState, city: City): number {
   return per * n;
 }
 
+/** CIV6 (University of Sankore): the Science a foreign route pays the
+ *  city holding the wonder (`routesToCityScience`). */
+function wonderRouteGainScience(state: GameState, dest: City): number {
+  let science = 0;
+  for (const w of dest.wonders ?? []) {
+    if (!state.map.tiles[w.tileIndex].builtWonderComplete) continue;
+    science += BUILT_WONDERS[w.id]?.effects?.routesToCityScience ?? 0;
+  }
+  return science;
+}
+
 /** CIV6 (University of Sankore): "Other Civilizations' Trade Routes to this
  *  city provide +1 Science and +1 Gold for them" — the DESTINATION's wonder
  *  pays the foreign SENDER. */
@@ -775,7 +786,15 @@ export function routeDestYields(state: GameState, owner: number, r: TradeRoute):
   if (!dest || isCityStateSeat(dSeat)) return out;
   allyHalf(dest, undefined);
   // TRADE POLICY outcome A, on any other player's route in
-  if (owner !== dSeat && r.toSeat === dSeat) out.gold += congressTradeGold(state, dSeat);
+  if (owner !== dSeat && r.toSeat === dSeat) {
+    out.gold += congressTradeGold(state, dSeat);
+    // CIV6 (University of Sankore, SANKORE_TRADE_GAIN_SCIENCE,
+    // MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS, Domestic
+    // false): any other player's route in pays its destination +2 Science
+    // (runs/h1_duelw1110, the city-state Lisbon's route to Antium: 2 Science
+    // at Antium)
+    out.science += wonderRouteGainScience(state, dest);
+  }
   const major = state.seats.some((s) => s.seat === owner);
   const foreign = major && owner !== dSeat && r.toSeat === dSeat;
   if (foreign) {

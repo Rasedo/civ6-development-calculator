@@ -254,30 +254,74 @@ function fertilize(state: GameState, tile: Tile): void {
 }
 
 /**
- * Every Floodplains tile ALONG one river.
+ * Each plot's RIVER, -1 beside none. A river is a chain of EDGES, two edges
+ * of it meeting at a vertex: of the three edges at a vertex, edge d of plot
+ * t meets t's edges d-1 and d+1 and the edge between t's neighbours
+ * n_{d-1} / n_d (n_d's edge d+4) and n_d / n_{d+1} (n_d's edge d+2). The
+ * plots beside a river are the plots on either side of its edges; a plot
+ * beside several belongs to ONE of them (the game's floodplain-to-river
+ * map), the river whose lowest-indexed plot is the highest — fitted on the
+ * two recorded cases: runs/h1_duelw1110 plot 609, beside the river of 567
+ * (lowest plot 434) and the river of 653 (609): its five floods silted 697
+ * and 742 and its Great Bath count took the second river's floods alone;
+ * runs/h1_duelw1109 plot 936, beside a river from 491 and one from 755: its
+ * floods silted 934 and 935. Static: rivers never move, so the answer is
+ * kept per map.
+ */
+const riverCache = new WeakMap<readonly Tile[], Int32Array>();
+export function riverOfPlots(map: GameMap): Int32Array {
+  const hit = riverCache.get(map.tiles);
+  if (hit) return hit;
+  const key = (t: Tile, d: number, n: Tile | null) => (n && n.index < t.index ? n.index * 6 + (d + 3) % 6 : t.index * 6 + d);
+  const edgeChain = new Map<number, number>();
+  const lowest: number[] = [];
+  for (const t0 of map.tiles) {
+    for (let d0 = 0; d0 < 6; d0++) {
+      if (!(t0.riverMask & (1 << d0)) || edgeChain.has(key(t0, d0, neighborTile(map, t0, d0)))) continue;
+      const chain = lowest.length;
+      lowest.push(t0.index);
+      const stack: [Tile, number][] = [[t0, d0]];
+      while (stack.length) {
+        const [t, d] = stack.pop()!;
+        const n = neighborTile(map, t, d);
+        const k = key(t, d, n);
+        if (edgeChain.has(k)) continue;
+        edgeChain.set(k, chain);
+        lowest[chain] = Math.min(lowest[chain], t.index, n?.index ?? t.index);
+        const push = (u: Tile | null, e: number) => { if (u && u.riverMask & (1 << e)) stack.push([u, e]); };
+        push(t, (d + 1) % 6);
+        push(t, (d + 5) % 6);
+        push(n, (d + 2) % 6);
+        push(n, (d + 4) % 6);
+      }
+    }
+  }
+  const out = new Int32Array(map.tiles.length).fill(-1);
+  for (const t of map.tiles) {
+    for (let d = 0; d < 6; d++) {
+      if (!(t.riverMask & (1 << d))) continue;
+      const c = edgeChain.get(key(t, d, neighborTile(map, t, d)))!;
+      const cur = out[t.index];
+      if (cur < 0 || lowest[c] > lowest[cur] || (lowest[c] === lowest[cur] && c > cur)) out[t.index] = c;
+    }
+  }
+  riverCache.set(map.tiles, out);
+  return out;
+}
+
+/**
+ * Every Floodplains tile ALONG one river: the river `start` belongs to
+ * (`riverOfPlots`).
  *
  * CIV6 (Flood): "The level of the water rises, flooding all Floodplains tiles
  * found along the River, and then recedes on the next turn." One severity for
  * the whole flood, then each reached tile takes the effects at that severity.
  */
 export function riverReach(map: GameMap, start: Tile): Tile[] {
-  // Two tiles are on the same river when a river EDGE separates them. A
-  // river's edges are a vertex-connected chain, and any two edges meeting at a
-  // vertex are consecutive edges of one common tile — so this tile walk covers
-  // exactly the one river and never leaks into another.
-  const seen = new Set<number>([start.index]);
-  const stack = [start];
-  while (stack.length) {
-    const t = stack.pop()!;
-    for (let d = 0; d < 6; d++) {
-      if (!(t.riverMask & (1 << d))) continue;
-      const n = neighborTile(map, t, d);
-      if (!n || seen.has(n.index)) continue;
-      seen.add(n.index);
-      stack.push(n);
-    }
-  }
-  const out = map.tiles.filter((t: Tile) => seen.has(t.index) && isFloodplains(t.feature));
+  const river = riverOfPlots(map);
+  const r = river[start.index];
+  if (r < 0) return [start];
+  const out = map.tiles.filter((t: Tile) => river[t.index] === r && isFloodplains(t.feature));
   return out.length ? out : [start];
 }
 
@@ -342,28 +386,26 @@ export interface FloodRiver {
 /**
  * The FLOOD RIVERS: one per river carrying Floodplains and one per
  * Floodplains plot no river touches, in the order of each one's lowest-index
- * Floodplains plot (the river walk is `riverReach`'s); a river's site is the
+ * Floodplains plot; a river's plots are the plots that belong to it
+ * (`riverOfPlots`), and its site is the
  * plot its flood starts on (`floodStart`). Static: rivers, Floodplains and
  * the map's water as made never move, so the exporter ships the starts
  * (`floodStarts`).
  */
 export function floodRivers(map: GameMap): FloodRiver[] {
-  const seen = new Uint8Array(map.tiles.length);
+  const riverOf = riverOfPlots(map);
+  const seen = new Set<number>();
   const out: FloodRiver[] = [];
   for (const t of map.tiles) {
-    if (!isFloodplains(t.feature) || seen[t.index]) continue;
-    seen[t.index] = 1;
-    const river = [t];
-    for (let i = 0; i < river.length; i++) {
-      const u = river[i];
-      for (let d = 0; d < 6; d++) {
-        if (!(u.riverMask & (1 << d))) continue;
-        const n = neighborTile(map, u, d);
-        if (!n || seen[n.index]) continue;
-        seen[n.index] = 1;
-        river.push(n);
-      }
+    if (!isFloodplains(t.feature)) continue;
+    const r = riverOf[t.index];
+    if (r < 0) {
+      out.push({ start: t, plots: [t] });
+      continue;
     }
+    if (seen.has(r)) continue;
+    seen.add(r);
+    const river = map.tiles.filter((u) => riverOf[u.index] === r);
     out.push({ start: floodStart(map, river), plots: river });
   }
   return out;
@@ -395,12 +437,13 @@ function floodStart(map: GameMap, river: readonly Tile[]): Tile {
   const queue = river.filter((u) => neighbors(map, u).some((n) => TERRAINS[n.terrain].water))
     .sort((a, b) => a.index - b.index);
   for (const u of queue) dist.set(u.index, 0);
+  const on = new Set(river.map((u) => u.index));
   for (let i = 0; i < queue.length; i++) {
     const u = queue[i];
     for (let d = 0; d < 6; d++) {
       if (!(u.riverMask & (1 << d))) continue;
       const n = neighborTile(map, u, d);
-      if (!n || dist.has(n.index)) continue;
+      if (!n || !on.has(n.index) || dist.has(n.index)) continue;
       dist.set(n.index, dist.get(u.index)! + 1);
       queue.push(n);
     }

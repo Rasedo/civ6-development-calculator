@@ -18,7 +18,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles } from './governors';
+import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles, governedCityIds } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders, seatWonderSum, seatWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -1348,7 +1348,7 @@ export function cityTourism(state: GameState, city: City): number {
   const s = seatOf(state, city.seat);
   if (!s) return 0;
   const pct = seatTourismPct(state, city.seat);
-  return raisedTourism(tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city)), pct)
+  return raisedTourism(tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city), governedCityIds(s)), pct)
     + raisedTourism(cityReligiousTourism(state, city), pct);
 }
 
@@ -1651,7 +1651,7 @@ export function computeCityStats(
   if (perIn || perDom) {
     let all = 0;
     let dom = 0;
-    for (const sx of state.seats) {
+    for (const sx of [...state.seats, ...(state.cityStates ?? [])]) {
       for (const r of sx.tradeRoutes ?? []) {
         if (sx.seat === city.seat ? r.to === city.id
           : r.toSeat === city.seat && r.toSeatCity === city.id) {
