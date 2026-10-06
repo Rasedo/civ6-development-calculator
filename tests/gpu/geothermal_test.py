@@ -112,7 +112,9 @@ def test_source_counts(rules, path) -> None:
             assert not bool(sim._adj_src_count(src).any()), \
                 f"source {src} names neither a feature nor a terrain, yet counts"
             continue
-        on = ((sim.feat_id == fid) & ~sim.feat_stripped) if fid >= 0 else (sim.terrain == tid)
+        # a terrain source is its flat and hills rows, never its mountain
+        on = (((sim.feat_id == fid) & ~sim.feat_stripped) if fid >= 0
+              else (sim.terrain == tid) & ~sim.tile_mountain)
         got = sim._adj_src_count(src)
         assert torch.equal(got, neigh_count(sim, on).to(got.dtype)), f"source {src} miscounts"
         hit += 1

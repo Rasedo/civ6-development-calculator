@@ -14782,10 +14782,8 @@ class SimSeats:
               + (self.pair_dist[prev, cur].long() > 1).long() * self._path_portal)
         score = (sc * valid[:, 1:].long()).sum(dim=1)
         eff = torch.clamp(torch.div(self._path_denom * score, n.clamp(min=1), rounding_mode="floor"), max=self._path_cap)
-        posts = torch.zeros_like(n)
-        if row < self.n_majors:
-            held = self._route_course_posts(row, self.seat_route_course[:, row])[bb, kk]  # [n, L]
-            posts = (held & (self.tile_seat[b1, c0] != row)).sum(dim=1)
+        held = self._route_course_posts(row, self.seat_route_course[:, row])[bb, kk]  # [n, L]
+        posts = (held & (self.tile_seat[b1, c0] != int(self._ROW_SEAT[row]))).sum(dim=1)
         gold = d[bb, kk] * eff.double() / float(self._path_denom) + posts.double()
         out[bb, kk] = torch.where(n >= 2, gold, torch.zeros_like(gold))
         return out

@@ -2523,9 +2523,12 @@ class SimInit:
         self._lumber_iidx = 2
         self._quarry_iidx = 3
         # the catalog rows no plane or `_dyn_*` amount carries — the Lumber
-        # Mill's and the strategic resources' — counted live per row
+        # Mill's, the strategic resources' and the district types' with no
+        # amount vector of their own (the Theater Square's Entertainment
+        # Complex and Water Park) — counted live per row
         # (`_adj_source_plane`) and floored on their own
-        _dyn_names = ("LUMBER_MILL", "STRATEGIC")
+        _dyn_names = ("LUMBER_MILL", "STRATEGIC", "COMMERCIAL_HUB", "HOLY_SITE_DISTRICT",
+                      "ENTERTAINMENT_COMPLEX", "WATER_PARK")
         self._d_dyn_adj = [[(int(a["src"]), float(a["amount"])) for a in d["adjacency"]
                             if self._adj_src_names[int(a["src"])] in _dyn_names]
                            for d in self.districts_cat]

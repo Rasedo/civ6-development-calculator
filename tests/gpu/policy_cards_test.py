@@ -168,9 +168,9 @@ def main() -> None:
     if gp_i is not None:
         assert inv[0][1] == gp_i["ENGINEER"], "INVENTION pays the Engineer class"
     assert len(sim._pol_gppb_rows[pol_i["NOBEL_PRIZE"]]) == 6, "NOBEL_PRIZE: six building rows"
-    fx = {"govtit": [], "bprod": [], "byield": [], "spacep": [], "gppb": []}
+    fx = {"govtit": [], "bprod": [], "byield": [], "spacep": [], "gppb": [], "bamen": [], "dpow": [], "dext": []}
     on = torch.ones(B, dtype=torch.bool)
-    sim._fx_rows(fx, on, sim._pol_govtit[pol_i["INVENTION"]], [], [], [], inv)
+    sim._fx_rows(fx, on, sim._pol_govtit[pol_i["INVENTION"]], [], [], [], inv, [], [], [])
     assert len(fx["gppb"]) == 1 and fx["gppb"][0][1:] == inv[0], "the row rides the bundle to the Great Person walk"
     print(f"  8 garrison amenity/loyalty 1/2, INVENTION row {inv[0]}")
 

@@ -63,10 +63,10 @@ ROWS = [
     ("SPHINX", "civic", "NATURAL_HISTORY", {"culture": 1}),
     ("ZIGGURAT", "civic", "NATURAL_HISTORY", {"culture": 1}),
     # CIV6 (Predictive Systems): "+1 Production to Quarry, Oil Well, and
-    # Oil Rig improvements" — the Oil Rig waits on an improvement the
-    # catalog does not hold.
+    # Oil Rig improvements"
     ("QUARRY", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
     ("OIL_WELL", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
+    ("OFFSHORE_OIL_RIG", "tech", "PREDICTIVE_SYSTEMS", {"production": 1}),
     # CIV6 (Expansion2_Improvements.xml, Improvement_BonusYieldChanges 224-230)
     ("QUARRY", "tech", "GUNPOWDER", {"production": 1}),
     ("MINE", "tech", "SMART_MATERIALS", {"production": 1}),

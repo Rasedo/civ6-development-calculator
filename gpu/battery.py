@@ -78,6 +78,24 @@ HUNT_CKPT_DIR = (_argval("--ckpt-dir")
 # the (seed, turn) a red serve lane named, so the reminder can fill itself in
 _hunt_hint: list[tuple[str, str]] = []
 
+# ---------------------------------------------------------- subset mode --
+# `--subset N` is the whole battery — stage 0, every poke, the static checks
+# — with the serve gate over N of the fixture seeds instead of all of them,
+# for a box that cannot hold the full fan-out. The N seeds are spread evenly
+# over the sorted fixture list (every other seed at 12 of 24): a pick by
+# recorded cost would favour the cheap games, which are the short ones that
+# reach the fewest mechanics, and would move as costs are recorded. Shards
+# keep two seeds each, the full run's shape, so row-mixing faults still show.
+# The row is recorded as `pass-subset` with its seed count: it never
+# advances the cadence clock and never reads as the full green.
+SUBSET = int(_argval("--subset") or 0) or None
+
+
+def subset_seeds(seeds: list[int], n: int) -> list[int]:
+    """`n` of the sorted fixture seeds, evenly spaced from the first."""
+    assert 0 < n <= len(seeds), f"--subset {n}: have {len(seeds)} fixture seeds"
+    return [seeds[i * len(seeds) // n] for i in range(n)]
+
 
 def print_hunt_reminder() -> None:
     """THE REMINDER, printed on every run because that is the only placement
@@ -586,7 +604,9 @@ def main() -> int:
               f"{time.strftime('%H:%M:%S', time.localtime(other.get('started', 0)))}. "
               "One battery at a time; its completion notification is the signal.")
         return 2
-    _live.claim(f"hunt {HUNT_SEEDS}" if HUNT else "full" if FULL else "battery",
+    assert not (HUNT and SUBSET), "--seeds is a hunt, --subset a battery: pass one"
+    _live.claim(f"hunt {HUNT_SEEDS}" if HUNT else f"subset {SUBSET}" if SUBSET
+                else "full" if FULL else "battery",
                 _stats._git("rev-parse", "HEAD"),
                 None if HUNT else _live.expected_wall(_stats._rows()))
     try:
@@ -699,6 +719,7 @@ def _main() -> int:
     # waiting on the marker line.
     _mem_free_start = 10 ** 9
     _k = _pokes = 0
+    _seeds: list[int] = []
     if not failed.is_set():
         # The DECISION-SERVER gate sharded over ALL fixture seeds: per-turn
         # obs/unit-target equality and a state-digest compare. The lane's wall
@@ -715,17 +736,22 @@ def _main() -> int:
             _gone = [s for s in _want if s not in _seeds]
             assert not _gone, f"--seeds names no fixture: {_gone}; have {_seeds}"
             _seeds = _want
+        _want_shards = min(MAX_SHARDS, len(_seeds))
+        if SUBSET:
+            _seeds = subset_seeds(_seeds, SUBSET)
+            _want_shards = min(MAX_SHARDS, (len(_seeds) + 1) // 2)
+            print(f"subset: {len(_seeds)} seeds, evenly spaced — {','.join(map(str, _seeds))}", flush=True)
         # how wide this run may fan out, given the memory this box
         # actually has free right now. Never a refusal — a narrower run, which
         # is a LONGER run.
-        _k, _pokes, _why = plan_pool(min(MAX_SHARDS, len(_seeds)))
+        _k, _pokes, _why = plan_pool(_want_shards)
         if HUNT:
             # one seed, one shard, and nothing else running beside it
             _k, _pokes, _why = 1, 0, "hunt mode: one serve shard, no poke pool"
         print(f"memory: {_why}", flush=True)
-        if (_k, _pokes) != (min(MAX_SHARDS, len(_seeds)), POKE_WORKERS):
+        if (_k, _pokes) != (_want_shards, POKE_WORKERS):
             print(f"        {_k} serve shard(s) and {_pokes} poke worker(s) "
-                  f"instead of {min(MAX_SHARDS, len(_seeds))} and {POKE_WORKERS}", flush=True)
+                  f"instead of {_want_shards} and {POKE_WORKERS}", flush=True)
         print_hunt_reminder()
         mem_min_free[0] = free_mb() or 10 ** 9
         _mem_free_start = mem_min_free[0]
@@ -971,6 +997,10 @@ def _main() -> int:
                 ("game_speed", [py, "tests/gpu/game_speed_test.py"], 4),  # the online speed: CostMultiplier, the truncating helper, scaled grants
                 ("pack_events", [py, "tests/gpu/pack_events_test.py"], 4),  # the GS pack events: meteor sites, forest and jungle fires, Eyjafjallajokull and Vesuvius
                 ("eco_residue", [py, "tests/gpu/eco_residue_test.py"], 4),  # fractional purchase price, policy-unlock gold, the minor's Palace, the Free City floor
+                ("adjacency_rows", [py, "tests/gpu/adjacency_rows_test.py"], 4),  # district adjacency as the DLL sums it: the owner, the pillage, the resource as seen
+                ("dig_site_border", [py, "tests/gpu/dig_site_border_test.py"], 2),  # a dig site is a seen resource to the next-plot scorer
+                ("late_tree", [py, "tests/gpu/late_tree_test.py"], 4),  # Future Tech/Civic repeat, Seasteads, Logistics, After Action Reports
+                ("luxury_allocation", [py, "tests/gpu/luxury_allocation_test.py"], 4),  # one pass per luxury over the need-sorted cities, the duplicate's wrap
             ],
         ]
         # A lane that names a path nothing writes, or a test file no lane
@@ -1105,7 +1135,7 @@ def _main() -> int:
         return 1 if failed.is_set() else 0
     _stats.record(results, wall, not failed.is_set() and not oom.is_set(), mem=_mem,
                   oom=oom.is_set(), box="clean" if _live.mode() == "measure" else "working",
-                  serve_cost=serve_costs or None)
+                  serve_cost=serve_costs or None, seeds=len(_seeds), subset=bool(SUBSET))
     if oom.is_set() and not failed.is_set():
         # NOT a pass — the run did not finish — and NOT a fail, because the
         # code is not what broke. The cadence clock does not advance.
@@ -1116,7 +1146,7 @@ def _main() -> int:
         print("BATTERY FAILED")
         print_hunt_reminder()
         return 1
-    print("BATTERY OK")
+    print(f"BATTERY OK — SUBSET of {len(_seeds)} seeds, not the full green" if SUBSET else "BATTERY OK")
     return 0
 
 

@@ -63,11 +63,15 @@ def _last_pass_head(rows: list[dict]) -> str:
 
 
 def record(results, wall: float, ok: bool, mem: dict | None = None,
-           oom: bool = False, box: str | None = None, serve_cost: list | None = None) -> None:
+           oom: bool = False, box: str | None = None, serve_cost: list | None = None,
+           seeds: int = 0, subset: bool = False) -> None:
     """Append one battery record. `results` is battery.py's (name, secs, rc)
     list; `serve_cost` the green serve shards' seeds and turn-loop seconds,
-    which `plan_shards` pairs seeds by. Never raises: a statistics writer
-    that can fail a green battery is worse than no statistics."""
+    which `plan_shards` pairs seeds by; `seeds` how many fixture seeds the
+    serve gate drove. A green `subset` run records `pass-subset`, which no
+    reader of `pass` counts: it is not the full green. Never raises: a
+    statistics writer that can fail a green battery is worse than no
+    statistics."""
     try:
         rows = _rows()
         head = _git("rev-parse", "HEAD")
@@ -85,7 +89,9 @@ def record(results, wall: float, ok: bool, mem: dict | None = None,
             "branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
             # three outcomes, not two. `oom` never counts as a pass,
             # so the cadence clock does not advance on one.
-            "result": "oom" if oom else "pass" if ok else "fail",
+            "result": "oom" if oom else ("pass-subset" if subset else "pass") if ok else "fail",
+            "seeds": seeds,
+            "subset": subset,
             "mem": mem,
             "wall_s": round(wall, 1),
             # "clean" only when the owner set MEASURE mode: the box was free,
