@@ -125,7 +125,8 @@ export type ImprovementId =
   | 'CITY_PARK'
   | 'MOUNTAIN_ROAD'
   | 'SKI_RESORT'
-  | 'SEASTEAD';
+  | 'SEASTEAD'
+  | 'OFFSHORE_OIL_RIG';
 
 export type DistrictId =
   | 'CITY_CENTER'

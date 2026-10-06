@@ -926,6 +926,36 @@ Engines: `growth256` (the tier), `growthPct256` (the accumulator's terms),
 `City.growthDrift` / `city_growth_drift` (the residue), the treaty's detach in
 `congressSession` / `_world_congress`.
 
+## H-1: the luxury allocation — READ
+
+Player_Resources.cpp 0x4a6110 (callers 0x4a7560, the import/export setter,
+and 0x4a8ed0) rebuilds `m_aLuxuryAllocations` (Player_Resources +0x460,
+serialized at 0x4a3d46):
+- a city entry per city of the player's list (+0x12f0 -> +0xd8, walked in
+  order): {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less
+  its luxury amenities 0x1b5210 (its non-luxury amenities), granted 0};
+- a resource entry per resource the player holds (0x510960), resource index
+  order: reach = the resource's per-copy reach (0x527a50); a no-cap resource
+  (`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplies it by
+  its copies (0x4a93c0) and carries a wrap flag; a luxury the player owns
+  adds `m_iExtraAmenitiesPerOwnedLuxuryResource` (+0x160), a bonus resource
+  `m_iExtraAmenitiesPerOwnedBonusResource` (+0x1c0); reach 0 is dropped;
+- the resources are insertion-sorted (0x4a1eb0 -> 0x4a0e90, stable) by reach
+  descending; the cities (0x4a1fd0 -> 0x4a0f60, stable) ascending by
+  non-luxury + granted - amenities needed (0x5275a0), i.e. neediest first,
+  once before the first resource and again after each;
+- each resource grants one amenity to each of the first `reach` cities in
+  that order, stopping at the list's end — a wrapping (no-cap, copies > 1)
+  one runs on from the list's start (0x4a6b74).
+
+Recorded, runs/h1_duelw1112 t83-t102: China's Amber under Luxury Policy A
+(2 copies) reaches 8 in one pass, then three passes of 4: Xi'an, Guangzhou,
+Beijing, Taiyuan, Chengdu read 3, 5, 4, 5, 3 (t83) and 5, 3, 4, 5, 3 (t90),
+which the pass-per-copy fit with a fewer-copies-first rank (the engines'
+rule before this reading) missed by one in two cities each turn. On the ten
+duels city.amenities 18,085 -> 18,267 passes, no duel worse (1104's six
+Cocoa included). The engines: `luxuryAmenities` / `_luxury_amenities`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

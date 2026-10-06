@@ -200,7 +200,28 @@ def main() -> None:
     assert not bool(sim.tile_locked[0, mine]), "a second flip must clear the pin"
     print("  a flip lands on the seat's own ground and nowhere else")
 
-    print("CITIZENS OK — the pin, its two clamps, the pillage gate and the plot lock")
+    # --- 7) AN UNASSIGNED CITIZEN PAYS GOLD ---------------------------------
+    # CIV6 (GlobalParameters GOLD_PERCENTAGE_YIELD_PER_UNASSIGNED_POP 50):
+    # a citizen with no plot and no slot to work pays half a Gold. Every plot
+    # of the window worked and every slot filled, each citizen more pays half
+    # a Gold (the tier factor held at 1, no other percent on the city).
+    tiles, valid = sim._work_window(row)
+    n = int(valid[0, j].sum())
+    one = torch.ones(sim.B, sim.RC, dtype=torch.float64)
+
+    def gold_at(pop: int) -> tuple[float, int]:
+        sim.city_pop[0, row, j] = pop
+        sim._eff_version += 1
+        spec = int(sim._city_specialists(row)[0, j].sum())
+        return float(sim._seat_city_walk(row, amen_yf=one)[0, j, 2]), spec
+
+    g0, s0 = gold_at(n + 8)
+    g1, s1 = gold_at(n + 12)
+    assert s0 == s1, "the slots were not full at the smaller size"
+    assert abs((g1 - g0) - 2.0) < 1e-9, f"four unassigned citizens paid {g1 - g0}, not 2"
+    print(f"  four unassigned citizens pay {g1 - g0} Gold")
+
+    print("CITIZENS OK — the pin, its two clamps, the pillage gate, the plot lock and the idle citizen's Gold")
 
 
 if __name__ == "__main__":

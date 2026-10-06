@@ -390,6 +390,11 @@ export const CITIZEN_CULTURE = srcConst('citizenCulture', 0.3, {
   derived: 'CULTURE_PERCENTAGE_YIELD_PER_POP / 100 — the install writes the share as a percentage',
   inputs: [gp('CULTURE_PERCENTAGE_YIELD_PER_POP')],
 });
+/** each citizen working neither a plot nor a specialist slot pays this Gold */
+export const UNASSIGNED_CITIZEN_GOLD = srcConst('unassignedCitizenGold', 0.5, {
+  derived: 'GOLD_PERCENTAGE_YIELD_PER_UNASSIGNED_POP / 100 — the install writes the share as a percentage',
+  inputs: [gp('GOLD_PERCENTAGE_YIELD_PER_UNASSIGNED_POP')],
+});
 
 export const CITY_CENTER_MIN_FOOD = srcConst('centerMinFood', 2,
   gp('YIELD_FOOD_CITY_TERRAIN_REPLACE'));

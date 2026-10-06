@@ -1245,6 +1245,10 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
  *  lets an Archaeologist work one. */
 export const SHIPWRECK_CIVIC = 'CULTURAL_HERITAGE';
 
+/** the civic that reveals ANTIQUITY SITES (Resources.xml
+ *  RESOURCE_ANTIQUITY_SITE's PrereqCivic). */
+export const ANTIQUITY_CIVIC = 'NATURAL_HISTORY';
+
 /** Is there a dig under this unit that it may work RIGHT NOW? Land
  *  sites need nothing; a WRECK needs Cultural Heritage. */
 export function digUnderfoot(state: GameState, tile: Tile | undefined, seat: number): 'antiquity' | 'shipwreck' | null {

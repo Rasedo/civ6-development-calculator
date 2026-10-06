@@ -16,7 +16,9 @@ export const IMPROVEMENT_IDS: readonly string[] = ['FARM', 'MINE', 'LUMBER_MILL'
   // ...and the Ski Resort after that
   'SKI_RESORT',
   // ...and the Seastead after that
-  'SEASTEAD'];
+  'SEASTEAD',
+  // ...and the Offshore Oil Rig after that
+  'OFFSHORE_OIL_RIG'];
 
 export const DEDICATED_IMPROVEMENTS = 3;
 

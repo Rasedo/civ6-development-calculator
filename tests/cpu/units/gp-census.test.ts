@@ -459,7 +459,7 @@ describe('the route clauses', () => {
     expect(cityTradeYields(state, theirs).gold).toBe(out0 + 2);
   });
 
-  it('Raja Todar Mal: +0.5 Gold per specialty district at a domestic destination; Rockefeller +2 per strategic kind improved there', () => {
+  it('Raja Todar Mal: +0.5 Gold per specialty district at a domestic destination; Rockefeller +2 per strategic plot there', () => {
     const state = newGame();
     const seat = state.seats[0];
     const a = seat.cities[0];
@@ -472,7 +472,7 @@ describe('the route clauses', () => {
     addSeatPerm(seat, GP_ABILITY.GP_JOHN_ROCKEFELLER.perm!);
     expect(cityTradeYields(state, a).gold).toBe(g0 + 0.5);
     const iron = state.map.tiles[ownBare(state, 0, b)];
-    Object.assign(iron, { resource: 'IRON', improvement: 'MINE' });
+    Object.assign(iron, { resource: 'IRON' });
     seat.research.techs.push('BRONZE_WORKING');
     expect(cityTradeYields(state, a).gold).toBe(g0 + 0.5 + 2);
   });

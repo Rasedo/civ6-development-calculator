@@ -515,17 +515,21 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
  *
  * CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is TRUE for a full
  * civ and FALSE for every other class of player — a city-state, the Free
- * Cities player and a barbarian tribe all bank the culture and buy nothing
- * with it, yet still draw their next plot. A minor takes ground through the
- * ENVOY channel instead (`CanAnnexTilesWithReceivedInfluence`).
+ * Cities player and a barbarian tribe bank no culture and buy nothing, yet
+ * still draw their next plot (runs/h1_duelw1112: the three city-states' boxes
+ * read 0 every record, each holding a next plot). A minor takes ground
+ * through the ENVOY channel instead (`CanAnnexTilesWithReceivedInfluence`).
  */
 export function cityBorderGrowth(state: GameState, city: City, seat: number, culture: number): void {
   if (congressBorderFrozen(state, seat)) return;
-  const pct = governorSum(state, city, (e) => e.borderExpansionPct) + getModifiers(state, seat).borderExpansionPct;
-  city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
-  const cost = borderGrowthCost(city.tilesAcquired);
   const ctx = makeYieldCtx(state, seat);
-  if (civLevelOf(seat).canAnnexTilesWithCulture && city.cultureBox >= cost) {
+  const annex = civLevelOf(seat).canAnnexTilesWithCulture;
+  if (annex) {
+    const pct = governorSum(state, city, (e) => e.borderExpansionPct) + getModifiers(state, seat).borderExpansionPct;
+    city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
+  }
+  const cost = borderGrowthCost(city.tilesAcquired);
+  if (annex && city.cultureBox >= cost) {
     city.cultureBox -= cost;
     const stored = city.nextPlot ?? -1;
     const plot = stored >= 0 && !tileClaimed(state.map.tiles[stored]) ? stored : drawBorderPlot(state, city, ctx);

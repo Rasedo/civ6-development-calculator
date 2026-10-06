@@ -5538,6 +5538,23 @@ class SimSeats:
             out[:, r].scatter_add_(1, slc, (has & (sl >= 0) & near).long())
         return out
 
+    def _city_strat_plots(self, viewer: int) -> torch.Tensor:
+        """[B, n_majors, RC] long — `routeDestStrategicPlots`' count: each
+        city's own plots within 3 rings of its centre carrying a strategic
+        resource row `viewer` sees, improved or not, a copy counting again
+        (City_Resources 0x1f71b0)."""
+        B, NM, RC = self.B, self.n_majors, self.RC
+        out = torch.zeros(B, NM, RC, dtype=torch.long, device=self.device)
+        has = self._res_live() & (self.res_cat == 2) & ~self._res_hidden(viewer)
+        tix = torch.arange(self.T, device=self.device)
+        for r in range(NM):
+            sl = self.city_slot_at(r)  # [B, T] owning column, -1 none
+            slc = sl.clamp(min=0)
+            ctr = self.city_center[:, r, :RC].gather(1, slc).clamp(min=0)    # [B, T]
+            near = self.pair_dist[ctr, tix.expand_as(ctr)] <= 3
+            out[:, r].scatter_add_(1, slc, (has & (sl >= 0) & near).long())
+        return out
+
     def _route_length_gold(self, crs: torch.Tensor) -> torch.Tensor:
         """`routeLengthGold`'s magnitude, [..., K] long — floor(n x a + a / 2)
         in 24.8 fixed point, n the plots of each stored course `crs`
@@ -8880,11 +8897,11 @@ class SimSeats:
         if bool(_tdm.count_nonzero()):
             _spec_o = (_comp_o & self._is_specialty.reshape(1, 1, -1)).sum(dim=2).double()  # [B, cols]
             _rk_add(2, _tdm.unsqueeze(1) * _spec_o.gather(1, dest_j) * pd)
-        # CIV6 (John Rockefeller): "+2 Gold for each Strategic resource improved
-        # by the destination city" — each kind it has improved
+        # CIV6 (John Rockefeller): Gold per strategic plot at the destination
+        # (`routeDestStrategicPlots`)
         _rkf = self._gp_perm(row, "strategicRouteGold").double()
         if bool(_rkf.count_nonzero()):
-            _kd = self._city_improved_res_kinds(row, 2).double()  # 2 = strategic
+            _kd = self._city_strat_plots(row)[:, row].double()
             _rk_add(2, _rkf.unsqueeze(1) * _kd.gather(1, dest_j) * pd)
         # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC): the roster's
         # rows, the same shape the international leg pays
@@ -9094,9 +9111,8 @@ class SimSeats:
                 gold_i = gold_i + _fgd.gather(1, _rx).gather(2, _col).squeeze(2).double()
             if bool(_rkf.count_nonzero()):
                 _kall = torch.zeros(B, self.city_id.shape[1], RCw, dtype=torch.float64, device=self.device)
-                for _r2 in range(self.n_majors):
-                    _kr = self._city_improved_res_kinds(_r2, 2).double()
-                    _kall[:, _r2, : _kr.shape[1]] = _kr
+                _ks = self._city_strat_plots(row).double()
+                _kall[:, : _ks.shape[1], : _ks.shape[2]] = _ks
                 gold_i = gold_i + _rkf.unsqueeze(1) * _kall.gather(1, _rx).gather(2, _col).squeeze(2)
             # CIV6 (University of Sankore): "Other Civilizations' Trade Routes
             # to this city provide +1 Science and +1 Gold for them" — the
@@ -11308,7 +11324,17 @@ class SimSeats:
             y_oth = y_oth - hidY[:, :, 2:].sum(dim=2)
         y_sum = ((f_plane.double() + p_plane.double() + y_oth.double())
                  * ((self.district < 0) & (self.built_wonder < 0)).to(torch.float64))
-        return y_sum, self._res_live() & ~self._res_hidden(row)
+        return y_sum, self._seen_resource(row)
+
+    def _seen_resource(self, row: int) -> torch.Tensor:
+        """[B, T] bool — `seenResourceAt`'s twin: a resource this row's
+        research reveals, and a dig site its civics reveal (an Antiquity Site
+        past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`)."""
+        seen = self._res_live() & ~self._res_hidden(row)
+        for plane, civic in ((self.antiquity, self._antiquity_civic), (self.shipwreck, self._shipwreck_civic)):
+            if civic >= 0 and row < self.n_majors:
+                seen = seen | (plane & self.civ_civics[:, row, civic].unsqueeze(1))
+        return seen
 
     def _seat_border_key(self, row: int, center: torch.Tensor):
         B = self.B
@@ -11348,7 +11374,7 @@ class SimSeats:
         nv = nbs >= 0
         nc = nbs.clamp(min=0).reshape(B, -1)
         free = (self.tile_seat.gather(1, nc) < 0).reshape(nbs.shape) & nv
-        seen = (self._res_live() & ~self._res_hidden(row)).gather(1, nc).reshape(nbs.shape)
+        seen = self._seen_resource(row).gather(1, nc).reshape(nbs.shape)
         nw = self.nwonder.gather(1, nc).reshape(nbs.shape)
         nd = self.pair_dist[center.view(B, 1, 1).expand_as(nbs).reshape(B, -1), nc].reshape(nbs.shape)
         nb_term = ((free & seen).sum(dim=2) + (free & nw).sum(dim=2)
@@ -11387,7 +11413,7 @@ class SimSeats:
         columns in a per-batch order.
 
         A class of player that cannot annex with culture (`CivilizationLevels`:
-        a city-state, the Free Cities player) banks the culture and buys
+        a city-state, the Free Cities player) banks no culture and buys
         nothing, and still draws. BORDER CONTROL outcome B's target does
         nothing at all: no culture banked, no plot drawn."""
         bidx = self._bidx
@@ -11406,7 +11432,8 @@ class SimSeats:
         cul = cul_c.double()
         cul = torch.where(_gpct != 0, cul * (100.0 + _gpct) / 100.0, cul)
         box = self.city_cbox[bidx, row, col]
-        self.city_cbox[bidx, row, col] = torch.where(act, box + cul.to(box.dtype), box)
+        if bool(self._row_annex_culture[row]):
+            self.city_cbox[bidx, row, col] = torch.where(act, box + cul.to(box.dtype), box)
         center = self.city_center[bidx, row, col]
         cid = self.city_id[bidx, row, col]
         if bool(self._row_annex_culture[row]):

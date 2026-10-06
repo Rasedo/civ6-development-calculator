@@ -1844,6 +1844,7 @@ class SimInit:
         self._park_amen_near = int(_ri["parkAmenitiesNear"])
         self._park_amen_cities = int(_ri["parkAmenityCities"])
         self._shipwreck_civic = int(_ri["shipwreckCivic"])
+        self._antiquity_civic = int(_ri["antiquityCivic"])
         self._gw_printing_tech = int(rr["gwPrintingTech"])
         self._gw_printing_mult = int(rr["gwPrintingWritingMult"])
         # a maker's raised work Tourism, [object type, roster index], -1 none

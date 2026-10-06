@@ -73,14 +73,15 @@ describe('the culture box buys ground for a full civ alone', () => {
     const city = settleAt(state, tileAtCoords(state.map, 8, 8).index, 0);
     cityBorderGrowth(state, city, FREE_SEAT, 10_000);
     expect(city.tilesAcquired).toBe(0);
-    expect(city.cultureBox).toBe(10_000);
+    expect(city.cultureBox).toBe(0);
   });
 
-  it('banks and buys nothing for a city-state either', () => {
+  it('banks and buys nothing for a city-state either (runs/h1_duelw1112: every box 0)', () => {
     const state = makeState(makeMap(24, 24));
     const city = settleAt(state, tileAtCoords(state.map, 8, 8).index, 0);
     cityBorderGrowth(state, city, seatOfCityState(0), 10_000);
     expect(city.tilesAcquired).toBe(0);
-    expect(city.cultureBox).toBe(10_000);
+    expect(city.cultureBox).toBe(0);
+    expect(city.nextPlot ?? -1).toBeGreaterThanOrEqual(0);
   });
 });

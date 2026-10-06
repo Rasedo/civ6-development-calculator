@@ -385,11 +385,11 @@ def test_routes(rules, path, R) -> None:
     assert gold(1) == out0 + 2, "...and provides +2 Gold to it"
     print("  1 foreign-route Gold OK — both ends")
 
-    # John Rockefeller: +2 per strategic kind the destination has improved
-    kinds = int(sim._city_improved_res_kinds(ROW, 2)[B0, 0])
+    # John Rockefeller: +2 per strategic plot at the destination the sender sees
+    kinds = int(sim._city_strat_plots(1)[B0, ROW, 0])
     o1 = gold(1)
     sim.civ_gp_perm[:, 1, sim._gp_perm_names.index("strategicRouteGold")] = 2.0
-    assert gold(1) == o1 + 2 * kinds, f"Rockefeller: {kinds} kinds improved at the destination"
+    assert gold(1) == o1 + 2 * kinds, f"Rockefeller: {kinds} strategic plots at the destination"
     # Raja Todar Mal: +0.5 per specialty district at a domestic destination
     k1 = int((sim.seat_routes[B0, ROW, :, 0] < 0).nonzero()[0])
     sim.seat_routes[B0, ROW, k1, 0] = sim.city_id[B0, ROW, 0]
@@ -407,7 +407,7 @@ def test_routes(rules, path, R) -> None:
     _f = next(f for g in statecompare.load_manifest()["groups"] if g["name"] == "seat"
               for f in g["fields"] if f["name"] == "gpPerm")
     assert _f["compare"] == "milli", "a 0.5 channel under an exact fold rounds apart on the two engines"
-    print(f"  2 Rockefeller and Todar Mal OK — {kinds} strategic kinds, two specialty districts")
+    print(f"  2 Rockefeller and Todar Mal OK — {kinds} strategic plots, two specialty districts")
 
     # Ibn Fadlan: a route to a city-state
     if sim.S > 0 and bool(sim.citystate_alive[B0, 0]):

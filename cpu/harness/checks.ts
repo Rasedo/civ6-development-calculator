@@ -65,6 +65,9 @@ import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOIC
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId } from './aliases';
+import { GOVERNMENTS, POLICIES } from '../data/policies';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
 
 export interface CheckResult {
   turn: number;
@@ -210,7 +213,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const gaps = cityGaps(imp, c);
     const push = (check: string, ok: boolean, game: unknown, ours: unknown, st?: Record<string, unknown>) =>
       out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !st ? {} : { state: st }) });
+    // the city's yields and boxes stand as its seat's last turn left them,
+    // the congress then standing with them (1112 China t182: the session
+    // shown that turn reaches its cities' amenity tier at t183)
+    state.congress = imp.congressOf(city.seat);
     const stats = computeCityStats(state, city);
+    state.congress = congressNow;
     const gy = c.yields.map(num);
     // the game's city Gold is before its buildings' and districts' upkeep
     const oy = YIELD_KEYS.map((k: YieldKey) => round3(k === 'gold' ? stats.total.gold + stats.maintenance : stats.total[k]));
@@ -659,6 +667,29 @@ function popGrant(cat: Catalog, c: DumpCity, next: DumpCity): number {
   return n;
 }
 
+/** The research the later record holds lands before the cities grow: a
+ *  player's turn completes its technologies and civics ahead of its cities'
+ *  growth and culture steps, and a completed civic's new government and
+ *  policies are slotted with it (runs/h1_duelw1112 t56: China's government
+ *  changed with its civic, Xi'an's box growing at the new housing). Cards
+ *  swapped with no civic completed came after the cities (1112 t201). */
+function landResearch(state: GameState, cat: Catalog, seat: number, pa?: DumpPlayer, pb?: DumpPlayer): void {
+  const s = seatOf(state, seat);
+  if (!s || !pa || !pb || !isCiv(seat)) return;
+  const ids = (bits: string, names: string[], kind: 'tech' | 'civic', prefix: string, known: object) =>
+    [...(bits ?? '')].flatMap((ch, k) => (ch === '1' ? [engineId(kind, names[k], prefix, known)] : []))
+      .filter((x): x is string => !!x);
+  if (pa.techs !== pb.techs) s.research.techs = ids(pb.techs, cat.techs, 'tech', 'TECH_', TECHS) as typeof s.research.techs;
+  if (pa.civics === pb.civics) return;
+  s.research.civics = ids(pb.civics, cat.civics, 'civic', 'CIVIC_', CIVICS) as typeof s.research.civics;
+  const gov = num(pb.government);
+  const gid = gov >= 0 ? engineId('government', cat.governments[gov], 'GOVERNMENT_', GOVERNMENTS) : null;
+  if (gid) s.government.chosen = gid as typeof s.government.chosen;
+  s.government.policies = (pb.policies ?? []).map((x) => num(x)).filter((i) => i >= 0)
+    .map((i) => engineId('policy', cat.policies[i], 'POLICY_', POLICIES))
+    .filter((x): x is string => !!x) as typeof s.government.policies;
+}
+
 /** how far a Settler the city trained can stand from it at the next record:
  *  its moves on the turn it appears */
 const SETTLER_WALK = UNITS.SETTLER.moves;
@@ -775,8 +806,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     for (const { city, dump: c } of list) {
       const next = after.get(`${c.owner}:${c.id}`);
       if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
-      sides.push(landProduction(state, cat, city, next, a.head.W));
-      // the Settler stands beside the city, or the city trained it (its
+      sides.push(landProduction(state, cat, city, next, a.head.W));      // the Settler stands beside the city, or the city trained it (its
       // queue's head) and it walked off within its first moves
       const trained = (c.queue?.[0] as { UnitType?: number } | undefined)?.UnitType === settlerIdx && next.pop === c.pop - 1;
       if (acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
@@ -798,6 +828,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const next = after.get(`${c.owner}:${c.id}`);
       return n + (next ? popGrant(cat, c, next) : 0);
     }, 0);
+    landResearch(state, cat, seat, a.players.find((q) => q.id === imp.playerOfSeat.get(seat)),
+      b.players.find((q) => q.id === imp.playerOfSeat.get(seat)));
     const lux = luxuryAmenities(state, seat);
     const mods = getModifiers(state, seat);
     const stats = new Map(list.map(({ city }) => [city, computeCityStats(state, city, lux, mods)]));

@@ -14,7 +14,7 @@ import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TU
 import { BUILDINGS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
-import { RESOURCES } from '../../world/resources';
+import { resourceImprovement } from '../../world/resources';
 import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
 import { suzerainMinorSeats } from './cityStates';
 import { getModifiers } from './effects';
@@ -93,7 +93,7 @@ export function accrueStockpiles(state: GameState, seat: number): void {
   for (const t of state.map.tiles) {
     if (!t.resource || t.pillaged || hidden.has(t.resource)) continue;
     const k = strategicSlot(t.resource);
-    if (k < 0 || t.improvement !== RESOURCES[t.resource]?.improvement) continue;
+    if (k < 0 || t.improvement !== resourceImprovement(t)) continue;
     // CIV6 (LOC_CITY_STATES_SUZERAIN_DIPLOMATIC_BONUS): "Gain ownership of
     // all the city-state's resources" — an improved source on a suzerained
     // city-state's ground pays the suzerain the resource's own number, and

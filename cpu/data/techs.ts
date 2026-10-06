@@ -406,6 +406,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_PLASTICS&PrereqTech=TECH_COMBUSTION', 'PrereqTech', { expect: 'TECH_COMBUSTION' }),
     'effects.0.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_FOOD&PrereqTech=TECH_PLASTICS', 'ImprovementType', { expect: 'IMPROVEMENT_FISHING_BOATS' }),
     'effects.0.yields.food': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_FISHING_BOATS&YieldType=YIELD_FOOD&PrereqTech=TECH_PLASTICS', 'BonusYieldChange'),
+    'effects.1.improvement': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'PrereqTech', { expect: 'TECH_PLASTICS' }),
   },
   COMPUTERS: {
     era: xml('Technologies', 'TechnologyType=TECH_COMPUTERS', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -552,6 +553,8 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     'effects.1.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_QUARRY&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'BonusYieldChange'),
     'effects.2.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_OIL_WELL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'ImprovementType', { expect: 'IMPROVEMENT_OIL_WELL' }),
     'effects.2.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_OIL_WELL&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'BonusYieldChange'),
+    'effects.3.improvement': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'ImprovementType', { expect: 'IMPROVEMENT_OFFSHORE_OIL_RIG' }),
+    'effects.3.yields.production': xml('Improvement_BonusYieldChanges', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG&YieldType=YIELD_PRODUCTION&PrereqTech=TECH_PREDICTIVE_SYSTEMS', 'BonusYieldChange'),
   },
 };
 
@@ -759,6 +762,8 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('PLASTICS', 'Plastics', 'Atomic', 1480, ['COMBUSTION'], [
       // CIV6 (Fishing Boats): "+1 Food (requires Plastics)".
       { kind: 'improvementYields', improvement: 'FISHING_BOATS', yields: { food: 1 } },
+      // CIV6 (Offshore Oil Rig): the improvement's PrereqTech
+      { kind: 'unlockImprovement', improvement: 'OFFSHORE_OIL_RIG' },
     ]),
 
     T('COMPUTERS', 'Computers', 'Atomic', 1660, ['ELECTRICITY', 'RADIO'], [
@@ -825,6 +830,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       { kind: 'unlockImprovement', improvement: 'OFFSHORE_WIND_FARM' },
       { kind: 'improvementYields', improvement: 'QUARRY', yields: { production: 1 } },
       { kind: 'improvementYields', improvement: 'OIL_WELL', yields: { production: 1 } },
+      { kind: 'improvementYields', improvement: 'OFFSHORE_OIL_RIG', yields: { production: 1 } },
     ]),
     // CIV6 (Seasteads): Future era, "Awards 1 Diplomatic Victory point", and
     // the Seastead improvement's PrereqTech.

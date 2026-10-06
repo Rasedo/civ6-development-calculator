@@ -48,7 +48,8 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
-import { scaleByGameSpeed } from '../data/constants';
+import { emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
@@ -485,6 +486,9 @@ export interface History {
   /** every great person the records' `greatPeople` named, by
    *  GreatPersonIndividuals index; null where no record carried it */
   people: Map<number, RecruitedPerson> | null;
+  /** each major's strategic stockpile (`Seat.stockpile`) after each record's
+   *  power step, by player and turn (`importPower`) */
+  stockpile: Map<number, Map<number, number[]>>;
 }
 
 /** A recruited great person as the records follow it: the unit that carried
@@ -555,7 +559,7 @@ export function newHistory(): History {
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null };
+    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null, stockpile: new Map() };
 }
 
 /** Fold a record's `events` into the history: the floods (each with its
@@ -847,15 +851,22 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const now = new Set(c.buildings.map((b) => JSON.stringify(b)));
       const diff = [...c.buildings.filter((b) => !was.has(JSON.stringify(b))),
         ...(bwas.get(`${c.owner}:${c.id}`) ?? []).filter((b) => !now.has(JSON.stringify(b)))];
-      if (!diff.some((b) => paysAt(b[0] as number))) continue;
-      const all = diff.some((b) => paysEmpire(cat, b[0] as number));
-      for (const d of rec.cities) if (d === c || (all && d.owner === c.owner)) for (const q of d.plots) cityMoved.add(q);
+      const paying = diff.filter((b) => paysAt(b[0] as number));
+      if (!paying.length) continue;
+      const all = paying.some((b) => paysEmpire(cat, b[0] as number));
+      for (const d of rec.cities) {
+        if (d !== c && !(all && d.owner === c.owner)) continue;
+        for (const q of d.plots) if (paying.some((b) => paysPlotAt(cat, b[0] as number, rec, q))) cityMoved.add(q);
+      }
     }
+    const payless = new Set(['IMPROVEMENT_BARBARIAN_CAMP', 'IMPROVEMENT_GOODY_HUT'].map((n) => cat.improvements.indexOf(n)).filter((k) => k >= 0));
     const preserve = cat.districts.indexOf('DISTRICT_PRESERVE');
     const centre = cat.districts.indexOf('DISTRICT_CITY_CENTER');
     const same = (i: number, k: number) => plotAt(rec, i)[k] === plotAt(h.last!, i)[k];
-    const still = (i: number) => same(i, P.feature) && same(i, P.resource) && same(i, P.improvement)
-      && same(i, P.improvementPillaged) && same(i, P.district) && same(i, P.wonder) && same(i, P.owner);
+    // `bare`: the plot's own improvement may have gone or been pillaged
+    const still = (i: number, bare = false) => same(i, P.feature) && same(i, P.resource)
+      && (bare || (same(i, P.improvement) && same(i, P.improvementPillaged)))
+      && same(i, P.district) && same(i, P.wonder) && same(i, P.owner);
     const nbr = (i: number) => {
       const r = Math.floor(i / W);
       const c = i % W;
@@ -888,14 +899,20 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         const res = plotAt(rec, i)[P.resource] as number;
         const bareKey = `${plotAt(rec, i)[P.feature]}|${plotAt(rec, i)[P.owner]}|${res}`;
         const y1 = plotAt(rec, i)[P.yields] as number[];
+        // a Barbarian Outpost or a Tribal Village pays its plot nothing
         const unimproved = (r: TurnRecord) => (plotAt(r, i)[P.improvement] as number) < 0
-          || plotAt(r, i)[P.improvementPillaged] === 1;
+          || plotAt(r, i)[P.improvementPillaged] === 1 || payless.has(plotAt(r, i)[P.improvement] as number);
         const bare = unimproved(rec) && (plotAt(rec, i)[P.district] as number) < 0
           && (plotAt(rec, i)[P.wonder] as number) < 0 && Array.isArray(y1)
           && (res < 0 || !RESOURCES[strip(cat.resources[res] ?? '', 'RESOURCE_')]?.revealTech);
         const acc = h.eventYields.get(i) ?? [0, 0, 0];
-        if (bare && !unimproved(h.last) && same(i, P.owner) && same(i, P.resource)
-          && same(i, P.district) && !cityMoved.has(i)) {
+        // the plot stood under a working improvement, a district or a wonder
+        // the record before (runs/h1_duelw1112, plot 622: a wonder site from
+        // t59, given up at t70 reading 2 Food where its bare reading at t58
+        // was 1, the t67 flood's)
+        const covered = (r: TurnRecord) => !unimproved(r) || (plotAt(r, i)[P.district] as number) >= 0
+          || (plotAt(r, i)[P.wonder] as number) >= 0;
+        if (bare && covered(h.last) && same(i, P.owner) && same(i, P.resource) && !cityMoved.has(i)) {
           const b = h.bare.get(i);
           const owner = plotAt(rec, i)[P.owner] as number;
           if (b && b.key === bareKey && !(owner >= 0 && moved.has(owner))) {
@@ -919,9 +936,11 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // a plot whose yields rose with nothing about it, its neighbours or
         // its owner moving: a random event's draw
         // a district's plot yields nothing but the city centre's, which a
-        // flood silts like any other plot
+        // flood silts like any other plot; a pillaged improvement removed
+        // leaves the plot as bare as it stood (runs/h1_duelw1112, plot 564:
+        // its pillaged Farm washed away at t100 with +1 Production)
         const dist = plotAt(rec, i)[P.district] as number;
-        if (!still(i) || (dist >= 0 && dist !== centre) || cityMoved.has(i)) continue;
+        if (!still(i, unimproved(rec) && unimproved(h.last)) || (dist >= 0 && dist !== centre) || cityMoved.has(i)) continue;
         // an unowned plot's yields are the viewing player's (a strategic it
         // has just revealed pays from that record on)
         const owner = plotAt(rec, i)[P.owner] as number;
@@ -1079,6 +1098,24 @@ function paysPlots(cat: Catalog, bi: number): boolean {
   const unique = cat.buildingReplaces.some(([u]) => u === name);
   return !!b && !!(b.coastPlotYields || b.plotFeatureYields || b.coastResourceYields || b.special === 'WATER_MILL'
     || (unique && b.civVariants?.some((v) => v.featureTileYields || v.coastResourceYields)));
+}
+
+/** Can the building row `bi` (one `paysPlots` names) pay plot `i` of the
+ *  record: the Water Mill a farmable bonus resource's plot, a Coast clause a
+ *  Coast or Lake plot, a feature clause a plot carrying a feature; a wonder
+ *  or a unique row's clause any plot. */
+function paysPlotAt(cat: Catalog, bi: number, rec: TurnRecord, i: number): boolean {
+  const name = cat.buildings[bi];
+  if (cat.wonders.includes(name) || cat.buildingReplaces.some(([u]) => u === name)) return true;
+  const id = engineRowOf(cat, 'building', bi);
+  const b = id ? BUILDINGS[id] : undefined;
+  if (!b) return true;
+  const p = plotAt(rec, i);
+  const rid = strip(cat.resources[p[P.resource] as number] ?? '', 'RESOURCE_');
+  const water = cat.terrains[p[P.terrain] as number] === 'TERRAIN_COAST' || p[P.isLake] === 1;
+  return (b.special === 'WATER_MILL' && RESOURCES[rid]?.category === 'bonus' && RESOURCES[rid]?.improvement === 'FARM')
+    || (!!(b.coastPlotYields || b.coastResourceYields) && water)
+    || (!!b.plotFeatureYields && (p[P.feature] as number) >= 0);
 }
 
 /** Does the building row `bi` of the record name a wonder paying every plot
@@ -1606,6 +1643,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
   const readBack = history?.floods ? importFloods(state, history.floods) : importFloodCounts(rec, state, cityByKey.values());
   if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
+  if (history) importPower(ctx, rec, state, seatOfGame, history);
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
@@ -1615,6 +1653,47 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
     cityBefore: prevCities,
   };
+}
+
+/**
+ * THE POWER the record's cities stand in (`City.powered`). The records carry
+ * no strategic stockpile, so each major's is replayed from the first record
+ * on by the engine's own turn step (`accrueStockpiles`, `chargeUnitUpkeep`,
+ * `resolveSeatPower`): the bank the record before left, each turn between
+ * the two paying the improved sources the record shows, a unit new in the
+ * record paying its resource cost, the units' fuel, then the plants' burn.
+ * A record set that begins past turn 1 holds no bank to start from: its
+ * seats carry a `stockpile` gap.
+ */
+function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (pid: number) => number, h: History): void {
+  const prevUnits = new Set((h.before && h.before.turn < rec.turn ? h.before.units : []).map((u) => `${u.owner}:${u.id}`));
+  for (const p of rec.players) {
+    const seat = seatOfGame(p.id);
+    const s = seatOf(state, seat);
+    if (!bool(p.major) || !s || seat >= state.seats.length) continue;
+    const banks = h.stockpile.get(p.id) ?? new Map<number, number[]>();
+    h.stockpile.set(p.id, banks);
+    let from = -Infinity;
+    for (const t of banks.keys()) if (t < rec.turn && t > from) from = t;
+    if (from === -Infinity && h.firstTurn > 1) {
+      ctx.scopeSeat = seat;
+      gap(ctx, 'stockpile', 'before the first record');
+      ctx.scopeSeat = undefined;
+    }
+    s.stockpile = from === -Infinity ? emptyStockpile() : [...banks.get(from)!];
+    const turns = from === -Infinity ? 1 : rec.turn - from;
+    for (let k = 0; k < turns; k++) accrueStockpiles(state, seat);
+    if (from !== -Infinity) {
+      for (const u of rec.units) {
+        if (u.owner !== p.id || prevUnits.has(`${u.owner}:${u.id}`)) continue;
+        const id = unitId(ctx, u.type);
+        if (id) chargeUnitResource(state, seat, id, undefined, Math.max(0, num(u.formation) || 0));
+      }
+    }
+    chargeUnitUpkeep(state, seat);
+    resolveSeatPower(state, seat);
+    banks.set(rec.turn, [...s.stockpile]);
+  }
 }
 
 /** The prices the record's standing districts locked at placement

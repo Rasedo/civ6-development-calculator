@@ -90,13 +90,13 @@ class SimEconomy:
                 counts.scatter_add_(1, self.lux_id.clamp(min=0), mine.long())
         # CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
         # B: This Luxury resource grants no Amenities." B silences the named
-        # luxury outright (the Affluence copies with it); A pays one extra
-        # full-reach round per copy the row holds beyond the first. The
-        # duplicated luxury's copies serve FIRST (`dup_seg` rounds), all of
-        # them.
+        # luxury outright (the Affluence copies with it); under A the named
+        # luxury is ONE pass reaching `_lux_k` cities per copy the row holds,
+        # wrapping round the list while copies are left (Player_Resources
+        # 0x4a6110: a no-cap resource's reach times its copies). `dup` is the
+        # copies beyond the first, 0 where no such pass runs.
         lp_out, lp_tgt = self._congress_by_id("LUXURY_POLICY")
         dup = torch.zeros(B, dtype=torch.long, device=self.device)
-        dup_seg = dup
         if bool((lp_out >= 0).count_nonzero()):
             t0 = lp_tgt.clamp(min=0, max=self._n_lux - 1)
             ban = lp_out == 1
@@ -104,11 +104,10 @@ class SimEconomy:
             dup = torch.where(lp_out == 0,
                               (held.gather(1, t0.unsqueeze(1)).squeeze(1) - 1).clamp(min=0),
                               dup)
-            dup_seg = torch.where(dup > 0, dup + 1, dup)
-        rounds = (counts > 0).long().sum(dim=1) + dup
+        rounds = (counts > 0).long().sum(dim=1)
         # CIV6 (John Spilsbury and the three after him): an INVENTED luxury
         # serves cities exactly like a worked one, and its own row says how
-        # many it reaches. They rank AFTER the worked ones, in creation order.
+        # many it reaches.
         if row < self.n_majors:
             gp_n = self.civ_gp_lux_n[:, row]
             gp_reach = self.civ_gp_lux[:, row]
@@ -116,8 +115,8 @@ class SimEconomy:
             gp_n = torch.zeros_like(rounds)
             gp_reach = torch.zeros(B, self.civ_gp_lux.shape[2], dtype=self.civ_gp_lux.dtype, device=self.device)
         # CIV6 (Zanzibar): Cinnamon and Cloves stand on no tile (`Frequency=0`)
-        # and each is `Happiness="6"` — two rounds of a SIX-city reach, the
-        # shape an invented luxury already has. They rank after those.
+        # and each is `Happiness="6"` — two passes of a SIX-city reach, the
+        # shape an invented luxury already has.
         spice_n = torch.zeros_like(rounds)
         if self._suz_c_spice >= 0 and row < self.n_majors:
             spice_n = self._suz_effect(row, self._suz_c_spice).long() * self._suz_spice_n
@@ -145,18 +144,36 @@ class SimEconomy:
         mx = int(total.max().item())
         if mx == 0:
             return out
+        # each pass's reach, in TS's concatenation (worked luxuries, invented
+        # ones, Zanzibar's pair, Buenos Aires' bonuses), the duplicated
+        # luxury's own pass widened by its copies; then widest first
+        rr = torch.arange(mx, device=self.device).reshape(1, -1)
+        rounds_c = rounds.unsqueeze(1)
+        gp_c = gp_n.unsqueeze(1)
+        gi = (rr - rounds_c).clamp(min=0, max=gp_reach.shape[1] - 1)
+        _after_gp = rr - rounds_c - gp_c
+        reach = torch.where(
+            rr < rounds_c,
+            torch.full_like(rr.expand(B, mx), self._lux_k),
+            torch.where(
+                _after_gp < 0,
+                gp_reach.gather(1, gi).long(),
+                torch.where(_after_gp < spice_n.unsqueeze(1),
+                            torch.full_like(rr.expand(B, mx), self._suz_spice_amen),
+                            torch.full_like(rr.expand(B, mx), self._suz_bonus_amen))))
+        reach = torch.where(rr < total.unsqueeze(1), reach, torch.zeros_like(reach))
+        reach[:, 0] = torch.where(dup > 0, reach[:, 0] * (dup + 1), reach[:, 0])
+        reach = reach.sort(dim=1, descending=True).values
         if self._log_diff:
             for _rb in range(B):
-                _rr = [self._lux_k] * int(rounds[_rb])
-                _rr += [int(gp_reach[_rb, _i]) for _i in range(int(gp_n[_rb]))]
-                _rr += [self._suz_spice_amen] * int(spice_n[_rb])
-                _rr += [self._suz_bonus_amen] * int(bonus_n[_rb])
+                _rr = [int(reach[_rb, _i]) for _i in range(int(total[_rb]))]
                 self._diff_events.setdefault(_rb, []).append(
                     f"r:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
                     f" lux{int((counts > 0).long().sum(dim=1)[_rb])}"
-                    f" dup{int(dup[_rb])} reach[{','.join(str(x) for x in _rr)}]")
+                    f" dup{int(dup[_rb])}"
+                    f" reach[{','.join(str(x) for x in _rr)}]")
         # ONE persistent list (`luxuryAmenities`): `pos` is each slot's place
-        # in it — city-id order at first, dead slots last — and every copy
+        # in it — city-id order at first, dead slots last — and every pass
         # re-sorts it by need with the old place breaking ties. A slot is a
         # storage address the compaction reorders; the id is fixed for the
         # city's life, so the list starts from the id.
@@ -166,43 +183,22 @@ class SimEconomy:
                                                                                  dtype=f64, device=self.device))
         pos = torch.empty(B, cols, dtype=f64, device=self.device)
         pos.scatter_(1, seq.argsort(dim=1, stable=True), ar)
-        held_dup = torch.zeros(B, cols, dtype=f64, device=self.device)
-        kmax = max(self._lux_k, int(gp_reach.max().item()) if bool((gp_n > 0).count_nonzero()) else 0)
-        if bool((spice_n > 0).count_nonzero()):
-            kmax = max(kmax, self._suz_spice_amen)
-        if bool((bonus_n > 0).count_nonzero()):
-            kmax = max(kmax, self._suz_bonus_amen)
-        k = min(kmax, cols)
-        krank = torch.arange(k, device=self.device).reshape(1, -1)
+        n_alive = alive.long().sum(dim=1).clamp(min=1).unsqueeze(1)
         for rnd in range(mx):
-            act = total > rnd
-            gi = (rnd - rounds).clamp(min=0, max=gp_reach.shape[1] - 1)
-            # the four segments, in the order TS concatenates them: worked
-            # luxuries, invented ones, Zanzibar's pair, Buenos Aires' bonuses
-            _after_gp = rnd - rounds - gp_n
-            reach = torch.where(
-                rnd < rounds,
-                torch.full_like(rounds, self._lux_k),
-                torch.where(
-                    _after_gp < 0,
-                    gp_reach.gather(1, gi.unsqueeze(1)).squeeze(1),
-                    torch.where(_after_gp < spice_n,
-                                torch.full_like(rounds, self._suz_spice_amen),
-                                torch.full_like(rounds, self._suz_bonus_amen))))
+            r_n = reach[:, rnd].unsqueeze(1)
             need = (amen_need - (amen_have + out)).to(f64)
-            # while the duplicated luxury serves, fewer of its copies outrank
-            # more; the key packs (copies asc, need desc, place asc) into one
-            # f64, exact for need in halves and any place this row can hold
-            in_dup = (rnd < dup_seg).unsqueeze(1)
-            rk = torch.where(in_dup, held_dup, torch.zeros_like(held_dup))
-            key = torch.where(alive, (need - rk * self._LUX_KEY_SCALE) * self._LUX_KEY_SCALE - pos,
-                              -1e15 - pos)
+            # (need desc, place asc) packed into one f64, exact for need in
+            # halves and any place this row can hold
+            key = torch.where(alive, need * self._LUX_KEY_SCALE - pos, -1e15 - pos)
             order = key.argsort(dim=1, descending=True)
             pos.scatter_(1, order, ar)
-            top_i = order[:, :k]
-            grant = alive.gather(1, top_i) & act.unsqueeze(1) & (krank < reach.unsqueeze(1))
-            out.scatter_add_(1, top_i, grant.to(dt))
-            held_dup.scatter_add_(1, top_i, (grant & in_dup).to(f64))
+            rank = pos.long()
+            # the widened pass wraps round the list; every other stops at its end
+            wrap = (dup > 0).unsqueeze(1) & (rnd == 0)
+            g_wrap = r_n // n_alive + (rank < r_n % n_alive).long()
+            g_plain = (rank < r_n).long()
+            grant = torch.where(wrap, g_wrap, g_plain) * alive.long()
+            out += grant.to(dt)
         return out
 
     # ------------------------------------------------------------------
@@ -7352,6 +7348,8 @@ class SimEconomy:
         popf = pop.double()
         citz[:, :, 3] = self.rules.citizen_science * popf
         citz[:, :, 4] = self.rules.citizen_culture * popf
+        # a citizen with no plot and no slot to work pays Gold
+        citz[:, :, 2] = self.rules.unassigned_citizen_gold * (pop_t - take.sum(dim=2)).clamp(min=0).double()
 
         # ================= bucket 5: BONUSES ================================
         # m.cityYields to every city + m.capitalYields to the capital, summed as

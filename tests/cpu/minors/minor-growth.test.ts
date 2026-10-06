@@ -65,13 +65,13 @@ describe("a minor's city keeps a real food box", () => {
 
 describe("a minor's culture box banks and buys nothing", () => {
   // CIV6 (`CivilizationLevels`): `CanAnnexTilesWithCulture` is FALSE for
-  // CITY_STATE. The box still fills off the same walk a major's does — the
-  // rule is at the SPEND, exactly where the Border Control Treaty puts it.
-  it('fills the box from its own culture', () => {
+  // CITY_STATE: its box banks none of its culture (runs/h1_duelw1112: the
+  // three city-states' boxes read 0 every record) and buys nothing.
+  it('banks none of its own culture', () => {
     const { state, cs } = scene();
     expect(cs.cultureBox ?? 0).toBe(0);
     minorPhase(state);
-    expect(cs.cultureBox ?? 0).toBeGreaterThan(0);
+    expect(cs.cultureBox ?? 0).toBe(0);
   });
 
   it('claims no ground however full the box is', () => {
@@ -79,7 +79,7 @@ describe("a minor's culture box banks and buys nothing", () => {
     const owned0 = state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length;
     minorPhase(state);
     expect(cs.tilesAcquired ?? 0).toBe(0);
-    expect(cs.cultureBox ?? 0).toBeGreaterThanOrEqual(10_000);
+    expect(cs.cultureBox ?? 0).toBe(10_000);
     expect(state.map.tiles.filter((t) => tileSeat(t) === cs.seat).length).toBe(owned0);
   });
 

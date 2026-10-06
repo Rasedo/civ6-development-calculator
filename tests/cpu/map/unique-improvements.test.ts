@@ -71,7 +71,9 @@ describe('the unique improvement catalog', () => {
     expect(IMPROVEMENT_IDS.indexOf('SKI_RESORT')).toBe(39);
     // ...and the Seastead after that
     expect(IMPROVEMENT_IDS.indexOf('SEASTEAD')).toBe(40);
-    expect(IMPROVEMENT_IDS.length).toBe(41);
+    // ...and the Offshore Oil Rig after that
+    expect(IMPROVEMENT_IDS.indexOf('OFFSHORE_OIL_RIG')).toBe(41);
+    expect(IMPROVEMENT_IDS.length).toBe(42);
   });
 
   it('gives one civilization at most one unique improvement', () => {

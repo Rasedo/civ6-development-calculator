@@ -1714,6 +1714,31 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_SEASTEAD', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
     },
   },
+  // CIV6 (Offshore Oil Rig, Improvements.xml): Oil on Coast or Ocean, +2
+  // Production, -1 Appeal beside it, unlocked by Plastics, built by a Builder
+  OFFSHORE_OIL_RIG: {
+    id: 'OFFSHORE_OIL_RIG',
+    appealAdjacent: -1,
+    name: 'Offshore Oil Rig',
+    code: 'Or',
+    plunder: { kind: 'gold', amount: 50 },
+    yields: { production: 2 },
+    housing: 0,
+    resourceOnly: true,
+    waterOnly: true,
+    terrains: ['COAST', 'LAKE', 'OCEAN'],
+    description: 'Oil at sea.',
+    src: {
+      appealAdjacent: xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'Appeal'),
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'PlunderType', { expect: 'PLUNDER_GOLD' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'PlunderAmount'),
+      'yields.production': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG&YieldType=YIELD_PRODUCTION', 'YieldChange'),
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'ResourceType')] },
+      waterOnly: xml('Improvements', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG', 'Domain', { expect: 'DOMAIN_SEA' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_OFFSHORE_OIL_RIG (TERRAIN_COAST is the engine\'s Coast and Lake), as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG&TerrainType=TERRAIN_COAST', 'TerrainType'), xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_OFFSHORE_OIL_RIG&TerrainType=TERRAIN_OCEAN', 'TerrainType')] },
+    },
+  },
 };
 
 /**

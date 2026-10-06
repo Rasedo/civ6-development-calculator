@@ -8,7 +8,7 @@ import { AGREEMENT_TURNS, ALLIANCE_L2_QP, ALLIANCE_L3_QP, ALLIANCE_M1_CS, ALLIAN
   VISIBILITY_CS_PER_LEVEL , CIV_LEADERS, AGE_START_BARS } from '../data/seats';
 import { GP_RESOURCE_REVEAL, gpPermOf } from '../data/greatPeople';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL } from '../data/espionage';
-import { RESOURCES } from '../../world/resources';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
 import { emptyStockpile } from '../data/constants';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { CIV_LEVELS, type CivLevelDef, type CivLevelId } from '../data/civLevels';
@@ -99,18 +99,17 @@ const NOTHING_HIDDEN: ReadonlySet<string> = new Set<string>();
 /**
  * Does this seat have ACCESS to a strategic resource? True iff some tile it
  * OWNS carries that resource AND its completed, unpillaged matching improvement
- * (PASTURE on horses, MINE on iron — read from the resource catalog).
- * Improvements are instant here, so `tile.improvement === imp` means built.
+ * (PASTURE on horses, MINE on iron, an Offshore Oil Rig on Oil at sea — `resourceImprovement`).
+ * Improvements are instant here, so a standing improvement means built.
  *
  * Access is a pure boolean; the stockpile counts in stockpile.ts. Mirrors the
  * GPU res_id/res_imp/improvement scan.
  */
 export function civHasStrategic(state: GameState, civ: number, resourceId: string): boolean {
-  const imp = RESOURCES[resourceId]?.improvement;
-  if (!imp) return false;
+  if (!RESOURCES[resourceId]) return false;
   if (hiddenResourcesFor(state, civ).has(resourceId)) return false; // CIV6: no access to what you cannot see
   for (const t of state.map.tiles) {
-    if (t.resource !== resourceId || t.pillaged || t.improvement !== imp) continue;
+    if (t.resource !== resourceId || t.pillaged || t.improvement !== resourceImprovement(t)) continue;
     if (tileOwnedByCiv(t, civ)) return true;
   }
   return false;

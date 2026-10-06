@@ -3,7 +3,7 @@ import { addYields, emptyYields, type City, type CityState, type DistrictId, typ
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
 import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, liveSpecialtyCount } from './yields';
-import { seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
+import { isCivicComplete, seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
 import { CIVICS } from '../data/civics';
@@ -32,11 +32,11 @@ import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIB
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
-import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
+import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
 import { hiddenResourcesFor } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
-import { garrisonOf } from './units';
+import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, garrisonOf } from './units';
 import { floodBarrierScale } from './climate';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
@@ -657,18 +657,18 @@ function nonLuxuryAmenities(
 }
 
 /**
- * Which cities each luxury's amenity reaches. CIV6 has no install row for it
- * (a DLL rule); this is the rule fitted on the H-1 records
- * (`GetAmenitiesFromLuxuries` per city):
- * - every copy a luxury serves goes to `reach` cities (LUXURY_AMENITY_CITIES
- *   for a worked one), one amenity each;
- * - the cities stand in ONE list, founding (id) order at first, and before
- *   every copy that list is stably re-sorted by need — amenitiesNeeded less
- *   the city's non-luxury amenities (`nonLuxuryAmenities`) and the luxury
- *   amenities granted so far — so equally needy cities keep the order the
- *   previous copy left them in;
- * - the Luxury Policy's duplicated luxury serves first, and while it does a
- *   city holding fewer of its copies ranks ahead of any holding more.
+ * Which cities each luxury's amenity reaches, as the DLL allocates it
+ * (Player_Resources 0x4a6110, dll_readings "H-1: the luxury allocation"):
+ * - each luxury the seat holds is ONE pass of LUXURY_AMENITY_CITIES cities,
+ *   one amenity each; the Luxury Policy's duplicated luxury is a no-cap
+ *   resource whose pass reaches that many per copy held and wraps round the
+ *   list while copies are left;
+ * - the passes run widest first (a stable sort, resource order breaking
+ *   ties, which no allocation can tell apart);
+ * - the cities stand in ONE list, founding (id) order at first, stably
+ *   re-sorted before every pass by need — amenitiesNeeded less the city's
+ *   non-luxury amenities (`nonLuxuryAmenities`) and the luxury amenities
+ *   granted so far — and a pass serves its first cities in that order.
  */
 export function luxuryAmenities(state: GameState, seat: number): Map<number, number> {
   // a city-state's one city is its `minorCity` view (its Seat's `cities` is
@@ -681,10 +681,9 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
 
   // CIV6 (Luxury Policy): "A: +1 Amenity on duplicates of a Resource. /
   // B: This Luxury resource grants no Amenities." B silences the named
-  // luxury outright; A pays one extra full-reach round per copy the seat
-  // holds beyond the first — its own, its city-states', its Great Persons',
-  // its deals' (1104 China's six Cocoa, four of them its own plots, pay five
-  // extra rounds, t143-162).
+  // luxury outright; A widens the luxury's pass by every copy the seat holds
+  // — its own, its city-states', its Great Persons', its deals' (1104
+  // China's six Cocoa, four of them its own plots, reach 24, t143-162).
   const banned = congressBannedLuxury(state);
   const dupLux = congressDuplicateLuxury(state);
   const held = luxuryHoldings(state, seat).held;
@@ -731,30 +730,32 @@ export function luxuryAmenities(state: GameState, seat: number): Map<number, num
       if (RESOURCES[t.resource]?.category === 'bonus') bonusLux.add(t.resource);
     }
   }
-  // the duplicated luxury's copies serve first, all of them
-  const dupRounds = dupCopies > 1 ? dupCopies : 0;
-  const reach = [
-    ...new Array<number>(luxuries.size + Math.max(0, dupCopies - 1)).fill(LUXURY_AMENITY_CITIES),
-    ...(seatOf(state, seat)?.gpLuxuries ?? []),
-    ...zanzibar,
-    ...new Array<number>(bonusLux.size).fill(BUENOS_AIRES_AMENITIES),
-  ];
+  // each luxury is ONE pass of its reach; the duplicated luxury's pass
+  // reaches LUXURY_AMENITY_CITIES per copy the seat holds and wraps round
+  // the list while copies are left (Player_Resources 0x4a6110: a no-cap
+  // resource's reach times its copies). The passes run widest first.
+  const passes: { n: number; wrap: boolean }[] = [
+    ...[...luxuries].map((r) => (r === dupLux && dupCopies > 1
+      ? { n: LUXURY_AMENITY_CITIES * dupCopies, wrap: true }
+      : { n: LUXURY_AMENITY_CITIES, wrap: false })),
+    ...(seatOf(state, seat)?.gpLuxuries ?? []).map((n) => ({ n, wrap: false })),
+    ...zanzibar.map((n) => ({ n, wrap: false })),
+    ...new Array<number>(bonusLux.size).fill(BUENOS_AIRES_AMENITIES).map((n) => ({ n, wrap: false })),
+  ].sort((a, b) => b.n - a.n);
   const dlR = (globalThis as { __diffLog?: string[] }).__diffLog;
-  if (dlR) dlR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${reach.join(',')}]`);
+  if (dlR) dlR.push(`r:${seat} t${state.turn} lux${luxuries.size} dup${dupCopies} reach[${passes.map((p) => p.n).join(',')}]`);
   const need = (c: City): number => amenitiesNeeded(c.population) - ((baseHave.get(c.id) ?? 0) + result.get(c.id)!);
-  const dupHeld = new Map<number, number>();
-  for (const c of cities) dupHeld.set(c.id, 0);
-  // ONE list, re-sorted in place: Array.prototype.sort is stable, so a tie
-  // keeps the order the previous copy left
+  // ONE list, re-sorted in place before every pass: Array.prototype.sort is
+  // stable, so a tie keeps the order the previous pass left
   const order = [...cities].sort((a, b) => a.id - b.id);
-  reach.forEach((n, i) => {
-    const dup = i < dupRounds;
-    order.sort((a, b) => (dup ? dupHeld.get(a.id)! - dupHeld.get(b.id)! : 0) || need(b) - need(a));
-    for (const c of order.slice(0, n)) {
+  for (const p of passes) {
+    order.sort((a, b) => need(b) - need(a));
+    const n = p.wrap ? p.n : Math.min(p.n, order.length);
+    for (let k = 0; k < n; k++) {
+      const c = order[k % order.length];
       result.set(c.id, result.get(c.id)! + 1);
-      if (dup) dupHeld.set(c.id, dupHeld.get(c.id)! + 1);
     }
-  });
+  }
   return result;
 }
 
@@ -783,8 +784,9 @@ export function resourcePriority(tile: Tile): number {
  * `PLOT_INFLUENCE_*` GlobalParameter except the 3-ring bound and the
  * neighbours' -1s, which the DLL spells as literals:
  * - distance d to the centre: d · DISTANCE_MULTIPLIER · 2;
- * - a resource the seat can see: RESOURCE_COST within 3 rings; any other
- *   plot pays WATER_COST if water and RING_COST beyond 3 rings;
+ * - a resource the seat can see (`seenResourceAt`): RESOURCE_COST within
+ *   3 rings; any other plot pays WATER_COST if water and RING_COST beyond 3
+ *   rings;
  * - an improvement: RING_COST on a barbarian outpost, IMPROVEMENT_COST on
  *   any other (a Tribal Village included);
  * - a natural wonder: NW_COST;
@@ -794,12 +796,12 @@ export function resourcePriority(tile: Tile): number {
  *   within 3 rings of the centre.
  */
 export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: YieldCtx,
-  hidden: ReadonlySet<string>, camps: ReadonlySet<number>): number {
+  seen: (t: Tile) => boolean, camps: ReadonlySet<number>): number {
   const P = PLOT_INFLUENCE;
   const ctr = state.map.tiles[city.centerIndex];
   const d = hexDistance(state.map, ctr.col, ctr.row, t.col, t.row);
   let cost = d * P.distanceMultiplier * 2;
-  if (t.resource !== null && !hidden.has(t.resource)) {
+  if (seen(t)) {
     if (d <= 3) cost += P.resourceCost;
   } else {
     if (isWater(t)) cost += P.waterCost;
@@ -813,13 +815,27 @@ export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: Yiel
   let nwNear = false;
   for (const n of neighbors(state.map, t)) {
     if (tileClaimed(n)) continue;
-    if (n.resource !== null && !hidden.has(n.resource)) cost -= 1;
+    if (seen(n)) cost -= 1;
     if (naturalWonderAt(n)) {
       cost -= 1;
       if (hexDistance(state.map, ctr.col, ctr.row, n.col, n.row) <= 3) nwNear = true;
     }
   }
   return nwNear ? cost - 1 : cost;
+}
+
+/** Does the seat see a resource on a plot (the next-plot scorer's 'a resource
+ *  the player can see', 0x1aa7f0): a resource its research reveals, and a dig
+ *  site — Resources.xml's RESOURCE_ANTIQUITY_SITE (PrereqCivic Natural
+ *  History) and RESOURCE_SHIPWRECK (PrereqCivic Cultural Heritage), carried
+ *  on the plot as `Tile.antiquity` / `Tile.shipwreck` (runs/h1_duelw1112
+ *  Yiyang t216-222: the Shipwreck at 529 drawn over 528). */
+export function seenResourceAt(state: GameState, seat: number): (t: Tile) => boolean {
+  const hidden = hiddenResourcesFor(state, seat);
+  const antiquity = isCivicComplete(state, ANTIQUITY_CIVIC, seat);
+  const shipwreck = isCivicComplete(state, SHIPWRECK_CIVIC, seat);
+  return (t) => (t.resource !== null && !hidden.has(t.resource))
+    || (antiquity && !!t.antiquity) || (shipwreck && !!t.shipwreck);
 }
 
 /** The plots culture growth would claim next: every candidate at the lowest
@@ -831,12 +847,12 @@ export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: Yiel
 export function borderBestPlots(state: GameState, city: City, ctx?: YieldCtx): number[] {
   const own = ctx ?? makeYieldCtx(state, city.seat);
   const yctx: YieldCtx = { ...own, mods: { ...own.mods, plotYields: [] } };
-  const hidden = hiddenResourcesFor(state, city.seat);
+  const seen = seenResourceAt(state, city.seat);
   const camps = campTiles(state);
   let best = Infinity;
   let out: number[] = [];
   for (const i of borderCandidates(state, city).sort((a, b) => a - b)) {
-    const c = borderPlotCost(state, city, state.map.tiles[i], yctx, hidden, camps);
+    const c = borderPlotCost(state, city, state.map.tiles[i], yctx, seen, camps);
     if (c < best) { best = c; out = [i]; } else if (c === best) out.push(i);
   }
   return out;
@@ -1582,6 +1598,8 @@ export function computeCityStats(
   const citizens = emptyYields();
   citizens.science = city.population * CITIZEN_SCIENCE;
   citizens.culture = city.population * CITIZEN_CULTURE;
+  // a citizen with no plot and no slot to work pays Gold
+  citizens.gold = Math.max(0, city.population - specialistTotal - worked.length) * UNASSIGNED_CITIZEN_GOLD;
 
   const bonuses = emptyYields();
   addYields(bonuses, m.cityYields);

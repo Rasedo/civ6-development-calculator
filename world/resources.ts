@@ -83,7 +83,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
   IRON: { id: 'IRON', name: 'Iron', category: 'strategic', revealTech: 'BRONZE_WORKING', yields: { science: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: HILLS, noFeature: true },
   NITER: { id: 'NITER', name: 'Niter', category: 'strategic', revealTech: 'MILITARY_ENGINEERING', yields: { food: 1, production: 1 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'], elevations: FLAT, okFeatures: ['FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'] },
   COAL: { id: 'COAL', name: 'Coal', category: 'strategic', revealTech: 'INDUSTRIALIZATION', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS'], elevations: HILLS, noFeature: true },
-  OIL: { id: 'OIL', name: 'Oil', category: 'strategic', revealTech: 'REFINING', yields: { production: 3 }, improvement: 'OIL_WELL', terrains: ['DESERT', 'TUNDRA', 'SNOW'], elevations: FLAT, noFeature: true },
+  OIL: { id: 'OIL', name: 'Oil', category: 'strategic', revealTech: 'REFINING', yields: { production: 3 }, improvement: 'OIL_WELL', waterImprovement: 'OFFSHORE_OIL_RIG', terrains: ['DESERT', 'TUNDRA', 'SNOW'], elevations: FLAT, noFeature: true },
   ALUMINUM: { id: 'ALUMINUM', name: 'Aluminum', category: 'strategic', revealTech: 'RADIO', yields: { science: 1 }, improvement: 'MINE', terrains: ['DESERT', 'PLAINS'], elevations: HILLS, noFeature: true },
   URANIUM: { id: 'URANIUM', name: 'Uranium', category: 'strategic', revealTech: 'COMBINED_ARMS', yields: { production: 2 }, improvement: 'MINE', terrains: ['GRASSLAND', 'PLAINS', 'DESERT', 'TUNDRA', 'SNOW'], elevations: ANY, noFeature: true },
 

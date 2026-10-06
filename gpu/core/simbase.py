@@ -242,6 +242,7 @@ class Rules:
     focus_base: torch.Tensor
     citizen_science: float
     citizen_culture: float
+    unassigned_citizen_gold: float
     food_per_citizen: float
     housing_left_growth: tuple  # (half, quarter, zero): growth falls to half / a quarter at, halts below
     boost_fraction: float
@@ -485,6 +486,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         focus_base=torch.tensor(r["focusBase"], dtype=torch.float64),
         citizen_science=r["citizenScience"],
         citizen_culture=r["citizenCulture"],
+        unassigned_citizen_gold=r["unassignedCitizenGold"],
         food_per_citizen=r["foodPerCitizen"],
         housing_left_growth=tuple(int(x) for x in r["housingLeftGrowth"]),
         boost_fraction=r["boostFraction"],
