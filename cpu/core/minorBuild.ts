@@ -677,6 +677,7 @@ function minorRepairTarget(state: GameState, cityState: CityState): string | und
  *  (`minorRepairTarget`). */
 function minorBuild(state: GameState, cityState: CityState, production: number): void {
   cityState.fullyPowered = false;
+  delete cityState.buildProject;
   delete cityState.projectYield;
   let pot = cityState.prodProgress ?? 0;
   const toward = (pct: number) => {
@@ -751,6 +752,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
       }
       if (pot < cost) {
         cityState.fullyPowered = !!def.fullyPowered;
+        cityState.buildProject = want.project;
         return;
       }
       cityState.prodProgress = pot - cost;

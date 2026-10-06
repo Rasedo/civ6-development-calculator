@@ -18,7 +18,7 @@ import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlan
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
-import { minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
+import { cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
 import { minorPhase } from './minorBuild';
 import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
@@ -1840,9 +1840,16 @@ export function pressureFromCity(state: GameState, city: City, g: number): numbe
     || (holySite && suzerainEffect(state, city.seat, 'holySitePressure'));
   const site = holySite || completedWonders(state, city).some((w) => w.def.effects?.religionSite);
   const mult = asHoly ? HOLY_CITY_PRESSURE_MULT : site ? HOLY_SITE_PRESSURE_MULT : 1;
-  // CIV6 (Bishop): "Religious pressure to adjacent cities is 100% stronger
-  // from this city."
-  return RELIGION_PRESSURE_PER_TURN * mult * governorTileMult(state, tiles[city.centerIndex], (e) => e.pressureMult);
+  // the percents sum (0x1f33e0): CIV6 (Bishop) "Religious pressure to
+  // adjacent cities is 100% stronger from this city", and the district
+  // project heading the queue (Projects_XP2.ReligiousPressureModifier, Holy
+  // Site Prayers' 100): runs/h1_duelw1118 Armagh presses 8 while Prayers
+  // heads its queue, 4 otherwise
+  const head = city.queue[0];
+  const project = head?.kind === 'project' ? head.project : cityStateAt(state, city.centerIndex)?.buildProject;
+  const pct = (governorTileMult(state, tiles[city.centerIndex], (e) => e.pressureMult) - 1) * 100
+    + (project ? PROJECTS[project]?.pressurePct ?? 0 : 0);
+  return (RELIGION_PRESSURE_PER_TURN * mult * (100 + pct)) / 100;
 }
 
 /**

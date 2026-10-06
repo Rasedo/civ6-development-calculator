@@ -47,7 +47,7 @@ import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Un
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, isFreeSeat, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
@@ -68,6 +68,7 @@ import { PLACEABLE_DISTRICTS } from '../data/districts';
 import { effectiveSpecialists } from './city';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { TECHS } from '../data/techs';
+import { PROJECTS } from '../data/projects';
 import { CIVICS } from '../data/civics';
 import { UNITS, UNIT_INDEX } from '../data/units';
 import { SPY_IDLE } from '../data/espionage';
@@ -716,6 +717,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorLastHit: overCityStates((cityState) => cityState.lastHitTurn ?? 0),
   minorPowered: overCityStates((cityState) => (cityState.powered ? 1 : 0)),
   minorFullyPowered: overCityStates((cityState) => (cityState.fullyPowered ? 1 : 0)),
+  minorBuildProject: overCityStates((cityState) => (cityState.buildProject ? Object.keys(PROJECTS).indexOf(cityState.buildProject) : -1)),
   minorRepairWait: overCityStates((cityState) => (cityState.repairWait ? 1 : 0)),
   minorRoutes: overCityStates((cityState, state) => routeRowsOf(state, cityState)),
   minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
@@ -811,7 +813,7 @@ const CITY: Record<string, Extractor> = {
   }),
   // the turn a FREE CITY revolted, which its grants count from; -1 for a
   // city that is not Free
-  freedTurn: overCities((r) => (isFreeSeat(r.city.seat) ? r.city.foundedTurn : -1)),
+  foundedTurn: overCities((r) => r.city.foundedTurn),
   // a FREE CITY's build pot (`freeCityBuild`); 0 for any other city
   freePot: overCities((r) => r.city.freePot ?? 0),
   // every layout slot's work — object, maker, era, civilization; -1s for an

@@ -1978,6 +1978,17 @@
           "note": "its last turn's Production went toward a still-running fullyPowered project"
         },
         {
+          "name": "minorBuildProject",
+          "compare": "exact",
+          "covers": [
+            "CityState.buildProject"
+          ],
+          "planes": [
+            "citystate_build_proj"
+          ],
+          "note": "the district project its last turn's Production went toward and did not finish (projects-table index, -1 none)"
+        },
+        {
           "name": "minorRepairWait",
           "compare": "exact",
           "covers": [
@@ -2460,15 +2471,15 @@
           "note": "a FREE CITY's race: the loyalty pressure each major has put on it since it revolted, per major; zeros for a city that is not Free. The Free Cities seat itself (GameState.freeSeat / the GPU's FREE_ROW) is enumerated by this group: its cities are city rows after the majors' (`cityHolders` / `_city_rows`), and every city field, this one included, compares them."
         },
         {
-          "name": "freedTurn",
+          "name": "foundedTurn",
           "compare": "exact",
           "covers": [
             "City.foundedTurn"
           ],
           "planes": [
-            "city_freed_turn"
+            "city_founded_turn"
           ],
-          "note": "the turn a FREE CITY revolted, which its grants count from; -1 for a city that is not Free. TS reads it off `foundedTurn`, which the transfer that made the city Free writes; `foundedTurn` has no other reader."
+          "note": "the turn its owner founded or took the city — a Free City's revolt, which its grants count from; the luxury allocation serves no city founded this turn"
         },
         {
           "name": "freePot",

@@ -1655,6 +1655,7 @@ class SimOrders:
             self.city_is_cap[b, row, col] = False  # an annexed minor is never a capital
             self.city_orig_cap[b, row, col] = -1   # ...and never anyone's original one
             self.city_founder[b, row, col] = -1     # a minor founded it, and minors keep no ledger
+            self.city_founded_turn[b, row, col] = int(self.turn)
             # CIV6 (City-State Emergency): the minor's PATRONS — met, with at
             # least one envoy — are who may bring it to the Congress.
             _cs_kind = self._emg_at["CITY_STATE"]

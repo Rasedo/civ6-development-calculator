@@ -824,6 +824,7 @@ CITY_STATE = {
     "minorPowered": lambda sim, b, rows: [1 if bool(sim.city_powered[b, sim._CITY_MINOR0 + s, 0]) else 0
                                           for s in rows],
     "minorFullyPowered": lambda sim, b, rows: [1 if bool(sim.citystate_full_power[b, s]) else 0 for s in rows],
+    "minorBuildProject": lambda sim, b, rows: [int(sim.citystate_build_proj[b, s]) for s in rows],
     "minorRepairWait": lambda sim, b, rows: [1 if bool(sim.citystate_repair_wait[b, s]) else 0 for s in rows],
     "minorRoutes": lambda sim, b, rows: [_routes_of(sim, b, 100 + s) for s in rows],
     "minorBuildFrom": lambda sim, b, rows: [[int(x) for x in sim.citystate_build_from[b, s].tolist()] for s in rows],
@@ -968,7 +969,7 @@ CITY = {
     "freePressure": lambda sim, b, rows: [
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],
-    "freedTurn": _cty("city_freed_turn"),
+    "foundedTurn": _cty("city_founded_turn"),
     "freePot": _cty("city_free_pot"),
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.

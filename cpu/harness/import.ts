@@ -1817,6 +1817,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER');
       minor.religionPressure = religionPressure;
       minor.unconvertedPressure = unconvertedPressure;
+      // the district project heading the record's queue
+      const head = c.queue?.[0];
+      const project = head && typeof head === 'object' && head.ProjectType !== undefined
+        ? engineId('project', cat.projects[head.ProjectType] ?? '', 'PROJECT_', PROJECTS) : null;
+      if (project) minor.buildProject = project;
+      else delete minor.buildProject;
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       // its citizens pinned as a major's are: the minor's walk works the

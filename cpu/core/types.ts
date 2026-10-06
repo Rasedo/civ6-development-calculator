@@ -943,6 +943,10 @@ export interface CityState extends Seat {
   /** its last turn's Production went toward a `fullyPowered` project that is
    *  still running (`minorBuild`) — the queue head `minorPower` reads */
   fullyPowered?: boolean;
+  /** the district project its last turn's Production went toward and did
+   *  not finish (`minorBuild`) — the queue head the religious step reads
+   *  (`pressureFromCity`). Absent = none. */
+  buildProject?: string;
   /** The STORED answer to the suzerain contest (-1 none), refreshed at every
    *  envoy write — the fixed point that rules reweighting envoys BY the
    *  current suzerain read (Containment, the border passage). */

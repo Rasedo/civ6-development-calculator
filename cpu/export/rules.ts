@@ -1127,6 +1127,8 @@ export function buildRules() {
       rainforestFid: FEAT_IDS.indexOf('RAINFOREST'),
       // gold an international route out of a city holding the feature pays
       featIntlGold: FEAT_IDS.map((f) => FEATURES[f]?.cityIntlRouteGold ?? 0),
+      // amenities a city holding the feature earns (`localAmenities`)
+      featCityAmenities: FEAT_IDS.map((f) => FEATURES[f]?.cityAmenities ?? 0),
       // Great Works. The WRITER / ARTIST / MUSICIAN class indices by created
       // kind (0 WRITING / 1 ART / 2 MUSIC), the works each makes, PRINTING's
       // doubling of a Work of Writing's tourism, and each artist's works.
@@ -1590,6 +1592,9 @@ export function buildRules() {
         // runs (`FullyPoweredWhileActive`)
         yp: p.yieldPct ?? 0,
         fp: p.fullyPowered ? 1 : 0,
+        // the percent the city's religious pressure gains while the row heads
+        // its queue (`ReligiousPressureModifier`)
+        relp: p.pressurePct ?? 0,
         g: p.gpClass ? GP_CLASSES.indexOf(p.gpClass) : -1,
         // the FULL class list + this project's own per-class rate. `g` stays
         // for index stability; the GPU reads `gs`/`gf` and falls back to `g`.

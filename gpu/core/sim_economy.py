@@ -5344,11 +5344,27 @@ class SimEconomy:
                         site[:, r] = site[:, r] | (cw & self._wond_religion_site.reshape(1, 1, -1)).any(dim=2)
             step = (torch.where(holy, self._holy_city_mult, torch.where(site, self._holy_site_mult, 1))
                     * self._pressure_per_turn).double()
-            # CIV6 (Bishop): "Religious pressure to adjacent cities is 100%
-            # stronger from this city" — the SOURCE city's own governor, a major's.
+            # the percents sum (0x1f33e0): CIV6 (Bishop) "Religious pressure to
+            # adjacent cities is 100% stronger from this city" — the SOURCE
+            # city's own governor, a major's — and the district project heading
+            # the queue (Projects_XP2.ReligiousPressureModifier): a major's
+            # queue head, a minor's unfinished build (`citystate_build_proj`)
+            pct = torch.zeros(B, NSC, RC, dtype=torch.float64, device=dev)
             if self.n_governors:
                 for r in range(M):
-                    step[:, r] = step[:, r] * self._governor_mult(r, "pressureMult").double()
+                    pct[:, r] = pct[:, r] + 100.0 * self._governor_sum_less1(r, "pressureMult").double()
+            if self._proj_rp_any:
+                head = self.city_current[:, :M, :RC, 0] - self.PROJECT_BASE
+                okh = (head >= 0) & (head < self._proj_rp_t.numel())
+                pct[:, :M] = pct[:, :M] + torch.where(okh, self._proj_rp_t.take(head.clamp(min=0)),
+                                                      torch.zeros((), dtype=torch.float64, device=dev))
+                if self.S:
+                    mp = self.citystate_build_proj[:, : self.S]
+                    m0 = self._CITY_MINOR0
+                    pct[:, m0:m0 + self.S, 0] = pct[:, m0:m0 + self.S, 0] + torch.where(
+                        mp >= 0, self._proj_rp_t.take(mp.clamp(min=0)),
+                        torch.zeros((), dtype=torch.float64, device=dev))
+            step = step * (100.0 + pct) / 100.0
             stepf = step.reshape(B, K)
             # the pair amount: [B, target, source]
             d = self.pair_dist[cen.unsqueeze(2), cen.unsqueeze(1)].to(torch.long)

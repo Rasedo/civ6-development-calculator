@@ -40,6 +40,10 @@ export interface ProjectDef {
   /** CIV6 (Projects_XP2.FullyPoweredWhileActive): the city counts as fully
    *  powered, with no fuel burned, while this project heads its queue. */
   fullyPowered?: boolean;
+  /** CIV6 (Projects_XP2.ReligiousPressureModifier): the percent the city's
+   *  religious pressure on its neighbours gains while this project heads its
+   *  queue (`pressureFromCity`). */
+  pressurePct?: number;
   /** Great-person class receiving points on completion. Kept as the PRIMARY
    *  class (and the GPU export's single `g` column) for index stability; read
    *  `gpClassesOf(p)` for the full list. */
@@ -175,10 +179,12 @@ export const PROJECTS: Record<string, ProjectDef> = Object.fromEntries(
       yield: 'faith',
       yieldPct: 15,
       gpClass: 'PROPHET',
-      description: 'Convert production into faith and Great Prophet points.',
+      pressurePct: 100,
+      description: 'Convert production into faith and Great Prophet points; +100% religious pressure while it runs.',
       cost: 25,
       costProgressGame: 1500,
       src: {
+        pressurePct: xml('Projects_XP2', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'ReligiousPressureModifier'),
         yieldPct: xml('Project_YieldConversions', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'PercentOfProductionRate'),
         cost: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'Cost', { scale: GAME_SPEED }),
         costProgressGame: xml('Projects', 'ProjectType=PROJECT_ENHANCE_DISTRICT_HOLY_SITE', 'CostProgressionParam1'),

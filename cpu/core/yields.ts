@@ -49,10 +49,13 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
     const pay = (up && r.upgradeYields) || r.yields;
     let n = 0;
     for (const nb of neighbors(ctx.map, tile)) {
+      // a district counts complete and unpillaged; OtherDistrictAdjacent only
+      // the plot owner's own, a named district whoever owns it (DLL 0x365ae0)
+      const liveDistrict = nb.district !== null && nb.districtComplete && !nb.districtPillaged;
       const hit =
         (r.bonusResource && nb.resource !== null && RESOURCES[nb.resource].category === 'bonus') ||
-        (r.anyDistrict && nb.district !== null && nb.districtComplete) ||
-        (!!r.district && nb.district === r.district && nb.districtComplete) ||
+        (r.anyDistrict && liveDistrict && nb.ownerSeat === tile.ownerSeat) ||
+        (!!r.district && nb.district === r.district && liveDistrict) ||
         (!!r.builtWonder && nb.builtWonder !== null && nb.builtWonderComplete) ||
         (!!r.mountain && isMountain(nb)) ||
         (!!r.sameImprovement && nb.improvement === imp && !nb.pillaged) ||
@@ -874,11 +877,16 @@ export function cityDistrictSum(
   return n;
 }
 
+const NW_AMENITY_FEATURES = Object.keys(FEATURES).filter((f) => FEATURES[f].cityAmenities) as FeatureId[];
+
 /** The amenities a city earns AT HOME: its own complete districts, then its
  *  own non-regional buildings. A pillaged district darkens both. */
 export function localAmenities(state: GameState, city: City): number {
   const dark = darkBuildings(state.map, city);
   let n = cityDistrictSum(state, city, 'amenities');
+  // CIV6 (PAMUKKALE_AMENITY): a natural wonder in the city's borders, once
+  // however many of its plots the city holds
+  for (const f of NW_AMENITY_FEATURES) if (cityHasFeature(state, city, f)) n += FEATURES[f].cityAmenities!;
   // CIV6 (Bath): the unique district's own flat Amenity, in the base the
   // luxury ranking sorts on — where the Aqueduct's own would sit.
   for (const d of city.districts) {

@@ -383,7 +383,7 @@ def test_grants(rules, path) -> None:
     col = free_slot(sim, centre)
     F = sim.FREE_ROW
     cid = int(sim.city_id[B0, F, col])
-    assert int(sim.city_freed_turn[B0, F, col]) == t0
+    assert int(sim.city_founded_turn[B0, F, col]) == t0
     # the former owner's melee pair exists on the flip turn itself, on the
     # nearest free land plots, the first on the ring's walk first, in the
     # hostile pool, each remembering the city that granted it

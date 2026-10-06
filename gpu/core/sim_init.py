@@ -279,6 +279,10 @@ class SimInit:
         # its last turn's Production went toward a `fullyPowered` project
         # still running — the queue head `_minor_power` reads (`fullyPowered`)
         self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the district project (projects-table row, -1 none) its last turn's
+        # Production went toward and did not finish — the queue head the
+        # religious step reads (`buildProject`)
+        self.citystate_build_proj = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # a building was pillaged while the minor worked on an item: its
         # repair waits for that item (`CityState.repairWait`)
         self.citystate_repair_wait = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
@@ -1351,10 +1355,10 @@ class SimInit:
         # "since the Free City became independent" (`City.freePressure`),
         # accrued by `_free_cities_phase`; zeros for any other city.
         self.city_free_press = torch.zeros(B, self.CITY_ROWS, civ_city_pad, self.n_majors, dtype=dtype, device=device)
-        # the turn a city became FREE — the revolt's turn on the free row, -1
-        # on every other city (TS's `foundedTurn`, which the transfer writes).
-        # Its grants fall due off it.
-        self.city_freed_turn = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
+        # the turn its owner founded or took the city (TS's `foundedTurn`), -1
+        # on an empty slot: a Free City's grants fall due off its revolt's
+        # turn, and the luxury allocation serves no city founded this turn
+        self.city_founded_turn = torch.full((B, self.CITY_ROWS, civ_city_pad), -1, dtype=torch.long, device=device)
         # the residue the city's growth accumulator keeps, in 256ths
         # (`City.growthDrift`): each detached growth percent leaves its
         # attach plus its detach, floored both ways
@@ -1523,6 +1527,11 @@ class SimInit:
                                          dtype=torch.float64, device=device)
         self._proj_y_t = torch.tensor([int(p["y"]) for p in self._proj_rows] or [-1], dtype=torch.long, device=device)
         self._proj_fp = [i for i, p in enumerate(self._proj_rows) if int(p["fp"])]
+        # each row's religious-pressure percent while it heads its city's
+        # queue (`ProjectDef.pressurePct`)
+        self._proj_rp_t = torch.tensor([float(p["relp"]) for p in self._proj_rows] or [0.0],
+                                       dtype=torch.float64, device=device)
+        self._proj_rp_any = bool(self._proj_rp_t.count_nonzero())
         self._proj_gf = float(_pj["gppFraction"])
         # The space-race chain. Space rows carry sp/vic flags (+ rt tech gate,
         # rp previous-step link) and sit LAST in the projects table, in chain
@@ -1804,6 +1813,8 @@ class SimInit:
         self._promo_xp_per_level = int(rr["promoXpPerLevel"])
         self._rainforest_fid = int(rr["rainforestFid"])
         self._feat_intl_gold = torch.tensor([float(x) for x in rr["featIntlGold"]], dtype=torch.float64, device=device)
+        # (feature index, amenities) a city holding the feature earns
+        self._feat_city_amen = [(i, float(x)) for i, x in enumerate(rr["featCityAmenities"]) if float(x)]
         self._gp_nc = int(self._gp_class_district.numel())
         # PERMANENT channels a spent Great Person leaves behind, the count of
         # charges actually spent (which is what a founded religion reads), and

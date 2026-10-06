@@ -826,6 +826,7 @@ class SimMinors:
             return
         B, dev = self.B, self.device
         self.citystate_full_power[:, s] = False
+        self.citystate_build_proj[:, s] = -1
         rd = self.rules_dev
         row = self._CITY_MINOR0 + s
         # the step clears the yield the last one converted
@@ -944,6 +945,9 @@ class SimMinors:
                     continue
                 toward(avail, 0.0)
                 pay = avail & (self.citystate_prod[:, s] >= cost_r)
+                self.citystate_build_proj[:, s] = torch.where(
+                    avail & ~pay, torch.full_like(self.citystate_build_proj[:, s], self._repair_proj_idx),
+                    self.citystate_build_proj[:, s])
                 self.citystate_repair_wait[:, s] &= ~pay
                 if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
@@ -982,6 +986,10 @@ class SimMinors:
                         self.city_proj_yield[:, row, 0] = torch.where(
                             avail, torch.full_like(self.city_proj_yield[:, row, 0], yi), self.city_proj_yield[:, row, 0])
                     pay = avail & (self.citystate_prod[:, s] >= cost_p)
+                    # an unfinished project heads the queue the religious step reads
+                    self.citystate_build_proj[:, s] = torch.where(
+                        avail & ~pay, torch.full_like(self.citystate_build_proj[:, s], pi),
+                        self.citystate_build_proj[:, s])
                     if pi in self._proj_fp:
                         # a project still running lights the next turn's grid
                         self.citystate_full_power[:, s] |= avail & ~pay

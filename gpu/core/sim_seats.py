@@ -8276,10 +8276,15 @@ class SimSeats:
                 di = int(r["dist"])
                 if int(r["bw"]):
                     hit |= (self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc]
+                # a district counts complete and unpillaged; OtherDistrictAdjacent
+                # only the plot owner's own, a named district whoever owns it
+                # (DLL 0x365ae0)
+                live_d = self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
                 if int(r["anyd"]):
-                    hit |= (self.district[:, nbc] >= 0) & self.district_complete[:, nbc]
+                    hit |= ((self.district[:, nbc] >= 0) & live_d
+                            & (self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)))
                 elif di >= 0:
-                    hit |= (self.district[:, nbc] == di) & self.district_complete[:, nbc]
+                    hit |= (self.district[:, nbc] == di) & live_d
                 for f in r["feats"]:
                     hit |= (self.feat_id[:, nbc] == f) & ~self.feat_stripped[:, nbc]
                 if int(r["mtn"]):
@@ -8336,8 +8341,11 @@ class SimSeats:
         mutation sites. All consumers read-only."""
         # ...and the row's TECHS: a revealed resource starts paying its yield
         # (`_res_hidden`); the plane's version counter is the stamp
+        # ...and the districts a suzerain improvement counts: their pillage
+        # and their owners (`_imp_adjacency`)
         key = (row, self._eff_version, self._bel_stamp(), simbase.write_stamp(self.civ_techs),
-               simbase.write_stamp(self.civ_civics))
+               simbase.write_stamp(self.civ_civics), simbase.write_stamp(self.district_pillaged),
+               self._tile_owner_ver)
         if self._belief_feat_cache is not None and self._belief_feat_cache[0] == key:
             return self._belief_feat_cache[1]
         suz = self._imp_adjacency(row)
@@ -10483,6 +10491,10 @@ class SimSeats:
             dreg, self.city_bldg_pillaged[:, row, :cols])
         selb = _held & ~_bc["regional"].unsqueeze(1)
         have = torch.einsum("bjn,bn->bj", selb.to(torch.float64), _bc["amenities"])
+        # CIV6 (PAMUKKALE_AMENITY): a natural wonder in the city's borders,
+        # once however many of its plots the city holds
+        for _nf, _na in self._feat_city_amen:
+            have = have + self._city_has_feature(row, _nf).double() * _na
         # CIV6 (Thermal Bath, THERMALBATH_ADDAMENITIES): more while its city's
         # border holds a tile of one feature.
         for (_abi, _aciv), (_afeat, _aamt) in self._bvar_amen_feat.items():
@@ -10703,7 +10715,7 @@ class SimSeats:
         self.city_unconverted[b, row, col] = 0
         self.city_growth_drift[b, row, col] = 0
         self.city_free_press[b, row, col, :] = 0
-        self.city_freed_turn[b, row, col] = -1
+        self.city_founded_turn[b, row, col] = -1
         # the walk's stash: a city no walk has read yet carries none
         # (`workedTiles` / `amenityTier` unset on a new City object)
         self.city_worked[b, row, col, :] = -1
@@ -11134,8 +11146,8 @@ class SimSeats:
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
-        # ...and the turn it became Free, which its grants count from
-        self.city_freed_turn[b, dst_row, col] = int(self.turn) if dst_row == self.FREE_ROW else -1
+        # ...and the turn its new owner took it (a Free City's grants count from it)
+        self.city_founded_turn[b, dst_row, col] = int(self.turn)
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
         self.city_proj_conv[b, dst_row, col] = 0
@@ -11601,6 +11613,7 @@ class SimSeats:
                               torch.full_like(colon_g, -1))
             colon_p = torch.where(colon_g >= 0, self._enh["colon"][_eh + 1], torch.zeros_like(colon_g))
         self.city_alive[rows, row, slot] = True
+        self.city_founded_turn[rows, row, slot] = int(self.turn)
         self.city_is_cap[rows, row, slot] = new_cap
         self.city_orig_cap[rows, row, slot] = torch.where(
             new_cap, torch.full_like(s_idx, row), torch.full_like(s_idx, -1))

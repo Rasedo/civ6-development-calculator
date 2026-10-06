@@ -1031,7 +1031,7 @@ _MUTABLE = [
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
-    "city_freed_turn",  # the turn a Free City became free, which its grants count from
+    "city_founded_turn",  # the turn its owner founded or took the city
     "free_treasury",  # the Free Cities seat's treasury
     "seat_shortfall",  # every city row's holder's last turn shortfall, which bankruptcy reads
     # THE GOVERNOR ROSTER — one slot per catalog governor per major row
@@ -1082,6 +1082,7 @@ _MUTABLE = [
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
+    "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step

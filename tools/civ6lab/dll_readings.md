@@ -788,9 +788,19 @@ fraction bits (every amount is written `<< 8`).
   Expansion2_RemoveData deletes the base Jerusalem trait) and its +0x1368
   player founded the religion; else HOLY_SITE_PRESSURE_MULTIPLIER (+0x5e8)
   with a Holy Site; then x (100 + the owner religion's 0x4975a0 + the
-  city's +0xd4 (MODIFIER_SINGLE_CITY_RELIGION_PRESSURE, the Bishop) + a
-  table term read through the city's +0x2170) / 100, then the game speed
-  (0x525590). The unread percent terms are 1107 Kandy's 8 against 4.
+  city's +0xd4 (MODIFIER_SINGLE_CITY_RELIGION_PRESSURE, the Bishop) + the
+  queue term) / 100, the percents SUMMED, then the game speed (0x525590).
+  The queue term: the city's build queue (+0x2170, head 0x179650; -1 when
+  empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a
+  Projects_XP2 row (0xad5fb0 / 0x28a940) — its +0x24, ReligiousPressureModifier
+  (Holy Site Prayers 100, every other row 0). Recorded: runs/h1_duelw1118
+  Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every
+  record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and
+  4 on the rest (t61–67, t86–115, t131–138, t157–211), China's cities each
+  pressed 4 a turn harder with it (`pressureFromCity` / the GPU spread's
+  `pct`; a minor's head is its unfinished build, `CityState.buildProject` /
+  `citystate_build_proj`); 1107 Kandy's 8 against 4. 0x4975a0 (the owner
+  religion's +0x6d0, plus +0x790 while its +0x730 entry holds) is unread.
 - The population change 0x1f3050 (called from City ChangePopulation
   0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n,
   `<< 8`, to the entry of the current majority (+8: -1 when none, the
@@ -980,6 +990,18 @@ mountain rules close 1104 t143 and 1108 t187 (an Industrial Zone at 3 rows
 + 1 Mountain, the game's moment paid). Check: `tests/cpu/city/adjacency-rows.test.ts`,
 `tests/gpu/adjacency_rows_test.py`; H-1 `city.yields` 5,759 → 5,921 passes,
 `step.eraScore` 2,690 → 2,693 over the six Duels.
+
+An improvement's adjacency runs the same row evaluator: 0x3664d0
+(`improvementDef != nullptr`) walks the improvement's
+Improvement_Adjacencies rows (+0x110..+0x118) through 0x365ae0 with the
+player it is handed, so an OtherDistrictAdjacent row counts only that
+player's complete, unpillaged, non-InternalOnly districts and an
+AdjacentDistrict row its type complete and unpillaged, whoever owns it
+(`improvementAdjacency` / `_imp_adjacency`, the plot's owner the player).
+Recorded (runs/h1_duelw1118): China's Monastery on plot 781 beside Longxi's
+Campus and Armagh's Neighborhood reads 2 Faith t208–249 (counting both
+would pay 3); Armagh's Monastery on plot 915 beside its centre and its
+pillaged Holy Site reads 2 t23–25 and 3 once the site is repaired (t26).
 
 ## H-1: a district project's yield conversion — READ
 

@@ -747,7 +747,7 @@ class SimPhase:
         at 0 as a minor's does (`_seat_upkeep_and_bankruptcy`). Then
         each city takes its grant when one falls due — every
         `_free_grant_period`th of its turns, the flip turn its first
-        (`city_freed_turn`), the chassis `_free_grant_type`'s — puts the same
+        (`city_founded_turn`), the chassis `_free_grant_type`'s — puts the same
         walk's Production into its build table (`_free_city_build`), fires the
         ranged strikes any walled city fires (`_city_strikes`) and runs its
         loyalty (its heal is the turn's end's, `_heal_cities`): CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
@@ -809,7 +809,7 @@ class SimPhase:
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
             # a grant falls due every `_free_grant_period`th of the city's own
             # turns, the flip turn its first
-            due = act & ((int(self.turn) - self.city_freed_turn[:, row, j] + 1) % self._free_grant_period == 0)
+            due = act & ((int(self.turn) - self.city_founded_turn[:, row, j] + 1) % self._free_grant_period == 0)
             if bool(due.count_nonzero()):
                 self._grant_free_unit(due, jc, self._free_grant_type(due))
             self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)

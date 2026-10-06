@@ -35,6 +35,10 @@ interface FeatureDef {
    *  a CITY_HAS_<feature> subject), once however many of its plots the city
    *  holds. */
   cityIntlRouteGold?: number;
+  /** Amenities a city holding the feature earns, once however many of its
+   *  plots the city holds (MODIFIER_ALL_CITIES_ADJUST_NATURAL_WONDER_AMENITY
+   *  on a CITY_HAS_<feature> subject; the game's GetAmenitiesFromNaturalWonders) */
+  cityAmenities?: number;
 }
 
 /** The FLOODPLAINS CLASS: the desert, grassland and plains floodplains. A rule
@@ -157,11 +161,16 @@ Object.assign(FEATURES, {
   PANTANAL: { id: 'PANTANAL', name: 'Pantanal', yields: { food: 2, culture: 2 }, ...NW },
   ULURU: { id: 'ULURU', name: 'Uluru', yields: {}, impassable: true, adjacentYields: { culture: 2, faith: 2 }, ...NW },
   TORRES_DEL_PAINE: { id: 'TORRES_DEL_PAINE', name: 'Torres del Paine', yields: {}, impassable: true, doublesAdjacentTerrain: true, ...NW },
-  MOUNT_KILIMANJARO: { id: 'MOUNT_KILIMANJARO', name: 'Mount Kilimanjaro', yields: {}, impassable: true, adjacentYields: { food: 1, science: 1 }, ...NW },
+  // CIV6 (Features.xml Feature_AdjacentYields): Kilimanjaro Food 2, Everest Faith 1
+  MOUNT_KILIMANJARO: { id: 'MOUNT_KILIMANJARO', name: 'Mount Kilimanjaro', yields: {}, impassable: true, adjacentYields: { food: 2 }, ...NW },
   YOSEMITE: { id: 'YOSEMITE', name: 'Yosemite', yields: {}, impassable: true, adjacentYields: { gold: 1, food: 1, science: 1 }, ...NW },
-  CLIFFS_OF_DOVER: { id: 'CLIFFS_OF_DOVER', name: 'Cliffs of Dover', yields: {}, impassable: true, adjacentYields: { gold: 2, culture: 1 }, ...NW },
-  MOUNT_EVEREST: { id: 'MOUNT_EVEREST', name: 'Mount Everest', yields: {}, impassable: true, adjacentYields: { faith: 1, science: 1 }, ...NW },
-  EYE_OF_THE_SAHARA: { id: 'EYE_OF_THE_SAHARA', name: 'Eye of the Sahara', yields: { science: 2, gold: 1 }, ...NW },
+  // CIV6 (Features.xml): the Cliffs are passable and pay their own plots Food 2,
+  // Gold 3, Culture 3 (Feature_YieldChanges), nothing to their neighbours
+  // (runs/h1_duelw1117 plots 581 / 625, h1_duelw1118 569 / 613: 2F 3G 3C)
+  CLIFFS_OF_DOVER: { id: 'CLIFFS_OF_DOVER', name: 'Cliffs of Dover', yields: { food: 2, gold: 3, culture: 3 }, ...NW },
+  MOUNT_EVEREST: { id: 'MOUNT_EVEREST', name: 'Mount Everest', yields: {}, impassable: true, adjacentYields: { faith: 1 }, ...NW },
+  // CIV6 (Expansion1_Features_Major.xml, Expansion1_Expansion2.xml): Production 2, Science 1
+  EYE_OF_THE_SAHARA: { id: 'EYE_OF_THE_SAHARA', name: 'Eye of the Sahara', yields: { production: 2, science: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
 
 // THE FIRE'S FEATURES, appended after the wonders. CIV6
@@ -237,15 +246,18 @@ Object.assign(FEATURES, {
 // Gold 2, Culture 2, its plots' whole yields (runs/h1_duelw1107 read
 // 0F 1P 2G 2C). PAMUKKALE (two plots, Impassable) pays no plot: its
 // `Adjacency_YieldChanges` rows go to the districts beside it (`PAMUKKALE`
-// in `AdjacencySource`). Giant's Causeway's ABILITY_SPEAR_OF_FIONN and
-// Pamukkale's amenities and fresh water are not modelled.
+// in `AdjacencySource`); a city holding it earns 1 Amenity (PAMUKKALE_AMENITY,
+// Expansion2_Features.xml: runs/h1_duelw1106 Taiyuan and Jerusalem, 1117
+// Taiyuan with one plot or both read GetAmenitiesFromNaturalWonders 1).
+// Giant's Causeway's ABILITY_SPEAR_OF_FIONN and Pamukkale's second Amenity
+// beside an Entertainment Complex are not modelled.
 Object.assign(FEATURES, {
   PIOPIOTAHI: { id: 'PIOPIOTAHI', name: 'Piopiotahi', yields: {}, impassable: true, adjacentYields: { gold: 1, culture: 1 }, ...NW },
   TSINGY: { id: 'TSINGY', name: 'Tsingy de Bemaraha', yields: {}, impassable: true, adjacentYields: { culture: 1, science: 1 }, ...NW },
   DEVILS_TOWER: { id: 'DEVILS_TOWER', name: "Devil's Tower", yields: {}, impassable: true, adjacentYields: { faith: 1, production: 1 }, ...NW },
   GIANTS_CAUSEWAY: { id: 'GIANTS_CAUSEWAY', name: "Giant's Causeway", yields: {}, impassable: true, adjacentYields: { culture: 1 }, ...NW },
   LAKE_RETBA: { id: 'LAKE_RETBA', name: 'Lake Retba', yields: { production: 1, gold: 2, culture: 2 }, ...NW },
-  PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, ...NW, freshWater: true },
+  PAMUKKALE: { id: 'PAMUKKALE', name: 'Pamukkale', yields: {}, impassable: true, cityAmenities: 1, ...NW, freshWater: true },
 } satisfies Record<string, FeatureDef>);
 
 // THREE MORE WONDERS, appended after Pamukkale; the engines' map generator
