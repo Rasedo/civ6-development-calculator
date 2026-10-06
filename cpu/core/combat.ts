@@ -28,7 +28,7 @@ import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
-import { nextRandom } from './rand';
+import { nextRandom, randRange } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -901,12 +901,8 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   // identical int.
   const q = Math.round(strengthDiff * 10);
   const c0 = state.rngState >>> 0;
-  const r = nextRandom(state);
-  // the game's GetRandNum(COMBAT_MAX_EXTRA_DAMAGE): ONE draw mapped to 0..11
-  // (the game scales the top 15 bits of its LCG by the range; floor(r·12) is
-  // that mapping on this engine's unit draw — exact in a double, and the GPU
-  // twin computes the identical floor)
-  const roll = Math.floor(r * COMBAT_MAX_EXTRA_DAMAGE);
+  // the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
+  const roll = randRange(state, COMBAT_MAX_EXTRA_DAMAGE);
   const dmg = damageOf(roll, x);
   const cb = (globalThis as any).__cbLog;
   // `parts` (where a call site passes them) splits the diff into the two
@@ -1257,10 +1253,11 @@ export function captureRoll(state: GameState, strengthDiff: number, t = -1): boo
   const q = Math.round(strengthDiff * 10);
   const pct = Math.min(100, Math.max(0, Math.round(50 + (q * 5) / CAPTURE_BASE_STRENGTH_DIFF)));
   const c0 = state.rngState >>> 0;
-  const r = nextRandom(state);
-  const hit = Math.floor(r * 100) < pct;
+  // the game's "Unit Capture Chance" draw: rand(100)
+  const r = randRange(state, 100);
+  const hit = r < pct;
   const cb = (globalThis as any).__cbLog;
-  if (cb) cb.push(`k:cap t:${t} c:${c0} diff${q} r${Math.round(r * 1e6)} pct${pct} hit${hit ? 1 : 0}`);
+  if (cb) cb.push(`k:cap t:${t} c:${c0} diff${q} r${r} pct${pct} hit${hit ? 1 : 0}`);
   return hit;
 }
 

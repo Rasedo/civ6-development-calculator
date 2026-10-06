@@ -39,11 +39,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths, FIXTURES  # noqa: E402
 from warmup import warm_base, opened  # noqa: E402
 
+
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
 B0 = 0
 _R = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
 UNI = [u["id"] for u in _R["units"]]
 TECH = [t["id"] for t in _R["techs"]]
-STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 
 def fresh(rules, path, slot: int = 0):
@@ -57,7 +65,7 @@ def _world(path) -> dict:
 
 def draws(s0: int, s1: int) -> int:
     for n in range(64):
-        if (s0 + n * STEP) & 0xFFFFFFFF == s1 & 0xFFFFFFFF:
+        if _lcg_n(s0, n) == s1 & 0xFFFFFFFF:
             return n
     raise AssertionError("more than 64 draws")
 

@@ -105,7 +105,13 @@ def main() -> None:
         place_apostle(sim, sb, tb, 1, 20, promos)
         before = int(sim.rng_state[0])
         sim._theological_combat_phase()
-        return (int(sim.rng_state[0]) - before) & 0xFFFFFFFF
+        # the generator's steps from before to now (the LCG, `_lcg_step`)
+        s, after = before, int(sim.rng_state[0])
+        for k in range(256):
+            if s == after:
+                return k
+            s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+        raise AssertionError("the stream moved more than 256 steps")
 
     plain, martyr = stream_cost(0), stream_cost(1 << mcol)
     assert plain == martyr, f"a martyr's death cost {martyr} of stream, a plain one {plain}"

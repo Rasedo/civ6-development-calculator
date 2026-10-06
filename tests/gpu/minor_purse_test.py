@@ -42,11 +42,9 @@ M32 = 0xFFFFFFFF
 
 
 def draw(st: int) -> float:
-    """the next draw of the mulberry32 stream from state `st` (`_next_random`)"""
-    a = (st + 0x6D2B79F5) & M32
-    t = ((a ^ (a >> 15)) * (1 | a)) & M32
-    t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
-    return ((t ^ (t >> 14)) & M32) / 4294967296.0
+    """the next draw of the stream from state `st` (`_next_random`: one LCG
+    step read as a fraction of 2^32)"""
+    return ((st * 1103515245 + 12345) & M32) / 4294967296.0
 
 
 def seek(sim, pred) -> None:
@@ -314,7 +312,7 @@ def test_walker(rules, path) -> None:
     st = int(sim.rng_state[B0])
     sim._walk_units("major", 100 + s, act, lambda hp: still.unsqueeze(0).expand(sim.B, -1), home_w)
     assert int(sim.major_unit_tile[B0, u]) == ctr
-    assert int(sim.rng_state[B0]) == (st + 0x6D2B79F5) & M32
+    assert int(sim.rng_state[B0]) == (st * 1103515245 + 12345) & M32
     print("  7 walker OK — the drawn step toward the weighted ring, home again, a still turn one draw")
 
 

@@ -22,6 +22,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import load_rules, fixture_paths
 from warmup import warm_base, opened
 
+
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
 M32 = 0xFFFFFFFF
 
 
@@ -40,10 +49,7 @@ def build(rules):
 
 def roll_of(state: int) -> int:
     """`_next_random`'s draw from `state`, as the concert's per-mille roll."""
-    a = (state + 0x6D2B79F5) & M32
-    t = ((a ^ (a >> 15)) * (1 | a)) & M32
-    t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
-    return int(((t ^ (t >> 14)) & M32) / 4294967296.0 * 1000)
+    return int(_lcg_n(state, 1) / 4294967296.0 * 1000)
 
 
 def seed_for_tier(sim, level: int, tier: int) -> int:
@@ -338,7 +344,7 @@ def test_concert(rules) -> None:
     sim.rng_state[0] = seed_for_tier(sim, 1, 2)
     before = int(sim.rng_state[0])
     sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
-    assert int(sim.rng_state[0]) == (before + 0x6D2B79F5) & M32, "the concert is not a one-draw verb"
+    assert int(sim.rng_state[0]) == _lcg_n(before, 1), "the concert is not a one-draw verb"
     print(f"  concert OK: {len(tiers)} tiers walked at venue {val}, one draw each")
 
 
@@ -361,7 +367,7 @@ def test_band_promotions(rules) -> None:
         before = int(sim.rng_state[0])
         sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
         after = int(sim.rng_state[0])
-        return next(k for k in range(8) if (before + k * 0x6D2B79F5) & M32 == after)
+        return next(k for k in range(8) if _lcg_n(before, k) == after)
 
     # the grant: three distinct columns, the level's XP, four draws in all
     slot = place_band(sim, 0, tile)

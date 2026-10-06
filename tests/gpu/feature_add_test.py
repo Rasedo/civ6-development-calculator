@@ -40,11 +40,19 @@ from core import load_rules, fixture_paths, FIXTURES  # noqa: E402
 from core import statecompare as sc  # noqa: E402
 from warmup import warm_base, opened  # noqa: E402
 
+
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
 B0 = 0
 UNI = [u["id"] for u in json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))["units"]]
 # FEAT_IDS: WOODS 0, RAINFOREST 1, MARSH 2, FLOODPLAINS 3, ..., GEOTHERMAL_FISSURE 7, VOLCANIC_SOIL 8
 WOODS, RAINFOREST, MARSH, FLOODPLAINS, GEO, SOIL = 0, 1, 2, 3, 7, 8
-STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 
 def fresh(rules, path, slot: int = 0):
@@ -206,7 +214,7 @@ def main() -> None:
             sim3._erupt(hit, ring_of(sim3, v), rowt)
             # the garrison band where a centre stands, the walls band while walls stand
             want_draws = n_kinds * len(reach) + (cities + walled if banded else 0) + n_yields * len(elig)
-            assert (s0 + want_draws * STEP) & 0xFFFFFFFF == int(sim3.rng_state[B0]), \
+            assert _lcg_n(s0, want_draws) == int(sim3.rng_state[B0]), \
                 "an eruption draws once per damage row per reached plot, then once per Yields row per eligible plot"
             for n in ring:
                 silt = (int(sim3.fertility_prod[B0, n]), int(sim3.fertility_sci[B0, n]),

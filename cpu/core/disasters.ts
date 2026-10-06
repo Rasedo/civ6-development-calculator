@@ -3,12 +3,12 @@ import type { City, CityState, GameState, StormRecord, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, tilesAtOffsets, tilesWithin, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
+import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIR_NE, DIR_E, DIR_SE, DIR_SW, DIR_W, DIR_NW } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
-import { nextRandom } from './rand';
+import { nextRandom, randRange } from './rand';
 import { fogActive, isExplored } from './fog';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, campTiles } from './seats';
 import { raiseAidRequest } from './competition';
@@ -27,7 +27,7 @@ import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
-import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, STORM_SPACING } from '../data/disasters';
+import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
 import { TURN_LIMIT } from './game';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_FEATURES, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_SPREAD_CROSS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
@@ -43,7 +43,7 @@ function log(state: GameState, text: string): void {
 
 function pick<T>(state: GameState, arr: T[]): T | undefined {
   if (arr.length === 0) return undefined;
-  return arr[Math.floor(nextRandom(state) * arr.length)];
+  return arr[randRange(state, arr.length)];
 }
 
 /** CIV6 (Reinforced Materials): "This city's improvements, buildings and
@@ -191,7 +191,7 @@ function unitDamageDraws(state: GameState, tile: Tile, naval: boolean, lo: numbe
   for (const u of unitsAt(state, tile.index)) {
     const dom = unitDomain(u.type);
     if (dom === 'air' || dom === 'spy' || dom === 'civilian' || !!UNITS[u.type]?.naval !== naval) continue;
-    out.set(u.id, lo + Math.floor(nextRandom(state) * (hi - lo)));
+    out.set(u.id, lo + randRange(state, hi - lo));
   }
   return out;
 }
@@ -486,7 +486,7 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
     for (const row of FLOOD_DAMAGE_ROWS[sev]) {
       for (const t of reach) {
         if (floodImmune(state, t)) continue;
-        if (Math.floor(nextRandom(state) * 100) < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
+        if (randRange(state, 100) < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
       }
     }
   }
@@ -494,7 +494,7 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   for (const row of FLOOD_YIELD_ROWS[sev]) {
     const pct = mitigated ? Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * row.pct) / 100) : row.pct;
     for (const t of reach) {
-      if (Math.floor(nextRandom(state) * 100) >= pct || t.feature !== row.feature) continue;
+      if (randRange(state, 100) >= pct || t.feature !== row.feature) continue;
       silt(state, t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
     }
   }
@@ -559,40 +559,26 @@ export function stormStartRadius(ev: StormEvent): number {
 }
 
 /**
- * A storm's start plot ("Pick Storm Start Plot", GameCore_XP2 0x288250): ONE
- * weighted draw over every map plot in ascending order whose whole disc of
- * `stormStartRadius` lies on the map and on the storm's terrain
- * (`stormFamilyAt`, the row's RandomEvent_Terrains; 0x28eab0), each weighing
- * 1 + min(its hex distance to the nearest live storm's centre,
- * `STORM_SPACING`) (0x2900c0). A live storm's centre is no bar. No
- * candidate, no draw. `_storm_start` is the twin.
+ * A storm's start plot ("Pick Storm Start Plot", GameCore_XP2 0x288250 →
+ * 0x2900c0 → 0x28aa00): ONE uniform draw over every map plot in ascending
+ * order that qualifies — Hexes ≥ 19 asks the plot and one of its six
+ * neighbours (all six on the map) to stand on the storm's terrain
+ * (`stormFamilyAt`, the row's RandomEvent_Terrains; 0x28eab0), Hexes ≥ 3 the
+ * plot alone, a smaller row no plot. The spacing weight 0x2900c0 computes
+ * never reaches the draw. No candidate, no draw. `_storm_start` is the twin.
  */
 export function stormStart(state: GameState, ev: StormEvent): Tile | undefined {
   const map = state.map;
-  const r = stormStartRadius(ev);
-  const full = 1 + 3 * r * (r + 1);
-  const centres = (state.storms ?? []).filter((s) => s.left > 0).map((s) => map.tiles[s.at]);
-  const cands: Tile[] = [];
-  const weights: number[] = [];
-  let total = 0;
-  for (const t of map.tiles) {
-    if (stormFamilyAt(t) !== ev.family) continue;
-    const disc = tilesWithin(map, t.col, t.row, r);
-    if (disc.length !== full || disc.some((u) => stormFamilyAt(u) !== ev.family)) continue;
-    let d: number = STORM_SPACING;
-    for (const c of centres) d = Math.min(d, hexDistance(map, t.col, t.row, c.col, c.row));
-    cands.push(t);
-    weights.push(1 + d);
-    total += 1 + d;
-  }
-  if (total === 0) return undefined;
-  const at = Math.floor(nextRandom(state) * total);
-  let cum = 0;
-  for (let i = 0; i < cands.length; i++) {
-    cum += weights[i];
-    if (at < cum) return cands[i];
-  }
-  return cands[cands.length - 1];
+  const need = ev.hexes >= 19 ? 2 : ev.hexes >= 3 ? 1 : 0;
+  if (need === 0) return undefined;
+  const cands = map.tiles.filter((t) => {
+    if (stormFamilyAt(t) !== ev.family) return false;
+    if (need === 1) return true;
+    const ring = neighbors(map, t);
+    return ring.length === 6 && ring.some((n) => stormFamilyAt(n) === ev.family);
+  });
+  if (!cands.length) return undefined;
+  return cands[randRange(state, cands.length)];
 }
 
 /** A city whose reactor can melt down, and its seat. */
@@ -686,7 +672,7 @@ export function droughtStart(state: GameState): Tile | undefined {
     total += 1 + d;
   }
   if (total === 0) return undefined;
-  const at = Math.floor(nextRandom(state) * total);
+  const at = randRange(state, total);
   let cum = 0;
   for (let i = 0; i < cands.length; i++) {
     cum += weights[i];
@@ -721,9 +707,9 @@ function volcanoRoll(state: GameState): void {
   } else if (active.length === 0) {
     return;
   }
-  if (Math.floor(nextRandom(state) * Math.max(d, 1)) !== 0) return;
+  if (randRange(state, d) !== 0) return;
   const from = wake ? volcanoes.filter((t) => !t.volcanoActive) : active;
-  const t = from[Math.floor(nextRandom(state) * from.length)];
+  const t = from[randRange(state, from.length)];
   t.volcanoActive = wake;
 }
 
@@ -820,7 +806,7 @@ function randomEvent(state: GameState, strip: boolean): void {
     : k.map((t) => sitePairWeight(rows[i], ((t.eventFired ?? 0) >> i) & 1 ? 100 : 100 + FIRST_TIME_OCCURRENCE_BOOST, degrees))));
   let total = 0;
   for (const p of pairs) for (const x of p) total += x;
-  const at = Math.floor(nextRandom(state) * Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total));
+  const at = randRange(state, Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total));
   let cum = 0;
   for (let i = 0; i < rows.length; i++) {
     for (let k = 0; k < pairs[i].length; k++) {
@@ -1072,7 +1058,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
     for (const n of ring) {
       if (!eruptionReaches(n)) continue;
       if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
-      if (nextRandom(state) < p) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+      if (randRange(state, 100) < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
     }
   }
   const soil: [number, 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'][] = [
@@ -1082,7 +1068,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
     if (p <= 0) continue;
     for (const n of ring) {
       if (!soilPaintable(n)) continue;
-      if (nextRandom(state) >= p) continue;
+      if (randRange(state, 100) >= Math.round(p * 100)) continue;
       if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
       silt(state, n, key);
     }
@@ -1121,7 +1107,7 @@ function eventDamage(state: GameState, tile: Tile, kind: FloodDamageRow['kind'],
       const held = cityAtIndex(state, tile.index);
       if (!held) return;
       if (kind === 'CITY_WALLS' && outerPool(state, held.city) <= 0) return;
-      const dmg = lo + Math.floor(nextRandom(state) * (hi - lo));
+      const dmg = lo + randRange(state, hi - lo);
       if (kind === 'CITY_GARRISON') hitCityHp(state, tile, dmg);
       else hitCityWalls(state, tile, dmg);
       return;
@@ -1280,7 +1266,7 @@ export function stormWalk(state: GameState, s: StormRecord, ev: StormEvent, stri
     const w = windWeights(center.row, map.height).map((x, d) => (neighborTile(map, center, d) ? x : 0));
     const total = w.reduce((a, b) => a + b, 0);
     if (total === 0) break;
-    let pick = Math.floor(nextRandom(state) * total);
+    let pick = randRange(state, total);
     let d = 0;
     while (d < 5 && pick >= w[d]) { pick -= w[d]; d++; }
     const dest = neighborTile(map, center, d)!;

@@ -45,10 +45,10 @@ import { GWO_PORTRAIT } from '../../../cpu/data/greatWorks';
 
 /** a seed whose first three d6 draws sum to 18: the measured 3d6 succeeds
  *  UNDETECTED at every threshold a scene below rolls against. */
-const WINS = 749;
+const WINS = 634;
 /** the mission's own published duration. */
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
-const LOSES = 1;
+const LOSES = 479;
 /** the bit an Espionage promotion holds in its own class list. */
 function spyBit(id: string): number {
   const k = promoRows('ESPIONAGE').findIndex((p) => p.id === id);

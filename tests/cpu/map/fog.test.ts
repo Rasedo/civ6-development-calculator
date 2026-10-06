@@ -146,6 +146,8 @@ describe('tribal villages', () => {
     hut.goodyHut = true;
     const unit = spawnUnit(state, 'SCOUT', tileAtCoords(state.map, 9, 9).index, 0)!;
     unit.tileIndex = hut.index;
+    // a stream whose village pays a reward the record below reads
+    state.rngState = 0x9e3779b9;
     const before = serializeRewards(state);
     claimGoodyHut(state, unit);
     expect(hut.goodyHut).toBe(false);

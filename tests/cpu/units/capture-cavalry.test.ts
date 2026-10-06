@@ -22,12 +22,13 @@ import type { GameState, Unit } from '../../../cpu/core/types';
  *
  * The GPU twin is tests/gpu/capture_cavalry_test.py.
  */
-const STEP = 0x6d2b79f5; // mulberry32's per-draw increment, on both engines
+const lcg = (s: number) => (Math.imul(1103515245, s) + 12345) >>> 0; // the generator's step, on both engines
 const seatRow = (civ: string) => CIV_LEADERS.findIndex((l) => l.civ === civ);
 
 function draws(s0: number, s1: number): number {
-  // the state is a 32-bit counter stepping by STEP and wrapping, so count steps
-  for (let k = 0; k <= 8; k++) if (((s0 + k * STEP) >>> 0) === (s1 >>> 0)) return k;
+  // count the generator's steps from s0 to s1
+  let s = s0 >>> 0;
+  for (let k = 0; k <= 8; k++, s = lcg(s)) if (s === (s1 >>> 0)) return k;
   throw new Error(`the stream moved by a non-draw amount: ${s0} -> ${s1}`);
 }
 

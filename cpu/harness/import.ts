@@ -34,6 +34,7 @@ import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
+import type { EventReplay } from './eventReplay';
 import { eruptionRing, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT } from '../data/disasters';
 import { isWater } from '../../world/query';
@@ -500,6 +501,9 @@ export interface History {
    *  index}`, each with the plot it started on; null where no record carried
    *  `events` */
   floods: Map<string, number> | null;
+  /** the recorded random events the game's generator replays from the
+   *  witnesses' states (`replayEvents`): their fertility, placed by the draws */
+  replay?: EventReplay;
   /** the sea level the records' `events` reached: the highest
    *  RANDOM_EVENT_SEA_LEVEL_RISE<n> named */
   seaLevel: number;
@@ -606,7 +610,7 @@ const EVENT_COLUMNS: readonly number[] = [0, 1, 3, 4];
 
 /** The map of a record as the engine reads its ground: terrain, feature,
  *  resource, improvement and rivers (no owners, districts or cities). */
-function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
+export function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
   const ctx: Ctx = { cat, gaps: new Map(), bReplace: new Map(), dReplace: new Map(), uReplace: new Map(), wonders: new Set() };
   const tiles: Tile[] = [];
   for (let i = 0; i < rec.head.W * rec.head.H; i++) tiles.push(tileOf(ctx, rec, i));
@@ -731,6 +735,8 @@ function foldEventYields(h: History, rec: TurnRecord, cat: Catalog): void {
       const plots = stormFootprint(map, map.tiles[num(cur)], DROUGHT_HEXES).filter((t) => !isWater(t)).map((t) => t.index);
       h.droughts.push({ turn, sev: dry, plots });
     }
+    // an event the generator placed lays its draws itself (`History.replay`)
+    if (h.replay?.events.has(key)) continue;
     const { slots, exact } = eventSlots(map, name, num(cur), num(start));
     if (exact) {
       if (was !== undefined) continue;
@@ -963,6 +969,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   foldEvents(h, rec, cat);
   h.eventRead = new Map();
   foldEventYields(h, rec, cat);
+  for (const [i, g] of h.replay?.gains.get(rec.turn) ?? []) {
+    const acc = h.eventYields.get(i) ?? [0, 0, 0, 0];
+    h.eventYields.set(i, acc.map((v, k) => v + g[k]));
+  }
   // a person spent by this record: a resource it reveals moves its owner's
   // plots this turn
   for (const [ind, p] of foldPeople(h, rec, cat) ? h.people! : []) {

@@ -40,9 +40,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, fixture_paths, FIXTURES
 from warmup import warm_base, opened
 
+
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
 ROW = 0   # the carrier's seat
 FOE = 1   # a seat at war with it
-STEP = 0x6D2B79F5
 M32 = 0xFFFFFFFF
 UNI = [u["id"] for u in json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))["units"]]
 
@@ -122,7 +130,7 @@ def free_tile(sim, want_water: bool) -> int:
 
 def draws(s0: int, s1: int, cap: int = 200) -> int:
     for k in range(cap + 1):
-        if (s0 + k * STEP) & M32 == s1 & M32:
+        if _lcg_n(s0, k) == s1 & M32:
             return k
     raise AssertionError(f"the stream moved by more than {cap} draws")
 

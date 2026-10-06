@@ -3031,7 +3031,6 @@ class SimInit:
         # a drought's start plot weighs 1 + min(its distance to a live event,
         # this) (`droughtStart`)
         self._drought_spacing = int(_ds["droughtSpacing"])
-        self._storm_spacing = int(_ds["stormSpacing"])
         # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
         # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
         # per row: the per-plot Volcanic Soil chance and the

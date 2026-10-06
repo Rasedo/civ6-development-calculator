@@ -84,11 +84,15 @@ def test_free_research(rules, path) -> None:
     assert int(took.sum()) == sim.B, "the free tech was not one of the available rows"
     assert int(sim.civ_civics[:, row].sum()) == 0, "a free TECH completed a civic"
 
-    # a seat with nothing available spends none of the stream
+    # a seat with nothing available spends none of the stream (every row
+    # done, the repeatable Future Tech held back)
     sim.civ_techs[:, row, :] = True
+    repeat = sim._t_repeat.clone()
+    sim._t_repeat.zero_()
     quiet = sim.rng_state.clone()
     sim._grant_free_research(row, n1, n0)
     assert bool((sim.rng_state == quiet).all()), "an exhausted tree still drew"
+    sim._t_repeat.copy_(repeat)
 
     # the draw SPREADS: over many grants a row is not always the first column
     sim2 = build(rules, path, b=1)

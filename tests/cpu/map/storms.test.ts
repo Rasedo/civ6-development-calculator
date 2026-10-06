@@ -4,7 +4,7 @@ import { emptySeat, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { nextRandom } from '../../../cpu/core/rand';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
-import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk, stormStart, stormStartRadius } from '../../../cpu/core/disasters';
+import { disasterPhase, stormWeights, eventRows, stormFootprint, stormTile, stormWalk, stormStart } from '../../../cpu/core/disasters';
 import { hexDistance } from '../../../world/hex';
 import { STORM_DISC, STORM_EVENTS, STORM_FAMILIES, STORM_UNIT_ROWS, stormFamilyAt, PREVAILING_WINDS, WIND_BAND_LO, WIND_BAND_HI, windLatitude, windWeights, STORM_MOVEMENT, STORM_LAST_TURN_PCT, RANDOM_EVENT_START_TURN, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { makeYieldCtx } from '../../../cpu/core/effects';
@@ -24,14 +24,15 @@ import { placeCityStateAt } from '../../../cpu/core/cityStates';
  * Japan's units and doubles it for enemies on Japanese ground; Mother Russia
  * the same over blizzards.
  */
-const STEP = 0x6d2b79f5; // mulberry32's per-draw increment, on both engines
+const lcg = (s: number) => (Math.imul(1103515245, s) + 12345) >>> 0; // the generator's step, on both engines
 const seatRow = (leader: string) => CIV_LEADERS.findIndex((l) => l.leader === leader);
 const EV = (id: string) => STORM_EVENTS[STORM_EVENTS.findIndex((e) => e.id === id)];
 /** a family's two rows, in table order */
 const familyPair = (f: string) => STORM_EVENTS.flatMap((e, i) => (e.family === f ? [i] : []));
 
 function draws(s0: number, s1: number, most = 12): number {
-  for (let k = 0; k <= most; k++) if (((s0 + k * STEP) >>> 0) === (s1 >>> 0)) return k;
+  let s = s0 >>> 0;
+  for (let k = 0; k <= most; k++, s = lcg(s)) if (s === (s1 >>> 0)) return k;
   throw new Error(`the stream moved by a non-draw amount: ${s0} -> ${s1}`);
 }
 
@@ -258,33 +259,34 @@ describe('the eight storms are the install\'s table', () => {
     expect(Math.abs(draw(STORM_LAST_TURN_PCT) - half(fe.fertFood))).toBeLessThan(0.035);
   });
 
-  it('a storm starts by one weighted draw: 1 + its distance to a live centre, a live centre allowed', () => {
-    // a tornado (Hexes 1, radius 0) on all-Grassland: every plot a candidate
+  it('a storm starts by one uniform draw over the plots its count rule takes (0x288250)', () => {
+    // a Tornado Family (Hexes 1) finds no plot; an Outbreak (Hexes 3) any plot
+    // of its terrain, a live centre no bar and no weight
     const state = board(null);
-    const tor = STORM_EVENTS.find((e) => e.id === 'TORNADO_FAMILY')!;
-    expect(stormStartRadius(tor)).toBe(0);
+    const fam = STORM_EVENTS.find((e) => e.id === 'TORNADO_FAMILY')!;
+    const out = STORM_EVENTS.find((e) => e.id === 'TORNADO_OUTBREAK')!;
+    expect(stormStart(state, fam)).toBeUndefined();
     const c = tileAtCoords(state.map, 8, 8);
     const n = tileAtCoords(state.map, 9, 8);
-    state.storms = [{ id: 1, event: STORM_EVENTS.indexOf(tor), at: c.index, left: 2, struck: [] }];
+    state.storms = [{ id: 1, event: STORM_EVENTS.indexOf(out), at: c.index, left: 2, struck: [] }];
     const hits = new Map<number, number>();
     const N = 40000;
     for (let i = 0; i < N; i++) {
-      const t = stormStart(state, tor)!;
+      const t = stormStart(state, out)!;
       hits.set(t.index, (hits.get(t.index) ?? 0) + 1);
     }
-    // the centre itself still weighs 1, its neighbour 2
     expect(hits.get(c.index) ?? 0).toBeGreaterThan(0);
-    expect(Math.abs((hits.get(n.index) ?? 0) / (hits.get(c.index) ?? 1) - 2)).toBeLessThan(0.6);
-    // a Category 5 hurricane (Hexes 19, radius 2) needs a whole radius-2
-    // disc of Ocean: none on Grassland, the map's inner plots on an ocean
+    expect(Math.abs((hits.get(n.index) ?? 0) / (hits.get(c.index) ?? 1) - 1)).toBeLessThan(0.4);
+    // a Category 5 hurricane (Hexes 19) asks its plot and one of its six
+    // neighbours, all six on the map: none on Grassland, every plot off the
+    // edge rows on an ocean
     const cat5 = STORM_EVENTS.find((e) => e.id === 'HURRICANE_CAT_5')!;
-    expect(stormStartRadius(cat5)).toBe(2);
     expect(stormStart(state, cat5)).toBeUndefined();
     const sea = makeState(makeMap(16, 16, 'OCEAN'));
-    for (let i = 0; i < 200; i++) {
-      const t = stormStart(sea, cat5)!;
-      expect(t.col >= 2 && t.col <= 13 && t.row >= 2 && t.row <= 13).toBe(true);
-    }
+    const rows = new Set<number>();
+    for (let i = 0; i < 400; i++) rows.add(stormStart(sea, cat5)!.row);
+    expect(rows.has(0) || rows.has(15)).toBe(false);
+    expect(rows.has(1) && rows.has(14)).toBe(true);
   }, 30_000); // 40,000 whole-map draws: past the default 5 s on a loaded box
 
   it('the canonical disc is centre, ring 1, ring 2, each ring by tile index', () => {

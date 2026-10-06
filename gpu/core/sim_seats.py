@@ -6660,11 +6660,11 @@ class SimSeats:
             return None
         kinds = [k for k in range(len(self._goody_kinds))
                  if any(self._goody_sub[i][1] == k for i in elig)]
-        r = float(self._next_random(one)[b])
-        kind = kinds[min(len(kinds) - 1, int(r * len(kinds)))]
+        # "Choosing a Goody Hut Type", then "Choosing a Sub Type": the game's draws
+        kind = kinds[int(self._rand_range(one, len(kinds))[b])]
         subs = [i for i in elig if self._goody_sub[i][1] == kind]
         total = sum(self._goody_sub[i][2] for i in subs)
-        acc = float(self._next_random(one)[b]) * total
+        acc = int(self._rand_range(one, total)[b])
         for i in subs:
             acc -= self._goody_sub[i][2]
             if acc < 0:

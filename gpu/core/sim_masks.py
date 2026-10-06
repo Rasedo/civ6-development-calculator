@@ -216,29 +216,27 @@ class SimMasks:
             self._dedication_event(row, ded, newly)
 
 
+    def _lcg_step(self, mask: torch.Tensor) -> torch.Tensor:
+        """Civ 6's generator (the DLL's get 0x8b6c10): state' = 1103515245 *
+        state + 12345 mod 2^32 in the games of `mask`; returns the [B] int64
+        states after the step (the others' unchanged). The product of two
+        values under 2^31 and 2^32 stays inside int64. TS `rand.ts` is the
+        twin."""
+        stepped = (self.rng_state * LCG_MUL + LCG_ADD) & M32
+        self.rng_state.copy_(torch.where(mask, stepped, self.rng_state))
+        return stepped
+
     def _next_random(self, mask: torch.Tensor) -> torch.Tensor:
-        """One mulberry32 draw per game: [B] f64 in [0, 1); the stream moves
-        only in the games of `mask`. The batch is a handful of games, so a
-        [B] mask draws on the host — the same 32-bit integer arithmetic
-        (every product masked to its low 32 bits, which the int64 tensor
-        path's wrap also keeps) and the same correctly rounded division."""
-        if mask.shape == self.rng_state.shape and mask.dim() == 1:
-            outs: list = []
-            new: list = []
-            for s, mk in zip(self.rng_state.tolist(), mask.tolist()):
-                a = (s + 0x6D2B79F5) & M32
-                t = ((a ^ (a >> 15)) * (1 | a)) & M32
-                t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
-                outs.append(float((t ^ (t >> 14)) & M32) / 4294967296.0)
-                new.append(a if mk else s)
-            self.rng_state.copy_(torch.tensor(new, dtype=self.rng_state.dtype, device=self.device))
-            return torch.tensor(outs, dtype=torch.float64, device=self.device)
-        a = (self.rng_state + 0x6D2B79F5) & M32
-        t = ((a ^ (a >> 15)) * (1 | a)) & M32
-        t = (((t + (((t ^ (t >> 7)) * (61 | t)) & M32)) & M32) ^ t) & M32
-        out = ((t ^ (t >> 14)) & M32).to(torch.float64) / 4294967296.0
-        self.rng_state.copy_(torch.where(mask, a, self.rng_state))
-        return out
+        """One step read as a fraction of 2^32: [B] f64 in [0, 1); the stream
+        moves only in the games of `mask`. TS `nextRandom` is the twin."""
+        return self._lcg_step(mask).to(torch.float64) / 4294967296.0
+
+    def _rand_range(self, mask: torch.Tensor, mx: torch.Tensor | int) -> torch.Tensor:
+        """The game's draw in [0, max): the new state's top 16 bits times max
+        read as 16 bits, over 2^16 ([B] int64). TS `randRange` is the
+        twin."""
+        s = self._lcg_step(mask)
+        return ((s >> 16) * (torch.as_tensor(mx, device=self.device).long() & 0xFFFF)) >> 16
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None,
                      parts: tuple[torch.Tensor, ...] | None = None) -> torch.Tensor:
@@ -253,7 +251,8 @@ class SimMasks:
         b = self._log_combat_b
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
-        r = self._next_random(mask)
+        # the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
+        roll = self._rand_range(mask, self._dmg_max_extra)
         q = js_round(diff * 10).to(torch.long)
         # `damageExponent`: the difference at 1/1000, D = floor(256 * diff),
         # x = (k * D) >> 8 — integer floors on both engines
@@ -264,9 +263,6 @@ class SimMasks:
         # to the same damage
         R = self._dmg_reach
         base = self._dmg_base.take((x + R).clamp(0, 2 * R))
-        # the game's GetRandNum(12): ONE draw mapped to 0..11 — floor(r * 12) is
-        # exact in float64 and TS damageRoll computes the identical floor
-        roll = torch.floor(r * self._dmg_max_extra).to(torch.long)
         # `damageOf`: the product and the half each rounded to f32 (an f64
         # product of a small integer and an f32 factor is exact, so the f32
         # rounding of it is the f32 product), truncated, clamped
@@ -298,13 +294,14 @@ class SimMasks:
         b = self._log_combat_b
         log_hit = b is not None and bool(mask[b])
         c0 = int(self.rng_state[b]) if log_hit else 0
-        r = self._next_random(mask)
+        # the game's "Unit Capture Chance" draw: rand(100)
+        r = self._rand_range(mask, 100)
         q = js_round(diff * 10).to(torch.long)
         pct = js_round(50 + q.to(torch.float64) * 5 / self._capture_base_diff).clamp(0, 100).to(torch.long)
-        hit = mask & ((r * 100).floor().to(torch.long) < pct)
+        hit = mask & (r < pct)
         if log_hit:
             self._combat_events.append(
-                f"k:cap t:{int(tile[b])} c:{c0} diff{int(q[b])} r{int(js_round(r[b] * 1e6))} pct{int(pct[b])} hit{int(hit[b])}"
+                f"k:cap t:{int(tile[b])} c:{c0} diff{int(q[b])} r{int(r[b])} pct{int(pct[b])} hit{int(hit[b])}"
             )
         return hit
 

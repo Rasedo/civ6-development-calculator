@@ -3,11 +3,13 @@
     state' = (1103515245 * state + 12345) mod 2^32     -- ANSI/glibc LCG
     r16    = range mod 65536                            -- the argument is
                                                         -- truncated to 16 bits
-    if r16 == 0: return 0 AND DO NOT ADVANCE the state
-    draw   = (top15(state') * r16) >> 15,  top15 = state' >> 17
+    draw   = ((state' >> 16) * r16) >> 16         -- the DLL's get 0x8b6c10
 
-Every number below came from Game.GetRandNum / Game.GetRandomSeed /
-Game.SetRandomSeed over the tuner (runs/rng_20260921T090000Z.jsonl).
+Lua's Game.GetRandNum returns 0 without advancing on r16 == 0; the DLL's own
+get advances on every call. Every number below came from Game.GetRandNum /
+Game.GetRandomSeed / Game.SetRandomSeed over the tuner
+(runs/rng_20260921T090000Z.jsonl); the draws of the seed sweep (range
+1000000) tell this form from (top15 * r16) >> 15 at seeds 2147483647 and -1.
 """
 
 M = 1 << 32
@@ -33,15 +35,19 @@ def draw(state, rng):
     if r16 == 0:
         return 0, u32(state)          # early return, state untouched
     s = step(state)
-    return ((s >> 17) * r16) >> 15, s
+    return ((s >> 16) * r16) >> 16, s
 
 
 fails = 0
 
 print("== state recurrence (seed -> seed after one draw, range 1000000) ==")
-for before, after in [(0, 12345), (1, 1103527590), (2, -2087924461), (3, -984409216),
-                      (12345, -740551042), (65536, 1315778617),
-                      (2147483647, 1043980748), (-1, -1103502900)]:
+for before, after, value in [(0, 12345, 0), (1, 1103527590, 4357), (2, -2087924461, 8714),
+                             (3, -984409216, 13072), (12345, -740551042, 14035),
+                             (65536, 1315778617, 5195), (2147483647, 1043980748, 4122),
+                             (-1, -1103502900, 12602)]:
+    if draw(before, 1000000)[0] != value:
+        fails += 1
+        print(f"  MISS draw from seed {before}: model {draw(before, 1000000)[0]} vs game {value}")
     got = s32(step(before))
     if got != after:
         fails += 1

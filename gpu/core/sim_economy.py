@@ -999,8 +999,7 @@ class SimEconomy:
         TS)."""
         cnt = cand.sum(dim=1)
         has = mask_hit & (cnt > 0)
-        r = self._next_random(has)
-        k = torch.floor(r * cnt.to(torch.float64)).to(torch.long)
+        k = self._rand_range(has, cnt)
         cum = cand.long().cumsum(dim=1)
         tile = ((cum == (k + 1).unsqueeze(1)) & cand).long().argmax(dim=1)
         return has, tile
@@ -1424,8 +1423,7 @@ class SimEconomy:
         d = torch.where(wake & (x >= 200), torch.div(d, torch.div(x, 100, rounding_mode="floor").clamp(min=1),
                                                      rounding_mode="floor"), d)
         roll = (v > 0) & (wake | (a > 0))
-        r = self._next_random(roll)
-        fire = roll & (torch.floor(r * d.clamp(min=1).double()).long() == 0)
+        fire = roll & (self._rand_range(roll, d) == 0)
         if not bool(fire.count_nonzero()):
             return
         got, t = self._pick_live(fire, torch.where(wake.unsqueeze(1), vol & ~self.volcano_active, act))
@@ -1749,42 +1747,28 @@ class SimEconomy:
         return out
 
     def _storm_cands(self, e: int) -> torch.Tensor:
-        """[B, T] storm row `e`'s start candidates (`stormStart`): plots whose
-        whole disc of the row's radius (`Hexes` 19 → 2, 3 or 7 → 1, 1 → 0)
-        lies on the map and on the storm's terrain."""
+        """[B, T] storm row `e`'s start candidates (`stormStart`): Hexes >= 19
+        asks the plot and one of its six neighbours (all six on the map) to
+        stand on the storm's terrain, Hexes >= 3 the plot alone, a smaller
+        row none."""
         hexes = int(self._st_hexes[e])
-        rad = 2 if hexes >= 19 else 1 if hexes >= 3 else 0
-        n = 1 + 3 * rad * (rad + 1)
         base = (self.storm_fam == int(self._st_family[e])) & ~self.tile_submerged     # [B, T]
-        fp = tiles_from_offsets(torch.arange(self.T, device=self.device), self._storm_offs[:n],
-                                self.W, self.H, self.wrap_x)
-        cand = base & (fp >= 0).all(dim=1).unsqueeze(0)
-        for k in range(1, n):
-            cand = cand & base[:, fp[:, k].clamp(min=0)]
-        return cand
+        if hexes < 3:
+            return torch.zeros_like(base)
+        if hexes < 19:
+            return base
+        nb = self.neigh                                                              # [T, 6]
+        whole = (nb >= 0).all(dim=1).unsqueeze(0)
+        near = torch.zeros_like(base)
+        for d in range(nb.shape[1]):
+            near = near | (base[:, nb[:, d].clamp(min=0)] & (nb[:, d] >= 0).unsqueeze(0))
+        return base & whole & near
 
     def _storm_start(self, hit: torch.Tensor, e: int) -> tuple[torch.Tensor, torch.Tensor]:
         """`stormStart` — storm row `e`'s start plot where `hit` [B]: ONE
-        weighted draw over every plot in tile order whose whole disc of the
-        row's radius (`Hexes` 19 → 2, 3 or 7 → 1, 1 → 0) lies on the map and
-        on the storm's terrain, each weighing 1 + min(its distance to the
-        nearest live storm's centre, the spacing). A live centre is no bar.
-        No candidate, no draw. Returns (got, tile)."""
-        B, T, dev = self.B, self.T, self.device
-        cand = self._storm_cands(e) & hit.unsqueeze(1)
-        live = self.storm_left > 0
-        dist = torch.full((B, T), self._storm_spacing, dtype=torch.long, device=dev)
-        for b in (hit & live.any(dim=1)).nonzero(as_tuple=True)[0].tolist():
-            near = self.pair_dist[:, self.storm_at[b][live[b]]].long().min(dim=1).values
-            dist[b] = near.clamp(max=self._storm_spacing)
-        w = torch.where(cand, 1 + dist, torch.zeros_like(dist))
-        total = w.sum(dim=1)
-        got = hit & (total > 0)
-        rr = self._next_random(got)
-        at = torch.floor(rr * total.double()).long()
-        cum = w.cumsum(dim=1)
-        tile = (cand & (cum > at.unsqueeze(1))).long().argmax(dim=1)
-        return got, tile
+        uniform draw over its candidates in tile order (`_storm_cands`); no
+        candidate, no draw. Returns (got, tile)."""
+        return self._pick_live(hit, self._storm_cands(e) & hit.unsqueeze(1))
 
     def _drought_start(self, hit: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`droughtStart` — a drought's start plot where `hit` [B]: ONE
@@ -1802,8 +1786,7 @@ class SimEconomy:
         w = torch.where(cand, 1 + dist, torch.zeros_like(dist))
         total = w.sum(dim=1)
         got = hit & (total > 0)
-        r = self._next_random(got)
-        at = torch.floor(r * total.double()).long()
+        at = self._rand_range(got, total)
         cum = w.cumsum(dim=1)
         tile = (cand & (cum > at.unsqueeze(1))).long().argmax(dim=1)
         return got, tile
@@ -1920,7 +1903,7 @@ class SimEconomy:
         for pw in pairs:
             total = total + pw.sum(dim=1)
         span = total.clamp(min=self._event_occ_scale * self._event_turns)
-        at = torch.floor(self._next_random(every) * span.double()).long()
+        at = self._rand_range(every, span)
         ev = torch.full((B,), -1, dtype=torch.long, device=dev)
         key = torch.full((B,), -1, dtype=torch.long, device=dev)
         done = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -2147,8 +2130,9 @@ class SimEconomy:
                 if bool(bonus.count_nonzero()):
                     br = bonus.nonzero(as_tuple=True)[0]
                     self._drop_resource(br, t[br])
-                r = self._next_random(on)
-                self._event_damage(on & (r < p), t, kind, self._er_dmg_lo.take(row), self._er_dmg_hi.take(row))
+                r = self._rand_range(on, 100)
+                self._event_damage(on & (r < js_round(p * 100).long()), t, kind, self._er_dmg_lo.take(row),
+                                   self._er_dmg_hi.take(row))
         for py, plane in ((self._er_paint_p, self.fertility), (self._er_prod_p, self.fertility_prod),
                           (self._er_sci_p, self.fertility_sci), (self._er_cul_p, self.fertility_cul)):
             p = py[row]
@@ -2158,8 +2142,8 @@ class SimEconomy:
             for d in range(K):
                 nd = torch.where(present, ring[:, d], none)
                 elig = self._soil_paintable(nd)
-                r = self._next_random(elig)
-                land = elig & (r < p)
+                r = self._rand_range(elig, 100)
+                land = elig & (r < js_round(p * 100).long())
                 if not bool(land.count_nonzero()):
                     continue
                 lr = land.nonzero(as_tuple=True)[0]
@@ -2205,8 +2189,7 @@ class SimEconomy:
             city = land & self._centre_held(tile)
             if kind == "CITY_WALLS":
                 city = city & (self._centre_outer_hp(tile) > 0)
-            r = self._next_random(city)
-            dmg = lo + torch.floor(r * (hi - lo).double()).to(torch.long)
+            dmg = lo + self._rand_range(city, hi - lo)
             self._hit_centre(city, tile, dmg, walls=kind == "CITY_WALLS")
         else:
             raise AssertionError(f"a damage kind with no arm: {kind}")
@@ -2389,8 +2372,7 @@ class SimEconomy:
             w = self._wind_pool[centre] * (self.neigh[centre] >= 0).long()  # [B, 6]
             total = w.sum(dim=1)
             going = going & (total > 0)
-            r = self._next_random(going)
-            pick = (r * total.to(torch.float64)).floor().to(torch.long)
+            pick = self._rand_range(going, total)
             d = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=5)
             dest = self.neigh[centre, d]  # [B]
             dc = dest.clamp(min=0)
@@ -2568,9 +2550,7 @@ class SimEconomy:
             m = out[:, k] >= 0
             if not bool(m.count_nonzero()):
                 break
-            r = self._next_random(m)
-            dmg[:, k] = torch.where(m, lo_t + torch.floor(r * (hi_t - lo_t).double()).to(torch.long),
-                                    torch.zeros_like(lo_t))
+            dmg[:, k] = torch.where(m, lo_t + self._rand_range(m, hi_t - lo_t), torch.zeros_like(lo_t))
         return out, dmg
 
     def _strike_units(self, hit: torch.Tensor, tile: torch.Tensor, owner: torch.Tensor,
@@ -2680,8 +2660,8 @@ class SimEconomy:
                 for on, t in plots:
                     seat_at = self.tile_seat[bidx, t]
                     go = hs & on & ~self._seat_plays(seat_at, "EGYPT")
-                    r = self._next_random(go)
-                    self._event_damage(go & (torch.floor(r * 100) < pct), t, kind, lo_t, hi_t)
+                    r = self._rand_range(go, 100)
+                    self._event_damage(go & (r < pct), t, kind, lo_t, hi_t)
         live = self._fertility_live()
         for s, rows in enumerate(self._flood_yields):
             hs = hit & (sev == s) & live
@@ -2694,8 +2674,8 @@ class SimEconomy:
                 silt = self.fertility if plane == 0 else self.fertility_prod
                 for on, t in plots:
                     go = hs & on
-                    r = self._next_random(go)
-                    land = (go & (torch.floor(r * 100) < p) & (self.feat_id[bidx, t] == fid)
+                    r = self._rand_range(go, 100)
+                    land = (go & (r < p) & (self.feat_id[bidx, t] == fid)
                             & ~self.feat_stripped[bidx, t])
                     lr = land.nonzero(as_tuple=True)[0]
                     if lr.numel():

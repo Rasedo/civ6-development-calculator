@@ -134,7 +134,6 @@ export function droughtTerrain(t: { terrain: string; elevation: string }): boole
 export const DROUGHT_SPACING = srcConst('disasters.droughtSpacing', 15, drought('DROUGHT_MAJOR', 'Spacing'));
 /** A storm row's `Spacing` (15 on every storm row): the distance past which
  *  a live storm's centre no longer lowers a start plot's weight. */
-export const STORM_SPACING = srcConst('disasters.stormSpacing', 15, drought('HURRICANE_CAT_4', 'Spacing'));
 
 /** Dry ground for a drought's patch: its terrain above the sea and CIV6
  *  (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas that
@@ -941,6 +940,95 @@ export const FLOOD_MITIGATED_YIELD_REDUCTION = srcConst('disasters.floodMitigate
   derived: 'the three flood rows\' RandomEvents.MitigatedYieldReduction (50 on each)',
   inputs: FLOOD_SEVS.map((s) => xml('RandomEvents', floodEv(s), 'MitigatedYieldReduction', { expect: 50 })),
 });
+
+/** One `RandomEvent_Damages` row of a storm, in XML order: its DamageType,
+ *  Percentage, CoastalLowlandPercentage (-1 where the row carries none) and
+ *  MinHP / MaxHP band (0 where none). */
+export interface StormDamageRow {
+  kind: string;
+  pct: number;
+  lowland: number;
+  lo: number;
+  hi: number;
+}
+/** One `RandomEvent_Yields` row of a storm, in XML order (FeatureType
+ *  FEATURE_ICE on every one: a feature that exists, so the row draws). */
+export interface StormYieldRow {
+  yield: 'YIELD_FOOD' | 'YIELD_PRODUCTION';
+  pct: number;
+}
+const stormRows = (id: string, dmg: readonly StormDamageRow[], yields: readonly StormYieldRow[]) => {
+  const ev = `RandomEventType=RANDOM_EVENT_${id}`;
+  srcConst(`disasters.stormDamageRows.${id}`, dmg.flatMap((r) => [r.kind, r.pct, r.lowland, r.lo, r.hi]), {
+    derived: `the RANDOM_EVENT_${id} rows of RandomEvent_Damages in XML order (Expansion2_RandomEvents.xml), each `
+      + 'its DamageType, Percentage, CoastalLowlandPercentage (-1 absent), MinHP and MaxHP (the schema default 0 where none)',
+    inputs: dmg.flatMap((r) => {
+      const at = `${ev}&DamageType=${r.kind}`;
+      return [xml('RandomEvent_Damages', at, 'Percentage', { expect: r.pct }),
+        xml('RandomEvent_Damages', at, 'CoastalLowlandPercentage', r.lowland < 0 ? { absent: true } : { expect: r.lowland }),
+        xml('RandomEvent_Damages', at, 'MinHP', { expect: r.lo }),
+        xml('RandomEvent_Damages', at, 'MaxHP', { expect: r.hi })];
+    }),
+  });
+  srcConst(`disasters.stormYieldRows.${id}`, yields.flatMap((r) => [r.yield, r.pct]), {
+    derived: `the RANDOM_EVENT_${id} rows of RandomEvent_Yields in XML order, each its YieldType and Percentage`,
+    inputs: yields.map((r) => xml('RandomEvent_Yields', `${ev}&YieldType=${r.yield}&FeatureType=FEATURE_ICE`, 'Percentage', { expect: r.pct })),
+  });
+  return { dmg, yields };
+};
+const sd = (kind: string, pct: number, lowland = -1, lo = 0, hi = 0): StormDamageRow => ({ kind, pct, lowland, lo, hi });
+const sy = (y: 'F' | 'P', pct: number): StormYieldRow => ({ yield: y === 'F' ? 'YIELD_FOOD' : 'YIELD_PRODUCTION', pct });
+const STORM_BASE_ROWS = (destroyed: number, pillaged: number, district: number, building: number, plLow = -1, diLow = -1) => [
+  sd('IMPROVEMENT_DESTROYED', destroyed), sd('IMPROVEMENT_PILLAGED', pillaged, plLow),
+  sd('DISTRICT_PILLAGED', district, diLow), sd('BUILDING_PILLAGED', building)];
+/** each storm row's damage and yield rows, in `STORM_EVENTS` order */
+export const STORM_ROWS: readonly { dmg: readonly StormDamageRow[]; yields: readonly StormYieldRow[] }[] = [
+  stormRows('BLIZZARD_SIGNIFICANT', STORM_BASE_ROWS(25, 50, 15, 40), [sy('F', 10)]),
+  stormRows('BLIZZARD_CRIPPLING', [...STORM_BASE_ROWS(50, 100, 50, 100), sd('POPULATION_LOSS', 15),
+    sd('UNIT_KILLED_CIVILIAN', 20), sd('UNIT_DAMAGE_LAND', 100, -1, 40, 60), sd('UNIT_DAMAGE_NAVAL', 60, -1, 40, 60)], [sy('F', 20)]),
+  stormRows('DUST_STORM_GRADIENT', STORM_BASE_ROWS(35, 75, 20, 60), [sy('F', 10), sy('P', 20)]),
+  stormRows('DUST_STORM_HABOOB', [...STORM_BASE_ROWS(75, 100, 75, 100), sd('POPULATION_LOSS', 20),
+    sd('UNIT_KILLED_CIVILIAN', 20), sd('UNIT_DAMAGE_LAND', 100, -1, 40, 60), sd('UNIT_DAMAGE_NAVAL', 60, -1, 40, 60)],
+  [sy('F', 20), sy('P', 30)]),
+  stormRows('TORNADO_FAMILY', STORM_BASE_ROWS(35, 75, 20, 60), []),
+  stormRows('TORNADO_OUTBREAK', [...STORM_BASE_ROWS(75, 100, 75, 100), sd('POPULATION_LOSS', 20),
+    sd('UNIT_KILLED_CIVILIAN', 20), sd('UNIT_DAMAGE_LAND', 100, -1, 40, 60), sd('UNIT_DAMAGE_NAVAL', 100, -1, 40, 60)], []),
+  stormRows('HURRICANE_CAT_4', [...STORM_BASE_ROWS(25, 50, 15, 40, 100, 100), sd('UNIT_DAMAGE_NAVAL', 60, -1, 40, 60)],
+    [sy('F', 30)]),
+  stormRows('HURRICANE_CAT_5', [...STORM_BASE_ROWS(50, 100, 50, 100, -1, 100), sd('POPULATION_LOSS', 15),
+    sd('UNIT_KILLED_CIVILIAN', 20), sd('UNIT_DAMAGE_LAND', 100, -1, 40, 60), sd('UNIT_DAMAGE_NAVAL', 100, -1, 60, 80)],
+  [sy('F', 45), sy('P', 15)]),
+];
+
+/** CIV6 (`PrevailingWinds`, XML order): the rows a storm's step weighs, as
+ *  the game reads them — its latitude band (both ends inclusive), its
+ *  direction (the DLL's DirectionTypes index: 0 NORTHEAST, 1 EAST, 2
+ *  SOUTHEAST, 3 SOUTHWEST, 4 WEST, 5 NORTHWEST) and weight. */
+export interface WindRow {
+  lo: number;
+  hi: number;
+  dir: number;
+  weight: number;
+}
+const WIND_DIRECTION_TYPES = ['NORTHEAST', 'EAST', 'SOUTHEAST', 'SOUTHWEST', 'WEST', 'NORTHWEST'] as const;
+const windXmlRow = (lo: number, hi: number, dir: typeof WIND_DIRECTION_TYPES[number], weight: number): WindRow => {
+  srcConst(`disasters.windRow.${lo}.${dir}`, [hi, weight], {
+    derived: `the PrevailingWinds row MinimumLatitude ${lo} DIRECTION_${dir}: its MaximumLatitude and Weight`,
+    inputs: [xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_${dir}`, 'MaximumLatitude', { expect: hi }),
+      xml('PrevailingWinds', `MinimumLatitude=${lo}&DirectionType=DIRECTION_${dir}`, 'Weight', { expect: weight })],
+  });
+  return { lo, hi, dir: WIND_DIRECTION_TYPES.indexOf(dir), weight };
+};
+export const WIND_ROWS: readonly WindRow[] = [
+  windXmlRow(60, 90, 'NORTHWEST', 1), windXmlRow(60, 90, 'WEST', 2), windXmlRow(60, 90, 'SOUTHWEST', 2),
+  windXmlRow(30, 60, 'NORTHEAST', 2), windXmlRow(30, 60, 'EAST', 2), windXmlRow(30, 60, 'SOUTHEAST', 1),
+  windXmlRow(5, 30, 'NORTHWEST', 2), windXmlRow(5, 30, 'WEST', 2), windXmlRow(5, 30, 'SOUTHWEST', 1),
+  windXmlRow(0, 5, 'NORTHWEST', 1), windXmlRow(0, 5, 'WEST', 1),
+  windXmlRow(-5, 0, 'WEST', 1), windXmlRow(-5, 0, 'SOUTHWEST', 1),
+  windXmlRow(-30, -5, 'NORTHWEST', 1), windXmlRow(-30, -5, 'WEST', 2), windXmlRow(-30, -5, 'SOUTHWEST', 2),
+  windXmlRow(-60, -30, 'NORTHEAST', 1), windXmlRow(-60, -30, 'EAST', 2), windXmlRow(-60, -30, 'SOUTHEAST', 2),
+  windXmlRow(-90, -60, 'NORTHWEST', 2), windXmlRow(-90, -60, 'WEST', 2), windXmlRow(-90, -60, 'SOUTHWEST', 1),
+];
 
 /**
  * THE NUCLEAR ACCIDENT, one row per severity MINOR / MAJOR / CATASTROPHIC

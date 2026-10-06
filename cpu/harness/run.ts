@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import type { Catalog, TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
+import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult } from './checks';
 
 interface Tally {
@@ -64,6 +65,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   const failures = new Map<string, Failure>();
   const gaps = new Map<string, number>();
   const history = newHistory();
+  history.replay = replayEvents(turns.map((t) => byTurn.get(t)!), cat);
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);

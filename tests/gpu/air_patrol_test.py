@@ -25,6 +25,17 @@ from core import load_rules, fixture_paths, neutral
 from warmup import warm_base, opened
 
 
+def _steps(s0: int, s1: int, most: int = 64) -> int:
+    """the generator's steps from state s0 to s1 (the LCG, `_lcg_step`)"""
+    s = s0 & 0xFFFFFFFF
+    for k in range(most + 1):
+        if s == s1 & 0xFFFFFFFF:
+            return k
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return -1
+
+
+
 def fresh(rules, path, turns=30):
     """ONE warmed engine per (fixture, warmup); every scene restores it."""
     return warm_base((str(path), turns), lambda: opened(rules, path, turns))
@@ -327,7 +338,7 @@ def main() -> None:
     order(sim, row, bs, sim._A_AIR_STRIKE + bc.index(sea[0]))
     assert not bool(sim.unit_alive[0, bs]), "the hull's answer downed the bomber, gone after its blow"
     assert int(sim.unit_hp[0, hull]) < 100, "a bomber the burst downed still strikes"
-    draws5 = ((int(sim.rng_state[0]) - int(r5[0])) & 0xFFFFFFFF) // 0x6D2B79F5
+    draws5 = _steps(int(r5[0]), int(sim.rng_state[0]))
     assert draws5 == 2, f"the burst, then the strike — {draws5} draws"
     print("  5 the answers come first OK (a bomber the burst downed still strikes, 2 draws)")
 
@@ -635,7 +646,7 @@ def main() -> None:
         s.rng_state.copy_(r0)
         xp0 = (int(s.unit_xp[0, b2]), int(s.unit_xp[0, v]))
         order(s, row, b2, s._A_AIR_STRIKE + bc.index(t2))
-        draws = ((int(s.rng_state[0]) - int(r0[0])) & 0xFFFFFFFF) // 0x6D2B79F5
+        draws = _steps(int(r0[0]), int(s.rng_state[0]))
         return (100 - int(s.unit_hp[0, v]), 100 - int(s.unit_hp[0, b2]), draws,
                 (int(s.unit_xp[0, b2]) - xp0[0], int(s.unit_xp[0, v]) - xp0[1]), want_d, want_b)
 

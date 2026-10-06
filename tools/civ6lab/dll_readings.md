@@ -209,6 +209,84 @@ One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.
 - Espionage: "Rolling Espionage Result" (mission, escape), "Police Exit
   Covered", "Spy EscapeRoute".
 
+## H-1: the random events' draws — READ, replayed on 1115 / 1116
+
+The generator (0x8b6c10): state' = 0x41c64e6d · state + 0x3039 (mod 2^32),
+value = ((state' >> 16) · (max & 0xffff)) >> 16, the state stored every
+call — a max of 0 steps and returns 0 (Lua's GetRandNum returns early;
+rng_fit.py's (top15 · r) >> 15 misses seeds 2147483647 and -1 of the tuner
+sweep, this form fits all 120 observations: `tests/cpu/harness/
+civ6Random.test.ts`). The weighted picker 0x287c00: one draw over the
+16-bit total, the first entry whose running sum passes it.
+
+Where the turn's step falls: `Game.GetRandomSeed()` read at every
+PlayerTurnStarted / PlayerTurnStartComplete (h1_starts.lua) brackets the
+draws from the barbarians' completed start of turn T-1 to player 0's start
+of turn T; the random-event step 0x338710 is the LAST thing to draw there.
+Its order: the storms' walks (0x288f40 → 0x28ecd0), the volcano roll
+(0x335040: one "Active Volcano Roll", a choice after a 0), the weights
+(0x335260, no draw; entries in RandomEvents order, the empty slot appended
+last for 10N − Σ), "Random Event Roll", the event (0x334d30). On 1116
+39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the
+flood's draws ending on the witness (after the units and districts that
+spend draws: see below); a flood whose replay lands also lands its roll in
+its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116).
+
+Per family, after the roll:
+- Flood 0xa2f200: unless mitigated (a complete unpillaged Dam on one of the
+  river's Floodplains, 0xa2c280; the Great Bath on one, 0xa2b280), each
+  RandomEvent_Damages row (XML order) over the plots, one "Pillage
+  Improvement Chance" rand(100) a plot whose owner is not immune (0xa28eb0,
+  TRAIT_AVOID_*); a landed UNIT_DAMAGE_LAND rolls once per land unit,
+  CITY_GARRISON once on a complete district with garrison hit points
+  (0x336000), CITY_WALLS once while the walls stand (0x336170); then each
+  RandomEvent_Yields row over the plots, one "Boosted Yield Chance" rand(100)
+  a plot, +1 where under the Percentage (halved, truncated, when mitigated)
+  and the plot carries the row's Floodplains — the count FertilityAdded.
+  The plots: the river's Floodplains list (0xa2aa30 → 0xa2aca0): the river's
+  plot list as its edges were laid from the source (the source edge its own
+  plot, IsNE/NW/WOfRiver, then the plot across; each later edge the plot
+  across it, each plot once), reversed (rivers start inland), the first
+  unbroken run of 4–10 plots taking Floodplains. Read off the record's river
+  edges from the flood's start plot (`floodplainList`); two rivers meeting
+  above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,
+  told apart by which river holds which list. 1115 river 181 (446 / 490,
+  the source edge's owner) separates the source rule from "shared then
+  other": Jiaodong's centre never takes silt (t46, t64, t248).
+- Storm birth 0x291a20: "Pick Storm Start Plot" (above), "Storm Direction
+  Preview" (0x28d1f0, a weighted draw over the wind rows at its latitude),
+  the name (one draw over the naming player's citizen names, 0x28d400), the
+  first strike 0x286f80 at 100% on a COPY of the record (stored before it,
+  so the stored struck list starts empty).
+- Storm walk 0x28ecd0, on the two turns after birth (a third turn's gap
+  holds the quiet turn's draws): percent 50 once turn − start + 1 ≥
+  Duration; steps of 0x28c500 — one "Storm Direction" weighted draw over the
+  PrevailingWinds rows (XML order) whose latitude band holds the plot and
+  whose neighbour exists (DirectionTypes offsets 0xeff670 / 0xeff688: NE
+  (0,+1), E (+1,0), SE (+1,−1), SW (0,−1), W (−1,0), NW (−1,+1) axial, y
+  north), cost 1 on the storm's terrain else 2 of Movement 8, a drawn step
+  past what is left ending the walk with its draw spent; each step strikes;
+  then a Preview draw. The strike: the footprint 0x28d6b0 (centre; Hexes 3
+  adds NE and NW; 7 the six in direction order; 19 every axial (dq, dr) of
+  −2..2 within 2, dq outer, the centre again) minus the struck list; per
+  plot each damage row one rand(100) against Percentage × pct // 100 (the
+  row's CoastalLowlandPercentage on a lowland plot), its own rolls after it;
+  then off water and impassable plots each yield row one rand(100). 38 of 38
+  births and first walks (1115: 28, 1116: 10) land the recorded plot and
+  FertilityAdded.
+- Eruption 0xa22000: damage 0xa1c1a0 (each row, each neighbour in
+  DirectionTypes order not impassable and bare / Removable / Volcanic Soil,
+  a bonus resource removed, one rand(100)), then soil 0xa219e0 (each yield
+  row, each such neighbour off water, one "Fertility Gain Chance"
+  rand(100)). 13 of 14 eruptions reproduce the painted plots and yields.
+
+What the records cannot show and the replay allows for: a unit that came
+and went on a struck plot between the records (0–2 draws before the yields),
+draws after the event (1116 t91: two). The volcano roll does not run every
+turn (1116 t6, t8: a one-draw gap; some walk turns fit only without it):
+its gate's counts (vtable +0x68 with true / false, the choice skipping
+entries whose +8 is −1) are not read to the end — a LAB line.
+
 ## Tools added for these readings
 
 `dll_hash.py` names a 32-bit type hash (the game's hash is CRC32 without its
@@ -467,16 +545,23 @@ Harbor 479 -> sea with no post in Shenyang: a switch there would leave range
 water. The engines (`walk` / `_trade_reach`): a City Centre's plot neither,
 every other plot its ground; route.originYields on the six duels 112 -> 44.
 
-## C-49 tail: the storm's start plot — READ
+## C-49 tail: the storm's start plot — READ (REVERSED)
 
-"Pick Storm Start Plot" 0x288250: every map plot scored by 0x2900c0 — valid
-(0x28aa00 over the radius the row's Hexes gives: >= 19 → 2, >= 3 → 1, else
-0) when each plot in it passes 0x28eab0 (its terrain in the row's
-RandomEvent_Terrains, an empty list passing all), weight valid × (Spacing +
-1), less (Spacing − d) when the nearest live storm's current plot (m_aStorms
-+0x8b0, stride 0x68, the path's last plot; 0x28cfa0) lies d < Spacing away;
-ONE weighted draw. No test of a plot under another event: a storm may begin
-on a live storm's centre (weight 1). Every storm row's Spacing is 15.
+"Pick Storm Start Plot" 0x288250 passes 0x2900c0 a COUNT, not a radius:
+2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x28aa00 with that count:
+0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on
+runs/h1_duelw1115 / 1116); 1 asks the plot alone to pass the predicate (its
+terrain in the row's RandomEvent_Terrains); 2 asks the plot, all six ring-1
+plots on the map, and one of them passing. 0x2900c0's weight (valid ×
+(Spacing + 1), less Spacing − d near a live storm) only sorts plots into the
+vector of weight > 0: the draw is `get(count of entries)` — ONE UNIFORM draw
+over the qualifying plots in ascending order (0x2883a4 passes the vector's
+size, not its total). The earlier reading (a weighted draw over plots whose
+whole disc qualifies) reproduces 1 of the 15 recorded births on 1115; this one 22 of 22
+(the replay of `cpu/harness/eventReplay.ts`: hurricanes t45, t69, t74, t103,
+t109, t163, t209, t243, dust storms t9, t24, t179, blizzards t30, t210,
+tornado outbreaks t114, t158 on 1115; t13, t47, t48, t83, t191, t211, t225
+on 1116).
 
 ## C-74 tail: "under an event" for a drought start — READ
 

@@ -19,7 +19,7 @@ Two observation streams feed the policy:
                                hp, position, and the bearing to the nearest
                                barbarian camp)
 
-reset(scramble=...) re-seeds each game's in-state mulberry32 per episode,
+reset(scramble=...) re-seeds each game's in-state generator per episode,
 so consecutive episodes see different barbarian spawns, quests, wars and
 disasters on the same maps; reset() without it reproduces the fixture's
 exact stream — the gate setting.

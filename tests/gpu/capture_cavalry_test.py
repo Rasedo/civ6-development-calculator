@@ -37,9 +37,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths, FIXTURES
 from warmup import settle_all
 
+
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
 ROW = 0   # the attacker's seat
 FOE = 1   # the defender's seat
-STEP = 0x6D2B79F5  # mulberry32's per-draw increment, the same on both engines
 M32 = 0xFFFFFFFF
 UNI = [u["id"] for u in json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))["units"]]
 
@@ -118,9 +126,9 @@ def dir_of(sim, frm, to) -> int:
 
 
 def draws(s0: int, s1: int) -> int:
-    # the state is a 32-bit counter stepping by STEP and wrapping, so count steps
+    # count the generator's steps (the LCG) from s0 to s1
     for k in range(9):
-        if (s0 + k * STEP) & M32 == s1 & M32:
+        if _lcg_n(s0, k) == s1 & M32:
             return k
     raise AssertionError(f"the stream moved by a non-draw amount: {s0} -> {s1}")
 

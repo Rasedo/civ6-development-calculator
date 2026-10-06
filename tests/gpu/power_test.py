@@ -49,6 +49,15 @@ from core.simbase import FIXTURES, NO_SEAT  # noqa: E402
 from warmup import settle_all, warm_base  # noqa: E402
 
 
+def _lcg_n(s: int, k: int) -> int:
+    """the generator's state k steps on from s (the LCG, `_lcg_step`)"""
+    s &= 0xFFFFFFFF
+    for _ in range(k):
+        s = (s * 1103515245 + 12345) & 0xFFFFFFFF
+    return s
+
+
+
 # THE WARMED BASE, ONE PER b. `main` runs one scene per test body, and a scene
 # pays a `restore` instead of a fixture load, a settle and 20 steps at B=2. `_STATIC` names the plane these pokes
 # write that `snapshot`/`restore` does not carry (it is not in `_MUTABLE`), so
@@ -613,7 +622,6 @@ def test_reactor_age(sim) -> None:
     print("  reactor OK: the age ticks, the project resets it, and both halves of its gate")
 
 
-STEP = 0x6D2B79F5  # mulberry32's per-draw increment, on both engines
 
 
 def test_reactor_accident(sim) -> None:
@@ -672,7 +680,7 @@ def test_reactor_accident(sim) -> None:
             sim._nuclear_accident(hit, at, sev)
             hurt = int(sim.major_unit_hp[0, slots[0]]) < 100
             n_draws = len(sim._accident_rows[sev]) + int(hurt)
-            assert (s0 + n_draws * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), \
+            assert _lcg_n(s0, n_draws) == int(sim.rng_state[0]), \
                 "an accident draws once per damage row, once more for the struck warrior"
             assert int(sim.tile_fallout[0, izt]) == int(sim._accident_fallout[sev])
             assert int((sim.tile_fallout[0] > 0).sum()) == 1, "fallout on the reactor's plot alone"
@@ -707,7 +715,7 @@ def test_reactor_accident(sim) -> None:
         sim.civilian_at[0, izt] = slots[1] + lo
         s0 = int(sim.rng_state[0])
         sim._nuclear_accident(hit, at, 2)
-        assert (s0 + 9 * STEP) & 0xFFFFFFFF == int(sim.rng_state[0]), "a civilian alone drew a damage"
+        assert _lcg_n(s0, 9) == int(sim.rng_state[0]), "a civilian alone drew a damage"
         assert not bool(sim.major_unit_alive[0, slots[1]]), "CATASTROPHIC kills the civilian"
     sim.civilian_at[0, izt] = -1
     sim.tile_fallout[0] = 0

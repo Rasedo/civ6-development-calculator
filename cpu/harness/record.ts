@@ -233,8 +233,9 @@ export interface TurnRecord {
   errors: string[];
   /** the random events of the record's turn and the one before: [turn,
    *  RandomEvents index, current plot, start plot, fertility added, tiles
-   *  damaged, population lost, units lost] */
-  events?: Read<[number, number, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>][]>;
+   *  damaged, population lost, units lost, river id, volcano id, natural-wonder
+   *  volcano id, start turn, end turn, direction] */
+  events?: Read<[number, number, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>, Read<number>, ...Read<number>[]][]>;
   /** every great person recruited so far: [GreatPersonIndividuals index,
    *  claimant player, GreatPersonClasses index, era, turn granted] */
   greatPeople?: Read<[number, number, number, number, number][]>;
@@ -258,6 +259,9 @@ export interface StartWitness {
   turn: number;
   player: number;
   point: 'pre' | 'post';
+  /** the generator's state (`Game.GetRandomSeed()`) at that point; absent from
+   *  records the dumper wrote before it read it */
+  seed?: Read<number>;
   gold: Read<number>;
   faith: Read<number>;
   researching: Read<number>;

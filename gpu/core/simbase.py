@@ -889,6 +889,9 @@ ASSIST_TOWER = 2
 # unrelated to any of this.
 
 M32 = 0xFFFFFFFF
+# Civ 6's generator, the ANSI LCG (cpu/core/rand.ts LCG_MUL / LCG_ADD)
+LCG_MUL = 1103515245
+LCG_ADD = 12345
 
 _PAIR_DIST_CACHE: dict[tuple[int, int, bool], torch.Tensor] = {}
 

@@ -1,4 +1,4 @@
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import { GOODY_KINDS, GOODY_SUBTYPES, type GoodyKind, type GoodySubType } from '../data/goodyHuts';
 import type { GameState } from './types';
 
@@ -39,10 +39,11 @@ export function drawGoodyReward(
 ): GoodySubType | null {
   const kinds = eligibleGoodyKinds(turn, hasCity);
   if (!kinds.length) return null;
-  const kind = kinds[Math.min(kinds.length - 1, Math.floor(nextRandom(state) * kinds.length))];
+  // "Choosing a Goody Hut Type", then "Choosing a Sub Type": the game's draws
+  const kind = kinds[randRange(state, kinds.length)];
   const subs = GOODY_SUBTYPES.filter((s) => s.hut === kind && goodyEligible(s, turn, hasCity));
   const total = subs.reduce((n, s) => n + s.weight, 0);
-  let r = nextRandom(state) * total;
+  let r = randRange(state, total);
   for (const s of subs) {
     r -= s.weight;
     if (r < 0) return s;

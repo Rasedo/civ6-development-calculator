@@ -34,7 +34,7 @@ import type { City, GameState, QueueItem } from '../../../cpu/core/types';
 
 /** a seed whose first three d6 draws sum to 18: the measured 3d6 succeeds
  *  UNDETECTED at every threshold a scene below rolls against. */
-const WINS = 749;
+const WINS = 634;
 const turnsOf = (m: number): number => SPY_MISSIONS[m]!.turns;
 function spyBit(id: string): number {
   const k = promoRows('ESPIONAGE').findIndex((p) => p.id === id);
@@ -216,7 +216,7 @@ describe('the counterspy defends the district it stands on and the adjacent ones
     for (const r of SPY_ESCAPE_ROUTES) if (r.district !== null) (r as { district: string }).district = 'NO_SUCH_DISTRICT';
     try {
       let caught = false;
-      for (let seed = 1; seed < 200 && !caught; seed++) {
+      for (let seed = 1; seed < 60000 && !caught; seed += 7) {
         const { state, theirs } = spyState();
         const hub = districtAt(state, theirs, 'COMMERCIAL_HUB', 1);
         const low = spyAt(state, 1, theirs.centerIndex); // first by slot, adjacent
