@@ -523,7 +523,7 @@ class SimInit:
 
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
-            ("settlers_trained", torch.long, 0), ("discount_districts", torch.long, 0),
+            ("settlers_trained", torch.long, 0),
             ("relic_reserve", torch.long, 0),
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
             ("cur_tech", torch.long, -1), ("diplo_favor", torch.long, 0),
@@ -2313,6 +2313,11 @@ class SimInit:
         self.road_tier = torch.zeros(B, dtype=torch.long, device=device)
         self.district_pillaged = torch.zeros(B, T, dtype=torch.bool, device=device)
         nD = len(self.districts_cat)
+        # the COMPLETED specialty districts each district type's price reads
+        # for the under-represented discount (`Seat.discountDistricts`): every
+        # type's taken when a technology or civic completes, a type's own
+        # again when a district of it completes (`refreshDistrictDiscount`)
+        self.civ_discount_districts = torch.zeros(B, self.n_majors, nD, dtype=torch.long, device=device)
         self.d_static_adj = torch.tensor(
             [[t.get("dadj", [0.0] * nD) for t in f["tiles"]] for f in fixtures],
             dtype=dtype, device=device,
@@ -2354,6 +2359,9 @@ class SimInit:
         # (`_ignite`, `_regrow`): a burning or burnt plot is neither choppable
         # nor Removable, and the Woods or Rainforest that regrows is the t0 one
         self._ftr0 = self.tile_ftr.clone()
+        # the feature removals' [Food, Production] bases by the `ftr` code
+        # (`CHOP_ROWS`, Feature_Removes)
+        self._chop_rows = torch.tensor([[int(v) for v in r] for r in rules.lump["chopRows"]], dtype=torch.long, device=device)
         self._ftu0 = self.tile_ftu.clone()
         self._frm0 = self.feat_removable.clone()
         sc = rules.district_scaffold

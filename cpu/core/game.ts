@@ -38,7 +38,7 @@ import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
 import { isWater, deriveContinents, deriveMountainRanges } from '../../world/query';
-import { DISTRICTS } from '../data/districts';
+import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
@@ -109,17 +109,16 @@ export function districtDiscountPct(type: DistrictId): number {
   return DISTRICTS[type]?.discountPct ?? 40;
 }
 
-/** CIV6 ("District", District discount mechanics): a specialty district is
- *  40% off when BOTH hold — A = specialty types unlocked, B = specialty
- *  districts COMPLETED, C(T) = districts of type T completed or placed:
- *  B >= A, and C(T) < B/A. `n < ceil(D/U)` is that inequality over integers.
- *  The roster is every RequiresPopulation row (`countsTowardLimit`: the
- *  Government Plaza, the Diplomatic Quarter and the Preserve among them). B is
- *  the count the seat took when its last technology or civic completed
- *  (`Seat.discountDistricts`); A and C(T) are live (runs/h1_duelw110{3..8}:
- *  8,200 quoted prices, 134 wrong on a live B, 15 on this one — China's fourth
- *  Campus, done t123, discounted nothing until a technology landed at t125).
- *  A district's cost locks in when it is placed. */
+/** CIV6 ("District", District discount mechanics; GameCore_XP2 0x409870's
+ *  under-average model over PlayerStats 0x4bca20 / 0x4bdd70): a specialty
+ *  district is 40% off when BOTH hold — A = specialty types unlocked, B =
+ *  specialty districts COMPLETED, C(T) = districts of type T completed or
+ *  placed: B >= A, and C(T) < B/A. `n < ceil(D/U)` is that inequality over
+ *  integers. The roster is every RequiresPopulation row (`countsTowardLimit`:
+ *  the Government Plaza, the Diplomatic Quarter and the Preserve among them).
+ *  B is the count the type's price last took (`refreshDistrictDiscount`); A
+ *  and C(T) are live (runs/h1_duelw110{3..8}: 8,200 quoted prices, 134 wrong
+ *  on a live B). A district's cost locks in when it is placed. */
 export function districtDiscounted(
   state: GameState,
   seat: number,
@@ -134,12 +133,31 @@ export function districtDiscounted(
   for (const c of owner?.cities ?? citiesOf(state, seat)) {
     for (const d of c.districts) if (d.type === type) n += 1;
   }
-  const D = seatOf(state, seat)?.discountDistricts ?? 0;
+  const D = seatOf(state, seat)?.discountDistricts?.[PLACEABLE_DISTRICTS.indexOf(type)] ?? 0;
   return D >= U && n < Math.ceil(D / U);
 }
 
-/** The specialty districts (`countsTowardLimit`) a seat has COMPLETED — what
- *  `Seat.discountDistricts` takes when a technology or civic completes. */
+/** Take the specialty districts completed into the seat's prices
+ *  (`Seat.discountDistricts`): every type's when a technology or civic
+ *  completes, before the cities produce; `type`'s alone when a district of
+ *  it completes. Between those a price stands on the count it took: a
+ *  district finished elsewhere moves no other type's price
+ *  (runs/h1_duelw110{3..8}: China's fourth Campus, done t123, discounted
+ *  nothing until a technology landed at t125; runs/h1_duelw1112: China's
+ *  Holy Sites quoted 119 at t208-209, the turn Yiyang's completed, beside
+ *  Harbors still at 201, both discounted from the technology of t210). */
+export function refreshDistrictDiscount(state: GameState, seat: number, type?: DistrictId): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  const D = completedSpecialtyDistricts(state, seat);
+  const out = s.discountDistricts ?? PLACEABLE_DISTRICTS.map(() => 0);
+  PLACEABLE_DISTRICTS.forEach((t, i) => {
+    if (type === undefined || t === type) out[i] = D;
+  });
+  s.discountDistricts = out;
+}
+
+/** The specialty districts (`countsTowardLimit`) a seat has COMPLETED. */
 export function completedSpecialtyDistricts(state: GameState, seat: number): number {
   let D = 0;
   for (const c of citiesOf(state, seat)) {

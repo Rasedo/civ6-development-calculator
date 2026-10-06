@@ -956,6 +956,59 @@ rule before this reading) missed by one in two cities each turn. On the ten
 duels city.amenities 18,085 -> 18,267 passes, no duel worse (1104's six
 Cocoa included). The engines: `luxuryAmenities` / `_luxury_amenities`.
 
+## H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ
+
+- The city base's best melee (PlayerStats +0xf0, saved as
+  m_iMaxMeleeStrengthTrained): 0x4c1a30, called as a unit is made (the
+  city's 0x1e6570, 0xb02c60, 0xb67b30, 0xbd8be0, a hero 0x8ffac0) and the
+  era's starting units (0x4580b0 through 0x4c1c10), raises it to
+  0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in
+  it — where 0x4bffa0 passes the unit row: its domain (row +0x1c) not 1, no
+  tag 0x36c125c9 (no install or DLL name hashes to it) and its row +0x24
+  entry's flag +0x48 bit 4. An embarked unit stands at its embarked
+  strength and raises nothing. Records: 1112 China's Mechanized Infantry
+  made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the
+  corps upgraded on land at t216 read 95. The harness: a unit first seen
+  embarked raises nothing (the ten duels' city.defense 0 worse; it also
+  clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land
+  and raised nothing — 0x4bffa0's row test, unnamed, a LAB line).
+- A drought's end turn (0x2922ff, beside "Pick Drought Start Plot"): the
+  current turn plus 0x5254d0(the row's Duration) — the game speed's
+  CostMultiplier / 100, truncated: online 2 (MAJOR) and 5 (EXTREME); the
+  clear at 0x28789a when the turn reaches it. Records: 1109 plot 785's
+  footprint −1 Food t110–111 (and t121, t133, t209), 1110 plot 887's
+  EXTREME t64–68. `DROUGHT_TURNS` / the exported droughtDuration.
+- The Trader's sea: the trade path's context (0x558ba0) sets +0x1a1 from
+  0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0):
+  a game flag, the player's embark list, or a researched technology with
+  EmbarkAll (Technologies +0x70 bit 4: Shipbuilding) or an EmbarkUnitType
+  naming the unit (Celestial Navigation's UNIT_TRADER); the node test
+  0x558db0 closes water while it is clear. Record: 1112 China's Trader to
+  Preslav at sea t68–72 with Shipbuilding and no Celestial Navigation, the
+  route paying the water path's 11.4375 from t64. Unexplained: Guangzhou →
+  Preslav t54–55 at 11.4375 with Sailing alone (AUDIT C-94 LAB).
+- A harvest's or feature removal's lump: the harvest 0x95fbf0 calls
+  0x5256d0 once per yield row (`Resource_Harvests.Amount`,
+  `Feature_Removes.Yield`): A = base + (base·GAME_COST_ESCALATION(1000)/100
+  − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 /
+  0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an
+  improvement (+0x44) A·(100 − HARVEST_IMPROVED_DEGRADATION 50 − 30 more
+  pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256,
+  truncated: half online); then the plot's city's harvest percent (+0x1e08,
+  the Groundbreaker's 50). Records: runs/h1_duelw1112 Xi'an's Rainforest
+  (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14
+  Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing
+  in the box in the owner's actions, the city growing at once where it
+  fills it (t49 6 → 7 with 9.55 left). `lumpValue` / `_lump_value`.
+- The district discount (0x409870's under-average models): the type's count
+  0x4bdd70 (placed districts included) against 0x4bca20's average, the
+  completed specialty districts over the unlocked specialty types, both live.
+  What the city's quoted price caches is unread: the records fit every
+  type's price retaking the completed count at a technology or civic and a
+  type's own again when a district of it completes (1112 Holy Site 119
+  t208–209; the ten duels' buy.districtCost +161, 1110 −6 where the record
+  caught China mid-turn) — `refreshDistrictDiscount`, a LAB line.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

@@ -42,13 +42,14 @@ import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldC
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
 import { governorFlag } from '../core/governors';
-import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, GOLD_PURCHASE_MULT } from '../data/constants';
+import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
+import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT } from '../data/constants';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
-import { hexDistance, neighbors } from '../../world/hex';
+import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, congressOfRecord, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
@@ -103,9 +104,18 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
   if (g !== null && g !== undefined && g !== seat) {
     for (const x of imp.seatGaps.get(g) ?? []) if (x.startsWith('belief:')) out.push(x);
   }
-  for (const q of c.plots) for (const x of imp.tileGaps.get(q) ?? []) out.push(`plot ${q} ${x}`);
+  // an unseen event draw moves only the plot's own yields: a gap of the city
+  // that works it
+  const worked = new Set(c.worked);
+  for (const q of c.plots) {
+    for (const x of imp.tileGaps.get(q) ?? []) if (worked.has(q) || !x.startsWith('event-draw:')) out.push(`plot ${q} ${x}`);
+  }
   return [...new Set(out)];
 }
+
+/** the checks a worked plot's yields feed — its Food the loyalty a starving
+ *  city loses too: an unseen event draw on it is their gap alone */
+const EVENT_DRAW_READERS = new Set(['city.yields', 'city.centreYields', 'city.foodSurplus', 'step.growth', 'city.loyaltyPerTurn', 'step.loyalty']);
 
 /** the checks no plot of the city's feeds: a dropped row on one of its plots,
  *  or a dropped resource of its seat's, is no gap of theirs */
@@ -125,6 +135,7 @@ function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
   let g = PLOT_BLIND.has(check) ? gaps.filter((x) => !x.startsWith('plot ') && !x.startsWith('resource:')) : gaps;
   if (!PARK_READERS.has(check)) g = g.filter((x) => !x.startsWith('national-park:'));
   if (!LUXURY_READERS.has(check)) g = g.filter((x) => !x.startsWith('luxury-') && !x.startsWith('luxuries:'));
+  if (!EVENT_DRAW_READERS.has(check)) g = g.filter((x) => !/^plot \d+ event-draw:/.test(x));
   // an unknown spent person's building row moves its yield's readers only
   g = g.filter((x) => !x.startsWith('gp-unknown:') || check === 'city.yields'
     || (check === 'step.border' && x.endsWith(' culture')));
@@ -136,7 +147,9 @@ function gapsFor(gaps: string[], check: string): { gaps?: string[] } {
 function plotGaps(imp: Imported, t: { index: number; col: number; row: number }): string[] {
   const out: string[] = [];
   for (const n of [t, ...neighbors(imp.state.map, imp.state.map.tiles[t.index])]) {
-    for (const x of imp.tileGaps.get(n.index) ?? []) out.push(`plot ${n.index} ${x}`);
+    for (const x of imp.tileGaps.get(n.index) ?? []) {
+      if (n.index === t.index || !x.startsWith('event-draw:')) out.push(`plot ${n.index} ${x}`);
+    }
   }
   return out;
 }
@@ -284,7 +297,14 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       }
     } else {
       const ties = borderBestPlots(state, city);
-      push('city.nextPlot', num(c.nextPlot) < 0 ? ties.length === 0 : ties.includes(num(c.nextPlot)), num(c.nextPlot), ties);
+      const ok = num(c.nextPlot) < 0 ? ties.length === 0 : ties.includes(num(c.nextPlot));
+      // the plot a city claims next is scored by its yields: an unseen event
+      // draw on an unowned plot in reach is the pick's gap
+      const centre = state.map.tiles[city.centerIndex];
+      const draws = ok ? [] : tilesWithin(state.map, centre.col, centre.row, BORDER_MAX_RADIUS).filter((t) => t.ownerSeat < 0)
+        .flatMap((t) => [...imp.tileGaps.get(t.index) ?? []].filter((x) => x.startsWith('event-draw:')).map((x) => `plot ${t.index} ${x}`));
+      const g = [...(gapsFor(gaps, 'city.nextPlot').gaps ?? []), ...draws];
+      out.push({ turn, check: 'city.nextPlot', subject, ok, game: num(c.nextPlot), ours: ties, ...(g.length ? { gaps: g } : {}) });
     }
     // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
@@ -592,7 +612,31 @@ function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
  * turn_order_civ6.md, "Loyalty's place"; runs/h1_duelw1103, Beijing t209:
  * the Monument it completed paid none of its +1 that turn).
  */
-function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCity, W: number): (landed: boolean) => void {
+/** The Food a city's owner took off its plots between two records: a feature
+ *  gone with nothing set in its place (`chopGrant`) and a bonus resource
+ *  harvested (`harvestGrant`), each priced on the plot as `a` showed it. A
+ *  plot a district, a wonder or an eruption's soil took is no clearing. */
+function actionFood(state: GameState, cat: Catalog, a: TurnRecord, b: TurnRecord, city: City, c: DumpCity): number {
+  let food = 0;
+  for (const q of c.plots) {
+    const pa = plotAt(a, q);
+    const pb = plotAt(b, q);
+    if (pb[P.owner] !== pa[P.owner] || pb[P.ownerCity] !== pa[P.ownerCity]) continue;
+    if ((pb[P.district] as number) >= 0 || (pb[P.wonder] as number) >= 0) continue;
+    const t = state.map.tiles[q];
+    const grants: LumpGrant[] = [];
+    if ((pa[P.feature] as number) >= 0 && (pb[P.feature] as number) < 0) grants.push(...chopGrant(state, t, city.seat));
+    if ((pa[P.resource] as number) >= 0 && (pb[P.resource] as number) < 0
+      && cat.features[pb[P.feature] as number] !== 'FEATURE_VOLCANIC_SOIL') {
+      const g = harvestGrant(state, t, city.seat);
+      if (g) grants.push(g);
+    }
+    for (const g of grants) if (g.key === 'food') food += g.amount;
+  }
+  return food;
+}
+
+function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCity, W: number, actedFirst: boolean): (landed: boolean) => void {
   type Side = { buildings: string[]; pillaged: string[] | undefined; wonders: City['wonders']; districts: City['districts'];
     tiles: [number, Tile['district'], boolean, boolean, boolean][] };
   const touched = new Set<number>();
@@ -646,6 +690,12 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     const id = engineRowOf(cat, 'district', ti) as DistrictId | null;
     if (!id || id === 'CITY_CENTER' || cat.districts[ti] === 'DISTRICT_WONDER') continue;
     const t = state.map.tiles[dy * W + dx];
+    // a district placed across the pair and not finished was placed in the
+    // owner's actions: after its turn start banked, unless the owner is the
+    // player the records were read in (`actedFirst`; runs/h1_duelw1112
+    // Taiyuan t71: its Granary completes and the city banks +7 on the plot
+    // an Industrial Zone was placed on afterwards)
+    if (!actedFirst && !complete && !city.districts.some((x) => x.tileIndex === t.index)) continue;
     t.district = id;
     t.districtComplete = complete === true;
     t.districtPillaged = dpil === true;
@@ -787,6 +837,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const spreadCities = new Map<string, City>();
   for (const s of spreadState.seats) for (const c of s.cities) spreadCities.set(`${s.seat}:${c.id}`, c);
 
+  // the player whose turn the records were read in (the local seat, or in
+  // an observer game the active player): its actions come between the
+  // record and its next turn start; every other player starts, then acts
+  const seatInTurn = a.players.find((p) => bool(p.turnActive))?.id ?? num(a.head.localPlayer);
   // the per-city turn step, city by city in the game's order, stats first
   const perSeat = new Map<number, { city: City; dump: DumpCity }[]>();
   for (const { city, dump } of citiesOfImport(imp)) {
@@ -806,7 +860,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     for (const { city, dump: c } of list) {
       const next = after.get(`${c.owner}:${c.id}`);
       if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
-      sides.push(landProduction(state, cat, city, next, a.head.W));      // the Settler stands beside the city, or the city trained it (its
+      sides.push(landProduction(state, cat, city, next, a.head.W, c.owner === seatInTurn));
+      // the Settler stands beside the city, or the city trained it (its
       // queue's head) and it walked off within its first moves
       const trained = (c.queue?.[0] as { UnitType?: number } | undefined)?.UnitType === settlerIdx && next.pop === c.pop - 1;
       if (acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
@@ -851,11 +906,31 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const before = { pop: city.population, food: city.foodBox };
       const outside = acts.popOutsideBox.has(k) && !settled.has(city) && !granted ? 'a citizen came or went outside the food box' : null;
       const growSkip = boxSkip ?? outside;
+      // a feature cleared or a resource harvested off the city's plots across
+      // the pair pays its Food into the box in the owner's actions: before
+      // its turn start for the player the records were read in, after it for
+      // every other, the city growing at once where the lump fills its box
+      // (runs/h1_duelw1112 Xi'an: a Rainforest cleared t49 +11 grows it to 7
+      // with 9.55 left, a Marsh t74 +31 to 11 with 3.02)
+      const lump = actionFood(state, cat, a, b, city, c);
+      if (c.owner === seatInTurn) city.foodBox += lump;
       seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
+      // the actions after the turn start: the turn's border step stands on
+      // the city its start left
+      let popAfter = city.population;
+      let boxAfter = city.foodBox;
+      if (c.owner !== seatInTurn && lump > 0) {
+        boxAfter += lump;
+        const need = growthFoodNeeded(popAfter);
+        if (boxAfter >= need) {
+          boxAfter -= need;
+          popAfter += 1;
+        }
+      }
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
-        res('step.growth', city.population + (granted ? grant : 0) === next.pop && near(city.foodBox, num(next.food), 0.05),
-          [next.pop, num(next.food)], [city.population + (granted ? grant : 0), round3(city.foodBox)],
+        res('step.growth', popAfter + (granted ? grant : 0) === next.pop && near(boxAfter, num(next.food), 0.05),
+          [next.pop, num(next.food)], [popAfter + (granted ? grant : 0), round3(boxAfter)],
           { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus), needed: st.growthNeeded,
             housing: st.housing, tier: st.amenities.tier.name });
       }

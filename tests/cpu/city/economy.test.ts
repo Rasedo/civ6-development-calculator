@@ -6,7 +6,7 @@ import { buySeatBuilding } from '../../../cpu/core/phase';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
-import { chopValue, chopGrant, harvestGrant, CHOP_BASE } from '../../../cpu/core/economy';
+import { lumpValue, chopGrant, harvestGrant } from '../../../cpu/core/economy';
 import { PROJECTS, PROJECT_GPP_FRACTION } from '../../../cpu/data/projects';
 import { computeCityStats } from '../../../cpu/core/city';
 import { purchasableBuildings } from '../../../cpu/core/rules';
@@ -149,8 +149,8 @@ describe('chops and harvests', () => {
   it('chopping woods inside borders grants era-scaled production', () => {
     const { state, city, woods, builder } = chopSetup();
     commitProduction(state, 0, city, { kind: 'building', building: 'MONUMENT', progress: 0 });
-    const expected = chopValue(state, 0, undefined, CHOP_BASE);
-    expect(chopGrant(state, woods, 0)).toEqual({ key: 'production', amount: expected });
+    const expected = lumpValue(state, 0, woods, 20);
+    expect(chopGrant(state, woods, 0)).toEqual([{ key: 'production', amount: expected }]);
     const r = builderRemoveFeature(state, builder.id, 0);
     expect(r.ok).toBe(true);
     expect(woods.feature).toBeNull();
@@ -159,11 +159,34 @@ describe('chops and harvests', () => {
     expect(state.eventLog.some((e) => e.includes('Chopped'))).toBe(true);
   });
 
+  it('a lump escalates with the game progress in integers, at the game speed (GameCore_XP2 0x5256d0)', () => {
+    const state = makeState();
+    // P 0: the base itself, halved online
+    expect(lumpValue(state, 0, undefined, 20)).toBe(10);
+    // twelve technologies: P = floor(1200 / 77) = 15, 10 + 90·15/100 = 23, 11 online
+    // (runs/h1_duelw1112 Xi'an's Rainforest Food)
+    seatOf(state, 0)!.research.techs = Array.from({ length: 12 }, (_t, i) => `T${i}`);
+    expect(lumpValue(state, 0, undefined, 10)).toBe(11);
+    // an improved plot keeps half of it, a pillaged one a fifth
+    const t = tileAtCoords(state.map, 2, 2);
+    t.improvement = 'FARM';
+    expect(lumpValue(state, 0, t, 10)).toBe(5);
+    t.pillaged = true;
+    expect(lumpValue(state, 0, t, 10)).toBe(2);
+  });
+
+  it('a Rainforest pays its two Feature_Removes rows', () => {
+    const { state, woods } = chopSetup();
+    woods.feature = 'RAINFOREST';
+    expect(chopGrant(state, woods, 0)).toEqual([{ key: 'food', amount: lumpValue(state, 0, woods, 10) },
+      { key: 'production', amount: lumpValue(state, 0, woods, 10) }]);
+  });
+
   it('chop value scales with research progress', () => {
     const state = makeState();
-    const before = chopValue(state, 0, undefined, CHOP_BASE);
+    const before = lumpValue(state, 0, undefined, 20);
     grantTechs(state, 'MINING', 'POTTERY', 'ANIMAL_HUSBANDRY', 'BRONZE_WORKING');
-    expect(chopValue(state, 0, undefined, CHOP_BASE)).toBeGreaterThan(before);
+    expect(lumpValue(state, 0, undefined, 20)).toBeGreaterThan(before);
   });
 
   it('chops outside your borders grant nothing', () => {
@@ -171,7 +194,7 @@ describe('chops and harvests', () => {
     const far = tileAtCoords(state.map, 10, 10);
     far.feature = 'WOODS';
     builder.tileIndex = far.index;
-    expect(chopGrant(state, far, 0)).toBeNull();
+    expect(chopGrant(state, far, 0)).toEqual([]);
     const r = builderRemoveFeature(state, builder.id, 0);
     expect(r.ok).toBe(true);
     expect(far.feature).toBeNull();
@@ -204,7 +227,7 @@ describe('chops and harvests', () => {
     const builder = spawnUnit(state, 'BUILDER', wheat.index, 0)!;
     builder.tileIndex = wheat.index;
     const grant = harvestGrant(state, wheat, 0);
-    expect(grant).toEqual({ key: 'food', amount: chopValue(state, 0, undefined, CHOP_BASE) });
+    expect(grant).toEqual({ key: 'food', amount: lumpValue(state, 0, wheat, 20) });
     const r = builderHarvest(state, builder.id);
     expect(r.ok).toBe(true);
     expect(wheat.resource).toBeNull();

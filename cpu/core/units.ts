@@ -258,12 +258,15 @@ export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { ty
 }
 
 /**
- * Whether a seat's Traders may go to sea. CIV6 (the pedia): "The Celestial
- * Navigation technology is required to move on Coast tiles." The pedia's
- * Cartography gate on Ocean is not the game's: the lab's route path crossed
- * five Ocean plots with Celestial Navigation and no Cartography
- * (tools/civ6lab, lab 5), so water, Ocean included, opens at once. A seat
- * without Celestial Navigation keeps to the land.
+ * Whether a seat's Traders may go to sea: the trade path's context takes the
+ * player's CanEmbark of its Trader (GameCore_XP2 0x558ba0 -> 0x553680 ->
+ * 0x4ee3f0), true with a technology whose `EmbarkUnitType` names the Trader
+ * (Celestial Navigation) or that sets `EmbarkAll` (Shipbuilding)
+ * (runs/h1_duelw1112: China's Trader to Preslav at sea from t68 with
+ * Shipbuilding and no Celestial Navigation, its route paying the water path's
+ * 11.4375 Gold from t64). No Cartography gate on Ocean: the lab's route path
+ * crossed five Ocean plots with Celestial Navigation and no Cartography
+ * (tools/civ6lab, lab 5), so water, Ocean included, opens at once.
  */
 export const TRADE_WATER_NONE = 0;
 export const TRADE_WATER_OPEN = 1;
@@ -309,7 +312,7 @@ export function ignoresShores(state: GameState, unit: { type: string; seat: numb
 
 export function tradeWaterLevel(state: GameState, seat: number): number {
   const techs = seatOf(state, seat)?.research.techs;
-  return techs?.includes('CELESTIAL_NAVIGATION') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
+  return techs?.includes('CELESTIAL_NAVIGATION') || techs?.includes('SHIPBUILDING') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
 }
 
 /** The MP a river crossing costs (real Civ 6 ends movement; this model charges
@@ -2003,18 +2006,19 @@ export function builderRemoveFeature(state: GameState, unitId: number, seat: num
   const tile = state.map.tiles[unit!.tileIndex];
   const check = canRemoveFeature(state, tile, seat);
   if (!check.ok) return check;
-  const grant = state.sandbox ? null : chopGrant(state, tile, seat);
+  const grants = state.sandbox ? [] : chopGrant(state, tile, seat);
   const feature = tile.feature;
   const featureName = feature ? FEATURES[feature]?.name ?? feature : '';
   // a Lumber Mill stands only on a feature it lists, and goes with it
   if (tile.improvement === 'LUMBER_MILL') tile.improvement = null;
   tile.feature = null;
-  if (grant) {
+  for (const grant of grants) {
     applyLumpYield(state, tile.index, grant, seat);
     state.eventLog.push(`Chopped ${featureName}: +${grant.amount} ${grant.key}.`);
-    const gold = congressChopGold(state, feature, grant.amount);
-    if (gold) applyLumpYield(state, tile.index, { key: 'gold', amount: gold }, seat);
   }
+  // CIV6 (Deforestation Treaty A): "Gold equal to the Production and Food"
+  const gold = congressChopGold(state, feature, grants.reduce((n, g) => n + g.amount, 0));
+  if (gold) applyLumpYield(state, tile.index, { key: 'gold', amount: gold }, seat);
   spendCharge(state, unit!);
   return ok;
 }

@@ -1916,13 +1916,16 @@ class SimMasks:
     def _trade_water_level(self, row: int) -> torch.Tensor:
         """[B] long — 1 where this row's Traders may go to sea, Ocean
         included, else 0 (`tradeWaterLevel`), off its holder's own research —
-        a major's or a city-state's. CIV6: "The Celestial Navigation technology
-        is required to move on Coast tiles"; the lab's route path crossed Ocean
-        with no Cartography, so no second gate stands.
+        a major's or a city-state's: Celestial Navigation (its EmbarkUnitType
+        is the Trader) or Shipbuilding (EmbarkAll); the lab's route path
+        crossed Ocean with no Cartography, so no second gate stands.
         """
-        if self._celestial_tech < 0:
-            return torch.zeros(self.B, dtype=torch.long, device=self.device)
-        return self._seat_techs(row)[:, self._celestial_tech].long()
+        techs = self._seat_techs(row)
+        out = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        for t in (self._celestial_tech, self._shipbuilding_tech):
+            if t >= 0:
+                out = out | techs[:, t]
+        return out.long()
 
     def _canal_pass(self) -> torch.Tensor:
         """[B, T] — CIV6 (Canal): "Allows Naval units to pass through this

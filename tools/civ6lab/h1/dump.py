@@ -13,15 +13,21 @@ row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
 raw), `events` (the random events of the turn and the one before),
 `greatPeople` (every recruited person by individual), `parks` (the
 National Parks' plots), `cities` (each with its `plots`: the map plots whose
-owner and owning city are the city's), `units`. The catalogs (index -> type
-name) go once to `<out>.cat.json`.
+owner and owning city are the city's), `units`, and from the turn-start
+witness (`h1_starts.lua`, armed by `play`) `starts` (per player the last turn
+its PlayerTurnStarted and PlayerTurnStartComplete fired, read before the
+dump; `startsMoved: true` when one fired while it read) and `witness` (each
+player's state at those two points of its block, for the record's turn and
+the one before). The catalogs (index -> type name) go once to
+`<out>.cat.json`.
 
 `play` passes turns one at a time and dumps after each until `--turns` more
 turns are recorded or the wall `--deadline` is near; it is resumable — run it
 again on the same `--out` and it carries on from the game's current turn. In
 a game with a human seat the seat is Autoplayed one turn at a time
 (`lab.advance`), so the game HOLDS at the seat's turn while the dump reads:
-the state cannot move under it. `--observer` follows an all-AI game as
+the state cannot move under it; the dump waits (`--start-wait`) until the
+seat's own turn start has run (`wait_started`), so every record holds it. `--observer` follows an all-AI game as
 `watch.py` does; the counter can move during a dump there (an observer game
 cannot be paused from the tuner), which the `moved` flag records.
 """
@@ -44,16 +50,76 @@ GC, IG = lab.GC, lab.IG
 PRELUDE = (LAB / "lab_json.lua").read_text(encoding="utf-8")
 
 
-def lua(name: str, cat: bool = False) -> str:
-    code = (HERE / name).read_text(encoding="utf-8")
-    return PRELUDE + "\n" + code.replace("ZCAT", "1" if cat else "0")
+def lua(name: str, cat: bool = False, **tokens: str | int) -> str:
+    code = (HERE / name).read_text(encoding="utf-8").replace("ZCAT", "1" if cat else "0")
+    for k, v in tokens.items():
+        code = code.replace(k, str(v))
+    return PRELUDE + "\n" + code
+
+
+def starts(t: Tuner, mode: str, timeout: float = 30.0) -> dict:
+    """The turn-start witness (`h1_starts.lua`): `arm` installs its two
+    listeners in GameCore_Tuner (once per game), `starts` and `read` only
+    read. Returns the read line: `starts` (per player the last turn its
+    PlayerTurnStarted and PlayerTurnStartComplete fired) and, from `read`,
+    `witness` (each player's state at those two points, for the current turn
+    and the one before)."""
+    out = t.run(GC, lua("h1_starts.lua", ZMODE=mode, ZTURN=lab.turn(t)), timeout=timeout)
+    for ln in reversed(out):
+        try:
+            o = json.loads(ln)
+        except ValueError:
+            continue
+        if o.get("k") == "starts":
+            return o
+    return {"starts": {}, "witness": {}, "errors": out[-3:]}
+
+
+def start_complete(o: dict, player: int) -> int:
+    """The last turn `player`'s turn start completed, per a `starts` read
+    (-1 never seen)."""
+    v = (o.get("starts") or {}).get(str(player))
+    return int(v[1]) if isinstance(v, list) and len(v) > 1 else -1
+
+
+def wait_started(t: Tuner, lp: int, turn: int, limit: float, log, first: float = 2.0, poll: float = 3.0) -> bool:
+    """Hold the dump until the local seat's start of `turn` has completed
+    (its PlayerTurnStartComplete fired, `h1_starts.lua`): the counter moves
+    before the game's turn change and the seat's own block run (the era
+    change, the per-turn favor, the seat's banks), and a dump read in that
+    gap catches the seat's cities before their turn start — the records'
+    "a turn start missing" (1103-1112: every era's first turn and the turns
+    a screen stood over the change). A screen or a session holding the turn
+    is answered as `lab.wait_turn` answers it. False when `limit` seconds
+    pass first; the record's `starts` then shows it."""
+    t0 = time.monotonic()
+    looked = t0 + first - poll
+    while time.monotonic() - t0 < limit:
+        try:
+            if start_complete(starts(t, "starts"), lp) >= turn:
+                return True
+        except TunerError:
+            pass
+        now = time.monotonic()
+        if now - looked >= poll:
+            looked = now
+            try:
+                for c in lab.diagnose(t, lp):
+                    if c[0] in ("popup", "session"):
+                        log(f"    start held: {c[0]} {c[1]} -> {lab.handle(t, lp, c)}")
+            except (TunerError, IndexError) as e:
+                log(f"    diagnose failed: {e}")
+        time.sleep(0.25)
+    return False
 
 
 def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
     """One turn's record, and the catalog when `cat`."""
     before = lab.turn(t)
+    st = starts(t, "read", timeout)
     gc_lines = t.run(GC, lua("h1_dump_gc.lua"), timeout=timeout)
     ig_lines = t.run(IG, lua("h1_dump_ig.lua", cat), timeout=timeout)
+    st_after = starts(t, "starts", timeout)
     after = lab.turn(t)
     rec: dict = {"turnBefore": before, "turnAfter": after, "moved": before != after,
                  "map": [], "players": [], "cities": [], "units": [], "religions": None, "errors": []}
@@ -98,6 +164,13 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
                 by_city.setdefault((p[6], p[19]), []).append(y * len(row) + x)
     for c in rec["cities"]:
         c["plots"] = by_city.get((c["owner"], c["id"]), [])
+    # whose turn start the record holds (`h1_starts.lua`), read before the
+    # dump; a start that ran while it read is flagged
+    if st.get("armed"):
+        rec["starts"] = st.get("starts") or {}
+        rec["witness"] = st.get("witness") or []
+        if (st_after.get("starts") or {}) != rec["starts"]:
+            rec["startsMoved"] = True
     return rec, catalog
 
 
@@ -137,9 +210,17 @@ def cmd_play(a, t: Tuner) -> int:
     done = recorded_turns(a.out)
     left = a.turns
     end = a.t0 + a.deadline - a.reserve
+    log = lambda s: print(s, flush=True)  # noqa: E731
     while left > 0:
         now = lab.turn(t)
+        # the witness listens from here on (once per game; a loaded game arms
+        # afresh) — the turn starts before this call ran are not witnessed
+        st = starts(t, "arm")
         if now not in done:
+            # the seat's own turn start runs before its record is read
+            if lp >= 0 and st.get("armed") and start_complete(st, lp) == now - 1:
+                if not wait_started(t, lp, now, a.start_wait, log):
+                    log(f"    turn {now}: the seat's turn start did not complete within {a.start_wait}s")
             rec, cat = snapshot(t, not a.out.with_suffix(".cat.json").exists(), a.timeout)
             write(a.out, rec, cat)
             if not rec["moved"]:
@@ -153,9 +234,9 @@ def cmd_play(a, t: Tuner) -> int:
         wait = max(5.0, end - time.monotonic())
         try:
             if a.observer:
-                lab.wait_turn(t, now, -1, wait, lambda s: print(s, flush=True), one_more_turn=True)
+                lab.wait_turn(t, now, -1, wait, log, one_more_turn=True)
             else:
-                lab.advance(t, "autoplay", lp, wait, lambda s: print(s, flush=True), one_more_turn=True)
+                lab.advance(t, "autoplay", lp, wait, log, one_more_turn=True)
         except lab.TurnStalled as e:
             print(f"stalled: {e}")
             break
@@ -172,6 +253,8 @@ def main(argv=None) -> int:
     p.add_argument("--deadline", type=float, default=170.0, help="wall seconds this call may take")
     p.add_argument("--reserve", type=float, default=25.0, help="seconds kept back for the last dump")
     p.add_argument("--timeout", type=float, default=60.0, help="seconds one Lua dump may take")
+    p.add_argument("--start-wait", type=float, default=60.0,
+                   help="seconds `play` waits for the seat's own turn start before it dumps")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("snap")
     s.add_argument("--out", type=pathlib.Path, required=True)

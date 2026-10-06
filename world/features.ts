@@ -15,7 +15,9 @@ interface FeatureDef {
   impassable?: boolean;
   removable: boolean;
   freshWater?: boolean;
-  chopYield?: YieldKey;
+  /** CIV6 (Features.xml `Feature_Removes`): what removing it pays, per yield,
+   *  before the progress escalation (`lumpValue`) */
+  chop?: Partial<Record<YieldKey, number>>;
   /** a NATURAL WONDER row — one roster with every other feature. Its
    *  `yields` are the tile's WHOLE yields (no terrain underneath),
    *  `adjacentYields` pay every neighbouring tile, and a
@@ -45,7 +47,7 @@ export function isFloodplains(feature: string | null | undefined): boolean {
 /** Features a builder can CLEAR — the Deforestation Treaty's target space,
  *  and the order its wire target index addresses. */
 export function clearableFeatures(): string[] {
-  return Object.values(FEATURES).filter((f) => f.removable && f.chopYield).map((f) => f.id);
+  return Object.values(FEATURES).filter((f) => f.removable && f.chop).map((f) => f.id);
 }
 
 export const FEATURES: Record<string, FeatureDef> = {
@@ -56,7 +58,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['GRASSLAND', 'PLAINS', 'TUNDRA'],
     allowHills: true,
     removable: true,
-    chopYield: 'production',
+    chop: { production: 20 },
   },
   RAINFOREST: {
     id: 'RAINFOREST',
@@ -65,7 +67,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['PLAINS'],
     allowHills: true,
     removable: true,
-    chopYield: 'food',
+    chop: { food: 10, production: 10 },
   },
   MARSH: {
     id: 'MARSH',
@@ -74,7 +76,7 @@ export const FEATURES: Record<string, FeatureDef> = {
     terrains: ['GRASSLAND'],
     allowHills: false,
     removable: true,
-    chopYield: 'food',
+    chop: { food: 20 },
   },
   // CIV6 (Features.xml FEATURE_FLOODPLAINS, Food 3, which
   // Expansion2_Features.xml's Feature_YieldChanges update sets to 2): the

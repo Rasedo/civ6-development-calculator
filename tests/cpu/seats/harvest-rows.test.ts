@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit, builderHarvest } from '../../../cpu/core/units';
-import { harvestGrant, CHOP_BASE, chopValue } from '../../../cpu/core/economy';
+import { harvestGrant, lumpValue } from '../../../cpu/core/economy';
 import { unitActionNames } from '../../../cpu/core/unitActions';
 import { IMPROVEMENT_IDS } from '../../../cpu/core/unitActions';
 import { RESOURCES } from '../../../world/resources';
@@ -84,12 +84,11 @@ describe('the harvest', () => {
       const g = harvestGrant(state, at, 1);
       expect(g, id).toBeTruthy();
       expect(RESOURCES[id].harvestAmount, id).toBe(base);
-      expect(g!.amount, id).toBe(chopValue(state, 1, at, base));
+      expect(g!.amount, id).toBe(lumpValue(state, 1, at, base));
     }
   });
 
-  it('a FEATURE chop keeps its own base, unrelated to the resource table', () => {
-    expect(CHOP_BASE).toBe(20);
+  it('every harvestable resource row carries its own amount', () => {
     // no resource row may silently fall back to the chop base: the ten rows
     // the install lists all carry their own amount
     for (const id of Object.keys(RESOURCES)) {

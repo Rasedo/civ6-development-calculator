@@ -125,8 +125,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       riv: hasRiver(t) ? 1 : 0,
       wh: hasFreshWater(map, t) ? HOUSING_FRESH_WATER : isCoastalLand(map, t) ? HOUSING_COASTAL : HOUSING_NO_WATER,
       // Chop planes: ftr = the chop grant key when this tile's feature
-      // is removable AND carries a chopYield AND no resource depends on it
-      // (0 none, 1 food, 2 production); ftu = the tech whose effect unlocks
+      // is removable AND carries a chop AND no resource depends on it
+      // (0 none, else its row of `CHOP_ROWS`, the rules' chopRows); ftu = the tech whose effect unlocks
       // that feature's removal (-1 = never removable).
       ftr: chopKeyCode(t),
       ftu: chopUnlockTech(t),

@@ -25,7 +25,7 @@ import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
-import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_DURATION, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
+import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
 import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, STORM_SPACING } from '../data/disasters';
 import { TURN_LIMIT } from './game';
@@ -919,10 +919,10 @@ function fireTurn(state: GameState): void {
  * A DROUGHT of severity `sev` centred on `center`: its footprint is the first
  * `DROUGHT_HEXES` slots of `STORM_DISC`, water skipped, each plot in the
  * disc's order (`droughtTile`). Its record (`GameState.droughts`) keeps the
- * footprint and the row's turns.
+ * footprint and its turns (`DROUGHT_TURNS`).
  */
 export function drought(state: GameState, center: Tile, sev: number, strip: boolean): void {
-  const turns = DROUGHT_DURATION[sev];
+  const turns = DROUGHT_TURNS[sev];
   const plots: number[] = [];
   for (const t of stormFootprint(state.map, center, DROUGHT_HEXES)) {
     if (isWater(t)) continue;

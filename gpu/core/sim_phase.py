@@ -1753,6 +1753,12 @@ class SimPhase:
         dr = made_d.nonzero(as_tuple=True)[0]
         dt = dtile[dr].clamp(min=0)
         self.district_complete[dr, dt] = True
+        # the type's own price takes the completed count afresh
+        # (`refreshDistrictDiscount`)
+        _dty = self.district[dr, dt]
+        _dok = _dty >= 0
+        if bool(_dok.count_nonzero()):
+            self.civ_discount_districts[dr[_dok], row, _dty[_dok]] = self._completed_specialty(row)[dr[_dok]]
         # The registry holds ONE tile per type; TS walks every instance. So
         # for a type a city may hold SEVERAL of, point the entry at the one
         # that just finished — then "the registry names a complete tile"
@@ -2344,12 +2350,13 @@ class SimPhase:
                 _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
             # a CHANGE carries the slotted cards over
             self._carry_policies(row, _gov_on & (_adopted != _gov_before), _slots_before)
-        # the district discount's count of completed specialty districts,
-        # taken when a technology or civic completes — before the cities produce
+        # every district type's count of completed specialty districts, taken
+        # when a technology or civic completes — before the cities produce
         _disc_at = tech_done | civic_done
         if bool(_disc_at.count_nonzero()):
             self.civ_discount_districts[:, row] = torch.where(
-                _disc_at, self._completed_specialty(row), self.civ_discount_districts[:, row])
+                _disc_at.unsqueeze(1), self._completed_specialty(row).unsqueeze(1),
+                self.civ_discount_districts[:, row])
         no_c = active & (self.civ_cur_civic[:, row] == -1) & ~self._available_mask(self.civ_civics[:, row], self._prereq_c, self._c_repeat).any(dim=1)
         self.civ_civic_prog[:, row] = torch.where(no_c, torch.minimum(self.civ_civic_prog[:, row], torch.zeros_like(self.civ_civic_prog[:, row])), self.civ_civic_prog[:, row])
 

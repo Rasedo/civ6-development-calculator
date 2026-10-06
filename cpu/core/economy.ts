@@ -11,6 +11,7 @@ import { governorTileMult } from './governors';
 import { computeUnlocksIn } from './effects';
 import { repairDrip } from './rules';
 import { FEATURES } from '../../world/features';
+import { GAME_COST_ESCALATION, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { RESOURCES } from '../../world/resources';
 
 /**
@@ -44,28 +45,37 @@ export function selectResearch(rsr: ResearchState, id: string | null, isCivic = 
 }
 
 /**
- * CIV6 (harvest/plunder progression): a lump scales with the LARGER of tech
+ * CIV6 (plunder progression): a pillage lump scales with the LARGER of tech
  * progress (of the 67-tech tree) and civic progress (of the 50-civic tree),
- * x10 at 100% — the chop's 20 becomes 200, a quarry harvest's 25 becomes 250.
+ * x10 at 100%.
  */
 export function progressScale(r: ResearchState | undefined): number {
   return 1 + 9 * Math.max((r?.techs.length ?? 0) / 67, (r?.civics.length ?? 0) / 50);
 }
 
-/** CIV6: a chop or a harvest pays a lump that scales with game PROGRESS.
- *  `base` is the table's own figure — a feature chop's 20, or the resource's
- *  own `harvestAmount` (`Resource_Harvests.Amount`: 20 for Food and
- *  Production, 40 for the two Gold ones). Required, not defaulted: a caller
- *  that forgot it would quietly pay a chop's rate for a harvest. The lump is
- *  times the Groundbreaker's "+50% yields from plot harvests and feature
- *  removals in city" where the worked tile belongs to a city that holds it. */
-export function chopValue(state: GameState, seat: number, at: Tile | undefined, base: number): number {
+/**
+ * ONE yield row of a harvest or a feature removal, as the DLL scales it
+ * (GameCore_XP2 0x5256d0, called per row by the harvest 0x95fbf0): `base` the
+ * row's own figure (`Resource_Harvests.Amount`, `Feature_Removes.Yield`),
+ * escalated by the game's progress — base + (base·GAME_COST_ESCALATION/100 −
+ * base)·P/100, P `gameProgressPct`, in integers; on an improved plot
+ * (100 − HARVEST_IMPROVED_DEGRADATION)% of it, a pillaged one 30 less; at the
+ * game's speed (`scaleByGameSpeed`); then the plot's city's harvest percent
+ * (the Groundbreaker's "+50% yields from plot harvests and feature removals
+ * in city"), floored. Records: runs/h1_duelw1112 Xi'an's Rainforests at P 15
+ * and 20 (11 and 14 Food), its Marsh at P 24 (31 Food).
+ */
+export function lumpValue(state: GameState, seat: number, at: Tile | undefined, base: number): number {
+  const r = seatOf(state, seat)?.research;
+  const p = gameProgressPct(r?.techs.length ?? 0, r?.civics.length ?? 0);
+  let a = base + Math.trunc(((Math.trunc((base * GAME_COST_ESCALATION) / 100) - base) * p) / 100);
+  if (at?.improvement) {
+    a = Math.trunc((a * (100 - HARVEST_IMPROVED_DEGRADATION - (at.pillaged ? HARVEST_PILLAGED_DEGRADATION : 0))) / 100);
+  }
+  a = scaleByGameSpeed(a);
   const mult = at ? governorTileMult(state, at, (e) => e.harvestMult) : 1;
-  return Math.round(base * progressScale(seatOf(state, seat)?.research) * mult);
+  return Math.floor(a * mult);
 }
-
-/** The base a FEATURE chop pays before the progress scale. */
-export const CHOP_BASE = 20;
 
 /**
  * CIV6 (Pillaging): pay the pillager what the wrecked target's plunder row
@@ -135,17 +145,17 @@ export function pillagePlunder(
   }
 }
 
-interface LumpGrant {
+export interface LumpGrant {
   key: YieldKey;
   amount: number;
 }
 
-export function chopGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
-  if (!tile.feature) return null;
-  const key = FEATURES[tile.feature]?.chopYield;
-  if (!key) return null;
-  if (tileSeat(tile) !== seat) return null;
-  return { key, amount: chopValue(state, seat, tile, CHOP_BASE) };
+/** What removing the plot's feature pays inside the seat's borders: a lump
+ *  per `Feature_Removes` row (`FeatureDef.chop`), empty elsewhere. */
+export function chopGrant(state: GameState, tile: Tile, seat: number): LumpGrant[] {
+  const rows = tile.feature ? FEATURES[tile.feature]?.chop : undefined;
+  if (!rows || tileSeat(tile) !== seat) return [];
+  return (Object.entries(rows) as [YieldKey, number][]).map(([key, base]) => ({ key, amount: lumpValue(state, seat, tile, base) }));
 }
 
 export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGrant | null {
@@ -158,7 +168,7 @@ export function harvestGrant(state: GameState, tile: Tile, seat: number): LumpGr
   const rs = seatOf(state, seat)?.research;
   if (!rs) return null;
   if (!state.sandbox && !computeUnlocksIn(rs, getModifiers(state, seat).districtPrereq).improvements.has(res.improvement)) return null;
-  return { key: res.harvestYield, amount: chopValue(state, seat, tile, res.harvestAmount ?? CHOP_BASE) };
+  return { key: res.harvestYield, amount: lumpValue(state, seat, tile, res.harvestAmount ?? 0) };
 }
 
 export function applyLumpYield(

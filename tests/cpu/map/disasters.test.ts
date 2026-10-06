@@ -5,7 +5,7 @@ import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
 import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots } from '../../../cpu/core/disasters';
-import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_DURATION, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
+import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_TURNS, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
 import { EVENT_OCC_SCALE, STANDARD_MAP_AREA, FIRST_TIME_OCCURRENCE_BOOST, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P, ERUPTION_CIV_KILL_P } from '../../../cpu/data/disasters';
@@ -784,7 +784,7 @@ describe('the turn\'s one random event', () => {
     expect(Math.abs(woke / N - 1 / 31)).toBeLessThan(0.008);
   });
 
-  it('a drought is seven plots for 5 or 10 turns', () => {
+  it('a drought is seven plots for its Duration at the game speed (2 or 5 turns online)', () => {
     // an inland grassland: dry ground far from any Coast
     const state = makeState(makeMap(20, 20));
     state.disasters = true;
@@ -807,7 +807,8 @@ describe('the turn\'s one random event', () => {
       expect([...rec.plots].sort((x, y) => x - y)).toEqual(dry.map((t) => t.index));
       expect(rec.left).toBe(dry[0].droughtTurns);
     }
-    expect([...lengths].sort((x, y) => x - y)).toEqual([5, 10]);
+    expect([...lengths].sort((x, y) => x - y)).toEqual([...DROUGHT_TURNS]);
+    expect([...DROUGHT_TURNS]).toEqual([2, 5]);
   });
 
   it('a drought starts anywhere on the map, each candidate weighing 1 + min(its distance to a live drought\'s last plot, 15)', () => {
@@ -1347,7 +1348,7 @@ describe('the drought\'s rules', () => {
         }
         drought(state, c, sev, false);
         for (const t of plots) {
-          expect(t.droughtTurns).toBe(DROUGHT_DURATION[sev]);
+          expect(t.droughtTurns).toBe(DROUGHT_TURNS[sev]);
           if (t === mine) {
             expect(t.improvement).toBe('MINE');
             expect(t.pillaged).toBe(false);

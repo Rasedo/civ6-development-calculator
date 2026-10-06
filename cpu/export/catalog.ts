@@ -13,15 +13,25 @@ import { TECHS } from '../data/techs'; // era scale
 import { CIVICS } from '../data/civics';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 
+/** The feature removals' rows the chop plane (`ftr`) indexes: 0 none, then
+ *  each distinct `FeatureDef.chop` in catalog order as [Food, Production]
+ *  bases. */
+const CHOP_ROWS: [number, number][] = [[0, 0]];
+for (const def of Object.values(FEATURES) as any[]) {
+  if (!def.removable || !def.chop) continue;
+  const row: [number, number] = [def.chop.food ?? 0, def.chop.production ?? 0];
+  if (!CHOP_ROWS.some((r) => r[0] === row[0] && r[1] === row[1])) CHOP_ROWS.push(row);
+}
+
 function chopKeyCode(t: any): number {
   if (!t.feature) return 0;
   const def = (FEATURES as any)[t.feature];
-  if (!def?.removable || !def?.chopYield) return 0;
+  if (!def?.removable || !def?.chop) return 0;
   if (t.resource) {
     const res = (RESOURCES as any)[t.resource];
     if (res?.requiresFeature?.includes(t.feature)) return 0;
   }
-  return def.chopYield === 'food' ? 1 : def.chopYield === 'production' ? 2 : 0;
+  return CHOP_ROWS.findIndex((r) => r[0] === (def.chop.food ?? 0) && r[1] === (def.chop.production ?? 0));
 }
 function chopUnlockTech(t: any): number {
   if (!t.feature) return -1;
@@ -128,4 +138,4 @@ function featureAdjContribution(tile: Tile, id: DistrictId, removable = true): n
   return sum;
 }
 
-export { LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, wonderBit, staticAdjRaw, featureAdjContribution };
+export { CHOP_ROWS, LUXURY_IDS, chopKeyCode, chopUnlockTech, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, wonderStaticOk, wonderBit, staticAdjRaw, featureAdjContribution };

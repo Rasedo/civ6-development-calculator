@@ -1,7 +1,7 @@
 // The autoplay importer and checks: a hand-built turn record of a 6x4 game map
 // becomes the engine GameState the H-1 checks read.
 import { describe, expect, it } from 'vitest';
-import { advanceHistory, importTurn, newHistory } from '../../../cpu/harness/import';
+import { advanceHistory, citiesNotStarted, importTurn, newHistory, notStarted } from '../../../cpu/harness/import';
 import { hexDistance } from '../../../world/hex';
 import { diffActions, stateChecks } from '../../../cpu/harness/checks';
 import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../../cpu/harness/record';
@@ -241,6 +241,66 @@ describe('the history', () => {
     const h = newHistory();
     advanceHistory(h, record(40), CAT);
     expect(importTurn(record(40), CAT, h).tilesUnknown.has(8)).toBe(true);
+  });
+
+  it('raises the best melee on no unit first seen embarked', () => {
+    const h = newHistory();
+    advanceHistory(h, record(1), CAT);
+    advanceHistory(h, record(2, { units: [...record(1).units, { ...unit(0, 9, 1, 2, 2), embarked: true }] }), CAT);
+    expect(h.bestMelee.get(0) ?? 0).toBe(0);
+  });
+});
+
+describe('the recorded random events', () => {
+  const cat: Catalog = { ...CAT, randomEvents: ['RANDOM_EVENT_DROUGHT_MAJOR', 'RANDOM_EVENT_FLOOD_MODERATE'] };
+  it('dry a recorded drought\'s footprint for its turns at the game speed', () => {
+    const h = newHistory();
+    const at = 1 * W + 3;
+    const ev = (turn: number) => [[turn, 0, at, at, 0, 0, 0, 0]] as TurnRecord['events'];
+    advanceHistory(h, record(9, { events: [] }), cat);
+    const dry = (turn: number) => {
+      const r = record(turn, { events: ev(10) });
+      advanceHistory(h, r, cat);
+      return importTurn(r, cat, h).state.map.tiles[at].droughtTurns;
+    };
+    expect(dry(10)).toBe(2);
+    expect(dry(11)).toBe(1);
+    expect(dry(12)).toBe(0);
+  });
+
+  it('read no yields off the records where the records carry events', () => {
+    // a bare plot's Food rises with no event recorded: no fertility lands
+    const h = newHistory();
+    const at = 2 * W + 4;
+    advanceHistory(h, record(9, { events: [] }), cat);
+    const b = record(10, { events: [] });
+    b.map[2][4] = plot(0, { 16: [3, 0, 0, 0, 0, 0] });
+    advanceHistory(h, b, cat);
+    expect(importTurn(b, cat, h).state.map.tiles[at].fertility).toBe(0);
+    // without events the reading lands
+    const h2 = newHistory();
+    advanceHistory(h2, record(9), cat);
+    const c = record(10);
+    c.map[2][4] = plot(0, { 16: [3, 0, 0, 0, 0, 0] });
+    advanceHistory(h2, c, cat);
+    expect(importTurn(c, cat, h2).state.map.tiles[at].fertility).toBe(1);
+  });
+});
+
+describe('the turn-start witness', () => {
+  it('names the players whose start ran between two records, and those a dump caught midway', () => {
+    // the boxes stand still in both records: read off them, every major is late
+    const a = record(5);
+    const b = record(6);
+    expect([...notStarted(a, b)]).toEqual([0, 2]);
+    // the witness says player 0's start completed between them, player 2's not
+    const wa = record(5, { starts: { 0: [5, 5], 2: [4, 4] } });
+    const wb = record(6, { starts: { 0: [6, 6], 2: [4, 4] } });
+    expect([...notStarted(wa, wb)]).toEqual([2]);
+    expect(citiesNotStarted(wa, wb).size).toBe(0);
+    // a dump that caught player 0's start begun and not done
+    const mid = record(6, { starts: { 0: [6, 5], 2: [5, 5] } });
+    expect([...citiesNotStarted(wa, mid)]).toEqual(['0:65536']);
   });
 });
 

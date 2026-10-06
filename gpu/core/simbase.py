@@ -257,6 +257,7 @@ class Rules:
     culture_cost: tuple  # (CULTURE_COST_FIRST_PLOT, _LATER_PLOT_MULTIPLIER, _LATER_PLOT_EXPONENT) — `_border_cost`
     plot_influence: dict  # borderPlotCost's PLOT_INFLUENCE_* terms — `_seat_border_key`
     progress: dict  # {techCount, civicCount, speedPct} — `_progress_pct` / `_progress_cost`
+    lump: dict  # {escalation, improvedDegradation, pillagedDegradation, chopRows} — `_lump_value`
     plot_price: tuple  # (base, ring step, climb, divisor) — `_plot_price`
     # the install's `CivilizationLevels` table, one dict per class of player in
     # the exporter's order (TRIBE, CITY_STATE, FULL_CIV, FREE_CITIES). Ten
@@ -501,6 +502,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         culture_cost=tuple(float(x) for x in r["cultureCost"]),
         plot_influence={k: int(v) for k, v in r["plotInfluence"].items()},
         progress=r["progress"],
+        lump=r["lump"],
         plot_price=tuple(int(x) for x in r["plotPrice"]),
         civ_levels=r["civLevels"],
         center_min_food=r["centerMinFood"],

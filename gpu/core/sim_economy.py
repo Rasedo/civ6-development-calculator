@@ -579,6 +579,26 @@ class SimEconomy:
         c = torch.div(100 * civics_n.long(), int(pr["civicCount"]), rounding_mode="floor")
         return torch.maximum(t, c)
 
+    def _lump_value(self, row: int, base: torch.Tensor, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
+        """`lumpValue` — [n] long: ONE yield row of a harvest or a feature
+        removal by seat row `row` on plots (`rows`, `tiles`), `base` [n] the
+        row's own figure: base + (base·escalation/100 − base)·P/100 in
+        integers, P the game's progress; an improved plot's degradation (a
+        pillaged one's beside it); the game speed; the plot's governor
+        harvest multiplier, floored."""
+        lp = self.rules.lump
+        base = base.long()
+        p = self._progress_pct(row)[rows]
+        a = base + torch.div((torch.div(base * int(lp["escalation"]), 100, rounding_mode="trunc") - base) * p,
+                             100, rounding_mode="trunc")
+        keep = (100 - int(lp["improvedDegradation"])
+                - self.pillaged[rows, tiles].long() * int(lp["pillagedDegradation"]))
+        a = torch.where(self.improvement[rows, tiles] >= 0, torch.div(a * keep, 100, rounding_mode="trunc"), a)
+        a = self.rules.scale_by_game_speed(a.double())
+        if self.n_governors:
+            a = torch.floor(a * self._governor_tile_mult(row, "harvestMult")[rows, tiles])
+        return a.long()
+
     def _progress_pct(self, row: int) -> torch.Tensor:
         """[B] long — the game's progress for ANY seat row (`researchProgressPct`)."""
         return self._progress_pct_of(self._seat_techs(row).sum(dim=1), self._seat_civics(row).sum(dim=1))
@@ -633,13 +653,13 @@ class SimEconomy:
         return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2))
 
     def _district_discounted(self, row: int, di: int) -> torch.Tensor:
-        """`districtDiscounted`: U and n live, D the completed count the seat
-        took when its last technology or civic completed."""
+        """`districtDiscounted`: U and n live, D the completed count the type's
+        price last took (`_refresh_district_discount`)."""
         if not bool(self._is_specialty[di]):
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         U = self._unlocked_specialty_count(self._seat_techs(row), self._seat_civics(row))
         n = (self.city_dist_tile[:, row, :, di] >= 0).sum(dim=1)
-        D = self.civ_discount_districts[:, row]
+        D = self.civ_discount_districts[:, row, di]
         thresh = torch.div(D + U.clamp(min=1) - 1, U.clamp(min=1), rounding_mode="floor")
         return (U > 0) & (D >= U) & (n < thresh)
 

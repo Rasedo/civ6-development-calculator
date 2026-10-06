@@ -10,7 +10,7 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
-import { grantEraBoosts } from './game';
+import { grantEraBoosts, refreshDistrictDiscount } from './game';
 import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
@@ -246,6 +246,8 @@ export function completeQueueItem(
     case 'district': {
       const dt = state.map.tiles[item.tileIndex];
       dt.districtComplete = true;
+      // the type's own price takes the completed count afresh
+      if (dt.district) refreshDistrictDiscount(state, city.seat, dt.district);
       if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
       if (dt.district) districtMoment(state, city.seat, city, dt.index, dt.district);
       if (dt.district === 'ENCAMPMENT') {

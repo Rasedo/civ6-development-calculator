@@ -325,7 +325,7 @@ export function unitMask(ctx: MaskCtx, u: Unit): number[] {
   // CHOP: the GPU asks no ownership — the Builder, a charge, a removable
   // feature that pays a lump and no resource depends on, its removal tech and
   // no Congress ban. `builderRemoveFeature` pays only inside the borders.
-  if (builder && charges > 0 && here.feature && FEATURES[here.feature]?.chopYield
+  if (builder && charges > 0 && here.feature && FEATURES[here.feature]?.chop
       && canRemoveFeature(state, here, seat).ok) out.add(A_CHOP);
   // REPAIR asks no charge: a Builder on an own pillaged tile, and no drought
   // holding its improvement (`droughtBars`).

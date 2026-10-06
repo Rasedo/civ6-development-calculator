@@ -22,6 +22,8 @@ export const P = {
   terrain: 0, feature: 1, resource: 2, resourceCount: 3, improvement: 4, improvementPillaged: 5,
   owner: 6, district: 7, wonder: 8, wonderComplete: 9, route: 10, riverBits: 11, cliffBits: 12,
   freshWater: 13, appeal: 14, workers: 15, yields: 16, isLake: 17, routePillaged: 18,
+  /** the owning city's id, -1 unowned */
+  ownerCity: 19,
   /** the coastal lowland band (a `coastalLowlands` index, -1 none), flooded
    *  and submerged — absent from records the dumper wrote before it read them */
   lowland: 20, flooded: 21, submerged: 22,
@@ -238,6 +240,38 @@ export interface TurnRecord {
   greatPeople?: Read<[number, number, number, number, number][]>;
   /** the National Parks: [name, plot indices] */
   parks?: Read<[string, number[]][]>;
+  /** whose turn start the record holds (`tools/civ6lab/h1/h1_starts.lua`),
+   *  by game player: [the last turn its PlayerTurnStarted fired, the last
+   *  turn its PlayerTurnStartComplete fired], read before the dump. Absent
+   *  from records the dumper wrote before it armed the witness. */
+  starts?: Record<string, [number, number]>;
+  /** a turn start that ran while the dump read */
+  startsMoved?: boolean;
+  /** each player's state at its start of turn (`pre`, as PlayerTurnStarted
+   *  fired: what the start banks from) and as it completed (`post`), for
+   *  the record's turn and the one before */
+  witness?: StartWitness[];
+}
+
+/** One player's state at a point of its start of turn (`TurnRecord.witness`). */
+export interface StartWitness {
+  turn: number;
+  player: number;
+  point: 'pre' | 'post';
+  gold: Read<number>;
+  faith: Read<number>;
+  researching: Read<number>;
+  researchProgress: Read<number>;
+  civic: Read<number>;
+  civicProgress: Read<number>;
+  eraScore: Read<number>;
+  cities: {
+    id: Read<number>; pop: Read<number>; food: Read<number>; foodSurplus: Read<number>;
+    growthThreshold: Read<number>; culture: Read<number>; cultureYield: Read<number>;
+    nextPlot: Read<number>; plots: Read<number>; loyalty: Read<number>; loyaltyPerTurn: Read<number>;
+    production: Read<number>; productionProgress: Read<number>; yields: Read<number[]>;
+    worked: Read<number[]>; religions: unknown;
+  }[];
 }
 
 export interface Catalog {

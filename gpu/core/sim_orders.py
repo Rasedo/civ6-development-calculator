@@ -532,17 +532,8 @@ class SimOrders:
                 if bool(_hvm.count_nonzero()):
                     _r = _hvm.nonzero(as_tuple=True)[0]
                     _t = hc[_r]
-                    # the same progress scale the chop reads, and the same
-                    # Groundbreaker multiplier
-                    _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
-                                                     civics.sum(dim=1).double() / 50.0)
-                    _hm = torch.ones_like(_psc)
-                    if self.n_governors:
-                        _hm = self._governor_tile_mult(row, "harvestMult")[_r, _t]
-                        _psc = _psc[_r]
-                    else:
-                        _psc = _psc[_r]
-                    _amt = js_round(_hamt[_r].double() * _psc * _hm)
+                    # the lump the chop reads (`lumpValue`), on the plot as it stands
+                    _amt = self._lump_value(row, _hamt[_r], _r, _t).double()
                     self._drop_resource(_r, _t)
                     _col_h = self._city_col_at(row, _r, _t)
                     _drip_h = self.city_progress[:, row, :, 0].clone()
@@ -1003,21 +994,16 @@ class SimOrders:
                     cr = chp.nonzero(as_tuple=True)[0]
                     ct = hc[cr]
                     self.unit_mp[cr, sc[cr]] = 0  # the turn is spent (TS movesLeft = 0)
+                    # each Feature_Removes row of the feature, one lump a row
+                    # (`chopGrant`, `lumpValue`), read on the plot as it stood
+                    _rows_c = self._chop_rows[ftr[cr]]
+                    food_c = self._lump_value(row, _rows_c[:, 0], cr, ct).to(self.dtype)
+                    prod_c = self._lump_value(row, _rows_c[:, 1], cr, ct).to(self.dtype)
                     self._strip_feature_at(cr, ct)
                     if self.LUMBER >= 0:
                         was_l = self.improvement[cr, ct] == self.LUMBER
                         self.improvement[cr, ct] = torch.where(
                             was_l, torch.full_like(self.improvement[cr, ct], -1), self.improvement[cr, ct])
-                    # CIV6 (harvest progression): x10 at 100% of the
-                    # LARGER tree — 1 + 9 * max(techs/67, civics/50)
-                    _psc = 1.0 + 9.0 * torch.maximum(techs.sum(dim=1).double() / 67.0,
-                                                     civics.sum(dim=1).double() / 50.0)
-                    # CIV6 (Groundbreaker): "+50% yields from plot harvests and
-                    # feature removals in city" — the harvested tile's own city.
-                    _hm = torch.ones_like(_psc)
-                    if self.n_governors:
-                        _hm = self._governor_tile_mult(row, "harvestMult")[cr, ct]
-                    amount = js_round(20.0 * _psc * _hm).to(self.dtype)
                     # the Deforestation Treaty pays a SECOND lump, in gold —
                     # decided over the WHOLE batch, because `ct` is narrowed
                     _dgold = self._congress_chop(self.feat_id.gather(1, hc.unsqueeze(1)).squeeze(1))[1]
@@ -1025,18 +1011,17 @@ class SimOrders:
                     _drip_c = self.city_progress[:, row, :, 0].clone()
                     for i2 in range(len(cr)):
                         b2, j2 = int(cr[i2]), int(col_c[i2])
-                        amt = float(amount[b2])
+                        f_amt, p_amt = float(food_c[i2]), float(prod_c[i2])
                         # gold lands in the BANK, so it needs no city column
                         if bool(_dgold[b2]):
-                            self.civ_treasury[b2, row] += amt
+                            self.civ_treasury[b2, row] += f_amt + p_amt
                         if j2 < 0:
                             continue
-                        if int(ftr[cr[i2]]) == 1:
-                            self.city_growth[b2, row, j2] += amt
-                        elif int(self.city_current[b2, row, j2, 0]) >= 0:
-                            self.city_progress[b2, row, j2, 0] += amt
+                        self.city_growth[b2, row, j2] += f_amt
+                        if int(self.city_current[b2, row, j2, 0]) >= 0:
+                            self.city_progress[b2, row, j2, 0] += p_amt
                         else:
-                            self.city_prod_bank[b2, row, j2] += amt
+                            self.city_prod_bank[b2, row, j2] += p_amt
                     self._repair_drip(row, _drip_c)
                     self.unit_charges[cr, sc[cr]] -= 1
                     spent = chp & (self.unit_charges.gather(1, sc.unsqueeze(1)).squeeze(1) <= 0)

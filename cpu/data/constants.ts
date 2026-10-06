@@ -216,6 +216,12 @@ export const GAME_COST_ESCALATION = srcConst('scenario.gameCostEscalation', 1000
   note: 'the policy-unlock price escalates its three figures by it (dll_policy.py on runs/bds4_probe_20260926T135815Z.jsonl and runs/bds3_ladder_*: 853 of 853)',
 });
 
+/** A harvest's or feature removal's lump on an improved plot keeps
+ *  (100 − this)% of itself, a pillaged one (100 − this − the pillaged row)%
+ *  (GameCore_XP2 0x5256d0: GlobalParameters +0x3d4 / +0x3d8). */
+export const HARVEST_IMPROVED_DEGRADATION = srcConst('scenario.harvestImprovedDegradation', 50, gp('HARVEST_IMPROVED_DEGRADATION'));
+export const HARVEST_PILLAGED_DEGRADATION = srcConst('scenario.harvestPillagedDegradation', 30, gp('HARVEST_PILLAGED_DEGRADATION'));
+
 /** ANARCHY. CIV6 (the Governments pedia): "If you switch to a previously
  *  adopted government, you will enter a state of Anarchy". Measured: a return
  *  to any government the seat held before, requested at turn T, left it in no

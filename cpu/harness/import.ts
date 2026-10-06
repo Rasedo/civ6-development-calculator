@@ -34,7 +34,9 @@ import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
-import { riverReach } from '../core/disasters';
+import { eruptionRing, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT } from '../data/disasters';
+import { isWater } from '../../world/query';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
@@ -400,23 +402,41 @@ export interface History {
    *  when its feature regrows (`RandomEvent_Yields` Turns 2 and 6) */
   fireFood: Map<number, number>;
   fireProd: Map<number, number>;
-  /** a random event's fertility by plot, [Food, Production, Science] — the
-   *  game's own per-plot draw off `RandomEvent_Yields`, read as the record's
-   *  yields against the record before: what a plot gained when it turned to
-   *  Volcanic Soil (the feature the soil replaced given back), and what a
-   *  plot gained with nothing else about it or its owner moving (a flood, a
-   *  storm, a blizzard) */
-  eventYields: Map<number, [number, number, number]>;
+  /** a random event's fertility by plot, [Food, Production, Science,
+   *  Culture] (`EVENT_CHANNELS`). Where the records carry `events`, the
+   *  draws a recorded event determines (`foldEventYields`); where they do
+   *  not, the game's per-plot draw read as the record's yields against the
+   *  record before: what a plot gained when it turned to Volcanic Soil (the
+   *  feature the soil replaced given back), and what a plot gained with
+   *  nothing else about it or its owner moving (a flood, a storm, a
+   *  blizzard) */
+  eventYields: Map<number, number[]>;
+  /** the FertilityAdded each recorded event was folded at, by
+   *  `${turn}:${RandomEvents index}` */
+  eventCounts: Map<string, number>;
+  /** the recorded events with draws still to place (`foldEventYields`,
+   *  `placeEventDraws`) */
+  openEvents: OpenEvent[];
+  /** the yield columns of each plot the last record's readings placed a
+   *  draw from (`Imported.readBack` of that record) */
+  eventRead: Map<number, Set<number>>;
+  /** plots a storm's uncounted last turn moved, each with the storm */
+  eventDraws: Map<number, Set<string>>;
+  /** the droughts the records' `events` placed: the turn each began, its
+   *  severity and its footprint (`drought`) */
+  droughts: { turn: number; sev: number; plots: number[] }[];
   /** each plot's yields at the last record it stood bare (no working
    *  improvement, district, wonder or revealed-by-research resource), keyed
    *  by its feature, owner and resource then, and the draws read on it by
    *  then */
   bare: Map<number, { key: string; y: number[]; ev: number[] }>;
-  /** each player's district-discount count (`Seat.discountDistricts`): the
-   *  specialty districts it had completed at the record before its research
-   *  last moved — the count the game took when the technology or civic
-   *  completed, ahead of that turn's productions */
-  discountDistricts: Map<number, number>;
+  /** each player's district-discount counts (`Seat.discountDistricts`), by
+   *  player and type: every type's the specialty districts it had completed
+   *  at the record before its research last moved (the technology or civic
+   *  completed ahead of that turn's productions); a type's own again where a
+   *  district of it completed since the record before, the count after
+   *  that turn's productions */
+  discountDistricts: Map<number, Map<DistrictId, number>>;
   /** the age each era transition gave each player, in order (`AGE_DARK`,
    *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
   ages: Map<number, number[]>;
@@ -556,7 +576,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
-    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null, stockpile: new Map() };
@@ -573,6 +593,234 @@ function foldEvents(h: History, rec: TurnRecord, cat: Catalog): void {
     if (rise) h.seaLevel = Math.max(h.seaLevel, Number(rise[1]));
     if (name.startsWith('RANDOM_EVENT_FLOOD_') && num(start) >= 0) h.floods.set(`${turn}:${type}`, num(start));
   }
+}
+
+/** A fertility channel a random event's yield row adds to (`silt`), with
+ *  its yield column in the record's YIELD_KEYS order. */
+type EventChannel = 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul';
+const EVENT_CHANNELS: readonly EventChannel[] = ['fertility', 'fertilityProd', 'fertilitySci', 'fertilityCul'];
+const EVENT_COLUMNS: readonly number[] = [0, 1, 3, 4];
+
+/** The map of a record as the engine reads its ground: terrain, feature,
+ *  resource, improvement and rivers (no owners, districts or cities). */
+function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
+  const ctx: Ctx = { cat, gaps: new Map(), bReplace: new Map(), dReplace: new Map(), uReplace: new Map(), wonders: new Set() };
+  const tiles: Tile[] = [];
+  for (let i = 0; i < rec.head.W * rec.head.H; i++) tiles.push(tileOf(ctx, rec, i));
+  const map: GameMap = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
+  for (const t of tiles) t.riverMask = edgeMask(map, rec, t, P.riverBits);
+  return map;
+}
+
+/**
+ * Where a recorded random event's fertility rows may land, by the engine's
+ * own rules on the ground it struck (`map`): each (plot, channel) draw of
+ * the event, one per row and plot. A flood draws every `FLOOD_YIELD_ROWS`
+ * row of its severity on every plot of its river (`riverReach` from the
+ * recorded start plot) of the row's Floodplains kind; an eruption every
+ * soil row on every neighbour of the volcano or wonder (`eruptionRing`) the
+ * soil may paint (`soilPaintable`). A storm's walk is not recorded, only
+ * where it began and where it stands: `exact` is false and `slots` holds
+ * every land plot a fertile storm row may have reached — within its
+ * footprint's radius and the walk's slack of the line between the two, or
+ * within that and `walk` more steps of where it stands (a turn's walk the
+ * record does not follow).
+ * Droughts, fires (their fertility follows their features, `History.fireFood`),
+ * meteors and the sea draw none.
+ */
+function eventSlots(map: GameMap, name: string, cur: number, start: number, walk = 0): { slots: [number, EventChannel][]; exact: boolean } {
+  const ev = strip(name, 'RANDOM_EVENT_');
+  const at = (i: number) => (i >= 0 && i < map.tiles.length ? map.tiles[i] : undefined);
+  const flood = ['FLOOD_MODERATE', 'FLOOD_MAJOR', 'FLOOD_1000_YEAR'].indexOf(ev);
+  if (flood >= 0) {
+    const s = at(start);
+    if (!s) return { slots: [], exact: false };
+    const reach = riverReach(map, s);
+    const slots: [number, EventChannel][] = [];
+    for (const row of FLOOD_YIELD_ROWS[flood]) {
+      for (const t of reach) if (t.feature === row.feature) slots.push([t.index, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd']);
+    }
+    return { slots, exact: true };
+  }
+  const eruption = (ERUPTION_ROWS as readonly string[]).indexOf(ev);
+  if (eruption >= 0) {
+    const wonder = ERUPTION_WONDER[eruption];
+    const plots = wonder ? map.tiles.filter((t) => t.feature === wonder) : [at(cur)].filter((t): t is Tile => !!t);
+    if (!plots.length) return { slots: [], exact: false };
+    const ring = eruptionRing(map, plots);
+    const slots: [number, EventChannel][] = [];
+    const rows = [ERUPTION_PAINT_P[eruption], ERUPTION_PROD_P[eruption], ERUPTION_SCI_P[eruption], ERUPTION_CUL_P[eruption]];
+    rows.forEach((p, k) => {
+      if (p <= 0) return;
+      for (const n of ring) if (soilPaintable(n)) slots.push([n.index, EVENT_CHANNELS[k]]);
+    });
+    return { slots, exact: true };
+  }
+  const storm = STORM_EVENTS.find((s) => s.id === ev);
+  if (storm) {
+    const channels = ([[storm.fertFood, 'fertility'], [storm.fertProd, 'fertilityProd']] as const).filter(([p]) => p > 0).map(([, c]) => c);
+    const a = at(start) ?? at(cur);
+    const b = at(cur) ?? a;
+    if (!channels.length) return { slots: [], exact: true };
+    if (!a || !b) return { slots: [], exact: false };
+    const slack = stormStartRadius(storm) + 2;
+    const span = hexDistance(map, a.col, a.row, b.col, b.row);
+    const slots: [number, EventChannel][] = [];
+    for (const t of map.tiles) {
+      if (isWater(t) || t.elevation === 'MOUNTAIN') continue;
+      const fromB = hexDistance(map, t.col, t.row, b.col, b.row);
+      if (hexDistance(map, t.col, t.row, a.col, a.row) + fromB > span + 2 * slack && fromB > slack + walk) continue;
+      for (const c of channels) slots.push([t.index, c]);
+    }
+    return { slots, exact: false };
+  }
+  return { slots: [], exact: true };
+}
+
+/** A recorded random event whose fertility draws are still being placed
+ *  (`History.openEvents`). */
+interface OpenEvent {
+  key: string;
+  /** the gap its unplaced draws leave: `<EVENT> t<turn>` */
+  label: string;
+  /** the draws each (plot, channel) slot may still take, by `${plot}:${channel index}` */
+  slots: Map<string, number>;
+  /** every plot of its slots */
+  plots: Set<number>;
+  /** the draws the game counted (FertilityAdded) not yet placed */
+  remaining: number;
+  /** the last record whose change against the record before may hold its
+   *  draws: the first record showing it; a storm's, the record of its second
+   *  turn (the last whose count a record carries) */
+  through: number;
+  /** a storm's last turn: its walk strikes again then, counted by no record */
+  last: number;
+  storm: boolean;
+  /** a storm's slots for its last turn: a full turn's walk past where its
+   *  last counted record left it */
+  lastSlots?: Set<string>;
+}
+
+/**
+ * Fold a record's `events` into the open events (`History.openEvents`):
+ * a flood's or an eruption's once its record shows it, its slots
+ * (`eventSlots`) on the ground of the record before it struck and the draws
+ * it landed the game's FertilityAdded — none landed, or no slot, opens
+ * nothing. A fertile storm opens at its first record and grows at each
+ * record showing it: its slots by where it now stands, its count as the
+ * record raises it, its last turn's slots (`OpenEvent.lastSlots`) a turn's
+ * walk past where it now stands.
+ */
+function foldEventYields(h: History, rec: TurnRecord, cat: Catalog): void {
+  if (!Array.isArray(rec.events)) return;
+  let here: GameMap | undefined;
+  for (const e of rec.events) {
+    const [turn, type, cur, start, added] = e;
+    const key = `${turn}:${type}`;
+    const count = num(added);
+    const was = h.eventCounts.get(key);
+    const name = cat.randomEvents?.[type] ?? '';
+    const ground = h.last && h.last.turn < turn ? h.last : rec;
+    const map = ground === rec ? (here ??= recordMap(rec, cat)) : recordMap(ground, cat);
+    // a drought dries its footprint for its turns (`drought`)
+    const dry = ['RANDOM_EVENT_DROUGHT_MAJOR', 'RANDOM_EVENT_DROUGHT_EXTREME'].indexOf(name);
+    if (dry >= 0 && was === undefined && map.tiles[num(cur)]) {
+      const plots = stormFootprint(map, map.tiles[num(cur)], DROUGHT_HEXES).filter((t) => !isWater(t)).map((t) => t.index);
+      h.droughts.push({ turn, sev: dry, plots });
+    }
+    const { slots, exact } = eventSlots(map, name, num(cur), num(start));
+    if (exact) {
+      if (was !== undefined) continue;
+      h.eventCounts.set(key, count);
+      if (!(count > 0) || !slots.length) continue;
+    } else if (was !== undefined && !h.openEvents.some((o) => o.key === key)) continue;
+    let ev = h.openEvents.find((o) => o.key === key);
+    if (!ev) {
+      ev = { key, label: `${strip(name, 'RANDOM_EVENT_')} t${turn}`, slots: new Map(), plots: new Set(), remaining: 0,
+        through: Math.max(rec.turn, exact ? turn : turn + 1),
+        last: exact ? turn : turn + (STORM_EVENTS.find((s) => `RANDOM_EVENT_${s.id}` === name)?.duration ?? 1) - 1, storm: !exact };
+      h.openEvents.push(ev);
+    }
+    if (count > (was ?? 0)) {
+      ev.remaining += count - (was ?? 0);
+      h.eventCounts.set(key, count);
+    } else if (was === undefined) {
+      h.eventCounts.set(key, count);
+    }
+    for (const [i, c] of slots) {
+      const k = `${i}:${EVENT_CHANNELS.indexOf(c)}`;
+      // a storm strikes each plot once (`StormRecord.struck`)
+      if (exact) ev.slots.set(k, (ev.slots.get(k) ?? 0) + 1);
+      else if (!ev.slots.has(k)) ev.slots.set(k, 1);
+      ev.plots.add(i);
+    }
+    if (!exact) {
+      const far = eventSlots(here ??= recordMap(rec, cat), name, num(cur), num(start), STORM_MOVEMENT).slots;
+      ev.lastSlots = new Set(far.map(([i, c]) => `${i}:${EVENT_CHANNELS.indexOf(c)}`));
+    }
+  }
+}
+
+/** A plot's rise this record that no row of the engine's explains, read as
+ *  a random event's draw: [Food, Production, Science, Culture]; `bare`, a
+ *  plot coming out from under an improvement, district or wonder, whose
+ *  rise may hold a draw of any earlier event. */
+interface DrawReading {
+  plot: number;
+  gain: number[];
+  bare: boolean;
+}
+
+/**
+ * Place this record's readings (`DrawReading`) on the open events, exact
+ * events before storms: an event takes the readings on its slots — a bare
+ * reading whenever it comes, any other only through the event's own record
+ * (`OpenEvent.through`) — when together they come to no more draws than it
+ * has left; then each draw it takes lands on its plot
+ * (`History.eventYields`), and the record's columns it was read from are
+ * read back (`History.eventRead`). Readings beyond what is left are no
+ * event's to say which, and are placed nowhere. A storm's last turn strikes
+ * uncounted: a reading on its slots then marks its plot (`History.eventDraws`).
+ * An event whose draws are all placed, a storm past its last turn with none
+ * left, closes. A reading no open event takes lays nothing.
+ */
+function placeEventDraws(h: History, rec: TurnRecord, readings: DrawReading[]): void {
+  const order = [...h.openEvents.filter((o) => !o.storm), ...h.openEvents.filter((o) => o.storm)];
+  for (const ev of order) {
+    const take: [DrawReading, number, number][] = [];
+    let total = 0;
+    for (const r of readings) {
+      if (!r.bare && rec.turn > ev.through) continue;
+      r.gain.forEach((g, c) => {
+        const room = ev.slots.get(`${r.plot}:${c}`) ?? 0;
+        if (g <= 0 || room <= 0) return;
+        const n = Math.min(g, room);
+        take.push([r, c, n]);
+        total += n;
+      });
+    }
+    if (total > 0 && total <= ev.remaining) {
+      for (const [r, c, n] of take) {
+        const acc = h.eventYields.get(r.plot) ?? [0, 0, 0, 0];
+        acc[c] += n;
+        h.eventYields.set(r.plot, acc);
+        r.gain[c] -= n;
+        const k = `${r.plot}:${c}`;
+        ev.slots.set(k, ev.slots.get(k)! - n);
+        if (!h.eventRead.has(r.plot)) h.eventRead.set(r.plot, new Set());
+        h.eventRead.get(r.plot)!.add(EVENT_COLUMNS[c]);
+      }
+      ev.remaining -= total;
+    }
+    if (ev.storm && rec.turn > ev.through && rec.turn <= ev.last) {
+      for (const r of readings) {
+        if (!r.gain.some((g, c) => g > 0 && ev.lastSlots?.has(`${r.plot}:${c}`))) continue;
+        if (!h.eventDraws.has(r.plot)) h.eventDraws.set(r.plot, new Set());
+        h.eventDraws.get(r.plot)!.add(`${ev.label} last turn`);
+      }
+    }
+  }
+  h.openEvents = h.openEvents.filter((o) => o.remaining > 0 || (o.storm && rec.turn < o.last));
 }
 
 /** Fold a record's `greatPeople` into the history (`RecruitedPerson`);
@@ -700,6 +948,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   // plot is the local player's reading.
   const newlyRevealed = new Map<number, Set<string>>();
   foldEvents(h, rec, cat);
+  h.eventRead = new Map();
+  foldEventYields(h, rec, cat);
   // a person spent by this record: a resource it reveals moves its owner's
   // plots this turn
   for (const [ind, p] of foldPeople(h, rec, cat) ? h.people! : []) {
@@ -748,7 +998,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       // a city-state's unit handed to a major is a levy (`Unit.leviedFrom`)
       if (from && minors.has(from.owner) && !minors.has(u.owner)) h.levied.set(`${u.owner}:${u.id}`, from.owner);
-      const cs = from ? 0 : made(u.type, Math.max(0, num(u.formation)));
+      const cs = from || bool(u.embarked) ? 0 : made(u.type, Math.max(0, num(u.formation)));
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
     }
@@ -790,10 +1040,17 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     // built since)
     const dry = (i: number) => !/_(COAST|OCEAN|MOUNTAIN)$/.test(cat.terrains[plotAt(rec, i)[P.terrain] as number] ?? '')
       && plotAt(rec, i)[P.isLake] !== 1;
-    const addEvent = (i: number, f: number, pr: number, sc: number) => {
+    // where the records carry `events`, a reading is placed on the recorded
+    // events (`placeEventDraws`); where they do not, it lands as read
+    const readings: DrawReading[] = [];
+    const addEvent = (i: number, f: number, pr: number, sc: number, bare = false) => {
       if ((!f && !pr && !sc) || !dry(i)) return;
-      const acc = h.eventYields.get(i) ?? [0, 0, 0];
-      h.eventYields.set(i, [acc[0] + f, acc[1] + pr, acc[2] + sc]);
+      if (h.floods !== null) {
+        readings.push({ plot: i, gain: [f, pr, sc, 0], bare });
+        return;
+      }
+      const acc = h.eventYields.get(i) ?? [0, 0, 0, 0];
+      h.eventYields.set(i, [acc[0] + f, acc[1] + pr, acc[2] + sc, acc[3]]);
     };
     // the players whose own rows moved a plot's yields this turn: a pantheon
     // or a government may reach any plot (`moved`); a card pays a plot only
@@ -905,7 +1162,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         const bare = unimproved(rec) && (plotAt(rec, i)[P.district] as number) < 0
           && (plotAt(rec, i)[P.wonder] as number) < 0 && Array.isArray(y1)
           && (res < 0 || !RESOURCES[strip(cat.resources[res] ?? '', 'RESOURCE_')]?.revealTech);
-        const acc = h.eventYields.get(i) ?? [0, 0, 0];
+        const acc = h.eventYields.get(i) ?? [0, 0, 0, 0];
         // the plot stood under a working improvement, a district or a wonder
         // the record before (runs/h1_duelw1112, plot 622: a wonder site from
         // t59, given up at t70 reading 2 Food where its bare reading at t58
@@ -917,10 +1174,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
           const owner = plotAt(rec, i)[P.owner] as number;
           if (b && b.key === bareKey && !(owner >= 0 && moved.has(owner))) {
             const draw = (k: number, a: number) => Math.max(0, y1[k] - b.y[k] - (acc[a] - b.ev[a]));
-            addEvent(i, draw(0, 0), draw(1, 1), draw(3, 2));
+            addEvent(i, draw(0, 0), draw(1, 1), draw(3, 2), true);
           }
         }
-        if (bare) h.bare.set(i, { key: bareKey, y: [...y1], ev: [...(h.eventYields.get(i) ?? [0, 0, 0])] });
+        if (bare) h.bare.set(i, { key: bareKey, y: [...y1], ev: [...(h.eventYields.get(i) ?? [0, 0, 0, 0])] });
         // a building that pays the city's plots, farmed or not, moved the
         // improved plot: it moves the bare reading the same (runs/h1_duelw1108,
         // plot 743: the Rice Farm +1 Food with Wolin's Water Mill at t58); one
@@ -977,6 +1234,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         h.fireProd.set(i, (h.fireProd.get(i) ?? 0) + 1);
       }
     }
+    if (h.floods !== null) placeEventDraws(h, rec, readings);
     // the game era's countdown over each turn since the last record, on
     // this record's player eras (a player's era moves at its turn's end)
     let c = h.eraCountdown;
@@ -1001,9 +1259,14 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const done = (r: TurnRecord, pid: number) => (bitCount(r.players.find((q) => q.id === pid)?.techs)
       + bitCount(r.players.find((q) => q.id === pid)?.civics));
     for (const p of rec.players) {
-      if (bool(p.major) && done(rec, p.id) !== done(h.last, p.id)) {
-        h.discountDistricts.set(p.id, completedSpecialty(h.last, cat, p.id));
+      if (!bool(p.major)) continue;
+      const counts = h.discountDistricts.get(p.id) ?? new Map<DistrictId, number>();
+      h.discountDistricts.set(p.id, counts);
+      if (done(rec, p.id) !== done(h.last, p.id)) {
+        const D = completedSpecialty(h.last, cat, p.id);
+        for (const t of PLACEABLE_DISTRICTS) counts.set(t, D);
       }
+      for (const t of completedSince(h.last, rec, cat, p.id)) counts.set(t, completedSpecialty(rec, cat, p.id));
     }
     // a route gone with its Trader alive ran to its end: its owner holds a
     // Trading Post at both of its cities
@@ -1134,6 +1397,27 @@ function bitCount(bits: string | undefined): number {
   return n;
 }
 
+/** the types of the districts a player completed between two records: one
+ *  complete in `b` that `a` showed in the same city incomplete or not at all */
+function completedSince(a: TurnRecord, b: TurnRecord, cat: Catalog, pid: number): Set<DistrictId> {
+  const was = new Set<string>();
+  const held = new Set<number>();
+  for (const c of a.cities) {
+    if (c.owner !== pid) continue;
+    held.add(c.id);
+    for (const d of c.districts) if (d[3] === true) was.add(`${d[1]},${d[2]}`);
+  }
+  const out = new Set<DistrictId>();
+  for (const c of b.cities) {
+    if (c.owner !== pid || !held.has(c.id)) continue;
+    for (const d of c.districts) {
+      const id = engineRowOf(cat, 'district', d[0] as number) as DistrictId | null;
+      if (id && id !== 'CITY_CENTER' && d[3] === true && !was.has(`${d[1]},${d[2]}`)) out.add(id);
+    }
+  }
+  return out;
+}
+
 /** the specialty districts (`countsTowardLimit`) a player had completed in a record */
 function completedSpecialty(rec: TurnRecord, cat: Catalog, pid: number): number {
   let n = 0;
@@ -1169,11 +1453,31 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   ctx.scopeTile = undefined;
   for (const [i, n] of history?.fireFood ?? []) tiles[i].fertility = n;
   for (const [i, n] of history?.fireProd ?? []) tiles[i].fertilityProd = n;
-  for (const [i, [f, pr, sc]] of history?.eventYields ?? []) {
+  for (const [i, [f, pr, sc, cu]] of history?.eventYields ?? []) {
     tiles[i].fertility += Math.max(0, f);
     tiles[i].fertilityProd += Math.max(0, pr);
     if (sc > 0) tiles[i].fertilitySci = (tiles[i].fertilitySci ?? 0) + sc;
+    if (cu > 0) tiles[i].fertilityCul = (tiles[i].fertilityCul ?? 0) + cu;
   }
+  // the droughts the records placed, each with the turns it has left
+  // (`disasterPhase` takes one off each turn after the drought's)
+  for (const d of history?.droughts ?? []) {
+    const left = DROUGHT_TURNS[d.sev] - (rec.turn - d.turn);
+    if (left > 0) for (const i of d.plots) tiles[i].droughtTurns = Math.max(tiles[i].droughtTurns, left);
+  }
+  // a plot a recorded event may have laid a draw on that no record places
+  for (const ev of history?.openEvents ?? []) {
+    if (ev.remaining <= 0) continue;
+    for (const i of ev.plots) {
+      ctx.scopeTile = i;
+      gap(ctx, 'event-draw', ev.label);
+    }
+  }
+  for (const [i, labels] of history?.eventDraws ?? []) {
+    ctx.scopeTile = i;
+    for (const l of labels) gap(ctx, 'event-draw', l);
+  }
+  ctx.scopeTile = undefined;
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
   for (const t of tiles) {
     t.riverMask = edgeMask(map, rec, t, P.riverBits);
@@ -1304,7 +1608,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // the Settlers in the field
     const settlers = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_SETTLER',
       (n) => UNITS.SETTLER.cost + scaleByGameSpeed(SETTLER_COST_STEP) * n);
-    s.discountDistricts = history?.discountDistricts.get(p.id) ?? completedSpecialty(rec, ctx.cat, p.id);
+    const counts = history?.discountDistricts.get(p.id);
+    s.discountDistricts = PLACEABLE_DISTRICTS.map((t) => counts?.get(t) ?? completedSpecialty(rec, ctx.cat, p.id));
     s.settlersTrained = settlers ?? Math.max(0, rec.cities.filter((c) => c.owner === p.id).length - 1
       + rec.units.filter((u) => u.owner === p.id && ctx.cat.units[u.type] === 'UNIT_SETTLER').length);
     for (const [id, def] of Object.entries(UNITS)) {
@@ -1642,6 +1947,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (col >= 0) projectYieldUnread.set(key, col);
   }
   const readBack = history?.floods ? importFloods(state, history.floods) : importFloodCounts(rec, state, cityByKey.values());
+  // the columns this record's readings placed an event's draws from
+  for (const [i, cols] of history?.eventRead ?? []) readBack.set(i, new Set([...(readBack.get(i) ?? []), ...cols]));
   if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
   if (history) importPower(ctx, rec, state, seatOfGame, history);
   return {
@@ -2401,20 +2708,28 @@ function importQueue(ctx: Ctx, state: GameState, c: DumpCity, city: City): boole
 }
 
 /**
- * The players whose turn start had not run when `b` was read: every city of
- * theirs that `a` saw with food and culture coming in shows both boxes
- * exactly where `a` left them. The next record then carries two turn starts
- * at once, so neither pair is a one-turn step for that player.
+ * The cities, by `${owner}:${id}`, whose own turn start the record pair
+ * missed while their owner's other cities moved. Where both records carry
+ * the turn-start witness (`TurnRecord.starts`): every city of a player whose
+ * start a dump caught begun and not done. Otherwise read off the boxes: the
+ * same size, a food surplus and culture to bank, and neither box moved — the
+ * record caught the turn part way through its owner's cities, and the next
+ * pair banks two turns at once (runs/h1_duelw1108 t148: Rome grows,
+ * Aquileia and Mediolanum hold still, then bank +0.84 / +6.3 on a surplus
+ * of 0.42 / 3.15).
  */
-/** the cities, by `${owner}:${id}`, whose own turn start the record pair
- *  missed while their owner's other cities moved: the same size, a food
- *  surplus and culture to bank, and neither box moved — the record caught the
- *  turn part way through its owner's cities, and the next pair banks two
- *  turns at once (runs/h1_duelw1108 t148: Rome grows, Aquileia and Mediolanum
- *  hold still, then bank +0.84 / +6.3 on a surplus of 0.42 / 3.15) */
 export function citiesNotStarted(a: TurnRecord, b: TurnRecord): Set<string> {
-  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const out = new Set<string>();
+  // the witness names whose start a dump caught part way: begun, not done
+  if (a.starts && b.starts) {
+    const midway = (r: TurnRecord, pid: number) => {
+      const s = r.starts?.[String(pid)];
+      return !!s && s[0] > s[1];
+    };
+    for (const c of b.cities) if (midway(a, c.owner) || midway(b, c.owner)) out.add(`${c.owner}:${c.id}`);
+    return out;
+  }
+  const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   for (const c1 of b.cities) {
     const k = `${c1.owner}:${c1.id}`;
     const c0 = before.get(k);
@@ -2424,7 +2739,21 @@ export function citiesNotStarted(a: TurnRecord, b: TurnRecord): Set<string> {
   return out;
 }
 
+/**
+ * The players whose turn start had not run when `b` was read. Where both
+ * records carry the turn-start witness (`TurnRecord.starts`): no
+ * PlayerTurnStartComplete fired for them between the two reads. Otherwise
+ * read off the boxes: every city of theirs that `a` saw with food and
+ * culture coming in shows both boxes exactly where `a` left them. The next
+ * record then carries two turn starts at once, so neither pair is a
+ * one-turn step for that player.
+ */
 export function notStarted(a: TurnRecord, b: TurnRecord): Set<number> {
+  if (a.starts && b.starts) {
+    const done = (r: TurnRecord, pid: number) => r.starts?.[String(pid)]?.[1] ?? -1;
+    return new Set(b.players.filter((p) => b.cities.some((c) => c.owner === p.id) && done(a, p.id) === done(b, p.id))
+      .map((p) => p.id));
+  }
   const before = new Map(a.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const moving = new Map<number, boolean>();
   for (const c1 of b.cities) {

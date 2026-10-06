@@ -750,10 +750,12 @@ export interface Seat {
   /** the Settlers this seat has TRAINED or BOUGHT — what `settlerCost`'s
    *  progression counts (a starting, captured or granted one moves nothing). */
   settlersTrained?: number;
-  /** the COMPLETED specialty districts the under-represented discount reads
-   *  (`districtDiscounted`): taken when a technology or civic completes, so a
-   *  district finished since moves no price until the next one does. */
-  discountDistricts?: number;
+  /** the COMPLETED specialty districts each district type's price reads for
+   *  the under-represented discount, dense over `PLACEABLE_DISTRICTS`
+   *  (`districtDiscounted`): every type's taken when a technology or civic
+   *  completes, a type's own again when a district of it completes
+   *  (`refreshDistrictDiscount`). */
+  discountDistricts?: number[];
   /** CIV6: a Relic with no open slot is held until one opens, not lost. */
   relicReserve: number;
   /** CIV6 (Warlord's Throne): "Capturing an enemy City grants 20% bonus

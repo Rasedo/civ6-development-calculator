@@ -1,5 +1,6 @@
 import type { CivId, LeaderId } from './seats';
 import { srcConst, xml, type SrcMap } from './provenance';
+import { scaleByGameSpeed } from './constants';
 
 /**
  * THE TURN'S ONE RANDOM EVENT. CIV6 (`RandomEvent_Frequencies`,
@@ -97,7 +98,8 @@ export const RANDOM_EVENT_START_TURN = srcConst('disasters.randomEventStartTurn'
 
 /** DROUGHT_MAJOR / DROUGHT_EXTREME: weights 23 / 5, each counted once; the
  *  footprint is `Hexes` 7 (the first seven `STORM_DISC` slots, the centre and
- *  its ring) and the dry spell lasts `Duration` 5 / 10 turns. */
+ *  its ring) and the dry spell lasts `Duration` 5 / 10 at the game's speed
+ *  (`DROUGHT_TURNS`). */
 const drought = (ev: string, col: string) => xml('RandomEvents', `RandomEventType=RANDOM_EVENT_${ev}`, col);
 export const DROUGHT_WEIGHT = srcConst('disasters.droughtWeight', [23, 5] as const, {
   derived: 'the two drought rows\' OccurrencesPerGame at REALISM_SETTING_MODERATE, MAJOR then EXTREME',
@@ -107,6 +109,12 @@ export const DROUGHT_DURATION = srcConst('disasters.droughtDuration', [5, 10] as
   derived: 'the two drought rows\' RandomEvents.Duration, MAJOR then EXTREME',
   inputs: [drought('DROUGHT_MAJOR', 'Duration'), drought('DROUGHT_EXTREME', 'Duration')],
 });
+/** The turns a drought lies on its plots: its `Duration` at the game's
+ *  speed (GameCore_XP2 0x2922ff: the drought's end turn is the current turn
+ *  plus 0x5254d0(Duration), Duration × CostMultiplier / 100 truncated —
+ *  online 2 and 5, the dry spells of runs/h1_duelw1109 t110 at plot 785
+ *  (t110-111) and runs/h1_duelw1110 t64 at plot 887 (t64-68)). */
+export const DROUGHT_TURNS: readonly number[] = DROUGHT_DURATION.map(scaleByGameSpeed);
 export const DROUGHT_HEXES = srcConst('disasters.droughtHexes', 7, drought('DROUGHT_MAJOR', 'Hexes'));
 export const DROUGHT_CIPD = srcConst('disasters.droughtCipd', [0, 50] as const, {
   derived: 'the two drought rows\' RandomEvents.ChanceIncreasePerDegree, MAJOR then EXTREME',

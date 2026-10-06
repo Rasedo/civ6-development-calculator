@@ -777,7 +777,7 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // CIV6: "A: Clearing Features of this type yields Gold equal to the
   // Production and Food. / B: Features of this type cannot be cleared by any
   // player." (Atomic through Information) The target space is the CLEARABLE
-  // features — the rows carrying a chopYield, in catalog order.
+  // features — the rows carrying a chop, in catalog order.
   { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
   // CIV6 (Expansion2_Congress.xml, ResolutionEffects): WhichEffect 1 (A) is
   // WC_RES_BUILDING_PRODUCTION_BAN, "Ban the production of buildings of this
