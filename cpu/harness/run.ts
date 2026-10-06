@@ -4,6 +4,7 @@
  * roster gaps.
  *
  *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> [--out <report.json>] [--from T] [--to T]
+ *   npx vite-node cpu/harness/run.ts -- <dump.jsonl> --replay <replay.json> [--from T] [--to T]
  *
  * Writes `<dump>.report.json` (or `--out`) and its Markdown digest
  * (`.report.md`): per check the counts (pass, fail, skip by reason, and how
@@ -11,13 +12,16 @@
  * subject failing with the same numbers and the same importer gaps is one row
  * with its first and last turn and its count — and the gap table; and prints
  * the per-check table. A record whose counter moved during its dump is not
- * read.
+ * read. `--replay` runs the action replay instead (`replay.ts`): the engine
+ * free from the first record on the recorded decisions, its report and
+ * Markdown summary written to the named file.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import type { Catalog, TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult } from './checks';
+import { replayMarkdown, runReplay } from './replay';
 
 interface Tally {
   pass: number;
@@ -138,7 +142,18 @@ function markdown(report: ReturnType<typeof runReport>, perCheck = 5): string {
 function main() {
   const { pos, opt } = args(process.argv.slice(2));
   const dump = pos[0];
-  if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file] [--from T] [--to T]');
+  if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
+  if (opt.replay) {
+    const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined });
+    writeFileSync(opt.replay, JSON.stringify(r, null, 1) + '\n');
+    writeFileSync(opt.replay.replace(/\.json$/, '.md'), replayMarkdown(r));
+    console.log(`replay (${r.source}): ${r.perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${opt.replay}`);
+    console.log('subsystem'.padEnd(28), 'held'.padStart(5), 'matched'.padStart(8), ' first');
+    for (const [k, s] of Object.entries(r.subsystems)) {
+      console.log(k.padEnd(28), String(s.held).padStart(5), `${s.matched}/${s.compared}`.padStart(8), ' ', s.first ? `t${s.first.turn} ${s.first.subject}` : '-');
+    }
+    return;
+  }
   const report = runReport(dump, opt.from ? Number(opt.from) : -Infinity, opt.to ? Number(opt.to) : Infinity);
   const out = opt.out ?? dump.replace(/\.jsonl$/, '.report.json');
   writeFileSync(out, JSON.stringify(report, null, 1) + '\n');
