@@ -14,7 +14,7 @@
  */
 
 import type { DistrictId, GreatPersonClass, ImprovementId } from '../core/types';
-import { type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export type BoostCheck =
   | { kind: 'building'; id: string; count: number }
@@ -146,3 +146,19 @@ const BOOST_SRC: SrcMap = {
 export const BOOSTS: Record<string, BoostDef> = Object.fromEntries(
   Object.entries(RAW_BOOSTS).map(([k, v]) => [k, { ...v, src: BOOST_SRC }]),
 );
+
+/** The technologies and civics that carry no `Boosts` row in the install —
+ *  the rows the random boost pickers never offer (the DLL's 0x4ca470 /
+ *  0x4caa50 and their civic twins pool only boostable rows). */
+const BOOSTLESS_TECHS = ['POTTERY', 'ANIMAL_HUSBANDRY', 'MINING', 'FUTURE_TECH'] as const;
+const BOOSTLESS_CIVICS = [
+  'CODE_OF_LAWS', 'IDEOLOGY', 'FUTURE_CIVIC', 'GLOBAL_WARMING_MITIGATION', 'SMART_POWER_DOCTRINE',
+  'INFORMATION_WARFARE', 'EXODUS_IMPERATIVE', 'CULTURAL_HEGEMONY',
+] as const;
+export const BOOSTLESS: ReadonlySet<string> = new Set(srcConst('boosts.boostless', [...BOOSTLESS_TECHS, ...BOOSTLESS_CIVICS], {
+  derived: 'the Technologies and Civics rows the layered Boosts table names none of',
+  inputs: [
+    ...BOOSTLESS_TECHS.map((t) => xml('Boosts', `TechnologyType=TECH_${t}`, 'BoostID', { absent: true })),
+    ...BOOSTLESS_CIVICS.map((c) => xml('Boosts', `CivicType=CIVIC_${c}`, 'BoostID', { absent: true })),
+  ],
+}));

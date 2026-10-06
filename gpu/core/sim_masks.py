@@ -243,11 +243,6 @@ class SimMasks:
         self.rng_state.copy_(torch.where(mask, stepped, self.rng_state))
         return stepped
 
-    def _next_random(self, mask: torch.Tensor) -> torch.Tensor:
-        """One step read as a fraction of 2^32: [B] f64 in [0, 1); the stream
-        moves only in the games of `mask`. TS `nextRandom` is the twin."""
-        return self._lcg_step(mask).to(torch.float64) / 4294967296.0
-
     def _rand_range(self, mask: torch.Tensor, mx: torch.Tensor | int) -> torch.Tensor:
         """The game's draw in [0, max): the new state's top 16 bits times max
         read as 16 bits, over 2^16 ([B] int64). TS `randRange` is the

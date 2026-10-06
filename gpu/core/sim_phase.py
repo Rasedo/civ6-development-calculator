@@ -721,20 +721,18 @@ class SimPhase:
         self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
 
     def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
-        """[B] long — `freeCityGrantType` in the games of `due`: ONE draw over
-        `_free_grant_w` among the classes the world era has a chassis for, in
-        table order — `pick` in [0, their weights' sum) names the first class
-        whose running sum exceeds it — and that class's chassis of the era;
-        -1 outside `due`. The draw is taken whether or not a tile is free."""
+        """[B] long — `freeCityGrantType` in the games of `due`: ONE weighted
+        pick ("Free Cities Unit Choice") over `_free_grant_w` among the
+        classes the world era has a chassis for, in table order, and that
+        class's chassis of the era; -1 outside `due`. The draw is taken
+        whether or not a tile is free."""
         era = self._world_era().clamp(min=0, max=self._free_grant_units.shape[1] - 1)
         units = self._free_grant_units[:, era].t()  # [B, classes]
         w = torch.tensor(self._free_grant_w, dtype=torch.long, device=self.device).unsqueeze(0)
         w = torch.where(units >= 0, w, torch.zeros_like(w))
         total = w.sum(dim=1)
         draw = due & (total > 0)
-        r = self._next_random(draw)
-        pick = torch.floor(r * total.to(torch.float64)).to(torch.long)
-        k = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=units.shape[1] - 1)
+        k = self._rand_weighted(draw, w).clamp(min=0)
         got = units.gather(1, k.unsqueeze(1)).squeeze(1)
         return torch.where(draw, got, torch.full_like(got, -1))
 
@@ -1532,6 +1530,8 @@ class SimPhase:
                 wi = (cur - self.WONDER_BASE).clamp(min=0)
                 wt = self.city_wonder[bidx, row, col, :][wr, wi[wr]]
                 self.built_wonder_complete[wr, wt.clamp(min=0)] = True
+                # the plots the completion annexes, before the grants
+                self._wonder_free_tiles(row, col, made_w)
                 # `wonderMoment`: GAME_ERA when the wonder's era is the game
                 # era or later, else PAST_ERA
                 _wcur = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -2754,21 +2754,18 @@ class SimPhase:
     def _seat_pantheon_race(self, row: int, active: torch.Tensor) -> None:
         """The PANTHEON RACE for ONE seat row, at the loop position right
         after the GP race. The pick's IDENTITY matters: the effects apply to
-        this seat. The draw takes the k-th OPEN id in data order —
-        open[floor(rand * open.length)], the open list filtering the claimed
-        pool. The pantheon costs pantheonFaithCost from this seat's own faith
-        (deducted only when a pick lands). The draw advances only where its
-        own open-mask fires, so the RNG stream stays aligned with the TS block
-        turn by turn. A religion's own beliefs are the record's BELIEF arm
-        (`_apply_beliefs`)."""
+        this seat. ONE integer draw over the open pool takes the k-th OPEN id
+        in data order (TS `open[randRange(open.length)]`). The pantheon costs
+        pantheonFaithCost from this seat's own faith (deducted only when a
+        pick lands). The draw advances only where its own open-mask fires, so
+        the RNG stream stays aligned with the TS block turn by turn. A
+        religion's own beliefs are the record's BELIEF arm (`_apply_beliefs`)."""
         rr = self.rules.seats
         pfc = float(rr["pantheonFaithCost"])
         pdue = active & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc)
         popen = pdue & (self.pantheon_claimed_n < rr["pantheonPool"])
-        rp_ = self._next_random(popen)
+        k = self._rand_range(popen, int(rr["pantheonPool"]) - self.pantheon_claimed_n)
         if bool(popen.count_nonzero()) and self._bel_any:
-            n_open = (~self.pan_claimed).sum(dim=1)
-            k = torch.floor(rp_ * n_open.to(torch.float64)).to(torch.long)
             cum = (~self.pan_claimed).long().cumsum(dim=1)
             sel = (~self.pan_claimed) & (cum == (k + 1).unsqueeze(1))
             pid = sel.long().argmax(dim=1)

@@ -167,6 +167,8 @@ export interface DumpCity {
   queue: Read<DumpQueueEntry>[];
   /** the production each queue entry has banked, parallel to `queue` */
   queueProgress?: Read<number>[];
+  /** the city's production a turn */
+  productionYield?: Read<number>;
 }
 
 /** One build-queue entry: the row index of what it builds (one of the four

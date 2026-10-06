@@ -255,6 +255,7 @@ class Rules:
     amenity_pop_per: int  # CITY_POP_PER_AMENITY — the need is ceil(pop / this)
     city_growth: tuple  # (CITY_GROWTH_THRESHOLD, _MULTIPLIER, _EXPONENT) — `_growth_needed`
     culture_cost: tuple  # (CULTURE_COST_FIRST_PLOT, _LATER_PLOT_MULTIPLIER, _LATER_PLOT_EXPONENT) — `_border_cost`
+    wonder_free_tiles: int  # WONDER_FREE_TILES_UPON_COMPLETION — `_wonder_free_tiles`
     plot_influence: dict  # borderPlotCost's PLOT_INFLUENCE_* terms — `_seat_border_key`
     progress: dict  # {techCount, civicCount, speedPct} — `_progress_pct` / `_progress_cost`
     lump: dict  # {escalation, improvedDegradation, pillagedDegradation, chopRows} — `_lump_value`
@@ -500,6 +501,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         amenity_pop_per=int(r["amenityPopPer"]),
         city_growth=tuple(float(x) for x in r["cityGrowth"]),
         culture_cost=tuple(float(x) for x in r["cultureCost"]),
+        wonder_free_tiles=int(r["wonderFreeTiles"]),
         plot_influence={k: int(v) for k, v in r["plotInfluence"].items()},
         progress=r["progress"],
         lump=r["lump"],

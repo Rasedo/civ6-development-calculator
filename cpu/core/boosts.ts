@@ -4,10 +4,12 @@ import { seatOf, citiesOf, tileSeat, allianceLevelWith } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState, Seat } from './types';
 import { isExplored } from './fog';
-import { BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
+import { BOOSTLESS, BOOSTS, BOOST_FRACTION, type BoostCheck } from '../data/boosts';
 import { getModifiers, slottedPolicyIndices } from './effects';
 import { DISTRICTS } from '../data/districts';
-import { TECHS } from '../data/techs';
+import { ERAS, TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { randRange } from './rand';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, naturalWonderAt } from '../../world/query';
 
@@ -145,4 +147,39 @@ export function toggleBoost(state: GameState, id: string, seat: number): void {
   const i = seatOf(state, seat)!.research.boosted.indexOf(id);
   if (i >= 0) seatOf(state, seat)!.research.boosted.splice(i, 1);
   else seatOf(state, seat)!.research.boosted.push(id);
+}
+
+/**
+ * THE RANDOM BOOST PICKERS' POOL (the DLL's 0x4caa50 for techs, 0x39c930
+ * for civics: "Choosing random tech / civic boost to grant based on era,
+ * Player: n"): the rows of the eras `lo`..`hi` that carry a `Boosts` row
+ * (`BOOSTLESS`), neither held nor boosted — era by era, each era's rows in
+ * the catalog's order —, each weight 1.
+ */
+export function boostPool(rsr: ResearchState, kind: 'tech' | 'civic', lo: number, hi: number): string[] {
+  const rows = kind === 'tech' ? Object.values(TECHS) : Object.values(CIVICS);
+  const held = kind === 'tech' ? rsr.techs : rsr.civics;
+  const out: string[] = [];
+  for (let e = Math.max(0, lo); e <= hi && e < ERAS.length; e++) {
+    for (const d of rows) {
+      if (ERAS.indexOf(d.era) === e && !BOOSTLESS.has(d.id) && !held.includes(d.id) && !rsr.boosted.includes(d.id)) out.push(d.id);
+    }
+  }
+  return out;
+}
+
+/** The goody hut's and the era-less grants' era (the DLL's 0x4ca470 /
+ *  0x39c330, "Choosing random tech / civic boost to grant based on era"): the
+ *  earliest era holding a row `boostPool` would offer; -1 with none. */
+export function earliestBoostEra(rsr: ResearchState, kind: 'tech' | 'civic'): number {
+  for (let e = 0; e < ERAS.length; e++) if (boostPool(rsr, kind, e, e).length > 0) return e;
+  return -1;
+}
+
+/** `n` draws over `pool`, each removing its pick, the picks boosted; the
+ *  count drawn (none from an empty pool). */
+export function drawBoosts(state: GameState, rsr: ResearchState, pool: string[], n: number): number {
+  let k = 0;
+  for (; k < n && pool.length > 0; k++) rsr.boosted.push(pool.splice(randRange(state, pool.length), 1)[0]);
+  return k;
 }

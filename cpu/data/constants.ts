@@ -18,6 +18,11 @@ export const CITY_WORK_RADIUS = srcConst('seats.workRadius', 3,
 export const BORDER_MAX_RADIUS = srcConst('constants.BORDER_MAX_RADIUS', 5,
   gp('PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE'));
 
+/** The plots a city annexes when a wonder completes in it, one border pick
+ *  each (the DLL's building completion 0x17f870 -> 0x1a8a30). */
+export const WONDER_FREE_TILES = srcConst('constants.WONDER_FREE_TILES', 2,
+  gp('WONDER_FREE_TILES_UPON_COMPLETION'));
+
 /** The terms of a plot's culture-claim COST (`borderPlotCost`): the
  * `PLOT_INFLUENCE_*` GlobalParameters the DLL's GetNextBuyablePlot scorer
  * reads. The lowest cost is claimed. */

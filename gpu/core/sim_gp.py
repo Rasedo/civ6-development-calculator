@@ -614,32 +614,18 @@ class SimGp:
 
     def _gp_boost_draw(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,
                        era: torch.Tensor, is_civic: bool) -> None:
-        """N eurekas (or inspirations) drawn over the eras `era + lo`..`+ hi`,
-        in the catalog order the TS filter walks. A row with nothing open
-        spends none of the stream."""
+        """N eurekas (or inspirations) over the eras `era + lo`..`+ hi`: the
+        era-range picker (`_boost_pool`, `_draw_boosts`; TS `boostRandom`). A
+        row with nothing open spends none of the stream."""
         n = self._gp_fx(cls, at, "inspirationRandom" if is_civic else "eurekaRandom").long() * m.long()
         if not bool((n > 0).count_nonzero()):
             return
         lo = era + self._gp_fx(cls, at, "eurekaLo").long()
         hi = era + self._gp_fx(cls, at, "eurekaHi").long()
-        eras = self._civic_era if is_civic else self._tech_era
-        done = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
-        boosted = self.civ_civic_boosted[:, row] if is_civic else self.civ_tech_boosted[:, row]
-        nk = min(done.shape[1], boosted.shape[1], eras.numel())
-        band = (eras[:nk].reshape(1, -1) >= lo.reshape(-1, 1)) & (eras[:nk].reshape(1, -1) <= hi.reshape(-1, 1))
+        got = self._draw_boosts(row, is_civic, self._boost_pool(row, is_civic, lo, hi), n)
         for k in range(int(n.max())):
-            want = n > k
-            if not bool(want.count_nonzero()):
-                continue
-            openm = band & ~done[:, :nk] & ~boosted[:, :nk]
-            hit = want & openm.any(dim=1)
-            if not bool(hit.count_nonzero()):
-                continue
-            pick = self._pick_live(hit, openm)[1]
-            r = hit.nonzero(as_tuple=True)[0]
-            boosted[r, pick[r]] = True
             self._dedication_event(
-                row, self._ded_pen_brush if is_civic else self._ded_free_inquiry, hit.long())
+                row, self._ded_pen_brush if is_civic else self._ded_free_inquiry, (got > k).long())
 
     # ---------------------------------------------------------------- the city
     def _gp_instant_buildings(self, row: int, m: torch.Tensor, cls: torch.Tensor,

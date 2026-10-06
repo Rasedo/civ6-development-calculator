@@ -14,6 +14,7 @@ import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
+import { boostPool, drawBoosts } from './boosts';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
@@ -24,7 +25,6 @@ import { GWO_ARTIFACT, GWO_RELIC, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
-import { CIVICS } from '../data/civics';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { scaleByGameSpeed } from '../data/constants';
 import { isSpaceProject } from '../data/projects';
@@ -184,40 +184,30 @@ export function districtTilesOfOwner(state: GameState, tile: Tile): number[] {
   return [...tiles].sort((a, b) => a - b);
 }
 
-/** one eureka/inspiration draw over the eras `lo`..`hi`, in the catalog order
- *  both engines walk. The stream advances only when something was open. */
+/** `n` eurekas / inspirations over the eras `lo`..`hi`: the DLL's era-range
+ *  picker (`boostPool`), each draw removing its pick. The stream advances only
+ *  while something is open. */
 export function boostRandom(
   state: GameState, seat: number, kind: 'tech' | 'civic', n: number, lo: number, hi: number,
 ): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
-  const rsr = owner.research;
-  for (let i = 0; i < n; i++) {
-    const rows = kind === 'tech' ? Object.values(TECHS) : Object.values(CIVICS);
-    const held = kind === 'tech' ? rsr.techs : rsr.civics;
-    const pool = rows.filter((d) => {
-      const e = ERAS.indexOf(d.era);
-      return e >= lo && e <= hi && !held.includes(d.id) && !rsr.boosted.includes(d.id);
-    });
-    if (pool.length === 0) return; // nothing open — the stream is not spent
-    const pick = pool[randRange(state, pool.length)];
-    rsr.boosted.push(pick.id);
-    dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
-  }
+  const k = drawBoosts(state, owner.research, boostPool(owner.research, kind, lo, hi), n);
+  for (let i = 0; i < k; i++) dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
 }
 
-/** N technologies COMPLETED outright, drawn over what is available — the
- *  `grantFreeResearch` draw, reached from an ability instead of a wonder. */
+/** N technologies COMPLETED outright — the free-tech picker
+ *  (`grantFreeResearch`'s), reached from an ability instead of a wonder: ONE
+ *  pool of what is researchable now, each draw removing its pick. */
 function freeTechs(state: GameState, seat: number, n: number): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
   const rsr = owner.research;
-  for (let i = 0; i < n; i++) {
-    const open = Object.values(TECHS).filter(
-      (d) => !rsr.techs.includes(d.id) && d.prereqs.every((p) => rsr.techs.includes(p)),
-    );
-    if (open.length === 0) return;
-    const pick = open[randRange(state, open.length)];
+  const open = Object.values(TECHS).filter(
+    (d) => !rsr.techs.includes(d.id) && d.prereqs.every((p) => rsr.techs.includes(p)),
+  );
+  for (let i = 0; i < n && open.length > 0; i++) {
+    const pick = open.splice(randRange(state, open.length), 1)[0];
     if (pick.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     rsr.techs.push(pick.id);
     delete rsr.techRetained[pick.id];

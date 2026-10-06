@@ -42,7 +42,7 @@ function stormFree(state: GameState, watched: Tile[]): boolean {
 import { neighborTile, neighbors } from '../../../world/hex';
 import type { GameState, Tile } from '../../../cpu/core/types';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
-import { nextRandom } from '../../../cpu/core/rand';
+import { randRange } from '../../../cpu/core/rand';
 import { tileYields } from '../../../cpu/core/yields';
 import { generateMap } from '../../../world/mapgen';
 
@@ -414,7 +414,7 @@ describe('the flood\'s row walk', () => {
     const probe = { rngState: before } as GameState;
     let n = 0;
     while (probe.rngState !== state.rngState && n < 10000) {
-      nextRandom(probe);
+      randRange(probe, 1);
       n++;
     }
     return n;
@@ -974,7 +974,7 @@ describe('the nuclear accident', () => {
       fn();
       for (let n = 0; n < 32; n++) {
         if (probe.rngState === state.rngState) return n;
-        nextRandom(probe);
+        randRange(probe, 1);
       }
       throw new Error('more than 32 draws');
     };
@@ -1211,9 +1211,9 @@ describe('the eruption on owned and unowned ground', () => {
     };
     const none = run([]);
     const probe = { rngState: none } as GameState;
-    nextRandom(probe);
+    randRange(probe, 1);
     expect(run(['WARRIOR'])).toBe(probe.rngState);
-    nextRandom(probe);
+    randRange(probe, 1);
     expect(run(['WARRIOR', 'BATTERING_RAM'])).toBe(probe.rngState);
     // a civilian draws no damage
     expect(run(['BUILDER'])).toBe(none);

@@ -4645,35 +4645,31 @@ class SimSeats:
         return out | self._eng_finish_at(row)
 
     def _promo_offer_draw(self, landed: torch.Tensor, slot: torch.Tensor) -> None:
-        """`drawPromoOffer` — CIV6 (Apostle, Spy, Rock Band): "three
-        promotions randomly chosen from the pool", `_promo_offer_n` DISTINCT
-        UNHELD columns of the unit's own class list drawn without replacement,
-        so the stream is exactly that many numbers however the picks land. The
-        offer IS a level to spend: the unit leaves armed with its next
-        level's XP. `landed` [B] names the games, `slot` [B] the unit."""
+        """`drawPromoOffer` — CIV6 (Apostle, Spy, Rock Band: NumRandomChoices
+        3), the DLL's level offer 0x4f23a0: every row of the unit's class
+        drawn out of a weight-1 vector ("Random Promotion", one draw over what
+        is left, the drawn row removed) — a full shuffle, as many draws as
+        rows — and the first `_promo_offer_n` drawn make the offer (the rows'
+        one shared Level keeps the order), a held row among them. The offer IS
+        a level to spend: the unit leaves armed with its next level's XP.
+        `landed` [B] names the games, `slot` [B] the unit."""
         if not bool(landed.count_nonzero()):
             return
         rd = self.rules_dev
         ar = torch.arange(self.B, device=self.device)
         sl = slot.clamp(min=0)
         cls = rd.u_promo_class[self.unit_type[ar, sl].clamp(min=0, max=self.NU - 1)]
-        n = torch.where(cls >= 0, rd.promo_rows[cls.clamp(min=0)], torch.zeros_like(cls))
-        held = self.unit_promos[ar, sl]
-        avail = n - self._promo_count(held)
+        n = torch.where(landed & (cls >= 0), rd.promo_rows[cls.clamp(min=0)], torch.zeros_like(cls))
         ncol = int(rd.promo_cols)
+        left = torch.arange(ncol, device=self.device).unsqueeze(0) < n.unsqueeze(1)
         offer = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        for jd in range(self._promo_offer_n):
-            draw = landed & (jd < avail)
-            if not bool(draw.count_nonzero()):
-                break
-            pick = (self._next_random(draw) * (avail - jd)).floor().long()
-            done = torch.zeros_like(draw)
-            for k in range(ncol):
-                free_k = ((((offer | held) >> k) & 1) == 0) & (k < n)
-                take = draw & ~done & free_k & (pick == 0)
-                offer = torch.where(take, offer | (1 << k), offer)
-                done = done | take
-                pick = torch.where(draw & ~done & free_k, pick - 1, pick)
+        for jd in range(int(n.max())):
+            draw = landed & (jd < n)
+            v = self._rand_range(draw, n - jd)
+            pick = left & ((left.long().cumsum(dim=1) - 1) == v.unsqueeze(1)) & draw.unsqueeze(1)
+            left = left & ~pick
+            if jd < self._promo_offer_n:
+                offer = offer | (pick.long() << torch.arange(ncol, device=self.device).unsqueeze(0)).sum(dim=1)
         rows = landed.nonzero(as_tuple=True)[0]
         self.unit_promo_offer[rows, sl[rows]] = offer[rows]
         self.unit_xp[rows, sl[rows]] = self._xp_to_next(self.unit_level[rows, sl[rows]])
@@ -5975,35 +5971,44 @@ class SimSeats:
         return fires, res0, res1, fires & (world_era >= self._congress_dv_min)
 
     def _congress_draw_slate(self, fires: torch.Tensor) -> None:
-        """ANNOUNCE a session's slate: CIV6 — the slate is a random draw
-        among the era-eligible resolutions, two distinct (one when only one
-        is eligible, none when none is). Era-eligibility is read AT THE
-        ANNOUNCEMENT; the session later runs what was announced. Each draw
-        advances the stream only where its pool is non-empty, in step with
-        the TS `congressSession` draw block."""
+        """ANNOUNCE a session's slate — TS `congressSession`'s draw, the DLL's
+        session setup 0x598270: over the era-eligible resolutions (read AT
+        THE ANNOUNCEMENT), min(3, eligible) draws each over what is left and
+        removing its pick; with three drawn, the first two the previous slate
+        did not hold stand (fewer when it held more), else every one drawn;
+        then one draw over the lone InjectionOnly row in its era (the
+        Diplomatic Victory resolution from Modern)."""
         NR = len(self._congress_res)
         if NR == 0 or not bool(fires.count_nonzero()):
             return
-        neg2 = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        B, dev = self.B, self.device
         world_era = self._world_era()
         elig = torch.stack([
             (world_era >= r["min"]) & (world_era <= r["max"]) for r in self._congress_res
         ], dim=1) & fires.unsqueeze(1)  # [B, NR]
         E = elig.long().sum(dim=1)
-        r0 = self._next_random(fires & (E > 0))
-        k0 = torch.floor(r0 * E.to(torch.float64)).to(torch.long)
-        sel0 = elig & (elig.long().cumsum(dim=1) == (k0 + 1).unsqueeze(1))
-        p0 = sel0.long().argmax(dim=1)
-        self.congress_slate[:, 0] = torch.where(
-            fires, torch.where(E > 0, p0, neg2), self.congress_slate[:, 0])
-        elig1 = elig & ~sel0
-        E1 = elig1.long().sum(dim=1)
-        r1 = self._next_random(fires & (E1 > 0))
-        k1 = torch.floor(r1 * E1.to(torch.float64)).to(torch.long)
-        sel1 = elig1 & (elig1.long().cumsum(dim=1) == (k1 + 1).unsqueeze(1))
-        p1 = sel1.long().argmax(dim=1)
-        self.congress_slate[:, 1] = torch.where(
-            fires, torch.where(E1 > 0, p1, neg2.clone()), self.congress_slate[:, 1])
+        want = E.clamp(max=2)
+        ndraw = torch.minimum(want + 1, E)
+        before = self.congress_slate.clone()
+        left = elig.clone()
+        drawn = torch.full((B, 3), -1, dtype=torch.long, device=dev)
+        for j in range(3):
+            d = fires & (j < ndraw)
+            if not bool(d.count_nonzero()):
+                break
+            v = self._rand_range(d, E - j)
+            pick = left & ((left.long().cumsum(dim=1) - 1) == v.unsqueeze(1)) & d.unsqueeze(1)
+            drawn[:, j] = torch.where(d, pick.long().argmax(dim=1), drawn[:, j])
+            left = left & ~pick
+        repeat = (drawn.unsqueeze(2) == before.unsqueeze(1)).any(dim=2) & (ndraw > want).unsqueeze(1)
+        keep = (drawn >= 0) & ~repeat
+        rank = keep.long().cumsum(dim=1)
+        for s in range(2):
+            at = keep & (rank == s + 1)
+            got = drawn.gather(1, at.long().argmax(dim=1, keepdim=True)).squeeze(1)
+            self.congress_slate[:, s] = torch.where(
+                fires, torch.where(at.any(dim=1), got, torch.full_like(got, -1)), self.congress_slate[:, s])
+        self._rand_range(fires & (world_era >= self._congress_dv_min), 1)
 
     def _world_congress(self) -> None:
         """The `worldCongress`/`congressSession` mirror — one Regular Session
@@ -6804,15 +6809,16 @@ class SimSeats:
         elif pay == ch["faith"]:
             self.civ_faith[b, srow] += amt
         elif pay in (ch["civicBoost"], ch["techBoost"]):
+            # the DLL's 0x4ca470 / 0x39c330: the boostable rows of the
+            # EARLIEST era holding one (TS `earliestBoostEra`, `boostPool`)
             civic = pay == ch["civicBoost"]
-            held = self.civ_civics[b, srow] if civic else self.civ_techs[b, srow]
-            bst = self.civ_civic_boosted[b, srow] if civic else self.civ_tech_boosted[b, srow]
-            k = min(held.shape[0], bst.shape[0])
-            for col in self._goody_pool_draw(one, b, (~held[:k] & ~bst[:k]), amt):
-                if civic:
-                    self.civ_civic_boosted[b, srow, col] = True
-                else:
-                    self.civ_tech_boosted[b, srow, col] = True
+            n_era = int((self._civic_era if civic else self._tech_era).max()) + 1
+            for e in range(n_era):
+                et = torch.full((self.B,), e, dtype=torch.long, device=self.device)
+                pool = self._boost_pool(srow, civic, et, et) & one.unsqueeze(1)
+                if bool(pool[b].any()):
+                    self._draw_boosts(srow, civic, pool, one.long() * amt)
+                    break
         elif pay == ch["tech"]:
             held = self.civ_techs[b, srow]
             for col in self._goody_pool_draw(one, b, ~held, amt):
@@ -6923,38 +6929,50 @@ class SimSeats:
         b = self.tile_continent.gather(1, to_tile.clamp(min=0).reshape(self.B, -1)).reshape(to_tile.shape)
         return (from_tile >= 0) & (to_tile >= 0) & (a >= 0) & (b >= 0) & (a != b)
 
-    def _draw_era_boost(self, row: int, m: torch.Tensor, era: torch.Tensor,
-                        n: torch.Tensor, era_of: torch.Tensor,
-                        held: torch.Tensor, boosted: torch.Tensor) -> None:
-        """One kind's half of `grantEraBoosts`: `n` draws per game from the
-        UNEARNED rows of `era`. A game whose pool is empty takes NO draw at
-        all — TS returns out of its loop there, so the rng must not move for
-        it either, which is what masking `_rand_range` gives."""
-        if not bool(m.count_nonzero()) or int(n.max()) <= 0:
-            return
-        k = min(era_of.numel(), held.shape[2], boosted.shape[2])
+    def _boost_pool(self, row: int, is_civic: bool, lo: torch.Tensor, hi: torch.Tensor) -> torch.Tensor:
+        """[B, k] bool — `boostPool`'s twin (the DLL's era boost pickers): the
+        rows of the eras `lo`..`hi` [B] carrying a `Boosts` row, neither held
+        nor boosted by row `row`."""
+        era_of = self._civic_era if is_civic else self._tech_era
+        able = self._civic_boostable if is_civic else self._tech_boostable
+        held = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
+        boosted = self.civ_civic_boosted[:, row] if is_civic else self.civ_tech_boosted[:, row]
+        k = min(era_of.numel(), able.numel(), held.shape[1], boosted.shape[1])
+        e = era_of[:k].reshape(1, -1)
+        return ((e >= lo.reshape(-1, 1)) & (e <= hi.reshape(-1, 1)) & able[:k].reshape(1, -1)
+                & ~held[:, :k] & ~boosted[:, :k])
+
+    def _draw_boosts(self, row: int, is_civic: bool, pool: torch.Tensor, n: torch.Tensor) -> torch.Tensor:
+        """`drawBoosts`'s twin: `n` [B] draws over `pool` [B, k] in the pool's
+        order — era by era, each era's rows in column order —, each removing
+        its pick, the picks boosted. Returns the draws taken [B]; a game with
+        nothing left takes none."""
+        drawn = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        if int(n.max()) <= 0 or not bool(pool.any()):
+            return drawn
+        k = pool.shape[1]
+        era_of = (self._civic_era if is_civic else self._tech_era)[:k]
+        perm = torch.argsort(era_of * k + torch.arange(k, device=self.device), stable=True)
+        live = pool[:, perm].clone()
+        boosted = self.civ_civic_boosted if is_civic else self.civ_tech_boosted
         for i in range(int(n.max())):
-            want = m & (n > i)
+            want = (n > i) & live.any(dim=1)
             if not bool(want.count_nonzero()):
                 break
-            open_ = ((era_of[:k].reshape(1, -1) == era.reshape(-1, 1))
-                     & ~held[:, row, :k] & ~boosted[:, row, :k])
-            cnt = open_.sum(dim=1)
-            want = want & (cnt > 0)          # "if available" — no pool, no draw
-            if not bool(want.count_nonzero()):
-                break
-            pick = self._rand_range(want, cnt)
-            # the pick-th OPEN column, in ascending index — TS indexes its
-            # filtered array the same way
-            rank = open_.long().cumsum(dim=1) - 1
-            hit = open_ & (rank == pick.reshape(-1, 1)) & want.reshape(-1, 1)
-            boosted[:, row, :k] |= hit
+            pick = self._rand_range(want, live.sum(dim=1))
+            hit = live & ((live.long().cumsum(dim=1) - 1) == pick.unsqueeze(1)) & want.unsqueeze(1)
+            live = live & ~hit
+            col = perm[hit.long().argmax(dim=1)]
+            r = want.nonzero(as_tuple=True)[0]
+            boosted[r, row, col[r]] = True
+            drawn = drawn + want.long()
+        return drawn
 
     def _grant_era_boosts(self, row: int, m: torch.Tensor, era: torch.Tensor) -> None:
         """CIV6 (Dynastic Cycle): "When completing a wonder receive a random
         Eureka and Inspiration from the era of the wonder, if available."
-        `grantEraBoosts`'s twin — TECHS first, then CIVICS, because both
-        engines replay one rng stream."""
+        `grantEraBoosts`'s twin — the picker over the wonder's era alone,
+        TECHS first, then CIVICS."""
         if not self._wonder_era_boost_rows:
             return
         t_n = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -6963,8 +6981,8 @@ class SimSeats:
             w = self._row_is(row, _c, _l).long()
             t_n = t_n + w * int(_t)
             c_n = c_n + w * int(_v)
-        self._draw_era_boost(row, m, era, t_n, self._tech_era, self.civ_techs, self.civ_tech_boosted)
-        self._draw_era_boost(row, m, era, c_n, self._civic_era, self.civ_civics, self.civ_civic_boosted)
+        self._draw_boosts(row, False, self._boost_pool(row, False, era, era), t_n * m.long())
+        self._draw_boosts(row, True, self._boost_pool(row, True, era, era), c_n * m.long())
 
     def _wonder_tourism_pct(self, row: int) -> torch.Tensor:
         """[B] long — the percentage this row adds to the WONDER half of its
@@ -7418,24 +7436,16 @@ class SimSeats:
 
     def _boost_random_civics(self, row: int, hit: torch.Tensor, n: int,
                              lo: int, hi: int) -> None:
-        """`boostRandom(kind='civic')` — N inspirations drawn over the eras
-        `lo`..`hi` inclusive, in the catalog order the TS filter walks. A row
-        with nothing open spends NONE of the stream, as TS returns first."""
+        """`boostRandom(kind='civic')` — N inspirations over the eras
+        `lo`..`hi` inclusive: the era-range picker (`_boost_pool`,
+        `_draw_boosts`). A row with nothing open spends NONE of the stream."""
         if n <= 0 or lo < 0 or hi < lo or not bool(hit.count_nonzero()):
             return
-        done_c = self.civ_civics[:, row]
-        boosted = self.civ_civic_boosted[:, row]
-        nk = min(done_c.shape[1], boosted.shape[1], self._civic_era.numel())
-        band = ((self._civic_era[:nk] >= lo) & (self._civic_era[:nk] <= hi)).reshape(1, -1)
-        for _ in range(n):
-            openm = band & ~done_c[:, :nk] & ~boosted[:, :nk]
-            want = hit & openm.any(dim=1)
-            if not bool(want.count_nonzero()):
-                return
-            pick = self._pick_live(want, openm)[1]
-            r = want.nonzero(as_tuple=True)[0]
-            boosted[r, pick[r]] = True
-            self._dedication_event(row, self._ded_pen_brush, want.long())
+        lo_t = torch.full((self.B,), lo, dtype=torch.long, device=self.device)
+        hi_t = torch.full((self.B,), hi, dtype=torch.long, device=self.device)
+        got = self._draw_boosts(row, True, self._boost_pool(row, True, lo_t, hi_t), hit.long() * n)
+        for i in range(n):
+            self._dedication_event(row, self._ded_pen_brush, (got > i).long())
 
     def _competition_podium(self, done: torch.Tensor) -> None:
         """CIV6 (Competition): "the civilization with the highest score wins the
@@ -7875,24 +7885,28 @@ class SimSeats:
 
     def _grant_free_research(self, row: int, n_tech: torch.Tensor, n_civic: torch.Tensor) -> None:
         """`grantFreeResearch` — complete N techs and N civics outright, DRAWN
-        AT RANDOM over the rows available at that moment, then clearing the
-        pick and its parked progress the way the paid completion does. Techs
-        before civics and one draw per grant: TS spends the stream in that
-        order, and a seat with nothing available spends none of it."""
+        AT RANDOM (the DLL's 0x4caeb0 / 0x39cd90): ONE pool of the rows
+        available before the first grant, each draw removing its pick, then
+        clearing the pick and its parked progress the way the paid completion
+        does. Techs before civics; a seat with nothing available spends none
+        of the stream."""
         for is_civic in (0, 1):
             n = n_civic if is_civic else n_tech
+            if int(n.max()) <= 0:
+                continue
+            done0 = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
+            pre = self._prereq_c if is_civic else self._prereq_t
+            avail = self._available_mask(done0, pre, self._c_repeat if is_civic else self._t_repeat).clone()
             for k in range(int(n.max())):
                 want = n > k
                 if not bool(want.count_nonzero()):
                     continue
-                done = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
-                pre = self._prereq_c if is_civic else self._prereq_t
-                avail = self._available_mask(done, pre, self._c_repeat if is_civic else self._t_repeat)
                 hit = want & avail.any(dim=1)
                 if not bool(hit.count_nonzero()):
                     continue
                 pick = self._pick_live(hit, avail)[1]
                 r = hit.nonzero(as_tuple=True)[0]
+                avail[r, pick[r]] = False
                 if is_civic:
                     self.civ_civics[r, row, pick[r]] = True
                     self.civ_civic_retain[r, row, pick[r]] = 0
@@ -7911,23 +7925,18 @@ class SimSeats:
         """CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
         Inspiration from that era." Called in the games `adv` [B] whose game
         era just began, right after the new age is committed, ascending row
-        order. A row draws only where the new era still holds a civic it has
-        neither unlocked nor triggered, so an unpayable row spends none of the
-        shared stream. The granted Inspiration pays Pen, Brush and Voice like
+        order. A row draws only where the new era still holds a boostable
+        civic (`_boost_pool`) it has neither unlocked nor triggered, so an
+        unpayable row spends none of the shared stream. The granted Inspiration pays Pen, Brush and Voice like
         a detected one."""
         if self._suz_c_era < 0 or self.S == 0:
             return
-        ncv = min(self.civ_civic_boosted.shape[2], self._civic_era.numel())
-        want = self._civic_era[:ncv].reshape(1, -1) == self.game_era.reshape(-1, 1)
         for row in range(self.n_majors):
-            open_m = want & ~self.civ_civics[:, row, :ncv] & ~self.civ_civic_boosted[:, row, :ncv]
-            hit = self._suz_effect(row, self._suz_c_era) & open_m.any(dim=1) & adv
+            hit = self._suz_effect(row, self._suz_c_era) & adv
             if not bool(hit.count_nonzero()):
                 continue
-            pick = self._pick_live(hit, open_m)[1]
-            r = hit.nonzero(as_tuple=True)[0]
-            self.civ_civic_boosted[r, row, pick[r]] = True
-            self._dedication_event(row, self._ded_pen_brush, hit.long())
+            got = self._draw_boosts(row, True, self._boost_pool(row, True, self.game_era, self.game_era), hit.long())
+            self._dedication_event(row, self._ded_pen_brush, got)
             self._eff_version += 1
 
     def _add_era_score(self, row: int, per: int, count: torch.Tensor) -> None:
@@ -11493,6 +11502,32 @@ class SimSeats:
                     self.city_acquired[rows, row, col.take(rows)] += 1
         nxt = self._seat_border_draw(row, center, cid, act)
         self.city_next_plot[bidx, row, col] = torch.where(act, nxt, self.city_next_plot[bidx, row, col])
+
+    def _wonder_free_tiles(self, row: int, col: torch.Tensor, made: torch.Tensor) -> None:
+        """WONDER_FREE_TILES_UPON_COMPLETION (TS `completeQueueItem`'s wonder
+        arm, the DLL's 0x17f870 -> 0x1a8a30): the city of column `col` [B]
+        annexes that many plots where `made`, each one `_seat_border_draw`
+        (no draw with nothing in reach, and the city's later picks stop); an
+        annex clears the stored next plot and is no culture claim
+        (`city_acquired` stands)."""
+        bidx = self._bidx
+        center = self.city_center[bidx, row, col]
+        cid = self.city_id[bidx, row, col]
+        go = made.clone()
+        for _ in range(int(self.rules.wonder_free_tiles)):
+            spot = self._seat_border_draw(row, center, cid, go)
+            go = go & (spot >= 0)
+            if not bool(go.count_nonzero()):
+                return
+            rows = go.nonzero(as_tuple=True)[0]
+            sp = spot.take(rows)
+            self.tile_seat[rows, sp] = int(self._ROW_SEAT[row])
+            self.tile_city[rows, sp] = cid.take(rows)
+            self._tile_owner_ver += 1
+            if row < self.n_majors:
+                self._reveal_around(rows, row, sp, 1)
+            self._claim_version += 1
+            self.city_next_plot[rows, row, col.take(rows)] = -1
 
     def _found_city_at(self, row: int, want: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
         """FOUND a city for seat row `row` at `tile` [B] where `want` — the

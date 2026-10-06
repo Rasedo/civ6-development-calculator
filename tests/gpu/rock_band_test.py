@@ -48,8 +48,8 @@ def build(rules):
 
 
 def roll_of(state: int) -> int:
-    """`_next_random`'s draw from `state`, as the concert's per-mille roll."""
-    return int(_lcg_n(state, 1) / 4294967296.0 * 1000)
+    """the concert's per-mille roll from `state` (`_rand_range(_, 1000)`)."""
+    return ((_lcg_n(state, 1) >> 16) * 1000) >> 16
 
 
 def seed_for_tier(sim, level: int, tier: int) -> int:
@@ -349,8 +349,8 @@ def test_concert(rules) -> None:
 
 
 def test_band_promotions(rules) -> None:
-    """The band's tree: the top tiers grant a promotion (three columns drawn,
-    the level's XP banked; a pending offer banks a re-arm instead; four is the
+    """The band's tree: the top tiers grant a promotion (every class row
+    shuffled, the first three offered, the level's XP banked; a pending offer banks a re-arm instead; four is the
     ceiling), and the held ones bend the concert — Album Cover Art rolls a level
     higher at a wonder, Goes to 11 shares with the majors in reach, Pop Star
     pays gold, Indie drops the host's loyalty, Religious Rock converts it."""
@@ -360,6 +360,7 @@ def test_band_promotions(rules) -> None:
     tv = torch.tensor([tile], device=sim.device)
     vb = sim._band_venue_bits
     n = sim._promo_offer_n
+    rows = 12  # the Rock Band class's rows, each one draw of the shuffle
     xp1 = int(sim._xp_to_next(torch.tensor([1]))[0])
 
     def concert(slot, level=1, tier=0):
@@ -367,11 +368,11 @@ def test_band_promotions(rules) -> None:
         before = int(sim.rng_state[0])
         sim._do_concert(0, one, tv, torch.tensor([slot], device=sim.device))
         after = int(sim.rng_state[0])
-        return next(k for k in range(8) if _lcg_n(before, k) == after)
+        return next(k for k in range(32) if _lcg_n(before, k) == after)
 
-    # the grant: three distinct columns, the level's XP, four draws in all
+    # the grant: the tier roll, the shuffle's draws, three columns, the XP
     slot = place_band(sim, 0, tile)
-    assert concert(slot) == 1 + n, "the granting tier did not draw the offer after the tier roll"
+    assert concert(slot) == 1 + rows, "the granting tier did not shuffle the offer after the tier roll"
     off = int(sim.unit_promo_offer[0, slot])
     assert bin(off).count("1") == n and off < (1 << 12), f"offer {off:b}"
     assert int(sim.unit_xp[0, slot]) == xp1, "the band left without its level's XP"
@@ -384,8 +385,8 @@ def test_band_promotions(rules) -> None:
     assert concert(slot) == 1 and int(sim.unit_promo_offer[0, slot]) == 0, "a full band was granted a fifth"
     slot = place_band(sim, 0, tile, promos=0b111)
     sim.unit_level[0, slot] = 4
-    assert concert(slot) == 1 + n, "three held and none owed did not draw the fourth"
-    assert int(sim.unit_promo_offer[0, slot]) & 0b111 == 0, "the offer named a held column"
+    # three held and none owed: the shuffle takes every row, held ones included
+    assert concert(slot) == 1 + rows, "three held and none owed did not shuffle the offer"
     assert bin(int(sim.unit_promo_offer[0, slot])).count("1") == n
     sim.unit_alive[0, slot] = False
 

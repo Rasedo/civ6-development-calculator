@@ -41,10 +41,10 @@ BLD = [b["id"] for b in RULES["buildings"]]
 M32 = 0xFFFFFFFF
 
 
-def draw(st: int) -> float:
-    """the next draw of the stream from state `st` (`_next_random`: one LCG
-    step read as a fraction of 2^32)"""
-    return ((st * 1103515245 + 12345) & M32) / 4294967296.0
+def draw(st: int) -> int:
+    """the next draw over 10000 of the stream from state `st` (`_rand_range`:
+    one LCG step's top 16 bits times 10000, over 2^16)"""
+    return ((((st * 1103515245 + 12345) & M32) >> 16) * 10000) >> 16
 
 
 def seek(sim, pred) -> None:
@@ -206,10 +206,10 @@ def test_military_buy(rules, path) -> None:
     sim._minor_purchases(s)
     assert int(sim.rng_state[B0]) == rng, "a treasury under the floor drew"
     sim.citystate_treasury[B0, s] = 500.0
-    seek(sim, lambda r: int(r * 10000) >= bp)
+    seek(sim, lambda r: r >= bp)
     sim._minor_purchases(s)
     assert len(kinds(sim, s)) == 2
-    seek(sim, lambda r: int(r * 10000) < bp)
+    seek(sim, lambda r: r < bp)
     sim._minor_purchases(s)
     assert kinds(sim, s).count("SLINGER") == 1, kinds(sim, s)
     assert float(sim.citystate_treasury[B0, s]) == 500.0 - price(sim, "SLINGER", float(sim.rules.gold_purchase_mult))
@@ -221,7 +221,7 @@ def test_military_buy(rules, path) -> None:
     sim.citystate_treasury[B0, s] = 500.0
     sim.citystate_loss_turn[B0, s] = int(sim.turn) - 1
     mult = int(rules.citystate["lossBuyMult"])
-    seek(sim, lambda r: bp <= int(r * 10000) < bp * mult)
+    seek(sim, lambda r: bp <= r < bp * mult)
     sim._minor_purchases(s)
     assert len(kinds(sim, s)) == 3, kinds(sim, s)
     print("  4 military purchase OK — the count's rate over the floor, tripled after a loss")
@@ -252,7 +252,7 @@ def test_monk_buy(rules, path) -> None:
     mp = price(sim, "WARRIOR_MONK", float(sim.rules.faith_purchase_mult))
     sim.citystate_faith[B0, s] = mp + 7.0
     sim.citystate_treasury[B0, s] = 0.0
-    seek(sim, lambda r: int(r * 10000) < int(rules.citystate["militaryBuyBp"][0]))
+    seek(sim, lambda r: r < int(rules.citystate["militaryBuyBp"][0]))
     sim._minor_purchases(s)
     assert kinds(sim, s).count("WARRIOR_MONK") == 1, kinds(sim, s)
     assert float(sim.citystate_faith[B0, s]) == 7.0

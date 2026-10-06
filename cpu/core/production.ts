@@ -36,16 +36,20 @@ import { applyLumpYield } from './economy';
 import { congressGppFactor } from './congress';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
+import { claimTile, drawBorderPlot } from './city';
+import { WONDER_FREE_TILES } from '../data/constants';
 
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
- *  are DRAWN AT RANDOM. One draw per grant over the rows available at that
- *  moment, so a seat with nothing available advances the stream not at all. */
+ *  are DRAWN AT RANDOM — the DLL's 0x4caeb0 / 0x39cd90 ("Choosing random tech
+ *  / civic to grant based on era"): ONE pool of the rows researchable before
+ *  the first grant, each draw removing its pick (a row the grants open is not
+ *  in it), so a seat with nothing available advances the stream not at all. */
 function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
+  const open = kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)];
   for (let i = 0; i < n; i++) {
-    const open = kind === 'tech' ? availableTechsIn(rsr) : availableCivicsIn(rsr);
     if (open.length === 0) return; // the tree is exhausted
-    const next = open[randRange(state, open.length)];
+    const next = open.splice(randRange(state, open.length), 1)[0];
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);
@@ -307,6 +311,17 @@ export function completeQueueItem(
     }
     case 'wonder': {
       state.map.tiles[item.tileIndex].builtWonderComplete = true;
+      // CIV6 (WONDER_FREE_TILES_UPON_COMPLETION, the DLL's completion
+      // 0x17f870 -> 0x1a8a30): the city annexes that many plots before the
+      // wonder's grants, each one border pick (`drawBorderPlot`, no draw with
+      // nothing in reach); an annex clears the stored next plot (0x1a8b70)
+      // and is no culture claim (`tilesAcquired` stands)
+      for (let k = 0; k < WONDER_FREE_TILES; k++) {
+        const plot = drawBorderPlot(state, city);
+        if (plot === null) break;
+        claimTile(state, city, plot);
+        city.nextPlot = -1;
+      }
       wonderMoment(state, city.seat, WONDER_ERA_INDEX[item.wonder] ?? 0);
       // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
       // THE WONDER, before any other completion payout draws

@@ -1911,6 +1911,8 @@ class SimInit:
         self._route_dom_gold = int(rr["routeGoldCulturalDominance"])
         self._tech_era = torch.tensor(rr["techEra"] or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr["civicEra"] or [0], dtype=torch.long, device=device)
+        self._tech_boostable = torch.tensor(rr["techBoostable"] or [False], dtype=torch.bool, device=device)
+        self._civic_boostable = torch.tensor(rr["civicBoostable"] or [False], dtype=torch.bool, device=device)
         # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
         # and never its queued price, which is what "the ORIGINAL wonder
         # cost" means for the Builder's charge

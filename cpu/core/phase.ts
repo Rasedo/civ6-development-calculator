@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
-import { nextRandom } from './rand';
+import { randRange, randWeighted } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
@@ -801,11 +801,11 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
   if (u) u.freeCity = city.id;
 }
 
-/** A recurring grant's chassis: ONE draw over `FREE_CITY_GRANT_WEIGHTS`
- *  among the classes the world era has a chassis for, in table order —
- *  `pick` in [0, their weights' sum) names the first class whose running sum
- *  exceeds it — and that class's chassis of the era (`eraUnitOfClass`). The
- *  draw is taken whether or not a tile is free for the unit. */
+/** A recurring grant's chassis: ONE weighted pick ("Free Cities Unit
+ *  Choice", 0x274010 through the picker) over `FREE_CITY_GRANT_WEIGHTS`
+ *  among the classes the world era has a chassis for, in table order, and
+ *  that class's chassis of the era (`eraUnitOfClass`). The draw is taken
+ *  whether or not a tile is free for the unit. */
 function freeCityGrantType(state: GameState): string | null {
   const era = Math.max(0, worldEraIndex(state));
   const open: [string, number][] = [];
@@ -813,15 +813,9 @@ function freeCityGrantType(state: GameState): string | null {
     const id = eraUnitOfClass(cls, era);
     if (id) open.push([id, FREE_CITY_GRANT_WEIGHTS[i]]);
   });
-  const total = open.reduce((s, [, w]) => s + w, 0);
-  if (total <= 0) return null;
-  const pick = Math.floor(nextRandom(state) * total);
-  let run = 0;
-  for (const [id, w] of open) {
-    run += w;
-    if (pick < run) return id;
-  }
-  return null;
+  if (open.reduce((s, [, w]) => s + w, 0) <= 0) return null;
+  const k = randWeighted(state, open.map(([, w]) => w));
+  return k >= 0 ? open[k][0] : null;
 }
 
 /** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat
@@ -2641,7 +2635,7 @@ export function seatPhase(state: GameState): void {
       // THIS seat's envoys — the accrual channel), else a new one issues on
       // cooldown expiry. The kind is DETERMINISTIC: the FIRST SATISFIABLE
       // option in the fixed order [clearCamp, buildDistrict, sendTradeRoute]
-      // against this seat's state — NO nextRandom. questIssuedTurn clock
+      // against this seat's state — no draw. questIssuedTurn clock
       // defaults to 0 → first issue at turn≥cooldown.
       for (const cityState of state.cityStates) {
         if (!hasMet(cityState, actor.seat)) continue;
@@ -2931,16 +2925,17 @@ export function seatPhase(state: GameState): void {
 
     advanceGreatPeople(state, actor.seat);
 
-    // The PANTHEON RACE — an eager rule for EVERY seat row, drawn from the
-    // open pool; the gate and the draw mirror the GPU's row-generic
-    // `_seat_pantheon_race`, so the streams stay aligned. A religion's own
-    // beliefs are the record's `beliefs` arm (`adoptBeliefs`).
-    // Pantheon: costs PANTHEON_FAITH_COST from this seat's own faith.
+    // The PANTHEON RACE — an eager rule for EVERY seat row: the pick is ONE
+    // integer draw over the open pool in data order (Civ 6's AI picks its
+    // belief with no draw of the game's; the gate and the draw mirror the
+    // GPU's row-generic `_seat_pantheon_race`). A religion's own beliefs are
+    // the record's `beliefs` arm (`adoptBeliefs`). Pantheon: costs
+    // PANTHEON_FAITH_COST from this seat's own faith.
     if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
       const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
       if (open.length > 0) {
         actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
-        const pick = open[Math.floor(nextRandom(state) * open.length)];
+        const pick = open[randRange(state, open.length)];
         state.claimedPantheons.push(pick);
         pantheonMoment(state, actor.seat);
         actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers

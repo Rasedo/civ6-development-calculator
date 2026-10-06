@@ -1966,8 +1966,7 @@ class SimOrders:
 
         any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
         can_roll = any_city & (self.n_camps < self.max_camps)
-        r1 = self._next_random(can_roll)
-        want = can_roll & (r1 < cb["campSpawnChance"])
+        want = can_roll & (self._rand_range(can_roll, 100) < cb["campSpawnPct"])
         if bool(want.count_nonzero()):
             wr = want.nonzero(as_tuple=True)[0]
             # campCandidates excludes t.district LIVE: camp_ok is static, but
@@ -1993,9 +1992,11 @@ class SimOrders:
                 cand_w = cand_w & ~near_camp_w
             has = torch.zeros_like(want)
             has[wr] = cand_w.any(dim=1)
-            r2 = self._next_random(has)
+            n_c = torch.zeros(B, dtype=torch.long, device=dev)
+            n_c[wr] = cand_w.sum(dim=1)
+            k_all = self._rand_range(has, n_c)
             if bool(has.count_nonzero()):
-                k_w = torch.floor(r2[wr] * cand_w.sum(dim=1).to(torch.float64)).to(torch.long)
+                k_w = k_all[wr]
                 cum_w = cand_w.long().cumsum(dim=1)
                 sel_w = cand_w & (cum_w == (k_w + 1).unsqueeze(1))
                 spot = torch.zeros(B, dtype=torch.long, device=dev)
@@ -2048,14 +2049,13 @@ class SimOrders:
             self._spawn_barb(_rg & horse, camp, cav_type)
             self._spawn_barb(_rg & ~horse, camp, melee_type)
             can_grow = active & near_any & (_barbs().sum(dim=1) < self.n_camps * cb["maxBarbPerCamp"])
-            r = self._next_random(can_grow)
-            _raid = can_grow & (r < cb["garrisonGrowChance"])
+            _raid = can_grow & (self._rand_range(can_grow, 100) < cb["raidPct"])
             # The raid ROTATES: the camp's CLASS unit, then ranged, then melee,
             # so every camp fields melee and ranged whatever it stands on. `k`
             # IS the TS `campNo`: camps append at n_camps and _clear_camp_at
             # splices left exactly like state.barbCamps.splice, so slots
             # 0..n_camps-1 are dense and in the same order as the TS array.
-            # Zero-draw: the 0.1 roll above already fired and nothing else is
+            # Zero-draw: the raid roll above already fired and nothing else is
             # consulted.
             _slot = (k + self.turn) % 3
             if _slot == 1:

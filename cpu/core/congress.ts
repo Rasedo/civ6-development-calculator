@@ -9,7 +9,7 @@
  * falls back to the deterministic self-interest rule below — the AI vote.
  * Both engines only TALLY.
  */
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { GP_CLASSES } from '../data/greatPeople';
 import { gwCountsByObj } from './greatWorks';
@@ -467,12 +467,16 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
   if (win.outcome === 0) diploVictoryMoment(state, t.seat);
 }
 
-/** One Regular Session: the ANNOUNCED slate (CIV6 — a random draw among
- * the era-eligible resolutions, drawn at the previous session's close),
- * then the Diplomatic Victory resolution from Modern. The standing effects
- * REPLACE the previous session's and hold until the next one. Each draw
- * advances the stream only where its pool is non-empty, in step with the
- * GPU `_congress_draw_slate`. */
+/** One Regular Session: the ANNOUNCED slate, drawn at the previous session's
+ * close as the DLL's session setup 0x598270 draws it — the era-eligible
+ * resolutions that are not InjectionOnly, each weight 1: min(3, eligible)
+ * "World Congress Resolutions" draws, each over what is left and removing
+ * its pick; with three drawn, the first two the previous slate did not hold
+ * stand (fewer when it held more), else every one drawn; then ONE draw over
+ * the InjectionOnly rows in their era (the Diplomatic Victory resolution from
+ * Modern, a lone row: a draw over 1). The Diplomatic Victory resolution then
+ * sits every session from Modern. The standing effects REPLACE the previous
+ * session's and hold until the next one. `_congress_draw_slate` is the twin. */
 export function congressSession(state: GameState, worldEra: number,
                                 recorded: readonly (CongressVote | null)[],
                                 voters: readonly CongressVoterCtx[]): void {
@@ -483,13 +487,14 @@ export function congressSession(state: GameState, worldEra: number,
     for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
       if (worldEra >= CONGRESS_RESOLUTIONS[i].minEra && worldEra <= CONGRESS_RESOLUTIONS[i].maxEra) pool.push(i);
     }
-    slate[0] = slate[1] = -1;
-    if (pool.length > 0) {
-      const a = Math.floor(nextRandom(state) * pool.length);
-      slate[0] = pool[a];
-      pool.splice(a, 1);
-    }
-    if (pool.length > 0) slate[1] = pool[Math.floor(nextRandom(state) * pool.length)];
+    const before = [slate[0], slate[1]];
+    const want = Math.min(2, pool.length);
+    const drawn: number[] = [];
+    for (let k = Math.min(want + 1, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length), 1)[0]);
+    const kept = drawn.length > want ? drawn.filter((r) => !before.includes(r)).slice(0, want) : drawn;
+    slate[0] = kept[0] ?? -1;
+    slate[1] = kept[1] ?? -1;
+    if (worldEra >= CONGRESS_DV_MIN_ERA) randRange(state, 1);
   };
   // a session whose slate was never announced (the FIRST one, or an
   // announcement that found nothing eligible) draws its own, now

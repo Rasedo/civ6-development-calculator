@@ -4,9 +4,8 @@ import type { GameState } from './types';
  * CIV 6'S SYNCHRONOUS GENERATOR (GameCore_XP2_Release.dll's get 0x8b6c10,
  * `tools/civ6lab/dll_readings.md` "H-1: the random events' draws"): one
  * 32-bit state, the ANSI LCG state' = 1103515245 · state + 12345 (mod 2^32),
- * every draw one step. `randRange` is the game's own draw; `nextRandom` reads
- * the same step as a fraction of 2^32 for the draws whose game site the
- * engine does not yet follow. `_rand_range` / `_next_random` are the twins.
+ * every draw one step. `randRange` is the game's own draw; `_rand_range` is
+ * the twin.
  */
 export const LCG_MUL = 1103515245;
 export const LCG_ADD = 12345;
@@ -35,9 +34,4 @@ export function randWeighted(state: GameState, weights: readonly number[]): numb
     if (v < 0) return i;
   }
   return -1;
-}
-
-/** one step read as a fraction in [0, 1) */
-export function nextRandom(state: GameState): number {
-  return step(state) / 4294967296;
 }

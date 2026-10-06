@@ -266,7 +266,7 @@ def poke_row_walk() -> None:
             probe = int(sim.rng_state[0])
             sim.rng_state[0] = seed
             while int(sim.rng_state[0]) != probe and spent < 4096:
-                sim._next_random(one)
+                sim._rand_range(one, 1)
                 spent += 1
             assert spent == want, f"{label} plot, severity {sev}: {spent} draws, not {want}"
     # a yield row lands on its own kind alone: MODERATE carries Food rows only,
@@ -327,7 +327,7 @@ def poke_river_reach() -> None:
     probe = sim.rng_state.clone()
     sim.rng_state.copy_(st)
     while int(sim.rng_state[0]) != int(probe[0]) and spent < 4096:
-        sim._next_random(torch.ones(1, dtype=torch.bool, device=sim.device))
+        sim._rand_range(torch.ones(1, dtype=torch.bool, device=sim.device), 1)
         spent += 1
     egypt = [s for s in range(sim.n_majors) if bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0])]
     want = spent_by_walk(sim, reach, 2, egypt)

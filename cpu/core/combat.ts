@@ -28,7 +28,7 @@ import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
-import { nextRandom, randRange } from './rand';
+import { randRange } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
@@ -71,6 +71,12 @@ const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
 export const MAX_BARB_PER_CAMP = 3;
+/** the engine's barbarian turn: the percent a turn a new camp rises while
+ *  below the cap, and the percent a garrisoned camp sends a raider — each one
+ *  rand(100) on the game's generator (Civ 6's own camp step 0x14fcc0 counts
+ *  its camps off a target and draws none of these) */
+export const BARB_CAMP_SPAWN_PCT = 8;
+export const BARB_RAID_PCT = 10;
 
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
   // You do not clear your OWN camps: the camps belong to the barbarian seat.
@@ -3098,10 +3104,10 @@ export function barbarianPhase(state: GameState): void {
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
   const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
-  if (anyCivCity && state.barbSeat.camps.length < maxCamps && nextRandom(state) < 0.08) {
+  if (anyCivCity && state.barbSeat.camps.length < maxCamps && randRange(state, 100) < BARB_CAMP_SPAWN_PCT) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {
-      const spot = candidates[Math.floor(nextRandom(state) * candidates.length)];
+      const spot = candidates[randRange(state, candidates.length)];
       state.barbSeat.camps.push(spot.index);
       // SCOUT-THEN-RAID: a brand-new camp opens with a scout that goes
       // looking for a target; the regarrison and raid sites below keep the
@@ -3127,7 +3133,7 @@ export function barbarianPhase(state: GameState): void {
       spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
     } else if (
       barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
-      nextRandom(state) < 0.1
+      randRange(state, 100) < BARB_RAID_PCT
     ) {
       const water = neighbors(map, map.tiles[campIdx])
         // A tech-less barbarian cannot enter OCEAN (waterEnterable gates it on

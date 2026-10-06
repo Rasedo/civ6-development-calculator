@@ -13,7 +13,7 @@ import { walkUnit } from '../../../cpu/core/walker';
 import { computeCityStats } from '../../../cpu/core/city';
 import { builderCost, spawnUnit } from '../../../cpu/core/units';
 import { purchaseStep } from '../../../cpu/core/effects';
-import { nextRandom } from '../../../cpu/core/rand';
+import { randRange } from '../../../cpu/core/rand';
 import {
   MINOR_BUILDER_BUY_SLOTS, MINOR_LOSS_BUY_MULT, MINOR_MILITARY_BUY_BP, MINOR_MILITARY_BUY_FLOOR,
   MINOR_UPGRADE_GOLD,
@@ -56,11 +56,11 @@ function pillageForRepair(cs: CityState): void {
   cs.repairWait = false;
 }
 
-/** Set the stream so its next draw satisfies `pred`. */
+/** Set the stream so its next draw over 10000 satisfies `pred`. */
 function seek(state: GameState, pred: (r: number) => boolean): void {
   for (let s = 1; s < 1_000_000; s++) {
     state.rngState = s;
-    if (pred(nextRandom(state))) {
+    if (pred(randRange(state, 10000))) {
       state.rngState = s;
       return;
     }
@@ -158,12 +158,12 @@ describe("a city-state's purse", () => {
     expect(state.rngState).toBe(rng);
     // a draw above the rate buys nothing
     cs.treasury = 500;
-    seek(state, (r) => Math.floor(r * 10000) >= bp);
+    seek(state, (r) => r >= bp);
     minorPurchases(state, cs);
     expect(army(state, cs).length).toBe(2);
     // a draw under it buys the army row's pick — the ranged class the army
     // lacks, its strongest chassis the minor's research opens
-    seek(state, (r) => Math.floor(r * 10000) < bp);
+    seek(state, (r) => r < bp);
     minorPurchases(state, cs);
     const bought = army(state, cs).filter((u) => u.type === 'SLINGER');
     expect(bought.length).toBe(1);
@@ -177,7 +177,7 @@ describe("a city-state's purse", () => {
     const bp = MINOR_MILITARY_BUY_BP[1];
     cs.treasury = 500;
     cs.lossTurn = state.turn - 1;
-    seek(state, (r) => Math.floor(r * 10000) >= bp && Math.floor(r * 10000) < bp * MINOR_LOSS_BUY_MULT);
+    seek(state, (r) => r >= bp && r < bp * MINOR_LOSS_BUY_MULT);
     minorPurchases(state, cs);
     expect(army(state, cs).length).toBe(3);
     // eight military units: no draw at all
@@ -206,7 +206,7 @@ describe("a city-state's purse", () => {
     const price = purchaseStep(Math.round(UNITS.WARRIOR_MONK.cost * FAITH_PURCHASE_MULT));
     cs.faith = price + 7;
     cs.treasury = 0; // the monk needs no gold floor
-    seek(state, (r) => Math.floor(r * 10000) < MINOR_MILITARY_BUY_BP[0]);
+    seek(state, (r) => r < MINOR_MILITARY_BUY_BP[0]);
     minorPurchases(state, cs);
     expect(army(state, cs).filter((u) => u.type === 'WARRIOR_MONK').length).toBe(1);
     expect(cs.faith).toBe(7);
@@ -271,7 +271,7 @@ describe('the walker', () => {
     walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);
     expect(u.tileIndex).toBe(cs.centerIndex);
     state.rngState = s0;
-    nextRandom(state);
+    randRange(state, 1);
     const s1 = state.rngState;
     state.rngState = s0;
     walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);

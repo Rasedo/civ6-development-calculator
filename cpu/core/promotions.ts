@@ -14,7 +14,7 @@ import {
 import { UNIT_HP, UNITS } from '../data/units';
 import { logXpWrite } from './difflog';
 import { improvementIsCover } from '../data/improvements';
-import { nextRandom } from './rand';
+import { randRange } from './rand';
 
 /** CIV6: "A unit will require an amount of XP equal to 15 times the level it
  *  is currently on to reach the next level (a brand new unit starts at level
@@ -185,23 +185,23 @@ export function promoCount(unit: { promos?: number }): number {
   return n;
 }
 
-/** CIV6 (Apostle, Spy, Rock Band): "three promotions randomly chosen from
- *  the pool" — PROMO_OFFER_DRAW distinct UNHELD columns of the unit's own
- *  class list, drawn without replacement, so the stream is exactly that many
- *  numbers however the picks land. The offer IS a level to spend, so the
- *  unit leaves armed with its next level's XP. */
+/** CIV6 (Apostle, Spy, Rock Band: Units.NumRandomChoices 3): the DLL's level
+ *  offer 0x4f23a0 (from the XP gain 0x55d990) puts every row of the unit's
+ *  class in a weighted vector, weight 1 each, and draws them all out ("Random
+ *  Promotion", one draw over what is left, the drawn row removed) — a full
+ *  shuffle, as many draws as rows; the shuffled rows are then stably sorted
+ *  by Level (each of these classes' rows share one, so the order stands) and
+ *  the first PROMO_OFFER_DRAW make the offer, a held row among them
+ *  (runs/h1_duelw1118 t218: a Spy's 17 draws 17..1; t224: two Apostles' 9..1
+ *  twice). The offer IS a level to spend, so the unit leaves armed with its
+ *  next level's XP. */
 export function drawPromoOffer(state: GameState, unit: Unit): void {
   const rows = unitPromoRows(unit);
-  const held = unit.promos ?? 0;
-  const avail = rows.length - promoCount(unit);
+  const pool = rows.map((_, k) => k);
   let offer = 0;
-  for (let j = 0; j < PROMO_OFFER_DRAW && j < avail; j++) {
-    let pick = Math.floor(nextRandom(state) * (avail - j));
-    for (let k = 0; k < rows.length; k++) {
-      if ((held | offer) & (1 << k)) continue;
-      if (pick === 0) { offer |= 1 << k; break; }
-      pick -= 1;
-    }
+  for (let j = 0; pool.length > 0; j++) {
+    const k = pool.splice(randRange(state, pool.length), 1)[0];
+    if (j < PROMO_OFFER_DRAW) offer |= 1 << k;
   }
   unit.promoOffer = offer;
   unit.xp = xpToNextLevel(unit);

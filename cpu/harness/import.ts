@@ -110,6 +110,8 @@ export interface Imported {
   /** each city as the record of the turn before showed it, by
    *  `${gamePlayer}:${gameCityId}` (empty without that record) */
   cityBefore: Map<string, DumpCity>;
+  /** the record of the turn before (null without it) */
+  recordBefore: TurnRecord | null;
   /** the gaps met importing each seat (its research, government, policies,
    *  pantheon, its religion's beliefs) and each plot (a feature, resource or
    *  improvement dropped) */
@@ -2048,6 +2050,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
     cityBefore: prevCities,
+    recordBefore: b1,
   };
 }
 

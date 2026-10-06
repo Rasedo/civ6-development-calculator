@@ -5,7 +5,7 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../help
 import { emptySeat, seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { spawnUnit, concertVenue, concertVenueBits, performConcert, unitFullMoves } from '../../../cpu/core/units';
 import { purchaseRockBand, rockBandCost } from '../../../cpu/core/game';
-import { nextRandom } from '../../../cpu/core/rand';
+import { randRange } from '../../../cpu/core/rand';
 import { promoCount, promoReady, unitPromoRows, promoValueFor } from '../../../cpu/core/promotions';
 import { civVariantOf } from '../../../cpu/core/seats';
 import { DISTRICTS } from '../../../cpu/data/districts';
@@ -78,11 +78,11 @@ function bandCol(id: string): number {
 /** the number of draws a concert took off `state`'s stream. */
 function drawsTaken(before: number, state: GameState): number {
   const probe = { rngState: before } as GameState;
-  for (let k = 0; k < 8; k++) {
+  for (let k = 0; k < 32; k++) {
     if (probe.rngState === state.rngState) return k;
-    nextRandom(probe);
+    randRange(probe, 1);
   }
-  throw new Error('more than eight draws');
+  throw new Error('more than 32 draws');
 }
 
 /** the rngState whose very next draw lands in `tier`'s bucket at `level`. */
@@ -92,7 +92,7 @@ function seedForTier(level: number, tier: number): number {
   for (let i = 0; i < tier; i++) lo += odds[i];
   const hi = lo + odds[tier];
   for (let s = 1; s < 2_000_000; s++) {
-    const roll = Math.floor(nextRandom({ rngState: s } as GameState) * 1000);
+    const roll = randRange({ rngState: s } as GameState, 1000);
     if (roll >= lo && roll < hi) return s;
   }
   throw new Error(`no rngState lands in tier ${tier} at level ${level}`);
@@ -276,14 +276,14 @@ describe('performing a concert', () => {
     const b = band(state, tile);
     state.rngState = seedForTier(1, 2);
     const after = { rngState: state.rngState } as GameState;
-    nextRandom(after);
+    randRange(after, 1);
     performConcert(state, b.id, 0);
     expect(state.rngState).toBe(after.rngState);
   });
 });
 
 describe('the band tree', () => {
-  it('the purchase draws three distinct columns and banks the level', () => {
+  it('the purchase shuffles the class rows, offers the first three and banks the level', () => {
     const { state, mine } = twoSeatGame();
     const own = seatOf(state, 0)!;
     own.faith = 100_000;
@@ -293,8 +293,8 @@ describe('the band tree', () => {
       state.rngState = 7 + i * 1000;
       const before = state.rngState;
       expect(purchaseRockBand(state, mine.id, 0).ok).toBe(true);
-      expect(drawsTaken(before, state)).toBe(PROMO_OFFER_DRAW);
       const u = state.units[state.units.length - 1];
+      expect(drawsTaken(before, state)).toBe(unitPromoRows(u).length);
       expect(u.type).toBe('ROCK_BAND');
       const off = u.promoOffer ?? 0;
       expect(promoCount({ promos: off })).toBe(PROMO_OFFER_DRAW);
@@ -311,7 +311,7 @@ describe('the band tree', () => {
     const fresh = band(state, tile);
     let before = (state.rngState = seedForTier(1, 0));
     expect(performConcert(state, fresh.id, 0).ok).toBe(true);
-    expect(drawsTaken(before, state)).toBe(1 + PROMO_OFFER_DRAW);
+    expect(drawsTaken(before, state)).toBe(1 + unitPromoRows(fresh).length);
     expect(promoCount({ promos: fresh.promoOffer })).toBe(PROMO_OFFER_DRAW);
     expect(promoReady(fresh)).toBe(true);
     expect(fresh.promoBonus ?? 0).toBe(0);
@@ -328,12 +328,13 @@ describe('the band tree', () => {
     expect(performConcert(state, full.id, 0).ok).toBe(true);
     expect(drawsTaken(before, state)).toBe(1);
     expect(full.promoOffer ?? 0).toBe(0);
-    // three held and none owed: the fourth is drawn off the UNHELD columns
+    // three held and none owed: the offer shuffles EVERY class row, held ones
+    // included (the DLL's 0x4f23a0 filters none: runs/h1_duelw1117 / 1118, every
+    // Rock Band offer draws 12)
     const three = band(state, tile, 0, ['ALBUM_COVER_ART', 'ARENA_ROCK', 'GLAM_ROCK']);
     before = (state.rngState = seedForTier(1, 0));
     expect(performConcert(state, three.id, 0).ok).toBe(true);
-    expect(drawsTaken(before, state)).toBe(1 + PROMO_OFFER_DRAW);
-    expect((three.promoOffer ?? 0) & three.promos!).toBe(0);
+    expect(drawsTaken(before, state)).toBe(1 + unitPromoRows(three).length);
     expect(promoCount({ promos: three.promoOffer })).toBe(PROMO_OFFER_DRAW);
   });
 
@@ -347,7 +348,7 @@ describe('the band tree', () => {
     const [o1, o2] = ROCK_BAND_TIER_ODDS;
     let seed = 0;
     for (let s = 1; s < 2_000_000 && !seed; s++) {
-      const roll = Math.floor(nextRandom({ rngState: s } as GameState) * 1000);
+      const roll = randRange({ rngState: s } as GameState, 1000);
       if (roll >= o1[0] + o1[1] && roll < o2[0] + o2[1]) seed = s;
     }
     const plain = band(state, w);

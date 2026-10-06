@@ -10,7 +10,7 @@ import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from '
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
-import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
+import { boostPool, drawBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
@@ -43,8 +43,6 @@ import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { TECHS, ERAS } from '../data/techs';
-import { CIVICS } from '../data/civics';
-import { randRange } from './rand';
 import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
@@ -1673,11 +1671,9 @@ function religiousVictor(state: GameState): number {
 
 /**
  * CIV6 (Dynastic Cycle): "a random Eureka and Inspiration from the era of the
- * wonder, IF AVAILABLE" — one draw per count from the unearned rows of that
- * era, and nothing at all where the era holds none. ONE body for both kinds,
- * so the tech and the civic pool cannot drift apart, and the draws are taken
- * in a fixed order (techs, then civics) because both engines replay the same
- * stream.
+ * wonder, IF AVAILABLE" — the picker over the wonder's era alone
+ * (`boostPool`), the techs' draws first, then the civics', and nothing at
+ * all where the era holds none.
  */
 export function grantEraBoosts(state: GameState, seat: number, era: string): void {
   const rows = getModifiers(state, seat).wonderEraBoost;
@@ -1687,42 +1683,28 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
   let techs = 0;
   let civics = 0;
   for (const r of rows) { techs += r.techs; civics += r.civics; }
-  const draw = (n: number, pool: () => string[], onto: string[]): void => {
-    for (let i = 0; i < n; i++) {
-      const open = pool();
-      if (open.length === 0) return;            // "if available" — no draw at all
-      onto.push(open[randRange(state, open.length)]);
-    }
-  };
-  draw(techs, () => Object.values(TECHS)
-    .filter((t) => t.era === era && !rsr.techs.includes(t.id) && !rsr.boosted.includes(t.id))
-    .map((t) => t.id), rsr.boosted);
-  draw(civics, () => Object.values(CIVICS)
-    .filter((c) => c.era === era && !rsr.civics.includes(c.id) && !rsr.boosted.includes(c.id))
-    .map((c) => c.id), rsr.boosted);
+  const e = ERAS.indexOf(era as never);
+  drawBoosts(state, rsr, boostPool(rsr, 'tech', e, e), techs);
+  drawBoosts(state, rsr, boostPool(rsr, 'civic', e, e), civics);
 }
 
 /**
  * CIV6 (Vilnius's suzerain): "When you enter a new era, earn 1 random
  * Inspiration from that era." Runs at the era boundary, right after
  * `enterEra` commits the new age, in ascending seat order. A seat draws
- * only when the new era still holds a civic it has neither unlocked nor
+ * only when the new era still holds a boostable civic (`boostPool`) it has neither unlocked nor
  * triggered — an unpayable seat must not advance the shared stream. The
  * granted Inspiration is an Inspiration like any other, so it pays the Pen,
  * Brush and Voice dedication the same way a detected one does.
  */
 function eraInspirations(state: GameState): void {
-  const era = ERAS[state.gameEra ?? 0];
+  const era = state.gameEra ?? 0;
   for (let seat = 0; seat < state.seats.length; seat++) {
     const sx = seatOf(state, seat);
     if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
-    const rsr = sx.research;
-    const open = Object.values(CIVICS).filter(
-      (c) => c.era === era && !rsr.civics.includes(c.id) && !rsr.boosted.includes(c.id),
-    );
-    if (open.length === 0) continue;
-    rsr.boosted.push(open[randRange(state, open.length)].id);
-    dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+    if (drawBoosts(state, sx.research, boostPool(sx.research, 'civic', era, era), 1)) {
+      dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
+    }
   }
 }
 

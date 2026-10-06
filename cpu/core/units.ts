@@ -56,7 +56,7 @@ import {
   STRATEGIC_IDS, emptyStockpile, progressCost, gameProgressK, gameProgressPct,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
-import { CIVICS } from '../data/civics';
+import { boostPool, drawBoosts, earliestBoostEra } from './boosts';
 import { tradeCapacity } from './trade';
 import { revealAround, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
@@ -2182,12 +2182,12 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       break;
     case 'civicBoost':
     case 'techBoost': {
-      const pool = Object.keys(p.kind === 'techBoost' ? TECHS : CIVICS).filter((id) =>
-        !owner.research.boosted.includes(id)
-        && !(p.kind === 'techBoost' ? owner.research.techs : owner.research.civics).includes(id));
-      for (let i = 0; i < amount && pool.length; i++) {
-        owner.research.boosted.push(pool.splice(randRange(state, pool.length), 1)[0]);
-      }
+      // the DLL's 0x4ca470 / 0x39c330: the boostable rows of the EARLIEST era
+      // holding one (`earliestBoostEra`, `boostPool`), each draw removing its
+      // pick (runs/h1_duelw1117 t6: 8 Ancient techs, t30: 6 then 5 civics)
+      const kind = p.kind === 'techBoost' ? 'tech' : 'civic';
+      const era = earliestBoostEra(owner.research, kind);
+      if (era >= 0) drawBoosts(state, owner.research, boostPool(owner.research, kind, era, era), amount);
       break;
     }
     case 'tech': {

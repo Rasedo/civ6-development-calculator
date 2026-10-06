@@ -223,7 +223,7 @@ def main() -> None:
     assert int(s8._extra_charges(0, ti_mil)[0]) == 0, "and the Military Engineer nothing"
     print("  charges OK — builder, spread and Great Engineer, per owner, at creation")
 
-    # --- 9) free research completes the FIRST available rows ----------------
+    # --- 9) free research draws off one pool of the available rows ---------
     s9 = build(rules, paths[0])
     t_before = int(s9.civ_techs[0, 0].sum())
     c_before = int(s9.civ_civics[0, 0].sum())
@@ -232,10 +232,13 @@ def main() -> None:
     s9._grant_free_research(0, two, zero)
     assert int(s9.civ_techs[0, 0].sum()) == t_before + 2, "Oxford's two free technologies must land"
     assert int(s9.civ_civics[0, 0].sum()) == c_before, "and no civic with them"
+    avail_c = int(s9._available_mask(s9.civ_civics[:, 0], s9._prereq_c, s9._c_repeat)[0].sum())
     s9._grant_free_research(0, zero, two)
-    assert int(s9.civ_civics[0, 0].sum()) == c_before + 2, "the Bolshoi's two free civics must land"
+    # ONE pool of the civics available before the grants (the DLL's 0x39cd90):
+    # a fresh tree offers Code of Laws alone, so the second grant finds none
+    assert int(s9.civ_civics[0, 0].sum()) == c_before + min(2, avail_c), "the Bolshoi's free civics come off one pool"
     assert int(s9.civ_techs[0, 1].sum()) == t_before, "another seat's tree must not move"
-    print("  free research OK — techs and civics, first available, owner only")
+    print("  free research OK — techs and civics off one pool, owner only")
 
     # --- 10) the tourism multipliers ---------------------------------------
     s10 = build(rules, paths[0])

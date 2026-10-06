@@ -307,8 +307,7 @@ def test_damage_roll_table(sim) -> None:
         got = int(sim._damage_roll(mask, diff)[0])
         # reference: same draw from the same rng state, the DLL's law
         sim.rng_state = rng0.clone()
-        r = sim._next_random(mask)
-        roll = int(torch.floor(r * sim._dmg_max_extra)[0])
+        roll = int(sim._rand_range(mask, sim._dmg_max_extra)[0])
         assert 0 <= roll < sim._dmg_max_extra
         want = _dll_damage(roll, dv)
         assert got == want, f"damage_roll(diff={dv}) = {got}, reference = {want}"

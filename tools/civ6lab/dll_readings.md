@@ -1357,6 +1357,125 @@ appeal before the Conservation term until t242 — the same cache. LAB lines.
   (5,099 unhealed still turns over the sixteen duels, its gains all pillage
   heals; AUDIT C-94 LAB).
 
+## H-1: every draw of a player's start (witnesses, RandCalls.csv)
+
+The game's own per-draw log (`Logs/RandCalls.csv`, kept as
+`runs/h1_randcalls_duelw1117_1118.csv`: turn, range, value, the
+state BEFORE the draw, label) holds runs/h1_duelw1117 (t1-250, 21,322 draws)
+and runs/h1_duelw1118 (t1-278, 23,169) whole, chained, every value
+((state' >> 16) · max16) >> 16 (46,082 of 46,082); each witness seed lands in
+the chain, so every start's draws carry their labels. A start (pre -> post)
+draws, in order:
+- before the cities: a city-state whose research or civic completed picks
+  the next ("BT Research Choice" 0x763020: the AI plan's tech, no draw, else
+  ONE uniform draw over every researchable tech; "Random Civic Choice"
+  0x626600 alike) — which way the plan went the records do not show; a great
+  person's replacement when the player recruits in its start (C-93's pick);
+  rarer: a civic's or a GP's boosts, "Choose random agenda", a quest.
+- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:
+  production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its
+  production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots
+  (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw
+  each, before the wonder's own grants (China's Dynastic Cycle boost, Oxford's
+  techs: runs/h1_duelw1117 t44, t226); the annex 0x1a8b70 clears the city's
+  stored next plot (+0x1c = -1) and counts no culture claim (+0x10 is the
+  border turn's alone); the border turn taking a plot draws afresh when the
+  stored plot is -1 or owned (0x1a9e74), then every turn the closing pick; a
+  Spy the city trains takes "Choosing a Citizen Name" and its level offer
+  (below); a unit's goody hut.
+- the picker 0x1ab1c0 draws only over a non-empty list (0x1aa7f0: unowned
+  plots, byte +0x1c 0xff). Its three callers are the border turn's two and
+  0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex
+  0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them.
+Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the
+witnessed starts, the count lands exactly with no AI choice in it on
+1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the starts that draw at
+all: 73.4 / 74.0 / 72.4 / 74.0%), and with its city-states' and recruits'
+choices resolved by the count on 99.6 / 99.7 / 99.4 / 99.4%.
+On 1117 / 1118 the resolved choices are
+the game's logged ones on 630 of 631 starts. Unexplained, 6-10 a duel: a
+civic's antiquity eras and boosts, a Spy's name and shuffle, an agenda, a
+quest, a start goody; and the player 1 starts that draw one or two picks
+more with NO plot changing hands between the records (runs/h1_duelw1117 t28:
+1/2, 0/1, 0/1 for one city that annexed its stored plot; runs/h1_duelw1118
+t33, t66, t148) — a LAB line.
+
+## H-1: the random promotion offer (0x4f23a0) — READ
+
+Called from a unit's XP gain 0x55d990 when it levels and its type's
+`NumRandomChoices` (unit info +0x60: Apostle, Spy, Rock Band 3) is above 0
+(and 0x4f2d50 refuses): every row of the player's promotion list (+0x940)
+whose class is the unit's (0x524010) goes in a weight-1 vector; the vector
+is drawn OUT ("Random Promotion", one draw over what is left, the drawn row
+erased) — a full shuffle, as many draws as rows; the shuffled list is
+stably sorted by the entries' second word (0x4e6d70, an insertion sort below
+29: the Level), and the first NumRandomChoices make the offer. No held-row
+filter. runs/h1_duelw1118 t218: a Spy's 17 draws 17..1 after its "Choosing a
+Citizen Name"; t224: two Apostles' 9..1 twice; all 16 Rock Band offers of
+the two logs draw 12, its class's rows. Each of the three classes'
+rows share one Level in the engines' catalog, so the sort keeps the shuffle's
+order. The engines follow (`drawPromoOffer` / `_promo_offer_draw`).
+
+## H-1: the World Congress slate (0x598270) — READ
+
+The session setup lists the resolutions in their era (EarliestEra / LatestEra
+at row +0x68 / +0x98 against the game era) that the Lua `CanUseResolutions`
+allows, split by InjectionOnly (row +0xb8, `dll_rowmap.py 0xa6a7b0`): of the
+rest, min(3, n) "World Congress Resolutions" draws, each over what is left
+and removing its pick (0x59a680); with three drawn, the first two the
+previous session did not hold stand, else all drawn; then ONE draw over the
+InjectionOnly rows (the Diplomatic Victory resolution, Modern on: a lone row,
+a draw over 1). runs/h1_duelw1117 t61, t81, t101: 10, 9, 8; t121, t141: 12,
+11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's
+(one draw over a list of rows not in play, called from 0x599275) — unread.
+The "Random congress resolution target" draws after them (16 sites,
+0x611140..) are the AI's targets. The engines (`congressSession` /
+`_congress_draw_slate`) follow, over the resolutions they model.
+
+## H-1: the random boost and free research pickers — READ
+
+0x4ca470 (techs; civics 0x39c330), "Choosing random tech / civic boost to
+grant based on era" — the goody hut's boosts: the earliest era holding a row
+neither researched nor boosted that carries a `Boosts` row; that era's rows
+(its own list, +0x168), weight 1 each; n draws, each erasing its pick.
+runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal
+Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of
+Laws carries none); 1118 t10, t25, t29 alike. 0x4caa50 (civics 0x39c930), the
+same over the eras lo..hi, era by era, labelled "..., Player: n": a Great
+Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge,
+4), Vilnius. Every weight is 1. The engines follow (`BOOSTLESS`, `boostPool`,
+`earliestBoostEra`, `drawBoosts` / `_boost_pool`, `_draw_boosts`). 0x4caeb0
+(civics 0x39cd90), "Choosing random tech / civic to grant based on era"
+(Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows
+researchable before the grants (0x4c8c40), each draw erasing its pick — a
+row the first grant opens is not offered (1117 t226: two draws); the engines
+follow (`grantFreeResearch` / `_grant_free_research`).
+
+## H-1: the barbarians' turn (0x1514a0) — PARTLY READ
+
+The barbarian manager's turn: 0x14f530, the camp step 0x14fcc0, each tribe's
+turn 0x1488a0 ("[BarbarianTribe_Instance] Conversion Point Chance", "Tech
+Steal Cooldown", "Barbarian Ranged unit roll" rand(100) per unit it raises),
+then the clans' 0x8e1bf0. The camp step: a target of max camps (+0x110) ×
+the land plots no major has seen over all land plots (0x50b2d0 on hash
+0x253718b0), less the camps standing (+0x170); the first placement adds
+BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33) % of it, every later
+turn one; each camp a weighted pick over the scored regions ("Barbarian camp
+region placement", the "Barbarian Camp Evaluation" jobs at +0x620), a plot in
+it ("Barbarian camp location"), a tribe ("Barb Tribe Roll" 0x152460).
+runs/h1_duelw1117: camps on t1-4 and t8 only. The engines keep their own
+camp and raid rolls (8%, 10%: `BARB_CAMP_SPAWN_PCT`, `BARB_RAID_PCT`) on
+integer draws — a BUILD line.
+
+## H-1: draws with no game site
+
+The engines' pantheon pick (`_seat_pantheon_race`) and the Free Cities' grant
+("Free Cities Unit Choice", 0x274010, one weighted pick: the engines'
+`freeCityGrantType` / `_free_grant_type` take it as the picker does)
+— the pantheon has no labelled site: Civ 6's AI picks its belief without a
+draw of the game's, so the engines' integer draw there is the driver's stand-in
+(AUDIT BUILD).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
