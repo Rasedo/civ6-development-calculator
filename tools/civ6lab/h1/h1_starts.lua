@@ -17,7 +17,8 @@
 -- The witness of a player's start, `pre` at PlayerTurnStarted and `post` at
 -- PlayerTurnStartComplete, from what GameCore's objects expose (no food or
 -- culture box, loyalty, citizens or queue progress readers there — those
--- are InGame-only): the player's gold, faith, research and progress, civic;
+-- are InGame-only): the generator's state, the player's gold, faith,
+-- research and progress, civic;
 -- per city its population, food surplus, owned plots, yields and majority
 -- religion. `pre` is what the start banks from (the player's last actions
 -- done); `post` what it left.
@@ -53,6 +54,9 @@ local function playerWitness(p)
     local ok, v = pcall(f)
     w[k] = ok and v or ("err:" .. tostring(v))
   end
+  -- the synchronous generator's state here (a read, no draw), so the
+  -- engines can replay this start's draws from it (tools/civ6lab/rng_fit.py)
+  r("seed", function() return Game.GetRandomSeed() end)
   r("gold", function() return pl:GetTreasury():GetGoldBalance() end)
   r("faith", function() return pl:GetReligion():GetFaithBalance() end)
   r("researching", function() return pl:GetTechs():GetResearchingTech() end)

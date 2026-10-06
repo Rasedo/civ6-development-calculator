@@ -229,6 +229,11 @@ def cmd_play(a, t: Tuner) -> int:
             print(f"turn {rec.get('turn')} moved={rec['moved']} cities={len(rec['cities'])}"
                   f" units={len(rec['units'])} errors={len(rec['errors'])}"
                   f" at {time.monotonic() - a.t0:.0f}s", flush=True)
+            # the seat is gone (the dump lists only living players): with no
+            # seat's turn to hold, the game would run on unheld — stop here
+            if lp >= 0 and not any(p.get("id") == lp for p in rec["players"]):
+                print(f"game_over {json.dumps({'seatEliminated': lp, 'turn': rec.get('turn')})}")
+                break
         if left <= 0 or time.monotonic() >= end:
             break
         wait = max(5.0, end - time.monotonic())
