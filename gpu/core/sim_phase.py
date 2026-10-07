@@ -68,8 +68,8 @@ class SimPhase:
         matrix — `unitsHostile` asked of the whole map at once — so
         barbarians, at-war majors and at-war city-states all answer through
         one lookup and no seat gets a hand-written hostility set of its own.
-        Every row fires from its centre's standing strength
-        (`_centre_strength`, `centreStrength`)."""
+        Every row fires from its holder's best ranged made
+        (`_strike_strength`, `cityStrikeStrength`)."""
         Bn, Tn, dev2 = self.B, self.T, self.device
         if not bool(fire.count_nonzero()):
             return
@@ -122,17 +122,11 @@ class SimPhase:
         # embarked target takes the era's flat override instead
         _ch = self._chassis_ability_cs(d_seat, d_type, tt, def_ranged=True)
         def_cs = def_cs + torch.where(d_emb, torch.zeros_like(_ch), _ch).to(def_cs.dtype)
-        # the centre's standing strength, whoever holds it (`centreStrength`);
-        # a major's government and governor terms ride on top
-        atk_cs = self._centre_strength(torch.full_like(col, row), col)
+        # the holder's best ranged made, whoever holds it (`cityStrikeStrength`);
+        # a major's Bastions half rides on top
+        atk_cs = self._strike_strength(row, col)
         if row < self.n_majors:
             atk_cs = atk_cs + self._gov_mods(row)[12]["crng"].to(atk_cs.dtype)
-            # CIV6 (Redoubt): "Increase city garrison Combat Strength by 5" —
-            # this model fires a strike from the same base it defends with, so
-            # the governor's adder rides both.
-            if self.n_governors:
-                atk_cs = atk_cs + self._governor_city_defense(
-                    torch.full_like(col, row), col).to(atk_cs.dtype)
         # a SURVIVED Military Emergency pays its target +2 CS on every City
         # Strike against a member, forever
         _emg_s = torch.zeros(Bn, dtype=torch.float64, device=dev2)
@@ -1496,7 +1490,7 @@ class SimPhase:
             _tr = self._spawn_unit(row, made_u, self._air_spawn_at(row, ui, col, ctr), ui, init_xp=xp,
                                    free_promo=fp, formation=form_t,
                                    init_mp=self._train_mp_bonus(_bl_u, ui, row))
-            self._raise_best_melee(row, _tr, ui, formation=form_t)
+            self._raise_best_trained(row, _tr, ui, formation=form_t)
             # CIV6 (People of the Steppe): "Receive a second light cavalry
             # unit ... each time you train a light cavalry unit" — a TRAINED
             # one, the Arsenal's own door (`EXTRA_UNIT_COPY_ROWS`)
@@ -1514,7 +1508,7 @@ class SimPhase:
                 if not bool(_ew.count_nonzero()):
                     continue
                 for _ in range(_en):
-                    self._raise_best_melee(
+                    self._raise_best_trained(
                         row, self._spawn_unit(row, _ew, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
                         formation=form_t)
             # CIV6 (Suleiman's Janissary): the chassis costs the TRAINING city
@@ -1540,7 +1534,7 @@ class SimPhase:
                 twin = made_u & self.unit_naval[ui] & self._seat_wonder_any(row, self._wond_dupnaval)
                 if bool(twin.count_nonzero()):
                     # what was trained arrives twice, tier and all
-                    self._raise_best_melee(
+                    self._raise_best_trained(
                         row, self._spawn_unit(row, twin, ctr, ui, init_xp=xp, free_promo=fp, formation=form_t), ui,
                         formation=form_t)
             if self._builder_idx >= 0:

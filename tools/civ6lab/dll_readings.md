@@ -2596,11 +2596,91 @@ fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
   (a storm's two plots at the turn's end, 10 → 8, its box standing), 1124
   Granada t74 and t120, Cardiff t103.
 
+## H-1: the melee result, a ranged blow's domain, a city's shot — READ
+
+The action replay's battles against each game's `Logs/CombatLog.csv` (Game
+Turn, attacker / defender civ, object types, ids, base strengths, the summed
+modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
+`<dump stem>.logs/` for 1125-1128), the draws from `RandCalls.csv`.
+
+- The melee result (0x206960, Combat_Manager): the defender's damage is
+  drawn first (0x51a240); the counter — the attacker's damage — is never
+  drawn where the defender is embarked (0x8be30, byte +0x6b0) and does not
+  fight embarked (+0x18c3, m_bFightWhileEmbarked). Both sides' totals are
+  then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would
+  fall, the side whose total overshoots further falls and the other is left
+  at max - 1 damage (1 HP) — the attacker on a tie (0x206d01: `jle`). The
+  experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2).
+  Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a
+  city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the
+  Warrior stands at 1; 1120 t13 17 / 32 (a defender at 18 HP). 197 of the
+  CombatLog's melee rows (`UNIT_GALLEY` on Rome's embarked Warriors at
+  DefenderStr 15 among them) log 0 for the attacker. The engines:
+  `resolveMutualKill`, `meleeAttack`'s embarked arm / `_melee_exchange`.
+- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify
+  turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0).
+  Fortification grows only in the Fortify operation's tick (0x95ebb0,
+  0x960800, 0x959830: +1 to FORTIFY_TURN_MAX), as the C-94 BUILD line says.
+  The engines: `spendAttack` / `_spend_one_attack`.
+- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength):
+  a bombard attack (combat type 0x4fc9163d) loses
+  COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (GlobalParameters +0x188, 17) on
+  a defender of the land domain (+0x650 == 2,
+  LESS_EFFECTIVE_VS_LAND_UNITS); a ranged attack (0x2ec4ce4d) by a land unit
+  loses it on a defender of the sea domain (0, LESS_EFFECTIVE_VS_NAVAL_UNITS).
+  Records: 1124 t45-77 a barbarian Slinger on Rome's Galleys logs 15 - 12
+  (a +5 of its own, see below), Archers, Crossbowmen, Rangers and Field
+  Cannons on ships 17 under; Catapults, Bombards and Trebuchets on ships their
+  whole Bombard (1122 t99, t125, 1124 t103, t116, t198, 1128 t149, t150).
+  The engines: `rangedDomainCS` / `_ranged_domain_cs` (the Giant Death
+  Robot's naval clause is this rule).
+- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the
+  attacker's damage, then 0x519440 the district's hit points (hash
+  0x5e97d629) and 0x519440 its outer defense (0x6da56a3d), each its own
+  "Unit Combat Damage" draw; the defense's damage is scaled by
+  COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; +0x1a4,
+  +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw
+  twice (hit points, defense) and nothing for the attacker. The log carries
+  one UnitDamageChanged for the three (1117 t14). The engines split one roll
+  (`cityDamageSplit`): see the contradictions below.
+- A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150,
+  m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH
+  3) plus the city's district attack bonus (+0x1890); 0x51c2d0 takes off
+  the damaged district's loss — the wounded law (0x522630) at
+  COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER 10 on the percent of the outer
+  defense's damage where the district has an outer defense, else of its hit
+  points'. The best ranged rises beside the best melee (0x4c1a30): the unit's
+  ranged strength 0x56e3e0 (RangedCombat, row +0x6c, a Bombard is none) with
+  its formation's; +0x1b0 the best Bombard (0x56daa0) beside it. Records:
+  1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as
+  Crossbowmen, Field Cannons and Battleships come; a city-state that made no
+  ranged unit strikes at 3 (t217-219). The engines: `cityStrikeStrength` /
+  `_strike_strength`, `Seat.bestRangedCS` / `civ_best_ranged`.
+- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the
+  player's m_bMilitaryCombatAdjacency (+0x1268), which only
+  EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_BONUS on
+  Military Tradition).
+- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on
+  some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's
+  Scout, t32, t37, t84; 1126 the Archer 2818053 on every shot t75-88; the
+  same Slinger 1124 2883596 at -12 on ships and +5 on land t44-83), and a +3
+  to +5 China's and the city-states' units carry against barbarians (1124
+  t34, t62, t72, t102-104) — no install row (the modifiers of
+  MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the
+  difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps'
+  promotions are empty.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
   `woundPenalty` / its GPU twin round 10 - HP/10 (AUDIT C-94 BUILD); the
   garrison term reads the law.
+- A unit's attack on a city (0x206080, 0x204b10, 0x2074b0, "H-1: the melee
+  result, a ranged blow's domain, a city's shot"): the game draws the
+  district's hit-point damage and its outer defense's damage apart, the
+  defense's scaled by COMBAT_DEFENSE_DAMAGE_PERCENT_*, and a melee attacker's
+  damage first; the engines split one roll (`cityDamageSplit`,
+  `cityAssault` drawing the city's then the attacker's) (AUDIT C-94 BUILD).
 - CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE's 0x1a1640 term (AUDIT
   C-94 BUILD).
 - Lifetime culture (0x3a1fb0) grows by every gain of civic progress, a

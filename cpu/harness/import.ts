@@ -81,7 +81,7 @@ import { LUXURY_IDS } from '../../world/resources';
 import { SPY_MISSIONS, SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
 import type { QueueItem } from '../core/types';
 import { projectCost, settlerCost, unitStepCost } from '../core/game';
-import { builderCost, traderCost, unitDomain } from '../core/units';
+import { builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
@@ -463,6 +463,8 @@ export interface History {
   /** the World Congress table the record before the current one showed */
   congressBefore?: unknown;
   bestMelee: Map<number, number>;
+  /** each player's strongest Ranged Strength made (`Seat.bestRangedCS`) */
+  bestRanged: Map<number, number>;
   /** units a major holds levied from a city-state, by `owner:id`, with the
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
@@ -729,7 +731,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), bestRanged: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
@@ -1194,12 +1196,17 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     if (Array.isArray(r) && r[2] === 'GovernorAssigned') h.govSeated.set(`${r[5]}:${r[6]}`, r[1] as number);
   }
   // what a unit new at this record raises its owner's base to
-  // (`raiseBestMelee`): a land or naval fighting unit's Combat with its
+  // (`raiseBestTrained`): a land or naval fighting unit's Combat with its
   // formation's strength
   const made = (idx: number, formation: number) => {
     const id = unitId({ cat, uReplace, gaps: new Map() }, idx);
     const def = id ? UNITS[id] : undefined;
     return def && def.combat > 0 && unitDomain(id!) === 'military' ? def.combat + (FORMATION_CS[formation] ?? 0) : 0;
+  };
+  const madeRanged = (idx: number, formation: number) => {
+    const id = unitId({ cat, uReplace, gaps: new Map() }, idx);
+    const r = id && made(idx, formation) > 0 ? rangedCombatOf(id) : 0;
+    return r > 0 ? r + (FORMATION_CS[formation] ?? 0) : 0;
   };
   // a resource a player reads paying its yield without the revealing
   // technology: the grant (`GP_RESOURCE_REVEAL`) where the records name no
@@ -1281,6 +1288,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (was) h.levied.set(`${u.owner}:${u.id}`, h.levied.get(`${was.owner}:${was.id}`)!);
       const cs = from || bool(u.embarked) ? 0 : made(u.type, Math.max(0, num(u.formation)));
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
+      const rs = from || bool(u.embarked) ? 0 : madeRanged(u.type, Math.max(0, num(u.formation)));
+      if (rs > (h.bestRanged.get(u.owner) ?? 0)) h.bestRanged.set(u.owner, rs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
     }
     // a unit the log shows trained, bought or upgraded raises it too, gone
@@ -1303,6 +1312,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (typeof idx !== 'number' || minors.has(r[3] as number)) continue;
       const cs = made(idx, 0);
       if (cs > (h.bestMelee.get(r[3] as number) ?? 0)) h.bestMelee.set(r[3] as number, cs);
+      const rs = madeRanged(idx, 0);
+      if (rs > (h.bestRanged.get(r[3] as number) ?? 0)) h.bestRanged.set(r[3] as number, rs);
     }
     const now = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     for (const u of h.last.units) {
@@ -2052,6 +2063,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (bool(p.major)) importAges(ctx, s, p, history);
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
+    s.bestRangedCS = history?.bestRanged.get(p.id) ?? 0;
     // the copies a price progression counts are the game's own, read off its
     // quote where one stands: a Builder taken back in the field moves no
     // price (runs/h1_duelw1105, China's t46 and t52 three-charge Builders

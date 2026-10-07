@@ -97,7 +97,7 @@ def main() -> int:
     assert len(g["upgradeTech"]) == 4 and all(int(x) >= 0 for x in g["upgradeTech"]), \
         f"every upgrade needs a real tech: {g['upgradeTech']}"
     assert (int(g["droneAA"]), int(g["particleBeamCS"]), int(g["enhancedMoves"]),
-            int(g["armorPlatingCS"]), int(g["navalPenalty"])) == (130, 30, 3, 10, 17)
+            int(g["armorPlatingCS"])) == (130, 30, 3, 10)
     s1 = fresh(rules, paths[0])
     assert (s1._gdr_u_drone, s1._gdr_u_beam, s1._gdr_u_moves, s1._gdr_u_armor) == (0, 1, 2, 3)
     assert s1._gdr_idx == gdr, f"_gdr_idx {s1._gdr_idx} vs wire row {gdr}"
@@ -154,12 +154,12 @@ def main() -> int:
     assert int(s5._gdr_armor_cs(L(s5, gdr), L(s5, row), L(s5, navy))[0]) == 10
     assert int(s5._gdr_armor_cs(L(s5, gdr), L(s5, row), L(s5, plane))[0]) == 0, "a plane is neither"
     assert int(s5._gdr_armor_cs(L(s5, gdr), L(s5, row), L(s5, -1))[0]) == 0, "and neither is a city"
-    # CIV6: "-17 Ranged Strength against District defenses and naval units" —
-    # no upgrade behind it, and the district half is `_ranged_city_pen`.
+    # CIV6 (0x51c810): every land ranged unit loses 17 on a naval hull, the
+    # chassis included, and the district half is `_ranged_city_pen`.
     s6 = fresh(rules, paths[0])
-    assert int(s6._gdr_naval_cs(L(s6, gdr), L(s6, navy))[0]) == -17
-    assert int(s6._gdr_naval_cs(L(s6, gdr), L(s6, foot))[0]) == 0
-    assert int(s6._gdr_naval_cs(L(s6, land_r), L(s6, navy))[0]) == 0
+    assert int(s6._ranged_domain_cs(L(s6, gdr), L(s6, navy))[0]) == -17
+    assert int(s6._ranged_domain_cs(L(s6, gdr), L(s6, foot))[0]) == 0
+    assert int(s6._ranged_domain_cs(L(s6, land_r), L(s6, navy))[0]) == -17
     print("  5 armor plating + the naval penalty OK")
 
     # --- 6) Enhanced Mobility: the moves, and the mountain ------------------

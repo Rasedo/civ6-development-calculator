@@ -831,7 +831,7 @@ class SimMinors:
         city's buildings hand a unit trained there (`applyTrainingGrants`)
         unless `grants` is off; a Builder counts toward the next one's price.
         Every such unit is trained or bought, so it raises the minor's best
-        melee (`_raise_best_melee`). The games where it landed."""
+        melee (`_raise_best_trained`). The games where it landed."""
         if not bool(mask.count_nonzero()):
             return torch.zeros_like(mask)
         row = self._CITY_MINOR0 + s
@@ -843,7 +843,7 @@ class SimMinors:
                 self.city_dist_tile[:, row, 0], self.city_bldg_pillaged[:, row, 0])
             xp = self._train_xp_pct(bl, u0, row, col0)
         landed = self._spawn_unit(row, mask, self.citystate_center[:, s].clamp(min=0), u0, init_xp=xp)
-        self._raise_best_melee(row, landed, u0)
+        self._raise_best_trained(row, landed, u0)
         if self._builder_idx >= 0:
             self.citystate_builders_trained[:, s] += (landed & (u0 == self._builder_idx)).long()
         self._gen_ver += 1
@@ -1204,8 +1204,8 @@ class SimMinors:
             self.major_unit_type[rr, u] = nxt[rr, u]
             self.major_unit_mp[rr, u] = 0
             self._gen_ver += 1
-            # the upgraded chassis raises the minor's base (`raiseBestMelee`)
-            self._raise_best_melee(self._CITY_MINOR0 + s, go, nxt.gather(1, first.unsqueeze(1)).squeeze(1),
+            # the upgraded chassis raises the minor's base (`raiseBestTrained`)
+            self._raise_best_trained(self._CITY_MINOR0 + s, go, nxt.gather(1, first.unsqueeze(1)).squeeze(1),
                                    formation=self.major_unit_formation.gather(1, first.unsqueeze(1)).squeeze(1))
 
     def _minor_monk_ok(self, s: int) -> torch.Tensor:

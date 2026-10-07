@@ -4,14 +4,14 @@ import { emptySeat, setWar, setTileOwner, tileSeat } from '../../../cpu/core/sea
 import {
   spawnUnit, refreshUnits, unitFullMoves, tileFreeForUnit, gdrJump,
 } from '../../../cpu/core/units';
-import { defenderCS, cityRangedStrength, gdrNavalCS, meleeAttack } from '../../../cpu/core/combat';
+import { defenderCS, cityRangedStrength, rangedDomainCS, meleeAttack } from '../../../cpu/core/combat';
 import { airDefenseOf, antiAirAt, antiAirOf } from '../../../cpu/core/air';
 import { formUp } from '../../../cpu/core/game';
 import {
   UNITS, GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES,
-  GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, RANGED_CITY_PENALTY,
+  GDR_ARMOR_PLATING_CS, RANGED_CITY_PENALTY,
 } from '../../../cpu/data/units';
-import { MP_SCALE } from '../../../cpu/data/constants';
+import { MP_SCALE, COMBAT_BOMBARD_VS_UNIT } from '../../../cpu/data/constants';
 import { RESOURCES } from '../../../world/resources';
 
 // CIV6 (Giant Death Robot), Gathering Storm. Nothing here is gate-reachable —
@@ -97,12 +97,14 @@ describe('the chassis itself', () => {
     const state = world();
     const b = bot(state, 10, 8);
     const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 10, 9).index, 0)!;
-    // CIV6: "-17 Ranged Strength against District defenses and naval units" —
-    // the district half is the penalty every land ranged unit already pays, so
-    // what the chassis adds is the naval half, and it needs no upgrade.
-    expect(gdrNavalCS(b, 'FRIGATE')).toBe(-GDR_NAVAL_PENALTY);
-    expect(gdrNavalCS(b, 'WARRIOR')).toBe(0);
-    expect(gdrNavalCS(archer, 'FRIGATE')).toBe(0);
+    const cat = spawnUnit(state, 'CATAPULT', tileAtCoords(state.map, 9, 9).index, 0)!;
+    // CIV6 (0x51c810): every land ranged unit loses 17 on a naval hull, the
+    // chassis included; a siege chassis fires its whole Bombard there
+    expect(rangedDomainCS(b, 'FRIGATE')).toBe(-COMBAT_BOMBARD_VS_UNIT);
+    expect(rangedDomainCS(b, 'WARRIOR')).toBe(0);
+    expect(rangedDomainCS(archer, 'FRIGATE')).toBe(-COMBAT_BOMBARD_VS_UNIT);
+    expect(rangedDomainCS(cat, 'FRIGATE')).toBe(COMBAT_BOMBARD_VS_UNIT);
+    expect(UNITS.CATAPULT.ranged!.strength + rangedDomainCS(cat, 'FRIGATE')).toBe(UNITS.CATAPULT.bombard);
     // and the district half is unchanged for this chassis
     expect(cityRangedStrength(state, b, 100))
       .toBe(UNITS[BOT].ranged!.strength - RANGED_CITY_PENALTY);

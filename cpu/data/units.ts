@@ -2126,10 +2126,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       gdr: true,
       waterWalk: true,
       // CIV6: "Can only heal in friendly territory", "Cannot earn experience
-      // or Promotions", "Cannot form Corps or Armies by any means", and
-      // "-17 Ranged Strength against District defenses and naval units" —
-      // the district half of which is the penalty every land ranged unit
-      // already pays, so `gdr` carries the NAVAL half.
+      // or Promotions", "Cannot form Corps or Armies by any means"; its
+      // "-17 Ranged Strength against District defenses and naval units" is
+      // what every land ranged unit pays (`rangedCityPenalty`,
+      // `rangedDomainCS`).
       healFriendlyOnly: true,
       requiresTech: 'ROBOTICS',
       requiresResource: 'URANIUM',
@@ -4022,10 +4022,6 @@ export const GDR_DRONE_AA = 130;
 export const GDR_PARTICLE_BEAM_CS = 30;
 export const GDR_ENHANCED_MOVES = 3;
 export const GDR_ARMOR_PLATING_CS = 10;
-/** CIV6: the chassis's own "-17 Ranged Strength against ... naval units". The
- *  district half of the same clause is `RANGED_CITY_PENALTY`, which every land
- *  ranged unit already pays. */
-export const GDR_NAVAL_PENALTY = 17;
 
 /** the catalog's order — how both engines name a chassis on the wire and in
  *  the decomposition log. It lives HERE rather than in a core module because

@@ -201,22 +201,22 @@ def test_trained_or_bought() -> None:
     sim._spawn_unit(r, one, torch.full((sim.B,), ctr, dtype=torch.long),
                     torch.full((sim.B,), sword, dtype=torch.long))
     assert int(sim.civ_best_melee[B0, r]) == 0, "a granted Swordsman raised the base"
-    sim._raise_best_melee(r, one, torch.full((sim.B,), sword, dtype=torch.long))
+    sim._raise_best_trained(r, one, torch.full((sim.B,), sword, dtype=torch.long))
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword])
-    sim._raise_best_melee(r, one, sim._warrior_idx)
+    sim._raise_best_trained(r, one, sim._warrior_idx)
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[sword]), "the base fell"
     # a ranged chassis' melee Combat counts (runs/h1_duelw1106 t195, a
     # Machine Gun), and a Corps' formation strength rides on it
     full = lambda i: torch.full((sim.B,), i, dtype=torch.long)  # noqa: E731
-    sim._raise_best_melee(r, one, full(cannon))
+    sim._raise_best_trained(r, one, full(cannon))
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[cannon]), "a ranged chassis did not raise it"
-    sim._raise_best_melee(r, one, full(cannon), formation=full(1))
+    sim._raise_best_trained(r, one, full(cannon), formation=full(1))
     assert int(sim.civ_best_melee[B0, r]) == int(sim._type_combat[cannon]) + int(sim._formation_cs[1]), (
         "a Corps' strength did not ride")
     # an aircraft moves nothing (runs/h1_duelw1107 t247, a Fighter)
     jet = next(i for i, u in enumerate(sim.rules.units) if u["id"] == "JET_FIGHTER")
     was = int(sim.civ_best_melee[B0, r])
-    sim._raise_best_melee(r, one, full(jet))
+    sim._raise_best_trained(r, one, full(jet))
     assert int(sim.civ_best_melee[B0, r]) == was, "an aircraft raised the base"
     print("  5 trained or bought OK — a starting or granted unit moves nothing, the base never falls")
 

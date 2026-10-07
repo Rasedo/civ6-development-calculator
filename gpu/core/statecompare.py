@@ -675,6 +675,7 @@ SEAT = {
     "relicReserve": _civ_scalar("civ_relic_reserve"),
     "emergencyRewards": _emg_rewards,
     "bestMeleeCS": _civ_scalar("civ_best_melee"),
+    "bestRangedCS": _civ_scalar("civ_best_ranged"),
     "techs": _civ_mask("civ_techs"),
     "civics": _civ_mask("civ_civics"),
     "boosted": _boosted,
@@ -876,6 +877,7 @@ CITY_STATE = {
     "minorLossTurn": lambda sim, b, rows: [int(sim.citystate_loss_turn[b, s]) for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
     "minorBestMeleeCS": lambda sim, b, rows: [int(sim.citystate_best_melee[b, s]) for s in rows],
+    "minorBestRangedCS": lambda sim, b, rows: [int(sim.citystate_best_ranged[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }

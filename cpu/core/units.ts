@@ -1240,7 +1240,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   unit.type = next;
   unit.movesLeft = 0;
   unit.movesFull = unitFullMoves(state, unit);
-  raiseBestMelee(state, seat, next, unit.formation ?? 0);
+  raiseBestTrained(state, seat, next, unit.formation ?? 0);
   return { ok: true };
 }
 
@@ -1597,7 +1597,7 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
 }
 
 /** A seat TRAINED, BOUGHT or UPGRADED to a land or naval fighting unit: the
- *  strongest Combat it has so made — a ranged chassis' melee Combat and a
+ *  strongest Combat (and Ranged Strength, `Seat.bestRangedCS`) it has so made — a ranged chassis' melee Combat and a
  *  Corps' or Army's formation strength included — rises to it and never falls
  *  (`Seat.bestMeleeCS`, the base its centres stand on). The live game raised
  *  the base at the purchase in every city at once and kept it after the unit
@@ -1613,11 +1613,25 @@ export function formationTierFor(state: GameState, seat: number, unitType: strin
  *  Submarine made a Nuclear Submarine, 80), a merge into a Corps or an Army
  *  did not (h1_duelw1107 t176), nor did an aircraft (h1_duelw1103 t240: a Jet
  *  Bomber; h1_duelw1107 t247: a Fighter). */
-export function raiseBestMelee(state: GameState, seat: number, unitType: string, formation = 0): void {
+export function raiseBestTrained(state: GameState, seat: number, unitType: string, formation = 0): void {
   const def = UNITS[unitType];
   if (!def || !(def.combat > 0) || unitDomain(unitType) !== 'military') return;
   const owner = seatOf(state, seat);
-  if (owner) owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat + (FORMATION_CS[formation] ?? 0));
+  if (!owner) return;
+  owner.bestMeleeCS = Math.max(owner.bestMeleeCS ?? 0, def.combat + (FORMATION_CS[formation] ?? 0));
+  // GameCore_XP2_Release.dll 0x4c1a30 raises the best Ranged Strength
+  // (PlayerStats +0x150, m_iMaxRangedStrengthTrained) on the same unit:
+  // the row's RangedCombat with the formation's strength (0x56e3e0) — a
+  // siege chassis' Bombard is no RangedCombat
+  const ranged = rangedCombatOf(unitType);
+  if (ranged > 0) owner.bestRangedCS = Math.max(owner.bestRangedCS ?? 0, ranged + (FORMATION_CS[formation] ?? 0));
+}
+
+/** a chassis' RangedCombat as the install writes it: its ranged strength,
+ *  none for a siege chassis (its `ranged.strength` is its Bombard's) */
+export function rangedCombatOf(unitType: string): number {
+  const def = UNITS[unitType];
+  return def?.ranged && def.bombard === undefined ? def.ranged.strength : 0;
 }
 
 /** `far`: a GRANT, which the game places on the nearest plot that takes the

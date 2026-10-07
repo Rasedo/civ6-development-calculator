@@ -272,6 +272,9 @@ class SimInit:
         # the strongest melee Combat Strength the minor has trained or bought — the base
         # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
         self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # the strongest Ranged Strength it has made — what its centre strikes
+        # from (`cityStrikeStrength`, the Seat's `bestRangedCS`)
+        self.citystate_best_ranged = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the episode's Builder purchase rate (per mille, -1 undrawn), the
         # military count at the end of the minor's last turn (-1 before its
         # first) and the turn it was last seen to lose a unit (-1 none) — the
@@ -575,7 +578,7 @@ class SimInit:
         self.seat_explored = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
 
         _civ_scalars = (
-            ("best_melee", torch.long, 0), ("builders_trained", torch.long, 0),
+            ("best_melee", torch.long, 0), ("best_ranged", torch.long, 0), ("builders_trained", torch.long, 0),
             ("settlers_trained", torch.long, 0),
             ("relic_reserve", torch.long, 0),
             ("civic_prog", dtype, 0), ("cur_civic", torch.long, -1),
@@ -3300,6 +3303,8 @@ class SimInit:
         self._wall_dmg_ranged = float(rules.combat["wallDamageRanged"])
         self._wall_breach = float(rules.combat["wallBreachFraction"])
         self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
+        self._bombard_vs_unit = int(rules.combat["bombardVsUnit"])
+        self._city_min_strike = int(rules.combat["cityMinStrike"])
         self._formation_cs = torch.tensor(
             [int(x) for x in rules.combat["formationCs"]], dtype=torch.long, device=device)
         self._formation_civic = [int(x) for x in rules.combat["formationCivic"]]
@@ -3631,7 +3636,6 @@ class SimInit:
         self._gdr_particle_cs = float(_gdr["particleBeamCS"])
         self._gdr_enhanced_moves = int(_gdr["enhancedMoves"])
         self._gdr_plate_cs = float(_gdr["armorPlatingCS"])
-        self._gdr_naval_penalty = float(_gdr["navalPenalty"])
         _st = rules.strategic
         _rsc = rules.resources
         # CIV6 (Resource_Harvests): the HARVEST's yield column, its own base

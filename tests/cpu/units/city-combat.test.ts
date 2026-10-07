@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
-import { disbandUnit, raiseBestMelee, reseatUnit, spawnUnit } from '../../../cpu/core/units';
+import { disbandUnit, raiseBestTrained, reseatUnit, spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
 import { applyTrainingGrants, cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
 import { endTurn } from '../../../cpu/core/game';
@@ -307,7 +307,7 @@ describe("a city centre's standing strength", () => {
 
   it('a garrison no stronger than the base and a foreign unit add nothing', () => {
     const { state, city } = scene();
-    raiseBestMelee(state, 1, 'SWORDSMAN');
+    raiseBestTrained(state, 1, 'SWORDSMAN');
     expect(centreStrength(state, city)).toBe(25);
     const w = spawnUnit(state, 'WARRIOR', city.centerIndex, 1)!;
     expect(centreStrength(state, city)).toBe(25);
@@ -332,11 +332,11 @@ describe("a city centre's standing strength", () => {
     expect(CITY_START_MELEE_MINOR).toBe(25);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + PALACE_CITY_CS + 3 * ENVOY_CITY_CS);
     // a trained Warrior stays under the minor's own start value
-    raiseBestMelee(state, cs.seat, 'WARRIOR');
+    raiseBestTrained(state, cs.seat, 'WARRIOR');
     expect(cs.bestMeleeCS).toBe(20);
     expect(centreStrength(state, minorCity(cs))).toBe(15 + 3 + 3);
     // the strongest melee it has trained, not its population or its type
-    raiseBestMelee(state, cs.seat, 'SWORDSMAN');
+    raiseBestTrained(state, cs.seat, 'SWORDSMAN');
     expect(centreStrength(state, minorCity(cs))).toBe(25 + 3 + 3);
   });
 });
@@ -379,16 +379,16 @@ describe('the base: the strongest melee ever trained or bought', () => {
     expect(centreStrength(state, city, false)).toBe(UNITS.SWORDSMAN.combat - CITY_BASE_MELEE_CUT);
     for (const u of state.units.filter((x) => x.seat === 0)) disbandUnit(state, u.id);
     expect(centreStrength(state, city)).toBe(UNITS.SWORDSMAN.combat - CITY_BASE_MELEE_CUT);
-    raiseBestMelee(state, 0, 'WARRIOR');
+    raiseBestTrained(state, 0, 'WARRIOR');
     expect(seat.bestMeleeCS).toBe(UNITS.SWORDSMAN.combat);
     // a ranged chassis' melee Combat counts (runs/h1_duelw1106 t195, a
     // Machine Gun), a Corps' formation strength rides on it, and an aircraft
     // moves nothing (runs/h1_duelw1107 t247, a Fighter)
-    raiseBestMelee(state, 0, 'FIELD_CANNON');
+    raiseBestTrained(state, 0, 'FIELD_CANNON');
     expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat);
-    raiseBestMelee(state, 0, 'FIELD_CANNON', 1);
+    raiseBestTrained(state, 0, 'FIELD_CANNON', 1);
     expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat + FORMATION_CS[1]);
-    raiseBestMelee(state, 0, 'JET_FIGHTER');
+    raiseBestTrained(state, 0, 'JET_FIGHTER');
     expect(seat.bestMeleeCS).toBe(UNITS.FIELD_CANNON.combat + FORMATION_CS[1]);
   });
 
@@ -396,7 +396,7 @@ describe('the base: the strongest melee ever trained or bought', () => {
     const { state, seat } = scene();
     const u = spawnUnit(state, 'KNIGHT', tileAtCoords(state.map, 8, 8).index, 0)!;
     u.formation = 1;
-    raiseBestMelee(state, 0, 'TANK', u.formation);
+    raiseBestTrained(state, 0, 'TANK', u.formation);
     expect(seat.bestMeleeCS).toBe(UNITS.TANK.combat + FORMATION_CS[1]);
   });
 

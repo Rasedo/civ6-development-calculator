@@ -10,7 +10,7 @@ import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuild
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
 import { boostPool, drawBoosts } from './boosts';
-import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
+import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
@@ -1222,7 +1222,7 @@ function purchaseWarriorMonk(state: GameState, city: City, buyer: Seat, seat: nu
   const u = spawnUnit(state, 'WARRIOR_MONK', city.centerIndex, seat);
   if (!u) return { ok: false, reason: 'No free tile near the city center.' };
   buyer.faith = (buyer.faith ?? 0) - cost;
-  raiseBestMelee(state, seat, 'WARRIOR_MONK');
+  raiseBestTrained(state, seat, 'WARRIOR_MONK');
   patronSaint(state, city, u);
   return { ok: true };
 }

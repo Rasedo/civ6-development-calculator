@@ -754,6 +754,17 @@
           ]
         },
         {
+          "name": "bestRangedCS",
+          "compare": "exact",
+          "covers": [
+            "Seat.bestRangedCS"
+          ],
+          "planes": [
+            "civ_best_ranged"
+          ],
+          "note": "the strongest Ranged Strength the seat has made, what its cities strike from (`cityStrikeStrength`)."
+        },
+        {
           "name": "techs",
           "compare": "exact",
           "covers": [
@@ -2222,6 +2233,15 @@
             "citystate_best_melee"
           ],
           "note": "the strongest melee Combat Strength the minor has fielded, the base its centre stands on (`holderStrength`); the Seat field a minor's record carries."
+        },
+        {
+          "name": "minorBestRangedCS",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "citystate_best_ranged"
+          ],
+          "note": "the strongest Ranged Strength the minor has made, what its centre strikes from (`cityStrikeStrength`); the Seat field a minor's record carries."
         },
         {
           "name": "warTurns",

@@ -39,7 +39,7 @@ import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
-import { applyTrainingGrants, centreStrength } from './combat';
+import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
 import { computeCityStats } from './city';
 import { minorCity, suzerainOf } from './cityStates';
@@ -49,7 +49,7 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
 import { FREE_SEAT, civsAtWar, hiddenResourcesFor, majorityReligionOf, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestMelee, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
@@ -103,7 +103,7 @@ export function minorPhase(state: GameState): void {
     minorBuilders(state, cityState);
     minorTrade(state, cityState);
     const city = minorCity(cityState);
-    cityStrikes(state, city, centreStrength(state, city));
+    cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!walkHeld) minorWalk(state, cityState);
     cityState.armySeen = minorMilitary(state, cityState).length;
   }
@@ -246,7 +246,7 @@ export function minorUpgrades(state: GameState, cityState: CityState, gained: nu
     cityState.treasury -= MINOR_UPGRADE_GOLD;
     u.type = UNITS[u.type].upgradesTo!;
     u.movesLeft = 0;
-    raiseBestMelee(state, cityState.seat, u.type, u.formation ?? 0);
+    raiseBestTrained(state, cityState.seat, u.type, u.formation ?? 0);
   }
 }
 
@@ -337,7 +337,7 @@ function minorBuyMilitary(state: GameState, cityState: CityState, units: Unit[])
     const u = spawnUnit(state, 'WARRIOR_MONK', cityState.centerIndex, cityState.seat);
     if (u) {
       cityState.faith -= monkPrice;
-      raiseBestMelee(state, cityState.seat, 'WARRIOR_MONK');
+      raiseBestTrained(state, cityState.seat, 'WARRIOR_MONK');
     }
     return;
   }

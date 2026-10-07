@@ -850,6 +850,11 @@ export interface Seat {
    *  Production in all Cities for 5 turns" — the turns still to run. */
   conquestProdTurns?: number;
   bestMeleeCS: number;
+  /** the strongest Ranged Strength of a unit the seat trained, bought or
+   *  upgraded to (its formation's included; a siege chassis' Bombard and an
+   *  aircraft's raise nothing): what its cities strike from
+   *  (`cityStrikeStrength`); absent, none */
+  bestRangedCS?: number;
   /** every ONE-TIME project this seat has completed. */
   projectsDone: string[];
   /** nuclear devices held, dense over `NUCLEAR_DEVICES`. CIV6: a finished

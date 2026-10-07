@@ -2253,15 +2253,23 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
   }
 }
 
+/** THE ACTION REPLAY'S HOLD on the cities' strikes: a city's shot is its
+ *  player's decision, which the replay lands where the record's log fired it
+ *  (`cityStrikeAt`). Off outside a replay. */
+let strikeHold = false;
+export function holdCityStrikes(on: boolean): void {
+  strikeHold = on;
+}
+
 /**
  * ONE city's ranged strikes for the turn, in its owner's turn — the centre's
  * and then the Encampment's. A major's city calls this from `seatPhase`, a
  * city-state's from `minorPhase`, each with the strength its own centre
  * fights at. The target is the nearest unit hostile to the city's seat at
- * range 1-2, the lowest tile index on a tie; one roll, no retaliation, no
- * capture.
+ * range 1-2, the lowest tile index on a tie (`cityStrikeAt`).
  */
 export function cityStrikes(state: GameState, city: City, strikeCS: number): void {
+  if (strikeHold) return;
   const striker = { seat: city.seat };
   // CIV6: walls give a city its ranged strike, and "if the Outer Defense of
   // a city or defensible district has been completely destroyed, its ranged
@@ -2286,23 +2294,7 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
         bestTile = t.index;
       }
     }
-    if (bestTile < 0) return;
-    const defender = stackDefender(state, visibleHostilesAt(state, bestTile, striker).filter(shootable), true); // a city strike is a SHOT
-    const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[bestTile], city.seat);
-    // a survived Military Emergency pays its target +2 CS on every City
-    // Strike against a member, forever. CIV6 (Expansion1_Emergencies.xml):
-    // the reward is gated on COMBAT_DISTRICT_VS_UNIT, so the Encampment's
-    // shot pays it too.
-    const atkCS = strikeCS + emergencyStrikeCS(state, city.seat, defender.seat);
-    defender.hp -= damageRoll(state, atkCS - defCSa, key, bestTile);
-    awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
-    warWearinessBattle(state, city.seat, defender.seat, bestTile, { dDied: defender.hp <= 0, city: true });
-    // The STRIKER is the city, so the dig's era gate is its owner's — the GPU
-    // passes `striker_row` at the same site.
-    if (defender.hp <= 0) {
-      unitKillEvent(state, city.seat, undefined, defender);
-      killUnit(state, defender);
-    }
+    if (bestTile >= 0) cityStrikeAt(state, city, key, strikeCS, bestTile);
   };
   for (let sk = 0; perimeter && sk < strikes; sk++) shoot(state.map.tiles[city.centerIndex], 'cstk');
   // CIV6: "building any level of Walls in the city will supply both" the
@@ -2317,6 +2309,34 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
     if (!encD) break;
     shoot(state.map.tiles[encD.tileIndex], 'estk');
   }
+}
+
+/**
+ * ONE shot of a city's centre (`cstk`) or its Encampment (`estk`) at the
+ * plot `targetIndex`: the plot's strongest unit hostile to the city's seat
+ * that a shot may take, one roll, no retaliation, no capture. False where
+ * the plot holds none.
+ */
+export function cityStrikeAt(state: GameState, city: City, key: 'cstk' | 'estk', strikeCS: number, targetIndex: number): boolean {
+  const targets = visibleHostilesAt(state, targetIndex, { seat: city.seat }).filter(shootable);
+  if (!targets.length) return false;
+  const defender = stackDefender(state, targets, true); // a city strike is a SHOT
+  const defCSa = cityStrikeDefenderCS(state, defender, state.map.tiles[targetIndex], city.seat);
+  // a survived Military Emergency pays its target +2 CS on every City
+  // Strike against a member, forever. CIV6 (Expansion1_Emergencies.xml):
+  // the reward is gated on COMBAT_DISTRICT_VS_UNIT, so the Encampment's
+  // shot pays it too.
+  const atkCS = strikeCS + emergencyStrikeCS(state, city.seat, defender.seat);
+  defender.hp -= damageRoll(state, atkCS - defCSa, key, targetIndex, { a: atkCS, d: defCSa });
+  awardDefenseXp(state, defender); // +2 to a surviving military defender (attacker is the city)
+  warWearinessBattle(state, city.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0, city: true });
+  // The STRIKER is the city, so the dig's era gate is its owner's — the GPU
+  // passes `striker_row` at the same site.
+  if (defender.hp <= 0) {
+    unitKillEvent(state, city.seat, undefined, defender);
+    killUnit(state, defender);
+  }
+  return true;
 }
 
 /**

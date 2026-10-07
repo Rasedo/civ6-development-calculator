@@ -549,6 +549,7 @@ const SEAT: Record<string, Extractor> = {
     ...st.seats.map((o) => s.emgNukeCS?.[o.seat] ?? 0),
   ]),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
+  bestRangedCS: overSeats((s) => s.bestRangedCS ?? 0),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
   citizenNames: overSeats((s) => s.citizenNames ?? 0),
   goodyKinds: overSeats((s) => GOODY_KINDS.map((_, i) => s.goodyKinds?.[i] ?? 0)),
@@ -783,6 +784,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorLossTurn: overCityStates((cityState) => cityState.lossTurn ?? -1),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
   minorBestMeleeCS: overCityStates((cityState) => cityState.bestMeleeCS),
+  minorBestRangedCS: overCityStates((cityState) => cityState.bestRangedCS ?? 0),
   warTurns: overCityStates((cityState, state) => warClockLine(state, cityState.seat)),
   treatyTurns: overCityStates((cityState, state) => treatyClockLine(state, cityState.seat)),
 };

@@ -636,6 +636,12 @@ export const COMBAT_BASE_DAMAGE = srcConst('combat.baseDamage', 24, gp('COMBAT_B
 export const COMBAT_MAX_EXTRA_DAMAGE = srcConst('combat.maxExtraDamage', 12, gp('COMBAT_MAX_EXTRA_DAMAGE'));
 export const COMBAT_POWER_SCALING = srcConst('combat.powerScaling', 0.04, gp('COMBAT_POWER_SCALING'));
 export const COMBAT_MINIMUM_DAMAGE = srcConst('combat.minimumDamage', 1, gp('COMBAT_MINIMUM_DAMAGE'));
+/** the least a city strikes at, whatever its holder has trained
+ *  (GameCore_XP2_Release.dll 0x4bd030) */
+export const CITY_MIN_STRIKE_CS = srcConst('combat.cityMinStrike', 3, gp('COMBAT_MINIMUM_CITY_STRIKE_STRENGTH'));
+/** what a bombard attack loses on a land unit and a land unit's ranged
+ *  attack loses on a naval unit (0x51c810, `rangedDomainCS`) */
+export const COMBAT_BOMBARD_VS_UNIT = srcConst('combat.bombardVsUnit', 17, gp('COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER'));
 export const COMBAT_MAX_HIT_POINTS = srcConst('combat.maxHitPoints', 100, gp('COMBAT_MAX_HIT_POINTS'));
 /** the DLL's COMBAT_POWER_SCALING in 1/256ths, truncated (0x519370): 10 */
 export const COMBAT_POWER_SCALING_256 = Math.trunc(COMBAT_POWER_SCALING * 256);

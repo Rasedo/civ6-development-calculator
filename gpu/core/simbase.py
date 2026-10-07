@@ -417,7 +417,7 @@ class Rules:
     strategic: dict  # {rid, rate, slotOf, capBase, capPerEncampmentBuilding, encampmentDidx}
     resources: dict  # {harvestYield, harvestAmount, improvement} per RESOURCE_IDS — the HARVEST's own table
     nuclear: dict  # {devices[{radius,fallout,range,upkeep,uranium}], falloutDamage, robotDamage, coverRange, aaSupport, aaWound, siloDefense, subDefense, interceptDamage, cleanCharges, siloIid, wwLaunched, emergency*}
-    gdr: dict  # {upgradeId[], upgradeTech[], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS, navalPenalty}
+    gdr: dict  # {upgradeId[], upgradeTech[], droneAA, particleBeamCS, enhancedMoves, armorPlatingCS}
     b_worship: torch.Tensor  # bool [NB] — worship building (built or faith-bought by the religion whose Worship belief names it; never gold-bought)
     b_era: torch.Tensor  # long [NB] — the era the building first unlocks (Heartbeat of Steam's gate)
     b_train_xp_pct: torch.Tensor  # long [NB] — the PERCENTAGE experience modifier this building grants a unit trained here; the Encampment and Harbor lines stack
@@ -1130,14 +1130,14 @@ _MUTABLE = [
     # instead of three, and a view can never be half-restored.
     "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep",
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
-    "civ_best_melee", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
+    "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_first_imp_tech",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_faith",
-    "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee",
+    "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on

@@ -8,6 +8,7 @@ import { cityBuildingYields } from '../../../cpu/core/yields';
 import { centreStrength, cityDefenseStrength, cityStrikeStrength, barbarianCombatCS } from '../../../cpu/core/combat';
 import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
+import { CITY_MIN_STRIKE_CS } from '../../../cpu/data/constants';
 import { UNIT_ERA_INDEX, unitHasClass, UNITS } from '../../../cpu/data/units';
 import { garrisonOf, spawnUnit } from '../../../cpu/core/units';
 import { seatOf, BARB_SEAT } from '../../../cpu/core/seats';
@@ -129,7 +130,9 @@ describe('the flat channels', () => {
     const state = makeState(makeMap(16, 16));
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
     const base = cityDefenseStrength(state, city);
-    expect(cityStrikeStrength(state, city)).toBe(base);
+    // a strike leaves from the best Ranged Strength made, at least 3
+    const fires = cityStrikeStrength(state, city);
+    expect(fires).toBe(CITY_MIN_STRIKE_CS);
     // BASTIONS is +6 Defense / +5 Ranged, so the two stop agreeing
     expect(POLICIES.BASTIONS.effects.cityDefense).toBe(6);
     expect(POLICIES.BASTIONS.effects.cityRanged).toBe(5);
@@ -139,7 +142,7 @@ describe('the flat channels', () => {
     expect(computeAdoption(seatOf(state, 0)!.research).policies).toContain('BASTIONS');
     // the Defense half is EFFECT_ADJUST_CITY_OUTER_DEFENSE: no walls, no +6
     expect(cityDefenseStrength(state, city)).toBe(base);
-    expect(cityStrikeStrength(state, city)).toBe(base + 5);
+    expect(cityStrikeStrength(state, city)).toBe(fires + 5);
     city.buildings.push('ANCIENT_WALLS');
     const walled = centreStrength(state, city);
     expect(cityDefenseStrength(state, city)).toBe(walled + 6);

@@ -15,7 +15,7 @@ import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, envoysReceived, hasMet, minorCity } from './cityStates';
-import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS } from '../data/units';
 import { UNIT_TYPE_IDX } from '../data/units';
 import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
@@ -27,13 +27,13 @@ import { cityStateAt, isSuzerain, suzerainEffect } from './cityStates';
 import { MAX_CITIES_PER_SEAT, DED_SKY, SKY_AIR_XP_PCT } from '../data/seats';
 import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
-import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
+import { drawAndPayGoody, raiseBestTrained, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
 import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, damageExponent, damageOf } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -299,9 +299,9 @@ export function trainMovement(
 }
 
 /** Everything the CITY that trained or bought a unit hands it for life, in one
- *  place, and the seat's strongest melee trained or bought (`raiseBestMelee`). */
+ *  place, and the seat's strongest melee trained or bought (`raiseBestTrained`). */
 export function applyTrainingGrants(state: GameState, city: City, unit: Unit): void {
-  raiseBestMelee(state, city.seat, unit.type, unit.formation ?? 0);
+  raiseBestTrained(state, city.seat, unit.type, unit.formation ?? 0);
   const cls = promoClassOf(unit.type);
   unit.xpPct = trainXpPct(state, city, cls);
   const mp = trainMovement(state, city, cls);
@@ -883,12 +883,18 @@ export function gdrBeamCS(state: GameState, unit: { type: string; seat: number }
   return gdrHas(state, unit, 'PARTICLE_BEAM') ? GDR_PARTICLE_BEAM_CS : 0;
 }
 
-/** CIV6 (Giant Death Robot): "-17 Ranged Strength against District defenses
- *  and naval units" — a clause of the chassis itself, no upgrade behind it.
- *  The district half of that sentence is `rangedCityPenalty`, which every
- *  land ranged unit already pays. */
-export function gdrNavalCS(attacker: Unit, foeType: string): number {
-  return UNITS[attacker.type]?.gdr && UNITS[foeType]?.naval ? -GDR_NAVAL_PENALTY : 0;
+/** THE DOMAIN TERM of a ranged blow on a unit (GameCore_XP2_Release.dll
+ *  0x51c810, COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER 17): a land unit's
+ *  ranged attack on a naval unit loses 17 (LESS_EFFECTIVE_VS_NAVAL_UNITS),
+ *  and a bombard attack loses 17 on a land unit only. A siege chassis's
+ *  `ranged.strength` is its Bombard less those 17, so on a naval unit it
+ *  fires its whole Bombard. runs/h1_duelw1124: a barbarian Slinger on Rome's
+ *  Galley logs 15 - 17; Trebuchets and Catapults on barbarian ships their
+ *  whole Bombard (1122 t99, 1124 t103 / t198, 1128 t149). */
+export function rangedDomainCS(attacker: Unit, foeType: string): number {
+  const a = UNITS[attacker.type];
+  if (!a || a.naval || a.air || !UNITS[foeType]?.naval) return 0;
+  return a.bombard !== undefined ? COMBAT_BOMBARD_VS_UNIT : -COMBAT_BOMBARD_VS_UNIT;
 }
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
@@ -1160,12 +1166,26 @@ export function cityDefenseStrength(state: GameState, city: City): number {
     + governorSum(state, city, (e) => e.cityDefense);
 }
 
-/** What the city FIRES at — Bastions' "+5 City Ranged Strength" half. This
- *  model has no separate ranged stat for a city, so a strike leaves from the
- *  same base the defence does and takes the ranged half instead. */
+/**
+ * What the city FIRES at (GameCore_XP2_Release.dll 0x249ee0 / 0x51c2d0):
+ * the strongest Ranged Strength its holder has trained (`Seat.bestRangedCS`),
+ * at least COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, less the damaged district's
+ * loss — the wounded law at COMBAT_WOUNDED_DISTRICT_DAMAGE_MULTIPLIER on the
+ * walls' damage percent where the city has walls, else its hit points'
+ * (`woundedLoss256`) — and a major's Bastions half ("+5 City Ranged
+ * Strength"). runs/h1_duelw1120: China's cities strike at 25 from t50 (an
+ * Archer trained), a city-state that trained no ranged unit at 3 (t217).
+ */
 export function cityStrikeStrength(state: GameState, city: City): number {
-  return centreStrength(state, city) + getModifiers(state, city.seat).cityRanged
-    + governorSum(state, city, (e) => e.cityDefense);
+  // the Free Cities train toward no ranged base of their own
+  const best = Math.max(isFreeSeat(city.seat) ? 0 : seatOf(state, city.seat)?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS);
+  const walls = wallsMax(state, city);
+  const maxHp = isCityStateSeat(city.seat) ? CITY_STATE_MAX_HP : CITY_MAX_HP;
+  const pct = walls > 0
+    ? Math.trunc(((walls - outerPool(state, city)) * 100) / walls)
+    : Math.trunc(((maxHp - Math.min(maxHp, city.hp)) * 100) / maxHp);
+  const cs = best - woundedLoss256(Math.max(0, pct)) / 256;
+  return isCiv(city.seat) ? cs + getModifiers(state, city.seat).cityRanged : cs;
 }
 
 /** CIV6 (Discipline): "+5 Combat Strength when fighting Barbarians." A
@@ -1230,10 +1250,23 @@ export function congressUnitCS(state: GameState, unit: { type: string; seat: num
 }
 
 /**
+ * A melee exchange whose two blows would both kill (GameCore_XP2_Release.dll
+ * 0x206960): the side whose damage overshoots its hit points further falls,
+ * and the other is left at 1 HP — the attacker stands on a tie. runs/
+ * h1_duelw1124 t13: a barbarian Warrior at 8 HP takes 32 (24 over) striking
+ * a city-state Warrior at 19 that the draw gave 31 (12 over): the Warrior
+ * stands at 1, the barbarian falls (CombatLog 18 / 32).
+ */
+export function resolveMutualKill(attacker: { hp: number }, defender: { hp: number }): void {
+  if (attacker.hp > 0 || defender.hp > 0) return;
+  if (attacker.hp < defender.hp) defender.hp = 1;
+  else attacker.hp = 1;
+}
+
+/**
  * CIV6 (War Department): "All units heal up to 20 hit points when they
  * eliminate a unit." The victor's own seat holds the building, so a barbarian
- * or a city-state kill pays nothing; a victor that fell in the same exchange
- * heals only once the mutual-kill rule has stood it back up.
+ * or a city-state kill pays nothing.
  */
 export function healOnEliminate(state: GameState, victor: Unit): void {
   const seat = unitSeat(victor);
@@ -1871,8 +1904,13 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
       + rosterCS(state, attacker, defender.seat, defender.hp, false)
       + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
     const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
-    defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex);
-    attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
+    defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex, { a: atkCSf, d: defCSf });
+    // CIV6 (GameCore_XP2_Release.dll 0x206960, the melee result): an
+    // EMBARKED defender strikes no blow back — the counter is never drawn
+    if (!defender.embarked) attacker.hp -= damageRoll(state, defCSf - atkCSf, 'melc', targetIndex);
+    // ...and where both blows would kill, the side the blow overshot further
+    // falls and the other stands at 1 HP, the attacker on a tie
+    resolveMutualKill(attacker, defender);
     // the capture roll sits right after the two damage rolls on both engines,
     // ahead of the experience award (which may draw a promotion offer)
     const captured = defender.hp <= 0 && mayCapture(state, attacker, defender)
@@ -1893,7 +1931,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
         disciplesSpread(state, unitSeat(attacker), attacker, defender.seat, targetIndex);
         killUnit(state, defender);
       }
-      if (attacker.hp <= 0) attacker.hp = 1; // victor survives
       if (!captured) healOnEliminate(state, attacker);
     } else if (attacker.hp <= 0) {
       unitKillEvent(state, unitSeat(defender), defender, attacker);
@@ -2283,7 +2320,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + emergencyAttackCS(state, attacker.seat, defender.seat) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
+  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + emergencyAttackCS(state, attacker.seat, defender.seat) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
   defender.hp -= damageRoll(state, atkCS - defCS, 'rng', targetIndex, {
     a: atkCS, d: defCS, at: UNIT_TYPE_IDX.indexOf(attacker.type), as: attacker.seat, dt: UNIT_TYPE_IDX.indexOf(defender.type), ds: defender.seat,
   });
@@ -2307,6 +2344,9 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
  *  `endsTurn` is the city / district / air path, which stops a unit dead. */
 function spendAttack(unit: Unit, endsTurn = false): void {
   unit.attacksLeft = Math.max(0, attacksLeftOf(unit) - 1);
+  // the attacker's fortification ends with the blow (GameCore_XP2_Release.dll
+  // 0x1fbae0 sets its fortify turns to 0 once the result is made)
+  unit.fortifyTurns = 0;
   // CIV6 (Cossack): "Can move after attacking" — the promotion's clause,
   // written on the chassis.
   const keeps = promoFlag(unit, 'MOVE_AFTER_ATTACK') || !!UNITS[unit.type]?.moveAfterAttack;
@@ -2395,7 +2435,7 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemies.length === 0) return false; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = stackDefender(state, enemies, true);
   const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + gdrNavalCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
+  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {

@@ -20,6 +20,7 @@
  * the engine's turn whichever player's it is (`replay.ts`, `stagePolicies`).
  */
 import { hexDistance } from '../../world/hex';
+import { UNITS } from '../data/units';
 import { gameHash } from './aliases';
 import { bool, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
 
@@ -80,9 +81,11 @@ export type Decision = Base & (
    *  (the defender's alone, struck by the actor's unit last activated): the
    *  two units, the plots they stood on as the log's steps had them, and the
    *  battle's place among its player's hits of the pair (its "Unit Combat
-   *  Damage" draws, `battle`) */
+   *  Damage" draws, `battle`). A city's shot (`strike`: the city's centre and
+   *  the plot it fired from, its centre or its Encampment) has no attacker
+   *  unit. */
   | { kind: 'battle'; player: number; attacker: string; defender: string; from: number; at: number;
-      ranged: boolean; seq: number; dmg: [number, number] }
+      ranged: boolean; seq: number; dmg: [number, number]; strike?: { city: number; origin: number } }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
@@ -658,14 +661,62 @@ export class RecordedActions implements ActionSource {
       let hits = 0;
       // the actor's unit the log last set acting: a ranged hit's shooter
       let acting: string | undefined;
+      // the actor's units in the order the log set them acting, the last last
+      let activated: string[] = [];
       const hit = (r: ActionRow | undefined) => !!r && r[2] === 'UnitDamageChanged' && n(r, 2) > n(r, 3);
+      const chassisOf = (key: string) => {
+        const u = units1.get(key) ?? a.units.find((x) => unitKey(x) === key);
+        return u ? UNITS[(cat.units[num(u.type)] ?? '').replace(/^UNIT_/, '')] : undefined;
+      };
+      // a unit whose only attack is melee: Combat, no Ranged, no Bombard
+      const meleeChassis = (key: string) => {
+        const def = chassisOf(key);
+        return !!def && def.combat > 0 && !def.ranged && def.bombard === undefined;
+      };
+      const shape = { width: W, height: b.head.H, wrapX: bool(b.head.wrapX) };
+      const dist = (p: number, q: number) => hexDistance(shape, p % W, Math.floor(p / W), q % W, Math.floor(q / W));
+      // could the unit have dealt this blow from `from` to `at`: a melee
+      // chassis beside it, a shooter within its range (a promotion's +1
+      // included)
+      const reaches = (key: string, from: number, at: number) => {
+        const def = chassisOf(key);
+        if (!def) return false;
+        const d = dist(from, at);
+        if (def.ranged) return d >= 1 && d <= def.ranged.range + 1;
+        return d === 1 && def.combat > 0 && def.bombard === undefined;
+      };
+      // the city of `pid` whose centre, else whose Encampment, stands within
+      // 2 of `at`, the nearest: the shooter of a blow no unit of its dealt
+      const strikerOf = (pid: number, at: number): { city: number; origin: number } | undefined => {
+        let best: { city: number; origin: number } | undefined;
+        let bd = 3;
+        for (const c of b.cities.length ? b.cities : a.cities) {
+          if (c.owner !== pid) continue;
+          const p = centreOf(c, W);
+          const d = dist(p, at);
+          if (d >= 1 && d < bd) { bd = d; best = { city: p, origin: p }; }
+        }
+        if (best) return best;
+        for (let p = 0; p < W * b.head.H; p++) {
+          const row = plotAt(b, p);
+          if (row[P.owner] !== pid || cat.districts[row[P.district] as number] !== 'DISTRICT_ENCAMPMENT') continue;
+          const d = dist(p, at);
+          const city = (b.cities.length ? b.cities : a.cities).find((c) => c.owner === pid && c.id === row[P.ownerCity]);
+          if (d >= 1 && d < bd && city) { bd = d; best = { city: centreOf(city, W), origin: p }; }
+        }
+        return best;
+      };
       ev.forEach((r, i) => {
         if (r[2] === 'PlayerTurnActivated' && n(r, 0) !== actor) {
           actor = n(r, 0);
           hits = 0;
           acting = undefined;
+          activated = [];
         } else if (r[2] === 'UnitMoved' || r[2] === 'UnitTeleported') pos.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
-        else if (r[2] === 'UnitActivityChanged' && n(r, 0) === actor) acting = `${n(r, 0)}:${n(r, 1)}`;
+        else if (r[2] === 'UnitActivityChanged' && n(r, 0) === actor) {
+          acting = `${n(r, 0)}:${n(r, 1)}`;
+          activated = [...activated.filter((x) => x !== acting), acting];
+        }
         if (!hit(r)) return;
         const k = hits;
         hits += 1;
@@ -675,21 +726,44 @@ export class RecordedActions implements ActionSource {
           const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
           if (!pv || !hit(pv) || n(pv, 0) === actor) {
             out0.push({ kind: 'hit', phase: phaseOf(actor), player: actor, unit: `${n(r, 0)}:${n(r, 1)}`, dmg: n(r, 2) - n(r, 3) });
+            // the attack drew the attacker's damage, then the city's hit
+            // points' and its walls' (GameCore_XP2_Release.dll 0x206080:
+            // 0x519370, then 0x519440 twice) — three draws, one event
+            hits += 2;
           }
           return;
         }
         const nx = ev.slice(i + 1, i + 4).find((x) => x[2] === 'UnitDamageChanged');
-        const melee = !!nx && hit(nx) && n(nx, 0) === actor;
+        const countered = !!nx && hit(nx) && n(nx, 0) === actor;
         const defender = `${n(r, 0)}:${n(r, 1)}`;
-        const attacker = melee ? `${n(nx, 0)}:${n(nx, 1)}` : acting;
-        const from = attacker === undefined ? undefined : pos.get(attacker);
+        let attacker = countered ? `${n(nx, 0)}:${n(nx, 1)}` : acting;
+        let from = attacker === undefined ? undefined : pos.get(attacker);
         const at = pos.get(defender);
+        if (!countered && at !== undefined && (attacker === undefined || from === undefined || !reaches(attacker, from, at))) {
+          // a blow the last acting unit could not have dealt is its city's
+          // shot (cities log no activity), else the last acting unit's of
+          // the actor that reaches (runs/h1_duelw1124 t23: a barbarian
+          // Slinger's shot behind a Scout's activity)
+          const striker = strikerOf(actor, at);
+          if (striker) {
+            out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker: '', defender, from: striker.origin, at, ranged: true, seq: k,
+              dmg: [n(r, 2) - n(r, 3), 0], strike: striker });
+            return;
+          }
+          const shooter = [...activated].reverse().find((x) => pos.has(x) && reaches(x, pos.get(x)!, at));
+          if (shooter) { attacker = shooter; from = pos.get(shooter); }
+        }
+        // a blow with no blow back from a melee chassis is its melee attack on
+        // an embarked unit, whose counter the game never draws
+        // (GameCore_XP2_Release.dll 0x206960; runs/h1_duelw1127 t90: a
+        // barbarian Galley on Rome's embarked Warrior)
+        const melee = countered || (attacker !== undefined && meleeChassis(attacker));
         if (attacker === undefined || from === undefined || at === undefined) {
           out0.push({ kind: 'hit', phase: phaseOf(actor), player: n(r, 0), unit: defender, dmg: n(r, 2) - n(r, 3) });
           return;
         }
         out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k,
-          dmg: [n(r, 2) - n(r, 3), melee ? n(nx!, 2) - n(nx!, 3) : 0] });
+          dmg: [n(r, 2) - n(r, 3), countered ? n(nx!, 2) - n(nx!, 3) : 0] });
       });
     }
     // the unit each village rewarded: `GoodyHutReward` (player, unit, type,

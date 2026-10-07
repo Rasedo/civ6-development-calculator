@@ -2775,7 +2775,7 @@ class SimSeats:
                     landed_u = self._spawn_unit(
                         row, elig_u, self._air_spawn_at(row, pick_ty, spawn_slot, ctr_u),
                         pick_ty, init_xp=xp_u, init_mp=self._train_mp_bonus(_bl_g, pick_ty, row))
-                    self._raise_best_melee(row, landed_u, pick_ty)
+                    self._raise_best_trained(row, landed_u, pick_ty)
                     price_u =self._gold_price(row, self._unit_buy_base().gather(1, pick_ty.clamp(min=0).unsqueeze(1)).squeeze(1) * mult
                                                * self._congress_unit_cost_mult(self._cur_gold)
                                                * self._land_unit_price_mult(row).gather(1, pick_ty.unsqueeze(1)).squeeze(1),
@@ -2884,7 +2884,7 @@ class SimSeats:
                 if bool(buy_k.count_nonzero()):
                     landed_k = self._spawn_unit(row, buy_k, at_r, self._monk_idx)
                     self.civ_faith[:, row] = torch.where(landed_k, self.civ_faith[:, row] - kcost, self.civ_faith[:, row])
-                    self._raise_best_melee(row, landed_k, self._monk_idx)
+                    self._raise_best_trained(row, landed_k, self._monk_idx)
         m_kind, m_j = self._driven_buy_monu.pop(row) if row in self._driven_buy_monu else (None, None)
         if m_kind is not None and m_j is not None:
             # CIV6 (GS Civilopedia, Monumentality, Golden face): "May purchase
@@ -3000,7 +3000,7 @@ class SimSeats:
                     self.city_dist_tile[bidx, row, ju], self.city_bldg_pillaged[bidx, row, ju])
                 landed_u = self._spawn_unit(row, buy_u, at_u, bu, init_xp=xp_u,
                                             init_mp=self._train_mp_bonus(_bl_f, bu, row))
-                self._raise_best_melee(row, landed_u, bu)
+                self._raise_best_trained(row, landed_u, bu)
                 self.civ_faith[:, row] = torch.where(landed_u, self.civ_faith[:, row] - price_u, self.civ_faith[:, row])
                 for _ui, _sl, _c in self._res_slot_units:
                     self._charge_unit_resource(row, landed_u & (bu == _ui), _ui)
@@ -4137,7 +4137,7 @@ class SimSeats:
         self.unit_mp.scatter_(1, sc.unsqueeze(1),
                               torch.where(ok, torch.zeros_like(here),
                                           self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)).unsqueeze(1))
-        self._raise_best_melee(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
+        self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
 
     def _seat_charge_upkeep(self, row: int) -> None:
         """`chargeUnitUpkeep` — CIV6 (Resource, GS): "each turn, the unit will
@@ -12105,7 +12105,7 @@ class SimSeats:
         resolution, for slot `u` of whichever pool `atk_kind` names.
 
         A military defender takes the defender-first roll pair with terrain
-        defense and the victor-survives rule; a LONE hostile civilian is taken
+        defense and the mutual-kill rule (`_melee_exchange`); a LONE hostile civilian is taken
         roll-free — captured by a major, killed by a barbarian — and the
         attacker advances into a tile its kill emptied.
 
@@ -12247,13 +12247,13 @@ class SimSeats:
                              + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
             _wwh = self._ww_occ(tgt)
             _wwd = d_seat_m
-            rows, def_dead, atk_dead, atk_raw, captured = self._melee_exchange(
+            rows, def_dead, atk_dead, captured = self._melee_exchange(
                 mil_att, tgt, ttc, d_slot, a_hp, u, atk_e, def_e,
-                self._row_of(a_seat[:, u]), a_type[:, u])
+                self._row_of(a_seat[:, u]), a_type[:, u], d_emb)
             self._award_pair_xp(
                 mil_att, a_kind=atk_kind, u=u, a_type=a_type[:, u], a_seat=a_seat[:, u],
                 d_slot=d_slot, d_type=d_type, d_is_barb=def_is_barb,
-                ranged=False, a_died=atk_raw, d_died=def_dead | captured)
+                ranged=False, a_died=atk_dead, d_died=def_dead | captured)
             self._unit_kill_event(a_seat[:, u], d_type, def_is_barb, def_dead, a_type[:, u],
                                   vict_form=self._form_tier(d_slot), killer_promos=a_promos,
                                   killer_tile=here)
@@ -13773,6 +13773,9 @@ class SimSeats:
         again", which holds for a hidden CHASSIS and for Twilight Veil alike."""
         a = getattr(self, f"{pre}_unit_attacks")
         a[:, u] = torch.where(fired, (a[:, u] - 1).clamp(min=0), a[:, u])
+        # the attacker's fortification ends with the blow (`spendAttack`)
+        f = getattr(self, f"{pre}_unit_fortify")
+        f[:, u] = torch.where(fired, torch.zeros_like(f[:, u]), f[:, u])
         if not self._stealth_live:
             return
         ty = getattr(self, f"{pre}_unit_type")[:, u].clamp(min=0, max=self.NU - 1)
@@ -14292,7 +14295,7 @@ class SimSeats:
                              is_mil: torch.Tensor, atk_cs: torch.Tensor,
                              def_e: torch.Tensor, def_hp: torch.Tensor,
                              striker_row, key: str) -> None:
-        d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt)
+        d = self._damage_roll(strike, atk_cs - def_e, k=key, tile=tt, parts=(atk_cs, def_e))
         self._ww_battle(strike, striker_row, self._row_of(d_seat), tt,
                         d_died=strike & (d_slot >= 0) & ((def_hp - d) <= 0), city=True)
         self._unit_kill_event(
@@ -14364,10 +14367,10 @@ class SimSeats:
     def _melee_exchange(self, att: torch.Tensor, tgt: torch.Tensor, tile_c: torch.Tensor,
                         d_slot: torch.Tensor, a_hp: torch.Tensor, u: int,
                         atk_e: torch.Tensor, def_e: torch.Tensor,
-                        atk_row: torch.Tensor, a_type: torch.Tensor):
+                        atk_row: torch.Tensor, a_type: torch.Tensor, d_emb: torch.Tensor):
         """ONE melee exchange between two units — the `meleeAttack` core.
 
-        The paired rolls, the defender-death write and the victor-survives rule
+        The paired rolls, the defender-death write and the mutual-kill rule
         are shared by every attacking pool. Only the CORE is shared: target
         selection, the roll-free civilian capture, the city-first precedence,
         the XP award and the advance rules stay with each caller — those
@@ -14377,24 +14380,37 @@ class SimSeats:
         which pool the defender lives in.
 
         DRAW ORDER is the parity contract: the defender's damage first, the
-        counter second, exactly as TS's meleeAttack draws them.
+        counter second, exactly as TS's meleeAttack draws them. An EMBARKED
+        defender (`d_emb`) strikes no blow back and its counter is never drawn
+        (GameCore_XP2_Release.dll 0x206960). Where both blows would kill, the
+        side the blow overshot further falls and the other stands at 1 HP, the
+        attacker on a tie (`resolveMutualKill`).
 
-        The fourth return is the attacker's RAW death, before the victor
-        survives: `awardBattleXp` reads the hp the rolls left, so a mutual kill
-        pays neither side. The fifth is the CAPTURE: a beaten unit that changed
-        hands instead of dying — CIV6 (Mongol Horde). It counts as a defeat for
-        the experience and the weariness, and as no death for the kill event,
-        the disciples, the dig, the heal and the advance: `def_dead` excludes it.
+        The third return is the attacker's death after that rule, which
+        `awardBattleXp` reads. The fourth is the CAPTURE: a beaten unit that
+        changed hands instead of dying — CIV6 (Mongol Horde). It counts as a
+        defeat for the experience and the weariness, and as no death for the
+        kill event, the disciples, the dig, the heal and the advance:
+        `def_dead` excludes it.
         """
-        d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt)
-        d_atk = self._damage_roll(att, def_e - atk_e, k="melc", tile=tgt)
+        d_def = self._damage_roll(att, atk_e - def_e, k="mel", tile=tgt, parts=(atk_e, def_e))
+        counter = att & ~d_emb
+        d_atk = torch.where(counter, self._damage_roll(counter, def_e - atk_e, k="melc", tile=tgt),
+                            torch.zeros_like(d_def))
         rows = att.nonzero(as_tuple=True)[0]
         def_dead = torch.zeros_like(att)
         captured = torch.zeros_like(att)
+        a_new = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         if len(rows) > 0:
             ds = d_slot[rows]
-            self.unit_hp[rows, ds] -= d_def[rows]
-            dead = self.unit_hp[rows, ds] <= 0
+            d_new = self.unit_hp[rows, ds] - d_def[rows]
+            a_r = a_new[rows]
+            both = (d_new <= 0) & (a_r <= 0)
+            d_stands = both & (a_r < d_new)
+            d_new = torch.where(d_stands, torch.ones_like(d_new), d_new)
+            a_new[rows] = torch.where(both & ~d_stands, torch.ones_like(a_r), a_r)
+            self.unit_hp[rows, ds] = d_new
+            dead = d_new <= 0
             if self._capture_rows and bool(dead.count_nonzero()):
                 fell = torch.zeros_like(att)
                 fell[rows[dead]] = True
@@ -14408,25 +14424,21 @@ class SimSeats:
             self.unit_alive[gd, ds[dead]] = False
             self._occ_clear(gd, td, ds[dead])
             self._dig_at(gd, td, self.unit_seat[gd, ds[dead]])
-        a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
-        atk_raw = att & (a_hp[:, u] <= 0)
-        beaten = def_dead | captured
-        both = beaten & atk_raw
-        a_hp[:, u] = torch.where(both, torch.ones_like(a_hp[:, u]), a_hp[:, u])
+        a_hp[:, u] = a_new
+        atk_dead = att & (a_hp[:, u] <= 0)
         # The WAR DEPARTMENT's heal, both ways: the attacker whose blow landed
         # and, where the counter killed instead, the defender who stood.
         a_hp[:, u] = self._heal_on_kill(atk_row, def_dead, a_hp[:, u])
-        d_won = atk_raw & ~beaten
-        if self._heal_kill_live and bool(d_won.count_nonzero()):
+        if self._heal_kill_live and bool(atk_dead.count_nonzero()):
             # the whole batch, narrowed after: a gather over a SUBSET index
             # reads batch rows 0..n-1, which are the wrong games
             ds_all = d_slot.clamp(min=0)
             d_seat_all = self.unit_seat.gather(1, ds_all.unsqueeze(1)).squeeze(1)
             hp_all = self.unit_hp.gather(1, ds_all.unsqueeze(1)).squeeze(1)
-            healed = self._heal_on_kill(self._row_of(d_seat_all), d_won, hp_all)
-            dr = d_won.nonzero(as_tuple=True)[0]
+            healed = self._heal_on_kill(self._row_of(d_seat_all), atk_dead, hp_all)
+            dr = atk_dead.nonzero(as_tuple=True)[0]
             self.unit_hp[dr, ds_all[dr]] = healed[dr]
-        return rows, def_dead, atk_raw & ~beaten, atk_raw, captured
+        return rows, def_dead, atk_dead, captured
 
     def _capture_beaten(self, captured: torch.Tensor, d_slot: torch.Tensor,
                         atk_row: torch.Tensor, tile_c: torch.Tensor) -> None:
@@ -14614,7 +14626,7 @@ class SimSeats:
                 ).to(def_e.dtype))
                 # "Ranged attacks ignore any Support received by the defender."
                 _cls = self._class_matchup_cs(ut0, d_type)
-                atk_e = atk_e + (_cls + self._gdr_naval_cs(ut0, d_type)).to(atk_e.dtype)
+                atk_e = atk_e + (_cls + self._ranged_domain_cs(ut0, d_type)).to(atk_e.dtype)
                 def_e = def_e + torch.where(
                     d_emb, torch.zeros_like(def_e),
                     self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
@@ -14838,7 +14850,7 @@ class SimSeats:
                 foe_in_district=self._on_district(ttc), tile=a_tile[:, u])
             atk_e = atk_e + self._rel_atk_cs(aseat, tgt).to(atk_e.dtype)  # unit-vs-unit: never gated
             atk_e = atk_e + (self._class_matchup_cs(at0, d_type)
-                             + self._gdr_naval_cs(at0, d_type)).to(atk_e.dtype)
+                             + self._ranged_domain_cs(at0, d_type)).to(atk_e.dtype)
             def_e = def_e + torch.where(
                 d_emb, torch.zeros_like(def_e),
                 self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))

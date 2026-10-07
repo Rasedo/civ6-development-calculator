@@ -527,6 +527,32 @@ class SimMasks:
         return (row < self.n_majors) & (row >= 0) & (
             self.row_civ.gather(1, r.unsqueeze(1)).squeeze(1) == civ)
 
+    def _strike_strength(self, row: int, col: torch.Tensor) -> torch.Tensor:
+        """[B] f64 — `cityStrikeStrength` before a major's Bastions half: the
+        holder's best Ranged Strength made (`civ_best_ranged`, a minor's
+        `citystate_best_ranged`; the Free Cities none), at least
+        COMBAT_MINIMUM_CITY_STRIKE_STRENGTH, less the wounded law on the
+        walls' damage percent where the city has walls, else its hit points'
+        (GameCore_XP2_Release.dll 0x249ee0 / 0x51c2d0)."""
+        bidx = self._bidx
+        c0 = col.clamp(min=0)
+        minor = self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S
+        if row < self.n_majors:
+            best = self.civ_best_ranged[:, row].long()
+        elif minor:
+            best = self.citystate_best_ranged[:, row - self._CITY_MINOR0].long()
+        else:
+            best = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        best = best.clamp(min=self._city_min_strike)
+        rt = torch.full_like(c0, row)
+        walls = self._walls_max_at(rt, c0).long()
+        pool = torch.minimum(self.city_outer_hp[bidx, row, c0].long(), walls)
+        cmax = int(self.rules.citystate["maxHp"] if minor else self.rules.combat["cityMaxHp"])
+        hp = self.city_hp[bidx, row, c0].long().clamp(max=cmax)
+        pct = torch.where(walls > 0, torch.div((walls - pool) * 100, walls.clamp(min=1), rounding_mode="trunc"),
+                          torch.div((cmax - hp) * 100, cmax, rounding_mode="trunc")).clamp(min=0, max=100)
+        return best.double() - self._wounded_loss.take(pct).double() / 256.0
+
     def _walls_max_at(self, row: torch.Tensor, col: torch.Tensor) -> torch.Tensor:
         """`wallsMax` — the size of that tier's perimeter pool, plus whatever a
         unique walls row adds on top of it."""
@@ -2659,16 +2685,17 @@ class SimMasks:
               & (self._type_air.take(foe_type.clamp(min=0, max=self.NU - 1)) == 0))
         return z + ok.long() * int(self._gdr_plate_cs)
 
-    def _gdr_naval_cs(self, utype: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
-        """long — `gdrNavalCS`. CIV6 (Giant Death Robot): "-17 Ranged Strength
-        against District defenses and naval units" — a clause of the chassis
-        itself, no upgrade behind it. The district half of that sentence is
-        `_ranged_city_pen`, which every land ranged unit already pays."""
-        z = torch.zeros(utype.shape, dtype=torch.long, device=self.device)
-        if self._gdr_idx < 0:
-            return z
-        hit = (utype == self._gdr_idx) & (foe_type >= 0) & self.unit_naval[foe_type.clamp(min=0, max=self.NU - 1)]
-        return z - hit.long() * int(self._gdr_naval_penalty)
+    def _ranged_domain_cs(self, utype: torch.Tensor, foe_type: torch.Tensor) -> torch.Tensor:
+        """long — `rangedDomainCS`: a land unit's ranged attack on a naval
+        unit loses COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER, a bombard attack
+        loses it on a land unit only, and a siege chassis's ranged strength
+        already carries that loss, so on a naval unit it fires its whole
+        Bombard (GameCore_XP2_Release.dll 0x51c810)."""
+        ut = utype.clamp(min=0, max=self.NU - 1)
+        land = (utype >= 0) & ~self.unit_naval[ut] & (self._type_air.take(ut) == 0)
+        hit = land & (foe_type >= 0) & self.unit_naval[foe_type.clamp(min=0, max=self.NU - 1)]
+        sign = torch.where(self._type_bombard.take(ut) > 0, 1, -1)
+        return hit.long() * sign * self._bombard_vs_unit
 
     def _advance_terrain(self, u_type: torch.Tensor, u_seat: torch.Tensor,
                          dest: torch.Tensor) -> torch.Tensor:
@@ -3012,9 +3039,9 @@ class SimMasks:
         ex = self.seat_explored[:, seat_row] if isinstance(seat_row, int) else self.seat_explored[torch.arange(self.B, device=self.device), seat_row]
         return ex.gather(1, tiles.clamp(min=0).reshape(self.B, -1)).reshape(tiles.shape)
 
-    def _raise_best_melee(self, row: int, landed: torch.Tensor, type_idx,
+    def _raise_best_trained(self, row: int, landed: torch.Tensor, type_idx,
                           formation: torch.Tensor | None = None) -> None:
-        """`raiseBestMelee` — the row TRAINED, BOUGHT or UPGRADED to `type_idx`
+        """`raiseBestTrained` — the row TRAINED, BOUGHT or UPGRADED to `type_idx`
         in the games of `landed`: a land or naval fighting unit's Combat, a
         ranged chassis' included, with its formation's strength (`formation`,
         the tier it was made at) rises to it and never falls (`civ_best_melee`,
@@ -3032,13 +3059,23 @@ class SimMasks:
         if formation is not None:
             made = made + self._formation_cs.take(formation.clamp(min=0, max=self._form_max))
         cs = torch.where(landed & (type_idx >= 0) & fights, made, torch.zeros_like(made))
+        # the best Ranged Strength rises on the same unit (0x4c1a30): the
+        # row's RangedCombat — none for a siege chassis — with the formation's
+        rng = torch.where(self._type_bombard.take(ti) > 0, torch.zeros_like(made), self._type_ranged_strength.take(ti))
+        if formation is not None:
+            rng = torch.where(rng > 0, rng + self._formation_cs.take(formation.clamp(min=0, max=self._form_max)), rng)
+        rs = torch.where(landed & (type_idx >= 0) & fights, rng, torch.zeros_like(rng))
         if row < self.n_majors:
             self.civ_best_melee[:, row] = torch.maximum(
                 self.civ_best_melee[:, row], cs.to(self.civ_best_melee.dtype))
+            self.civ_best_ranged[:, row] = torch.maximum(
+                self.civ_best_ranged[:, row], rs.to(self.civ_best_ranged.dtype))
         elif self._CITY_MINOR0 <= row < self._CITY_MINOR0 + self.S:
             s = row - self._CITY_MINOR0
             self.citystate_best_melee[:, s] = torch.maximum(
                 self.citystate_best_melee[:, s], cs.to(self.citystate_best_melee.dtype))
+            self.citystate_best_ranged[:, s] = torch.maximum(
+                self.citystate_best_ranged[:, s], rs.to(self.citystate_best_ranged.dtype))
 
     def _spawn_unit(self, row: int, mask: torch.Tensor, at_tile: torch.Tensor, type_idx, init_xp: torch.Tensor | None = None, charges: torch.Tensor | None = None, gp_at: torch.Tensor | None = None, free_promo: torch.Tensor | None = None, formation: torch.Tensor | None = None, init_mp: torch.Tensor | None = None, far: bool = False) -> torch.Tensor:
         """`spawnUnit`. `far`: a GRANT, placed on the nearest plot that takes
