@@ -185,16 +185,16 @@ describe('permanent and temporary', () => {
   it('a lump of a strategic resource goes over, and comes home at the term', () => {
     const state = table();
     const id = STRATEGIC_IDS[0];
-    grantStockpile(state, 1, id, 30);
+    grantStockpile(state, 1, id, 20);
     play(state, {
       1: { offer: [2, [[DEAL_RESOURCE, 0, 12]], []] },
       2: { accept: [1] },
     });
-    expect(stockOf(state, 1, id)).toBe(18);
+    expect(stockOf(state, 1, id)).toBe(8);
     expect(stockOf(state, 2, id)).toBe(12);
     for (let i = 0; i < DEAL_TURNS; i++) play(state, {});
     expect(stockOf(state, 2, id)).toBe(0);
-    expect(stockOf(state, 1, id)).toBe(30);
+    expect(stockOf(state, 1, id)).toBe(20);
   });
 
   it('an open-borders grant rides the border clock, not a deal term', () => {

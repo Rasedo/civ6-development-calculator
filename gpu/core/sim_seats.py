@@ -9962,12 +9962,11 @@ class SimSeats:
     def _city_power_need(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """The `cityPower` twin — what each city of seat row `row` ASKS, what
         its own renewables answer, and which plants could cover the rest.
-        Returns ([B, cols] demand, [B, cols] supply, [B, cols, nPlant] reach,
-        [B, cols, nPlant] rate), all fuel-free; `_resolve_seat_power` decides
-        what the bank can run. `rate` is the Power one unit of the plant's fuel
-        provides the receiver: the fuel's own rate plus CIV6 (Industrialist)
-        "+1" where the plant city's governor holds it, the best plant of the
-        kind in reach taken.
+        Returns ([B, cols] demand, [B, cols] supply, [B, src, recv] reach — a
+        standing, unpillaged Industrial Zone of city `src` within the regional
+        reach of city `recv`'s centre — and [B, src] the Power the src city's
+        governor adds to each unit its plants burn (CIV6 Industrialist "+1"),
+        all fuel-free; `_resolve_seat_power` decides what the bank can run.
 
         CIV6 (Power): a city's base load is what its standing buildings demand
         (a pillaged district's are dark, like their yields) plus
@@ -9989,12 +9988,11 @@ class SimSeats:
         demand = torch.einsum("bjn,bn->bj", stand.double(), self._b_cols(row)["power"])
         demand = demand + self._laser_power_load * self.city_lasers[:, row, :cols].double()
         demand = torch.where(alive, demand, torch.zeros_like(demand))
-        nP = max(len(self._plant_bidx), 1)
         supply = torch.zeros(B, cols, dtype=torch.float64, device=dev)
-        reach_p = torch.zeros(B, cols, nP, dtype=torch.bool, device=dev)
-        rate_p = torch.zeros(B, cols, nP, dtype=torch.long, device=dev)
+        near = torch.zeros(B, cols, cols, dtype=torch.bool, device=dev)
+        ppr = torch.zeros(B, cols, dtype=torch.long, device=dev)
         if not bool((demand > 0).count_nonzero()):
-            return demand, supply, reach_p, rate_p
+            return demand, supply, near, ppr
         _gov = self.n_governors > 0 and row < self.n_majors
         # CIV6 (Hydroelectric Dam): "Provides 6 Power to the city from
         # renewable water sources" — a renewable like Cardiff's, so it too must
@@ -10058,76 +10056,92 @@ class SimSeats:
                 near = zone.unsqueeze(2) & (dd <= reach)  # [B, src, recv]
                 # CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
                 # the plant's OWN city's governor raises what each resource provides
-                _ppr = (self._governor_sum(row, "plantPowerPerResource")[:, :cols].long() if _gov
-                        else torch.zeros(B, cols, dtype=torch.long, device=dev))   # [B, src]
-                for pi, n in enumerate(self._plant_bidx):
-                    src = near & self.city_bldg[:, row, :cols, n].unsqueeze(2)
-                    reach_p[:, :, pi] = src.any(dim=1)
-                    _best = torch.where(src, _ppr.unsqueeze(2), torch.full_like(src, -1, dtype=torch.long)).amax(dim=1)
-                    rate_p[:, :, pi] = int(self._b_fuel_rate[n]) + _best.clamp(min=0)
-        return demand, supply, reach_p, rate_p
+                if _gov:
+                    ppr = self._governor_sum(row, "plantPowerPerResource")[:, :cols].long()
+        return demand, supply, near, ppr
 
     def _resolve_seat_power(self, row: int) -> None:
-        """THE TURN'S POWER for seat row `row`: set `city_powered` and burn what
-        the plants convert.
+        """THE TURN'S POWER for seat row `row` (`resolveSeatPower`): set
+        `city_powered` and burn what the plants convert.
 
-        CIV6: "Each turn a Power Plant will attempt to provide required Power to
-        all cities within range, converting stockpiles of the relevant resource
-        into Power", and "cities will consider their own renewable power
-        supplies first, before turning to a nearby Power Plant" — so a plant is
-        asked only for the shortfall. Where two kinds reach one city, "the game
-        engine will use the Power Plant which draws the resource of which you
-        have a larger stockpile". The order in which one bank is shared among
-        several cities is not published; this walks the city SLOTS in order, and
-        a city the fuel no longer covers stays dark (`resolveSeatPower`).
+        Each city asks for its load less its own renewables. The fuels the seat
+        holds any of run largest stockpile first (catalog order on ties), each
+        fuel's plants in catalog order, each plant's standing copies in slot
+        order, and each copy serves its own city, then every other city in its
+        reach in slot order. A city's burn is whole units — what its remaining
+        need asks, or the whole bank where that is less — and the Power beyond
+        the need stands as the plant's extra Power for the next city it serves
+        (Player_Resources 0x4ae990 -> 0x4a7cc0, xExtraPowerAvailable). A city
+        is lit only when its whole need is met.
         CIV6 (Industrial Zone Logistics, `FullyPoweredWhileActive`): a city
         whose queue a `fullyPowered` project heads meets its whole load, no
         fuel burned."""
         cols = self.RC
         self._age_reactors(row)
-        demand, supply, reach_p, rate_p = self._city_power_need(row)
+        demand, supply, near, ppr = self._city_power_need(row)
         met = supply >= demand
         if self._proj_fp:
             head = self.city_current[:, row, :cols, 0]
             for pi in self._proj_fp:
                 met = met | (head == self.PROJECT_BASE + pi)
         lit = (demand > 0) & met
-        need = (demand - supply).clamp(min=0).long()
         want = (demand > 0) & ~met
-        if bool(want.count_nonzero()) and self._plant_bidx:
+        need = torch.where(want, demand - supply, torch.zeros_like(demand))
+        if bool(want.count_nonzero()) and self._plant_bidx and self._iz_idx >= 0:
             stock = self.civ_stockpile[:, row]
-            for j in range(cols):
-                cand = want[:, j] & reach_p[:, j].any(dim=1)
-                if not bool(cand.count_nonzero()):
-                    continue
-                best_have = torch.full_like(cand, -1, dtype=torch.long)
-                best_cost = torch.zeros_like(best_have)
-                best_slot = torch.zeros_like(best_have)
-                best_rate = torch.ones_like(best_have)
-                for pi, n in enumerate(self._plant_bidx):
-                    slot, base = int(self._b_fuel_slot[n]), int(self._b_fuel_rate[n])
-                    if slot < 0 or base <= 0:
-                        continue
-                    rate = rate_p[:, j, pi].clamp(min=1)
-                    have = stock[:, slot]
-                    take = cand & reach_p[:, j, pi] & (have > best_have)
-                    best_have = torch.where(take, have, best_have)
-                    best_cost = torch.where(take, (need[:, j] + rate - 1) // rate, best_cost)
-                    best_rate = torch.where(take, rate, best_rate)
-                    best_slot = torch.where(take, torch.full_like(best_slot, slot), best_slot)
-                pay = cand & (best_have >= 0) & (best_have >= best_cost)
-                lit[:, j] = lit[:, j] | pay
-                stock.scatter_add_(
-                    1, best_slot.unsqueeze(1),
-                    torch.where(pay, -best_cost, torch.zeros_like(best_cost)).unsqueeze(1))
-                self._log_stock(pay.nonzero(as_tuple=True)[0], row, best_slot[pay], "fu")
-                # CIV6 (Climate): the fuel a plant burns discharges carbon "per
-                # Power generated" (`plantCarbon`) — units x the Power each gave
-                # x the fuel's own carbon per Power, which is its per-resource
-                # figure over its base rate.
-                self._emit_carbon(row, torch.where(
-                    pay, (best_cost * best_rate).double() * self._carbon_per_power[best_slot],
-                    torch.zeros_like(best_cost, dtype=torch.float64)))
+            fuels: list[int] = []
+            for n in self._plant_bidx:
+                f = int(self._b_fuel_slot[n])
+                if f >= 0 and int(self._b_fuel_rate[n]) > 0 and f not in fuels:
+                    fuels.append(f)
+            if fuels:
+                nf = len(fuels)
+                stock0 = stock[:, fuels]                                       # [B, nf]
+                # largest stockpile first, catalog order on ties
+                key = -stock0 * nf + torch.arange(nf, device=self.device).unsqueeze(0)
+                order = torch.argsort(key, dim=1)
+                fuel_t = torch.tensor(fuels, dtype=torch.long, device=self.device)
+                for k in range(nf):
+                    fk = fuel_t[order[:, k]]                                    # [B]
+                    fk_ok = stock0.gather(1, order[:, k:k + 1]).squeeze(1) > 0
+                    for n in self._plant_bidx:
+                        slot, base = int(self._b_fuel_slot[n]), int(self._b_fuel_rate[n])
+                        if slot < 0 or base <= 0:
+                            continue
+                        runs = fk_ok & (fk == slot)
+                        hosts = self.city_bldg[:, row, :cols, n] & near.any(dim=2) & runs.unsqueeze(1)
+                        if not bool(hosts.count_nonzero()):
+                            continue
+                        for h in range(cols):
+                            on = hosts[:, h]
+                            if not bool(on.count_nonzero()):
+                                continue
+                            rate = (base + ppr[:, h]).double()
+                            extra = torch.zeros_like(rate)
+                            for j in [h] + [c for c in range(cols) if c != h]:
+                                serve = on & near[:, h, j] & (need[:, j] > 0)
+                                if not bool(serve.count_nonzero()):
+                                    continue
+                                rem = need[:, j]
+                                use = torch.where(serve, torch.minimum(extra, rem), torch.zeros_like(rem))
+                                rem = rem - use
+                                extra = extra - use
+                                ask = serve & (rem > 0)
+                                burn = torch.where(ask, torch.minimum(stock[:, slot], torch.ceil(rem / rate).long()),
+                                                   torch.zeros_like(stock[:, slot]))
+                                paid = burn > 0
+                                if bool(paid.count_nonzero()):
+                                    stock[:, slot] -= burn
+                                    self._log_stock(paid.nonzero(as_tuple=True)[0], row, slot, "fu")
+                                    # CIV6 (Climate): the fuel a plant burns discharges carbon "per
+                                    # Power generated" (`plantCarbon`)
+                                    self._emit_carbon(row, (burn.double() * rate) * self._carbon_per_power[slot])
+                                extra = extra + burn.double() * rate
+                                give = torch.where(ask, torch.minimum(extra, rem), torch.zeros_like(rem))
+                                rem = rem - give
+                                extra = extra - give
+                                need[:, j] = torch.where(serve, rem, need[:, j])
+            lit = lit | (want & (need <= 0))
         self.city_powered[:, row, :cols] = lit
 
     def _res_extracting(self) -> torch.Tensor:
@@ -10142,8 +10156,8 @@ class SimSeats:
     def _seat_accrue_stockpile(self, row: int) -> None:
         """One turn's resource income (`accrueStockpiles`): every tile this seat
         owns that hands it its strategic resource (`_res_extracting`) pays that
-        resource's published number, and the bank is then clamped to
-        `_stockpile_cap`."""
+        resource's published number, unclamped: the turn's fuel and plants burn
+        from it, and the cap holds at the turn's end (`_seat_cap_stockpile`)."""
         if self._n_strategic == 0:
             return
         # CIV6 (Resources.PrereqTech): a strategic the seat cannot see yet
@@ -10249,11 +10263,41 @@ class SimSeats:
             if _es < bank.shape[1]:
                 _has = (self._dist_counts(row)[:, : self.RC, _ed] > 0) & self.city_alive[:, row, : self.RC]
                 bank[:, _es] += (_has & _eon.unsqueeze(1)).long().sum(dim=1) * _en
-        cap = self._stockpile_cap(row).unsqueeze(1)
-        bank.copy_(torch.minimum(bank, cap))
+        # CIV6 (Hattusa, MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION
+        # under PLAYER_HAS_NO_IMPROVED_<R>): each strategic the suzerain sees
+        # and improves on none of its own plots pays it a standing amount
+        _hat = self._suz_effect_count(row, self._suz_c_free_strat)
+        if bool(_hat.count_nonzero()):
+            _techs = self._seat_techs(row)
+            for k, rid in enumerate(self._strat_rid):
+                _rt = int(self._res_reveal_tech[rid])
+                seen = (_techs[:, _rt] if _rt >= 0
+                        else torch.ones(self.B, dtype=torch.bool, device=self.device))
+                for _pk, _ri in self._gp_resource_reveal:
+                    if _ri == rid:
+                        seen = seen | (self._gp_perm(row, self._gp_perm_names[_pk]) > 0)
+                improved = (owned & (self.res_id == rid)).any(dim=1)
+                bank[:, k] += (seen & ~improved).long() * _hat * self._suz_free_strat
         if self._log_diff:
             for _k in range(bank.shape[1]):
                 self._log_stock(range(self.B), row, _k, "ac")
+
+    def _seat_cap_stockpile(self, row: int) -> torch.Tensor:
+        """THE TURN END's cap (`capStockpiles`): each strategic bank over
+        `_stockpile_cap` is handed back to the cap. [B] bool — was any slot
+        over (the hand-back that rebuilds the luxury allocation)."""
+        bank = self.civ_stockpile[:, row]
+        if self._n_strategic == 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        cap = self._stockpile_cap(row).unsqueeze(1)
+        over = bank > cap
+        bank.copy_(torch.minimum(bank, cap))
+        if self._log_diff and bool(over.count_nonzero()):
+            for _k in range(bank.shape[1]):
+                _rows = over[:, _k].nonzero().reshape(-1)
+                if _rows.numel():
+                    self._log_stock(_rows, row, _k, "cp")
+        return over.any(dim=1)
 
     def _city_has_feature(self, row: int, feat: int) -> torch.Tensor:
         """[B, RC] bool — CIV6 (REQUIREMENT_CITY_HAS_X_FEATURE_TYPE): does this

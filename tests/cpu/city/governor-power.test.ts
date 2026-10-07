@@ -83,14 +83,17 @@ describe('Industrialist', () => {
     city.districts.push({ type: 'INDUSTRIAL_ZONE', tileIndex: iz.index });
     city.buildings.push('COAL_POWER_PLANT', 'FACTORY', 'RESEARCH_LAB');
     const base = BUILDINGS.COAL_POWER_PLANT.fuelRate!;
-    expect(cityPower(state, city).plants).toEqual([{ id: 'COAL_POWER_PLANT', rate: base }]);
-    seatGov(state, city, GOVERNOR_INDEX.MAGNUS, P_IND);
-    expect(cityPower(state, city).plants).toEqual([{ id: 'COAL_POWER_PLANT', rate: base + 1 }]);
-    // the burn follows the raised rate: a load of 5 takes 2 Coal at 4, 1 at 5
     const seat = seatOf(state, 0)!;
     const k = STRATEGIC_IDS.indexOf('COAL');
-    seat.stockpile = STRATEGIC_IDS.map(() => 10);
     const demand = cityPower(state, city).demand;
+    // ungoverned, each Coal gives the plant's own rate
+    seat.stockpile = STRATEGIC_IDS.map(() => 10);
+    resolveSeatPower(state, 0);
+    expect(city.powered).toBe(true);
+    expect(seat.stockpile![k]).toBe(10 - Math.ceil(demand / base));
+    // the burn follows the raised rate
+    seatGov(state, city, GOVERNOR_INDEX.MAGNUS, P_IND);
+    seat.stockpile = STRATEGIC_IDS.map(() => 10);
     resolveSeatPower(state, 0);
     expect(city.powered).toBe(true);
     expect(seat.stockpile![k]).toBe(10 - Math.ceil(demand / (base + 1)));

@@ -839,14 +839,14 @@ def poke_deal(rules, path):
     if sim._n_strategic > 0:
         clear_pairs(sim)
         sim.civ_stockpile[:] = 0
-        sim.civ_stockpile[0, a, 0] = 30
+        sim.civ_stockpile[0, a, 0] = 20
         deal(sim, a, b, [[K._deal_k_res, 0, 12]], [])
-        assert int(sim.civ_stockpile[0, a, 0]) == 18
+        assert int(sim.civ_stockpile[0, a, 0]) == 8
         assert int(sim.civ_stockpile[0, b, 0]) == 12
         for _ in range(term):
             sim._deal_phase()
         assert int(sim.civ_stockpile[0, b, 0]) == 0
-        assert int(sim.civ_stockpile[0, a, 0]) == 30, "the lump never came home"
+        assert int(sim.civ_stockpile[0, a, 0]) == 20, "the lump never came home"
 
     # An OPEN BORDERS grant rides the border clock, never a deal term.
     clear_pairs(sim)

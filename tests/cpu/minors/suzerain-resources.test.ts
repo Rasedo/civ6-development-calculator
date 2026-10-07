@@ -14,7 +14,7 @@ import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/c
 import { luxuryAmenities, luxuryHoldings } from '../../../cpu/core/city';
 import { accrueStockpiles } from '../../../cpu/core/stockpile';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN } from '../../../cpu/data/constants';
-import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
+import { HATTUSA_FREE_STRATEGIC, SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
 import { RESOURCES, resourceImprovement } from '../../../world/resources';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
@@ -79,5 +79,38 @@ describe("a suzerained city-state's strategic source", () => {
     state.cityStates[0].envoys[0] = SUZERAIN_ENVOYS - 1;
     accrueStockpiles(state, 0);
     expect(bank[k]).toBe(STRATEGIC_PER_TURN.IRON);
+  });
+});
+
+describe("Hattusa's suzerain", () => {
+  it('banks each strategic it sees and improves nowhere of its own', () => {
+    const { state } = scene('WINE', SUZERAIN_ENVOYS);
+    state.cityStates[0].name = 'Hattusa';
+    const seat = seatOf(state, 0)!;
+    const bank = (seat.stockpile = STRATEGIC_IDS.map(() => 0));
+    const iron = STRATEGIC_IDS.indexOf('IRON');
+    const horses = STRATEGIC_IDS.indexOf('HORSES');
+    // nothing seen, nothing banked
+    seat.research.techs = seat.research.techs.filter((t) => t !== RESOURCES.IRON!.revealTech && t !== RESOURCES.HORSES!.revealTech);
+    accrueStockpiles(state, 0);
+    expect(bank[iron]).toBe(0);
+    // Iron seen and unimproved: the standing amount
+    seat.research.techs.push(RESOURCES.IRON!.revealTech!);
+    accrueStockpiles(state, 0);
+    expect(bank[iron]).toBe(HATTUSA_FREE_STRATEGIC);
+    expect(bank[horses]).toBe(0);
+    // an improved Iron of the suzerain's own ends it
+    const own = tileAtCoords(state.map, 6, 5);
+    setTileOwner(own, 0, seat.cities[0].id);
+    own.resource = 'IRON';
+    own.elevation = 'HILLS';
+    own.improvement = 'MINE';
+    accrueStockpiles(state, 0);
+    expect(bank[iron]).toBe(HATTUSA_FREE_STRATEGIC + STRATEGIC_PER_TURN.IRON);
+    // short of suzerainty, nothing
+    own.improvement = null;
+    state.cityStates[0].envoys[0] = SUZERAIN_ENVOYS - 1;
+    accrueStockpiles(state, 0);
+    expect(bank[iron]).toBe(HATTUSA_FREE_STRATEGIC + STRATEGIC_PER_TURN.IRON);
   });
 });

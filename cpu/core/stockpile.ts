@@ -12,12 +12,14 @@ import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PE
 import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
-import { BUILDINGS, buildingVariantFor } from '../data/buildings';
+import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor } from '../data/buildings';
 import { GP_CITY_FREE_EXTRACTION, GP_FREE_EXTRACTION, gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { governorSum, governorTileSum } from './governors';
 import { extractsResource, resourceImprovement } from '../../world/resources';
 import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenResourcesFor } from './seats';
-import { suzerainMinorSeats } from './cityStates';
+import { regionalReach, suzerainEffectCount, suzerainMinorSeats } from './cityStates';
+import { HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
+import { hexDistance } from '../../world/hex';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
 import { goldAffordable } from './game';
@@ -80,8 +82,8 @@ function goldenMineBonus(state: GameState, seat: number, resourceId: string): nu
  * One turn's income: every tile this seat owns that hands it its strategic
  * resource (`extractsResource`: its matching, unpillaged improvement, or a
  * complete, unpillaged district) pays that resource's published per-turn
- * number. The stockpile is then clamped to the cap — a
- * seat over the ceiling (its Encampment just went dark) loses the excess.
+ * number. The income lands unclamped: the turn's fuel and plants burn from
+ * it, and the cap holds only at the turn's end (`capStockpiles`).
  */
 export function accrueStockpiles(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
@@ -169,9 +171,44 @@ export function accrueStockpiles(state: GameState, seat: number): void {
     if (k < 0) continue;
     for (const city of citiesOf(state, seat)) if (cityHasLiveDistrict(state, city, r.district)) bk[k] += r.perTurn;
   }
-  const cap = stockpileCap(state, seat);
-  for (let k = 0; k < bk.length; k++) if (bk[k] > cap) bk[k] = cap;
+  // CIV6 (Hattusa, MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION under
+  // PLAYER_HAS_NO_IMPROVED_<R>): each strategic resource the suzerain sees and
+  // improves on none of its own plots pays it a standing amount
+  const hattusa = suzerainEffectCount(state, seat, 'freeStrategic');
+  if (hattusa) {
+    const improved = new Set<string>();
+    for (const t of state.map.tiles) {
+      if (t.resource && strategicSlot(t.resource) >= 0 && tileOwnedByCiv(t, seat) && extractsResource(t)) improved.add(t.resource);
+    }
+    STRATEGIC_IDS.forEach((id, k) => {
+      if (!hidden.has(id) && !improved.has(id)) bk[k] += HATTUSA_FREE_STRATEGIC * hattusa;
+    });
+  }
   for (let k = 0; k < bk.length; k++) logStockWrite(state.turn, seat, k, 'ac', bk[k]);
+}
+
+/**
+ * THE TURN END's cap (Player::Processor::DoTurnDeactivate 0x7eb60 ->
+ * 0x4e4ad0 -> Player_Resources 0x4a8f10): each accumulated resource whose
+ * stockpile, less what the player's queued units reserve, stands over the cap
+ * is handed back to the cap. The engine charges a unit's resource when its
+ * production starts, so the bank is already net of the reservations and the
+ * test is the bank against the cap. Returns whether any slot was over — the
+ * hand-back is a ChangeResourceAmount, which rebuilds the luxury allocation.
+ */
+export function capStockpiles(state: GameState, seat: number): boolean {
+  const s = seatOf(state, seat);
+  if (!s) return false;
+  const bk = bank(s);
+  const cap = stockpileCap(state, seat);
+  let over = false;
+  for (let k = 0; k < bk.length; k++) {
+    if (bk[k] <= cap) continue;
+    bk[k] = cap;
+    over = true;
+    logStockWrite(state.turn, seat, k, 'cp', bk[k]);
+  }
+  return over;
 }
 
 /** Put `n` of a strategic resource straight into the bank, under the same
@@ -375,51 +412,86 @@ export function spendStockpile(state: GameState, seat: number, resourceId: strin
 
 /**
  * THE TURN'S POWER, for one seat: which of its cities are lit, and what its
- * plants burn to light them.
+ * plants burn to light them (Player_Resources 0x4ae990 -> 0x4a7cc0).
  *
- * CIV6: "Each turn a Power Plant will attempt to provide required Power to all
- * cities within range, converting stockpiles of the relevant resource into
- * Power", and "cities will consider their own renewable power supplies first,
- * before turning to a nearby Power Plant" — so a plant is asked only for the
- * shortfall. Where two kinds of plant reach one city, "the game engine will use
- * the Power Plant which draws the resource of which you have a larger
- * stockpile". What the source does NOT publish is the order in which one
- * stockpile is shared out among several cities that need it; this walks the
- * seat's cities in slot order, and a city the fuel no longer covers stays dark.
+ * Each city asks for its load less its own renewables ("cities will consider
+ * their own renewable power supplies first, before turning to a nearby Power
+ * Plant"). The fuels the seat holds any of are walked largest stockpile first
+ * ("the game engine will use the Power Plant which draws the resource of which
+ * you have a larger stockpile"), each fuel's plants in catalog order, each
+ * plant's standing copies in the seat's city order, and each copy serves its
+ * own city, then every other city in its reach in city order. A city's burn is
+ * whole units — what its remaining need asks, or the whole stockpile where
+ * that is less — and the Power a unit gives beyond the need stands as the
+ * plant's extra Power, answering the next city it serves first
+ * (the DLL's xExtraPowerAvailable; runs/h1_duelw1120 China t190-214: Xi'an's 5 and
+ * Chengdu's 3 burn two Coal a turn, not three). A city is lit only when its
+ * whole need is met: "a city cannot supply Power to some buildings and not to
+ * others".
  * CIV6 (Industrial Zone Logistics, `FullyPoweredWhileActive`): a city whose
  * queue a `fullyPowered` project heads meets its whole load, no fuel burned.
  */
 export function resolveSeatPower(state: GameState, seat: number): void {
-  ageReactors(citiesOf(state, seat));
-  for (const city of citiesOf(state, seat)) {
+  const cities = citiesOf(state, seat);
+  ageReactors(cities);
+  const need = new Map<number, number>();
+  for (const city of cities) {
     const p = cityPower(state, city);
-    if (p.demand <= 0) {
-      city.powered = false;
-      continue;
-    }
+    city.powered = false;
+    if (p.demand <= 0) continue;
     const head = city.queue[0];
     if (p.supply >= p.demand || (head?.kind === 'project' && PROJECTS[head.project]?.fullyPowered)) {
       city.powered = true;
       continue;
     }
-    let bestFuel: string | undefined;
-    let bestRate = 0;
-    let bestStock = -1;
-    for (const plant of p.plants) {
-      const def = BUILDINGS[plant.id];
-      if (!def?.fuel || !def.fuelRate) continue;
-      const have = stockOf(state, seat, def.fuel);
-      if (have > bestStock) {
-        bestStock = have;
-        bestFuel = def.fuel;
-        bestRate = plant.rate;
+    need.set(city.id, p.demand - p.supply);
+  }
+  if (!need.size) return;
+  const reach = regionalReach(state, seat);
+  const fuels: string[] = [];
+  for (const id of POWER_PLANT_IDS) {
+    const f = BUILDINGS[id]?.fuel;
+    if (f && !fuels.includes(f) && stockOf(state, seat, f) > 0) fuels.push(f);
+  }
+  // largest stockpile first; Array.prototype.sort is stable, catalog order on ties
+  fuels.sort((x, y) => stockOf(state, seat, y) - stockOf(state, seat, x));
+  for (const fuel of fuels) {
+    for (const id of POWER_PLANT_IDS) {
+      const def = BUILDINGS[id];
+      if (def?.fuel !== fuel || !def.fuelRate) continue;
+      for (const host of cities) {
+        if (!host.buildings.includes(id)) continue;
+        const inst = host.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
+        if (!inst) continue;
+        const at = state.map.tiles[inst.tileIndex];
+        if (!at.districtComplete || at.districtPillaged) continue;
+        // CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
+        // the plant's own city's governor raises what each resource provides
+        const rate = def.fuelRate + governorSum(state, host, (e) => e.plantPowerPerResource);
+        let extra = 0;
+        for (const city of [host, ...cities.filter((c) => c !== host)]) {
+          let rem = need.get(city.id) ?? 0;
+          if (rem <= 0) continue;
+          const centre = state.map.tiles[city.centerIndex];
+          if (hexDistance(state.map, at.col, at.row, centre.col, centre.row) > reach) continue;
+          const use = Math.min(extra, rem);
+          rem -= use;
+          extra -= use;
+          if (rem > 0) {
+            const burn = Math.min(stockOf(state, seat, fuel), Math.ceil(rem / rate));
+            if (burn > 0) {
+              spendStockpile(state, seat, fuel, burn, 'fu');
+              emitCarbon(state, seat, plantCarbon(fuel, rate, burn));
+            }
+            extra += burn * rate;
+            const give = Math.min(extra, rem);
+            rem -= give;
+            extra -= give;
+          }
+          need.set(city.id, rem);
+        }
       }
     }
-    const burn = bestFuel ? Math.ceil((p.demand - p.supply) / bestRate) : 0;
-    city.powered = bestFuel !== undefined && bestStock >= burn;
-    if (city.powered) {
-      spendStockpile(state, seat, bestFuel, burn, 'fu');
-      emitCarbon(state, seat, plantCarbon(bestFuel!, bestRate, burn));
-    }
   }
+  for (const city of cities) if (need.has(city.id) && need.get(city.id)! <= 0) city.powered = true;
 }

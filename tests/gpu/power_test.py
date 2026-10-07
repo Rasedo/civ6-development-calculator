@@ -396,8 +396,13 @@ def test_accrual(sim) -> None:
     sim.improvement[0, t] = sim.res_imp[0, t]
     sim.civ_stockpile[:, row, k] = sim._stock_cap_base
     sim._seat_accrue_stockpile(row)
-    assert int(sim.civ_stockpile[0, row, k]) == sim._stock_cap_base, "the bank stops at the ceiling"
-    print("  accrual OK: the published rate per improved source, and the ceiling")
+    assert int(sim.civ_stockpile[0, row, k]) == sim._stock_cap_base + rate, \
+        "the income lands over the ceiling: the turn's burn draws on it first"
+    over = sim._seat_cap_stockpile(row)
+    assert int(sim.civ_stockpile[0, row, k]) == sim._stock_cap_base and bool(over[0]), \
+        "the turn's end hands the excess back to the ceiling"
+    assert not bool(sim._seat_cap_stockpile(row)[0]), "a bank at the ceiling is not over it"
+    print("  accrual OK: the published rate per improved source, and the ceiling at the turn's end")
 
 
 def test_unit_charge(sim) -> None:
@@ -726,7 +731,7 @@ def test_reactor_accident(sim) -> None:
     # the site: ages 9 / 10 / 25 / 30 open no row / MINOR / MINOR+MAJOR / all
     seen: set[int] = set()
     sim._nuclear_accident = lambda h, c, s: seen.add(s) if bool(h[0]) and int(c[0]) == centre else None
-    sim._flood_river = lambda h, t, s: None
+    sim._flood_river = lambda h, t, s, river: None
     sim._erupt = lambda h, v, s: None
     sim._drought = lambda g, t, v: None   # 400 turns of droughts would outlive the table
     w0 = sim._accident_weight

@@ -59,8 +59,8 @@ def main() -> None:
     bidx = {b["id"]: i for i, b in enumerate(R["buildings"])}
     uidx = {u["id"]: i for i, u in enumerate(R["units"])}
     def open_capital(s) -> bool:
-        """the spends stand people on the capital, the probe bumping each
-        next one onto a free land plot around it"""
+        """the spends stand people on the capital, the spawn bumping one onto
+        a free land plot around it where the centre is taken"""
         c = int(s.city_center[B0, 0, 0])
         return all(n >= 0 and bool(s.passable[B0, n]) and not bool(s.water[B0, n]) and int(s.civilian_at[B0, n]) < 0
                    for n in s.neigh[c].tolist())
@@ -89,7 +89,9 @@ def main() -> None:
 
     def spend(cls: int, at: int, tile: int) -> None:
         """stand the person up and spend its one charge on `tile` — the
-        applier's site legality is another poke's; this drives the SPEND."""
+        applier's site legality is another poke's; this drives the SPEND and
+        the verb's tail (`_spend_build_charge`): the person's last charge
+        retires it, so its plot is free for the next one."""
         u = int(sim._gp_class_unit[cls])
         t = torch.full((sim.B,), tile, dtype=torch.long)
         born = sim._spawn_unit(0, ones.clone(), t, u,
@@ -97,7 +99,11 @@ def main() -> None:
                                gp_at=torch.full((sim.B,), at, dtype=torch.long))
         assert bool(born.all()), "the person did not spawn"
         slot = getattr(sim, sim.POOL_NEXT["major"]) - 1 + sim.POOL_LO["major"]
-        sim._gp_apply(0, ones.clone(), slot, t)
+        sc = slot.long()
+        sim._gp_apply(0, ones.clone(), sc, t)
+        r = torch.arange(sim.B)
+        sim._spend_build_charge(r, sc, sim.unit_tile[r, sc].clone())
+        assert not bool(sim.unit_alive[r, sc].any()), "the spent person must leave the map"
         sim._eff_version += 1
 
     cap = int(sim.city_center[B0, 0, 0])

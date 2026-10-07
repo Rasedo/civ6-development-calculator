@@ -2189,10 +2189,50 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   (map seed 9131, 140 turns, scratch only) saw two arrivals, at China's
   PlayerTurnDeactivated (t90) and four rows into a city-state's start
   (t70), each after a Builder charge.
+- The turn end's cap (Player::Processor::DoTurnDeactivate 0x7eb60 ->
+  0x4e4ad0, which tail-jumps to Player_Resources 0x4a8f10): for each
+  accumulated resource, the stockpile less the player's reserved amount
+  (0x4aa530, m_aiReservedResources +0x528), where that is above 0, is
+  tested strictly over the cap (0x4aabe0: 0x5254d0, the game speed's
+  scaling, of the Resource_Consumption row's StockpileCap, plus the
+  player's per-resource extra +0x858 the Encampment buildings' modifiers
+  raise) and handed back to it through ChangeResourceAmount (ownership 0,
+  amount cap - (stock - reserved)) — a rebuild. A bank at the cap is not
+  over it. Online the cap is 25 before the buildings.
+- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070):
+  a unit at the queue's front with a strategic cost and no progress
+  (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less
+  its reservations covers it (0x4aa790), else leaves the front; the
+  completion (0x1856b3 / 0x185a2a) releases the reservation and charges
+  the stockpile together.
+- What the recorder's rows tell: LuxAllocNone [owner, city, row] stands at
+  the owner's next activation (a `false` activation, the AI's re-entry, does
+  not process the turn) and a rebuild that hands the new city nothing reads
+  the same — of the founding windows on the 162102Z / 194856Z
+  re-recordings, every None row whose city a full rebuild would serve
+  nothing agrees with a rebuild; the per-city luxAlloc of the records is the
+  measure. The founded city's luxuries (the harness's `foundedUnallocated`,
+  the triggers above) agree with the records' luxAlloc on 124 of 128
+  founding windows over the re-recorded 1117-1124 and 1129-1131, and on
+  all of 1103's (194856Z) with Hattusa below. A suzerained city-state's
+  unit upgrade re-ranks nothing (1123 t82 Brussels, 1125 t105). Open: 1119
+  t93 (China's turn end hands Iron back with Handan's Man-at-Arms at its
+  front, the bank short of it in the replay), 1120 t95 (the bank over the
+  cap a turn early: the record read before China's start), 1123 t91 (a
+  Cattle centre ranked one copy, the record none), 1131 t53 (Hunza's turn
+  re-ranks China: its Swordsman upgrade or its new technology); on the
+  earlier recordings 1125 t157 (China's turn end with Jebel Barkal
+  completed and Crassus spent, the bank under its cap).
+- Hattusa's suzerain (Expansion2_Leaders.xml, MINOR_CIV_HATTUSA_<R>_RESOURCE_XP2:
+  MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION Amount 2 under
+  PLAYER_HAS_NO_IMPROVED_<R>, REQUIREMENT_PLAYER_HAS_RESOURCE_IMPROVED
+  inverse and REQUIREMENT_PLAYER_HAS_RESOURCE_VISIBILITY) banks 2 a turn of
+  each strategic it sees and improves nowhere: runs/h1_duelw1103 (194856Z)
+  China with no strategic source rebuilt at its turn ends t64 and t92, its
+  bank over the cap.
 - Unread: what rebuilds it at a policy change (the records: 9 of 9 policy
   changes at the processing's start re-rank the cities' luxuries before
-  their growth), and which change re-runs it after a founding in the
-  action phase (AUDIT C-94 LAB).
+  their growth).
 
 ## H-1: the governors' clocks — READ
 

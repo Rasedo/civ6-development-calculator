@@ -50,7 +50,7 @@ import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILR
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
 import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, placeIdleCitizens, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
-import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
+import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
 import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
@@ -2655,6 +2655,7 @@ export function seatPhase(state: GameState): void {
         actor.cultureTotal = (actor.cultureTotal ?? 0) + c0;
       }
       if (recU) applySeatUnitOrders(state, actor, recU.units);
+      capStockpiles(state, actor.seat);
       continue;
     }
 
@@ -3552,6 +3553,8 @@ export function seatPhase(state: GameState): void {
       tradeRouteExpiry(state, actor);
     }
     if (recU) applySeatUnitOrders(state, actor, recU.units);
+    // the turn's end holds each strategic stockpile to its cap
+    capStockpiles(state, actor.seat);
     // the eurekas and inspirations the seat's processing and actions earned
     // land within its turn, as the game's events land them (a city founded on
     // the coast shows Sailing's boost in the record of the turn it was

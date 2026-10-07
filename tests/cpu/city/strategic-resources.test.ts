@@ -5,7 +5,7 @@ import { RESOURCES } from '../../../world/resources';
 import { endTurn } from '../../../cpu/core/game';
 import { trainableUnits, refreshUnits, spawnUnit } from '../../../cpu/core/units';
 import { BARB_SEAT, NO_SEAT, civHasStrategic, seatOf, setTileOwner, tileCity } from '../../../cpu/core/seats';
-import { accrueStockpiles, canTrainWithStockpile, chargeUnitUpkeep, fuelShortCS, grantStockpile, stockOf, stockpileCap, unitResourceCost } from '../../../cpu/core/stockpile';
+import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitUpkeep, fuelShortCS, stockOf, stockpileCap, strategicSlot, unitResourceCost } from '../../../cpu/core/stockpile';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { FORMATION_RESOURCE_MULT } from '../../../cpu/data/units';
 import { stackDefenceCS } from '../../../cpu/core/combat';
@@ -160,7 +160,7 @@ describe('a formation pays a multiple of the chassis charge', () => {
     const one = unitResourceCost(gated.id)!.n;
     const seat = seatOf(state, 0)!;
 
-    grantStockpile(state, 0, res, one * 2);
+    seat.stockpile![strategicSlot(res)] = one * 2;
     expect(canTrainWithStockpile(state, 0, gated.id, 0)).toBe(true);
     expect(canTrainWithStockpile(state, 0, gated.id, 1)).toBe(true);
     // an ARMY asks three times the charge, which this bank cannot meet
@@ -191,11 +191,15 @@ describe('stockpiles', () => {
     tile.improvement = 'FARM';
     accrueStockpiles(state, 0);
     expect(bank[k]).toBe(2 * STRATEGIC_PER_TURN.IRON);
-    // ...and the bank stops at the ceiling
+    // ...the income lands over the ceiling, and the turn's end hands the
+    // excess back
     tile.improvement = 'MINE';
     seat.stockpile[k] = STOCKPILE_CAP_BASE;
     accrueStockpiles(state, 0);
+    expect(seat.stockpile[k]).toBe(STOCKPILE_CAP_BASE + STRATEGIC_PER_TURN.IRON);
+    expect(capStockpiles(state, 0)).toBe(true);
     expect(seat.stockpile[k]).toBe(STOCKPILE_CAP_BASE);
+    expect(capStockpiles(state, 0)).toBe(false);
   });
 
   it('every Encampment building raises the ceiling for all resources', () => {

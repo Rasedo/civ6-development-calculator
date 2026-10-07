@@ -73,7 +73,8 @@ export type SuzEffect =
   | 'partnerProduction' // Singapore
   | 'wonderProduction'   // Brussels
   | 'freshWaterHousing' // Mohenjo-Daro
-  | 'gpActivatedPressure'; // Vatican City
+  | 'gpActivatedPressure' // Vatican City
+  | 'freeStrategic';   // Hattusa
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -87,7 +88,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
-  'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure',
+  'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure', 'freeStrategic',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -264,6 +265,17 @@ export const MILITARISTIC_BUILDING_ROWS: readonly (readonly string[])[] = [
  *  bonus resource on this seat's tiles serves ONE city, the reach an
  *  `Happiness="1"` luxury would have. */
 export const BUENOS_AIRES_AMENITIES = 1;
+
+/** CIV6 (Expansion2_Leaders.xml, MINOR_CIV_HATTUSA_<R>_RESOURCE_XP2, one per
+ *  strategic resource): `MODIFIER_PLAYER_ADJUST_FREE_RESOURCE_IMPORT_EXTRACTION`
+ *  Amount 2 under PLAYER_HAS_NO_IMPROVED_<R> (REQUIREMENT_PLAYER_HAS_RESOURCE_IMPROVED
+ *  inverse, REQUIREMENT_PLAYER_HAS_RESOURCE_VISIBILITY) — each turn the
+ *  suzerain banks 2 of every strategic resource it sees and improves nowhere
+ *  (runs/h1_duelw1103, China suzerain of Hattusa with no strategic source:
+ *  its luxury allocation rebuilt at its turn end, the bank over its cap, t64
+ *  and t92). */
+export const HATTUSA_FREE_STRATEGIC = srcConst('cityState.hattusaFreeStrategic', 2,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_HATTUSA_HORSES_RESOURCE_XP2&Name=Amount', 'Value'));
 interface SuzerainBonusDef {
   /** PROVENANCE, per column (cpu/data/provenance.ts). */
   src?: SrcMap;
@@ -334,6 +346,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // attaching MINOR_CIV_VATICAN_CITY_GREAT_PERSON_RELIGIOUS_PRESSURE to the
   // suzerain: MODIFIER_PLAYER_GRANT_RELIGIOUS_PRESSURE_GREAT_PERSON_ACTIVATED)
   'Vatican City': { name: 'Vatican City', type: 'religious', bonus: 'When you activate a Great Person they spread 400 Religious pressure of your founded (or majority) religion to cities within 10 tiles.', suz: 'gpActivatedPressure' },
+  Hattusa: { name: 'Hattusa', type: 'scientific', bonus: 'Receive 2 of each Strategic resource you have revealed but do not have an improved source of.', suz: 'freeStrategic' },
 };
 
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(

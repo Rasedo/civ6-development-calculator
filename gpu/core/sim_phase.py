@@ -16,6 +16,8 @@ class SimPhase:
         for row in range(self.n_majors):
             active = self._seat_turn(row)
             self._seat_unit_walk(row)
+            # the turn's end holds each strategic bank to its cap (`capStockpiles`)
+            self._seat_cap_stockpile(row)
             # the eurekas and inspirations the seat's processing and actions
             # earned land within its turn (`detectBoosts` at the block's end)
             self._detect_seat_boosts(row, active)

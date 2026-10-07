@@ -13,12 +13,12 @@ import { droughtShielded } from '../data/disasters';
 import { tileAppeal } from './appeal'; // the Seaside Resort's dynamic gold
 import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
-import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
+import { BUILDINGS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
 import { GP_BUILDING_YIELDS, gpPermOf, gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
-import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
+import { cityGovernorEffects, cityGovernorPromos } from './governors';
 
 function terrainYields(tile: Tile): Yields {
   const out = emptyYields();
@@ -669,12 +669,6 @@ export function cityHasFeature(state: GameState, city: City, feature: FeatureId)
 interface CityPower {
   demand: number;
   supply: number;
-  /** The power-plant building ids whose Industrial Zone reaches this centre,
-   *  in catalog order — what `resolveSeatPower` picks a fuel from — each with
-   *  the Power one unit of its fuel provides here: the fuel's own rate, plus
-   *  CIV6 (Industrialist) "+1" where the governor of the plant's city holds
-   *  it, the best such plant in reach taken. */
-  plants: { id: string; rate: number }[];
 }
 
 /**
@@ -693,8 +687,7 @@ interface CityPower {
  * building".
  *
  * This is the fuel-free half: what the city ASKS and what its own renewables
- * answer, plus which plants could cover the rest. `resolveSeatPower` decides,
- * once a turn, which of those the stockpile can actually run.
+ * answer. `resolveSeatPower` walks the plants, once a turn, over the rest.
  */
 export function cityPower(state: GameState, city: City): CityPower {
   const pillaged = pillagedDistrictTypes(state.map, city.districts);
@@ -747,28 +740,7 @@ export function cityPower(state: GameState, city: City): CityPower {
   for (const r of getModifiers(state, city.seat).powerWithDistrict) {
     if (cityHasLiveDistrict(state, city, r.district)) supply += r.power;
   }
-  const center = state.map.tiles[city.centerIndex];
-  const reach = regionalReach(state, city.seat);
-  // CATALOG order, so `resolveSeatPower`'s "largest stockpile wins" tie-break
-  // reads the same list the GPU builds.
-  const plants: { id: string; rate: number }[] = [];
-  for (const id of POWER_PLANT_IDS) {
-    let rate = -1;
-    for (const other of citiesOf(state, city.seat)) {
-      if (!other.buildings.includes(id)) continue;
-      const inst = other.districts.find((d) => d.type === 'INDUSTRIAL_ZONE');
-      if (!inst) continue;
-      const tile = state.map.tiles[inst.tileIndex];
-      if (!tile.districtComplete || tile.districtPillaged) continue;
-      if (hexDistance(state.map, tile.col, tile.row, center.col, center.row) > reach) continue;
-      // CIV6 (Industrialist, EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR):
-      // the plant's OWN city's governor raises what each resource provides
-      rate = Math.max(rate, (BUILDINGS[id]?.fuelRate ?? 0)
-        + governorSum(state, other, (e) => e.plantPowerPerResource));
-    }
-    if (rate >= 0) plants.push({ id, rate });
-  }
-  return { demand, supply, plants };
+  return { demand, supply };
 }
 
 /** The craft's speed above its base 1 LY/turn: every orbital station this

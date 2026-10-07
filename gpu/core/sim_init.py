@@ -497,6 +497,10 @@ class SimInit:
         # (`suzerainPartnerProduction`)
         self._suz_c_partner_prod = _sfx.index("partnerProduction") if "partnerProduction" in _sfx else -1
         self._suz_partner_prod = float(_suz["partnerProd"])
+        # Hattusa: a standing amount of each strategic the suzerain sees and
+        # improves nowhere (`accrueStockpiles`)
+        self._suz_c_free_strat = _sfx.index("freeStrategic") if "freeStrategic" in _sfx else -1
+        self._suz_free_strat = int(_suz["freeStrategic"])
         # Brussels: percent toward wonders (`suzerainWonderPct`)
         self._suz_c_wonder_prod = _sfx.index("wonderProduction") if "wonderProduction" in _sfx else -1
         self._suz_wonder_pct = float(_suz["wonderPct"])

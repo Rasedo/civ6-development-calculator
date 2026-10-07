@@ -13,7 +13,9 @@ city-state's resources." Proven here:
     nothing;
   * the minor keeps its own copy;
   * an improved strategic source on that ground pays the suzerain the
-    resource's per-turn number in `_seat_accrue_stockpile`.
+    resource's per-turn number in `_seat_accrue_stockpile`;
+  * Hattusa's suzerain banks its standing amount of each strategic it sees
+    and improves on none of its own plots.
 """
 
 from __future__ import annotations
@@ -101,6 +103,35 @@ def main() -> int:
     base = int(sim.civ_stockpile[b, row, k])
     assert got - base == rate, f"the suzerain's source paid {got - base}, wanted {rate}"
     print(f"  2 the suzerain banks the minor's improved source ({rate} a turn)")
+
+    # --- 3) Hattusa: each strategic seen and improved nowhere of its own ------
+    sim = fresh(rules, path)
+    code = sim._suz_c_free_strat
+    assert code >= 0, "freeStrategic is not on the wire"
+    sim.citystate_suz_code[b, 0] = code
+    suzerain(sim, b, row, suz_n)
+    k = 0
+    rid = sim._strat_rid[k]
+    rt = int(sim._res_reveal_tech[rid])
+    own = (sim.tile_seat[b] == row) & (sim.res_id[b] == rid)
+    sim.improvement[b, own] = -1
+    sim._tile_owner_ver += 1
+    if rt >= 0:
+        sim.civ_techs[b, row, rt] = False
+        sim.civ_stockpile[b, row].zero_()
+        sim._seat_accrue_stockpile(row)
+        assert int(sim.civ_stockpile[b, row, k]) == 0, "an unseen strategic paid Hattusa's amount"
+        sim.civ_techs[b, row, rt] = True
+    sim._eff_version += 1
+    sim.civ_stockpile[b, row].zero_()
+    sim._seat_accrue_stockpile(row)
+    paid = int(sim.civ_stockpile[b, row, k])
+    assert paid == sim._suz_free_strat, f"Hattusa paid {paid}, wanted {sim._suz_free_strat}"
+    suzerain(sim, b, row, suz_n - 1)
+    sim.civ_stockpile[b, row].zero_()
+    sim._seat_accrue_stockpile(row)
+    assert int(sim.civ_stockpile[b, row, k]) == 0, "short of suzerainty Hattusa still paid"
+    print(f"  3 Hattusa's suzerain banks {paid} of a strategic it sees and improves nowhere")
     print("suzerain resources OK")
     return 0
 

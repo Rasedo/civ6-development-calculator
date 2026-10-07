@@ -33,7 +33,7 @@ import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYiel
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
-import { minorCity, resolveSuzerains } from '../core/cityStates';
+import { minorCity, resolveSuzerains, suzerainMinorSeats } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
 import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, gpActivatedPressure, pressureFromCity, religiousUnitLost, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
@@ -51,6 +51,8 @@ import { DISTRICTS } from '../data/districts';
 import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, FeatureId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
+import { RESOURCES, resourceImprovement } from '../../world/resources';
+import { unitResourceCost } from '../core/stockpile';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import { Civ6Random, drawsBetween } from './civ6Random';
@@ -1134,7 +1136,20 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
       t.districtPillaged = false;
       pillaged.push(t);
     }
-    const out = withCards(state, seat, imp.luxCardsOf(seat), () => luxuryAmenities(state, seat));
+    // a city founded since the seat's last rebuild is not in the allocation
+    // until something rebuilds it (`foundedUnallocated`): the allocation
+    // stands as it was ranked without the city, which holds none
+    const unallocated = foundedUnallocated(rec, cat, imp, seat, owner, log);
+    const s = seatOf(state, seat);
+    const all = s?.cities ?? [];
+    if (s && unallocated.size) s.cities = all.filter((c) => !unallocated.has(c.id));
+    let out: Map<number, number>;
+    try {
+      out = withCards(state, seat, imp.luxCardsOf(seat), () => luxuryAmenities(state, seat));
+    } finally {
+      if (s) s.cities = all;
+    }
+    for (const id of unallocated) out.set(id, 0);
     for (const t of pillaged) t.districtPillaged = true;
     lux.set(seat, out);
     return out;
@@ -1559,6 +1574,13 @@ function bordersHeld(a: TurnRecord, b: TurnRecord): Set<number> {
  *  plot a district, a wonder or an eruption's soil took is no clearing. */
 function actionFood(state: GameState, cat: Catalog, a: TurnRecord, b: TurnRecord, city: City, c: DumpCity): number {
   let food = 0;
+  // the volcanoes erupting at the turn change: a resource gone beside one
+  // went with the eruption, no harvest's (runs/h1_duelw1124_20261007T162102Z
+  // t166: the Bananas beside Chengdu's volcano, its box standing)
+  const erupted = (Array.isArray(b.events) ? b.events : [])
+    .filter((e) => e[0] === b.turn && /^RANDOM_EVENT_(VOLCANO|VESUVIUS|KILIMANJARO|EYJAFJALLAJOKULL)_/.test(cat.randomEvents?.[e[1]] ?? ''))
+    .map((e) => state.map.tiles[num(e[2])])
+    .filter((t): t is Tile => !!t);
   for (const q of c.plots) {
     const pa = plotAt(a, q);
     const pb = plotAt(b, q);
@@ -1568,7 +1590,8 @@ function actionFood(state: GameState, cat: Catalog, a: TurnRecord, b: TurnRecord
     const grants: LumpGrant[] = [];
     if ((pa[P.feature] as number) >= 0 && (pb[P.feature] as number) < 0) grants.push(...chopGrant(state, t, city.seat));
     if ((pa[P.resource] as number) >= 0 && (pb[P.resource] as number) < 0
-      && cat.features[pb[P.feature] as number] !== 'FEATURE_VOLCANIC_SOIL') {
+      && cat.features[pb[P.feature] as number] !== 'FEATURE_VOLCANIC_SOIL'
+      && !erupted.some((v) => hexDistance(state.map, v.col, v.row, t.col, t.row) <= 1)) {
       const g = harvestGrant(state, t, city.seat);
       if (g) grants.push(g);
     }
@@ -1739,6 +1762,90 @@ const PURCHASE_UNIT_HASH = gameHash('UNIT');
 /** a production the log completes by a purchase: `CityProductionCompleted`'s last cell */
 const PURCHASED = 65535;
 
+/** the fertility channels a random event lays, each with its column in a
+ *  record's plot yields (YIELD_KEYS order) */
+const EVENT_STEP_CHANNELS: readonly ['fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul', number][] = [
+  ['fertility', 0], ['fertilityProd', 1], ['fertilitySci', 3], ['fertilityCul', 4],
+];
+
+/**
+ * The engine ids of the cities `owner` (engine `seat`) founded in this
+ * record's log that its luxury allocation does not hold yet. The allocation
+ * (Player_Resources 0x4a6110) is rebuilt only by the player's turn processing
+ * and by ChangeResourceAmount (0x4a7560); a founding calls neither, unless
+ * its centre takes a bonus or luxury resource (the district handler's 0x4ab4d0).
+ * After the founding the record holds the city's luxuries once one of these
+ * runs before the record:
+ * - the player's next processing (its PlayerTurnActivated row, `true`);
+ * - its turn end with a strategic stockpile over the cap (`stockOverCap`);
+ * - an improvement placed, changed or removed on a bonus or luxury resource
+ *   of its own or of a city-state it is suzerain of (0x4ab4d0; a
+ *   city-state's change re-hands its copies to its suzerain, 0x44eff0);
+ * - the turn of a city-state it is suzerain of that accumulates a strategic
+ *   resource (0x4ab6e0's income through 0x4a7560, re-handed by 0x44eff0);
+ * - a unit with a strategic cost the player completes or upgrades.
+ * Recorded (dll_readings "H-1: the luxury allocation's rebuilds"): the
+ * LuxAllocArrived / LuxAllocNone rows and the per-city luxAlloc of the
+ * 162102Z / 194856Z re-recordings of 1103 and 1117-1124.
+ */
+function foundedUnallocated(rec: TurnRecord, cat: Catalog, imp: Imported, seat: number, owner: number,
+  log: unknown[][]): Set<number> {
+  const out = new Set<number>();
+  if (!log.length) return out;
+  const state = imp.state;
+  const W = rec.head.W;
+  const suz = suzerainMinorSeats(state, seat);
+  const suzPlayers = new Set([...suz].map((s) => imp.playerOfSeat.get(s)).filter((p): p is number => p !== undefined));
+  // the suzerained city-states that accumulate a strategic resource each turn
+  const accumulates = new Set<number>();
+  for (const s of suz) {
+    const hidden = hiddenResourcesFor(state, s);
+    const p = imp.playerOfSeat.get(s);
+    if (p === undefined) continue;
+    for (const t of state.map.tiles) {
+      if (t.ownerSeat !== s || !t.resource || RESOURCES[t.resource]?.category !== 'strategic' || hidden.has(t.resource)) continue;
+      if (!t.pillaged && t.improvement === resourceImprovement(t)) { accumulates.add(p); break; }
+    }
+  }
+  const valued = (x: number, y: number): boolean => {
+    const t = state.map.tiles[y * W + x];
+    return !!t?.resource && RESOURCES[t.resource]?.category !== 'strategic';
+  };
+  const ownedBy = (x: number, y: number): boolean => {
+    const t = state.map.tiles[y * W + x];
+    return !!t && (t.ownerSeat === seat || suz.has(t.ownerSeat));
+  };
+  for (let i = 0; i < log.length; i++) {
+    const r = log[i];
+    if (r[2] !== 'CityAddedToMap' || r[3] !== owner) continue;
+    const city = imp.cityByKey.get(`${owner}:${r[4]}`);
+    if (!city) continue;
+    // the centre takes the resource beneath it at once
+    if (valued(r[5] as number, r[6] as number)) continue;
+    let rebuilt = false;
+    for (let j = i + 1; j < log.length && !rebuilt; j++) {
+      const q = log[j];
+      const name = q[2];
+      if (name === 'PlayerTurnActivated') {
+        rebuilt = (q[3] === owner && q[4] === true) || (suzPlayers.has(q[3] as number) && accumulates.has(q[3] as number));
+      } else if (name === 'PlayerTurnDeactivated') {
+        rebuilt = q[3] === owner && imp.stockOverCap.has(seat);
+      } else if (name === 'ImprovementAddedToMap' || name === 'ImprovementChanged' || name === 'ImprovementRemovedFromMap') {
+        rebuilt = valued(q[3] as number, q[4] as number) && ownedBy(q[3] as number, q[4] as number);
+      } else if (name === 'UnitUpgraded' || (name === 'CityProductionCompleted' && q[5] === 0)) {
+        // a unit with a strategic cost upgraded or completed by the player
+        // spends the resource (0x4a7560); a city-state's pays none
+        // (runs/h1_duelw1123_20261007T162102Z t82: Brussels' Swordsman
+        // upgrade leaves China's new Shanghai unallocated)
+        const unit = engineRowOf(cat, 'unit', (name === 'UnitUpgraded' ? q[5] : q[6]) as number);
+        rebuilt = q[3] === owner && !!unit && !!unitResourceCost(unit);
+      }
+    }
+    if (!rebuilt) out.add(city.id);
+  }
+  return out;
+}
+
 /** `f` read with seat `seat` holding `cards` (its government, slotted and
  *  lapsed cards), the seat's own put back after */
 function withCards<T>(state: GameState, seat: number, cards: LuxCards | undefined, f: () => T): T {
@@ -1863,11 +1970,42 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     const from = at < 0 ? -1 : log.slice(0, at).map((r) => r[2] === 'PlayerTurnDeactivated').lastIndexOf(true);
     const undo: (() => void)[] = [];
     if (from < 0) return () => {};
+    // a flood struck at the turn change (record t+1's events: one of the
+    // turn it reads)
+    const flooding = (Array.isArray(b.events) ? b.events : [])
+      .some((e) => e[0] === b.turn && (cat.randomEvents?.[e[1]] ?? '').startsWith('RANDOM_EVENT_FLOOD_'));
+    // each plot once, however many rows name it
+    const seen = new Set<number>();
     for (const r of log.slice(from + 1, at)) {
       if (r[2] !== 'PlotYieldChanged') continue;
       const t = state.map.tiles[(r[4] as number) * a.head.W + (r[3] as number)];
       const next = t && (mapAfter ??= recordMap(b, cat)).tiles[t.index];
-      if (!t || !next || t.feature === next.feature) continue;
+      if (!t || !next || seen.has(t.index)) continue;
+      seen.add(t.index);
+      if (t.feature === next.feature) {
+        // a flood's fertility the event step lays on Floodplains whose
+        // ground stands (runs/h1_duelw1121 t210: the Moderate Flood's +1 Food
+        // on Rome's worked Floodplains, its growth on surplus 6): the rise of
+        // the plot's recorded yields from record t to t+1
+        if (!flooding || !t.feature?.startsWith('FLOODPLAINS')) continue;
+        const p0 = plotAt(a, t.index);
+        const p1 = plotAt(b, t.index);
+        const y0 = p0[P.yields];
+        const y1 = p1[P.yields];
+        if (!Array.isArray(y0) || !Array.isArray(y1) || p0[P.improvement] !== p1[P.improvement]
+          || p0[P.district] !== p1[P.district] || p0[P.owner] !== p1[P.owner]) continue;
+        const was = { fertility: t.fertility, fertilityProd: t.fertilityProd, fertilitySci: t.fertilitySci, fertilityCul: t.fertilityCul };
+        let rose = false;
+        EVENT_STEP_CHANNELS.forEach(([ch, col]) => {
+          const d = num(y1[col]) - num(y0[col]);
+          if (d > 0) {
+            t[ch] = (t[ch] ?? 0) + d;
+            rose = true;
+          }
+        });
+        if (rose) undo.push(() => Object.assign(t, was));
+        continue;
+      }
       const f = t.feature ?? '';
       const nf = next.feature ?? '';
       const key = FIRE_BURNING_FEATURE.includes(f) && FIRE_BURNT_FEATURE.includes(nf) ? 'fertility'
@@ -1879,7 +2017,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       if (key) t[key] = (t[key] ?? 0) + 1;
       undo.push(() => Object.assign(t, was));
     }
-    return () => { for (const u of undo) u(); };
+    return () => { for (const u of undo.reverse()) u(); };
   };
 
   // a plot of `owner`'s that a unit of a player acting after it stands on at

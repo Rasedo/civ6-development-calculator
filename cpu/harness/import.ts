@@ -55,7 +55,7 @@ import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
 import { MP_SCALE, WONDER_FREE_TILES, borderGrowthCost, emptyStockpile, scaleByGameSpeed } from '../data/constants';
-import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower } from '../core/stockpile';
+import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower, stockpileCap, strategicSlot, unitResourceCost } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import { GOVERNMENTS, POLICIES, type SlotKind } from '../data/policies';
@@ -184,6 +184,9 @@ export interface Imported {
   /** the engine's price each standing district held when it was placed, by
    *  `${gamePlayer}:${gameCityId}:${district row}` (`History.districtLocked`) */
   districtLocked: Map<string, number>;
+  /** the majors whose turn ended with a strategic stockpile over its cap
+   *  (`importPower`) — a turn end that rebuilds their luxury allocation */
+  stockOverCap: Set<number>;
 }
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
@@ -641,6 +644,10 @@ export interface History {
   /** each major's strategic stockpile (`Seat.stockpile`) after each record's
    *  power step, by player and turn (`importPower`) */
   stockpile: Map<number, Map<number, number[]>>;
+  /** each city's queue-front unit with a strategic cost, by
+   *  `${player}:${city}`, and whether its start reserved the cost
+   *  (`importPower`) */
+  reservations: Map<string, { unit: string; held: boolean }>;
 }
 
 /** A recruited great person as the records follow it: the unit that carried
@@ -658,6 +665,9 @@ interface RecruitedPerson {
   /** the id of the claimant's city owning `at` in the last record the unit
    *  stood in, -1 where no city of the claimant owned it */
   city: number;
+  /** spent in the record's log after its claimant's turn start: the plot
+   *  appeal its charge raises stands from the claimant's next start */
+  late: boolean;
 }
 
 interface PolicySlots {
@@ -818,7 +828,7 @@ export function newHistory(): History {
     unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
+    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map(), reservations: new Map() };
 }
 
 /** Fold a record's `events` into the history: the floods (each with its
@@ -1113,9 +1123,10 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
     if (key) bound.add(key);
     const seen = unit ? rec : h.last ?? rec;
     const at = unit ? unit.y * W + unit.x : spentAtSpawn(seen, cat, player, name, ind);
-    h.people.set(ind, { player, cls: name, unit: key, at, spent: unit ? null : rec.turn, city: cityOwning(seen, at, player) });
+    h.people.set(ind, { player, cls: name, unit: key, at, spent: unit ? null : rec.turn, city: cityOwning(seen, at, player),
+      late: !unit && spentAfterStart(rec, player, ind) });
   }
-  for (const p of h.people.values()) {
+  for (const [ind, p] of h.people) {
     if (p.spent !== null || p.unit === null) continue;
     const u = live.get(p.unit);
     if (u) {
@@ -1123,6 +1134,7 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
       p.city = cityOwning(rec, p.at, p.player);
     } else {
       p.spent = rec.turn;
+      p.late = spentAfterStart(rec, p.player, ind);
       // where the log walks the unit before its activation, it was spent
       // there (1123 t91: Hildegard walks from Xi'an's centre to its Holy
       // Site at 39,16 and is spent on it, its Science from t92)
@@ -1134,6 +1146,23 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
     }
   }
   return true;
+}
+
+/** Was person `ind` of `player` spent in the record's log after the
+ *  player's last turn start there (its UnitGreatPersonActivated row after
+ *  its PlayerTurnActivated)? */
+function spentAfterStart(rec: TurnRecord, player: number, ind: number): boolean {
+  const logged = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(logged)) return false;
+  let started = false;
+  let late = false;
+  for (const r of logged as unknown[][]) {
+    if (r[2] === 'PlayerTurnActivated' && r[3] === player) {
+      started = true;
+      late = false;
+    } else if (r[2] === 'UnitGreatPersonActivated' && r[3] === player && r[6] === ind) late = started;
+  }
+  return late;
 }
 
 /** The plot the log last moves unit `key` (`owner:id`) to before its great
@@ -2601,7 +2630,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // the prices lock as the history reaches the record: a look ahead at the
   // next record (the era checks' t+1 read) locks nothing
   if (history && history.last === rec) lockDistrictPrices(rec, cat, state, cityByKey, history);
-  if (history) importPower(ctx, rec, state, seatOfGame, history);
+  const stockOverCap = history ? importPower(ctx, rec, state, seatOfGame, history) : new Set<number>();
   // a boosted item neither held nor current holds its boost as parked
   // progress (`markBoost`); the record shows no item's progress but the
   // current one's, so any research parked on it before is unread
@@ -2618,7 +2647,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
     congressGaps, congressOf, luxCardsOf: (seat: number) => luxCards.get(seat), queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
-    districtLocked: history?.districtLocked ?? new Map(),
+    districtLocked: history?.districtLocked ?? new Map(), stockOverCap,
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
     cityBefore: prevCities,
@@ -2638,9 +2667,16 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
  * record paying its resource cost, the units' fuel, then the plants' burn.
  * A record set that begins past turn 1 holds no bank to start from: its
  * seats carry a `stockpile` gap.
+ *
+ * Returns the seats whose last turn's income left a stockpile over the cap
+ * after that turn's charges: the cap is enforced at the player's turn end
+ * (Player::Processor::DoTurnDeactivate 0x7eb60 -> 0x4e4ad0 -> Player_Resources
+ * 0x4a8f10, which hands each accumulated resource over its cap back through
+ * ChangeResourceAmount), and that call rebuilds the luxury allocation.
  */
-function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (pid: number) => number, h: History): void {
+function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (pid: number) => number, h: History): Set<number> {
   const prevUnits = new Set((h.before && h.before.turn < rec.turn ? h.before.units : []).map((u) => `${u.owner}:${u.id}`));
+  const overCap = new Set<number>();
   for (const p of rec.players) {
     const seat = seatOfGame(p.id);
     const s = seatOf(state, seat);
@@ -2656,7 +2692,52 @@ function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (p
     }
     s.stockpile = from === -Infinity ? emptyStockpile() : [...banks.get(from)!];
     const turns = from === -Infinity ? 1 : rec.turn - from;
-    for (let k = 0; k < turns; k++) accrueStockpiles(state, seat);
+    // the resources the player's queue fronts reserve (Player_Resources
+    // +0x528, 0x4aa530; City_BuildQueue 0x17f3a0): a unit with a strategic
+    // cost reserves it where it starts at its city's front with the bank, less
+    // the reservations held, covering it, and holds it to its completion,
+    // when the resource is charged (a record's new unit pays here); one that
+    // started short reserves nothing while it stands. The turn end tests the
+    // stockpile less the reservations against the cap, handing the excess back
+    // to cap + reserved (runs/h1_duelw1124_20261007T162102Z t117: Beijing's
+    // Courser holds China's Horses over the cap; runs/h1_duelw1119_20261007T162102Z
+    // t92: Handan's Man-at-Arms, begun short of Iron, holds none, the bank
+    // handed back at China's turn end)
+    const reserved = emptyStockpile();
+    const fronts = new Map<string, { unit: string; held: boolean }>();
+    for (const c of rec.cities) {
+      if (c.owner !== p.id) continue;
+      const e = (c.queue ?? [])[0];
+      if (!e || typeof e !== 'object') continue;
+      const id = e.UnitType !== undefined ? unitId(ctx, e.UnitType) : undefined;
+      const cost = id ? unitResourceCost(id, Math.max(0, num(e.MilitaryFormationType ?? 0) || 0)) : undefined;
+      const k = cost ? strategicSlot(cost.id) : -1;
+      if (k < 0) continue;
+      const key = `${p.id}:${c.id}`;
+      const was = h.reservations.get(key);
+      const held = was && was.unit === id ? was.held : s.stockpile[k] - reserved[k] >= cost!.n;
+      fronts.set(key, { unit: id!, held });
+      if (held) reserved[k] += cost!.n;
+    }
+    if (h.last === rec) {
+      for (const key of [...h.reservations.keys()]) if (key.startsWith(`${p.id}:`)) h.reservations.delete(key);
+      for (const [key, f] of fronts) h.reservations.set(key, f);
+    }
+    const cap = stockpileCap(state, seat);
+    const turnEnd = (): boolean => {
+      let over = false;
+      for (let k = 0; k < s.stockpile!.length; k++) {
+        if (s.stockpile![k] - reserved[k] <= cap) continue;
+        s.stockpile![k] = cap + reserved[k];
+        over = true;
+      }
+      return over;
+    };
+    for (let k = 0; k < turns - 1; k++) {
+      accrueStockpiles(state, seat);
+      turnEnd();
+    }
+    accrueStockpiles(state, seat);
     if (from !== -Infinity) {
       for (const u of rec.units) {
         if (u.owner !== p.id || prevUnits.has(`${u.owner}:${u.id}`)) continue;
@@ -2666,8 +2747,10 @@ function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (p
     }
     chargeUnitUpkeep(state, seat);
     resolveSeatPower(state, seat);
+    if (turnEnd()) overCap.add(seat);
     banks.set(rec.turn, [...s.stockpile]);
   }
+  return overCap;
 }
 
 /** the plots the wonders a record's log completes in a city grant it
@@ -3866,6 +3949,12 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
           : s.cities.find((c) => c.isCapital);
         for (const [k, n] of cityPerm) {
           if (!city) continue;
+          // the city's plot appeal the game refreshes at its owner's turn
+          // start: a charge spent after that start raises it from the next
+          // (runs/h1_duelw1121 t247: Alvar Aalto spent in China's actions,
+          // Xi'an's plot appeal and park Tourism as before at t248, raised
+          // at t249)
+          if (k === 'appeal' && p.late && p.spent === rec.turn) continue;
           const v = (city.gpPerm ??= GP_CITY_PERM.map(() => 0));
           const at = GP_CITY_PERM.indexOf(k as (typeof GP_CITY_PERM)[number]);
           // the Bank's slots are already read off a work standing in one

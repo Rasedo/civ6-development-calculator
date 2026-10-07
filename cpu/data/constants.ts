@@ -595,14 +595,12 @@ export const TRADE_COURSE_MAX = srcConst('trade.courseMax', 96, {
   stylized: 'a storage capacity for the route course, not a rule; a 44 x 26 map fits any budget-walked path under it',
 });
 
-/** CIV6 (GS): "The maximum stockpile amount is initially 50 for each resource
- *  but constructing Encampment buildings in your empire (Barracks, Armory,
- *  etc.) will increase your maximum stockpile by 10 per building for all
- *  resources." */
-export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', 50, {
-  pedia: 'the GS Resources page ("The maximum stockpile amount is initially 50 for each resource"); '
-    + 'the install carries the cap as a DLL rule',
-});
+/** A strategic resource's stockpile cap before the Encampment buildings:
+ *  the resource's StockpileCap through the game speed (Player_Resources
+ *  0x4aabe0: 0x5254d0 of the Resource_Consumption row's +0x2c, plus the
+ *  player's per-resource extra +0x858), 25 online. */
+export const STOCKPILE_CAP_BASE = srcConst('strategic.capBase', scaleByGameSpeed(50),
+  xml('Resource_Consumption', 'ResourceType=RESOURCE_HORSES', 'StockpileCap', { scale: GAME_SPEED }));
 export const STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING =
   srcConst('strategic.capPerEncampmentBuilding', 10, {
     pedia: 'the GS Resources page ("increase your maximum stockpile by 10 per building")',

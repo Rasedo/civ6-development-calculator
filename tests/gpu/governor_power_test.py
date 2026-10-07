@@ -88,15 +88,19 @@ def test_industrialist(rules, path) -> None:
     sim.city_bldg[B0, ROW, 0, BIDS.index("RESEARCH_LAB")] = True
     sim._bldg_version += 1
     base = int(sim._b_fuel_rate[coal])
-    pi = sim._plant_bidx.index(coal)
+    slot = int(sim._b_fuel_slot[coal])
     assert float(sim._governor_building_yields(ROW)[B0, 0, 1]) == 0.0
-    _d, _s, _r, rate = sim._city_power_need(ROW)
-    assert int(rate[B0, 0, pi]) == base
+    demand, _s, reach, add = sim._city_power_need(ROW)
+    assert bool(reach[B0, 0, 0]) and int(add[B0, 0]) == 0, "the plant reaches its own city, no governor's add"
+    # ungoverned, each Coal gives the plant's own rate
+    sim.civ_stockpile[:, ROW] = 10
+    sim._resolve_seat_power(ROW)
+    assert bool(sim.city_powered[B0, ROW, 0])
+    assert int(sim.civ_stockpile[B0, ROW, slot]) == 10 - (int(demand[B0, 0]) + base - 1) // base
     seat_gov(sim, ind)
     assert float(sim._governor_building_yields(ROW)[B0, 0, 1]) == 2.0, "the plant's +2 Production"
-    demand, _s, reach, rate = sim._city_power_need(ROW)
-    assert bool(reach[B0, 0, pi]) and int(rate[B0, 0, pi]) == base + 1, "each resource provides 1 more"
-    slot = int(sim._b_fuel_slot[coal])
+    demand, _s, reach, add = sim._city_power_need(ROW)
+    assert int(add[B0, 0]) == 1, "each resource provides 1 more"
     sim.civ_stockpile[:, ROW] = 10
     sim._resolve_seat_power(ROW)
     assert bool(sim.city_powered[B0, ROW, 0])

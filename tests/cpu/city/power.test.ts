@@ -55,9 +55,9 @@ function lit(state: GameState, city: City): boolean {
 describe('power', () => {
   it('the base load is the sum of the standing buildings that ask for one', () => {
     const { state, city } = industrialCity();
-    expect(cityPower(state, city)).toEqual({ demand: 0, supply: 0, plants: [] });
+    expect(cityPower(state, city)).toEqual({ demand: 0, supply: 0 });
     city.buildings.push('RESEARCH_LAB'); // Base Load 3
-    expect(cityPower(state, city)).toEqual({ demand: 3, supply: 0, plants: [] });
+    expect(cityPower(state, city)).toEqual({ demand: 3, supply: 0 });
     expect(lit(state, city)).toBe(false); // a load with no supply
     city.buildings.push('FACTORY'); // Base Load 2
     expect(cityPower(state, city).demand).toBe(5);
