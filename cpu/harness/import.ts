@@ -762,7 +762,8 @@ export function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
   const tiles: Tile[] = [];
   for (let i = 0; i < rec.head.W * rec.head.H; i++) tiles.push(tileOf(ctx, rec, i));
   const map: GameMap = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
-    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents };
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents,
+    regions: cat.orders?.regions };
   for (const t of tiles) t.riverMask = edgeMask(map, rec, t, P.riverBits);
   return map;
 }
@@ -1926,7 +1927,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   // (the catalog's, else the map script's); a dump without them leaves the
   // engine its own orders, a gap on the turn's event pick, and its landmasses
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
-    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents };
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents,
+    regions: cat.orders?.regions };
   for (const t of tiles) {
     t.riverMask = edgeMask(map, rec, t, P.riverBits);
     t.cliffMask = edgeMask(map, rec, t, P.cliffBits);

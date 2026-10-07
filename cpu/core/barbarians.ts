@@ -21,7 +21,7 @@ import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffs
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, hiddenResourcesFor, isBarbSeat, isTerritorial, seatOfCityState, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, isBarbSeat, isTerritorial, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
@@ -103,13 +103,13 @@ function allSeers(state: GameState): Set<number> {
   return out;
 }
 
-/** may a camp stand on this plot (the improvement's ground, 0x35fd60): open
- *  land of its terrains, bare or under its features, no resource the
- *  barbarians see, nothing built */
-function campGround(t: Tile, hidden: ReadonlySet<string>): boolean {
+/** may a camp stand on this plot (the improvement's ground, 0x35fd60 asked
+ *  for no player, which reads every resource, 0x5112f0): open land of its
+ *  terrains, bare or under its features, no resource, nothing built */
+function campGround(t: Tile): boolean {
   if (isWater(t) || t.elevation === 'MOUNTAIN' || !BARB_CAMP_TERRAINS.includes(t.terrain)) return false;
   if (t.feature && !BARB_CAMP_FEATURES.includes(t.feature)) return false;
-  if (t.resource && !hidden.has(t.resource)) return false;
+  if (t.resource) return false;
   return !t.improvement && !t.goodyHut && !t.district && !t.builtWonder;
 }
 
@@ -123,10 +123,11 @@ function tribesOf(state: GameState): BarbTribe[] {
  * camp ground with no major's city nearer than BARBARIAN_CAMP_MINIMUM_DISTANCE_CITY
  * and no camp within BARBARIAN_CAMP_MINIMUM_DISTANCE_ANOTHER_CAMP; then the
  * distances to the nearest and second-nearest tribe (dead ones too, -1 where
- * none), floored at 0, plus the farthest major's city within the scan.
+ * none) and to the nearest camp ever raised (0 before the first), floored at
+ * 0, plus the farthest major's city within the scan.
  */
-function campScore(state: GameState, t: Tile, seen: Uint8Array, hidden: ReadonlySet<string>, majorCentres: number[]): number | null {
-  if (tileSeat(t) !== NO_SEAT || seen[t.index] || !campGround(t, hidden)) return null;
+function campScore(state: GameState, t: Tile, seen: Uint8Array, majorCentres: number[]): number | null {
+  if (tileSeat(t) !== NO_SEAT || seen[t.index] || !campGround(t)) return null;
   const { map } = state;
   const reach = Math.max(BARB_CAMP_DIST_CITY, BARB_CAMP_DIST_CAMP);
   let far = 0;
@@ -153,7 +154,10 @@ function campScore(state: GameState, t: Tile, seen: Uint8Array, hidden: Readonly
       near1 = d;
     }
   }
-  return Math.max(0, near1 + near2) + far;
+  // the nearest plot of the manager's camp list (every camp ever raised,
+  // 0x152b50 over +0x4a0, appended at 0x154642), 0 when empty: the nearest
+  // tribe again
+  return Math.max(0, near1 + near2 + Math.max(near1, 0)) + far;
 }
 
 /**
@@ -162,11 +166,10 @@ function campScore(state: GameState, t: Tile, seen: Uint8Array, hidden: Readonly
  * major sees now, less the camps standing; the first step that adds lays
  * BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD of it, every later one
  * a single camp. The candidates are scored per region — the map's regions
- * (0x153290: a region of more than 10 plots or on an area of more than 10)
- * are its areas split at the map script's chokepoints (Region_Builder's flood
- * 0x887810 stops at a chokepoint's line, 0x887aa0); the engines hold no
- * chokepoints and take each area (`Tile.area`) as one region — each region
- * keeping its best-scoring plots in plot order
+ * (`Tile.region`, 0x153290: a region of more than 10 plots or on an area of
+ * more than 10) are the land split at the map script's chokepoints
+ * (Region_Builder's flood 0x887810 stops at a chokepoint's line, 0x887aa0) —
+ * each region keeping its best-scoring plots in plot order
  * (the evaluation's stable sort); the regions holding the best score of all
  * are weighed by how many such plots each holds ("Barbarian camp region
  * placement"), a plot of the chosen one is drawn ("Barbarian camp
@@ -194,15 +197,25 @@ export function campStep(state: GameState): void {
   state.barbCampsBegun = true;
   if (add <= 0) return;
   const seen = plotsSeenNow(state, allSeers(state));
-  const hidden = hiddenResourcesFor(state, BARB_SEAT);
   const majorCentres = majors.flatMap((s) => state.seats[s].cities.map((c) => c.centerIndex));
-  const size = new Map<number, number>();
-  for (const t of map.tiles) if ((t.area ?? -1) >= 0) size.set(t.area!, (size.get(t.area!) ?? 0) + 1);
+  // a region takes part with more than BARB_REGION_MIN plots, or on an area
+  // (its first plot's, Map_Region's m_area) of more
+  const areaSize = new Map<number, number>();
+  const regSize = new Map<number, number>();
+  const regArea = new Map<number, number>();
+  for (const t of map.tiles) {
+    if ((t.area ?? -1) >= 0) areaSize.set(t.area!, (areaSize.get(t.area!) ?? 0) + 1);
+    const r = t.region ?? -1;
+    if (r < 0) continue;
+    regSize.set(r, (regSize.get(r) ?? 0) + 1);
+    if (!regArea.has(r)) regArea.set(r, t.area ?? -1);
+  }
   const best = new Map<number, { score: number; plots: number[] }>();
   for (const t of map.tiles) {
-    const reg = t.area ?? -1;
-    if (reg < 0 || (size.get(reg) ?? 0) <= BARB_REGION_MIN) continue;
-    const s = campScore(state, t, seen, hidden, majorCentres);
+    const reg = t.region ?? -1;
+    if (reg < 0 || ((regSize.get(reg) ?? 0) <= BARB_REGION_MIN
+      && (areaSize.get(regArea.get(reg)!) ?? 0) <= BARB_REGION_MIN)) continue;
+    const s = campScore(state, t, seen, majorCentres);
     if (s === null) continue;
     const b = best.get(reg);
     if (!b || s > b.score) best.set(reg, { score: s, plots: [t.index] });

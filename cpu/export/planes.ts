@@ -298,6 +298,8 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       cont: t.continent ?? -1,
       // CIV6 (AreaBuilder): the plot's area (`deriveAreas`)
       area: t.area ?? -1,
+      // CIV6 (Map_Region): the plot's region (`deriveRegions`)
+      region: t.region ?? -1,
       // CIV6 (Mountain Tunnel): the connected MOUNTAIN component this tile
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,

@@ -303,3 +303,14 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   RORAIMA: { id: 'RORAIMA', name: 'Mount Roraima', yields: {}, impassable: true, adjacentYields: { faith: 1, science: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// IK KIL, appended after the Matterhorn; the engines' map generator lays
+// none, an imported world carries it. CIV6 (Expansion2_Features.xml): one
+// plot of Grassland or Plains, flat or hills, Impassable, Appeal 2,
+// AddsFreshWater, no Feature_YieldChanges or Feature_AdjacentYields row
+// (runs/h1_duelw1126 plot 498: no camp may stand on it). Its
+// IKKIL_PRODUCTION_WONDER / IKKIL_PRODUCTION_DISTRICT (+50% Production toward
+// a wonder or a district beside it, in every city) are not modelled.
+Object.assign(FEATURES, {
+  IKKIL: { id: 'IKKIL', name: 'Ik Kil', yields: {}, impassable: true, ...NW, freshWater: true },
+} satisfies Record<string, FeatureDef>);

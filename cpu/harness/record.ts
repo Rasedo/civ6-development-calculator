@@ -345,6 +345,9 @@ export interface MapOrders {
   /** per plot its continent (the catalog's where the dump read them, else
    *  the map script's StampContinents); absent where neither is known */
   continents?: number[];
+  /** per plot its Map_Region (the map script's AnalyzeChokepoints on the
+   *  regenerated map, -1 none); absent where the map was not regenerated */
+  regions?: number[];
 }
 
 /** A dump's catalog (`<stem>.cat.json`) with the map orders beside it
@@ -356,7 +359,7 @@ export function loadCatalog(dumpPath: string): Catalog {
   const ordersPath = dumpPath.replace(/\.jsonl$/, '.orders.json');
   if (existsSync(ordersPath)) {
     const o = JSON.parse(readFileSync(ordersPath, 'utf8')) as MapOrders;
-    cat.orders = { source: o.source, rivers: o.rivers, volcanoes: o.volcanoes, continents: o.continents };
+    cat.orders = { source: o.source, rivers: o.rivers, volcanoes: o.volcanoes, continents: o.continents, regions: o.regions };
   }
   return cat;
 }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
-import { deriveAreas, deriveContinents, isWater } from '../../../world/query';
+import { deriveAreas, deriveContinents, deriveRegions, isWater } from '../../../world/query';
 import { homeContinent, onHomeContinent, routeIntercontinental, emptySeat, seatOf } from '../../../cpu/core/seats';
 import { neighbors } from '../../../world/hex';
 
@@ -93,6 +93,30 @@ describe('the areas (AreaBuilder)', () => {
     expect(new Set([west, ridge, mid, sea, east]).size).toBe(5);
     expect(map.tiles[0].area).toBe(0);
     for (const t of map.tiles) if (t.col === 6) expect(t.area).toBe(ridge);
+  });
+});
+
+describe('the regions (Map_Region)', () => {
+  it('stamps the map\'s regions where it carries them', () => {
+    const map = makeMap(12, 12, 'GRASSLAND');
+    map.regions = map.tiles.map((t) => (t.col < 4 ? 0 : 1));
+    deriveRegions(map);
+    expect(tileAtCoords(map, 2, 5).region).toBe(0);
+    expect(tileAtCoords(map, 9, 5).region).toBe(1);
+  });
+
+  it('else takes each passable land area, -1 off it', () => {
+    const map = makeMap(12, 12, 'GRASSLAND');
+    for (const t of map.tiles) if (t.col === 6) t.elevation = 'MOUNTAIN';
+    for (const t of map.tiles) if (t.col === 9) t.terrain = 'OCEAN';
+    deriveRegions(map);
+    const west = tileAtCoords(map, 2, 5).region!;
+    const mid = tileAtCoords(map, 7, 5).region!;
+    const east = tileAtCoords(map, 11, 5).region!;
+    expect(new Set([west, mid, east]).size).toBe(3);
+    expect(west).toBe(0);
+    expect(tileAtCoords(map, 6, 5).region).toBe(-1);
+    expect(tileAtCoords(map, 9, 5).region).toBe(-1);
   });
 });
 

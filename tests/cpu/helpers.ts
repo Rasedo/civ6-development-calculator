@@ -4,7 +4,7 @@ import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/t
 import { BARB_SEAT, NO_SEAT, emptySeat, seatOf, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
 import { slotGreedily } from '../../cpu/core/effects';
-import { deriveAreas, deriveContinents, deriveMountainRanges } from '../../world/query';
+import { deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
 import { deriveLowlands, standingRemovable } from '../../cpu/core/climate';
 import { canFoundCity } from '../../cpu/core/rules';
 import { GP_CLASSES } from '../../cpu/data/greatPeople';
@@ -69,6 +69,7 @@ export function makeState(map: GameMap = makeMap()): GameState {
   deriveLowlands(map);
   deriveContinents(map);
   deriveAreas(map);
+  deriveRegions(map);
   deriveMountainRanges(map);
   return {
     map,

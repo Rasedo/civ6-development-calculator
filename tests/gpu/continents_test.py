@@ -63,6 +63,12 @@ def test_the_area_plane_is_the_fixture(rules, path) -> None:
     assert sim.tile_area[B0].tolist() == want, "the shipped area ids did not survive the load"
     assert min(want) == 0, "a tile without an area"
     print("  1b the area plane OK")
+    want = [int(t.get("region", -1)) for t in fx["tiles"]]
+    assert sim.tile_region[B0].tolist() == want, "the shipped region ids did not survive the load"
+    land = (~sim.water[B0] & ~sim.tile_mountain[B0]).tolist()
+    assert all(dry for r, dry in zip(want, land) if r >= 0), "a region off passable land"
+    assert max(want) >= 0, "no region at all"
+    print("  1c the region plane OK")
 
 
 def test_water_carries_none(rules, path) -> None:

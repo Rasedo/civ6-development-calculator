@@ -36,7 +36,7 @@ import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
-import { isWater, deriveAreas, deriveContinents, deriveMountainRanges } from '../../world/query';
+import { isWater, deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
@@ -204,6 +204,7 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
   deriveLowlands(map);
   deriveContinents(map);
   deriveAreas(map);
+  deriveRegions(map);
   deriveMountainRanges(map);
   return {
     map,

@@ -33,7 +33,9 @@ across, each plot once, -1 for a partner off the map), `volcanoes` (plots in
 vector order), `continents` (per plot its Plot:GetContinentType(): the
 catalog's `continents` where the dump read them, else StampContinents' on the
 generated map, null where neither is known), `source` ("game" or "map
-script") and the check's notes.
+script") and the check's notes, and `regions` (per plot its Map_Region,
+-1 none: the map script's AnalyzeChokepoints on the generated map, null
+where it differs from the record).
 """
 from __future__ import annotations
 
@@ -130,6 +132,11 @@ def orders(dump: pathlib.Path, map_seed: int | None = None, config: str | None =
             notes.append("the map script's continents " + ("match" if not off else f"DIFFER on {off} plots"))
     else:
         continents = gen_cont if gen_ok else None
+    # the regions (Map_Region): the map script's AnalyzeChokepoints on the
+    # regenerated map, where it matches the record
+    regions = list(world.region) if gen_ok else None
+    if regions is not None:
+        notes.append(f"the map's regions: {len(world.region_sizes)}, {len(world.chokepoints)} chokepoints")
     if isinstance(live, list) and live:
         rivers = [[int(q) for q in r.get("plots", [])] for r in live]
         fp = {i for i, p in enumerate(plots) if p[1] >= 0 and "FLOODPLAINS" in cat["features"][p[1]]}
@@ -148,11 +155,13 @@ def orders(dump: pathlib.Path, map_seed: int | None = None, config: str | None =
         if gen_ok and [i for i in gen_volc if i in named] != named:
             notes.append(f"the named volcanoes {named} DIFFER from the map script's order {gen_volc}")
         return {"mapSeed": int(row["map_seed"]), "script": script, "size": cfg["size"], "source": "game",
-                "rivers": rivers, "volcanoes": volcanoes, "continents": continents, "notes": notes}
+                "rivers": rivers, "volcanoes": volcanoes, "continents": continents, "regions": regions,
+                "notes": notes}
     if not gen_ok:
         raise SystemExit(f"{dump.name}: {notes[-1]}; no orders written")
     return {"mapSeed": int(row["map_seed"]), "script": script, "size": cfg["size"], "source": "map script",
-            "rivers": gen_rivers, "volcanoes": gen_volc, "continents": continents, "notes": notes}
+            "rivers": gen_rivers, "volcanoes": gen_volc, "continents": continents, "regions": regions,
+            "notes": notes}
 
 
 def main() -> int:

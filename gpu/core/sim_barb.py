@@ -252,7 +252,7 @@ class SimBarb:
             return
         seen = self._barb_seen(False)
         # the camp's ground: open land of its terrains, bare or under its
-        # features, no resource the barbarians see, nothing built
+        # features, no resource, nothing built
         terr_ok = torch.zeros_like(land)
         for t in bb["campTerrains"]:
             terr_ok |= self.terrain == t
@@ -260,9 +260,9 @@ class SimBarb:
         for f in bb["campFeatures"]:
             if f >= 0:
                 feat_ok |= self.feat_id == f
-        rt = self._res_reveal_tech.take(self.res_id.clamp(min=0))
-        hidden = (rt >= 0) & ~self.barb_techs.gather(1, rt.clamp(min=0))
-        res_ok = (self.res_id < 0) | hidden
+        # no resource at all: the ground is asked for no player, who reads
+        # every resource
+        res_ok = self.res_id < 0
         built = (self.improvement >= 0) | self.tile_goody | (self.district >= 0) | (self.built_wonder >= 0)
         ground = land & ~self.tile_mountain & terr_ok & feat_ok & res_ok & ~built & (self.tile_seat < 0) & ~seen
         # no major's city nearer than the city distance; the farthest one in reach
@@ -293,16 +293,30 @@ class SimBarb:
             second = on & ~nearer & ((n2 < 0) | (d < n2))
             n2 = torch.where(nearer, n1, torch.where(second, d, n2))
             n1 = torch.where(nearer, d, n1)
-        score = (n1 + n2).clamp(min=0) + far
+        # and the nearest camp ever raised (the manager's camp list), 0 before
+        # the first: the nearest tribe again
+        score = (n1 + n2 + n1.clamp(min=0)).clamp(min=0) + far
         cand = ground & ~bad
-        # the regions: the areas (`Tile.area`) of more than regionMin plots
-        reg = self.tile_area
+        # the regions (`Tile.region`) of more than regionMin plots, or on an
+        # area (the region's first plot's) of more
+        reg = self.tile_region
         R = int(reg.max()) + 1 if reg.numel() else 0
         if R <= 0:
             return
         size = torch.zeros(B, R, dtype=torch.long, device=self.device)
         size.scatter_add_(1, reg.clamp(min=0), (reg >= 0).long())
-        big = size.gather(1, reg.clamp(min=0)) > bb["regionMin"]
+        ar = self.tile_area
+        A = int(ar.max()) + 1 if ar.numel() else 0
+        asize = torch.zeros(B, max(A, 1), dtype=torch.long, device=self.device)
+        asize.scatter_add_(1, ar.clamp(min=0), (ar >= 0).long())
+        idx = torch.arange(T, device=self.device).expand(B, T)
+        first = torch.full((B, R), T, dtype=torch.long, device=self.device)
+        first.scatter_reduce_(1, reg.clamp(min=0), torch.where(reg >= 0, idx, torch.full_like(idx, T)),
+                              reduce="amin", include_self=True)
+        rarea = ar.gather(1, first.clamp(max=T - 1))
+        rasize = asize.gather(1, rarea.clamp(min=0))
+        big = (size > bb["regionMin"]) | ((rarea >= 0) & (rasize > bb["regionMin"]))
+        big = big.gather(1, reg.clamp(min=0))
         cand = cand & (reg >= 0) & big
         sc = torch.where(cand, score, torch.full_like(score, -1))
         best = torch.full((B, R), -1, dtype=torch.long, device=self.device)

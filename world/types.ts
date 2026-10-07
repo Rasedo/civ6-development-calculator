@@ -80,7 +80,8 @@ export type FeatureId =
   | 'HA_LONG_BAY'
   | 'WHITE_DESERT'
   | 'MATTERHORN'
-  | 'RORAIMA';
+  | 'RORAIMA'
+  | 'IKKIL';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -270,6 +271,10 @@ export interface Tile {
    *  mountains or the other land, numbered from 0 by lowest plot. Derived at
    *  creation by `deriveAreas`. */
   area?: number;
+  /** CIV6 (Map_Region): the plot's region, -1 off passable land — the map's
+   *  `regions` where it carries them, else its passable land area. Derived at
+   *  creation by `deriveRegions`. */
+  region?: number;
   /** CIV6 (Mountain Tunnel): "a movement portal on a mountain range" — the
    *  connected component of MOUNTAIN tiles this one belongs to, -1 off a
    *  mountain. Static, like `continent`: mountains never move. */
@@ -334,6 +339,10 @@ export interface GameMap {
    *  script's StampContinents partition, -1 the sea); unset on a map whose
    *  generator kept none (`deriveContinents`) */
   continents?: number[];
+  /** the map's regions, per plot its Map_Region (AnalyzeChokepoints'
+   *  partition of the passable land between the chokepoints, -1 none); unset
+   *  on a map whose generator kept none (`deriveRegions`) */
+  regions?: number[];
 }
 
 export interface MapGenOptions {

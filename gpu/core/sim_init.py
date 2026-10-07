@@ -2468,6 +2468,11 @@ class SimInit:
         self.tile_area = torch.tensor(
             [[int(t.get("area", -1)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=device)
+        # CIV6 (Map_Region): the region per tile (`deriveRegions`) — the
+        # barbarians' camp step scores per region
+        self.tile_region = torch.tensor(
+            [[int(t.get("region", -1)) for t in f["tiles"]] for f in fixtures],
+            dtype=torch.long, device=device)
         # CIV6 (Mountain Tunnel): the connected MOUNTAIN component per tile, -1
         # off a mountain — "a movement portal on a mountain range".
         self.tile_range = torch.tensor(

@@ -3592,6 +3592,10 @@
         "why": "the world's continent partition, fixed at build; `deriveContinents` stamps it on `Tile.continent`, which both engines read through the fixture's cont plane."
       },
       {
+        "path": "GameMap.regions",
+        "why": "the world's region partition (Map_Region), fixed at build; `deriveRegions` stamps it on `Tile.region`, which both engines read through the fixture's region plane."
+      },
+      {
         "path": "Seat.name",
         "why": "presentation."
       },
@@ -3698,6 +3702,10 @@
       {
         "path": "Tile.area",
         "why": "a derived MAP fact, not state, static like `continent`: `deriveAreas` fills AreaBuilder's areas once at map creation and the exporter ships the ids per tile (the area plane)."
+      },
+      {
+        "path": "Tile.region",
+        "why": "a MAP fact, not state, static like `area`: `deriveRegions` stamps the map's regions (or its passable land areas) once at map creation and the exporter ships the ids per tile (the region plane)."
       }
     ],
     "gpu": [

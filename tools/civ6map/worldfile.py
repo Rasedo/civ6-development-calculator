@@ -148,7 +148,11 @@ def world_file(w: World, script: str, size: str, map_seed: int) -> dict:
                 "volcanoOrder": [i for i in dict.fromkeys(w.volcano_order) if w.feature[i] == w.fix["FEATURE_VOLCANO"]],
                 # StampContinents' partition, Plot:GetContinentType() per
                 # plot (-1 the sea): `GameMap.continents`
-                "continent": list(w.continent)},
+                "continent": list(w.continent),
+                # the map's regions (Map_Region, AnalyzeChokepoints' flood
+                # between the chokepoints): per plot its region, -1 none
+                # (`GameMap.regions`)
+                "region": list(w.region)},
         "civs": civs,
         "cityStates": city_states,
         "rngInit": (map_seed ^ 0x9E3779B9) & 0xFFFFFFFF,

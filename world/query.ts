@@ -56,6 +56,23 @@ export function deriveAreas(map: GameMap): void {
 }
 
 /**
+ * CIV6 (Map_Region): each plot's REGION — the map's `regions` (Region_Builder's
+ * flood between the map script's chokepoints, tools/civ6map regions.py),
+ * numbered in the order of their first plot, -1 off passable land. A map whose
+ * generator kept none takes each passable land area as a region. The
+ * barbarians' camp step reads them. Static at creation like `area`, which it
+ * follows.
+ */
+export function deriveRegions(map: GameMap): void {
+  if (map.regions) {
+    for (const t of map.tiles) t.region = map.regions[t.index];
+    return;
+  }
+  const reg = components(map, (t) => (isWater(t) || isImpassable(t) ? -1 : 0));
+  for (const t of map.tiles) t.region = reg[t.index];
+}
+
+/**
  * CIV6 (Mountain Tunnel): "Acts as a movement portal on a mountain range."
  * No table names a range, so one is the connected component of MOUNTAIN tiles
  * — static: mountains never move, so this bakes at export and never has to

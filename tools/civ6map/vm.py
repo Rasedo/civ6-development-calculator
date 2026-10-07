@@ -421,6 +421,7 @@ class Api:
 
     def TB_AnalyzeChokepoints(self):
         self._native("TerrainBuilder.AnalyzeChokepoints")
+        self.w.analyze_chokepoints()
 
     def TB_GenerateFloodplains(self, inland, lo, hi):
         self._native("TerrainBuilder.GenerateFloodplains")

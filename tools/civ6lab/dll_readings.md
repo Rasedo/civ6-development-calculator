@@ -1577,10 +1577,21 @@ clans' 0x8e1bf0 (no clans in these games).
   the regions at the global top score by their plot counts, "Barbarian camp
   location" is uniform over the region's plots, the region's weight goes to
   0; adding more than one, a plot within 7 of a tribe is passed over.
-- Plot score 0x151fa0: unowned, seen by no major or minor, camp terrain and
-  feature, no resource the barbarians see; no major city nearer than 4, no
+- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the
+  player manager's +0x4a0 list, every living player), camp terrain and
+  feature, no resource at all (0x35fd60 is asked for player -1, and
+  0x5112f0 hands player -1 every resource: 1118, 1119, 1123 and 1128 t1
+  drop exactly their Coal, Horses, Oil and Aluminum plots from the top, the
+  log's ranges 16, 10, 10, 15); no major city nearer than 4, no
   camp within 7; score = max(0, nearest + second-nearest tribe distance, dead
-  tribes counted) + the farthest major city within 7.
+  tribes counted, + the nearest plot of the manager's camp list) + the
+  farthest major city within 7. The camp list (+0x4a0, the AutoVariable at
+  +0x448) takes each new camp's plot index at tribe creation (0x154642) and
+  is cleared only at init (0x155aae); 0x152b50 returns the least plot
+  distance to it, 0 when empty — every camp ever raised, so the nearest
+  tribe counts twice. Checked on the recorded ties: 1126 turn 3 (996 and
+  1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8
+  (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5.
 - Tribe kind 0x154220: the first BarbarianTribes row the camp meets — NAVAL
   on an AREA under 15 plots (0x153d60 reads the plot's +8, the CvArea
   pointer Plot:GetArea returns (0x25990), and its +4 plot count; +0 is the id
@@ -1603,34 +1614,86 @@ recorded camp counts; its writer is unread. The sight the score and
 the target read is the engines' line of sight plus each centre's two rings
 and each owned plot's ring — a fit.
 
-### The map's regions (Region_Builder, XP2 MapGen) — READ, not ported
+### The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported
 
-The camp step's regions are not the continents: every Duel map of
-1103–1128 but 1125 is ONE continent (Plot:GetContinentType(), the record's
-`continents` and the map script's StampContinents alike), yet the first
-camp step draws "Barbarian camp region placement" over more than one
-region — 1126 t1 range 19 then "location" range 7, 1127 8 / 7, 1128 15 / 1,
-1124 7 / 4. Nor are they the areas: 1124's 7 top plots and 1128's 17 lie in
-one passable-land area each (353 and 337 plots), and the game splits them
-(4 + 3; at least two regions).
+The camp step's regions are not the continents (every Duel map of
+1103–1128 but 1125 is one continent) nor the areas: they are Map_Region
+objects (Core/Common/MapGen/Map_Region.cpp: +0 id, +4 m_plotCount, +0xc
+m_area), which TerrainBuilder.AnalyzeChokepoints builds — the binding
+(0x2b500 -> 0x8923f0) jumps straight into Region_Builder 0x887810, which
+first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the
+builder's +0x20) and then floods the regions. XP2 Continents.lua calls it
+twice (after the first AreaBuilder.Recalculate and after AddFeatures); the
+second wins. Ported in `tools/civ6map/chokepoints.py` and `regions.py`; the
+port was checked stage by stage against the DLL itself run under an
+emulator (unicorn, the analysis 0x86c030 called on each duel's regenerated
+grid with the map's plot, area and log objects faked): the triangulation,
+every cell stage and the chokepoint records equal it on all 26 duels, and
+the emulated chokepoints equal the game's own log (Logs/AI_ChokePoint.csv,
+the "Choke Points" section of the last call) on 1126, 1127 and 1128.
 
-The regions are Map_Region objects (Core/Common/MapGen/Map_Region.cpp: +0
-id, +4 m_plotCount (0x37180 adds, asserts "m_plotCount >= 0"), +0xc m_area
-(0x38200, asserts "m_area == INVALID_ID || m_area == area")). Region_Builder
-(0x887810, XP2/Common/MapGen/Region_Builder.cpp) walks the plots in index
-order; a plot with no region (+0x18), not impassable (byte +0x3a bit 3) and
-not water (0x834d0) seeds a new region, and a pathfinder flood (0x77d10)
-from it adds plots through the visitor 0x886dd0 (the region's plot count,
-the plot's region pointer, the plot's area) under the step test 0x887aa0:
-the target passable land and in no region yet, and the step from plot to
-plot not crossing any chokepoint's line — the map's chokepoint list
-(vfunc +0x110, +0x88), each chokepoint's plots at +0x40 (count +0x50), its
-ends 0x886bb0 / 0x886b50, a segment test 0x8808f0 and an orientation test
-0x881ed0. The chokepoints are TerrainBuilder.AnalyzeChokepoints' (the map
-scripts call it last; "Choke Points" 0x8783c0, the medial graph and its
-pruning 0x87a1d0 / 0x87f100; Plot:IsChokepoint reads them) — not read. The
-engines hold neither: they take each area as one region (`Tile.area`),
-which agrees with the game only where no chokepoint splits an area.
+- The points (0x87a030): every water or impassable plot, sorted by x, even
+  rows before odd, then y (0x880590), as axial (q = x − ⌊y/2⌋, r = y).
+- The triangulation: leaves of three points (two where n mod 3 leaves one
+  at the start or two at the end; 0x87a470, 0x86b440: edges (0,1), (2,0)
+  and a triangle unless collinear, (1,2)), merged pairwise until one
+  (0x87eff0 / 0x87ed40 / 0x86a460). A merge's base is the first pair, both
+  sides walked in (r, q) order, whose segment crosses no edge of either
+  side (0x8808f0, X = 2q + r, Y = r); then 0x87a6c0 zips upward: each
+  side's candidates are the base end's neighbours turning left of the base,
+  ranked by the cosine against it on the true hex geometry in float
+  (x = q + r/2, |v|² = 3x² + 2.25r²), the best's edge deleted while the
+  second lies in the circle through the base and the best (0x878f90, a float
+  determinant); between the two sides the in-circle test again. Triangles
+  are edge triples; edges and triangles keep the DLL's vector order.
+- Pruning (0x87f7a0): a triangle of touching obstacles goes (all its edges
+  neighbours, |len² − 3| < 0.001, or all but one of length² 9).
+- The dual graph (0x872580): a cell per triangle at its circumcentre — the
+  small-map callback 0x86f1a0 (maps up to 106 x 66) computes it in 24.8
+  fixed point (Math_FixedPointT: float to fixed is floor << 8 | the
+  fraction's 256ths, products >> 8, quotients (a << 8) / b truncated) with
+  the radius from the fixed formula, else (a negative square) from the side
+  lengths; cells are neighbours across a shared edge that is not between
+  neighbouring plots. The cell match by position never fires (its epsilon
+  0.001 is 0 in fixed point).
+- Cells with no neighbour go (0x87f480); each radius shrinks to the nearest
+  obstacle plot over its radius' rings (0x8801d0: 0x871f00 puts the centre
+  in a plot, 0x877890 measures); leaf cells narrower than their neighbour,
+  then leaves under 1.5, go until none (0x87f1b0, 0x87f5b0).
+- Marking (0x87d6a0): flag 0 on a cell of other than two neighbours, or
+  whose 3r² exceeds 12 and no other cell within r has a radius as large.
+  Linking (0x8759a0): each path of unflagged cells between flagged ones
+  (from the lower end) has its narrowest cell flagged 1 (the last of the
+  least, the far end counted), keeping the pair and linking both ends.
+  Cleaning (0x871d70) leaves the flagged cells.
+- Merging (0x87e150, looped): the widest unmerged chokepoint cell takes
+  the cells of its pairs whose radius it nearly matches (0.9 of the
+  narrower / 0.85 of the wider; 0.9 or 0.85 of the other when itself an
+  end), the narrower into the wider (0x87df70). The loop runs only when the
+  map analysis log exists (0x87a381 tests it) — the game's logging is on
+  (the owner's Logs/AI_ChokePoint.csv is that log), and with it off the
+  emulated chokepoints differ.
+- Chokepoints (0x8783c0): per flagged-1 cell the first triangle holding
+  its point (0x876830, barycentric in fixed); per pair, across each linked
+  cell the triangle edge (of its three obstacles) the link crosses whose
+  plots are more than a step apart, the nearest, else the edge nearest the
+  cell (0x873b00); the best does not reset between pairs. 0x87cff0 keeps a
+  pair (offset plots) when the plots its line passes between them (the
+  cube walk 0x38070 of 0x371d0) all lie in one area, once per ordered pair.
+
+Region_Builder then makes a chokepoint object per record (its line's plots,
+0x371d0) and walks the plots in index order: a plot of no region, not
+impassable (byte +0x3a bit 3) and not water seeds a region, and a flood
+(0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes,
+m_area its area) takes every plot the step test 0x887aa0 admits: passable
+land not yet the flood's own; free between plots off every chokepoint line;
+otherwise per chokepoint holding either plot — both on its line: free when
+the step misses the segment between its ends, else refused unless both lie
+on the line; one on it: refused when the step meets the segment, unless the
+target lies on the line and the source off it, the target then taken only
+while no region holds it. The camp step admits a region of more than 10
+plots or on an area (m_area, looked up at the game's time) of more than 10
+(0x153290).
 
 ## H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)
 

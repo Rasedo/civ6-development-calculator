@@ -51,6 +51,8 @@ interface WorldMapLayers {
   volcanoOrder?: number[];
   /** the game's continents per plot (`GameMap.continents`), where the generator kept them */
   continent?: number[];
+  /** the map's regions per plot (`GameMap.regions`), where the generator kept them */
+  region?: number[];
 }
 
 interface WorldCatalogs {
