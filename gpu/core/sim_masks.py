@@ -318,7 +318,10 @@ class SimMasks:
         return torch.where(mask & past.any(dim=1), idx, torch.full_like(idx, -1))
 
     def _damage_roll(self, mask: torch.Tensor, diff: torch.Tensor, k: str = "?", tile: torch.Tensor | None = None,
-                     parts: tuple[torch.Tensor, ...] | None = None) -> torch.Tensor:
+                     parts: tuple[torch.Tensor, ...] | None = None, finish=None) -> torch.Tensor:
+        """`damageRoll` / `lawDraw`: ONE "Unit Combat Damage" draw through the
+        damage law; `finish` takes the law's unclamped value to the damage
+        dealt (a unit's: clamped to [COMBAT_MINIMUM_DAMAGE, COMBAT_MAX_HIT_POINTS])."""
         if k in WW_BATTLE_KEYS:
             self._ww_opened += mask.long()
         # Combat log: every roll of the logged game becomes a keyed CB<seq>
@@ -347,7 +350,8 @@ class SimMasks:
         # rounding of it is the f32 product), truncated, clamped
         v = ((self._dmg_base_damage + roll).to(torch.float64) * base).to(torch.float32).to(torch.float64)
         v = (v + 0.5).to(torch.float32).to(torch.float64)
-        dmg = torch.trunc(v).to(torch.long).clamp(min=self._dmg_min, max=self._dmg_max)
+        raw = torch.trunc(v).to(torch.long)
+        dmg = raw.clamp(min=self._dmg_min, max=self._dmg_max) if finish is None else finish(raw)
         if log_hit:
             t_ = int(tile[b]) if tile is not None else -1
             # `parts` splits the diff into the two strengths (TS damageRoll's
@@ -408,39 +412,39 @@ class SimMasks:
         d_emb = self.unit_emb.gather(1, ds).squeeze(1)
         return out & (d_slot >= 0) & ~d_emb
 
-    def _city_damage_split(self, outer: torch.Tensor, walls_max: torch.Tensor,
-                           roll: torch.Tensor, klass: torch.Tensor,
-                           assist: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor]:
-        """`cityDamageSplit` — how ONE hit on a city centre divides between the
-        outer-defense perimeter and the centre behind it. Both shares come out
-        of the same roll and neither draws again.
-
-        `klass` is a HIT_ code per game rather than one string, because a batch
-        can be swinging a Swordsman in one world and firing a Catapult in the
-        next; `assist` carries the ASSIST_ bits of whatever support chassis
-        stands beside the target."""
-        o = outer.clamp(min=0)
-        wm = walls_max.clamp(min=0).double()
-        frac = torch.where(wm > 0, (o.double() / wm.clamp(min=1.0)).clamp(max=1.0),
-                           torch.zeros_like(wm))
-        f = torch.where(klass == HIT_MELEE,
-                        torch.full_like(wm, self._wall_dmg_melee),
-                        torch.full_like(wm, self._wall_dmg_ranged))
-        full = klass == HIT_BOMBARD
-        bypass = torch.zeros_like(full)
+    def _district_hit(self, mask: torch.Tensor, diff: torch.Tensor, outer: torch.Tensor,
+                      walls_max: torch.Tensor, hp_max: int, klass: torch.Tensor,
+                      assist: torch.Tensor | None, k: str, tile: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """`districtHit` (GameCore_XP2_Release.dll 0x519440, twice): the hit
+        points' draw, then the outer defense's, each clamped to
+        [COMBAT_MINIMUM_DAMAGE, `hp_max`]. The hit points' damage loses the
+        share the standing outer defense turns, v - trunc(v * trunc(256 * left
+        / max) / 256) of the law's unclamped v (none past a Siege Tower); the
+        outer defense's is taken at its kind's percent (a Battering Ram's melee
+        attacker at the bombard's), truncated, and stops at what the walls
+        hold. [B] each, every row drawn under `mask`."""
+        left = outer.clamp(min=0).to(torch.long)
+        wm = walls_max.clamp(min=0).to(torch.long)
+        bypass = torch.zeros_like(mask)
+        ram = torch.zeros_like(mask)
         if assist is not None:
-            full = full | ((assist & ASSIST_RAM) != 0)
             bypass = (assist & ASSIST_TOWER) != 0
-        f = torch.where(full, torch.ones_like(f), f)
-        wall = torch.where(
-            o > 0,
-            torch.minimum(o, js_round(roll.double() * f).clamp(min=1).to(o.dtype)),
-            torch.zeros_like(o),
-        )
-        through = ((1.0 - frac) / (1.0 - self._wall_breach)).clamp(0.0, 1.0)
-        through = torch.where(bypass, torch.ones_like(through), through)
-        centre = js_round(roll.double() * through).clamp(min=1).to(roll.dtype)
-        return wall, centre
+            ram = (assist & ASSIST_RAM) != 0
+        share = torch.where((left > 0) & (wm > 0) & ~bypass,
+                            torch.div(left * 256, wm.clamp(min=1), rounding_mode="floor"),
+                            torch.zeros_like(left))
+        lo = self._dmg_min
+        centre = self._damage_roll(
+            mask, diff, k=k, tile=tile,
+            finish=lambda raw: (raw - torch.div(raw * share, 256, rounding_mode="floor")).clamp(min=lo, max=hp_max))
+        pct = torch.where((klass == HIT_BOMBARD) | ((klass == HIT_MELEE) & ram),
+                          torch.full_like(left, self._def_pct_bombard),
+                          torch.where(klass == HIT_MELEE, torch.full_like(left, self._def_pct_melee),
+                                      torch.full_like(left, self._def_pct_ranged)))
+        dfn = self._damage_roll(
+            mask, diff, k=k + "w", tile=tile,
+            finish=lambda raw: torch.div(raw.clamp(min=lo, max=hp_max) * pct, 100, rounding_mode="floor"))
+        return torch.minimum(left, dfn).to(outer.dtype), centre
 
     def _hit_class(self, type_idx: torch.Tensor, ranged: bool) -> torch.Tensor:
         """`cityHitClass` — a siege unit's attack "uses Bombard Strength"
@@ -1322,19 +1326,20 @@ class SimMasks:
         return (bits * match.long()).sum(dim=1)  # 0 or 1
 
     def _flank_support_live(self, seat: torch.Tensor) -> torch.Tensor:
-        """[B] bool `flankSupportLive` — CIV6 (Flanking and Support): both
-        bonuses "are unavailable at the start of the game, and are unlocked
-        only after researching Military Tradition", and "Barbarians can gain
-        Flanking and Support once at least half of the major civilizations have
-        researched Military Tradition". Every seat that is not a major reads
-        that count."""
+        """[B] bool `flankSupportLive` — the player's own combat-adjacency
+        flag (0x521530, 0x521ed0), which Military Tradition sets: a major's, a
+        city-state's and the barbarians' own civics; the Free Cities research
+        none."""
         if self._flank_support_civic < 0:
             return torch.zeros_like(seat, dtype=torch.bool)
-        col = self.civ_civics[:, :, self._flank_support_civic]  # [B, n_majors]
-        half = (col.long().sum(dim=1) * 2) >= self.n_majors
+        c = self._flank_support_civic
+        col = self.civ_civics[:, :, c]  # [B, n_majors]
         major = (seat >= 0) & (seat < self.n_majors)
         own = col.gather(1, seat.clamp(min=0, max=self.n_majors - 1).unsqueeze(1)).squeeze(1)
-        return torch.where(major, own, half)
+        cs = (seat >= 100) & (seat < 100 + self.S)
+        cs_own = self.citystate_civics[:, :, c].gather(
+            1, (seat - 100).clamp(min=0, max=max(self.S - 1, 0)).unsqueeze(1)).squeeze(1)
+        return torch.where(major, own, torch.where(cs, cs_own, (seat == BARB_SEAT) & self.barb_civics[:, c]))
 
     def _congress_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """`congressUnitCS`' twin — the flat Combat Strength the WORLD

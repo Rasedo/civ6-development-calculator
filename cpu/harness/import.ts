@@ -3409,7 +3409,7 @@ function importGreatWorks(ctx: Ctx, c: DumpCity, city: City): void {
 
 /** a Great Person's engine id: the roster's own tag, or `GP_` + the
  *  individual's name */
-function aliasOrPrefixed(individual: string): string | null {
+export function aliasOrPrefixed(individual: string): string | null {
   const tagged = engineId('person', individual, 'GREAT_PERSON_INDIVIDUAL_', PEOPLE);
   if (tagged) return tagged;
   const bare = `GP_${strip(individual, 'GREAT_PERSON_INDIVIDUAL_')}`;

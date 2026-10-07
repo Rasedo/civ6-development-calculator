@@ -188,13 +188,18 @@ describe('RecordedActions', () => {
 
   it('reads a purchase\'s kind off its hash: a plot bought, a unit bought', () => {
     const a = record(10);
-    const b = record(11, { units: [unit(1, 4, 2, 6, 4)] });
+    const b = record(11, { units: [unit(1, 4, 2, 6, 4), unit(1, 5, 2, 6, 4)] });
     b.cities[1].plots = [38, 39, 30];
     b.players[1] = player(1, { gold: 25 });
+    // the log's order: the unit added, its teleport, then the purchase that
+    // added it; a second of the same chassis with no purchase behind it was
+    // not bought (runs/h1_duelw1124 t17-18)
     (b as TurnRecord & { actions: unknown[] }).actions = [
       [1, 10, 'CityMadePurchase', 1, 65536, 6, 3, gameHash('PLOT'), -1],
-      [2, 10, 'CityMadePurchase', 1, 65536, 6, 4, gameHash('UNIT'), 2],
-      [3, 10, 'UnitAddedToMap', 1, 4, 6, 4],
+      [2, 10, 'UnitAddedToMap', 1, 4, 6, 4],
+      [3, 10, 'UnitTeleported', 1, 4, 6, 4],
+      [4, 10, 'CityMadePurchase', 1, 65536, 6, 4, gameHash('UNIT'), 2],
+      [5, 10, 'UnitAddedToMap', 1, 5, 6, 4],
     ];
     const ds = new RecordedActions().decisions(a, b, CAT);
     expect(of(ds, 'buyPlot')).toEqual([{ kind: 'buyPlot', phase: 'after', player: 1, city: 38, plot: 30 }]);

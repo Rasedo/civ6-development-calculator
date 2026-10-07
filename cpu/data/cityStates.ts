@@ -10,7 +10,7 @@ import type { CityStateType, DistrictId, QueueItem, YieldKey } from '../core/typ
 import type { PromoClass } from './promotions';
 import type { PlotYieldRow } from './civilizations';
 import { type Src, type SrcMap, srcConst, xml } from './provenance';
-import { GAME_SPEED, speedTurns, speedTurnsSrc } from './constants';
+import { GAME_SPEED, scaleByGameSpeed } from './constants';
 
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
@@ -935,10 +935,14 @@ export const FREE_CITY_BUILD_ROWS: readonly FreeCityBuildRow[] = [
  *  current military units. The units will not be able to move on the turn
  *  they are levied, but will take orders from the Suzerain on the following
  *  turn. They will return to the city-state after {2_TurnLimit} Turns, or if
- *  the Suzerain changes." The turn limit is `LEVY_MILITARY_TURN_DURATION`,
- *  run online through `speedTurns`; the price is `levyGoldCost`'s. */
-export const LEVY_TURNS = srcConst('cityState.levyTurns', speedTurns(30),
-  speedTurnsSrc(xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value'), 30));
+ *  the Suzerain changes." The turn limit is LEVY_MILITARY_TURN_DURATION
+ *  through the speed's CostMultiplier (GameCore_XP2_Release.dll 0x44da30:
+ *  the minor's levy counter +1 against 0x5254d0 of the row, 15 online — not
+ *  GameSpeed_Durations' 21); the price is `levyGoldCost`'s. */
+export const LEVY_TURNS = srcConst('cityState.levyTurns', scaleByGameSpeed(30), {
+  derived: 'LEVY_MILITARY_TURN_DURATION through the speed CostMultiplier (GameCore_XP2 0x44da30 via 0x5254d0)',
+  inputs: [xml('GlobalParameters', 'Name=LEVY_MILITARY_TURN_DURATION', 'Value', { expect: 30 })],
+});
 
 export const GOV_INFLUENCE_TIER: Record<string, number> = {
   CHIEFDOM: 0,

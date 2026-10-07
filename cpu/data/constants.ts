@@ -669,7 +669,19 @@ export function damageFactor(x: number): number {
  *  exponent is held to the exported table's reach, past which every draw
  *  already clamps to the same damage. */
 export function damageOf(roll: number, x: number): number {
-  const xc = Math.max(-DAMAGE_EXPONENT_REACH, Math.min(DAMAGE_EXPONENT_REACH, x));
-  const v = Math.trunc(Math.fround(Math.fround((COMBAT_BASE_DAMAGE + roll) * damageFactor(xc)) + 0.5));
-  return Math.min(COMBAT_MAX_HIT_POINTS, Math.max(COMBAT_MINIMUM_DAMAGE, v));
+  return Math.min(COMBAT_MAX_HIT_POINTS, Math.max(COMBAT_MINIMUM_DAMAGE, damageRaw(roll, x)));
 }
+
+/** the law's value before its clamp (0x519090): what a district's hit
+ *  points' damage loses its walls' share from */
+export function damageRaw(roll: number, x: number): number {
+  const xc = Math.max(-DAMAGE_EXPONENT_REACH, Math.min(DAMAGE_EXPONENT_REACH, x));
+  return Math.trunc(Math.fround(Math.fround((COMBAT_BASE_DAMAGE + roll) * damageFactor(xc)) + 0.5));
+}
+
+/** the percent of a district hit's outer-defense damage each attack kind
+ *  deals (0x519440 on the outer defense's hash): a melee attack's, a ranged
+ *  one's, a bombard's (and a Battering Ram's melee attacker's) */
+export const COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE = srcConst('combat.defensePctMelee', 15, gp('COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE'));
+export const COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED = srcConst('combat.defensePctRanged', 50, gp('COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED'));
+export const COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD = srcConst('combat.defensePctBombard', 100, gp('COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD'));

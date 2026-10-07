@@ -3928,23 +3928,6 @@ export const WALLS_TIER_URBAN = 4;
 export const REPAIR_QUIET_TURNS = 3;
 /** the ANCIENT tier's pool, which is what a fresh set of Walls is worth. */
 export const WALLS_HP = WALLS_TIER_HP[1];
-/**
- * CIV6: the perimeter "is much tougher, practically impervious to most
- * conventional attacks" — "-85% for melee attacks... and -50% for ranged ones",
- * and "only units with attacks that use Bombard Strength" hit it at full.
- */
-export const WALL_DAMAGE_MELEE = 0.15;
-export const WALL_DAMAGE_RANGED = 0.5;
-/**
- * CIV6: how much of a hit reaches the centre depends on how breached the
- * perimeter is. Intact, "no attack can harm the city itself (it will do 1
- * damage only)"; around 80% the city "will then suffer not more than 5-10
- * damage per attack"; above 50% attacks "get through... but their force is
- * still reduced"; below 20-30% "the city starts taking real hits (that is,
- * full damage)". A share of `(1 - frac) / (1 - WALL_BREACH_FRACTION)` clamped
- * to [0, 1] hits every one of those four readings.
- */
-export const WALL_BREACH_FRACTION = 0.25;
 /** CIV6: "Ranged attacks receive a -17 penalty when attacking city and
  * district defenses". Naval ranged pay it against the perimeter only — they
  * "do not suffer the -17 RS penalty against cities (but still suffer against

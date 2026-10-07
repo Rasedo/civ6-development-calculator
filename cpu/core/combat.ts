@@ -15,7 +15,7 @@ import { declareWar } from './phase';
 import { declareWarOnCityState } from './cityStates';
 import { warBuffCS } from './casusBelli';
 import { envoysOf, envoysReceived, hasMet, minorCity } from './cityStates';
-import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS } from '../data/units';
+import { UNITS, UNIT_HP, CITY_MAX_HP, ENCAMPMENT_HP, RANGED_CITY_PENALTY, GDR_PARTICLE_BEAM_CS, GDR_ARMOR_PLATING_CS } from '../data/units';
 import { UNIT_TYPE_IDX } from '../data/units';
 import { IMPROVEMENTS, improvementDefenseCS, improvementIsCover } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disban
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -498,19 +498,19 @@ export function classMatchupCS(ownType: string, foeType: string): number {
 }
 
 /**
- * CIV6 (Flanking and Support): both bonuses "are unavailable at the start of
- * the game, and are unlocked only after researching Military Tradition", and
- * "Barbarians can gain Flanking and Support once at least half of the major
- * civilizations have researched Military Tradition". Every seat that is not a
- * major reads that same count — a barbarian has a Seat record but never
- * researches, so asking its own civics would keep it disarmed forever.
+ * FLANKING AND SUPPORT are gated on the player's own combat-adjacency flag
+ * (GameCore_XP2_Release.dll 0x521530, 0x521ed0: m_bMilitaryCombatAdjacency,
+ * +0x1268), which only EFFECT_GRANT_COMBAT_ADJACENCY sets — Military
+ * Tradition's CIVIC_GRANT_COMBAT_ADJACENCY_BONUS. Every player reads its own
+ * civics: a major's, a city-state's (runs/h1_duelw1117 t23: a city-state
+ * holding Military Tradition flanked a barbarian Warrior, +2 on both
+ * damages), the barbarians' (the civics half the majors hold,
+ * `barbarianTechs`); the Free Cities research none.
  */
 export const FLANK_SUPPORT_CIVIC = 'MILITARY_TRADITION';
 
 export function flankSupportLive(state: GameState, seat: number): boolean {
-  if (isCiv(seat)) return seatOf(state, seat)?.research.civics.includes(FLANK_SUPPORT_CIVIC) ?? false;
-  const have = state.seats.filter((x) => x.research.civics.includes(FLANK_SUPPORT_CIVIC)).length;
-  return have * 2 >= state.seats.length;
+  return seatOf(state, seat)?.research.civics.includes(FLANK_SUPPORT_CIVIC) ?? false;
 }
 
 /**
@@ -899,7 +899,14 @@ export function rangedDomainCS(attacker: Unit, foeType: string): number {
 
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
                            parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
-  // CIV6 (GameCore_XP2_Release.dll 0x519090): `damageOf` — 24 plus an
+  return lawDraw(state, strengthDiff, k, t, (raw) => Math.min(COMBAT_MAX_HIT_POINTS, Math.max(COMBAT_MINIMUM_DAMAGE, raw)), parts);
+}
+
+/** ONE "Unit Combat Damage" draw through the damage law, `finish` taking the
+ *  law's unclamped value (`damageRaw`) to the damage dealt. */
+function lawDraw(state: GameState, strengthDiff: number, k: string, t: number, finish: (raw: number) => number,
+                 parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
+  // CIV6 (GameCore_XP2_Release.dll 0x519090): `damageRaw` — 24 plus an
   // integer draw in 0..11, times e^(x/256) in single precision, the exponent
   // x from `damageExponent`, truncated after +0.5 and clamped to [1, 100].
   // The GPU reads the same factors from the exported table, indexed by x.
@@ -915,7 +922,7 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   const c0 = state.rngState >>> 0;
   // the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
   const roll = randRange(state, COMBAT_MAX_EXTRA_DAMAGE, 'Unit Combat Damage');
-  const dmg = damageOf(roll, x);
+  const dmg = finish(damageRaw(roll, x));
   const cb = (globalThis as any).__cbLog;
   // `parts` (where a call site passes them) splits the diff into the two
   // strengths, so a disagreement names its SIDE before its term.
@@ -931,35 +938,39 @@ export const ASSIST_RAM = 1;
 export const ASSIST_TOWER = 2;
 
 /**
- * How ONE hit on a city center divides between the outer-defense perimeter and
- * the centre behind it. Both shares come out of the SAME roll — a city attack
- * damages the perimeter and the city at once, each with its own reduction, and
- * neither share draws again.
- *
- * CIV6: the perimeter takes -85% from a melee attack and -50% from a ranged
- * one, while a BOMBARD attack and a Battering Ram's melee attacker "do full
- * damage". What reaches the centre opens as the perimeter is breached: 1
- * damage while it is intact, "5-10" around 80%, reduced-but-real above 50%,
- * full below the breach fraction — unless a Siege Tower lets the attacker
- * "bypass Walls and hit the city directly, inflicting damage as if there were
- * no walls protecting it".
+ * A DISTRICT'S DAMAGE from one attack on it (GameCore_XP2_Release.dll
+ * 0x519440, run twice by the melee 0x206080, ranged 0x204b10 and bombard
+ * 0x2074b0 attacks): the hit points' draw, then the outer defense's, each its
+ * own "Unit Combat Damage" draw on the attack's strength difference, clamped
+ * to [COMBAT_MINIMUM_DAMAGE, the district's maximum hit points `hpMax`].
+ * The hit points' damage first loses the share the standing outer defense
+ * turns (0x519090 on the hit points' hash): v - trunc(v * trunc(256 * left /
+ * max) / 256) of the law's unclamped v, none where a Siege Tower lets the
+ * attacker bypass the walls — intact walls let 1 through. The outer
+ * defense's damage is taken at COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE 15 /
+ * _RANGED 50 / _BOMBARD 100 (a Battering Ram's melee attacker at 100),
+ * truncated, and stops at what the walls hold. `k` keys the hit points'
+ * draw, `k` + "w" the walls'.
  */
-export function cityDamageSplit(
+export function districtHit(
+  state: GameState,
+  strengthDiff: number,
   outerHp: number,
   wallsMax: number,
-  roll: number,
+  hpMax: number,
   klass: 'melee' | 'ranged' | 'bombard',
-  assist = 0,
+  assist: number,
+  k: string,
+  t: number,
 ): { wall: number; centre: number } {
-  const outer = Math.max(0, outerHp);
-  const frac = wallsMax > 0 ? Math.min(1, outer / wallsMax) : 0;
-  const full = klass === 'bombard' || (assist & ASSIST_RAM) !== 0;
-  const f = full ? 1 : klass === 'melee' ? WALL_DAMAGE_MELEE : WALL_DAMAGE_RANGED;
-  const wall = outer > 0 ? Math.min(outer, Math.max(1, Math.round(roll * f))) : 0;
-  const through = (assist & ASSIST_TOWER) !== 0
-    ? 1
-    : Math.min(1, Math.max(0, (1 - frac) / (1 - WALL_BREACH_FRACTION)));
-  return { wall, centre: Math.max(1, Math.round(roll * through)) };
+  const left = Math.max(0, outerHp);
+  const share = left > 0 && wallsMax > 0 && (assist & ASSIST_TOWER) === 0 ? Math.floor((left * 256) / wallsMax) : 0;
+  const clamp = (v: number) => Math.min(hpMax, Math.max(COMBAT_MINIMUM_DAMAGE, v));
+  const centre = lawDraw(state, strengthDiff, k, t, (raw) => clamp(raw - Math.floor((raw * share) / 256)));
+  const pct = klass === 'bombard' || (klass === 'melee' && (assist & ASSIST_RAM) !== 0) ? COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD
+    : klass === 'melee' ? COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE : COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED;
+  const def = lawDraw(state, strengthDiff, `${k}w`, t, (raw) => Math.floor((clamp(raw) * pct) / 100));
+  return { wall: Math.min(left, def), centre };
 }
 
 /**
@@ -1498,13 +1509,9 @@ function assaultAtkCS(state: GameState, attacker: Unit, targetIndex: number): nu
 }
 
 /**
- * One assault exchange against a city center, whoever owns it. Both rolls are
- * drawn in stream order — the city's damage first, the attacker's second —
- * which is what the both seats copies each did; nothing between them
- * touches the RNG, so this is the same stream either way.
- *
- * `cityDamageSplit` divides the city's roll between the perimeter and the
- * centre. No walls → the full roll lands on the centre.
+ * One assault exchange against a city center, whoever owns it, in the DLL's
+ * draw order (0x206080): the attacker's damage first, then the district's
+ * hit points' and its outer defense's (`districtHit`).
  *
  * The caller decides what happens if the city falls; that branch is still
  * per-owner because a City and a City live in different registries.
@@ -1522,13 +1529,12 @@ function cityAssault(
       `combat=${UNITS[attacker.type]?.combat ?? 0} wound=${woundPenalty(attacker)} xp=${attacker.xp ?? 0} ` +
       `best=${holderStrength(state, cityBaseSeat(city))}`);
   }
-  const dmgToCity = damageRoll(state, atkCS - defCS, kCity, city.centerIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, kAttacker, city.centerIndex);
-  awardCityXp(state, attacker, city.hp - dmgToCity <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
   const outer = outerPool(state, city);
-  const split = cityDamageSplit(outer, wallsMax(state, city), dmgToCity,
+  const split = districtHit(state, atkCS - defCS, outer, wallsMax(state, city), CITY_MAX_HP,
     cityHitClass(attacker.type, false),
-    siegeAssist(state, attacker, city.centerIndex, wallsTier(state, city)));
+    siegeAssist(state, attacker, city.centerIndex, wallsTier(state, city)), kCity, city.centerIndex);
+  awardCityXp(state, attacker, city.hp - split.centre <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
   if (split.wall > 0) city.outerHp = outer - split.wall;
   city.hp -= split.centre;
   city.lastHitTurn = state.turn;
@@ -1561,33 +1567,34 @@ export function conquerEncampment(state: GameState, tile: Tile, attacker: Unit):
 }
 
 /**
- * The share of ONE roll that reaches an Encampment's garrison. CIV6 gives a
- * defensible district "Defenses HP equal to the City Center" and one set of
- * Walls supplies both — but each supplies its OWN pool, and destroying one
- * does not destroy the other. So the roll divides exactly as a hit on the
- * centre does, with the perimeter share coming off the DISTRICT's own pool.
+ * The damage that reaches an Encampment's garrison, from the district's two
+ * draws (`districtHit`). CIV6 gives a defensible district "Defenses HP equal
+ * to the City Center" and one set of Walls supplies both — but each supplies
+ * its OWN pool, and destroying one does not destroy the other. So the hit
+ * divides exactly as a hit on the centre does, the walls' damage coming off
+ * the DISTRICT's own pool; a district no city holds stands no walls.
  * `cityAtTile` is what hands this the city whose walls size that pool.
  */
-function encampSplit(state: GameState, tile: Tile, attacker: Unit, roll: number,
-                     ranged: boolean): number {
+function encampSplit(state: GameState, tile: Tile, attacker: Unit, diff: number,
+                     ranged: boolean, k: string): number {
   const held = cityAtTile(state, tile);
   if (!held) {
     // a CITY-STATE's Encampment splits against its own perimeter, the
     // minor's walls sizing the pool; no repair stamp - a minor tracks none
     const cs = isCityStateSeat(tileSeat(tile)) ? state.cityStates?.find((c) => c.seat === tileSeat(tile)) : undefined;
-    if (!cs) return roll;
+    if (!cs) return districtHit(state, diff, 0, 0, ENCAMPMENT_HP, cityHitClass(attacker.type, ranged), 0, k, tile.index).centre;
     const csShape = { buildings: cs.buildings ?? [], seat: cs.seat };
     const max = wallsMax(state, csShape);
     const outer = Math.min(tile.encampOuterHp ?? max, max);
-    const split = cityDamageSplit(outer, max, roll, cityHitClass(attacker.type, ranged),
-      ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, csShape)));
+    const split = districtHit(state, diff, outer, max, ENCAMPMENT_HP, cityHitClass(attacker.type, ranged),
+      ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, csShape)), k, tile.index);
     if (split.wall > 0) tile.encampOuterHp = outer - split.wall;
     return split.centre;
   }
   const outer = encampOuterPool(state, held, tile);
-  const split = cityDamageSplit(outer, wallsMax(state, held), roll,
+  const split = districtHit(state, diff, outer, wallsMax(state, held), ENCAMPMENT_HP,
     cityHitClass(attacker.type, ranged),
-    ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, held)));
+    ranged ? 0 : siegeAssist(state, attacker, tile.index, wallsTier(state, held)), k, tile.index);
   if (split.wall > 0) tile.encampOuterHp = outer - split.wall;
   held.lastHitTurn = state.turn;
   return split.centre;
@@ -1602,13 +1609,13 @@ function encampSplit(state: GameState, tile: Tile, attacker: Unit, roll: number,
 function rangedStrikeEncampment(state: GameState, attacker: Unit, tileIndex: number,
                                 defCS: number, relCity: number, key: string): void {
   const tile = state.map.tiles[tileIndex];
-  const roll = damageRoll(state, (cityRangedStrength(state, attacker, encampOuter(state, tile)) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker)
+  const diff = ((cityRangedStrength(state, attacker, encampOuter(state, tile)) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker)
     - woundPenalty(attacker)
     + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] })
     + relCity + generalAuraCS(state, attacker, attacker.tileIndex)
     + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)
-    + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS, key, tileIndex);
-  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, roll, true));
+    + rosterCS(state, attacker, tileSeat(tile), null, true)) - defCS);
+  tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP) - encampSplit(state, tile, attacker, diff, true, key));
   warWearinessBattle(state, attacker.seat, tileSeat(tile), tileIndex, { city: true });
   spendAttack(attacker, true);
   awardCityXp(state, attacker, (tile.encampHp ?? 0) <= 0 ? XP_CITY_FELLED : XP_CITY_ATTACK);
@@ -1634,9 +1641,9 @@ function encampOuter(state: GameState, tile: Tile): number {
  * exactly like a city assault.
  *
  * CIV6 gives a defensible district "Defenses HP equal to the City Center"
- * and one set of Walls supplies both — each with its OWN pool — so the roll
- * divides exactly as a hit on the centre does: the perimeter share comes off
- * the district's own pool and only what gets through reaches the garrison.
+ * and one set of Walls supplies both — each with its OWN pool — so the hit
+ * divides exactly as a hit on the centre does (`encampSplit`), after the
+ * attacker's own damage is drawn (0x206080).
  * `cityAtTile` is what hands this path the city whose walls size that pool.
  *
  * The attacker's CS comes from the shared `assaultAtkCS`, so the assault kinds
@@ -1649,11 +1656,10 @@ function attackEncampment(
   defCS: number): void {
   const tile = state.map.tiles[tileIndex];
   const atkCS = assaultAtkCS(state, attacker, tileIndex);
-  const dmgToEncamp = damageRoll(state, atkCS - defCS, 'enc', tileIndex);
   const dmgToAttacker = damageRoll(state, defCS - atkCS, 'encc', tileIndex);
   awardCityXp(state, attacker, XP_CITY_ATTACK);
   tile.encampHp = Math.max(0, (tile.encampHp ?? ENCAMPMENT_HP)
-    - encampSplit(state, tile, attacker, dmgToEncamp, false));
+    - encampSplit(state, tile, attacker, atkCS - defCS, false, 'enc'));
   if (tile.encampHp <= 0) conquerEncampment(state, tile, attacker);
   attacker.hp -= dmgToAttacker;
   spendAttack(attacker, true);
@@ -2258,8 +2264,8 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
       && unitVisibleTo(state, u, attacker.seat),
   );
   // Ranged units CAN bombard cities — same fallback
-  // chain as meleeAttack (seat city, then city-state center), one roll,
-  // no retaliation. Ranged fire never captures: the city holds at 1 HP
+  // chain as meleeAttack (seat city, then city-state center), the district's
+  // two draws (`districtHit`), no retaliation. Ranged fire never captures: the city holds at 1 HP
   // until melee takes it.
   //
   // CITY-FIRST, unconditionally, like meleeAttack: the CITY defends its own
@@ -2280,8 +2286,8 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   if (civCity && unitsHostile(state, attacker, { seat: civCity.holder.seat })) {
     const defCS = cityDefenseStrength(state, civCity.city);
     const outer = outerPool(state, civCity.city);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, civCity.holder.seat, null, true)) - defCS, 'rngrc', targetIndex);
-    const split = cityDamageSplit(outer, wallsMax(state, civCity.city), roll, cityHitClass(attacker.type, true));
+    const diff = ((cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, civCity.holder.seat, null, true)) - defCS);
+    const split = districtHit(state, diff, outer, wallsMax(state, civCity.city), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngrc', targetIndex);
     if (split.wall > 0) civCity.city.outerHp = outer - split.wall;
     civCity.city.hp = Math.max(1, civCity.city.hp - split.centre);
     civCity.city.lastHitTurn = state.turn;
@@ -2307,8 +2313,8 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
     const csShape = { buildings: cityState.buildings ?? [], seat: cityState.seat, outerHp: cityState.outerHp };
     const csOuter = outerPool(state, csShape);
     const defCS = centreStrength(state, minorCity(cityState));
-    const csRoll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, cityState.seat, null, true)) - defCS, 'rngcs', targetIndex);
-    const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll, cityHitClass(attacker.type, true));
+    const csDiff = ((cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + relCity + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, cityState.seat, null, true)) - defCS);
+    const csSplit = districtHit(state, csDiff, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP, cityHitClass(attacker.type, true), 0, 'rngcs', targetIndex);
     if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
     cityState.hp = Math.max(1, (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre);
     cityState.lastHitTurn = state.turn;
@@ -2388,8 +2394,8 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   if (enemyCity) {
     const defCS = cityDefenseStrength(state, enemyCity);
     const outer = outerPool(state, enemyCity);
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, held!.holder.seat, null, true)) - defCS, 'vrngc', targetIndex);
-    const split = cityDamageSplit(outer, wallsMax(state, enemyCity), roll, cityHitClass(attacker.type, true));
+    const diff = ((cityRangedStrength(state, attacker, outer) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, held!.holder.seat, null, true)) - defCS);
+    const split = districtHit(state, diff, outer, wallsMax(state, enemyCity), CITY_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngc', targetIndex);
     if (split.wall > 0) enemyCity.outerHp = outer - split.wall;
     enemyCity.hp = Math.max(1, enemyCity.hp - split.centre);
     enemyCity.lastHitTurn = state.turn;
@@ -2406,15 +2412,15 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
     return true;
   }
   // CIV6: a minor's city is a CITY to ranged fire too — `cityStateAttackable`
-  // answers, the walls take their share first, and the roll floors it at
+  // answers, the walls take their share first, and the hit floors it at
   // 1 HP like any centre (only melee finishes a city).
   const csHere = cityStateAt(state, targetIndex);
   if (csHere && csHere.centerIndex === targetIndex && cityStateAttackable(state, csHere, unitSeat(attacker))) {
     const csShape = { buildings: csHere.buildings ?? [], seat: csHere.seat, outerHp: csHere.outerHp };
     const csOuter = outerPool(state, csShape);
     const defCS = centreStrength(state, minorCity(csHere));
-    const roll = damageRoll(state, (cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS, 'vrngcs', targetIndex);
-    const split = cityDamageSplit(csOuter, wallsMax(state, csShape), roll, cityHitClass(attacker.type, true));
+    const diff = ((cityRangedStrength(state, attacker, csOuter) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, { attacking: true, ranged: true, vsCity: true, tile: state.map.tiles[attacker.tileIndex] }) + religionAttackCS(state, attacker, targetIndex) + generalAuraCS(state, attacker, attacker.tileIndex) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker) + rosterCS(state, attacker, csHere.seat, null, true)) - defCS);
+    const split = districtHit(state, diff, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP, cityHitClass(attacker.type, true), 0, 'vrngcs', targetIndex);
     if (split.wall > 0) csHere.outerHp = csOuter - split.wall;
     csHere.hp = Math.max(1, (csHere.hp ?? CITY_STATE_MAX_HP) - split.centre);
     csHere.lastHitTurn = state.turn;
@@ -2752,16 +2758,16 @@ function attackCityState(state: GameState, attacker: Unit, cityState: CityState)
   const csTier = wallsTier(state, csShape);
   const defCS = centreStrength(state, minorCity(cityState));
   const csOuter = outerPool(state, csShape);
-  const csRoll = damageRoll(state, atkCS - defCS, 'csty', cityState.centerIndex);
-  const csSplit = cityDamageSplit(csOuter, wallsMax(state, csShape), csRoll,
-    cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier));
+  const dmgToAttacker = damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
+  const csSplit = districtHit(state, atkCS - defCS, csOuter, wallsMax(state, csShape), CITY_STATE_MAX_HP,
+    cityHitClass(attacker.type, false), siegeAssist(state, attacker, cityState.centerIndex, csTier), 'csty', cityState.centerIndex);
   if (csSplit.wall > 0) cityState.outerHp = csOuter - csSplit.wall;
   cityState.hp = (cityState.hp ?? CITY_STATE_MAX_HP) - csSplit.centre;
   cityState.lastHitTurn = state.turn;
   // CIV6: barbarians never capture a city — their assault leaves the minor
   // standing at 1 HP, `hostileRangedStrike`'s own city floor.
   if (capsOf(attacker.seat).alwaysHostile) cityState.hp = Math.max(1, cityState.hp);
-  attacker.hp -= damageRoll(state, defCS - atkCS, 'cstyc', cityState.centerIndex);
+  attacker.hp -= dmgToAttacker;
   warWearinessBattle(state, attacker.seat, seatOfCityState(cityState.id), cityState.centerIndex,
     { aDied: attacker.hp <= 0, city: true });
   spendAttack(attacker, true);
@@ -3079,8 +3085,18 @@ function marchOn(state: GameState, unit: Unit, target: Tile, marchOnto: boolean)
  *  the record's; the hold takes the engine's barbarian turn. Null outside a
  *  replay. */
 let barbHold: ((state: GameState) => void) | null = null;
-export function holdBarbarians(fn: ((state: GameState) => void) | null): void {
+let barbRelease: ((state: GameState) => void) | null = null;
+export function holdBarbarians(fn: ((state: GameState) => void) | null, release: ((state: GameState) => void) | null = null): void {
   barbHold = fn;
+  barbRelease = release;
+}
+
+/** the hold's second half, once the turn's end (its random events, its
+ *  climate) has struck the map the barbarians' turn left: what the hold
+ *  keeps of their units leaves the engine's turn there. Nothing outside a
+ *  replay. */
+export function releaseBarbarians(state: GameState): void {
+  barbRelease?.(state);
 }
 
 /**

@@ -113,11 +113,15 @@ export function minorPhase(state: GameState): void {
  * THE LEVIED ARMY COMES HOME. CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):
  * "They will return to the city-state after {2_TurnLimit} Turns, or if the
  * Suzerain changes." Every unit still standing that the levy took from this
- * minor (`Unit.leviedFrom`) is the minor's again where it stands.
+ * minor (`Unit.leviedFrom`) is the minor's again where it stands. The
+ * term's turns are the minor's own starts, the first the one that follows
+ * the levy, so the army is home at the minor's start of turn `levyEnds` —
+ * 14 turns after the levy online (every recorded levy of the H-1 duels that
+ * ran its term, runs/h1_duelw1117-1131).
  */
 export function minorLevyReturn(state: GameState, cityState: CityState): void {
   if (cityState.levySeat === undefined) return;
-  if (state.turn < (cityState.levyEnds ?? 0) && suzerainOf(cityState) === cityState.levySeat) return;
+  if (state.turn + 1 < (cityState.levyEnds ?? 0) && suzerainOf(cityState) === cityState.levySeat) return;
   for (const u of state.units) {
     if (u.leviedFrom !== cityState.seat) continue;
     u.seat = cityState.seat;
@@ -280,19 +284,34 @@ export function minorPurchases(state: GameState, cityState: CityState): void {
   const units = state.units.filter((u) => u.seat === cityState.seat);
   if (!units.some((u) => u.type === 'BUILDER') && !minorTrainsBuilder(state, cityState)
       && minorBuilderWork(state, cityState)) {
-    const price = purchaseStep(builderCost(state, cityState.seat) * GOLD_PURCHASE_MULT);
-    if (goldAffordable(cityState.treasury, price)
+    if (goldAffordable(cityState.treasury, minorUnitGoldPrice(state, cityState, 'BUILDER'))
       && randRange(state, 1000, 'Engine: minor buy') < (cityState.builderBuyRate ?? 0)) {
-      const u = spawnUnit(state, 'BUILDER', cityState.centerIndex, cityState.seat);
-      if (u) {
-        applyTrainingGrants(state, minorCity(cityState), u);
-        cityState.treasury -= price;
-        cityState.buildersTrained += 1;
-      }
+      minorBuyUnit(state, cityState, 'BUILDER');
     }
   }
   minorBuyMilitary(state, cityState, units);
   minorBuyNaval(state, cityState);
+}
+
+/** A minor's Gold price for a unit: its production cost (a Builder's climbing
+ *  with the copies bought, `builderCost`) at the purchase multiplier. */
+export function minorUnitGoldPrice(state: GameState, cityState: CityState, id: string): number {
+  return purchaseStep((id === 'BUILDER' ? builderCost(state, cityState.seat) : UNITS[id].cost) * GOLD_PURCHASE_MULT);
+}
+
+/** THE MINOR'S GOLD PURCHASE: where the treasury covers the price and a tile
+ *  on or beside the centre is free, the unit lands with the city's training
+ *  grants and the price is paid (a Builder counts toward the next one's
+ *  price). False where nothing was bought. */
+export function minorBuyUnit(state: GameState, cityState: CityState, id: string): boolean {
+  const price = minorUnitGoldPrice(state, cityState, id);
+  if (!goldAffordable(cityState.treasury, price)) return false;
+  const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
+  if (!u) return false;
+  applyTrainingGrants(state, minorCity(cityState), u);
+  cityState.treasury -= price;
+  if (id === 'BUILDER') cityState.buildersTrained += 1;
+  return true;
 }
 
 /** Is the minor's production on a Builder this turn? The Builder row is the
@@ -342,13 +361,7 @@ function minorBuyMilitary(state: GameState, cityState: CityState, units: Unit[])
     return;
   }
   const id = minorArmyUnit(trainableIn(cityState.research, minorAnyResource()), units);
-  if (!id) return;
-  const price = purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
-  if (!goldAffordable(cityState.treasury, price)) return;
-  const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
-  if (!u) return;
-  applyTrainingGrants(state, minorCity(cityState), u);
-  cityState.treasury -= price;
+  if (id) minorBuyUnit(state, cityState, id);
 }
 
 /**
@@ -363,13 +376,9 @@ function minorBuyNaval(state: GameState, cityState: CityState): void {
   if (!cityNavalCapable(state, minorCity(cityState))) return;
   const id = minorBestOfClass(trainableIn(cityState.research, minorAnyResource(), true), MINOR_NAVAL_CLASS);
   if (!id) return;
-  const price = purchaseStep(UNITS[id].cost * GOLD_PURCHASE_MULT);
-  if (!goldAffordable(cityState.treasury, price)) return;
+  if (!goldAffordable(cityState.treasury, minorUnitGoldPrice(state, cityState, id))) return;
   if (randRange(state, 10000, 'Engine: minor buy') >= MINOR_NAVAL_BUY_BP) return;
-  const u = spawnUnit(state, id, cityState.centerIndex, cityState.seat);
-  if (!u) return;
-  applyTrainingGrants(state, minorCity(cityState), u);
-  cityState.treasury -= price;
+  minorBuyUnit(state, cityState, id);
 }
 
 /** May the minor's city sell a Warrior Monk — its majority religion's

@@ -3295,13 +3295,14 @@ class SimInit:
         self._walls_rows = [i for i, t in enumerate(rules.b_walls.tolist()) if int(t) > 0]
         # the ANCIENT tier's pool, which is what a fresh set of Walls is worth
         self._walls_hp = int(self._walls_tier_hp[1])
-        # What `_city_damage_split` and `_ranged_city_penalty` read: the
-        # perimeter's share of a melee and of a ranged hit, the fraction below
-        # which the centre takes full damage, and the ranged penalty against
-        # city and district defenses.
-        self._wall_dmg_melee = float(rules.combat["wallDamageMelee"])
-        self._wall_dmg_ranged = float(rules.combat["wallDamageRanged"])
-        self._wall_breach = float(rules.combat["wallBreachFraction"])
+        # What `_district_hit` and `_ranged_city_penalty` read: the percent of
+        # its own draw a melee, a ranged and a bombard hit deals the outer
+        # defense, and the ranged penalty against city and district defenses.
+        self._def_pct_melee = int(rules.combat["defensePctMelee"])
+        self._def_pct_ranged = int(rules.combat["defensePctRanged"])
+        self._def_pct_bombard = int(rules.combat["defensePctBombard"])
+        self._city_max_hp = int(rules.combat["cityMaxHp"])
+        self._cs_max_hp = int(rules.citystate["maxHp"])
         self._ranged_city_pen = float(rules.combat["rangedCityPenalty"])
         self._bombard_vs_unit = int(rules.combat["bombardVsUnit"])
         self._city_min_strike = int(rules.combat["cityMinStrike"])

@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { disbandUnit, raiseBestTrained, reseatUnit, spawnUnit } from '../../../cpu/core/units';
 import { outerPool } from '../../../cpu/core/rules';
-import { applyTrainingGrants, cityDamageSplit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
+import { applyTrainingGrants, districtHit, rangedCityPenalty, woundPenalty, rangedAttack, meleeAttack, hostileUnitAct, centreStrength } from '../../../cpu/core/combat';
 import { endTurn } from '../../../cpu/core/game';
 import { commitProduction } from '../../../cpu/core/seatTurn';
 import { BARB_SEAT, emptySeat, seatOf, seatOfCityState, setTileOwner, setWar } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { ENCAMPMENT_HP, FORMATION_CS, UNITS, WALLS_HP } from '../../../cpu/data/units';
-import { PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT } from '../../../cpu/data/constants';
+import { PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, damageExponent, damageRaw } from '../../../cpu/data/constants';
+import { randRange } from '../../../cpu/core/rand';
 import { DISTRICTS } from '../../../cpu/data/districts';
 import { tilesWithin } from '../../../world/hex';
 import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/core/types';
@@ -35,38 +36,43 @@ describe('the wound penalty', () => {
   });
 });
 
-describe('the outer-defense perimeter', () => {
-  it('CIV6: an intact perimeter holds the centre to 1 damage', () => {
-    const s = cityDamageSplit(WALLS_HP, WALLS_HP, 30, 'melee');
-    expect(s.centre).toBe(1);
+describe('the outer-defense perimeter (0x519440)', () => {
+  // two draws on a fixed generator, and the law's unclamped values for them
+  function twice(outer: number, max: number, klass: 'melee' | 'ranged' | 'bombard', assist = 0, diff = 0) {
+    const state = { rngState: 0x2468ace } as GameState;
+    const probe = { rngState: 0x2468ace } as GameState;
+    const x = damageExponent(diff);
+    const raw = [randRange(probe, 12, 'Unit Combat Damage'), randRange(probe, 12, 'Unit Combat Damage')].map((r) => damageRaw(r, x));
+    const hit = districtHit(state, diff, outer, max, 200, klass, assist, 'k', -1);
+    return { hit, raw, drew: state.rngState === probe.rngState };
+  }
+
+  it('draws twice: the hit points, then the outer defense', () => {
+    expect(twice(WALLS_HP, WALLS_HP, 'melee').drew).toBe(true);
+    expect(twice(0, 0, 'ranged').drew).toBe(true);
   });
 
-  it('CIV6: around 80% the centre "suffers not more than 5-10 damage"', () => {
-    expect(cityDamageSplit(0.8 * WALLS_HP, WALLS_HP, 30, 'ranged').centre).toBe(8);
+  it('an intact perimeter lets 1 through; an unwalled centre takes the whole law', () => {
+    expect(twice(WALLS_HP, WALLS_HP, 'melee').hit.centre).toBe(1);
+    const open = twice(0, 0, 'melee');
+    expect(open.hit).toEqual({ wall: 0, centre: open.raw[0] });
   });
 
-  it('CIV6: half-down lets a reduced hit through; past the breach it is full', () => {
-    const half = cityDamageSplit(0.5 * WALLS_HP, WALLS_HP, 30, 'ranged').centre;
-    expect(half).toBeGreaterThan(8);
-    expect(half).toBeLessThan(30);
-    expect(cityDamageSplit(0.25 * WALLS_HP, WALLS_HP, 30, 'ranged').centre).toBe(30);
-    expect(cityDamageSplit(0, WALLS_HP, 30, 'ranged').centre).toBe(30);
+  it('a breached perimeter turns its standing share: v - trunc(v x trunc(256 left / max) / 256)', () => {
+    const t = twice(40, WALLS_HP, 'ranged');
+    const share = Math.floor((40 * 256) / WALLS_HP);
+    expect(t.hit.centre).toBe(Math.max(1, t.raw[0] - Math.floor((t.raw[0] * share) / 256)));
   });
 
-  it('CIV6: the perimeter itself takes -85% from melee and -50% from ranged', () => {
-    expect(cityDamageSplit(WALLS_HP, WALLS_HP, 40, 'melee').wall).toBe(6);
-    expect(cityDamageSplit(WALLS_HP, WALLS_HP, 40, 'ranged').wall).toBe(20);
+  it('the perimeter takes COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE 15 / RANGED 50 of its own draw', () => {
+    const m = twice(WALLS_HP, WALLS_HP, 'melee');
+    expect(m.hit.wall).toBe(Math.floor((m.raw[1] * 15) / 100));
+    const r = twice(WALLS_HP, WALLS_HP, 'ranged');
+    expect(r.hit.wall).toBe(Math.floor((r.raw[1] * 50) / 100));
   });
 
-  it('the pool never goes negative, and an unwalled city loses nothing to it', () => {
-    expect(cityDamageSplit(3, WALLS_HP, 40, 'ranged').wall).toBe(3);
-    expect(cityDamageSplit(0, WALLS_HP, 40, 'melee')).toEqual({ wall: 0, centre: 40 });
-  });
-
-  it('both shares come out of the SAME roll вЂ” a hit damages perimeter and centre at once', () => {
-    const s = cityDamageSplit(0.4 * WALLS_HP, WALLS_HP, 30, 'melee');
-    expect(s.wall).toBeGreaterThan(0);
-    expect(s.centre).toBeGreaterThan(1);
+  it('the pool never goes negative', () => {
+    expect(twice(3, WALLS_HP, 'bombard').hit.wall).toBe(3);
   });
 });
 

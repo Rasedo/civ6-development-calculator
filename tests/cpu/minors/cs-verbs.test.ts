@@ -129,7 +129,7 @@ describe('civ levy', () => {
     stashLevy(state, civ.seat, state.cityStates.indexOf(cityState));
     seatPhase(state);
     expect(cityState.levySeat).toBe(civ.seat);
-    expect(cityState.levyEnds).toBe(state.turn + LEVY_TURNS);
+    expect(cityState.levyEnds).toBe(state.turn + LEVY_TURNS - 1);
     expect(armyOf(state, civ.seat)).toHaveLength(2);
     expect(armyOf(state, cityState.seat)).toHaveLength(0);
     expect(civ.treasury).toBe(0);

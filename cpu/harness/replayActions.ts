@@ -49,7 +49,9 @@ export type Decision = Base & (
   | { kind: 'buyUnit'; player: number; city: number; type: number; unit: string; currency: 'gold' | 'faith' }
   /** `unit`: the unit that laid it (the log's acting unit of its owner), where named */
   | { kind: 'improve'; player: number; plot: number; improvement: number; unit?: string }
-  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' }
+  /** a feature or resource taken off a plot; `unit`: the unit the log names
+   *  starting the removal or harvest there */
+  | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource'; unit?: string }
   /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
    *  down, standing on a wonder under construction) */
   | { kind: 'wonderCharge'; player: number; unit: string; plot: number }
@@ -57,6 +59,13 @@ export type Decision = Base & (
    *  major's on their plots (`UnitRemovedFromMap` then `UnitAddedToMap`),
    *  each record key old → new */
   | { kind: 'levy'; player: number; minor: number; units: [string, string][] }
+  /** a levy's end: the city-state's units home, each the major's unit and
+   *  the minor's id the game gives it */
+  | { kind: 'levyEnd'; player: number; units: [string, string][] }
+  /** a great person's activation (`UnitGreatPersonActivated`) on the plot
+   *  the log's steps had it on, the catalog's individual it names; a
+   *  Prophet's founding is `religion`'s */
+  | { kind: 'gpActivate'; player: number; unit: string; plot: number; individual: number }
   | { kind: 'worked'; player: number; city: number; plots: number[];
       /** each plot's lock rank (`Tile.lockRank`), all 0 when absent */
       ranks?: number[] }
@@ -83,9 +92,12 @@ export type Decision = Base & (
    *  battle's place among its player's hits of the pair (its "Unit Combat
    *  Damage" draws, `battle`). A city's shot (`strike`: the city's centre and
    *  the plot it fired from, its centre or its Encampment) has no attacker
-   *  unit. */
+   *  unit; a unit's melee attack on a city (its centre or Encampment at
+   *  `at`) has no defender unit. */
   | { kind: 'battle'; player: number; attacker: string; defender: string; from: number; at: number;
-      ranged: boolean; seq: number; dmg: [number, number]; strike?: { city: number; origin: number } }
+      ranged: boolean; seq: number; dmg: [number, number]; strike?: { city: number; origin: number };
+      /** the hit's place in the log (its row's sequence number) */
+      ord: number }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
@@ -483,6 +495,15 @@ export interface LogTally {
 
 /** the game's `CityMadePurchase` purchase type: the hash of its kind's name */
 const PURCHASE_UNIT = gameHash('UNIT');
+/** a unit set to carry out an order (`UnitActivityChanged`); ACTIVITY_AWAKE
+ *  marks one done with it (runs/h1_duelw1121 t25: a barbarian Horseman's
+ *  move ended, then the Horse Archer set acting before it shot; over the
+ *  CombatLogs of 1119-1128 the last unit set acting names the shooter 310
+ *  times where the last activity of any kind does, once) */
+const ACTIVITY_OPERATION = gameHash('ACTIVITY_OPERATION');
+const OP_REMOVE_FEATURE = gameHash('UNITOPERATION_REMOVE_FEATURE');
+const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
+const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
 /** the game's `CityProductionChanged` / `CityProductionCompleted` kinds */
@@ -557,13 +578,33 @@ export class RecordedActions implements ActionSource {
     };
     const units1 = new Map(b.units.map((u) => [unitKey(u), u]));
     const completed = new Set<string>();
-    const bought = new Map<string, number>();
     // each player's unit the log last set acting: the one an improvement laid
     // next is its work
     const acting = new Map<number, string>();
+    // where each unit stands as the log's steps move it, and the unit each
+    // feature removal or harvest the log names was made by: its owner's
+    // unit starting the operation on the plot
+    const stand = new Map(a.units.map((u) => [unitKey(u), u.y * W + u.x]));
+    const clearer = new Map<string, string>();
+    // each unit's last operation the log started
+    const lastOp = new Map<string, number>();
     for (const r of ev) {
       const name = r[2];
       if (name === 'UnitActivityChanged') acting.set(n(r, 0), `${n(r, 0)}:${n(r, 1)}`);
+      if (name === 'UnitMoved' || name === 'UnitTeleported') stand.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
+      if (name === 'UnitGreatPersonActivated') {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        const at = stand.get(k);
+        if (at !== undefined && lastOp.get(k) !== OP_FOUND_RELIGION) {
+          out0.push({ kind: 'gpActivate', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at, individual: n(r, 3) });
+        }
+      }
+      if (name === 'UnitOperationStarted') lastOp.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 2));
+      if (name === 'UnitOperationStarted' && (n(r, 2) === OP_REMOVE_FEATURE || n(r, 2) === OP_HARVEST)) {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        const at = stand.get(k);
+        if (at !== undefined) clearer.set(`${n(r, 0)}:${at}:${n(r, 2) === OP_REMOVE_FEATURE ? 'feature' : 'resource'}`, k);
+      }
       if (name === 'CityAddedToMap') {
         const plot = n(r, 3) * W + n(r, 2);
         const inf = inferred.find((d) => d.kind === 'found' && d.plot === plot) as Extract<Decision, { kind: 'found' }> | undefined;
@@ -576,8 +617,7 @@ export class RecordedActions implements ActionSource {
         const plot = n(r, 3) * W + n(r, 2);
         const type = n(r, 4);
         const obj = n(r, 5);
-        if (type === PURCHASE_UNIT) bought.set(`${owner}:${obj}:${plot}`, centre);
-        else if (type === PURCHASE_BUILDING) {
+        if (type === PURCHASE_BUILDING) {
           put('buyBuilding', `${owner}:${centre}:${obj}`, { kind: 'buyBuilding', phase: phaseOf(owner), player: owner, city: centre, building: obj,
             currency: currencyOf(owner, centre, 'B', obj) });
         } else if (type === PURCHASE_PLOT) put('buyPlot', `${owner}:${centre}:${plot}`, { kind: 'buyPlot', phase: phaseOf(owner), player: owner, city: centre, plot });
@@ -651,6 +691,23 @@ export class RecordedActions implements ActionSource {
       levies.set(key, d);
     });
     out0.push(...levies.values());
+    // a levy's end: a major's unit removed and its city-state's added on the
+    // same plot in the next event, the same chassis, at the minor's turn
+    // (runs/h1_duelw1117 t43: China's levied Warriors home to Antananarivo;
+    // 1121 t57)
+    const homes = new Map<number, Extract<Decision, { kind: 'levyEnd' }>>();
+    const typeOf = (key: string) => (units1.get(key) ?? a.units.find((x) => unitKey(x) === key))?.type;
+    ev.forEach((r, i) => {
+      const nx = ev[i + 1];
+      if (r[2] !== 'UnitRemovedFromMap' || !nx || nx[2] !== 'UnitAddedToMap' || !majorIds.has(n(r, 0)) || !minors.has(n(nx, 0))) return;
+      const from = `${n(r, 0)}:${n(r, 1)}`;
+      const to = `${n(nx, 0)}:${n(nx, 1)}`;
+      if (typeOf(from) === undefined || typeOf(from) !== typeOf(to)) return;
+      const d = homes.get(n(nx, 0)) ?? { kind: 'levyEnd', phase: phaseOf(n(nx, 0)), player: n(nx, 0), units: [] };
+      d.units.push([from, to]);
+      homes.set(n(nx, 0), d);
+    });
+    out0.push(...homes.values());
     // the melee battles: the defender's damage, then the attacker's, in the
     // attacker's player's turn; every unit where the log's steps had it
     {
@@ -706,6 +763,18 @@ export class RecordedActions implements ActionSource {
         }
         return best;
       };
+      // the city a melee attack of `pid`'s from `from` struck: another
+      // player's centre beside it, else another player's Encampment
+      const assaulted = (pid: number, from: number): number | undefined => {
+        for (const c of b.cities.length ? b.cities : a.cities) {
+          if (c.owner !== pid && dist(centreOf(c, W), from) === 1) return centreOf(c, W);
+        }
+        for (let p = 0; p < W * b.head.H; p++) {
+          const row = plotAt(b, p);
+          if (row[P.owner] !== pid && (row[P.owner] as number) >= 0 && cat.districts[row[P.district] as number] === 'DISTRICT_ENCAMPMENT' && dist(p, from) === 1) return p;
+        }
+        return undefined;
+      };
       ev.forEach((r, i) => {
         if (r[2] === 'PlayerTurnActivated' && n(r, 0) !== actor) {
           actor = n(r, 0);
@@ -714,8 +783,9 @@ export class RecordedActions implements ActionSource {
           activated = [];
         } else if (r[2] === 'UnitMoved' || r[2] === 'UnitTeleported') pos.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
         else if (r[2] === 'UnitActivityChanged' && n(r, 0) === actor) {
-          acting = `${n(r, 0)}:${n(r, 1)}`;
-          activated = [...activated.filter((x) => x !== acting), acting];
+          const k = `${n(r, 0)}:${n(r, 1)}`;
+          if (n(r, 2) === ACTIVITY_OPERATION) acting = k;
+          activated = [...activated.filter((x) => x !== k), k];
         }
         if (!hit(r)) return;
         const k = hits;
@@ -725,10 +795,19 @@ export class RecordedActions implements ActionSource {
           // it took on its own attack on a city, which no battle holds
           const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
           if (!pv || !hit(pv) || n(pv, 0) === actor) {
-            out0.push({ kind: 'hit', phase: phaseOf(actor), player: actor, unit: `${n(r, 0)}:${n(r, 1)}`, dmg: n(r, 2) - n(r, 3) });
             // the attack drew the attacker's damage, then the city's hit
             // points' and its walls' (GameCore_XP2_Release.dll 0x206080:
-            // 0x519370, then 0x519440 twice) — three draws, one event
+            // 0x519370, then 0x519440 twice) — three draws, one event; the
+            // city is the other player's centre, else Encampment, beside the
+            // attacker (runs/h1_duelw1117 t14: a barbarian Warrior at 27 HP
+            // on Valletta)
+            const unit = `${n(r, 0)}:${n(r, 1)}`;
+            const from = pos.get(unit);
+            const city = from === undefined ? undefined : assaulted(actor, from);
+            if (from !== undefined && city !== undefined) {
+              out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker: unit, defender: '', from, at: city, ranged: false, seq: k, ord: r[0] as number,
+                dmg: [0, n(r, 2) - n(r, 3)] });
+            } else out0.push({ kind: 'hit', phase: phaseOf(actor), player: actor, unit, dmg: n(r, 2) - n(r, 3) });
             hits += 2;
           }
           return;
@@ -746,12 +825,16 @@ export class RecordedActions implements ActionSource {
           // Slinger's shot behind a Scout's activity)
           const striker = strikerOf(actor, at);
           if (striker) {
-            out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker: '', defender, from: striker.origin, at, ranged: true, seq: k,
+            out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker: '', defender, from: striker.origin, at, ranged: true, seq: k, ord: r[0] as number,
               dmg: [n(r, 2) - n(r, 3), 0], strike: striker });
             return;
           }
+          // and with none that reaches, a blow no unit of the actor's dealt
+          // (runs/h1_duelw1121 t147: four blows behind a Battering Ram's
+          // activity)
           const shooter = [...activated].reverse().find((x) => pos.has(x) && reaches(x, pos.get(x)!, at));
-          if (shooter) { attacker = shooter; from = pos.get(shooter); }
+          attacker = shooter;
+          from = shooter === undefined ? undefined : pos.get(shooter);
         }
         // a blow with no blow back from a melee chassis is its melee attack on
         // an embarked unit, whose counter the game never draws
@@ -762,7 +845,7 @@ export class RecordedActions implements ActionSource {
           out0.push({ kind: 'hit', phase: phaseOf(actor), player: n(r, 0), unit: defender, dmg: n(r, 2) - n(r, 3) });
           return;
         }
-        out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k,
+        out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k, ord: r[0] as number,
           dmg: [n(r, 2) - n(r, 3), countered ? n(nx!, 2) - n(nx!, 3) : 0] });
       });
     }
@@ -774,21 +857,27 @@ export class RecordedActions implements ActionSource {
       if (v) v.unit = `${n(r, 0)}:${n(r, 1)}`;
     }
     const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
-    for (const r of ev) {
-      if (r[2] !== 'UnitAddedToMap') continue;
+    ev.forEach((r, i) => {
+      if (r[2] !== 'UnitAddedToMap') return;
       const k = `${n(r, 0)}:${n(r, 1)}`;
-      if (upgradedInto.has(k)) continue;
+      if (upgradedInto.has(k)) return;
       const u = units1.get(k);
-      if (!u || a.units.some((x) => unitKey(x) === k)) continue;
+      if (!u || a.units.some((x) => unitKey(x) === k)) return;
       const plot = u.y * W + u.x;
-      const at = bought.get(`${u.owner}:${u.type}:${n(r, 3) * W + n(r, 2)}`) ?? [...bought].find(([key]) => key.startsWith(`${u.owner}:${u.type}:`))?.[1];
+      // the purchase that added it is its owner's `CityMadePurchase` of its
+      // type just after the add (the add, its teleport, the purchase); a unit
+      // added with no purchase behind it was trained or granted
+      // (runs/h1_duelw1124 t17-18: Rome's bought Warrior, then its trained one)
+      const buy = ev.slice(i + 1, i + 4).find((x) => x[2] === 'CityMadePurchase' && n(x, 0) === u.owner
+        && n(x, 4) === PURCHASE_UNIT && n(x, 5) === u.type);
+      const at = buy ? cityPlot(n(buy, 0), n(buy, 1)) : undefined;
       if (at !== undefined && at >= 0) {
         put('unitOrigin', k, { kind: 'buyUnit', phase: phaseOf(u.owner), player: u.owner, city: at, type: u.type, unit: k, currency: currencyOf(u.owner, at, 'U', u.type) });
       } else {
         put('unitOrigin', k, { kind: 'unitNew', phase: 'after', player: u.owner, unit: k, type: u.type, plot,
           why: completed.has(`${u.owner}:${u.type}`) ? 'trained' : 'other' });
       }
-    }
+    });
     for (const r of ev) if (!READ_EVENTS.has(r[2])) this.unread.set(r[2], (this.unread.get(r[2]) ?? 0) + 1);
 
     // the inference's decisions of each settled kind, keyed alike
@@ -817,6 +906,10 @@ export class RecordedActions implements ActionSource {
     const out: Decision[] = [...out0];
     // the steps each moved unit took, on the inference's move
     for (const d of inferred) if (d.kind === 'move' && paths.has(d.unit)) d.path = paths.get(d.unit);
+    for (const d of inferred) {
+      const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
+      if (d.kind === 'clear' && by) d.unit = by;
+    }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();
     for (const d of inferred) {

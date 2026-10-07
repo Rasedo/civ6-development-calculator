@@ -6,7 +6,7 @@ import { neighbors } from '../../../world/hex';
 import { outerPool, repairDrip, wallsMax, wallsTier, availableBuildings } from '../../../cpu/core/rules';
 import { applyLumpYield } from '../../../cpu/core/economy';
 import {
-  ASSIST_RAM, ASSIST_TOWER, attackTargets, cityDamageSplit, cityDefenseStrength, cityHitClass,
+  ASSIST_RAM, ASSIST_TOWER, attackTargets, districtHit, cityDefenseStrength, cityHitClass,
   cityRangedStrength, encampmentDefense, encircled, meleeAttack, rangedAttack, siegeAssist,
   siegeMayShoot,
 } from '../../../cpu/core/combat';
@@ -15,6 +15,9 @@ import { completeProject } from '../../../cpu/core/production';
 import { buySeatBuilding, healCities, seatPhase } from '../../../cpu/core/phase';
 import { UNITS, WALLS_TIER_HP, REPAIR_QUIET_TURNS } from '../../../cpu/data/units';
 import { wallsStrength } from '../../../cpu/core/combat';
+import { damageRaw } from '../../../cpu/data/constants';
+import { randRange } from '../../../cpu/core/rand';
+import type { GameState } from '../../../cpu/core/types';
 
 // The siege round, against the pages it came from: City combat (Civ6) for the
 // perimeter, the damage classes and the siege; Battering Ram / Siege Tower for
@@ -78,31 +81,38 @@ describe('the siege roster', () => {
 
 describe('the damage split', () => {
   const W = WALLS_TIER_HP[1];
+  // the outer defense's draw and the law's value for it (the second draw)
+  function hit(outer: number, max: number, klass: 'melee' | 'ranged' | 'bombard', assist = 0) {
+    const state = { rngState: 0x13579b } as GameState;
+    const probe = { rngState: 0x13579b } as GameState;
+    const raw = [randRange(probe, 12, 'Unit Combat Damage'), randRange(probe, 12, 'Unit Combat Damage')].map((r) => damageRaw(r, 0));
+    return { ...districtHit(state, 0, outer, max, 200, klass, assist, 'k', -1), raw };
+  }
 
   it('CIV6: a BOMBARD attack does full damage to the perimeter', () => {
-    expect(cityDamageSplit(W, W, 40, 'bombard').wall).toBe(40);
-    expect(cityDamageSplit(W, W, 40, 'melee').wall).toBe(6);
+    const b = hit(W, W, 'bombard');
+    expect(b.wall).toBe(b.raw[1]);
+    const m = hit(W, W, 'melee');
+    expect(m.wall).toBe(Math.floor((m.raw[1] * 15) / 100));
   });
 
   it('CIV6: a Battering Ram makes the melee share full but leaves the centre reduced', () => {
-    const s = cityDamageSplit(W, W, 40, 'melee', ASSIST_RAM);
-    expect(s.wall).toBe(40);
-    // "damage against the city itself is still subject to damage reduction
-    // from Walls, while these retain most of their HP"
+    const s = hit(W, W, 'melee', ASSIST_RAM);
+    expect(s.wall).toBe(s.raw[1]);
     expect(s.centre).toBe(1);
   });
 
   it('CIV6: a Siege Tower hits the centre "as if there were no walls", walls reduced as ever', () => {
-    const s = cityDamageSplit(W, W, 40, 'melee', ASSIST_TOWER);
-    expect(s.centre).toBe(40);
-    expect(s.wall).toBe(6);
+    const s = hit(W, W, 'melee', ASSIST_TOWER);
+    expect(s.centre).toBe(s.raw[0]);
+    expect(s.wall).toBe(Math.floor((s.raw[1] * 15) / 100));
   });
 
-  it('the breach ramp reads the TIER\'s own pool, not the Ancient one', () => {
+  it('the standing share reads the TIER\'s own pool, not the Ancient one', () => {
     for (const tier of [1, 2, 3, 4]) {
       const mx = WALLS_TIER_HP[tier];
-      expect(cityDamageSplit(mx, mx, 30, 'ranged').centre).toBe(1);
-      expect(cityDamageSplit(Math.round(0.25 * mx), mx, 30, 'ranged').centre).toBe(30);
+      expect(hit(mx, mx, 'ranged').centre).toBe(1);
+      expect(hit(0, mx, 'ranged').centre).toBe(hit(0, mx, 'ranged').raw[0]);
     }
   });
 });

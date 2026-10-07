@@ -40,7 +40,7 @@ import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar
   placeSeatDistrict, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
-import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
+import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
@@ -51,7 +51,7 @@ import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '.
 import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
-import { applyTrainingGrants, cityStrikeStrength, clearCampFor, holdBarbarians, meleeAttack, rangedAttack, terrainDefense } from '../core/combat';
+import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, holdBarbarians, meleeAttack, rangedAttack, terrainDefense } from '../core/combat';
 import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -69,17 +69,19 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorItem, holdMinorWalk, minorBuilderLays, type MinorItem } from '../core/minorBuild';
+import { holdMinorItem, holdMinorWalk, minorBuilderLays, minorBuyUnit, minorUnitGoldPrice, type MinorItem } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
+import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
 import { loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
-import { engineId } from './aliases';
+import { engineId, gameHash } from './aliases';
+import { activateGreatPerson, gpClassOfUnit } from '../core/gpAbility';
+import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
 /** what became of one decision */
@@ -103,6 +105,9 @@ const LAB_HUMAN_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
   state: GameState;
+  /** the pair's Fortify orders: unit -> the order's place in the log and the
+   *  fortification record t+1 shows (`dugIn`) */
+  fortified: Map<string, { ord: number; turns: number }>;
   cat: Catalog;
   W: number;
   seatOfPlayer: Map<number, number>;
@@ -514,6 +519,7 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   const s0 = battleDraw(ctx, wit, b, d);
   if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); return; }
   if (def.tileIndex !== d.at) def.fortifyTurns = 0;
+  dugIn(ctx, d, def);
   def.tileIndex = d.at;
   if (!UNITS[def.type]?.naval && !waterWalks(def.type)) def.embarked = isWater(state.map.tiles[def.tileIndex]) || undefined;
   state.rngState = s0;
@@ -526,6 +532,64 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   if (!ok) { count(ctx, 'battle', 'refused', d.player, 'nothing to strike'); return; }
   ctx.battled.add(d.defender);
   if (!state.units.includes(def)) ctx.engineKilled.add(d.defender);
+  count(ctx, 'battle', 'applied');
+}
+
+/** the game's Fortify order (`UnitOperationStarted`'s operation hash) */
+const OP_FORTIFY = gameHash('UNITOPERATION_FORTIFY');
+
+/** each unit that took the Fortify order in the pair: the order's place in
+ *  the log, and the fortification record t+1 shows for it */
+function fortifiedIn(b: TurnRecord): Map<string, { ord: number; turns: number }> {
+  const out = new Map<string, { ord: number; turns: number }>();
+  const rows = (b as { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return out;
+  const dug = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, num(r.fortify)]));
+  for (const x of rows as unknown[][]) {
+    if (x[2] !== 'UnitOperationStarted' || x[5] !== OP_FORTIFY) continue;
+    const k = `${x[3]}:${x[4]}`;
+    const turns = dug.get(k);
+    if (turns !== undefined && !out.has(k)) out.set(k, { ord: x[0] as number, turns });
+  }
+  return out;
+}
+
+/** A DEFENDER THAT TOOK THE FORTIFY ORDER before the blow (in the log's
+ *  order) holds the fortification record t+1 shows for it, which may stand
+ *  two turns dug in after one order (runs/h1_duelw1117 t17: Rome's Warrior
+ *  327683, ordered at 31 HP, defended at +6 against a barbarian Warrior and
+ *  read 2; 1124 t69: an Archer's shot on Rome's Warrior, CombatLog +3 on Snow
+ *  at 66 HP); a blow before the order finds it as it stood (1121 t6: a camp's
+ *  Spearman struck by a city-state before its own turn's order). */
+function dugIn(ctx: Ctx, d: BattleDecision, def: Unit): void {
+  const f = ctx.fortified.get(d.defender);
+  if (f && d.ord > f.ord && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
+}
+
+/** A UNIT'S ATTACK ON A CITY the log names (its own damage, `battle` with no
+ *  defender): the engine's melee attack from where the log's steps had the
+ *  unit, on the city's centre or Encampment, on the game's own draws. */
+function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): void {
+  const { state } = ctx;
+  const atk = unitOf(ctx, d.attacker);
+  if (!atk) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); return; }
+  const s0 = battleDraw(ctx, wit, b, d);
+  if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); return; }
+  if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
+  atk.tileIndex = d.from;
+  if (!UNITS[atk.type]?.naval && !waterWalks(atk.type)) atk.embarked = isWater(state.map.tiles[atk.tileIndex]) || undefined;
+  atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
+  atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
+  state.rngState = s0;
+  const hp0 = atk.hp;
+  if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [];
+  ctx.stream.placed(true);
+  const r = meleeAttack(state, atk.id, d.at, atk.seat);
+  ctx.stream.placed(false);
+  if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0}->${atk.hp} vs city@${d.at} melee seq${d.seq} game[${d.dmg}] ours[-,${hp0 - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
+  if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); return; }
+  ctx.battled.add(d.attacker);
+  if (!state.units.includes(atk)) ctx.engineKilled.add(d.attacker);
   count(ctx, 'battle', 'applied');
 }
 
@@ -544,7 +608,7 @@ function battleTerms(state: GameState, atk: Unit, def: Unit): string {
       if (u.seat === def.seat) sd += 1;
     }
   }
-  return `terms terr${terrainDefense(dt)} fort${fortifyBonus(def)} ${dt.terrain}/${dt.feature ?? "-"}/${dt.elevation}/${dt.improvement ?? "-"}/${dt.district ?? "-"}/o${dt.ownerSeat} flank${fa} supp${sd} river${crossesRiver(state.map, at, dt) ? 1 : 0} atile ${at.terrain}/${at.feature ?? "-"}/${at.elevation}/${at.improvement ?? "-"}/${at.district ?? "-"}/o${at.ownerSeat} afort${fortifyBonus(atk)}`;
+  return `terms terr${terrainDefense(dt)} fort${fortifyBonus(def)} ${dt.terrain}/${dt.feature ?? "-"}/${dt.elevation}/${dt.improvement ?? "-"}/${dt.district ?? "-"}/o${dt.ownerSeat} flank${fa}${flankSupportLive(state, atk.seat) ? '' : 'x'} supp${sd}${flankSupportLive(state, def.seat) ? '' : 'x'} river${crossesRiver(state.map, at, dt) ? 1 : 0} atile ${at.terrain}/${at.feature ?? "-"}/${at.elevation}/${at.improvement ?? "-"}/${at.district ?? "-"}/o${at.ownerSeat} afort${fortifyBonus(atk)}`;
 }
 
 function startSeeds(b: TurnRecord, player: number): { pre?: number; post?: number } {
@@ -683,6 +747,17 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   const city = cityAt(state, d.city);
   const id = engineRowOf(ctx.cat, 'unit', d.type);
   const kind = `buyUnit:${d.currency}`;
+  // a city-state's purchase is its script's decision, through the minor's own verb
+  const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat && c.centerIndex === d.city) : undefined;
+  if (minor && id && d.currency === 'gold') {
+    const before = new Set(state.units);
+    const ok = minorBuyUnit(state, minor, id);
+    const made = state.units.find((u) => !before.has(u) && u.seat === seat && u.type === id);
+    if (ok && made) ctx.units.set(d.unit, made);
+    else spawnRecorded(ctx, rec, d.unit);
+    return void count(ctx, kind, ok && made ? 'applied' : 'fallback', d.player,
+      `minor ${id} price ${minorUnitGoldPrice(state, minor, id)} treasury ${Math.round(minor.treasury)}`);
+  }
   if (!actor || !city || !id || city.seat !== seat) {
     spawnRecorded(ctx, rec, d.unit);
     return void count(ctx, kind, 'fallback', d.player);
@@ -711,7 +786,8 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   const made = state.units.find((u) => !before.has(u) && u.seat === seat && u.type === id);
   if (ok && made) ctx.units.set(d.unit, made);
   else spawnRecorded(ctx, rec, d.unit);
-  count(ctx, kind, ok && made ? 'applied' : 'fallback', d.player);
+  count(ctx, kind, ok && made ? 'applied' : 'fallback', d.player,
+    d.currency === 'gold' && id !== 'SETTLER' ? `${id} price ${unitGoldPrice(state, id, seat, city)} treasury ${Math.round(actor.treasury ?? 0)}` : id);
 }
 
 /** the decisions of one phase, in a fixed order: cities first (a founding
@@ -720,7 +796,7 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'unitNew', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
   const { state, next } = ctx;
@@ -841,6 +917,49 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         count(ctx, 'levy', res.ok ? 'applied' : 'fallback', d.player, res.reason);
         break;
       }
+      case 'gpActivate': {
+        // the order is the player's, through the engine's verb from the plot
+        // the log's steps had the person on: the effects, the charge
+        const u = unitOf(ctx, d.unit);
+        if (!u) { count(ctx, 'gpActivate', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        u.tileIndex = d.plot;
+        // the person the log names: a unit the replay spawned from the
+        // record carries no identity of its own
+        if (u.gpAt === undefined) {
+          const id = aliasOrPrefixed(ctx.cat.greatPeople?.[d.individual] ?? '');
+          const cls = gpClassOfUnit(u);
+          const at = id && cls !== undefined ? GREAT_PEOPLE[cls].findIndex((p) => p.id === id) : -1;
+          if (at >= 0 && cls !== undefined) {
+            u.gpAt = at;
+            u.charges = gpChargesOf(GREAT_PEOPLE[cls][at]);
+          }
+        }
+        if (!activateGreatPerson(state, u)) {
+          if (TRACE.has('gpActivate')) console.error(`   ${d.unit} ${u.type} gpAt${u.gpAt} charges${u.charges} at ${u.tileIndex}`);
+          count(ctx, 'gpActivate', 'refused', d.player, 'the engine refused the activation');
+          break;
+        }
+        matchNewUnits(ctx, b);
+        count(ctx, 'gpActivate', 'applied');
+        break;
+      }
+      case 'levyEnd': {
+        // the engine's own levy clock sends the units home
+        // (`minorLevyReturn`); the game's new ids name the same units
+        const seat = seatOfP(ctx, d.player);
+        for (const [from, to] of d.units) {
+          const u = unitOf(ctx, from);
+          ctx.units.delete(from);
+          if (!u) continue;
+          ctx.units.set(to, u);
+          if (u.seat === seat) { count(ctx, 'levyEnd', 'applied'); continue; }
+          if (TRACE.has('levyEnd')) { const cs = state.cityStates.find((c) => c.seat === seat); console.error(`   levyEnd ${from} seat${u.seat} levied${u.leviedFrom} cs${seat} levySeat${cs?.levySeat} ends${cs?.levyEnds} turn${state.turn}`); }
+          u.seat = seat;
+          delete u.leviedFrom;
+          count(ctx, 'levyEnd', 'fallback', d.player);
+        }
+        break;
+      }
       case 'wonderCharge': {
         // the order is the player's, through the engine's verb, from where
         // the Builder stood
@@ -856,11 +975,24 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const seat = seatOfP(ctx, d.player);
         const t = state.map.tiles[d.plot];
         if (d.what === 'feature' ? !t.feature : !t.resource) { count(ctx, `clear:${d.what}`, 'refused', d.player); break; }
+        // the order is the player's, through the engine's verb with the
+        // builder the log names, from the plot: the lump, the charge
+        const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
+        let why = d.unit ? 'a builder the replay does not hold' : undefined;
+        if (builder) {
+          builder.tileIndex = d.plot;
+          const res = d.what === 'feature' ? builderRemoveFeature(state, builder.id, seat) : builderHarvest(state, builder.id);
+          if (res.ok) { count(ctx, `clear:${d.what}`, 'applied'); break; }
+          why = res.reason;
+          // the record's charge, spent
+          builder.charges = Math.max(0, (builder.charges ?? 1) - 1);
+        }
+        if (why) count(ctx, `clear:${d.what}`, 'fallback', d.player, why);
         const grants = d.what === 'feature' ? chopGrant(state, t, seat) : [harvestGrant(state, t, seat)].filter((g) => !!g);
         for (const g of grants) applyLumpYield(state, d.plot, g!, seat);
         if (d.what === 'feature') t.feature = null;
         else t.resource = null;
-        count(ctx, `clear:${d.what}`, 'applied');
+        if (!why) count(ctx, `clear:${d.what}`, 'applied');
         break;
       }
       case 'envoy': {
@@ -1022,6 +1154,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         ctx.units.delete(d.unit);
         if (!u) { count(ctx, `unitGone:${d.why}`, 'applied'); break; }
         disbandUnit(state, u.id);
+        if (TRACE.has('unitGone') && d.why !== 'founded') console.error(`   ${d.unit} ${u.type} hp${u.hp} at ${u.tileIndex} charges${u.charges ?? '-'}`);
         count(ctx, `unitGone:${d.why}`, d.why === 'founded' ? 'applied' : 'fallback', d.player);
         break;
       }
@@ -1164,6 +1297,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'battle': {
         if (d.strike) { strike(ctx, wit, b, d, d.strike); break; }
+        if (!d.defender) { assault(ctx, wit, b, d); break; }
         // the battle is the engine's: its melee or ranged combat resolves it
         // from where the log's steps had the two units, on the game's own
         // damage draws
@@ -1175,6 +1309,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // a unit the log's steps moved holds no fortification
         if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
         if (def.tileIndex !== d.at) def.fortifyTurns = 0;
+        dugIn(ctx, d, def);
         atk.tileIndex = d.from;
         def.tileIndex = d.at;
         // a land unit the log's steps left on water fights embarked
@@ -1201,6 +1336,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       case 'combat': {
         const u = unitOf(ctx, d.unit);
         if (!u || ctx.battled.has(d.unit)) break;
+        // the engine's own turn dealt it (a random event's damage): nothing to impose
+        if (u.hp === d.hp) { count(ctx, 'combat', 'applied'); break; }
+        if (TRACE.has('combat')) console.error(`   ${d.unit} ${u.type} hp${u.hp} -> ${d.hp} at ${u.tileIndex}`);
         u.hp = d.hp;
         count(ctx, 'combat', 'fallback', d.player);
         break;
@@ -1354,6 +1492,7 @@ function syncDraws(ctx: Ctx, b: TurnRecord, tribesBefore: number): boolean {
     const r = ctx.next.state.map.tiles[t.index];
     if (t.fertility === r.fertility && t.fertilityProd === r.fertilityProd && (t.fertilitySci ?? 0) === (r.fertilitySci ?? 0)
       && (t.fertilityCul ?? 0) === (r.fertilityCul ?? 0) && t.droughtTurns === r.droughtTurns) continue;
+    if (TRACE.has('soil')) console.error(`t${traceTurn} soil ${t.index} engine ${t.fertility}/${t.fertilityProd}/${t.droughtTurns} record ${r.fertility}/${r.fertilityProd}/${r.droughtTurns}`);
     t.fertility = r.fertility;
     t.fertilityProd = r.fertilityProd;
     t.fertilitySci = r.fertilitySci;
@@ -1656,7 +1795,7 @@ const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read
  *  first `:`, else the whole kind): a kind not named reaches every one —
  *  a seat's purse, research, government, or a city's state flows into all */
 const IMPOSES_ON: Record<string, readonly string[]> = {
-  combat: UNITS_SUBS, hit: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
+  combat: UNITS_SUBS, hit: UNITS_SUBS, levyEnd: UNITS_SUBS, gpActivate: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
   promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
@@ -1782,7 +1921,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream,
+    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream,
   };
   // the record's units in the importer's order
   let k = 0;
@@ -1818,6 +1957,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.fellBack = new Map();
     ctx.imposed = new Map();
     ctx.battled = new Set();
+    ctx.fortified = fortifiedIn(b);
     ctx.paths = new Map();
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
@@ -1861,7 +2001,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // no blow
     const barbRest = new Map<Unit, boolean>();
     const struck = new Set(ds.flatMap((d) => (d.kind === 'battle' ? [d.attacker] : [])));
-    for (const r of b.units) {
+    // a unit the pair killed rests or spends as its actions had it before
+    // the blow (runs/h1_duelw1124 t20: Rome's Warrior attacked, then fell to
+    // the barbarians at 1 HP, unhealed)
+    const held = new Set(b.units.map((r) => `${r.owner}:${r.id}`));
+    for (const r of [...b.units, ...a.units.filter((x) => !held.has(`${x.owner}:${x.id}`))]) {
       const key = `${r.owner}:${r.id}`;
       const u = unitOf(ctx, key);
       if (!u) continue;
@@ -1881,10 +2025,31 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // draws are on the turn's stream before the random events
     // (runs/h1_duelw1118 t7: without them a flood's draw took a citizen of
     // Rome the game's spared)
+    // The turn's end strikes the map their turn left: a unit record t+1
+    // holds stands its random events and climate where it holds it, and
+    // leaves the engine's turn after them (runs/h1_duelw1121 t19: an
+    // eruption's damage on a barbarian Spearman and Horse Archer).
     const barbs: Unit[] = [];
+    const barbAt = new Map<Unit, number>();
+    for (const r of b.units) {
+      const u = unitOf(ctx, `${r.owner}:${r.id}`);
+      if (u && isBarbSeat(u.seat)) barbAt.set(u, r.y * ctx.W + r.x);
+    }
+    const takeBarbs = (st: GameState, keep: boolean) => {
+      barbs.push(...st.units.filter((u) => isBarbSeat(u.seat) && !(keep && barbAt.has(u))));
+      st.units = st.units.filter((u) => !isBarbSeat(u.seat) || (keep && barbAt.has(u)));
+    };
+    const barbFrom = new Map<Unit, number>();
     holdBarbarians((st) => {
-      barbs.push(...st.units.filter((u) => isBarbSeat(u.seat)));
-      st.units = st.units.filter((u) => !isBarbSeat(u.seat));
+      takeBarbs(st, true);
+      for (const [u, at] of barbAt) {
+        barbFrom.set(u, u.tileIndex);
+        u.tileIndex = at;
+      }
+    }, (st) => {
+      // back where the replay's own steps take them from (`syncUnits`)
+      for (const [u, at] of barbFrom) u.tileIndex = at;
+      takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
     // A CITY-STATE'S BUILDERS lay what its AI picks, which the record's

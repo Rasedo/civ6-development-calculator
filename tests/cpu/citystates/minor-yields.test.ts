@@ -138,15 +138,16 @@ describe("the levy takes the minor's own army", () => {
     }
     expect(builder.seat).toBe(cs.seat); // a civilian is no military unit
     expect(cs.levySeat).toBe(0);
-    expect(cs.levyEnds).toBe(state.turn + LEVY_TURNS);
+    expect(cs.levyEnds).toBe(state.turn + LEVY_TURNS - 1);
     // "You have already levied the military of this city-state."
     expect(levyUnits(state, cs.id, 0).ok).toBe(false);
 
     // the term runs: home at its end
-    state.turn = cs.levyEnds! - 1;
+    // (the minor's start of turn T runs at the engine's turn T - 1)
+    state.turn = cs.levyEnds! - 2;
     minorLevyReturn(state, cs);
     expect(w1.seat).toBe(0);
-    state.turn = cs.levyEnds!;
+    state.turn = cs.levyEnds! - 1;
     minorLevyReturn(state, cs);
     for (const u of [w1, w2]) {
       expect(u.seat).toBe(cs.seat);

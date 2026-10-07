@@ -51,7 +51,7 @@ class SimMinors:
         it stands, its mark cleared."""
         alive = self.citystate_alive[:, s]
         ls = self.citystate_levy_seat[:, s]
-        back = alive & (ls >= 0) & ((int(self.turn) >= self.citystate_levy_ends[:, s])
+        back = alive & (ls >= 0) & ((int(self.turn) + 1 >= self.citystate_levy_ends[:, s])
                                     | (self.citystate_suzerain[:, s] != ls))
         if not bool(back.count_nonzero()):
             return

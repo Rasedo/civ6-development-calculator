@@ -1025,8 +1025,8 @@ export interface CityState extends Seat {
   met: number[];
   hp?: number;
   /** THE LEVY (`levyUnits`): the seat holding this minor's army, and the turn
-   *  it comes home (`LEVY_TURNS` after the levy). Absent while no one holds
-   *  it. */
+   *  at whose start it comes home (`LEVY_TURNS` - 1 after the levy). Absent
+   *  while no one holds it. */
   levySeat?: number;
   levyEnds?: number;
   /** the turn the minor's city last took a hit — the quiet the repair

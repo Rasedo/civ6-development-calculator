@@ -260,9 +260,12 @@ describe('flanking & support', () => {
   // The scenes below all grant MILITARY_TRADITION to seat 0, which is also what
   // switches the BARBARIANS on: with one major in the game, one researcher is
   // "at least half of the major civilizations".
+  // every player holds Military Tradition: the majors, the barbarians and
+  // the city-states each read their own civics (0x521530, +0x1268)
   const armed = () => {
     const b = battlefield();
     grantCivics(b.state, FLANK_SUPPORT_CIVIC);
+    for (const x of [b.state.barbSeat, ...b.state.cityStates]) x.research.civics.push(FLANK_SUPPORT_CIVIC);
     return b;
   };
 
@@ -280,7 +283,11 @@ describe('flanking & support', () => {
     expect(supportCount(state, defTile, def)).toBe(0);
     grantCivics(state, FLANK_SUPPORT_CIVIC);
     expect(flankSupportLive(state, 0)).toBe(true);
-    expect(flankSupportLive(state, BARB_SEAT)).toBe(true); // 1 of 1 majors is half
+    // the barbarians read their own civics, which the civics half the majors
+    // hold reach (`barbarianTechs`)
+    expect(flankSupportLive(state, BARB_SEAT)).toBe(false);
+    barbarianTechs(state);
+    expect(flankSupportLive(state, BARB_SEAT)).toBe(true);
     expect(flankCount(state, defTile, atk)).toBe(1);
   });
 

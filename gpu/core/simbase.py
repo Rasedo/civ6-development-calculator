@@ -906,7 +906,7 @@ XP_CITY_ATTACK = 3
 XP_CITY_DEFEND = 2
 XP_CITY_FELLED = 10
 XP_BARB_VETERAN = 1
-#: how ONE hit reaches a perimeter — the `cityDamageSplit` klass, as a code so
+#: the kind of ONE hit on a district — `cityHitClass`'s, as a code so
 #: a batch can carry a different verb per game.
 HIT_MELEE = 0
 HIT_RANGED = 1

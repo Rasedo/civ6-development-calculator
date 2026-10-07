@@ -40,7 +40,7 @@ import { xpToNextLevel } from './promotions';
 import { logXpWrite } from './difflog';
 
 /** the CLASS a Great Person chassis carries — the unit id IS the class name. */
-function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
+export function gpClassOfUnit(unit: { type: string }): GreatPersonClass | undefined {
   return (GP_CLASSES as readonly string[]).includes(unit.type)
     ? (unit.type as GreatPersonClass)
     : undefined;

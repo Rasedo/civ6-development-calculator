@@ -172,7 +172,7 @@ def main() -> None:
     mine0 = army_of(sim, R + 1)
     sim._seat_phase()
     assert int(sim.citystate_levy_seat[0, S0]) == R + 1, "L1 levy: the holder not stamped"
-    assert int(sim.citystate_levy_ends[0, S0]) == T + sim._levy_turns, "L1 levy: the term not stamped"
+    assert int(sim.citystate_levy_ends[0, S0]) == T + sim._levy_turns - 1, "L1 levy: the term not stamped"
     assert army_of(sim, cs_seat) == 0, "L1 levy: the minor kept an army"
     assert army_of(sim, R + 1) == mine0 + n_army, "L1 levy: the army did not change hands"
     taken = (sim.major_unit_alive[0] & (sim.major_unit_levy_src[0] == cs_seat))
@@ -182,10 +182,11 @@ def main() -> None:
 
     # -- L1b: the army comes home at the term's end, or when the suzerain changes
     sim.citystate_suzerain[0, S0] = R + 1
-    sim.turn = sim.citystate_levy_ends[0, S0].clone() - 1
+    # (the minor's start of turn T runs at the engine's turn T - 1)
+    sim.turn = sim.citystate_levy_ends[0, S0].clone() - 2
     sim._minor_levy_return(S0)
     assert army_of(sim, cs_seat) == 0, "L1b: home before the term"
-    sim.turn = int(sim.citystate_levy_ends[0, S0])
+    sim.turn = int(sim.citystate_levy_ends[0, S0]) - 1
     sim._minor_levy_return(S0)
     assert army_of(sim, cs_seat) == n_army, "L1b: not home at the term"
     assert int(sim.citystate_levy_seat[0, S0]) == -1

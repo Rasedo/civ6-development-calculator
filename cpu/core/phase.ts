@@ -383,7 +383,9 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     u.movesLeft = 0;
   }
   cityState.levySeat = seat;
-  cityState.levyEnds = state.turn + LEVY_TURNS;
+  // the minor's own turn, which follows the levy, is the term's first: the
+  // army comes home at the minor's start of turn L + LEVY_TURNS - 1
+  cityState.levyEnds = state.turn + LEVY_TURNS - 1;
   // CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY): the levy
   // hands two Envoys back (`LEVY_ROWS`)
   for (const r of getModifiers(state, seat).levy) {

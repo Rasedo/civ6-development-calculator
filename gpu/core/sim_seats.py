@@ -3073,7 +3073,7 @@ class SimSeats:
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
                     rows_l = do_l.nonzero(as_tuple=True)[0]
                     self.citystate_levy_seat[rows_l, sl[rows_l]] = row
-                    self.citystate_levy_ends[rows_l, sl[rows_l]] = int(self.turn) + self._levy_turns
+                    self.citystate_levy_ends[rows_l, sl[rows_l]] = int(self.turn) + self._levy_turns - 1
                     # CIV6 (PLAYER_LEVIED_MILITARY): the levy's moment (`levyMoment`)
                     self._add_era_score(row, int(self._mom["levied"]), do_l)
                     # CIV6 (Raven King, EFFECT_GRANT_INFLUENCE_TOKEN_LEVY_MILITARY):
@@ -13318,28 +13318,28 @@ class SimSeats:
                              self._holder_strength(srow).to(torch.float64))
         return def_cs, hrow, hcol, wtier, held
 
-    def _encamp_take_roll(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
-                          useat: torch.Tensor, roll: torch.Tensor, ranged: bool) -> None:
-        """Apply ONE roll to the district: CIV6 gives it "Defenses HP equal to
-        the City Center" and one set of Walls supplies both — each its OWN
-        pool — so the roll divides exactly as a hit on the centre does: the
-        perimeter share off `encamp_outer_hp`, and only what gets through
-        reaching `encamp_hp`."""
+    def _encamp_take_hit(self, m: torch.Tensor, tc: torch.Tensor, utype: torch.Tensor,
+                         useat: torch.Tensor, diff: torch.Tensor, ranged: bool, k: str) -> None:
+        """`encampSplit`: the district's two draws (`_district_hit`). CIV6 gives
+        it "Defenses HP equal to the City Center" and one set of Walls supplies
+        both — each its OWN pool — so the hit divides exactly as a hit on the
+        centre does: the walls' damage off `encamp_outer_hp`, the hit points'
+        reaching `encamp_hp`; a district no city holds stands no walls."""
         _dcs, hrow, hcol, wtier, held = self._encamp_terms(tc)
         _hc0 = hcol.clamp(min=0)
         bidx = torch.arange(self.B, device=self.device)
-        _assist = (torch.zeros_like(roll) if ranged
+        _assist = (torch.zeros_like(tc) if ranged
                    else self._siege_assist(useat, utype, tc, wtier))
-        _emax = self._walls_tier_hp[wtier]
+        _emax = torch.where(held, self._walls_tier_hp[wtier], torch.zeros_like(self._walls_tier_hp[wtier]))
         _eouter = torch.minimum(self.encamp_outer_hp[bidx, tc], _emax)
-        _wall, _centre = self._city_damage_split(
-            _eouter, _emax, roll,
-            self._hit_class(utype, ranged), _assist)
+        _wall, _centre = self._district_hit(
+            m, diff, _eouter, _emax, self._encamp_hp_max,
+            self._hit_class(utype, ranged), _assist, k, tc)
         rows = m.nonzero(as_tuple=True)[0]
         if rows.numel() == 0:
             return
         tr = tc[rows]
-        _dmg = torch.where(held, _centre, roll)
+        _dmg = _centre
         self.encamp_hp[rows, tr] = (self.encamp_hp[rows, tr] - _dmg[rows]).clamp(min=0)
         hr2 = rows[held[rows]]
         if hr2.numel() > 0:
@@ -13392,8 +13392,7 @@ class SimSeats:
                                    self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1), None, True,
                                    getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                             getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(def_cs.dtype))
-        roll = self._damage_roll(att, atk_e - def_cs, k=key, tile=tc)
-        self._encamp_take_roll(att, tc, at0, a_seat[:, u], roll, True)
+        self._encamp_take_hit(att, tc, at0, a_seat[:, u], atk_e - def_cs, True, key)
         self._ww_battle(att, self._row_of(a_seat[:, u]),
                         self._row_of(self.tile_seat.gather(1, tc.unsqueeze(1)).squeeze(1)),
                         tc, city=True)
@@ -13412,10 +13411,11 @@ class SimSeats:
         describes a unit standing in the CITY, not on this district), its own
         garrison pool takes the damage, and the attacker never advances.
 
-        ONE roll key whoever owns the district: `enc` for the damage and `encc`
-        for the counter — an Encampment is fought the same way on every row, and
-        the defense floor above is already one row-generic read. Draw ORDER is
-        TS's: damage-to-district, then counter."""
+        ONE key set whoever owns the district: `encc` for the attacker's
+        damage, `enc` / `encw` for the district's — an Encampment is fought the
+        same way on every row, and the defense floor above is already one
+        row-generic read. Draw ORDER is the DLL's (0x206080): the attacker's
+        damage, then the district's two."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         atk_cs = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
                   + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u)
@@ -13444,12 +13444,11 @@ class SimSeats:
             getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                             getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
         diff, cdiff = atk_e - def_cs, def_cs - atk_e
-        d_enc = self._damage_roll(att, diff, k="enc", tile=tc)
         d_self = self._damage_roll(att, cdiff, k="encc", tile=tc)
         self._spend_one_attack(atk_kind, u, att)
         self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
                             torch.full_like(tc, XP_CITY_ATTACK))
-        self._encamp_take_roll(att, tc, a_type[:, u], a_seat[:, u], d_enc, False)
+        self._encamp_take_hit(att, tc, a_type[:, u], a_seat[:, u], diff, False, "enc")
         # the assault that empties the pool CONQUERS the district
         self._conquer_encampment(
             att & (self.encamp_hp.gather(1, tc.unsqueeze(1)).squeeze(1) <= 0), tc, a_seat[:, u])
@@ -14071,28 +14070,25 @@ class SimSeats:
                       f"combat={float(self._type_combat[int(a_type[_b, u])]):.0f} "
                       f"wound={float(self._wound(a_hp[:, u], a_type[:, u])[_b]):.1f} "
                       f"xp={int(a_xp[_b, u])} best={int(self._holder_strength(hrow, slot)[_b])}")
-        # DRAW ORDER is the parity contract: the city's damage first, the
-        # counter second, exactly as TS's cityAssault draws them.
-        d_city = self._damage_roll(att, atk_e - def_cs, k="rcty", tile=tgt)
+        # DRAW ORDER is the DLL's (0x206080), `cityAssault`'s: the attacker's
+        # damage, then the district's hit points' and outer defense's
         d_atk = self._damage_roll(att, def_cs - atk_e, k="rctyc", tile=tgt)
         self._spend_one_attack(atk_kind, u, att)
-        # the FULL roll against the centre pool decides the felling rate, before
-        # the perimeter takes its share - `cityAssault` reads it that way
-        _chp = self.city_hp[bidx, hrow, slot]
-        self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
-                            torch.where(_chp - d_city <= 0,
-                                        torch.full_like(_chp, XP_CITY_FELLED),
-                                        torch.full_like(_chp, XP_CITY_ATTACK)))
         _wmax = self._walls_tier_hp[_wtier]
         _klass = self._hit_class(a_type[:, u], False)
         _assist = self._siege_assist(a_seat[:, u], a_type[:, u], tgt, _wtier)
+        wall, centre = self._district_hit(att, atk_e - def_cs, self.city_outer_hp[bidx, hrow, slot], _wmax,
+                                          self._city_max_hp, _klass, _assist, "rcty", tgt)
+        _chp = self.city_hp[bidx, hrow, slot]
+        self._award_city_xp(att, atk_kind, u, a_type[:, u], a_seat[:, u],
+                            torch.where(_chp - centre <= 0,
+                                        torch.full_like(_chp, XP_CITY_FELLED),
+                                        torch.full_like(_chp, XP_CITY_ATTACK)))
         rows = att.nonzero(as_tuple=True)[0]
         hr, sl = hrow[rows], slot[rows]
         outer = self.city_outer_hp[rows, hr, sl]
-        wall, centre = self._city_damage_split(outer, _wmax[rows], d_city[rows],
-                                               _klass[rows], _assist[rows])
-        self.city_outer_hp[rows, hr, sl] = outer - wall
-        self.city_hp[rows, hr, sl] -= centre
+        self.city_outer_hp[rows, hr, sl] = outer - wall[rows]
+        self.city_hp[rows, hr, sl] -= centre[rows]
         self.city_last_hit[rows, hr, sl] = self.turn
         a_hp[:, u] = torch.where(att, a_hp[:, u] - d_atk, a_hp[:, u])
         died = att & (a_hp[:, u] <= 0)
@@ -14275,17 +14271,16 @@ class SimSeats:
                                         self.tile_seat.gather(1, tgt.clamp(min=0).unsqueeze(1)).squeeze(1), None, True,
                                         getattr(self, f"{atk_kind}_unit_formation")[:, u],
                                             getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
-        d_cs = self._damage_roll(att, atk_e - def_cs, k="csty", tile=tgt)
         d_atk = self._damage_roll(att, def_cs - atk_e, k="cstyc", tile=tgt)
+        cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
+        cs_wall, cs_centre = self._district_hit(
+            att, atk_e - def_cs, cs_outer, self._walls_tier_hp[cs_tier], self._cs_max_hp,
+            self._hit_class(at0, False), cs_assist, "csty", tgt)
         self._spend_one_attack(atk_kind, u, att)
         rows = att.nonzero(as_tuple=True)[0]
-        cs_assist = self._siege_assist(a_seat[:, u], at0, tgt, cs_tier)
-        cs_wall, cs_centre = self._city_damage_split(
-            cs_outer[rows], self._walls_tier_hp[cs_tier][rows], d_cs[rows],
-            self._hit_class(at0, False)[rows], cs_assist[rows])
-        self.city_outer_hp[rows, cs_mrow[rows], 0] = cs_outer[rows] - cs_wall
+        self.city_outer_hp[rows, cs_mrow[rows], 0] = cs_outer[rows] - cs_wall[rows]
         self.city_last_hit[rows, cs_mrow[rows], 0] = self.turn
-        self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre
+        self.citystate_hp[rows, citystate_sc[rows]] -= cs_centre[rows]
         if atk_kind == "barb":
             # CIV6: barbarians never capture a city — their assault leaves the
             # minor standing at 1 HP, `_hostile_ranged_strike`'s own floor.
@@ -14513,15 +14508,15 @@ class SimSeats:
             atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
                              + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
             atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form, a_lev).to(atk_e.dtype)
-            d_city = self._damage_roll(city_att, atk_e - def_cs, k="vrngc", tile=tgt)
-            self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp.take(_wtier)
+            wall, centre = self._district_hit(city_att, atk_e - def_cs, outer_all, _wmax, self._city_max_hp,
+                                              _klass, None, "vrngc", tgt)
+            self._ww_battle(city_att, self._row_of(self._atk_seat(atk_kind, u)), hrow, tgt, city=True)
             rows = city_att.nonzero(as_tuple=True)[0]
             hr_, hc_ = hrow.take(rows), hcol.take(rows)
             outer = self.city_outer_hp[rows, hr_, hc_]
-            wall, centre = self._city_damage_split(outer, _wmax.take(rows), d_city.take(rows), _klass.take(rows))
-            self.city_outer_hp[rows, hr_, hc_] = outer - wall
-            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre).clamp(min=1)
+            self.city_outer_hp[rows, hr_, hc_] = outer - wall.take(rows)
+            self.city_hp[rows, hr_, hc_] = (self.city_hp[rows, hr_, hc_] - centre.take(rows)).clamp(min=1)
             self.city_last_hit[rows, hr_, hc_] = self.turn
             _chp = self.city_hp[_bidx, hrow, hcol]
             self._award_city_xp(city_att, atk_kind, u, _type_p[:, u], a_seat,
@@ -14572,15 +14567,14 @@ class SimSeats:
             atk_cs = atk_cs + (self._congress_unit_cs(ut0, a_seat)
                                + self._gov_unit_cs(ut0, a_seat)).to(atk_cs.dtype)
             atk_cs = atk_cs + self._roster_cs(a_seat, ut0, a_tile, ctr, None, True, a_form, a_lev).to(atk_cs.dtype)
-            d_csv = self._damage_roll(cs_att, atk_cs - def_cs, k="vrngcs", tile=tgt)
+            cs_wall, cs_centre = self._district_hit(cs_att, atk_cs - def_cs, cs_outer, self._walls_tier_hp[cs_tier],
+                                                    self._cs_max_hp, _klass, None, "vrngcs", tgt)
             self._ww_battle(cs_att, self._row_of(self._atk_seat(atk_kind, u)),
                             self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
-            cs_wall, cs_centre = self._city_damage_split(
-                cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_csv[rr], _klass[rr])
-            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
-            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=1)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, _type_p[:, u], a_seat,
                                 torch.where(_cshp <= 1,
@@ -14780,21 +14774,20 @@ class SimSeats:
             outer_all = self.city_outer_hp[bidx, hrow, slot]
             _rs = self._city_ranged_strength(at0, aseat, outer_all)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
-            d_city = self._damage_roll(city_att,
-                                       atk_base - atk_rs0 + _rs + _cpromo + rel_city
-                                       + self._roster_cs(aseat, at0, a_tile[:, u], hseat, None, True,
-                                                         getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                            getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
-                                       - def_cs,
-                                       k="rngrc", tile=tgt)
-            self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
             _wmax = self._walls_tier_hp[_wtier]
+            wall, centre = self._district_hit(city_att,
+                                              atk_base - atk_rs0 + _rs + _cpromo + rel_city
+                                              + self._roster_cs(aseat, at0, a_tile[:, u], hseat, None, True,
+                                                                getattr(self, f"{atk_kind}_unit_formation")[:, u],
+                                                                getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
+                                              - def_cs,
+                                              outer_all, _wmax, self._city_max_hp, _klass, None, "rngrc", tgt)
+            self._ww_battle(city_att, self._row_of(aseat), hrow, tgt, city=True)
             rr = city_att.nonzero(as_tuple=True)[0]
             hr, sl = hrow[rr], slot[rr]
             outer = self.city_outer_hp[rr, hr, sl]
-            wall, centre = self._city_damage_split(outer, _wmax[rr], d_city[rr], _klass[rr])
-            self.city_outer_hp[rr, hr, sl] = outer - wall
-            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre).clamp(min=1)  # ranged never captures
+            self.city_outer_hp[rr, hr, sl] = outer - wall[rr]
+            self.city_hp[rr, hr, sl] = (self.city_hp[rr, hr, sl] - centre[rr]).clamp(min=1)  # ranged never captures
             self.city_last_hit[rr, hr, sl] = self.turn
             _chp = self.city_hp[bidx, hrow, slot]
             self._award_city_xp(city_att, atk_kind, u, a_type[:, u], aseat,
@@ -14812,20 +14805,18 @@ class SimSeats:
             def_cs = self._centre_strength(cs_mrow, torch.zeros_like(cs_mrow))
             _cs_rs = self._city_ranged_strength(at0, aseat, cs_outer)
             _cpromo = self._assault_promo_cs(at0, a_promos, a_tile[:, u], ranged=True)
-            d_cs = self._damage_roll(cs_att,
-                                     atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city
-                                     + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True,
-                                                       getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                            getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
-                                     - def_cs,
-                                     k="rngcs", tile=tgt)
+            cs_wall, cs_centre = self._district_hit(cs_att,
+                                                    atk_base - atk_rs0 + _cs_rs + _cpromo + rel_city
+                                                    + self._roster_cs(aseat, at0, a_tile[:, u], 100 + csx, None, True,
+                                                                      getattr(self, f"{atk_kind}_unit_formation")[:, u],
+                                                                      getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_base.dtype)
+                                                    - def_cs,
+                                                    cs_outer, self._walls_tier_hp[cs_tier], self._cs_max_hp, _klass, None, "rngcs", tgt)
             self._ww_battle(cs_att, self._row_of(aseat), self._row_of(100 + csx), tgt, city=True)
             rr = cs_att.nonzero(as_tuple=True)[0]
-            cs_wall, cs_centre = self._city_damage_split(
-                cs_outer[rr], self._walls_tier_hp[cs_tier][rr], d_cs[rr], _klass[rr])
-            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall
+            self.city_outer_hp[rr, cs_mrow[rr], 0] = cs_outer[rr] - cs_wall[rr]
             self.city_last_hit[rr, cs_mrow[rr], 0] = self.turn
-            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre).clamp(min=1)
+            self.citystate_hp[rr, csx[rr]] = (self.citystate_hp[rr, csx[rr]] - cs_centre[rr]).clamp(min=1)
             _cshp = self.citystate_hp.gather(1, csx.unsqueeze(1)).squeeze(1)
             self._award_city_xp(cs_att, atk_kind, u, a_type[:, u], aseat,
                                 torch.where(_cshp <= 1,

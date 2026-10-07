@@ -13,7 +13,7 @@ import { boostPool, drawBoosts } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestTrained } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
-import { applyTrainingGrants, barbarianPhase, damageRoll, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
+import { applyTrainingGrants, barbarianPhase, damageRoll, releaseBarbarians, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
 import { revealAround } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
@@ -1569,6 +1569,7 @@ export function endTurn(state: GameState): void {
   if (state.unitsMode) barbarianPhase(state);
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
+  if (state.unitsMode) releaseBarbarians(state);
   seatPhase(state);
   minorPhase(state);
   freeCitiesPhase(state);

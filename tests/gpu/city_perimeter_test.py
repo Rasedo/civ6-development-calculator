@@ -9,14 +9,16 @@ walled city under attack — the scripted rollout builds no Walls and fields no
 Apostle pair — so this lane is the only proof these bodies agree with the pages
 they came from:
 
-  1. `_wound` is CIV6's `round(10 - HP/10)`: 30 HP loses 7, 1 HP loses 10.
-  2. `_city_damage_split` reproduces all four bands City combat (Civ6) states,
-     and takes -85% off a melee hit to the perimeter, -50% off a ranged one.
+  1. `_wound` is the wounded law (0x522630): 30 HP loses 1790/256.
+  2. `_district_hit` draws the hit points' damage, then the outer defense's
+     (GameCore_XP2_Release.dll 0x519440): intact walls let 1 through, a breach
+     turns its standing share, the walls take COMBAT_DEFENSE_DAMAGE_PERCENT_
+     MELEE 15 / RANGED 50 / BOMBARD 100 of their own draw.
   3. `_city_ranged_strength` charges land ranged -17 always and naval ranged
      only while a perimeter stands, and a SIEGE unit fires at its Bombard
      Strength with no penalty at all.
   4. A melee assault and a ranged bombardment both damage the perimeter AND
-     the centre out of one roll, drawing no more than before.
+     the centre.
   5. Theological combat rolls `_damage_roll` on the wounded religious-strength
      difference — two draws per fight, ahead of the martyr rolls.
 """
@@ -50,44 +52,46 @@ def L(sim, x) -> torch.Tensor:
 
 
 def test_wound(sim) -> None:
-    hp = torch.tensor([100, 30, 1, 0], dtype=torch.long)
+    hp = torch.tensor([100, 30, 1, 0, 18], dtype=torch.long)
     got = sim._wound(hp).tolist()
-    assert got == [0.0, 7.0, 10.0, 10.0], f"_wound = {got}, want [0, 7, 10, 10]"
-    every = sim._wound(torch.arange(0, 101, dtype=torch.long))
-    assert bool((every == every.round()).all()), "the wound penalty must land on integers"
-    print("  wound OK: round(10 - HP/10) — 30 HP loses 7, 1 HP loses 10, always integral")
+    # the wounded law (0x522630): 10 x the damage percent, each percent cut to 1/256
+    want = [0.0, 1790 / 256, 2530 / 256, 10.0, 2090 / 256]
+    assert got == want, f"_wound = {got}, want {want}"
+    print("  wound OK: the wounded law in 1/256 — 30 HP loses 1790/256, 18 HP 2090/256")
 
 
-def split(sim, outer, roll, klass, assist=0, wmax=None):
-    """`_city_damage_split` with the per-game codes spelled as scalars."""
+def hit(sim, outer, klass, assist=0, wmax=None):
+    """`_district_hit` with the per-game codes spelled as scalars, on the
+    sim's own generator: (wall, centre, the law's two unclamped values)."""
     W = sim._walls_hp if wmax is None else wmax
-    return sim._city_damage_split(L(sim, outer), L(sim, W), L(sim, roll),
-                                  L(sim, klass), L(sim, assist))
+    m = torch.tensor([True], device=sim.device)
+    d = torch.zeros(1, dtype=torch.float64, device=sim.device)
+    s0 = sim.rng_state.clone()
+    raw = [int(sim._damage_roll(m, d, finish=lambda r: r)[0]) for _ in range(2)]
+    sim.rng_state.copy_(s0)
+    wall, centre = sim._district_hit(m, d, L(sim, outer), L(sim, W), 200, L(sim, klass), L(sim, assist), "k", L(sim, 0))
+    assert bool((sim.rng_state != s0).any()), "the hit drew nothing"
+    return int(wall[0]), int(centre[0]), raw
 
 
 def test_split(sim) -> None:
     W = sim._walls_hp
-    bands = {
-        W: 1,                       # intact: "1 damage only"
-        int(0.8 * W): 8,            # "not more than 5-10 damage per attack"
-        int(0.25 * W): 30,          # breached: full damage
-        0: 30,                      # no perimeter at all
-    }
-    for outer, want in bands.items():
-        _, centre = split(sim, outer, 30, HIT_RANGED)
-        assert int(centre) == want, f"outer {outer}/{W}: centre {int(centre)}, want {want}"
-    _, half = split(sim, W // 2, 30, HIT_RANGED)
-    assert 8 < int(half) < 30, f"a half-down perimeter should reduce but not stop: {int(half)}"
-
-    wall_m, _ = split(sim, W, 40, HIT_MELEE)
-    wall_r, _ = split(sim, W, 40, HIT_RANGED)
-    assert int(wall_m) == 6, f"melee should take 15% of 40: {int(wall_m)}"
-    assert int(wall_r) == 20, f"ranged should take 50% of 40: {int(wall_r)}"
-    capped, _ = split(sim, 3, 40, HIT_RANGED)
-    assert int(capped) == 3, f"the perimeter share must cap at the pool: {int(capped)}"
-    none, full = split(sim, 0, 40, HIT_MELEE)
-    assert int(none) == 0 and int(full) == 40, "an unwalled city loses nothing to a pool it has not got"
-    print(f"  split OK: 1 / 8 / reduced / full across the four bands, -85% melee and -50% ranged (walls {W})")
+    _, c, _ = hit(sim, W, HIT_RANGED)
+    assert c == 1, f"an intact perimeter lets 1 through: {c}"
+    _, c, raw = hit(sim, 0, HIT_RANGED)
+    assert c == raw[0], f"no perimeter: the whole law {raw[0]}, got {c}"
+    _, c, raw = hit(sim, W // 4, HIT_RANGED)
+    share = (W // 4) * 256 // W
+    assert c == max(1, raw[0] - raw[0] * share // 256), f"a breach turns its standing share: {c}"
+    wm, _, raw = hit(sim, W, HIT_MELEE)
+    assert wm == raw[1] * 15 // 100, f"melee takes 15% of its draw: {wm}"
+    wr, _, raw = hit(sim, W, HIT_RANGED)
+    assert wr == raw[1] * 50 // 100, f"ranged takes 50% of its draw: {wr}"
+    capped, _, _ = hit(sim, 3, HIT_BOMBARD)
+    assert capped == 3, f"the perimeter share must cap at the pool: {capped}"
+    none, _, _ = hit(sim, 0, HIT_MELEE)
+    assert none == 0, "an unwalled city loses nothing to a pool it has not got"
+    print(f"  district hit OK: 1 through intact walls, the breach share, 15% / 50% of the walls' draw (walls {W})")
 
 
 def test_bombard_and_support(sim) -> None:
@@ -97,22 +101,19 @@ def test_bombard_and_support(sim) -> None:
     it". The tier gate is Gathering Storm's: the ram stops above Ancient Walls,
     the tower above Medieval."""
     W = sim._walls_hp
-    wall_b, _ = split(sim, W, 40, HIT_BOMBARD)
-    assert int(wall_b) == 40, f"a bombard hit must reach the perimeter at full: {int(wall_b)}"
-    wall_ram, centre_ram = split(sim, W, 40, HIT_MELEE, ASSIST_RAM)
-    assert int(wall_ram) == 40, f"a ram makes the melee share full: {int(wall_ram)}"
-    assert int(centre_ram) == 1, "a ram does NOT open the centre — 'damage against the city itself is still subject to damage reduction'"
-    wall_tw, centre_tw = split(sim, W, 40, HIT_MELEE, ASSIST_TOWER)
-    assert int(centre_tw) == 40, f"a tower hits the centre 'as if there were no walls': {int(centre_tw)}"
-    assert int(wall_tw) == 6, "a tower's own wall damage keeps the reduction"
-    both_w, both_c = split(sim, W, 40, HIT_MELEE, ASSIST_RAM | ASSIST_TOWER)
-    assert int(both_w) == 40 and int(both_c) == 40, "the two chassis change different halves"
-    # the CENTRE ramp reads the tier's own pool, not the Ancient one
+    wb, _, raw = hit(sim, W, HIT_BOMBARD)
+    assert wb == raw[1], f"a bombard hit must reach the perimeter at full: {wb}"
+    wram, cram, raw = hit(sim, W, HIT_MELEE, ASSIST_RAM)
+    assert wram == raw[1], f"a ram makes the melee share full: {wram}"
+    assert cram == 1, "a ram does NOT open the centre"
+    wtw, ctw, raw = hit(sim, W, HIT_MELEE, ASSIST_TOWER)
+    assert ctw == raw[0], f"a tower hits the centre 'as if there were no walls': {ctw}"
+    assert wtw == raw[1] * 15 // 100, "a tower's own wall damage keeps the reduction"
     for tier in range(1, len(sim._walls_tier_hp)):
         mx = int(sim._walls_tier_hp[tier])
-        _, c = split(sim, mx, 30, HIT_RANGED, 0, mx)
-        assert int(c) == 1, f"an intact tier-{tier} perimeter ({mx}) must hold the centre to 1: {int(c)}"
-    print(f"  bombard/support OK: full wall share, the tower's bypass, and the ramp at every tier {sim._walls_tier_hp.tolist()}")
+        _, c, _ = hit(sim, mx, HIT_RANGED, 0, mx)
+        assert c == 1, f"an intact tier-{tier} perimeter ({mx}) must hold the centre to 1: {c}"
+    print(f"  bombard/support OK: full wall share, the tower's bypass, every tier {sim._walls_tier_hp.tolist()}")
 
 
 def test_siege_tables(sim) -> None:
@@ -250,15 +251,15 @@ def test_assault(rules, path) -> None:
     sim._melee_city(torch.tensor([True]), L(sim, ctr), "major", slot)
     assert int(sim.city_hp[0, 0, 0]) == 199, f"an intact perimeter must hold the centre to 1: {int(sim.city_hp[0, 0, 0])}"
     lost = sim._walls_hp - int(sim.city_outer_hp[0, 0, 0])
-    # The SIZE of the melee share is `test_split`'s case, on a roll it controls;
+    # The SIZE of the melee share is `test_split`'s case, on draws it controls;
     # a late chassis rolls hard enough to take a whole Ancient perimeter in one
     # blow, which is the rule working, not failing. What this case owns is that
     # the perimeter absorbed and the centre was held.
     assert 0 < lost <= sim._walls_hp, f"the perimeter took {lost}, outside its own pool"
     assert int(sim.rng_state[0]) != before_rng, "the assault drew nothing"
-    print(f"  melee OK: centre 200 -> 199, perimeter -{lost} out of the SAME roll")
+    print(f"  melee OK: centre 200 -> 199, perimeter -{lost}")
 
-    # MELEE, no walls: the whole roll lands on the centre
+    # MELEE, no walls: the whole law lands on the centre
     sim2, slot2, ctr2 = scene(rules, path, walls=False)
     sim2.major_unit_type[0, slot2] = ty
     sim2._melee_city(torch.tensor([True]), L(sim2, ctr2), "major", slot2)

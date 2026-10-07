@@ -2691,8 +2691,24 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
   COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; +0x1a4,
   +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw
   twice (hit points, defense) and nothing for the attacker. The log carries
-  one UnitDamageChanged for the three (1117 t14). The engines split one roll
-  (`cityDamageSplit`): see the contradictions below.
+  one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP
+  on Valletta; the three RandCalls seeds are the replay's three draws).
+- The district's hit (0x519440 builds the law's struct: +0 / +4 the two
+  strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the
+  outer defense's damage and maximum, +0x14 the pool's hash, +0x1c
+  COMBAT_MINIMUM_DAMAGE, +0x20 COMBAT_BASE_DAMAGE, +0x2d the bypass flag).
+  The law 0x519090 takes v = trunc((24 + r) x expf(x) + 0.5) unclamped; on
+  the hit points' hash (0x5e97d629) with the bypass flag clear and the outer
+  defense standing (left = max - damage > 0) it subtracts trunc(v x t / 256),
+  t = trunc(256 x left / max) (the fixed-point divide 0x16e940 and multiply
+  0x16e7d0): intact walls let 1 through after the clamp. Then the clamp to
+  [+0x1c, +8]. On the outer defense's hash (0x6da56a3d) the clamped damage
+  is taken at its percent: melee 15 unless a player flag (0x5212f0) or the
+  ram test (0x51af50, the district's +0x1910 against the support's tier)
+  gives 100; ranged 50 unless the unit's +0x18c2 gives 100; bombard 100;
+  times / 100 truncated. The bypass flag: no walls-ignore value and 0x51acb0
+  (the Siege Tower) without the ram. The engines: `districtHit` /
+  `_district_hit` (the ram and the tower as `siegeAssist`'s bits).
 - A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150,
   m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH
   3) plus the city's district attack bonus (+0x1890); 0x51c2d0 takes off
@@ -2709,7 +2725,12 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
 - Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the
   player's m_bMilitaryCombatAdjacency (+0x1268), which only
   EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_BONUS on
-  Military Tradition).
+  Military Tradition) — every player's own, a city-state's and the
+  barbarians' included (1117 t23: a city-state holding Military Tradition
+  flanks a barbarian Warrior, 32 / 22 where +2 lands and 30 / 24 without;
+  1124 t38 CombatLog: a barbarian Warrior at 68 HP beside a second logs +4,
+  its +5 less the wound plus one flanker). The engines: `flankSupportLive`
+  / `_flank_support_live` read each player's civics.
 - Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on
   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's
   Scout, t32, t37, t84; 1126 the Archer 2818053 on every shot t75-88; the
@@ -2797,17 +2818,25 @@ recordings with the log), 1126 three lower where its flood rivers' order
 already fails (t99, t122, t146 ...). The scale (x1000) is a fit; the
 harness reads it per step (`loadCarbonLog`).
 
+## H-1: the levy's term — READ
+
+- Player_Influence 0x44da30 (the minor's levy counter, m_iLevyTurnCounter
+  +0xc90): +1, then against 0x5254d0(LEVY_MILITARY_TURN_DURATION, GP
+  +0x450 = 30) — the speed's CostMultiplier, 15 online, not
+  GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0);
+  0x4501c0 resets it at the levy. The counter ticks at the minor's own turn
+  starts, the first the one after the levy in the same game turn: every
+  recorded levy that ran its term came home 14 turns on (
+  runs/h1_duelw1117-1131, the log's UnitRemovedFromMap / UnitAddedToMap
+  pairs; 1117 t28 -> t42, 1121 t42 -> t56). The engines: `LEVY_TURNS`
+  (`scaleByGameSpeed`), `levyEnds` = the levy turn + LEVY_TURNS - 1 read at
+  the minor's start (`minorLevyReturn`, `_minor_levy_return`).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
   `woundPenalty` / its GPU twin round 10 - HP/10 (AUDIT C-94 BUILD); the
   garrison term reads the law.
-- A unit's attack on a city (0x206080, 0x204b10, 0x2074b0, "H-1: the melee
-  result, a ranged blow's domain, a city's shot"): the game draws the
-  district's hit-point damage and its outer defense's damage apart, the
-  defense's scaled by COMBAT_DEFENSE_DAMAGE_PERCENT_*, and a melee attacker's
-  damage first; the engines split one roll (`cityDamageSplit`,
-  `cityAssault` drawing the city's then the attacker's) (AUDIT C-94 BUILD).
 - CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE's 0x1a1640 term (AUDIT
   C-94 BUILD).
 - Lifetime culture (0x3a1fb0) grows by every gain of civic progress, a
