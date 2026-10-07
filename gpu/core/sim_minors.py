@@ -356,9 +356,7 @@ class SimMinors:
         alive = self.citystate_alive[:, s]
         keep = alive.double()
         tot = self._seat_city_stats(row, record=False)[0][:, 0]  # [B, 6], zero where the city is dead
-        self.citystate_tech_prog[:, s] += tot[:, 3] * keep
-        self.citystate_civic_prog[:, s] += tot[:, 4] * keep
-        gained = self._minor_research(s)
+        gained = self._minor_research(s, tot[:, 3] * keep, tot[:, 4] * keep)
         if bool((gained > 0).count_nonzero()):
             fresh = self._seat_city_stats(row, record=False)[0][:, 0]
             tot = torch.where((gained > 0).unsqueeze(1), fresh, tot)
@@ -390,12 +388,12 @@ class SimMinors:
         growth write moves it with no mirror of its own."""
         row = self._CITY_MINOR0 + s
         act = self.citystate_alive[:, s]
-        total, eff, need, _tier = self._seat_city_stats(row)
+        total, eff, need, _tier, lux = self._seat_city_stats(row)
         col = torch.zeros(self.B, dtype=torch.long, device=self.device)
         pop0 = self.city_pop[:, row, 0].clone()
         self._seat_city_growth(row, col, act, eff[:, 0], need[:, 0])
         self._seat_border_growth(row, col, act,
-                                 self._culture_after_growth(row, 0, pop0, total[:, 0, 4]) * act.double())
+                                 self._culture_after_growth(row, 0, pop0, total[:, 0, 4], lux) * act.double())
 
     def _minor_envoy_tiles(self, games: torch.Tensor) -> None:
         """A MINOR TAKES GROUND FROM THE INFLUENCE SPENT ON IT — `envoyTiles`,
@@ -466,38 +464,75 @@ class SimMinors:
                 # a game whose draw found nothing stops, as TS breaks
                 want = torch.where(ready & ~claim, torch.zeros_like(want), want)
 
-    def _minor_research(self, s: int) -> torch.Tensor:
-        """The cheapest available row completes (table order on a price tie),
-        at most one per pot per turn — the `minorResearch` twin. Early Empire
-        is the row the border refusal reads. CIV6 (Urban Defenses): the tech
-        "builds modern fortifications around the City Centers of all current
-        and future cities and their Encampment districts", so the minor's
-        perimeter arrives at the urban tier's full pool. Returns [B] long,
-        how many trees completed a row — the upgrade trigger's count."""
+    def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
+        """`minorResearch` — each tree as a major's runs: the CATCH-UP first
+        (`minorCatchUp`, read inline); with nothing in hand the minor's pick, the
+        cheapest row open to it (table order on a price tie), which resumes
+        the progress kept on it while the pool left goes to the overflow
+        (`selectResearch`); the item banks the turn's yield (`sci` / `cul`,
+        [B]) and the overflow, and completes at its cost, leaving the rest.
+        CIV6 (Urban Defenses): the tech "builds modern fortifications around
+        the City Centers of all current and future cities and their Encampment
+        districts", so the minor's perimeter arrives at the urban tier's full
+        pool. Returns [B] long, how many trees completed a row — the upgrade
+        trigger's count."""
         alive = self.citystate_alive[:, s]
         gained = torch.zeros(self.B, dtype=torch.long, device=self.device)
         rdv = self.rules_dev
-        for is_tech, have, prog, cost, pre in (
-            (True, self.citystate_techs, self.citystate_tech_prog, rdv.t_cost.to(self.device), self._prereq_t),
-            (False, self.citystate_civics, self.citystate_civic_prog, rdv.c_cost.to(self.device), self._prereq_c),
+        live = self._barb_majors_alive()
+        need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
+        for is_tech, have, prog, cur, retain, ovf, cost, pre, majors, add in (
+            (True, self.citystate_techs, self.citystate_tech_prog, self.citystate_cur_tech, self.citystate_tech_retain,
+             self.citystate_tech_ovf, rdv.t_cost.to(self.device), self._prereq_t, self.civ_techs, sci),
+            (False, self.citystate_civics, self.citystate_civic_prog, self.citystate_cur_civic, self.citystate_civic_retain,
+             self.citystate_civic_ovf, rdv.c_cost.to(self.device), self._prereq_c, self.civ_civics, cul),
         ):
+            n = cost.numel()
+            col = torch.arange(n, device=self.device).unsqueeze(0)
+            # the price the era terms set (`researchCost`); the pick reads the
+            # catalog's own
+            rc = self._research_cost(not is_tech)
+            # THE CATCH-UP: a row the minor lacks that `need` living majors hold
+            # stands at its cost less one, never lowered
+            held = (majors[:, : self.n_majors] & live.unsqueeze(2)).sum(dim=1)
+            hit = (held >= need.unsqueeze(1)) & ~have[:, s] & alive.unsqueeze(1)
+            if bool(hit.count_nonzero()):
+                c0 = cur[:, s]
+                floor = (rc - 1).to(retain.dtype)
+                on_cur = hit & (col == c0.unsqueeze(1))
+                retain[:, s] = torch.where(hit & ~on_cur, torch.maximum(retain[:, s], floor), retain[:, s])
+                cfloor = (rc - 1).gather(1, c0.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
+                prog[:, s] = torch.where(on_cur.any(dim=1), torch.maximum(prog[:, s], cfloor), prog[:, s])
+            # THE PICK where nothing is in hand
             avail = self._available_mask(have[:, s], pre)
-            if not bool(avail.count_nonzero()):
-                continue
             key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
                               torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
-            key = key + torch.arange(key.shape[1], device=self.device, dtype=torch.float64) * 1e-6
+            key = key + torch.arange(n, device=self.device, dtype=torch.float64) * 1e-6
             pick = key.argmin(dim=1)
-            cval = cost.take(pick)
-            fire = alive & avail.any(dim=1) & (prog[:, s] >= cval)
+            go = alive & (cur[:, s] < 0) & avail.any(dim=1)
+            if bool(go.count_nonzero()):
+                ovf[:, s] = torch.where(go, ovf[:, s] + prog[:, s], ovf[:, s])
+                kept = retain[:, s].gather(1, pick.unsqueeze(1)).squeeze(1)
+                prog[:, s] = torch.where(go, kept, prog[:, s])
+                retain[:, s] = torch.where(go.unsqueeze(1) & (col == pick.unsqueeze(1)), torch.zeros_like(retain[:, s]),
+                                           retain[:, s])
+                cur[:, s] = torch.where(go, pick, cur[:, s])
+            # the turn's yield and the overflow
+            prog[:, s] = torch.where(alive, prog[:, s] + add + ovf[:, s], prog[:, s])
+            ovf[:, s] = torch.where(alive, torch.zeros_like(ovf[:, s]), ovf[:, s])
+            # THE COMPLETION
+            c = cur[:, s]
+            cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
+            fire = alive & (c >= 0) & (prog[:, s] >= cval)
             gained = gained + fire.long()
             if bool(fire.count_nonzero()):
-                have[fire, s, pick[fire]] = True
-                prog[fire, s] = prog[fire, s] - cval[fire]
+                have[fire, s, c[fire]] = True
+                prog[:, s] = torch.where(fire, prog[:, s] - cval, prog[:, s])
+                cur[:, s] = torch.where(fire, torch.full_like(c, -1), c)
                 # the minor's record now feeds its own yield walk (`_seat_techs`)
                 self._eff_version += 1
                 if is_tech and self._urban_def_tech >= 0:
-                    self._minor_urban_fit(s, fire & (pick == self._urban_def_tech))
+                    self._minor_urban_fit(s, fire & (c == self._urban_def_tech))
         return gained
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:

@@ -351,6 +351,12 @@ export const INFLUENCE_PER_TURN = 3;
 export const FIRST_MEET_ENVOYS = srcConst('cityState.firstMeetEnvoys', 1,
   xml('GlobalParameters', 'Name=INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET', 'Value'));
 
+/** A MINOR'S CATCH-UP: a technology or civic it lacks that at least
+ *  max(1, (this x majors + 50) / 100) majors hold stands at its cost less one
+ *  (the immediate 50 of 0x4cb930 / 0x39ec60) */
+export const MINOR_CATCHUP_PCT = srcConst('cityState.catchUpPct', 50,
+  { lab: 'tools/civ6lab/dll_readings.md H-1: a minor\'s research catch-up (0x4cb930, 0x39ec60)' });
+
 /** The queue kinds a city-state's envoys pay PRODUCTION TOWARD, per type —
  *  the Industrial rows' EFFECT_ADJUST_CITY_PRODUCTION_BUILDING / _DISTRICT and
  *  the Militaristic rows' EFFECT_ADJUST_CITY_PRODUCTION_UNIT. The text reads

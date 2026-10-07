@@ -179,6 +179,13 @@ export function emptySeat(seat: number): Seat {
   };
 }
 
+/** the majors still in the game, a city or a unit (the player list the
+ *  DLL's research thresholds count: the barbarians' techs 0x14f530, a
+ *  minor's catch-up 0x4cb930 / 0x39ec60) */
+export function majorsAlive(state: GameState): number[] {
+  return state.seats.filter((s) => s.cities.length > 0 || state.units.some((u) => u.seat === s.seat)).map((s) => s.seat);
+}
+
 export function seatOf(state: GameState, seat: number): Seat | undefined {
   // BY ID, not by array position: conquering a city-state removes it from
   // `state.cityStates`, and every survivor after it would otherwise answer as

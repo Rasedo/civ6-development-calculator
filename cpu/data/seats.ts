@@ -475,6 +475,10 @@ export const MOMENT_NEIGHBORHOOD = [moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FI
   moment('DISTRICT_CONSTRUCTED_NEIGHBORHOOD_FIRST_IN_WORLD', 3)] as const;
 export const MOMENT_SEASIDE_RESORT = [moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST', 2),
   moment('IMPROVEMENT_CONSTRUCTED_SEASIDE_RESORT_FIRST_IN_WORLD', 3)] as const;
+/** CIV6 (IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST): "Your civilization
+ *  builds its first improvement on a tile that was enriched by a natural
+ *  disaster." */
+export const MOMENT_DISASTER_IMPROVEMENT = moment('IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST', 1);
 /** CIV6 (FORMATION_*): a seat's first Corps / Army (land), Fleet / Armada
  *  (naval), by formation level 1 / 2 */
 export const MOMENT_FORMATION = {

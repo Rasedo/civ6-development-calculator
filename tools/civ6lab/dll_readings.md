@@ -2775,9 +2775,6 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
   Alhambra reads the old ranking's amenity tier at its border (Content, the
   new cards Displeased) — the tier against the yields the re-slot moves is
   unread there (C-94 LAB).
-- A grown city's border culture reads the luxuries the processing ranked
-  before it grew (1121 t186: Jiaodong 6 -> 7 on its 3, Displeased; t220
-  Shenyang, t238 Taiyuan).
 - Founding (C-94 LAB, unread): every one of the 48 foundings that read a
   luxury at once had a city-state its founder is suzerain of take its turn
   between the founding and the record; 10 of the 16 that read none did too.
@@ -2816,7 +2813,74 @@ hurricane, t212 the meteor, t236 the forest fire, t245 the extreme drought;
 step.eventPick 2,784 -> 2,849 passes over the 26 duels (1119-1128, the
 recordings with the log), 1126 three lower where its flood rivers' order
 already fails (t99, t122, t146 ...). The scale (x1000) is a fit; the
-harness reads it per step (`loadCarbonLog`).
+harness reads it per step (`loadCarbonLog`). Against the sum of the four
+category columns (buildings', projects', routes', units' raw CO2) read
+unscaled, the Total column with the deforestation factor laid back picks
+2,369 against 2,334 over 1119-1128 (1119 +4, 1120 +2, 1121 +3, 1122 +6,
+1123 +16, 1124 +3, 1126 +1; 1125, 1127, 1128 equal).
+
+## H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ
+
+- The luxury allocation (0x4a6110) has two callers: ChangeResourceAmount
+  (0x4a7560 at 0x4a77d4) and the resources step 0x4a8ed0 in Player DoTurn.
+  A city's growth (City::ChangePopulation 0x1c79b0) is neither: the culture
+  its border banks after the growth reads its new size's amenity need on the
+  allocation its seat's processing ranked before the walk. Recorded:
+  runs/h1_duelw1128 Taiyuan t182 (grown to 7 on its two luxuries, Displeased,
+  banks 1175/256 x 1.35; the record after shows a later rebuild's third),
+  Chengdu t196 / t202, Jiaodong t197, Xi'an t200 (each 0.9 of the re-ranked
+  read); runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220
+  Shenyang, t238 Taiyuan. `cultureAfterGrowth`'s `luxMap` /
+  `_culture_after_growth`'s `lux`; over the 26 duels step.border +~300
+  passes, none worse.
+- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid
+  by 0x3d7020, whose one caller is Player DoTurn (0x4e4656, before the
+  resources step 0x4e46c0 and the cities), after the turn's decay (0x3d7270):
+  a city's loss stands as its owner's last processing laid it. Recorded:
+  runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and
+  no amenity lost at record 200, 424 after its t200 decay and one lost at
+  record 201 (the growth at t200 on the Displeased tier). The ledger
+  (Logs/Player_WarWeariness.csv) carries no turn: each "Attacking" row is the
+  attacker's k-th combat against that player in Logs/CombatLog.csv (China's
+  18, Rome's 9 on 1128), each "At War Decay" the processing the turn after
+  the player's row before (`readWeariness`, `wearyAt`).
+
+## H-1: the records' turn order — log readings (no DLL)
+
+- The World Congress resolves at the turn change (the log's
+  WorldCongressFinished row after the last player closed the turn): a
+  player's processing reads the session that stood at its own start
+  (runs/h1_duelw1128 China, the Border Control Treaty's target from session
+  161: banks 161 -> 162 in its turn before the session, holds from 162; its
+  t181 start draws no next plot under the treaty session 181 ends).
+- A citizen a record caught idle stays idle through its city's processing:
+  the citizen manager places it only on a reassign (a growth, an annex, the
+  AI's focus change). This REVERSES the harness's earlier reading that the
+  processing places every idle citizen (1108 Xi'an t207, 1114): on the 26
+  duels the new reading loses no pass and wins 1123 Xi'an t175-181 (one idle
+  for seven turns, the growth banking its surplus), 1128 Nazca t59 / t157 (a
+  Lighthouse, a Shipyard bought in the processing, their slot empty at the
+  growth), 1117 Rome t222 / t223, Xi'an t231, Valletta t92 / t149, 1119
+  Johannesburg t48 / t156, Akkad t76 / t157. The engines' turn still places
+  them (`placeIdleCitizens`; AUDIT C-94 LAB).
+- The event step's fire forms (burning, burnt +1 Food, regrown +1
+  Production) stand before the in-turn player's start (runs/h1_duelw1127
+  Rome t57: its Rainforest regrown at t58, the growth on surplus 7).
+- An era's age reads the score at the turn change: a moment with an id past
+  the player's MOMENT_GAME_ERA_STARTED_* counts toward the new era
+  (runs/h1_duelw1127 Rome t150: 19, a Dark Age, the new era's first
+  technology after it; runs/h1_duelw1108 Rome t180: a great person's +1
+  before it, 62, a Golden Age).
+- The "Random River" draws fall on the turn a river first lies in a major's
+  plots', cities' and units' sight at the close of a turn — the look from the
+  next record's positions — not on its first revealed plot: runs/h1_duelw1128
+  draws t1 x3, 14, 37, 46, 74, 93 against sight 1 x3, 14, 22, 46, 74, 93
+  (river 3's t37 the one miss), runs/h1_duelw1127 t1 x2, 2, 28, 58, 105 all
+  six; the records' revealed plots name river 2 of 1128 at t45 (no draw).
+- The deforestation band the flood rows' warming lays back off the climate
+  log's carbon ("H-1: the world's carbon in the climate log") is the turn-1
+  map's removable features' (`removableAtStart`): runs/h1_duelw1127 t225 and
+  t244, each pick on its recorded river.
 
 ## H-1: the levy's term — READ
 
@@ -2831,6 +2895,44 @@ harness reads it per step (`loadCarbonLog`).
   pairs; 1117 t28 -> t42, 1121 t42 -> t56). The engines: `LEVY_TURNS`
   (`scaleByGameSpeed`), `levyEnds` = the levy turn + LEVY_TURNS - 1 read at
   the minor's start (`minorLevyReturn`, `_minor_levy_return`).
+
+## H-1: a minor's research catch-up — READ
+
+0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler
+0x427bf0 that every player's object runs when a player gains an item
+(`player`, `item`): where the gainer's CivilizationLevel is FULL_CIV
+(0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 /
+0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a
+city-state or the Free Cities — it counts the players of the game's list
++0xb50 (the list 0x14f530 reads for the barbarians' techs: the majors in
+the game) holding the item, and where at least max(1, (len + 1) x 50 / 100)
+do (the immediate 0x32), sets the receiver's progress on the item to its
+cost less one ((cost << 8) - 0x100 through 0x4cc950 / 0x3a1fb0), the item
+in hand or another. Records: runs/h1_duelw1121 Rome's Code of Laws at its
+start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's
+CivicChanged for players 2, 3, 4 and 62 just before Rome's
+CivicCompleted), its Pottery at t6 theirs at 11 of 12, Bronze Working at
+t22 Antioch's 10.5 at 39 of 40; China's Craftsmanship at t11 completes
+Ayutthaya's from 8.98 of 20 at its own start; 1124 Rome's Mining at t17
+Cardiff's at 11 of 12. A major's progress is not touched (China's Code of
+Laws 4.59 of 10 at 1121 t4). The engines read it at the minor's turn
+(`minorCatchUp`, inline in `_minor_research`) and never lower the
+progress; MINOR_CATCHUP_PCT is the 50.
+
+## H-1: a city-state meets a major by a look — PARTLY READ (the records)
+
+A city-state and a major meet when a look of either takes in the other:
+the major's unit sees a plot of the minor's or a unit of its (1121 t33:
+Rome's Warrior two plots from Ayutthaya's Warrior, six from its border;
+1127 t15: Rome's Warrior two from Muscat's), and the minor's unit steps
+where it sees a plot or a unit of the major's, or where the major sees it
+(1124 t10: Granada's Warrior beside Xi'an's coast and China's Builder; the
+first meeting's envoy, `InfluenceGiven`, lands at the step, `DiplomacyMeet`
+later in the turn). The engines: `revealAround`'s meeting and
+`minorLookMeets` / `_reveal_around`, `_minor_look_meets`. Not separated by
+these records (C-94 LAB): the line of a look across a ridge of two plots
+(1124 t28: Cardiff's Warrior at (7,11) and China's Scout at (6,12) met; the
+engines' line between them takes the Rainforest at (7,12) and blocks).
 
 ## DLL rules the engines contradict
 

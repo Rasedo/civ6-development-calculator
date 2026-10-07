@@ -1051,6 +1051,8 @@ export interface CityState extends Seat {
   unconvertedPressure?: number;
   /** its city's district-slot pins (`City.specialistPref`) */
   specialistPref?: number[];
+  /** its city's citizens on neither a plot nor a slot (`City.idleCitizens`) */
+  idleCitizens?: number;
   /** the minor's own BUILD record — `minorBuild` writes these, the tile
    *  planes carry the districts, and the conquest hands the whole set to the
    *  captured City. Absent = nothing built yet. */

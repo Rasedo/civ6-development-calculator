@@ -99,6 +99,19 @@ export function scaleByGameSpeed(n: number): number {
 export const COST_MULTIPLIER_PCT = srcConst('scenario.costMultiplierPct', 50,
   xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier'));
 
+/** A technology's or a civic's percent change in cost by its era against the
+ *  game era: an item of a later era costs this much more, one of an earlier
+ *  era this much less (runs/h1_duelw1121: Horseback Riding 72 of 60 before the
+ *  Classical game era of t31, 60 after; Pottery 10 of 12 after) */
+export const TECH_COST_AFTER_ERA_PCT = srcConst('scenario.techCostAfterEraPct', 20,
+  xml('GlobalParameters', 'Name=TECH_COST_PERCENT_CHANGE_AFTER_GAME_ERA', 'Value'));
+export const TECH_COST_BEFORE_ERA_PCT = srcConst('scenario.techCostBeforeEraPct', -20,
+  xml('GlobalParameters', 'Name=TECH_COST_PERCENT_CHANGE_BEFORE_GAME_ERA', 'Value'));
+export const CIVIC_COST_AFTER_ERA_PCT = srcConst('scenario.civicCostAfterEraPct', 20,
+  xml('GlobalParameters', 'Name=CIVIC_COST_PERCENT_CHANGE_AFTER_GAME_ERA', 'Value'));
+export const CIVIC_COST_BEFORE_ERA_PCT = srcConst('scenario.civicCostBeforeEraPct', -20,
+  xml('GlobalParameters', 'Name=CIVIC_COST_PERCENT_CHANGE_BEFORE_GAME_ERA', 'Value'));
+
 /** THE GAME'S PROGRESS, the denominators: every Technologies and every Civics
  *  row a Gathering Storm game loads, whether or not this engine carries it —
  *  77 and 61 (the harness's price fits, runs/h1_duelw1103 / 1104). */

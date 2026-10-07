@@ -35,7 +35,7 @@ import { isWater } from '../../world/query';
 import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
-  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost } from '../core/game';
+  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs } from '../core/game';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
@@ -44,7 +44,7 @@ import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builde
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
-import { selectResearch, chopGrant, harvestGrant, applyLumpYield } from '../core/economy';
+import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, pillagePlunder } from '../core/economy';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
 import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '../core/governors';
@@ -54,23 +54,28 @@ import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, holdBarbarians, meleeAttack, rangedAttack, terrainDefense } from '../core/combat';
 import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
-import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, routeDestCenter, routeOriginCenter } from '../core/trade';
-import { goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
+import { MINOR_UPGRADE_GOLD } from '../data/cityStates';
+import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
+import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, seatOf, setTileOwner, setWar, unitsOf, BARB_SEAT } from '../core/seats';
+import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
+import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
-import { PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorItem, holdMinorWalk, minorBuilderLays, minorBuyUnit, minorUnitGoldPrice, type MinorItem } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, holdMinorResearch, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS } from '../core/unitActions';
+import { IMPROVEMENTS } from '../data/improvements';
+import { DISTRICTS } from '../data/districts';
+import type { ImprovementId } from '../../world/types';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
@@ -80,7 +85,6 @@ import { streamHold, type StreamHold } from './streamHold';
 import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash } from './aliases';
-import { activateGreatPerson, gpClassOfUnit } from '../core/gpAbility';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -122,6 +126,8 @@ interface Ctx {
   /** the importer's reading of record t+1, the ids every imposed outcome
    *  takes */
   next: Imported;
+  /** the pair's first record */
+  prev: TurnRecord;
   /** decision tallies, by `${kind}` and outcome */
   tally: Map<string, Record<Outcome, number>>;
   /** this pair's fallbacks, by player id */
@@ -187,22 +193,30 @@ function unitOf(ctx: Ctx, key: string): Unit | undefined {
   return u && ctx.state.units.includes(u) ? u : undefined;
 }
 
-/** a record unit as a new engine unit at its recorded plot */
-function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined {
+/** a record unit as an engine unit at its recorded plot, outside the game
+ *  (`spawnRecorded` places it) */
+function recordedUnit(ctx: Ctx, rec: TurnRecord, key: string, id: number): Unit | undefined {
   const u = rec.units.find((x) => `${x.owner}:${x.id}` === key);
   if (!u) return undefined;
   const seat = seatOfP(ctx, u.owner);
   const type = engineRowOf(ctx.cat, 'unit', u.type);
   if (seat === NO_SEAT || !type) return undefined;
   const def = UNITS[type];
-  const unit: Unit = {
-    id: ctx.state.nextUnitId++, type, seat, tileIndex: u.y * ctx.W + u.x,
+  return {
+    id, type, seat, tileIndex: u.y * ctx.W + u.x,
     movesLeft: num(u.moves) * MP_SCALE, movesFull: num(u.maxMoves) * MP_SCALE, hp: UNIT_HP - num(u.damage),
     charges: def.charges !== undefined ? num(u.buildCharges) || num(u.spreadCharges) || def.charges : null,
     xp: num(u.xp), level: num(u.level),
     ...(num(u.formation) > 0 ? { formation: num(u.formation) } : {}),
     ...(bool(u.embarked) ? { embarked: true } : {}),
   };
+}
+
+/** a record unit as a new engine unit at its recorded plot */
+function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined {
+  const unit = recordedUnit(ctx, rec, key, ctx.state.nextUnitId);
+  if (!unit) return undefined;
+  ctx.state.nextUnitId += 1;
   ctx.state.units.push(unit);
   ctx.units.set(key, unit);
   return unit;
@@ -291,7 +305,7 @@ function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
     // receives any (`addEnvoys`): the stored contest, and the ground the
     // minor annexes for them
     if (got < short) addEnvoys(state, cs, seat, short - got);
-    count(ctx, 'envoy', got >= short ? 'applied' : 'fallback', d.player, got >= short ? undefined : 'no token in the engine purse');
+    count(ctx, 'envoy', got >= short ? 'applied' : 'fallback', d.player, got >= short ? undefined : `no token in the engine purse (influence ${r3(s.influencePoints ?? 0)}, ${s.envoysAvailable ?? 0} tokens, met ${cs.met.includes(seat)})`);
   }
 }
 
@@ -390,7 +404,7 @@ function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
     if (i === 0) {
       const ok = placeHead(ctx, actor, city, q);
       const why = ok ? undefined : q.kind === 'building' && city.buildings.includes(q.building) ? 'already standing in the engine city'
-        : q.kind === 'district' || q.kind === 'wonder' ? 'the engine refuses the site' : 'the engine does not offer it';
+        : q.kind === 'district' || q.kind === 'wonder' ? 'the engine refuses the site' : `the engine does not offer ${itemKey(q)} in ${city.name} (pop ${city.population}, buildings ${city.buildings.join('|')}, districts ${city.districts.map((x) => x.type).join('|')})`;
       count(ctx, `queue:${q.kind}`, ok ? 'applied' : 'fallback', d.player, why);
       if (ok && q.kind === 'unit') chargeUnitResource(ctx.state, seat, q.unit, city, q.formation ?? 0);
     }
@@ -746,18 +760,15 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   const actor = seatOf(state, seat) as Seat | undefined;
   const city = cityAt(state, d.city);
   const id = engineRowOf(ctx.cat, 'unit', d.type);
-  const kind = `buyUnit:${d.currency}`;
-  // a city-state's purchase is its script's decision, through the minor's own verb
-  const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat && c.centerIndex === d.city) : undefined;
-  if (minor && id && d.currency === 'gold') {
-    const before = new Set(state.units);
-    const ok = minorBuyUnit(state, minor, id);
-    const made = state.units.find((u) => !before.has(u) && u.seat === seat && u.type === id);
-    if (ok && made) ctx.units.set(d.unit, made);
+  // a city-state's purchase is its AI's, through the minor's own verb
+  const minor = state.cityStates.find((c) => c.centerIndex === d.city && c.seat === seat);
+  if (minor) {
+    const u = id ? minorBuyUnit(state, minor, id, d.currency) : undefined;
+    if (u) ctx.units.set(d.unit, u);
     else spawnRecorded(ctx, rec, d.unit);
-    return void count(ctx, kind, ok && made ? 'applied' : 'fallback', d.player,
-      `minor ${id} price ${minorUnitGoldPrice(state, minor, id)} treasury ${Math.round(minor.treasury)}`);
+    return void count(ctx, 'minorAi:buy', u ? 'applied' : 'fallback', d.player, u ? undefined : `${id} at ${minor.treasury} gold, ${minor.faith} faith`);
   }
+  const kind = `buyUnit:${d.currency}`;
   if (!actor || !city || !id || city.seat !== seat) {
     spawnRecorded(ctx, rec, d.unit);
     return void count(ctx, kind, 'fallback', d.player);
@@ -792,11 +803,13 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
 
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
- *  the units; the research and civic picks last, after the blows whose
+ *  the units, a Trader's route once its unit stands (runs/h1_duelw1117 t44:
+ *  Antananarivo's Trader trained and sent in one turn); the research and
+ *  civic picks last, after the blows whose
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'pillage', 'gpActivate', 'unitNew', 'routes', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
   const { state, next } = ctx;
@@ -1029,6 +1042,33 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const s = seatOf(state, seat);
         const r = seatOf(next.state, seat)?.religion;
         if (!s || !r) { count(ctx, 'religion', 'refused', d.player); break; }
+        // the beliefs the record's religion holds that the engine's lacks, the
+        // player's picks, through the engine's own verb (`adoptBeliefs`: the
+        // Follower first at a founding), its holy city where the record's
+        // Great Prophet founded it
+        const picks: [number, number][] = [];
+        BELIEF_SLOTS.forEach((slot, c) => {
+          const id = r[slot];
+          if (id && !s.religion[slot]) picks.push([c, Object.keys(BELIEF_CATALOGS[c]).indexOf(id)]);
+        });
+        picks.sort((x, y) => (x[0] === BELIEF_CLASS_FOLLOWER ? -1 : y[0] === BELIEF_CLASS_FOLLOWER ? 1 : x[0] - y[0]));
+        const holyAt = typeof r.holyTile === 'number' ? r.holyTile : undefined;
+        // a founding spends the seat's Great Prophet on the holy city's Holy
+        // Site (`activateGreatPerson`), where the record's founded it
+        if (!s.religion.founded && r.founded && prophetsOf(s as Seat) === 0) {
+          const prophet = state.units.find((u) => u.seat === seat && u.type === 'PROPHET');
+          const holy = holyAt !== undefined ? cityAt(state, holyAt) : undefined;
+          // its Holy Site, else a wonder of its where a Prophet may found
+          // (Stonehenge: runs/h1_duelw1117 China t34)
+          const sites = holy ? [...holy.districts.filter((x) => x.type === 'HOLY_SITE').map((x) => x.tileIndex), ...holy.wonders.map((w) => w.tileIndex)] : [];
+          const site = prophet ? sites.find((p) => { prophet.tileIndex = p; return gpActivateOk(state, prophet); }) : undefined;
+          if (prophet && site !== undefined) {
+            prophet.tileIndex = site;
+            activateGreatPerson(state, prophet);
+          }
+        }
+        const adopted = picks.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, picks, holyAt) : { ok: false, reason: 'no belief to adopt' };
+        if (adopted.ok) { count(ctx, 'religion', 'applied'); break; }
         const founding = !s.religion.founded && r.founded;
         // the founding's moment, as the engine's own founding pays it
         if (founding) religionMoment(state, seat);
@@ -1041,7 +1081,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           holy.religionPressure = [...(read.religionPressure ?? [])];
           holy.followedReligion = read.followedReligion;
         }
-        count(ctx, 'religion', 'fallback', d.player);
+        count(ctx, 'religion', 'fallback', d.player, `${adopted.reason} [${state.units.filter((u) => u.seat === seat).map((u) => `${u.type}:${u.gpAt ?? '-'}`).join(' ')}]`);
         break;
       }
       case 'governors': {
@@ -1095,8 +1135,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           const dst = routeDestCenter(next.state, nextOwner, r);
           if (o < 0 || dst < 0 || have.has(key(o, dst))) continue;
           const from = cityAt(state, o);
+          const minor = isCityStateSeat(seat) ? state.cityStates.find((c) => c.seat === seat && c.centerIndex === o) : undefined;
           let res: { ok: boolean; reason?: string } = { ok: false, reason: 'no engine city at the origin' };
-          if (from && from.seat === seat) {
+          if (minor) {
+            // a city-state's Trader goes where its AI sent it; a major's city
+            // it names is the engine's at that centre
+            const to = r.toSeatCity !== undefined ? cityAt(state, dst) : undefined;
+            res = r.toCs !== undefined ? minorRouteTo(state, minor, { from: -1, to: -1, toCs: r.toCs })
+              : to ? minorRouteTo(state, minor, { from: -1, to: -1, toSeat: to.seat, toSeatCity: to.id })
+                : { ok: false, reason: 'no engine city at the destination' };
+          } else if (from && from.seat === seat) {
             if (r.toCs !== undefined) res = addCsTradeRoute(state, from.id, r.toCs, seat);
             else if (r.toSeat !== undefined && r.toSeat !== seat) {
               const to = cityAt(state, dst);
@@ -1169,16 +1217,27 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           break;
         }
         // a unit an engine verb of this phase made (a wonder a charge
-        // completed grants its Great Person) is the record's
-        if (major) matchNewUnits(ctx, b);
+        // completed grants its Great Person, a minor's harvest completes its
+        // item) is the record's
+        matchNewUnits(ctx, b);
         if ((d.why === 'trained' && major) || unitOf(ctx, d.unit)) break;
         spawnRecorded(ctx, b, d.unit);
-        count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player);
+        count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
         break;
       }
-      case 'move':
+      case 'move': {
         if (d.path) ctx.paths.set(d.unit, d.path);
+        // a unit the pair lost walked the log's steps before it fell, and saw
+        // from each (runs/h1_duelw1124 t13: Rome's Scout steps beside the
+        // Giant's Causeway, finds it, and dies to a barbarian later in the
+        // turn); the units record t+1 holds walk at `syncUnits`
+        const u = unitOf(ctx, d.unit);
+        if (!u || !d.path?.length || b.units.some((r) => `${r.owner}:${r.id}` === d.unit)) break;
+        u.fortifyTurns = 0;
+        for (const p of d.path) revealAround(state, u.seat, p, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+        u.tileIndex = d.path[d.path.length - 1];
         break;
+      }
       case 'camp': {
         const u = unitOf(ctx, d.unit);
         if (!u || !state.barbSeat.camps.includes(d.plot)) { count(ctx, 'camp', 'refused', d.player); break; }
@@ -1203,7 +1262,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!s || !t.goodyHut) { count(ctx, 'village', 'refused', d.player); break; }
         t.goodyHut = false;
         goodyMoment(state, s.seat);
-        const enterer = d.unit ? unitOf(ctx, d.unit) : undefined;
+        // a unit the log names that the engine never made (its production
+        // or its battles went otherwise) still enters: the reward is drawn
+        // for the record's unit, standing outside the engine's game
+        const enterer = d.unit ? unitOf(ctx, d.unit) ?? recordedUnit(ctx, b, d.unit, -1) ?? recordedUnit(ctx, ctx.prev, d.unit, -1) : undefined;
         if (enterer) {
           enterer.tileIndex = d.plot;
           drawAndPayGoody(state, enterer, t);
@@ -1234,7 +1296,27 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             if (id) markBoost(state, s.seat, id);
           }
         }
-        count(ctx, 'village', 'fallback', d.player);
+        count(ctx, 'village', 'fallback', d.player, d.unit ? `${d.unit} not in record t+1` : 'no unit the log names');
+        break;
+      }
+      case 'pillage': {
+        // the order is the unit's, from the plot the log names: the wrecked
+        // improvement or district pays its plunder row (`pillagePlunder`)
+        const u = unitOf(ctx, d.unit);
+        const t = state.map.tiles[d.plot];
+        if (!u || !t) { count(ctx, 'pillage', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        u.tileIndex = d.plot;
+        if (t.improvement && !t.pillaged) {
+          t.pillaged = true;
+          pillagePlunder(state, u, IMPROVEMENTS[t.improvement as ImprovementId]?.plunder, false, t.improvement, tileSeat(t));
+          u.movesLeft = 0;
+          count(ctx, 'pillage', 'applied');
+        } else if (t.district && t.district !== 'CITY_CENTER' && t.districtComplete && !t.districtPillaged) {
+          t.districtPillaged = true;
+          pillagePlunder(state, u, DISTRICTS[t.district].plunder, true);
+          u.movesLeft = 0;
+          count(ctx, 'pillage', 'applied');
+        } else count(ctx, 'pillage', 'refused', d.player, 'nothing standing to pillage');
         break;
       }
       case 'upgrade': {
@@ -1248,13 +1330,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const r = b.units.find((x) => `${x.owner}:${x.id}` === d.into);
         if (r) u.tileIndex = r.y * ctx.W + r.x;
         if (u.movesLeft <= 0) u.movesLeft = grantedMoves(state, u);
-        const res = upgradeUnit(state, u, u.seat);
+        // a city-state's upgrade is its AI's, through the minor's own verb
+        const minor = isCityStateSeat(u.seat) ? state.cityStates.find((c) => c.seat === u.seat) : undefined;
+        const res = minor ? (minorUpgradeUnit(state, minor, u) ? { ok: true } : { ok: false, reason: `the minor may not upgrade ${u.type}->${UNITS[u.type]?.upgradesTo} (gold ${r3(minor.treasury)}, plot seat ${tileSeat(state.map.tiles[u.tileIndex])}, techs ${minor.research.techs.join('|')})` })
+          : upgradeUnit(state, u, u.seat);
         ctx.units.delete(d.unit);
         ctx.units.set(d.into, u);
         if (!res.ok) {
           const t = r ? engineRowOf(ctx.cat, 'unit', r.type) : null;
           const s = seatOf(state, u.seat);
-          if (s) s.treasury -= upgradeGoldCost(state, u.seat, u.type, u.leviedFrom !== undefined, u.formation ?? 0);
+          if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : upgradeGoldCost(state, u.seat, u.type, u.leviedFrom !== undefined, u.formation ?? 0);
           if (t) u.type = t;
           u.movesLeft = 0;
           // the upgrade the record made raises its seat's bests as the verb's does
@@ -1355,6 +1440,22 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
     }
   }
+}
+
+/** THE ACTIVE PLAYER'S BOOSTS land in its actions, before its next start
+ *  (`detectBoosts`: a natural wonder its steps revealed — runs/h1_duelw1124
+ *  t13, Rome's Scout completes Astrology at 23 of 25, exactly, before its
+ *  start); an item a boost completed hands over to the one its queue holds
+ *  next, which record t+1 shows in hand (its Mining, 3.5 after the start) —
+ *  the player's pick, through the engine's own (`applyResearch`). */
+function activeBoosts(ctx: Ctx, b: TurnRecord, player: number): void {
+  const s = ctx.state.seats[seatOfP(ctx, player)];
+  if (!s?.cities.length) return;
+  const had = [s.research.tech, s.research.civic];
+  detectBoosts(ctx.state, s.seat);
+  const p1 = b.players.find((p) => p.id === player);
+  if (had[0] && !s.research.tech && num(p1?.researching) >= 0) applyResearch(ctx, player, num(p1?.researching), false);
+  if (had[1] && !s.research.civic && num(p1?.civic) >= 0) applyResearch(ctx, player, num(p1?.civic), true);
 }
 
 /** THE KILLS' BOOSTS. Combat is the record's (`combat` falls back), so the
@@ -1554,22 +1655,28 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[]): void {
   for (const t of state.map.tiles) {
     if ((t.improvement ?? null) === before[t.index]) continue;
     if (t.ownerSeat >= 0 && t.ownerSeat < state.seats.length) continue;
+    // a change that lands where the game's own did is the game's
+    if ((t.improvement ?? null) === (next.state.map.tiles[t.index].improvement ?? null)) continue;
+    const was = t.improvement;
     t.improvement = next.state.map.tiles[t.index].improvement;
-    count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat));
+    count(ctx, 'minorAi:improve', 'fallback', ctx.playerOfSeat.get(t.ownerSeat), `plot ${t.index}: the engine laid ${was}, the game ${t.improvement}`);
   }
 }
 
 /** THE DEDICATIONS are each player's pick at its age's start, which the
- *  engines' own round robin stands in for: each seat holds the ones record
- *  t+1 shows (runs/h1_duelw1117 Rome's Dark Age from t31 holds none, where the
- *  round robin's paid +1 on a boost at t35) */
+ *  engines' own round robin stands in for: each seat commits the ones record
+ *  t+1 shows through the engine's verb (`commitDedications`; runs/
+ *  h1_duelw1117 Rome's Dark Age from t31 holds none, where the round robin's
+ *  paid +1 on a boost at t35); a set the verb refuses is the record's */
 function syncDedications(ctx: Ctx): void {
   ctx.state.seats.forEach((s, seat) => {
     const want = seatOf(ctx.next.state, seat)?.dedicationPicks ?? [];
     if ((s.dedicationPicks ?? []).join() === want.join()) return;
+    const res = commitDedications(ctx.state, seat, want);
+    if (res.ok) return void count(ctx, 'dedications', 'applied');
     s.dedicationPicks = [...want];
     s.dedications = want.length;
-    count(ctx, 'dedications', 'fallback', ctx.playerOfSeat.get(seat));
+    count(ctx, 'dedications', 'fallback', ctx.playerOfSeat.get(seat), res.reason);
   });
 }
 
@@ -1796,7 +1903,7 @@ const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read
  *  a seat's purse, research, government, or a city's state flows into all */
 const IMPOSES_ON: Record<string, readonly string[]> = {
   combat: UNITS_SUBS, hit: UNITS_SUBS, levyEnd: UNITS_SUBS, gpActivate: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
-  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS,
+  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:buy': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
   'draw:camps': ['plots.improvement', 'barb.camps'],
@@ -1902,9 +2009,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
   holdMinorItem(minorItems(recs, cat));
+  holdMinorResearch(minorResearchPicks(recs, cat, first.playerOfSeat));
   // a city-state's army moves and fights as the record's moves and battles
-  // say (`syncUnits`, `battle`): the engine's walk for it is its AI's
-  holdMinorWalk(true);
+  // say (`syncUnits`, `battle`), its Builders lay what the record's
+  // improvements carry (`improve`), it buys what the log's purchases name
+  // (`buyUnit`) and its Trader goes where the record's routes run (`routes`):
+  // the engine's stand-ins for those are its AI's
+  holdMinorOrders(true);
   holdCityStrikes(true);
   const state = first.state;
   // each seat starts on the plots the record says it revealed
@@ -1921,7 +2032,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream,
+    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
   };
   // the record's units in the importer's order
   let k = 0;
@@ -1954,6 +2065,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     advanceHistory(history, b, cat);
     const read = importTurn(b, cat, history);
     ctx.next = read;
+    ctx.prev = a;
     ctx.fellBack = new Map();
     ctx.imposed = new Map();
     ctx.battled = new Set();
@@ -1968,6 +2080,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the active player's units stand where its actions left them before its
     // next start (`endTurn`'s seat phase): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
+    activeBoosts(ctx, b, activePlayer(a));
     const envoysWere = stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
@@ -2052,13 +2165,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
-    // A CITY-STATE'S BUILDERS lay what its AI picks, which the record's
-    // improvements carry (`improve`): the engine's own pick sits the turn out,
-    // its charges kept (runs/h1_duelw1115 Yerevan's Builder: the engine's
-    // pick spent its last charge at t8, the game's held it to t9)
-    const minorBuilders = state.units.filter((u) => isCityStateSeat(u.seat) && u.type === 'BUILDER' && (u.charges ?? 0) > 0)
-      .map((u) => [u, u.charges] as const);
-    for (const [u] of minorBuilders) u.charges = 0;
     // A PANTHEON is its player's decision (`pantheon`), which the game's AI
     // takes when it will, not on the first turn its faith covers the price
     // (runs/h1_duelw1118 China: 12 Faith at t28, founded at t29): the
@@ -2066,6 +2172,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const claimed = state.claimedPantheons;
     state.claimedPantheons = Object.keys(PANTHEONS);
     const rosters = new Map(state.seats.map((s) => [s.seat, structuredClone(governorsOf(s))]));
+    // THE ACTIVE PLAYER'S START runs first in the engine's turn, and in the
+    // game after the city-states' starts the record's pair holds (record
+    // t+1 is read in its turn): their catch-up counts its research as its
+    // actions left it (runs/h1_duelw1121: Rome's Code of Laws at its start
+    // of t4, every minor's done at its own start of t4)
+    const active = state.seats[seatOfP(ctx, activePlayer(a))];
+    holdMinorCatchUp(active ? new Map([[active.seat, { techs: [...active.research.techs], civics: [...active.research.civics] }]]) : null);
+    // ...and the game era it opens comes after every other player's start and
+    // actions of the pair: their research prices read the era before
+    // (runs/h1_duelw1121: Horseback Riding at 72 for the minors through their
+    // turn 30, Rome's Wheel at 32 in its start of t31)
+    const eraWas = state.gameEra ?? 0;
+    holdResearchEra(new Map([...state.seats.filter((s) => s !== active).map((s) => s.seat), ...state.cityStates.map((c) => c.seat)]
+      .map((seat) => [seat, eraWas] as const)));
     stream.actions(null);
     try {
       endTurn(state);
@@ -2075,6 +2195,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     } finally {
       state.claimedPantheons = claimed;
     }
+    holdMinorCatchUp(null);
     undoGovernorScript(state, rosters);
     stream.actions(a.turn);
     for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
@@ -2086,7 +2207,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // heal is taken at the health the blows left
     for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
     state.units.push(...barbs);
-    for (const [u, charges] of minorBuilders) u.charges = charges;
     verifyPolicies(ctx, staged);
     verifyEnvoys(ctx, envoysWere);
     matchNewUnits(ctx, b);
@@ -2099,6 +2219,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat));
     }
     undoMinorPlots(ctx, improvements);
+    // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
+    if (TRACE.has('minorProd')) {
+      for (const cs of state.cityStates) {
+        const us = state.units.filter((u) => u.seat === cs.seat).map((u) => `${u.type}@${u.tileIndex}`);
+        console.error(`t${traceTurn} minor ${cs.id} ${cs.name} item ${cs.prodItem ?? '-'} ${r3(cs.prodProgress ?? 0)} over ${r3(cs.prodOverflow ?? 0)} gold ${r3(cs.treasury)} routes ${(cs.tradeRoutes ?? []).length} [${us.join(' ')}] tech ${cs.research.techs.join(',')} cur ${cs.research.tech} ${r3(cs.research.techProgress)} ovf ${r3(cs.research.techOverflow ?? 0)} civic ${cs.research.civics.join(',')} ${r3(cs.research.civicProgress)} met [${cs.met}] envoys ${JSON.stringify(cs.envoys)}`);
+      }
+    }
     // the record's units the engine's own turn destroyed: a kill the log
     // names on one of them was the engine's to pay, and it paid it
     const live = new Set(state.units);
@@ -2137,6 +2264,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // after every seat's actions
     recordMoments(state);
     killBoosts(ctx, read);
+    holdResearchEra(null);
     const t = compareState(state, read);
     compareUnits(ctx, b, t);
     note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
@@ -2195,7 +2323,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
   holdMinorItem(null);
-  holdMinorWalk(false);
+  holdMinorResearch(null);
+  holdMinorCatchUp(null);
+  holdResearchEra(null);
+  holdMinorOrders(false);
   holdCityStrikes(false);
   holdBarbarians(null);
   return report;
@@ -2214,6 +2345,21 @@ function minorItems(recs: readonly TurnRecord[], cat: Catalog) {
     const rec = byTurn.get(state.turn);
     const c = rec?.cities.find((x) => x.y * rec.head.W + x.x === cs.centerIndex);
     return rec && c ? minorHead(cat, c, rec.head.W) : undefined;
+  };
+}
+
+/** THE CITY-STATES' RESEARCH PICKS: what a city-state researches is its AI's
+ *  pick, taken on a completion, so the item it works at its turn t is the
+ *  one record t shows (runs/h1_duelw1121 Antioch: Pottery done at t6,
+ *  Astrology at 0 in record t7, then Animal Husbandry over the cheaper
+ *  Mining at t16). The engine's own research step works it. */
+function minorResearchPicks(recs: readonly TurnRecord[], cat: Catalog, playerOfSeat: Map<number, number>) {
+  const byTurn = new Map(recs.map((r) => [r.turn, r]));
+  return (state: GameState, cs: CityState, civic: boolean): string | undefined => {
+    const p = byTurn.get(state.turn)?.players.find((x) => x.id === playerOfSeat.get(cs.seat));
+    const row = num(civic ? p?.civic : p?.researching);
+    if (!(row >= 0)) return undefined;
+    return (civic ? engineId('civic', cat.civics[row], 'CIVIC_', CIVICS) : engineId('tech', cat.techs[row], 'TECH_', TECHS)) ?? undefined;
   };
 }
 

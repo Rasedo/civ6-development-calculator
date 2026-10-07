@@ -84,6 +84,7 @@ import { projectCost, settlerCost, unitStepCost } from '../core/game';
 import { builderCost, rangedCombatOf, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
+import { standingRemovable } from '../core/climate';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from './aliases';
@@ -617,6 +618,11 @@ export interface History {
   /** the game's own draw log (`Logs/RandCalls.csv`, `randLog.ts`), where the
    *  recording kept it */
   randLog?: RandLog;
+  /** the war-weariness ledger on the timeline (`readWeariness`), where the
+   *  recording kept its logs */
+  weary?: WearyRow[];
+  /** the removable features of the turn-1 record (`GameState.removableAtStart`) */
+  removableAtStart?: number;
   /** by `${turn}:${owner}:${city id}`, a city's closing-pick ties as the
    *  record of that turn left them, for the start of that turn the next
    *  record witnesses: with no plot claimed (`open`) and with the stored plot
@@ -666,6 +672,73 @@ export interface LuxCards {
   chosen: string;
   policies: string[];
   lapsed: string[];
+}
+
+/** A war-weariness ledger row (`Logs/Player_WarWeariness.csv`) placed on the
+ *  game's timeline: the player's new total against `from`, in `actor`'s turn
+ *  `turn` — its processing (stage 0) or its actions (stage 1). */
+export interface WearyRow { player: number; from: number; total: number; turn: number; actor: number; stage: 0 | 1 }
+
+/**
+ * The war-weariness ledger on the game's timeline. The log carries no turn:
+ * each "Attacking" row is the attacker's combat against `from`, the k-th
+ * such row the k-th such combat of `Logs/CombatLog.csv` (which has its turn);
+ * an "At War Decay" row is the player's processing the turn after its row
+ * before; a "Getting Attacked" row stands in the turn of the row before it,
+ * in the attacker's actions (runs/h1_duelw1128 t196-204: China's 18 attacks
+ * and Rome's 9 the combat log's, every decay between them). Undefined where
+ * a row cannot be placed (a reason this reading does not know, more attacks
+ * than combats).
+ */
+export function readWeariness(ledger: string, combats: string): WearyRow[] | undefined {
+  const turnsOf = new Map<string, number[]>();
+  for (const line of combats.split('\n').slice(1)) {
+    const c = line.split(',').map((s) => s.trim());
+    if (c.length < 3 || c[0] === '') continue;
+    const k = `${Number(c[1])}:${Number(c[2])}`;
+    turnsOf.set(k, [...(turnsOf.get(k) ?? []), Number(c[0])]);
+  }
+  const out: WearyRow[] = [];
+  const used = new Map<string, number>();
+  for (const line of ledger.split('\n').slice(1)) {
+    const c = line.split(',').map((s) => s.trim());
+    if (c.length < 5) continue;
+    const [player, from, total] = [Number(c[0]), Number(c[1]), Number(c[3])];
+    const last = out.length ? out[out.length - 1] : undefined;
+    if (c[4] === 'Attacking') {
+      const k = `${player}:${from}`;
+      const n = used.get(k) ?? 0;
+      const turn = turnsOf.get(k)?.[n];
+      if (turn === undefined) return undefined;
+      used.set(k, n + 1);
+      out.push({ player, from, total, turn, actor: player, stage: 1 });
+    } else if (c[4] === 'At War Decay') {
+      const mine = out.filter((r) => r.player === player && r.from === from).pop();
+      if (!mine) return undefined;
+      out.push({ player, from, total, turn: mine.turn + 1, actor: player, stage: 0 });
+    } else if (c[4] === 'Getting Attacked' && last) {
+      out.push({ player, from, total, turn: last.turn, actor: from, stage: 1 });
+    } else return undefined;
+  }
+  return out;
+}
+
+/** Each player's war weariness against each other at a point of the turn
+ *  order — before `actor`'s turn-`turn` stage `stage` — by engine seat. */
+export function wearyAt(rows: readonly WearyRow[], seatOfPlayer: Map<number, number>, turn: number, actor: number,
+  stage: 0 | 1): Map<number, Record<number, number>> {
+  const before = (r: WearyRow) => r.turn < turn || (r.turn === turn && (r.actor < actor || (r.actor === actor && r.stage < stage)));
+  const out = new Map<number, Record<number, number>>();
+  for (const r of rows) {
+    if (!before(r)) continue;
+    const s = seatOfPlayer.get(r.player);
+    const o = seatOfPlayer.get(r.from);
+    if (s === undefined || o === undefined) continue;
+    const ww = out.get(s) ?? {};
+    ww[o] = r.total;
+    out.set(s, ww);
+  }
+  return out;
 }
 
 /** A record route's identity: its Trader and its two cities. */
@@ -1610,8 +1683,17 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         const y = plotAt(rec, i)[P.yields] as number[];
         const y0 = plotAt(h.last, i)[P.yields] as number[];
         const lost = was ? FEATURES[FEATURE_ID[was] ?? strip(was, 'FEATURE_')]?.yields ?? {} : {};
+        // and an improvement the eruption destroyed or pillaged gave its
+        // base yields up with it (runs/h1_duelw1109 plot 536 t55: a Mine
+        // gone, the soil's +1 Production in its place)
+        const imp0 = plotAt(h.last, i)[P.improvement] as number;
+        const standing = imp0 >= 0 && !plotAt(h.last, i)[P.improvementPillaged];
+        const gone = standing && ((plotAt(rec, i)[P.improvement] as number) !== imp0 || !!plotAt(rec, i)[P.improvementPillaged]);
+        const impId = gone ? engineId('improvement', cat.improvements[imp0] ?? '', 'IMPROVEMENT_', IMPROVEMENTS) : null;
+        const lostImp = (impId ? IMPROVEMENTS[impId as ImprovementId]?.yields : undefined) ?? {};
         const gain = (k: number, key: 'food' | 'production' | 'science') =>
-          Math.max(0, (y?.[k] ?? 0) - (y0?.[k] ?? 0) + ((lost as Partial<Record<string, number>>)[key] ?? 0));
+          Math.max(0, (y?.[k] ?? 0) - (y0?.[k] ?? 0) + ((lost as Partial<Record<string, number>>)[key] ?? 0)
+            + ((lostImp as Partial<Record<string, number>>)[key] ?? 0));
         addEvent(i, gain(0, 'food'), gain(1, 'production'), gain(3, 'science'));
       }
       if (now.startsWith('FEATURE_BURNT_')) h.fireFood.set(i, (h.fireFood.get(i) ?? 0) + 1);
@@ -1964,6 +2046,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const lowlandsRead = importLowlands(rec, tiles);
   // the sea level the records' events reached: one climate phase per rise
   if (history?.floods) state.climateIdx = history.seaLevel - 1;
+  // the removable features the map started with, the deforestation level's
+  // base (`deforestationLevel`): the turn-1 record's (runs/h1_duelw1127 t225
+  // and t244: the level past its 10% cut, the carbon unscaled)
+  if (history && history.removableAtStart === undefined && rec.turn === 1) history.removableAtStart = standingRemovable(state.map);
+  if (history?.removableAtStart !== undefined) state.removableAtStart = history.removableAtStart;
   // the National Parks: each plot names its park by the park's lowest plot
   const parksRead = Array.isArray(rec.parks);
   for (const [, plots] of parksRead ? rec.parks as [string, number[]][] : []) {
@@ -2246,7 +2333,19 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       // its citizens pinned as a major's are: the minor's walk works the
       // game's plots
-      for (const q of c.worked) if (q !== center && !tiles[q].district) tiles[q].locked = true;
+      let plots = 0;
+      for (const q of c.worked) {
+        if (q === center || tiles[q].district) continue;
+        tiles[q].locked = true;
+        plots += 1;
+      }
+      // the rest stand idle, as a major's do (runs/h1_duelw1128 Nazca t59:
+      // six citizens, four plots worked, the Harbor's slot open and empty)
+      const idle = c.pop - plots - pins.reduce((n, p) => n + Math.max(0, p), 0);
+      if (idle > 0) {
+        minor.idleCitizens = idle;
+        for (let i = 0; i < pins.length; i++) if (pins[i] < 0) pins[i] = 0;
+      } else delete minor.idleCitizens;
       continue;
     }
     const holder = seatOf(state, seat);
@@ -2310,9 +2409,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     if (num(c.governor) >= 0 && rec.players.find((q) => q.id === c.owner)?.governors === undefined) {
       gap(ctx, 'governor', 'not in the record');
     }
-    // the amenities war weariness and a gold shortfall take: the engine's
-    // weariness and shortfall ledgers are not in the dump
-    if (num(c.amenityParts?.[13]) > 0) gap(ctx, 'war-weariness', 'not imported');
+    // the amenities war weariness takes: the game's ledger where the recording
+    // kept its logs (`History.weary`, on the seats below); a gold shortfall's:
+    // the engine's shortfall ledger is not in the dump
+    if (num(c.amenityParts?.[13]) > 0 && !history?.weary) gap(ctx, 'war-weariness', 'not imported');
     if (num(c.amenityParts?.[14]) > 0 && !shortfallRead.has(c.owner)) gap(ctx, 'bankruptcy', 'not imported');
   }
 
@@ -2446,6 +2546,19 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const now = importCongress(rec.congress, rec, cat, state, religionSeat, seatOfGame);
   const before = history?.congressBefore !== undefined
     ? importCongress(history.congressBefore, rec, cat, state, religionSeat, seatOfGame) : now;
+  // each seat's war weariness as the ledger stood at its last processing,
+  // its decay in, its actions not: the amenities it costs are what that
+  // processing laid (runs/h1_duelw1128 Xi'an: 474 after China's attacks of
+  // t199 and no amenity lost at record 200; 424 after its decay of t200, one
+  // lost at record 201)
+  if (history?.weary) {
+    const inTurn = rec.players.find((p) => bool(p.turnActive))?.id ?? num(rec.head.localPlayer);
+    for (const s of state.seats) {
+      const pid = playerOfSeat.get(s.seat);
+      if (pid === undefined) continue;
+      s.ww = wearyAt(history.weary, seatOfPlayer, pid <= inTurn ? rec.turn : rec.turn - 1, pid, 1).get(s.seat) ?? {};
+    }
+  }
   const active = rec.players.find((p) => bool(p.turnActive));
   const congressOf = (seat: number): NonNullable<GameState['congress']> =>
     active !== undefined && (playerOfSeat.get(seat) ?? Infinity) <= active.id ? now.list : before.list;
@@ -3596,6 +3709,11 @@ function importProjectYield(state: GameState, cat: Catalog, c: DumpCity, prev: D
     const any = before ?? head(c);
     return any ? YIELD_KEYS.indexOf(PROJECTS[any].yield!) : -1;
   }
+  // a project the record before shows unstarted takes its first step on the
+  // overflow store a completion left, which no record holds (runs/h1_duelw1128
+  // Shanghai t177: the University's overflow, 17.03 converted where the
+  // city made 11)
+  if (before && num(prev!.queueProgress?.[0]) === 0) return YIELD_KEYS.indexOf(PROJECTS[before].yield!);
   if (before) {
     const def = PROJECTS[before];
     const production = num(prev!.yields[1]);

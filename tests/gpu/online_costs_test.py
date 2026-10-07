@@ -63,12 +63,13 @@ def test_costs(sim) -> None:
 
 def test_culture_after_growth(sim) -> None:
     row, j = 0, 0
-    cul = sim._seat_city_stats(row, record=False)[0][:, j, 4].clone()
+    read = sim._seat_city_stats(row, record=False)
+    cul, lux = read[0][:, j, 4].clone(), read[4]
     pop0 = sim.city_pop[:, row, j].clone()
-    same = sim._culture_after_growth(row, j, pop0, cul)
+    same = sim._culture_after_growth(row, j, pop0, cul, lux)
     assert torch.equal(same, cul), "a column that did not grow was read again"
     sim.city_pop[:, row, j] += 1
-    again = sim._culture_after_growth(row, j, pop0, cul)
+    again = sim._culture_after_growth(row, j, pop0, cul, lux)
     fresh_read = sim._seat_city_stats(row, record=False)[0][:, j, 4]
     assert float(again[B0]) == float(fresh_read[B0]), (float(again[B0]), float(fresh_read[B0]))
     assert float(again[B0]) > float(cul[B0]), "the new citizen paid no culture"

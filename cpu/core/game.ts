@@ -1558,11 +1558,14 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
  * the first player's start (its draw log, `Logs/RandCalls.csv`: runs/
  * h1_duelw1117 t40's last "Unit Combat Damage" and "Random Direction" draws,
  * then t41's volcano roll and event roll, then player 0's start); then the
+ * game era and Ages of the turn the starts open (`gameEraTurn`: runs/
+ * h1_duelw1121 t31, the Classical era's research prices in Rome's start and
+ * in every record from t31); then the
  * players' starts one
  * at a time in ascending player id — the majors, the city-states, the Free
  * Cities (16 of 16 turns); then the World Congress session
  * and the heal of every unit and every city, before the counter moves; then,
- * on the new turn, the era and Ages, and the victory checks. The majors'
+ * on the new turn, the victory checks. The majors'
  * actions follow, between two turns.
  */
 export function endTurn(state: GameState): void {
@@ -1570,6 +1573,7 @@ export function endTurn(state: GameState): void {
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   if (state.unitsMode) releaseBarbarians(state);
+  if (gameEraTurn(state, state.turn + 1)) eraInspirations(state);
   seatPhase(state);
   minorPhase(state);
   freeCitiesPhase(state);
@@ -1580,7 +1584,6 @@ export function endTurn(state: GameState): void {
 
   state.turn += 1;
   recordMoments(state);
-  if (gameEraTurn(state)) eraInspirations(state);
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
   // per completed laser station, and the win fires on ARRIVAL, not launch.
   // Ascending seat order + the victoryType guard: a same-turn tie goes to the
@@ -2107,9 +2110,11 @@ export function enhanceableClasses(state: GameState, seat: number): number[] {
  * picks, the Follower first, then a belief of another class. ENHANCING
  * (`canEnhanceReligion`): `beliefPicks` beliefs, each of a different class the
  * religion still lacks that has a belief left. Every pick names a belief no
- * religion holds. A set that does not fit is refused entire.
+ * religion holds. A set that does not fit is refused entire. The holy city is
+ * the seat's city at `holyTile` (where its Great Prophet founded), else its
+ * capital.
  */
-export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[]): RuleResult {
+export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[], holyTile?: number): RuleResult {
   const sx = seatOf(state, seat);
   if (!sx) return { ok: false, reason: 'No such seat.' };
   const rel = sx.religion;
@@ -2143,7 +2148,7 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
     rel.beliefsEarned = RELIGION_INITIAL_BELIEFS;
     rel.name = RELIGION_NAMES[seat % RELIGION_NAMES.length];
     religionMoment(state, seat);
-    rel.holyTile = (sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
+    rel.holyTile = (sx.cities.find((c) => c.centerIndex === holyTile) ?? sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
     grantFoundingPressure(state, seat);
     state.eventLog.push(`${sx.name} founded ${rel.name}.`);
   } else {

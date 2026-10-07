@@ -228,13 +228,13 @@ def main() -> None:
     assert bool((d_civic == 120.0).all()), f"Writer overflow lump wrong (want 2x60): {d_civic.tolist()}"
     assert int((sim.city_gw_obj[:, 0] >= 0).sum()) == gw0, "no AMPHITHEATER -> no slotted work"
 
-    # --- a seat-0 PROPHET banks its faith-column effect at the SPEND --------
-    # Confucius (PROPHET class 3, roster idx 0) carries fx.faith; `_gp_apply`
-    # banks it into the seat's faith total, and the claim before it only
+    # --- a seat-0 PROPHET pays no lump at the SPEND: its one act founds -----
+    # Confucius (PROPHET class 3, roster idx 0) carries no fx.faith; `_gp_apply`
+    # banks nothing into the seat's faith total, and the claim before it only
     # stands the Prophet up as a unit.
     assert sim._gp_effects.shape[2] > 4, "gpEffects must carry the faith column"
     pc = int(rr["prophetCls"])  # 3
-    assert float(sim._gp_effects[pc, 0, 4]) == 60.0, "Confucius pays the Classical lump"
+    assert float(sim._gp_effects[pc, 0, 4]) == 0.0, "a Prophet pays no lump"
     faith0 = sim.civ_faith[:, 0].clone()
     pe0 = sim.gp_earned[:, pc].clone()
     # the draw is random within the era pool — claim the OTHER Classical
@@ -257,7 +257,7 @@ def main() -> None:
     hc_p = sim.city_center[:, 0, 0].clamp(min=0)
     sim._gp_apply(0, torch.ones(sim.B, dtype=torch.bool, device=sim.device), sc_p, hc_p)
     d_faith = sim.civ_faith[:, 0] - faith0
-    assert bool((d_faith == 60.0).all()), f"seat-0 faith bank wrong: {d_faith.tolist()}"
+    assert bool((d_faith == 0.0).all()), f"a Prophet's spend banked faith: {d_faith.tolist()}"
 
     # snapshot/restore round-trips the GP tensors + the faith bank
     # and the belief state (all registered in _MUTABLE).
@@ -271,6 +271,7 @@ def main() -> None:
     sim.city_followed[0, 0, 0] = 0
     _off7 = int(sim.gp_offer[0, 7])
     _pr7 = float(sim.gp_price[0, 7])
+    _faith = float(sim.civ_faith[0, 0])
     snap = sim.snapshot()
     sim.gp_earned[:, 7] = 0
     sim.gp_claimed[:, 7, :] = False
@@ -289,7 +290,7 @@ def main() -> None:
     assert int(sim.gp_earned[0, 7]) >= 1, "gp_earned not preserved across snapshot"
     assert bool(sim.gp_claimed[0, 7].any()), "gp_claimed not preserved across snapshot"
     assert int(sim.gp_offer[0, 7]) == _off7 and float(sim.gp_price[0, 7]) == _pr7,         "gp_offer/gp_price not preserved across snapshot"
-    assert float(sim.civ_faith[0, 0]) >= 60.0, "faith not preserved across snapshot"
+    assert float(sim.civ_faith[0, 0]) == _faith, "faith not preserved across snapshot"
     assert bool(sim.enh_claimed[0, 2]) and int(sim.civ_enhancer[0, 1]) == 2 and int(sim.civ_beliefs_earned[0, 1]) == 3, \
         "enhancer state not preserved across snapshot"
     assert bool(sim.wor_claimed[0, 3]) and int(sim.civ_worship[0, 1]) == 3, "worship state not preserved across snapshot"

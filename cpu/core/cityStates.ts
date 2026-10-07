@@ -685,5 +685,6 @@ export function minorCity(cityState: CityState): City {
     religionPressure: cityState.religionPressure,
     unconvertedPressure: cityState.unconvertedPressure,
     specialistPref: cityState.specialistPref,
+    idleCitizens: cityState.idleCitizens,
   };
 }

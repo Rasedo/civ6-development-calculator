@@ -21,7 +21,7 @@ import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffs
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, isBarbSeat, isTerritorial, seatOfCityState, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
@@ -36,11 +36,6 @@ import {
   DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness,
   type BarbTag, type BarbTribeDef,
 } from '../data/barbarians';
-
-/** the majors still in the game: a city or a unit */
-function majorsAlive(state: GameState): number[] {
-  return state.seats.filter((s) => s.cities.length > 0 || state.units.some((u) => u.seat === s.seat)).map((s) => s.seat);
-}
 
 /**
  * THE BARBARIANS' TECHS AND CIVICS (0x14f530): each the barbarians lack that

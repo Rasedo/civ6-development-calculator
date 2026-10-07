@@ -18,7 +18,7 @@
  * adjacency rides them from `districtMoment` as the district completes.
  * `_moment_*` on the GPU is the twin.
  */
-import type { City, DistrictId, GameState } from './types';
+import type { City, DistrictId, GameState, Tile } from './types';
 import { addEraScore } from './eras';
 import { isCiv, seatOf } from './seats';
 import { isExplored } from './fog';
@@ -44,7 +44,7 @@ import {
   MOMENT_UNIQUE_IMPROVEMENT, MOMENT_NEIGHBORHOOD, MOMENT_SEASIDE_RESORT, MOMENT_MAX_BELIEFS,
   MOMENT_GOVERNORS_ALL, MOMENT_TRADING_POST_ALL, MOMENT_FIND_WONDER, MOMENT_FIRST_SUZERAIN,
   MOMENT_NEAR_WONDER, MOMENT_NEAR_FLOOD, MOMENT_NEAR_VOLCANO, MOMENT_LARGEST, MOMENT_HIGH_ADJACENCY,
-  MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT, MOMENT_POWER_FROM_RESOURCE,
+  MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT, MOMENT_POWER_FROM_RESOURCE, MOMENT_DISASTER_IMPROVEMENT,
 } from '../data/seats';
 
 type Pay = readonly [number, number];
@@ -88,6 +88,9 @@ export const DISTRICT_UNIQUE_KEY: Record<string, number> = Object.fromEntries(Ob
   .filter((d) => (d.civVariants ?? []).length > 0)
   .map((d) => [d.id, add(`UNIQUE_DISTRICT:${d.id}`, one(MOMENT_UNIQUE_DISTRICT))]));
 export const NEIGHBORHOOD_KEY = add('NEIGHBORHOOD', MOMENT_NEIGHBORHOOD);
+/** an improvement the seat lays on a plot a natural disaster enriched
+ *  (`improvementMoment`) */
+export const DISASTER_IMPROVEMENT_KEY = add('DISASTER_IMPROVEMENT', one(MOMENT_DISASTER_IMPROVEMENT));
 /** an improvement on the seat's land: a unique one, the Seaside Resort */
 export const IMPROVEMENT_KEY: Record<string, number> = Object.fromEntries(Object.values(IMPROVEMENTS)
   .filter((m) => m.uniqueTo || m.uniqueLeader || m.id === 'SEASIDE_RESORT')
@@ -149,6 +152,18 @@ export function recordMoment(state: GameState, seat: number, k: number): void {
   if (pay > 0) addEraScore(state, seat, pay);
   insertSorted(seen, k);
   insertSorted(world, k);
+}
+
+/** CIV6 (IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST): major `seat`
+ *  lays an improvement on `t` — a plot a natural disaster enriched (its
+ *  fertility) records the key; an improvement standing when a disaster
+ *  enriches its plot records nothing (runs/h1_duelw1117 China: its Farms
+ *  under the floods of t13-22 none, a Farm laid on t38's flood plot the
+ *  moment). `_moment_disaster_improvement` is the twin. */
+export function improvementMoment(state: GameState, seat: number, t: Tile): void {
+  if (t.fertility > 0 || t.fertilityProd > 0 || (t.fertilitySci ?? 0) > 0 || (t.fertilityCul ?? 0) > 0) {
+    recordMoment(state, seat, DISASTER_IMPROVEMENT_KEY);
+  }
 }
 
 /** CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): major `seat` records the

@@ -241,6 +241,13 @@ class SimGp:
         # ...or the City Center (-2), which the district plane never encodes:
         # the centre registry answers it
         a_dist = a_dist | (own & (sdist == -2) & (self.centre_slot_at.gather(1, tc) >= 0))
+        # ...or, for a Prophet, a complete wonder of this seat that allows a
+        # holy city (Stonehenge's AllowsHolyCity)
+        if self._wond_n and self._prophet_cls >= 0 and bool(self._wond_religion_site.any()) \
+                and bool((ok & (cls == self._prophet_cls)).count_nonzero()):
+            _rs = self.city_wonder[:, row, : self.RC][:, :, self._wond_religion_site].reshape(self.B, -1)
+            _on = ((tc.unsqueeze(2) == _rs.unsqueeze(1)) & (_rs >= 0).unsqueeze(1)).any(dim=2)
+            a_dist = a_dist | (own & (cls == self._prophet_cls) & _on & self.built_wonder_complete.gather(1, tc))
         # 1 anywhere the unit can already stand
         a_any = torch.ones_like(a_dist)
         # 2 a city of this seat with an open slot taking one of the person's

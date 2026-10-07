@@ -256,6 +256,14 @@ class SimInit:
         self.citystate_civics = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.bool, device=device)
         self.citystate_tech_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_civic_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the item in hand per tree (-1 none), the progress kept on the others
+        # and the overflow a completion set aside — a major's own shape
+        self.citystate_cur_tech = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_cur_civic = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_tech_retain = torch.zeros(B, s_pad, len(rules.t_cost), dtype=torch.float64, device=device)
+        self.citystate_civic_retain = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.float64, device=device)
+        self.citystate_tech_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        self.citystate_civic_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
         # spent down the fitted build table. The built results live on the
         # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)
@@ -4767,6 +4775,7 @@ class SimInit:
         self._mk_hood_d = int(m["neighborhoodDistrict"])
         self._mk_hood = int(m["neighborhoodKey"])
         self._mk_imp = torch.tensor(m["improvementKey"] or [-1], dtype=torch.long, device=device)
+        self._mk_disaster_imp = int(m["disasterImprovementKey"])
         self._mk_beliefs = int(m["maxBeliefsKey"])
         self._mk_governors = int(m["governorsAllKey"])
         self._mk_posts = int(m["tradingPostAllKey"])

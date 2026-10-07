@@ -73,7 +73,7 @@ describe("a city-state's route", () => {
     expect(pick.toCs).not.toBe(far.id);
 
     const trader = spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat)!;
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     expect(state.units.includes(trader)).toBe(false);
     expect(cs.tradeRoutes).toHaveLength(1);
     const r = cs.tradeRoutes![0];
@@ -84,7 +84,7 @@ describe("a city-state's route", () => {
     expect(r.course![0]).toBe(cs.centerIndex);
     expect(r.course![r.course!.length - 1]).toBe(routeDestCenter(state, cs, r));
     // no free Trader, no second route; the one it runs is no candidate again
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     expect(cs.tradeRoutes).toHaveLength(1);
   });
 
@@ -93,7 +93,7 @@ describe("a city-state's route", () => {
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
     const before = cityTradeYields(state, minorCity(cs));
     expect(sum(before)).toBe(0);
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     expect(cs.tradeRoutes![0].toCs).toBe(near.id);
     expect(cityTradeYields(state, minorCity(cs))).toEqual(cityStateRouteYields(state, near));
   });
@@ -101,7 +101,7 @@ describe("a city-state's route", () => {
   it('walks toward its destination and comes home with its Trader at the end of its term', () => {
     const { state, cs } = scene();
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     const r = cs.tradeRoutes![0];
     const exp = r.expiresTurn!;
     const firstGold = cityTradeYields(state, minorCity(cs)).gold;
@@ -109,7 +109,7 @@ describe("a city-state's route", () => {
     for (let turn = state.turn + 1; turn < exp + 40 && (cs.tradeRoutes ?? []).length > 0; turn++) {
       state.turn = turn;
       const at = r.walkTile;
-      minorTrade(state, cs);
+      minorTrade(state, cs, true);
       if (r.walkTile !== at) moved = true;
     }
     expect(moved).toBe(true);
@@ -120,7 +120,7 @@ describe("a city-state's route", () => {
     // cities, and its next route there pays the post's +1 Gold
     const dest = routeDestCenter(state, cs, r);
     expect(cs.tradingPosts).toEqual([cs.centerIndex, dest].sort((a, b) => a - b));
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     expect(routeDestCenter(state, cs, cs.tradeRoutes![0])).toBe(dest);
     expect(cityTradeYields(state, minorCity(cs)).gold).toBe(firstGold + 1);
   });
@@ -131,7 +131,7 @@ describe("a city-state's route", () => {
     const cap = settleAt(state, tileAtCoords(state.map, 5, 14).index, 0);
     cs.met = [0];
     spawnUnit(state, 'TRADER', cs.centerIndex, cs.seat);
-    minorTrade(state, cs);
+    minorTrade(state, cs, true);
     expect(cs.tradeRoutes![0].toSeatCity).toBe(cap.id);
     state.seats[0].treasury = 1000;
     expect(declareWarOnCityState(state, cs.id, 0).ok).toBe(true);

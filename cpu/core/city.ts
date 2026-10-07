@@ -285,10 +285,8 @@ export function tileScore(y: Yields, focus: FocusId): number {
  * has it in hand, and passing it keeps this the ONE place the citizen count
  * is spelled.
  */
-/** The turn's processing places every citizen the player left idle: its
- *  stats walk works all of them again (runs/h1_duelw1108 Xi'an t207: the
- *  record's idle citizen works a Food plot by the bank, +4 Food where the
- *  record's surplus read 2; 1114: 41 such banks). */
+/** The seat's processing puts every citizen the player left idle back to
+ *  work: its stats walk works all of them again. */
 export function placeIdleCitizens(cities: readonly City[]): void {
   for (const c of cities) c.idleCitizens = undefined;
 }

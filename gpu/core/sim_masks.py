@@ -107,7 +107,10 @@ class SimMasks:
         pop = self.city_pop[:, row]
         seat = int(self._ROW_SEAT[row])
         mine = (self.tile_seat == seat) & (self.improvement >= 0) & ~self.pillaged
-        has_res = (self.res_id >= 0) & ~self.res_stripped
+        # a resource the seat cannot see is plain ground to its boosts
+        # (runs/h1_duelw1124 t9: China's Farm on Horses before Animal
+        # Husbandry lands no Irrigation)
+        has_res = (self.res_id >= 0) & ~self.res_stripped & ~self._res_hidden(row)
         repl = tab["repl"]
         nu = repl.numel()
         ar = torch.arange(nu, device=dev)
@@ -2904,10 +2907,14 @@ class SimMasks:
                 kandy.extend([(b, g)] * (fresh * k))
         self.seat_explored[rows, seat_row] |= disk
         # a minor is MET the moment the look takes in a plot of its
-        # territory (`revealAround`'s meeting)
+        # territory or a unit of its (`revealAround`'s meeting)
         if self.S > 0:
             _own = self.tile_seat[rows]
-            _seen = torch.stack([(disk & (_own == 100 + s)).any(dim=1) for s in range(self.S)], dim=1)
+            _ua = self.major_unit_alive[rows]
+            _us = self.major_unit_seat[rows]
+            _uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & _ua
+            _seen = torch.stack([(disk & (_own == 100 + s)).any(dim=1) | (_uin & (_us == 100 + s)).any(dim=1)
+                                 for s in range(self.S)], dim=1)
             if bool(_seen.count_nonzero()):
                 self._meet_citystates(rows, seat_row, _seen)
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
@@ -3003,6 +3010,45 @@ class SimMasks:
         pick = torch.where(up < BIG, up, lo)
         on_tunnel = tun.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(on_tunnel & (pick < BIG) & (tiles >= 0), pick, out)
+
+    def _minor_look_meets(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
+                          see_through: torch.Tensor) -> None:
+        """`minorLookMeets`: minor `s` ([K] long)'s unit stands on `tiles`
+        ([K]) and looks, in the games `rows` ([K], unique); every major one of
+        whose plots or units the look takes in meets it (`_meet_citystates`),
+        and so does every major that sees the plot (`seatSeesPlot`), the
+        majors in seat order. No-op with fog off, as `revealAround` gates."""
+        if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
+            return
+        at = tiles.clamp(min=0)
+        disk = self._los_disk(rows, at, radius, see_through)
+        own = self.tile_seat[rows]
+        uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & self.major_unit_alive[rows]
+        us = self.major_unit_seat[rows]
+        col = torch.nn.functional.one_hot(s.clamp(min=0), self.S).bool()
+        dist = self.pair_dist[at].long()  # [K, T]
+        ctr = self._centre_seat_plane()[rows]
+        for g in range(self.n_majors):
+            seen = (disk & (own == g)).any(dim=1) | (uin & (us == g)).any(dim=1)
+            # `seatSeesPlot`: its plot or one beside, a centre within two, a
+            # unit whose sight reaches the plot
+            seen = seen | ((own == g) & (dist <= 1)).any(dim=1) | ((ctr == g) & (dist <= 2)).any(dim=1)
+            ut_all = self.major_unit_tile[rows].clamp(min=0)
+            mine = self.major_unit_alive[rows] & (us == g)
+            near = mine & (dist.gather(1, ut_all) <= 8)
+            for j in near.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                k = (near[:, j] & ~seen).nonzero(as_tuple=True)[0]
+                if k.numel() == 0:
+                    continue
+                kr = rows[k]
+                utp = self.unit_type[kr, j]
+                upr = self.unit_promos[kr, j]
+                rad = self._unit_sight(utp, upr, self.unit_seat[kr, j], kr)
+                look = self._los_disk(kr, self.unit_tile[kr, j].clamp(min=0), rad, self._sees_through(utp, upr))
+                seen[k] = seen[k] | look.gather(1, at[k].unsqueeze(1)).squeeze(1)
+            if bool(seen.count_nonzero()):
+                k = seen.nonzero(as_tuple=True)[0]
+                self._meet_citystates(rows[k], g, col[k])
 
     def _meet_citystates(self, rows: torch.Tensor, seat_row, seen: torch.Tensor | None = None) -> None:
         """`meetCityState` for every live minor `seen` ([K, S]; None: its
@@ -3153,12 +3199,18 @@ class SimMasks:
         self.major_unit_seat[rows, slot] = seat
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
-        # revealAround is a MAJOR's alone ("nothing reads a city-state's fog")
+        # revealAround: a MAJOR's look lifts its fog ("nothing reads a
+        # city-state's fog"); a city-state's unit's look meets the majors it
+        # takes in (`minorLookMeets`)
         if not minor:
             self._reveal_around(rows, row, spot.take(rows),
                                 self._unit_sight(type_idx.take(rows), torch.zeros_like(slot),
                                                  torch.full_like(slot, row), rows),
                                 see_through=self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
+        elif 100 <= seat < 100 + self.S:
+            self._minor_look_meets(rows, torch.full_like(slot, seat - 100), spot.take(rows),
+                                   self._unit_sight(type_idx.take(rows), torch.zeros_like(slot)),
+                                   self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat["unitHp"]
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1

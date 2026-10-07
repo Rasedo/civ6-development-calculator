@@ -1876,6 +1876,67 @@
           ]
         },
         {
+          "name": "minorCurrentTech",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.tech"
+          ],
+          "planes": [
+            "citystate_cur_tech"
+          ]
+        },
+        {
+          "name": "minorCurrentCivic",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civic"
+          ],
+          "planes": [
+            "citystate_cur_civic"
+          ]
+        },
+        {
+          "name": "minorTechOverflow",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.techOverflow"
+          ],
+          "planes": [
+            "citystate_tech_ovf"
+          ]
+        },
+        {
+          "name": "minorCivicOverflow",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.civicOverflow"
+          ],
+          "planes": [
+            "citystate_civic_ovf"
+          ]
+        },
+        {
+          "name": "minorTechRetained",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.techRetained"
+          ],
+          "planes": [
+            "citystate_tech_retain"
+          ],
+          "note": "the progress kept on the techs not in hand, in table order"
+        },
+        {
+          "name": "minorCivicRetained",
+          "compare": "milli",
+          "covers": [
+            "ResearchState.civicRetained"
+          ],
+          "planes": [
+            "citystate_civic_retain"
+          ]
+        },
+        {
           "name": "prodProgress",
           "compare": "milli",
           "covers": [
@@ -2537,7 +2598,7 @@
           "planes": [
             "city_idle"
           ],
-          "note": "the citizens the city holds on no plot and in no slot until its next turn start places them."
+          "note": "the citizens the city holds on no plot and in no slot until the engine's next turn start places them."
         },
         {
           "name": "specialistPref",
@@ -3702,6 +3763,10 @@
       {
         "path": "CityState.specialistPref",
         "why": "the H-1 importer's pins from a recorded game; no engine path writes a minor's."
+      },
+      {
+        "path": "CityState.idleCitizens",
+        "why": "the H-1 importer's idle citizens from a recorded game; no engine path writes a minor's."
       },
       {
         "path": "GameState.cityStateMax",

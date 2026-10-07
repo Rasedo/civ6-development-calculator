@@ -12,7 +12,7 @@
  * - which rivers are named (a river floods once named): as many as the log's
  *   "Random River" draws before the step, those the majors' sight reached
  *   first — the union over every record so far of what each major's plots,
- *   cities and units reveal (`initFog`);
+ *   cities and units show (`initFog`), at the record and as turn t closes;
  * - which volcanoes are active: the log's choices ("Choose Active" wakes,
  *   "Choose Inactive" puts to sleep), each the logged index into the
  *   candidates (a wake's the sleeping named ones) in the volcano vector's
@@ -27,13 +27,13 @@
  * Warming reads the world's carbon the game's climate log holds for the
  * step (`loadCarbonLog`: 1121 t189 / t203 / t241, the flood rows warmed by
  * 0.57 / 0.92 / 1.24 degrees, pick FLOOD_MAJOR at Tarim and FLOOD_MODERATE at
- * the Arno where the unwarmed table picks the other river), else the imported
- * state's.
+ * the Arno where the unwarmed table picks the other river; 1127 t225 / t244
+ * each on its recorded river), else the imported state's.
  */
 import type { GameState, Tile } from '../core/types';
 import type { CheckResult } from './checks';
-import type { Catalog, TurnRecord } from './record';
-import type { Imported } from './import';
+import { P, type Catalog, type TurnRecord } from './record';
+import { engineRowOf, type Imported } from './import';
 import type { RandLog } from './randLog';
 import { droughtStarts, eventAt, eventTable, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
 import type { GameMap } from '../../world/types';
@@ -41,7 +41,8 @@ import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
 import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters';
 import { ERUPTION_ROWS, STORM_EVENTS } from '../data/disasters';
-import { initFog } from '../core/fog';
+import { canSee, initFog, unitSeesThrough, unitSight } from '../core/fog';
+import { tilesWithin } from '../../world/hex';
 import { isCiv } from '../core/seats';
 import { deforestationLevel } from '../core/climate';
 import { deforestationModifier } from '../data/climate';
@@ -76,6 +77,30 @@ function sitePlots(t: EventTable, i: number, k: number): Tile[] | null {
 }
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : -1);
+
+/** What a major's own plots, cities and units show at a record's positions
+ *  (`initFog`'s look: each plot it owns and its ring, each city 3 plots, each
+ *  unit its sight cut by the line of sight), marked into `acc`. */
+function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, seat: number, acc: Uint8Array): void {
+  const { map } = state;
+  const W = rec.head.W;
+  const look = (q: number, radius: number, seeThrough?: boolean) => {
+    const t = map.tiles[q];
+    if (!t) return;
+    for (const n of tilesWithin(map, t.col, t.row, radius)) {
+      if (seeThrough === undefined || canSee(map, t, n, seeThrough)) acc[n.index] = 1;
+    }
+  };
+  rec.map.forEach((row, y) => row.forEach((p, x) => { if (num(p[P.owner]) === pid) look(y * W + x, 1); }));
+  for (const c of rec.cities) if (c.owner === pid) look(c.y * W + c.x, 3);
+  for (const u of rec.units) {
+    if (u.owner !== pid) continue;
+    const type = engineRowOf(cat, 'unit', u.type);
+    if (!type) continue;
+    const unit = { type, seat };
+    look(u.y * W + u.x, unitSight(unit, state), unitSeesThrough(unit));
+  }
+}
 
 export class EventPicks {
   /** every event the records showed: its turn, its RandomEvents type, its
@@ -125,6 +150,14 @@ export class EventPicks {
       let acc = this.explored.get(s.seat);
       if (!acc) this.explored.set(s.seat, (acc = new Uint8Array(state.map.tiles.length)));
       s.explored.forEach((v, i) => { if (v) acc![i] = 1; });
+      // and what it sees as turn t closes, before the step's roll: the same
+      // look from the next record's positions (a record is written at the
+      // in-turn player's start, after every other player's turn t; the log's
+      // "Random River" draws fall on the turn a river first lies in that
+      // look: runs/h1_duelw1128 t1, 14, 46, 74, 93, runs/h1_duelw1127 every
+      // draw t1-t105)
+      const pid = imp.playerOfSeat.get(s.seat);
+      if (next && pid !== undefined) sightIn(state, next, this.cat, pid, s.seat, acc);
       s.explored = Array.from(acc);
     }
     riverLists(state.map).forEach((r, i) => {
@@ -144,20 +177,25 @@ export class EventPicks {
     const tiles = state.map.tiles;
     const firedBefore = tiles.map((t) => t.eventFired);
     const activeBefore = tiles.map((t) => t.volcanoActive);
-    // the world's carbon at the step, the deforestation factor laid back off
-    // it (`worldCarbon`), all on the first seat
+    // the world's carbon at the step, which the records do not carry: the
+    // climate log's where the recording kept it (`loadCarbonLog`), the
+    // deforestation factor of the turn-1 map's base laid back off it, all on
+    // the first seat
     const co2Before = state.seats.map((s) => s.co2);
     const carbon = this.carbon?.get(T);
     if (carbon !== undefined) {
       state.seats.forEach((s, i) => { s.co2 = i === 0 ? carbon / (1 + deforestationModifier(deforestationLevel(state))) : 0; });
     }
     try {
-      return this.pick(state, T);
+      // with no next record the step's event is unknown (the dump ends, or
+      // the record after was written mid-turn)
+      const out = this.pick(state, T);
+      return next ? out : out.map((r) => ({ turn: r.turn, check: r.check, subject: r.subject, ok: true, skip: 'no t+1' }));
     } finally {
-      state.seats.forEach((s, i) => { s.co2 = co2Before[i]; });
       state.seats.forEach((s, i) => { s.explored = saved[i]; });
       [state.unitsMode, state.fogOfWar] = flags;
       tiles.forEach((t, i) => { t.eventFired = firedBefore[i]; t.volcanoActive = activeBefore[i]; });
+      state.seats.forEach((s, i) => { s.co2 = co2Before[i]; });
     }
   }
 

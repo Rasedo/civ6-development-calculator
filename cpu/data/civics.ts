@@ -8,6 +8,9 @@ export interface CivicDef {
   name: string;
   era: Era;
   cost: number;
+  /** the install's Standard-speed Cost, which the game's era terms scale
+   *  before the speed floors it (`researchCost`) */
+  baseCost: number;
   prereqs: string[];
   effects: ResearchEffect[];
   /** CIV6 (`Repeatable`): the row stays researchable once complete, and each
@@ -488,7 +491,7 @@ const C = (
   prereqs: string[],
   effects: ResearchEffect[] = [],
 ): CivicDef => ({
-  id, name, era, cost: scaleByGameSpeed(cost), prereqs, effects,
+  id, name, era, cost: scaleByGameSpeed(cost), baseCost: cost, prereqs, effects,
   ...(CIVIC_SRC[id] ? { src: CIVIC_SRC[id] } : {}),
 });
 

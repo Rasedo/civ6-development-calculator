@@ -40,7 +40,7 @@ def run_to(sim, to: int) -> list[list[int]]:
     while sim.turn < to:
         sim.turn += 1
         was = sim.game_era.clone()
-        sim._game_era_turn()
+        sim._game_era_turn(int(sim.turn))
         for b in range(sim.B):
             if int(sim.game_era[b]) != int(was[b]):
                 began[b].append(int(sim.turn))
@@ -86,7 +86,7 @@ def test_bars(rules, path) -> None:
     sim.era_score[:, 0] = 40
     sim.dark_ages[:, 0] = 1  # a Dark age entered before
     ncity = int(sim.city_alive[0, 0].long().sum())
-    sim._enter_era(torch.tensor([True, False]))
+    sim._enter_era(torch.tensor([True, False]), int(sim.turn))
     assert sim.game_era.tolist() == [1, 0]
     # 40 ≥ the start Golden bar: a Golden age, out of a Normal one
     assert int(sim.civ_age[0, 0]) == 2 and int(sim.golden_ages[0, 0]) == 1
@@ -176,6 +176,32 @@ def test_formation_and_encampment(rules, path) -> None:
     print("  6 once keys OK: a Corps and a full Encampment, in their game alone")
 
 
+def test_disaster_improvement(rules, path) -> None:
+    """7. An improvement laid on a plot a natural disaster enriched records
+    its once key (`improvementMoment`): one on a plain plot records nothing,
+    one on an enriched plot pays the row once, in its game alone; an
+    improvement standing on an enriched plot holds no key."""
+    sim = build(rules, path)
+    row = 0
+    k = sim._mk_disaster_imp
+    t = int((sim.tile_seat[0] < 0).nonzero(as_tuple=True)[0][0])
+    sim.tile_seat[:, t] = row
+    rows = torch.tensor([0], dtype=torch.long, device=sim.device)
+    tiles = torch.tensor([t], dtype=torch.long, device=sim.device)
+    before = sim.era_score[:, row].clone()
+    sim._moment_disaster_improvement(row, rows, tiles)
+    assert not bool(sim.moment_seen[:, row, k].any()), "an improvement on a plain plot recorded the key"
+    sim.fertility[0, t] = 1
+    sim.improvement[:, t] = 0
+    assert not bool(sim._moment_held(row)[:, k].any()), "a standing improvement held the key"
+    sim._moment_disaster_improvement(row, rows, tiles)
+    sim._moment_disaster_improvement(row, rows, tiles)
+    assert sim.moment_seen[:, row, k].tolist() == [True, False], "the enriched improvement's key"
+    paid = (sim.era_score[:, row] - before).tolist()
+    assert paid == [int(sim._mk_world[k]), 0], f"the key paid {paid}"
+    print("  7 disaster improvement OK: an improvement laid on an enriched plot, once, in its game alone")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -188,6 +214,7 @@ def main() -> None:
     test_moments(rules, p)
     test_high_adjacency(rules, p)
     test_formation_and_encampment(rules, p)
+    test_disaster_improvement(rules, p)
     print("GAME_ERA OK")
 
 

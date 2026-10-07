@@ -190,21 +190,21 @@ export function transferMoments(state: GameState, fromSeat: number, toSeat: numb
   else if (city.origCapitalSeat === fromSeat) addEraScore(state, toSeat, MOMENT_FOREIGN_CAPITAL);
 }
 
-/** The GAME ERA (`ERA_MIN_TURNS`'s rule) — runs right AFTER `state.turn += 1`
- *  in endTurn, the GPU's `_game_era_turn` at its own turn increment. Starts
+/** The GAME ERA (`ERA_MIN_TURNS`'s rule) on the turn `turn` opens — endTurn runs it
+ *  before the starts of that turn, the GPU's `_game_era_turn` alike. Starts
  *  the countdown when the era's minimum less the countdown has come and
  *  either its maximum less the countdown has too or at least half the major
  *  seats (eliminated ones counted) stand in a later era by their techs and
  *  civics; ticks a running one; begins the next era (`enterEra`) the turn it
  *  runs out. True on that turn. */
-export function gameEraTurn(state: GameState): boolean {
+export function gameEraTurn(state: GameState, turn = state.turn): boolean {
   const eras = state.seats.map((sx) => civEraIndex(sx.research.techs, sx.research.civics));
-  const next = eraCountdownStep(state.gameEra ?? 0, state.eraStartTurn ?? 1, state.eraCountdown ?? -1, state.turn, eras);
+  const next = eraCountdownStep(state.gameEra ?? 0, state.eraStartTurn ?? 1, state.eraCountdown ?? -1, turn, eras);
   if (next !== ERA_BEGINS) {
     state.eraCountdown = next;
     return false;
   }
-  enterEra(state);
+  enterEra(state, turn);
   return true;
 }
 
@@ -230,10 +230,10 @@ export function eraCountdownStep(era: number, start: number, countdown: number, 
 
 /** A new GAME ERA begins: its index and first turn, the road tier it brings,
  *  and each major seat's Age, dedications and next bars (`ageBars`). */
-export function enterEra(state: GameState): void {
+export function enterEra(state: GameState, turn = state.turn): void {
   const era = (state.gameEra ?? 0) + 1;
   state.gameEra = era;
-  state.eraStartTurn = state.turn;
+  state.eraStartTurn = turn;
   state.eraCountdown = -1;
   // CIV6: "all roads in your territory will upgrade to the next level
   // automatically" on reaching the era that brings the tier.
@@ -404,6 +404,24 @@ export function unitKillEvent(
  * Sky and Stars' era-keyed Eurekas and Automaton Warfare's free Giant Death
  * Robot. Everything else a golden face does is a standing read.
  */
+/** A SEAT COMMITS ITS DEDICATIONS for the age (a player's pick, which
+ *  `enterEra`'s round robin stands in for): each one the game era's window
+ *  offers, no more than the age allows; a Golden Age's grants land for the
+ *  ones newly taken. */
+export function commitDedications(state: GameState, seat: number, picks: readonly number[]): { ok: boolean; reason?: string } {
+  const s = seatOf(state, seat);
+  if (!s) return { ok: false, reason: 'no such seat' };
+  const era = state.gameEra ?? 0;
+  const window = DEDICATION_ERAS[Math.min(era, DEDICATION_ERAS.length - 1)];
+  if (picks.some((p) => !window.includes(p))) return { ok: false, reason: `a dedication outside era ${era}'s window` };
+  if (picks.length > (s.dedications ?? 1)) return { ok: false, reason: `${picks.length} dedications where the age allows ${s.dedications ?? 1}` };
+  const old = s.dedicationPicks ?? [];
+  s.dedicationPicks = [...picks];
+  const added = picks.filter((p) => !old.includes(p));
+  if (added.includes(DED_SKY) || added.includes(DED_AUTOMATON)) commitGoldenGrants(state, seat, era);
+  return { ok: true };
+}
+
 function commitGoldenGrants(state: GameState, seat: number, era: number): void {
   if (!goldenDedication(state, seat, DED_SKY) && !goldenDedication(state, seat, DED_AUTOMATON)) return;
   const owner = seatOf(state, seat);

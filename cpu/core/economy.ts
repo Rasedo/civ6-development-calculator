@@ -1,9 +1,9 @@
 
-import { seatOf, tileSeat, cityAtTile, citiesOf, isCiv, unitSeat , leaderOf, enkiduAllies, unitsOf, NO_SEAT } from './seats';
+import { seatOf, tileSeat, cityAtTile, citiesOf, isCiv, unitSeat , leaderOf, enkiduAllies, unitsOf, isCityStateSeat, NO_SEAT } from './seats';
 import { HARDRADA_PILLAGE, ENKIDU_SHARE_RANGE } from '../data/civilizations';
 import { hexDistance } from '../../world/hex';
 
-import type { City, GameState, PlunderKind, PlunderRow, ResearchState, Seat, Tile, Unit, YieldKey } from './types';
+import type { City, CityState, GameState, PlunderKind, PlunderRow, ResearchState, Seat, Tile, Unit, YieldKey } from './types';
 import { getModifiers } from './effects';
 import { UNIT_HP } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -11,8 +11,11 @@ import { governorTileMult } from './governors';
 import { computeUnlocksIn } from './effects';
 import { repairDrip } from './rules';
 import { FEATURES } from '../../world/features';
-import { GAME_COST_ESCALATION, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
+import { CIVIC_COST_AFTER_ERA_PCT, CIVIC_COST_BEFORE_ERA_PCT, COST_MULTIPLIER_PCT, GAME_COST_ESCALATION, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, TECH_COST_AFTER_ERA_PCT, TECH_COST_BEFORE_ERA_PCT, gameProgressPct, scaleByGameSpeed } from '../data/constants';
+import { ERAS, TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
+import { minorLump } from './minorBuild';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -29,6 +32,30 @@ import { RESOURCES } from '../../world/resources';
  * Selecting the SAME id is a no-op rather than a park-and-reload, so a record
  * that re-states the current pick cannot round-trip the pool through the map.
  */
+/** A TECHNOLOGY'S OR A CIVIC'S COST: its Standard Cost scaled by its era
+ *  against the game era (`TECH_COST_*_ERA_PCT` / `CIVIC_COST_*_ERA_PCT`, an
+ *  item of a later era dearer, an earlier one cheaper) and by the speed, then
+ *  floored once (runs/h1_duelw1121: Pottery 10 of the Standard 25 in the
+ *  Classical game era, Recorded History 87 of 175). */
+export function researchCost(state: GameState, id: string, civic: boolean, seat?: number): number {
+  const def = civic ? CIVICS[id] : TECHS[id];
+  const era = ERAS.indexOf(def.era);
+  const game = (seat !== undefined ? eraHold?.get(seat) : undefined) ?? state.gameEra ?? 0;
+  const pct = era > game ? (civic ? CIVIC_COST_AFTER_ERA_PCT : TECH_COST_AFTER_ERA_PCT)
+    : era < game ? (civic ? CIVIC_COST_BEFORE_ERA_PCT : TECH_COST_BEFORE_ERA_PCT) : 0;
+  return Math.floor((def.baseCost * COST_MULTIPLIER_PCT * (100 + pct)) / 10000);
+}
+
+let eraHold: Map<number, number> | null = null;
+
+/** The action replay's hold on the era a seat's research prices read
+ *  (`cpu/harness/replay.ts`): the game era a seat's start and actions of the
+ *  record's pair stood in, by seat, where the engine's turn opens the next
+ *  era ahead of them. Null outside a replay. */
+export function holdResearchEra(held: Map<number, number> | null): void {
+  eraHold = held;
+}
+
 export function selectResearch(rsr: ResearchState, id: string | null, isCivic = false): void {
   const cur = isCivic ? rsr.civic : rsr.tech;
   if (cur === id) return;
@@ -201,6 +228,11 @@ export function applyLumpYield(
   if (key === 'culture') {
     s.research.civicProgress += amount;
     s.cultureTotal += amount;
+    return;
+  }
+  // a city-state's city takes its lump as its own step would (`minorLump`)
+  if (isCityStateSeat(seat) && (key === 'food' || key === 'production')) {
+    minorLump(state, s as CityState, key, amount);
     return;
   }
   const city = cityAtTile(state, state.map.tiles[tileIndex]) as City | undefined;

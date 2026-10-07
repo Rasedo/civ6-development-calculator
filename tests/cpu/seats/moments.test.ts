@@ -3,7 +3,7 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { deriveContinents } from '../../../world/query';
 import { campMoment, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
-import { CITY_SIZE_KEY, FORMATION_KEY, FULL_ENCAMPMENT_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, recordMoments } from '../../../cpu/core/moments';
+import { CITY_SIZE_KEY, DISASTER_IMPROVEMENT_KEY, FORMATION_KEY, FULL_ENCAMPMENT_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, improvementMoment, recordMoments } from '../../../cpu/core/moments';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import {
@@ -11,7 +11,7 @@ import {
   MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD, MOMENT_HIGH_ADJACENCY, MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT,
   MOMENT_FOREIGN_CAPITAL, MOMENT_NEAR_CIV_CITY, MOMENT_NEW_CONTINENT, MOMENT_ON_DESERT, MOMENT_PANTHEON,
   MOMENT_PANTHEON_FIRST, MOMENT_PLAYER_DEFEATED, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_TO_ORIGINAL_OWNER,
-  MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA,
+  MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA, MOMENT_DISASTER_IMPROVEMENT,
 } from '../../../cpu/data/seats';
 
 const score = (state: ReturnType<typeof makeState>, seat: number) => seatOf(state, seat)!.eraScore ?? 0;
@@ -188,5 +188,20 @@ describe('a district\'s high starting adjacency', () => {
     expect(seatOf(state, 0)!.moments).toContain(HIGH_ADJACENCY_KEY.CAMPUS);
     districtMoment(state, 0, city, campus.index, 'CAMPUS');
     expect(score(state, 0)).toBe(pay);
+  });
+});
+
+describe('an improvement laid on a plot a natural disaster enriched', () => {
+  it('records IMPROVEMENT_CONSTRUCTED_ON_DISASTER_YIELD_TILE_FIRST once; a plain plot records nothing', () => {
+    const state = makeState(makeMap(20, 12));
+    const plain = tileAtCoords(state.map, 4, 4);
+    improvementMoment(state, 0, plain);
+    expect(score(state, 0)).toBe(0);
+    const rich = tileAtCoords(state.map, 6, 4);
+    rich.fertility = 1;
+    improvementMoment(state, 0, rich);
+    improvementMoment(state, 0, rich);
+    expect(score(state, 0)).toBe(MOMENT_DISASTER_IMPROVEMENT);
+    expect(seatOf(state, 0)!.moments).toContain(DISASTER_IMPROVEMENT_KEY);
   });
 });

@@ -248,7 +248,7 @@ class SimPhase:
             if cact_any_l[j]:
                 jc = torch.full((B,), j, dtype=torch.long, device=dev)
                 self._seat_city_produce(row, jc, cact_all[:, j], made[:, j], sci_turn, prod_pre, plain=plain[:, j])
-        total, eff, need, tier_idx = self._seat_city_stats(row)
+        total, eff, need, tier_idx, lux = self._seat_city_stats(row)
         flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         loy_pre = self._loyalty_pre(row)
         for j in range(self.RC):
@@ -258,7 +258,7 @@ class SimPhase:
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
             pop0 = self.city_pop[:, row, j].clone()
             self._seat_city_growth(row, jc, cact, eff[:, j], need[:, j])
-            cul_c = torch.where(cact, self._culture_after_growth(row, j, pop0, total[:, j, 4]),
+            cul_c = torch.where(cact, self._culture_after_growth(row, j, pop0, total[:, j, 4], lux),
                                 torch.zeros_like(total[:, j, 4]))
             self._seat_border_growth(row, jc, cact, cul_c)
             flip[:, j] = self._seat_city_loyalty(row, jc, cact, tier_idx[:, j], gov[:, j], eff[:, j] < 0, loy_pre)
@@ -878,15 +878,16 @@ class SimPhase:
                     self._log_pop(_w, row, col[_w], _t)
 
     def _culture_after_growth(self, row: int, j: int, pop_before: torch.Tensor,
-                              cul: torch.Tensor) -> torch.Tensor:
+                              cul: torch.Tensor, lux: torch.Tensor) -> torch.Tensor:
         """`cultureAfterGrowth` — [B] the Culture column `j`'s border box takes:
         the city as its growth left it. A game whose population moved reads
-        the column again (the luxuries re-ranked, the citizens re-placed); the
+        the column again (the citizens re-placed, the amenity tier on the new
+        size) on `lux`, the luxury allocation ranked before the walk; the
         rest keep `cul`, the read it grew on."""
         moved = self.city_pop[:, row, j] != pop_before
         if not bool(moved.count_nonzero()):
             return cul
-        amen = self._seat_amenity(row)
+        amen = self._seat_amenity(row, lux)
         again = self._seat_city_walk(row, j, amen_yf=amen[2][:, j:j + 1], amen_tier=amen[0])[:, 0, 4]
         return torch.where(moved, again.to(cul.dtype), cul)
 
@@ -2167,7 +2168,6 @@ class SimPhase:
 
         Returns [B] the cities' own science as the turn opened, which the
         Moon Landing lump reads."""
-        rdv = self.rules_dev
         B, dev = self.B, self.device
         NMa = self.n_majors
         zero = torch.zeros(B, dtype=torch.float64, device=dev)
@@ -2275,7 +2275,7 @@ class SimPhase:
         grants: list[tuple[torch.Tensor, int]] = []
         for _ in range(RESEARCH_LOOPS):
             curt = self.civ_cur_tech[:, row]
-            cost_t = rdv.t_cost.gather(0, curt.clamp(min=0))
+            cost_t = self._research_cost(False).gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1).to(self.civ_tech_prog.dtype)
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
             if not bool(fin.count_nonzero()):
                 break
@@ -2400,7 +2400,7 @@ class SimPhase:
         civic_done = torch.zeros(B, dtype=torch.bool, device=dev)
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
-            cost_c = rdv.c_cost.gather(0, curc.clamp(min=0))
+            cost_c = self._research_cost(True).gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1).to(self.civ_civic_prog.dtype)
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
             if not bool(fin.count_nonzero()):
                 break

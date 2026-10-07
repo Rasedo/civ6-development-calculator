@@ -1,5 +1,5 @@
 import { dedicationEvent, goldenBoostBonus } from './eras';
-import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv } from './seats';
+import { seatOf, citiesOf, tileSeat, allianceLevelWith, isCiv, hiddenResourcesFor } from './seats';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import type { GameState, ResearchState, Seat } from './types';
 import { isExplored } from './fog';
@@ -14,6 +14,7 @@ import { BUILDINGS } from '../data/buildings';
 import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
 import { completeResearchNow } from './phase';
+import { researchCost } from './economy';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, isMountain, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
@@ -74,7 +75,7 @@ export function markBoost(state: GameState, seat: number, id: string): boolean {
   if (rsr.boosted.includes(id) || rsr.techs.includes(id) || rsr.civics.includes(id)) return false;
   rsr.boosted.push(id);
   const civic = !TECHS[id];
-  const cost = civic ? CIVICS[id].cost : TECHS[id].cost;
+  const cost = researchCost(state, id, civic, seat);
   const have = progressOn(rsr, id);
   const add = Math.min(cost - have, boostAmount(cost, def.pct, boostPoints(state, seat, civic)));
   if (add <= 0) return true;
@@ -112,12 +113,16 @@ function completeDistricts(state: GameState, seat: number): string[] {
  *  China holds one improvement through t17 and reads no Craftsmanship
  *  inspiration while the map holds three Farms by t7), a pillaged one not
  *  counted (runs/h1_duelw1118 China t13-t18: two Farms, one pillaged since
- *  t11, and a Mine read none) */
+ *  t11, and a Mine read none), each with the resource under it as the seat
+ *  sees it: one it cannot see yet is plain ground (`hiddenResourcesFor`;
+ *  runs/h1_duelw1124 t9: China's Farm on Horses before Animal Husbandry lands
+ *  no Irrigation) */
 function ownImprovements(state: GameState, seat: number, keep: (imp: string, res: string | null) => boolean): number {
+  const hidden = hiddenResourcesFor(state, seat);
   let n = 0;
   for (const t of state.map.tiles) {
     if (tileSeat(t) !== seat || !t.improvement || t.pillaged) continue;
-    if (keep(t.improvement, t.resource ?? null)) n++;
+    if (keep(t.improvement, t.resource && !hidden.has(t.resource) ? t.resource : null)) n++;
   }
   return n;
 }

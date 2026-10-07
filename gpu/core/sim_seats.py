@@ -1411,13 +1411,12 @@ class SimSeats:
         """`gameEraIndex`: [B] each game's game era, an ERAS index."""
         return self.game_era
 
-    def _game_era_turn(self) -> None:
-        """`gameEraTurn` — right after the turn counter moves. Where no
+    def _game_era_turn(self, t: int) -> None:
+        """`gameEraTurn` on the turn `t` opens, before its starts. Where no
         countdown runs, one starts once the era's minimum less the countdown
         has come and either its maximum less the countdown has too or at least
         half the major rows stand in a later era (`_civ_era`); a running one
         ticks; the games whose countdown runs out begin their next era."""
-        t = int(self.turn)
         live = self.game_era < self._era_count - 1
         may = live & (self.era_countdown < 0) & (t >= self.era_start + self._era_min - self._era_cd)
         if bool(may.count_nonzero()):
@@ -1431,17 +1430,17 @@ class SimSeats:
         self.era_countdown.copy_(torch.where(run, self.era_countdown - 1, self.era_countdown))
         adv = run & (self.era_countdown < 0)
         if bool(adv.count_nonzero()):
-            self._enter_era(adv)
+            self._enter_era(adv, t)
             self._era_inspirations(adv)
 
-    def _enter_era(self, adv: torch.Tensor) -> None:
+    def _enter_era(self, adv: torch.Tensor, t: int) -> None:
         """`enterEra` — the games `adv` [B] begin their next game era: its
         index and first turn, the road tier it brings, and each major row's
         Age (its whole-game score against the bars the era before fixed),
         dedications and next bars (`ageBars`)."""
         new = torch.where(adv, self.game_era + 1, self.game_era)
         self.game_era.copy_(new)
-        self.era_start.copy_(torch.where(adv, torch.full_like(self.era_start, int(self.turn)), self.era_start))
+        self.era_start.copy_(torch.where(adv, torch.full_like(self.era_start, t), self.era_start))
         self.era_countdown.copy_(torch.where(adv, torch.full_like(self.era_countdown, -1), self.era_countdown))
         tier = torch.zeros_like(new)
         for _i, _e in enumerate(self._road_tier_era):
@@ -10649,7 +10648,7 @@ class SimSeats:
             housing = housing + self._governor_house_amen(row)[0][:, :cols]
         return maint, torch.where(alive, housing, torch.zeros_like(housing))
 
-    def _seat_amenity(self, row: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _seat_amenity(self, row: int, lux: torch.Tensor | None = None) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """THE amenity body, for every seat row — computeCityStats' amenity
         half, in f64.
 
@@ -10663,7 +10662,9 @@ class SimSeats:
         Returns (tier_idx, growth_f, yield_f, lux_add), each [B, cols]; the
         factors are f64 and a caller running self.dtype casts them. The seat
         block calls this ONCE per row, at its loop top (_seat_city_stats), so
-        the luxury ranking freezes there for the whole walk."""
+        the luxury ranking freezes there for the whole walk; `lux` hands in
+        a standing allocation in place of a new ranking (the culture after a
+        growth, `_culture_after_growth`)."""
         cols = self.RC
         alive = self.city_alive[:, row, :cols]
         is_cap = self.city_is_cap[:, row, :cols]
@@ -10813,7 +10814,7 @@ class SimSeats:
         # bankruptcy: what `luxuryAmenities` ranks on, and the one split point
         # both engines share. Kept for the amenity log.
         _amen_base = have
-        lux_add = self._luxury_amenities(row, have, need)
+        lux_add = self._luxury_amenities(row, have, need) if lux is None else lux
         balance = have + lux_add - need
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
@@ -11036,6 +11037,18 @@ class SimSeats:
             self.era_score[:, row] = self.era_score[:, row] + big * self._seat_wonder_sum(row, self._wond_erascore)
         self.moment_seen[:, row] = self.moment_seen[:, row] | new
         self.moment_world.copy_(self.moment_world | new)
+
+    def _moment_disaster_improvement(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> None:
+        """`improvementMoment` — major row `row` laid an improvement on plot
+        `tiles` in games `rows`: a plot a natural disaster enriched (its
+        fertility) records the key."""
+        rich = ((self.fertility[rows, tiles] > 0) | (self.fertility_prod[rows, tiles] > 0)
+                | (self.fertility_sci[rows, tiles] > 0) | (self.fertility_cul[rows, tiles] > 0))
+        if not bool(rich.count_nonzero()):
+            return
+        keys = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
+        keys[rows[rich], self._mk_disaster_imp] = True
+        self._moment_record(row, keys)
 
     def _moment_scatter(self, held: torch.Tensor, keys: torch.Tensor) -> None:
         """Mark in `held` [B, K] every key of `keys` [B, ...] (-1 none)."""
@@ -13152,6 +13165,14 @@ class SimSeats:
                     self.unit_promos.gather(1, _rc.unsqueeze(1)).squeeze(1)))
             self._reveal_around(rows[major], srow[major], dest.take(rows)[major], sight.take(rows)[major],
                                 see_through=see_thr.take(rows)[major])
+        # ...and a city-state's mover's look meets the majors it takes in
+        # (`revealAround`'s `minorLookMeets`)
+        mnr = (srow >= 100) & (srow < 100 + self.S)
+        if bool(mnr.count_nonzero()):
+            _ut = u_type.take(rows)[mnr]
+            _up = u_promos.take(rows)[mnr]
+            self._minor_look_meets(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
+                                   self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."
         if self._pk["PILGRIM"] >= 0:

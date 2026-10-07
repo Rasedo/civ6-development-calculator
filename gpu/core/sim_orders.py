@@ -1157,6 +1157,8 @@ class SimOrders:
                         self.improvement[_r, hc[_r]] = _k
                         self.pillaged[_r, hc[_r]] = False
                         did[_r] = True
+                        if row < self.n_majors:
+                            self._moment_disaster_improvement(row, _r, hc[_r])
                 # CIV6 (Mountain Tunnel, Qhapaq Ñan, Ski Resort): "Can only be built on an
                 # adjacent Mountain tile" — the rows whose target is not the
                 # builder's own tile, so each gets its own write. The pick is
@@ -1191,6 +1193,8 @@ class SimOrders:
                         self.improvement[_r, _tt[_r]] = _k
                         self.pillaged[_r, _tt[_r]] = False
                         did_adj[_r] = True
+                        if row < self.n_majors:
+                            self._moment_disaster_improvement(row, _r, _tt[_r])
                 # CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
                 # improvement — the same claim a district's bomb makes
                 # (`CULTURE_BOMB_ROWS`)

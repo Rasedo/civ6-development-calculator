@@ -108,6 +108,9 @@ export type Decision = Base & (
    *  upgrade under a new id */
   | { kind: 'upgrade'; player: number; unit: string; into: string }
   | { kind: 'camp'; player: number; plot: number; unit: string }
+  /** a unit's pillage (`UnitOperationStarted` UNITOPERATION_PILLAGE): the
+   *  plot it wrecked, the log's next `ImprovementChanged` */
+  | { kind: 'pillage'; player: number; unit: string; plot: number }
   | { kind: 'village'; player: number; plot: number; gold: number; faith: number; techBoosts: number[]; civicBoosts: number[];
       /** the city a citizen the village gave joined, -1 none */
       popCity: number;
@@ -506,6 +509,8 @@ const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
 const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
+/** the game's `UnitOperationStarted` operation: the hash of its row's name */
+const UNITOPERATION_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
 /** the game's `CityProductionChanged` / `CityProductionCompleted` kinds */
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
@@ -708,6 +713,17 @@ export class RecordedActions implements ActionSource {
       homes.set(n(nx, 0), d);
     });
     out0.push(...homes.values());
+    // a pillage: the unit's UNITOPERATION_PILLAGE, on the plot the log's next
+    // `ImprovementChanged` (x, y, ...) or `DistrictPillaged` (owner, district,
+    // city, x, y, ...) names
+    ev.forEach((r, i) => {
+      if (r[2] !== 'UnitOperationStarted' || n(r, 2) !== UNITOPERATION_PILLAGE) return;
+      const at = ev.slice(i + 1, i + 4).find((x) => x[2] === 'ImprovementChanged' || x[2] === 'DistrictPillaged');
+      if (!at) return;
+      const [x, y] = at[2] === 'DistrictPillaged' ? [n(at, 3), n(at, 4)] : [n(at, 0), n(at, 1)];
+      if (!(x >= 0 && x < W && y >= 0 && y < b.head.H)) return;
+      out0.push({ kind: 'pillage', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot: y * W + x });
+    });
     // the melee battles: the defender's damage, then the attacker's, in the
     // attacker's player's turn; every unit where the log's steps had it
     {
@@ -909,6 +925,13 @@ export class RecordedActions implements ActionSource {
     for (const d of inferred) {
       const by = d.kind === 'clear' ? clearer.get(`${d.player}:${d.plot}:${d.what}`) : undefined;
       if (d.kind === 'clear' && by) d.unit = by;
+    }
+    // ...and the steps a unit the pair lost took before it fell
+    const moved = new Set(inferred.flatMap((d) => (d.kind === 'move' ? [d.unit] : [])));
+    for (const [k, path] of paths) {
+      const u0 = a.units.find((x) => unitKey(x) === k);
+      if (!u0 || moved.has(k) || units1.has(k) || !path.length) continue;
+      out.push({ kind: 'move', phase: phaseOf(u0.owner), player: u0.owner, unit: k, plot: path[path.length - 1], path });
     }
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();

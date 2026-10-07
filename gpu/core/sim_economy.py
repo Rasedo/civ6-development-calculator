@@ -685,6 +685,20 @@ class SimEconomy:
         g = self._golden_ded(row, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
         return pts + g.long() * 10
 
+    def _research_cost(self, is_civic: bool) -> torch.Tensor:
+        """[B, N] long — `researchCost`: each item's Standard Cost scaled by
+        its era against each game's era (a later era's item dearer, an
+        earlier one's cheaper, `progress.*EraPct`) and by the speed, floored
+        once."""
+        rdv, pg = self.rules_dev, self.rules.progress
+        std = rdv.c_cost_std if is_civic else rdv.t_cost_std
+        era = (rdv.c_era if is_civic else rdv.t_era).unsqueeze(0)
+        game = self.game_era.unsqueeze(1)
+        after = int(pg["civicAfterEraPct" if is_civic else "techAfterEraPct"])
+        before = int(pg["civicBeforeEraPct" if is_civic else "techBeforeEraPct"])
+        pct = torch.where(era > game, after, torch.where(era < game, before, 0))
+        return torch.div(std.unsqueeze(0) * int(pg["speedPct"]) * (100 + pct), 10000, rounding_mode="floor")
+
     @staticmethod
     def _boost_amount(cost: torch.Tensor, pct: torch.Tensor, points: torch.Tensor) -> torch.Tensor:
         """`boostAmount`'s twin (the DLL's 0x4cd900 / 0x3a3c00 in 24.8 fixed
@@ -713,22 +727,21 @@ class SimEconomy:
         if not bool(newly.count_nonzero()):
             return newly
         boosted[:, row] |= newly
-        rdv = self.rules_dev
-        cost_n = (rdv.c_cost if is_civic else rdv.t_cost)[:n].long()
+        cost_n = self._research_cost(is_civic)[:, :n]
         prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
         retain = self.civ_civic_retain if is_civic else self.civ_tech_retain
         cur = (self.civ_cur_civic if is_civic else self.civ_cur_tech)[:, row]
         is_cur = torch.arange(n, device=self.device).unsqueeze(0) == cur.unsqueeze(1)
         have = torch.where(is_cur, prog[:, row].unsqueeze(1), retain[:, row, :n])
-        amt = self._boost_amount(cost_n.unsqueeze(0), pct[:n].long().unsqueeze(0),
+        amt = self._boost_amount(cost_n, pct[:n].long().unsqueeze(0),
                                  self._boost_points(row, is_civic).unsqueeze(1)).to(have.dtype)
-        add = torch.minimum(cost_n.unsqueeze(0).to(have.dtype) - have, amt)
+        add = torch.minimum(cost_n.to(have.dtype) - have, amt)
         go = newly[:, :n] & (add > 0)
         add = torch.where(go, add, torch.zeros_like(add))
         prog[:, row] += (add * is_cur.to(add.dtype)).sum(dim=1)
         retain[:, row, :n] += torch.where(is_cur, torch.zeros_like(add), add)
         full = torch.zeros_like(held)
-        full[:, :n] = go & (have + add >= cost_n.unsqueeze(0).to(have.dtype))
+        full[:, :n] = go & (have + add >= cost_n.to(have.dtype))
         if bool(full.count_nonzero()):
             self._complete_research_now(row, full, is_civic)
         return newly
@@ -7861,13 +7874,15 @@ class SimEconomy:
         return (self.S > 0 and row < self.n_majors
                 and bool((self.citystate_alive & self._citystate_item_type).count_nonzero()))
 
-    def _seat_city_stats(self, row: int, record: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _seat_city_stats(self, row: int, record: bool = True) -> tuple[torch.Tensor, ...]:
         """The city-stats read for seat row `row` as the state stands now: the
         twin of `computeCityStats(state, c, luxuryAmenities(...),
         getModifiers(...))` over every city of the row at once, one luxury
         ranking for the whole read. Returns the CityStats fields the seat
         block consumes — (total [B, RC, 6], eff_surplus [B, RC], need [B, RC],
-        tier_idx [B, RC]), all f64.
+        tier_idx [B, RC]), all f64 — and that ranking's luxury amenities
+        [B, RC] (`luxuryAmenities`' map, which the walk's culture after a
+        growth reads, `_culture_after_growth`).
 
         The seat block takes it three times: before the economy (the yields it
         banks), after the economy (the Production each city puts in), and
@@ -7885,7 +7900,7 @@ class SimEconomy:
         computation writes nothing; a `record` read stores the pick and the
         tier from the result, hit or miss. CIV6_STATS_MEMO_CHECK=1 recomputes
         on every hit and asserts."""
-        total, eff, need, tier_idx, worked = simbase.memo_read(
+        total, eff, need, tier_idx, worked, lux = simbase.memo_read(
             self, self._stats_memo, row, self._seat_city_stats_read, row,
             may_set=("_tiebreak_key_dtype",))
         if record:
@@ -7898,12 +7913,12 @@ class SimEconomy:
                 _alive_t, tier_idx.to(self.city_amen_tier.dtype),
                 torch.full_like(self.city_amen_tier[:, row, : self.RC], -1))
             self.city_worked[:, row, : self.RC].copy_(worked)
-        return total, eff, need, tier_idx
+        return total, eff, need, tier_idx, lux
 
     def _seat_city_stats_read(self, row: int) -> tuple[torch.Tensor, ...]:
-        """`_seat_city_stats` computed: its four fields and the worked-tile
-        pick [B, RC, M]."""
-        tier_idx, growth_f, yield_f, _lux = self._seat_amenity(row)
+        """`_seat_city_stats` computed: its four fields, the worked-tile
+        pick [B, RC, M] and the luxury amenities."""
+        tier_idx, growth_f, yield_f, lux = self._seat_amenity(row)
         maint, housing = self._seat_housing(row)  # once: maintenance for the walk, housing below
         worked: list = []
         total = self._seat_city_walk(row, amen_yf=yield_f, pick=worked, maint=maint,
@@ -7944,7 +7959,7 @@ class SimEconomy:
         eff = surplus * torch.floor(hf * m256) / 256.0
         eff = torch.where(surplus > 0, eff, surplus)
         need = self._growth_needed(pop)
-        return total, eff, need, tier_idx, worked[0]
+        return total, eff, need, tier_idx, worked[0], lux
 
     def seat_score(self, row: int) -> torch.Tensor:
         """[B] — the balanced empire score (`rules.score`) for ANY seat row: the

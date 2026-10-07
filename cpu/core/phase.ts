@@ -23,7 +23,7 @@ import { PROMO_COLS, UNIT_PROMO_CLASS, type PromoClass } from '../data/promotion
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
 import { BOOSTS } from '../data/boosts';
-import { selectResearch, pillagePlunder } from './economy';
+import { researchCost, selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
@@ -114,6 +114,7 @@ import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
+import { improvementMoment } from './moments';
 import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -516,14 +517,19 @@ export function freeCityLoyaltyDelta(state: GameState, city: City): number {
  * The Culture a city's border box takes this turn: the city as its growth
  * left it. CIV6: the game reads the city's Culture after the growth step
  * (runs/h1_duelw1104, Nidaros t5 → 6: box 4.195 + 1.723 − 5, the 1.723 its
- * post-growth yield; Rome's growth turn t3 in 1103 and 1104 likewise), so a city whose
- * population moved is read again — its luxuries re-ranked, its citizens
- * re-placed — and one that did not keeps the read it grew on. The GPU twin is
- * `_culture_after_growth`.
+ * post-growth yield; Rome's growth turn t3 in 1103 and 1104 likewise), so a
+ * city whose population moved is read again — its citizens re-placed, its
+ * amenity tier on its new size — on the luxury allocation its seat's
+ * processing ranked before the walk (`luxMap`): the growth re-ranks no
+ * luxury (runs/h1_duelw1128 Taiyuan t182: grown to 7 on its two luxuries,
+ * Displeased, it banks 1175/256 x 1.35, the record after showing a later
+ * rebuild's third). One that did not move keeps the read it grew on. The GPU
+ * twin is `_culture_after_growth`.
  */
-export function cultureAfterGrowth(state: GameState, city: City, popBefore: number, stats: CityStats): number {
+export function cultureAfterGrowth(state: GameState, city: City, popBefore: number, stats: CityStats,
+  luxMap?: Map<number, number>): number {
   if (city.population === popBefore) return stats.total.culture;
-  return computeCityStats(state, city).total.culture;
+  return computeCityStats(state, city, luxMap).total.culture;
 }
 
 /**
@@ -2172,6 +2178,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             if (tt >= 0 && adjacentPlotRowOk(idef, unit.type, un, leaderOf(state, actor.seat))
                 && (unit.charges ?? 0) > 0) {
               state.map.tiles[tt].improvement = imp;
+              improvementMoment(state, actor.seat, state.map.tiles[tt]);
               unit.charges = (unit.charges ?? 0) - 1;
               unit.movesLeft = 0;
               if (unit.charges <= 0 && unitIsNoncombat(unit.type)) disbandUnit(state, unit.id);
@@ -2191,6 +2198,7 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
           if (!here.improvement
               && validImprovementsIn(here, { unlocks: un, builder: unit.type, map: state.map, camps: campTiles(state), gpAppeal: cityAppealResolver(state), ownsTile: (t: Tile) => tileOwnedByCiv(t, actor.seat), suzerain: suzerainNames(state, actor.seat), civ: civOf(state, actor.seat), farmTerrain: getModifiers(state, actor.seat).farmTerrain, civics: actor.research.civics, hidden: hiddenResourcesFor(state, actor.seat), oneHeld, govPromos: hereCity ? cityGovernorPromos(state, hereCity) : undefined }).includes(imp)) {
             here.improvement = imp;
+            improvementMoment(state, actor.seat, here);
             // CIV6 (Mana): "Culture Bomb adjacent tiles" on the named
             // improvement — the same claim a district's bomb makes
             // (`CULTURE_BOMB_ROWS`)
@@ -2878,8 +2886,8 @@ export function seatPhase(state: GameState): void {
     // lump grants (applyLumpGrant, goody maps) add to the same field.
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
     let techDone = false;
-    while (rsr.tech && rsr.techProgress >= TECHS[rsr.tech].cost) {
-      rsr.techProgress -= TECHS[rsr.tech].cost;
+    while (rsr.tech && rsr.techProgress >= researchCost(state, rsr.tech, false, actor.seat)) {
+      rsr.techProgress -= researchCost(state, rsr.tech, false, actor.seat);
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       researchAward(actor, TECHS[rsr.tech].effects);
       if (!rsr.techs.includes(rsr.tech)) rsr.techs.push(rsr.tech);
@@ -2962,8 +2970,8 @@ export function seatPhase(state: GameState): void {
     const _govBefore = seatGovernment(state, actor.seat);
     const _slotsBefore = governmentSlots(state, actor.seat);
     let civicDone = false;
-    while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
-      rsr.civicProgress -= CIVICS[rsr.civic].cost;
+    while (rsr.civic && rsr.civicProgress >= researchCost(state, rsr.civic, true, actor.seat)) {
+      rsr.civicProgress -= researchCost(state, rsr.civic, true, actor.seat);
       researchAward(actor, CIVICS[rsr.civic].effects);
       if (!rsr.civics.includes(rsr.civic)) rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
@@ -3234,8 +3242,9 @@ export function seatPhase(state: GameState): void {
       }
     }
     const grown = new Map<number, CityStats>();
+    // the luxury allocation the walk reads, ranked once before it
+    const luxMap = luxuryAmenities(state, actor.seat);
     {
-      const luxMap = luxuryAmenities(state, actor.seat);
       const mods = getModifiers(state, actor.seat);
       for (const civCity of walkCities) grown.set(civCity.id, computeCityStats(state, civCity, luxMap, mods, true));
     }
@@ -3244,7 +3253,7 @@ export function seatPhase(state: GameState): void {
       const stats = grown.get(civCity.id)!;
       const popBefore = civCity.population;
       seatGrowth(civCity, stats.effectiveFoodSurplus, stats.growthNeeded, state.turn);
-      cityBorderGrowth(state, civCity, actor.seat, cultureAfterGrowth(state, civCity, popBefore, stats));
+      cityBorderGrowth(state, civCity, actor.seat, cultureAfterGrowth(state, civCity, popBefore, stats, luxMap));
       if (applyLoyalty(state, civCity, stats.amenities.tier.name, rGovIds.has(civCity.id), stats.foodSurplus < 0)) {
         civCityDefectors.push(civCity);
       }

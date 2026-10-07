@@ -16,13 +16,15 @@ class SimStep:
         # log); then the players' starts one at a time in ascending player id
         # — the majors, the city-states, the Free Cities (16 of 16 turns);
         # then the World Congress session and the heal of every unit and every
-        # city, before the counter moves; then, on the new turn, the era and
-        # Ages, and the victory checks.
+        # city, before the counter moves; then, on the new turn, the victory
+        # checks; the game era steps before the starts.
         if self.units_mode:
             self._barbarian_phase()
         if self.disasters:
             self._disaster_phase()
         self._climate_turn()
+        # the game era and Ages of the turn the starts open (`gameEraTurn`)
+        self._game_era_turn(int(self.turn) + 1)
         self._seat_phase()
         self._city_state_phase()
         self._free_cities_phase()
@@ -115,7 +117,6 @@ class SimStep:
             self._check_rc_registry_invariant()
 
         self._record_moments()
-        self._game_era_turn()
         # THE EXOPLANET FLIGHT — CIV6: 1 light-year/turn plus one per laser
         # station standing behind it, and the win fires on ARRIVAL, not launch.
         # Ties in one turn go to the lowest row (argmax takes the FIRST True),

@@ -72,11 +72,10 @@ export function gpCost(cls: GreatPersonClass, personEra: number, worldEra: numbe
  */
 type GpLumpKey = 'science' | 'culture' | 'faith' | 'gold' | 'productionToCapital';
 
-const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
+const GP_CURRENCY: Partial<Record<GreatPersonClass, GpLumpKey>> = {
   SCIENTIST: 'science',
   ENGINEER: 'productionToCapital',
   MERCHANT: 'gold',
-  PROPHET: 'faith',
   ARTIST: 'culture',
   ADMIRAL: 'gold',
   GENERAL: 'productionToCapital',
@@ -84,9 +83,14 @@ const GP_CURRENCY: Record<GreatPersonClass, GpLumpKey> = {
   MUSICIAN: 'culture',
 };
 
+/** A Great Prophet pays no lump: CIV6 (Great Prophet) its one action founds a
+ *  religion (runs/h1_duelw1117 China t34: its founding on Stonehenge leaves
+ *  its Faith at 2.4 where the turn's own yield and spending put it; the
+ *  Classical lump would read 62.4). */
 function gpEffect(cls: GreatPersonClass, era: number): GpEffect {
   const lump = GP_ERA_GPP[Math.min(Math.max(era, 0), GP_ERA_GPP.length - 1)];
-  return { [GP_CURRENCY[cls]]: lump };
+  const key = GP_CURRENCY[cls];
+  return key ? { [key]: lump } : {};
 }
 
 export interface GreatPersonDef {

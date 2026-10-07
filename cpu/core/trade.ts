@@ -1344,13 +1344,14 @@ export function minorRouteCandidate(state: GameState, cityState: CityState): Tra
 /**
  * THE CITY-STATE'S TRADE TURN (`minorPhase`): its routes walk and meet their
  * raiders; a free Trader under its trade capacity takes the scorer's
- * destination (`minorRouteCandidate`) and is spent on it; then the round
- * trips that are done end.
+ * destination (`minorRouteCandidate`) and is spent on it — where `pick`, the
+ * engine standing in for the minor's AI; then the round trips that are done
+ * end.
  */
-export function minorTrade(state: GameState, cityState: CityState): void {
+export function minorTrade(state: GameState, cityState: CityState, pick: boolean): void {
   tradeRouteWalk(state, cityState);
   const routes = cityState.tradeRoutes ?? [];
-  if (routes.length < tradeCapacity(state, cityState.seat) && freeTrader(state, cityState.seat)) {
+  if (pick && routes.length < tradeCapacity(state, cityState.seat) && freeTrader(state, cityState.seat)) {
     const r = minorRouteCandidate(state, cityState);
     if (r) {
       const dest = routeDestCenter(state, cityState, r);
@@ -1358,6 +1359,26 @@ export function minorTrade(state: GameState, cityState: CityState): void {
     }
   }
   tradeRouteExpiry(state, cityState);
+}
+
+/** A CITY-STATE SENDS ITS FREE TRADER on a route its AI picked (to another
+ *  city-state, `toCs`, or a major's city, `toSeat` / `toSeatCity`): under its
+ *  trade capacity, a Trader standing, the route not already running, its
+ *  destination within reach and not at war with it. */
+export function minorRouteTo(state: GameState, cityState: CityState, route: TradeRoute): RuleResult {
+  const routes = cityState.tradeRoutes ?? [];
+  if (routes.length >= tradeCapacity(state, cityState.seat)) return { ok: false, reason: 'No spare trading capacity.' };
+  if (state.unitsMode && !freeTrader(state, cityState.seat)) return { ok: false, reason: 'No free Trader to spend.' };
+  if (routes.some((x) => (route.toCs !== undefined && x.toCs === route.toCs)
+    || (route.toSeatCity !== undefined && x.toSeat === route.toSeat && x.toSeatCity === route.toSeatCity))) {
+    return { ok: false, reason: 'That route already runs.' };
+  }
+  if (route.toSeat !== undefined && civsAtWar(state, cityState.seat, route.toSeat)) return { ok: false, reason: 'At war with the destination.' };
+  const dest = routeDestCenter(state, cityState, route);
+  if (dest < 0 || !tradeCourse(tradeReach(state, cityState.seat, cityState.centerIndex), dest)) return { ok: false, reason: 'Beyond trade range.' };
+  commitRoute(state, cityState.seat, cityState.centerIndex, dest, { from: -1, to: -1, ...(route.toCs !== undefined ? { toCs: route.toCs }
+    : { toSeat: route.toSeat, toSeatCity: route.toSeatCity }) });
+  return { ok: true };
 }
 
 /** TRADE POLICY outcome B ends the routes it forbids the moment it passes —

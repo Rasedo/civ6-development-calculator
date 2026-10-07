@@ -25,7 +25,7 @@ import { GWO_ARTIFACT, GWO_RELIC, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
 import { ERAS, TECHS } from '../data/techs';
-import { WONDER_ERA_INDEX } from '../data/builtWonders';
+import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { scaleByGameSpeed } from '../data/constants';
 import { isSpaceProject } from '../data/projects';
 import { DED_FREE_INQUIRY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
@@ -81,6 +81,11 @@ export function gpActivateOk(state: GameState, unit: Unit): boolean {
   // CIV6 (`ActionRequiresNoMilitaryUnit`): a person who grants a unit on
   // its own plot waits until no military unit shares it
   if (gpNoMilitaryOf(person) && unitsAt(state, tile.index).some((u) => unitStackSlot(u) === 'military')) return false;
+  // CIV6 (Stonehenge, Buildings.AllowsHolyCity): "Prophets may found a
+  // religion on Stonehenge instead of a Holy Site" — a Prophet spends its
+  // charge on the seat's complete wonder that allows a holy city
+  if (person.class === 'PROPHET' && tileOwnedByCiv(tile, unit.seat) && tile.builtWonder && tile.builtWonderComplete
+    && BUILT_WONDERS[tile.builtWonder]?.effects?.religionSite) return true;
   return gpSiteHolds(state, unit.seat, site, district, tile,
     (city) => gwOpen(state, city, person, unit.gpAt ?? 0), building);
 }
