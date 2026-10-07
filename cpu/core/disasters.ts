@@ -9,7 +9,7 @@ import { isFloodplains } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
 import { atRngPoint, randRange, randWeighted, type DrawLabel } from './rand';
 import { fogActive, isExplored } from './fog';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, drawCitizenName } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, isCityStateSeat, cityHolders, drawCitizenName } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -143,9 +143,16 @@ function destroyImprovement(state: GameState, tile: Tile): void {
 }
 
 /** POPULATION_LOSS: one citizen of the city owning the tile, never its last —
- *  every holder that keeps a city list, the Free Cities seat included. */
+ *  every holder's, the Free Cities' and a city-state's one city included
+ *  (runs/h1_duelw1117 Antananarivo t170: a storm's plots at turn end, 10 ->
+ *  8; 1124 Granada t74 and t120, Cardiff t103: one each). */
 function losePopulation(state: GameState, tile: Tile): void {
   const seat = tileSeat(tile);
+  if (isCityStateSeat(seat)) {
+    const cs = state.cityStates.find((c) => c.seat === seat);
+    if (cs && cs.population > 1) cs.population -= 1;
+    return;
+  }
   const home = seatOf(state, seat)?.cities.find((c) => c.id === tile.ownerCity);
   if (home && home.population > 1) {
     home.population -= 1;

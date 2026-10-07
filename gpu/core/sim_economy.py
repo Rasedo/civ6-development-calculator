@@ -2396,12 +2396,17 @@ class SimEconomy:
     def _lose_citizen(self, pr: torch.Tensor, seat_at: torch.Tensor, tile: torch.Tensor) -> None:
         """`losePopulation` — POPULATION_LOSS in the games `pr`: one citizen
         of the city owning `tile` [B] (its seat `seat_at` [B]), never its last
-        — every holder that keeps a city list, which since the Free Cities
-        row is not the majors alone. A city-state's tile pays nothing: a minor
-        keeps no city list."""
+        — every holder's, the Free Cities' and a city-state's one city (its
+        row's column 0) included."""
         if not pr.numel():
             return
         tc = tile.unsqueeze(1)
+        _ms = pr[(seat_at[pr] >= 100) & (seat_at[pr] < 100 + self.S)]
+        if _ms.numel():
+            _mrow = self._CITY_MINOR0 + (seat_at[_ms] - 100)
+            _mpop = self.city_pop[_ms, _mrow, 0]
+            _mok = self.city_alive[_ms, _mrow, 0] & (_mpop > 1)
+            self.city_pop[_ms, _mrow, 0] = torch.where(_mok, _mpop - 1, _mpop)
         # `tile_seat` is an ABSOLUTE seat, so the row and the seat are carried
         # as a pair: a major's row IS its seat, the free row's is FREE_SEAT
         for _r, _seat in [(_m, _m) for _m in range(self.n_majors)] + [(self.FREE_ROW, FREE_SEAT)]:

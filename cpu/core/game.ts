@@ -976,6 +976,19 @@ export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
   // WORLD RELIGION outcome B pays the CONDEMNER for the act.
   const condemner = seatOf(state, unitSeat(unit));
   if (condemner) condemner.diplomaticFavor += congressCondemnFavor(state, loser);
+  religiousUnitLost(state, loser, tileIndex);
+  disbandUnit(state, target.id);
+  unit.movesLeft = 0;
+  return { ok: true };
+}
+
+/** A religious unit of religion `loser` killed by a military unit at
+ *  `tileIndex` — condemned, or one a moving unit kills on its path (the DLL's
+ *  religion swing 0x493f80 with its capture flag, from the condemn command
+ *  0x89cc00 and the move 0x26fe20 alike): every city within
+ *  RELIGION_SPREAD_RANGE_UNIT_CAPTURE sheds RELIGION_SPREAD_UNIT_CAPTURE of
+ *  that religion's pressure (`theoLoss`), floored at 0. */
+export function religiousUnitLost(state: GameState, loser: number, tileIndex: number): void {
   const nRel = state.seats.length;
   const dt = state.map.tiles[tileIndex];
   const loss = theoLoss(state, loser, CONDEMN_PRESSURE_SWING);
@@ -989,9 +1002,6 @@ export function condemnHeretic(state: GameState, unit: Unit): RuleResult {
     }
     pres[loser] = Math.max(0, pres[loser] - loss);
   }
-  disbandUnit(state, target.id);
-  unit.movesLeft = 0;
-  return { ok: true };
 }
 
 /**

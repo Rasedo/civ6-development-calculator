@@ -2497,6 +2497,41 @@ fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
   cards changed at the processing's start, the record holds t221's ranking)
   is no rule: ranking every non-active major under the record before's cards
   where they changed loses 26 passes on 1117/1118/1121/1124.
+## H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ
+
+- AnnexPlot 0x1a8b70 (the border turn 0x1a9bc0's claim, AnnexPlots 0x1a8a30
+  — a wonder's free tiles, a founding, a city-state's envoy annex —, the
+  purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count
+  (+0xc), clears the stored next plot (+0x1c) and runs the full citizen
+  reassign 0x196320 on the gaining city (0x1a8f4c) and on a losing one
+  (0x1a903c). Other callers of 0x196320: the favored / disfavored yield
+  setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0).
+  Recorded: a city-state's envoy annex re-places before its growth (1121
+  Hunza t41: 229 annexed, the growth on surplus 3 where the record's set
+  read 4; t45, Ayutthaya t158); step.minorGrowth over the 22 duels 14,284 →
+  14,499. A major's annex re-places by the AI's favored yields, which no
+  record holds: re-placing with none scores lower (step.growth −4,
+  step.border −3), so the harness keeps the record's citizens there.
+- The centre's garrison term 0x24a180 takes ONE unit, the plot's best
+  defender 0x208b80 (flag 0x10): among the plot's units in its own order
+  the comparator 0x523d60 keeps the first whose unwounded strength (0x56dc90
+  with the formation's) is strictly greater, and only then takes its wounds
+  off (0x522630). Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,
+  16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60
+  (the strongest-by-term reading gave 67.5). `garrisonCS`; the GPU's tile
+  seats one military unit, so its `_garrison_cs` reads the same.
+- A unit's move onto a plot holding a religious unit it kills (0x26fe20 →
+  0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_
+  UNIT_CAPTURE (gp +0x600, 125) within RELIGION_SPREAD_RANGE_UNIT_CAPTURE
+  (+0x5f0, 6) off the victim's religion, scaled by its player's +0x4f0
+  percent; the condemn command (0x89cc00, 0x947f10) and a combat kill
+  (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian
+  on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan
+  (`religiousUnitLost`, the harness replaying the log's kill).
+- A random event's POPULATION_LOSS strikes a city-state's city too
+  (`losePopulation` / `_lose_citizen`): runs/h1_duelw1117 Antananarivo t170
+  (a storm's two plots at the turn's end, 10 → 8, its box standing), 1124
+  Granada t74 and t120, Cardiff t103.
 
 ## DLL rules the engines contradict
 
@@ -2512,6 +2547,8 @@ fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
 - The citizen placement (0x197230, "H-1: the citizen manager's placement"):
   the engines' `assignWorkedTiles` / GPU walk score FOCUS_BASE and place
   every citizen afresh (AUDIT C-94 BUILD).
+- A move onto a religious unit (0x26fe20): the engines' melee order onto
+  one only shares its plot (AUDIT C-94 BUILD).
 - The high-adjacency moment reads District::GetYield's flat bucket (+0x2f0)
   and appeal rows (+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the
   Harness section's Moments BUILD line).

@@ -54,7 +54,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
-import { MP_SCALE, WONDER_FREE_TILES, emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { MP_SCALE, WONDER_FREE_TILES, borderGrowthCost, emptyStockpile, scaleByGameSpeed } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -1342,7 +1342,16 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       // fell with no more than those gained bought nothing (1118 Beijing t224:
       // two plots with its wonder, the price standing at 193)
       const free = wonderFreeTiles(rec, c.owner, c.id);
-      const paid = claimedNext || (num(c.culture) < num(b.culture) - 0.01
+      // a plot taken alone while the box rose, but by less than the turn's
+      // culture at the largest border percent (+25%) less the city's price:
+      // the culture claimed it with no plot stored (runs/h1_duelw1105 Ostia,
+      // founded t81: 0 -> 0.30 on 5.30 a turn, its first plot gained and the
+      // price 5 -> 10; a box held still is no claim: 1109 Guangzhou t150)
+      const rise = num(c.culture) - num(b.culture);
+      const roseShort = gainedNow.length === 1 && free === 0 && !(boughtPlots?.has(gainedNow[0]) ?? false)
+        && !gainedInActions.has(`${c.owner}:${c.id}:${gainedNow[0]}`)
+        && rise > 0 && rise < num(b.cultureYield) * 1.25 - borderGrowthCost(h.cultureTaken.get(k) ?? 0) + 0.01;
+      const paid = claimedNext || roseShort || (num(c.culture) < num(b.culture) - 0.01
         && (free > 0 ? gainedNow.length > free : c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
       if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
       // a box pays for one plot; any more came another way

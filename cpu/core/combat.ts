@@ -1083,18 +1083,26 @@ export function woundedLoss256(damagePct: number, reductionPct = 0): number {
  * Pike and Shot Army on a base of 55 added 17 t177-182, a Line Infantry
  * Corps 20 t183-211 and Army 27 t212-235). A ship in the city garrisons it as a land
  * unit does (runs/h1_duelw1103: a Galley, a Caravel, a Battleship). With
- * several on the centre, the strongest by this term. An aircraft and a
- * passenger are no garrison.
+ * several on the centre, the plot's best defender (0x208b80 with the
+ * comparator 0x523d60): the greatest Combat and formation strength unwounded,
+ * the first on a tie, its own wounds then taken off (runs/h1_duelw1121
+ * Guangzhou t191: a Line Infantry Corps of 75 at 16 HP over an Ironclad
+ * of 70 at 75 HP, 66.6015625). An aircraft and a passenger are no garrison.
  */
 function garrisonCS(state: GameState, city: City, base: number): number {
-  let best = 0;
+  let pick: Unit | undefined;
+  let top = -Infinity;
   for (const u of unitsAt(state, city.centerIndex)) {
     if (u.seat !== city.seat || unitDomain(u.type) !== 'military' || u.embarked) continue;
-    const loss = woundedLoss256(Math.trunc(((UNIT_HP - u.hp) * 100) / UNIT_HP), UNITS[u.type]?.noWoundPenalty ? 100 : 0);
-    const g = Math.max(0, ((UNITS[u.type]?.combat ?? 0) + formationCS(u)) - loss / 256 - base);
-    if (g > best) best = g;
+    const s = (UNITS[u.type]?.combat ?? 0) + formationCS(u);
+    if (s > top) {
+      top = s;
+      pick = u;
+    }
   }
-  return best;
+  if (!pick) return 0;
+  const loss = woundedLoss256(Math.trunc(((UNIT_HP - pick.hp) * 100) / UNIT_HP), UNITS[pick.type]?.noWoundPenalty ? 100 : 0);
+  return Math.max(0, top - loss / 256 - base);
 }
 
 /** CIV6 (Buildings.OuterDefenseStrength): each wall building the city has
