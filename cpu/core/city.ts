@@ -441,7 +441,10 @@ export function cityPlotBonus(state: GameState, city: City): (t: Tile, isCenter:
       const r = RESOURCES[t.resource];
       if (r?.category === 'bonus' && r.improvement === 'FARM') out.food += 1;
     }
-    if (t.terrain === 'COAST' || t.terrain === 'LAKE') {
+    // a plot the sea took is Coast without the buildings' Coast rows
+    // (runs/h1_duelw1122 t229-250: Chengdu's drowned plots read Food 1 Gold 1
+    // beside its other Coast at Food 2 Production 3 Gold 3)
+    if ((t.terrain === 'COAST' || t.terrain === 'LAKE') && !t.submerged) {
       for (const r of coastRows) if (!r.unimproved || t.improvement === null) addYields(out, r.yields);
     }
     if (coastResY && t.terrain === 'COAST' && t.resource !== null && !hiddenRes.has(t.resource)) addYields(out, coastResY);

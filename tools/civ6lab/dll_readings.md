@@ -2139,6 +2139,46 @@ river's flood site with no reveal check in the function itself. The order
 is map-generation state no record carries (docs/AUDIT.md C-94, ASK); the
 action replay holds the record's site (`holdFloodRiver`).
 
+## H-1: the citizen manager's placement — READ (the AI's favored yields unrecorded)
+
+City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the
+population change by City::ChangePopulation 0x1c79b0) adds to
+m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign
+0x196320 (save the forced counts +0x08, unassign all 0x196440, assign
+0x197230, lay the forced counts back 0x196e30), else 0x197230 places the
+unassigned ones beside the citizens already working. Growth (0x1b41e0:
+box - threshold, then the box clamped to the new threshold - 1) places one
+citizen incrementally; starvation re-places every citizen.
+
+0x197230: need = max(0, -floor((food256 - consumption(pop) << 8) / 256)),
+food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption
+0x5276c0 of the new population. One entry per free slot of each plot of the
+city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial
+dq, dr per index — the centre, then rings 1, 2, 3; the order the DP walks),
+the plot's capacity 0x195940 (0 on the centre, 0 where no yield is above 0,
+a district's specialist slots, else 1) less its workers. An entry's score
+(0x195f90): food (+0x08) the plot's Food; each yield not disfavored
+(+0x50) counted twice, Gold once (0xf2f97c = YIELD_GOLD), into favored
+(+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x10). The pick
+(0x193dc0) is a table over entries x count: an entry taken where
+better(cand, old) — old's food below the need and the candidate's at or
+above it, else favored greater, else (favored equal) other greater, strict —
+so an earlier entry keeps a tie. The N = unassigned count of the last row's
+backtrack are assigned (0x194d90).
+
+Scored on the records with no favored yield (`dpcheck.py`, `dpgrow.py` in
+the r22 scratchpad): the full set of worked non-district plots 1,133 of
+1,284 city-turns on runs/h1_duelw1117 (need 0 or the offsets ±1, ±2 score
+lower: 1,071 / 1,072 / 1,038); the incremental growth pick 186 of 203
+(1117, 1118). The rest follow the AI's favored yields: the log's
+CityFocusChanged rows (an AI city every turn or two) carry no yields, and
+the records hold none — 1117 Xiurong t199-240 (4 <-> 5 citizens: the
+growth pick Food-first, Plains 1/2 over a Great Wall 0/0/4/0/2, the
+re-placement Culture-first on the Great Walls; the border banks 25.5 and
+27.2 where an unfavored DP banks 27.5) and Guangzhou t173-249. The engines'
+own placement (`assignWorkedTiles` / the GPU walk: locked plots, then
+FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
@@ -2150,6 +2190,9 @@ action replay holds the record's site (`holdFloodRiver`).
   boost's share included, and not by culture held with no civic chosen: the
   engines' `cultureTotal` / `civ_culture` sum the culture yield (AUDIT C-94
   BUILD; the H-1 importer folds the game's rule).
+- The citizen placement (0x197230, "H-1: the citizen manager's placement"):
+  the engines' `assignWorkedTiles` / GPU walk score FOCUS_BASE and place
+  every citizen afresh (AUDIT C-94 BUILD).
 - The high-adjacency moment reads District::GetYield's flat bucket (+0x2f0)
   and appeal rows (+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the
   Harness section's Moments BUILD line).

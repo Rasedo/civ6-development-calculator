@@ -8576,8 +8576,13 @@ class SimSeats:
         its civilization's or leader's, gated on the civic it holds and the
         WORLD era, paid where the plot's terrain/hills/mountain/feature/
         improvement clauses match; and an Auckland suzerain's rows on its
-        terrain, the second under the row's OWN era (`civEraIndex`). The
-        consumer masks impassable ground the way `tileYields` leaves it."""
+        terrain, the second under the row's OWN era (`civEraIndex`); a plot
+        the sea took matches none. The consumer masks impassable ground the
+        way `tileYields` leaves it."""
+        plane = self._plot_yield_plane_rows(row)
+        return None if plane is None else plane * (~self.tile_submerged).unsqueeze(2).to(plane.dtype)
+
+    def _plot_yield_plane_rows(self, row: int) -> torch.Tensor | None:
         auck = None
         if self._suz_c_shallow_prod >= 0 and row < self.n_majors:
             auck = self._suz_effect(row, self._suz_c_shallow_prod)

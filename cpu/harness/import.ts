@@ -3406,7 +3406,24 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
     const cityPerm = Object.entries(fx.cityPerm ?? {}).filter(([, n]) => n);
     const tilePerm = Object.entries(fx.tilePerm ?? {}).filter(([, n]) => n);
     if (cityPerm.length || tilePerm.length) {
-      const tile = p.at >= 0 ? state.map.tiles[p.at] : undefined;
+      let tile = p.at >= 0 ? state.map.tiles[p.at] : undefined;
+      // a person that walked onto its district and spent its charge between
+      // two records was last seen off the site: the charge went to the
+      // seat's nearest completed district of the site's kind (1121
+      // Hildegard, last seen on Shanghai's centre, spent on its Holy Site
+      // the turn the Holy Site completed)
+      const site = gpSiteOf(person);
+      if (tile && site.site === 'district' && tile.district !== site.district) {
+        const from = tile;
+        let best: typeof tile | undefined;
+        let bestD = Infinity;
+        for (const t of state.map.tiles) {
+          if (t.ownerSeat !== seat || t.district !== site.district || !t.districtComplete) continue;
+          const d = hexDistance(state.map, from.col, from.row, t.col, t.row);
+          if (d < bestD) { best = t; bestD = d; }
+        }
+        tile = best ?? tile;
+      }
       if (!tile) gap(ctx, 'gp-site', person.id);
       else {
         // the city that owned the plot where the person was spent, while

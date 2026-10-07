@@ -156,8 +156,10 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   if (tile.resource && seen) addYields(out, RESOURCES[tile.resource].yields);
 
   // CIV6 (EFFECT_ADJUST_PLOT_YIELD): the roster's plot rows — the seat's
-  // civilization or leader pays a flat yield where the plot matches.
-  for (const r of ctx.mods.plotYields) {
+  // civilization or leader pays a flat yield where the plot matches; a plot
+  // the sea took matches none (runs/h1_duelw1122 t229-250: Auckland's
+  // suzerain reads Production 0 on its drowned Coast, 2 on the rest)
+  for (const r of tile.submerged ? [] : ctx.mods.plotYields) {
     if (r.terrain !== undefined && tile.terrain !== r.terrain) continue;
     if (r.hills !== undefined && (tile.elevation === 'HILLS') !== r.hills) continue;
     if (r.mountain && tile.elevation !== 'MOUNTAIN') continue;
@@ -619,6 +621,10 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
       const def = effectiveBuilding(ctx.mods.civ, id);
       if (!def || def.regional || def.district !== b.district || dark.has(id)) continue;
       base += def.yields?.[b.yield] ?? 0;
+      // the percent reads the building's whole row, its powered half included
+      // (runs/h1_duelw1117 Longxi t242: Rationalism's 50% on a powered
+      // Research Lab, Science 42 where the unpowered rows read 39.5)
+      if (powered) base += def.poweredYields?.[b.yield] ?? 0;
     }
     out[b.yield] += base * pct;
   }

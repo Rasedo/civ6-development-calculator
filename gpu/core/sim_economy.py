@@ -7189,6 +7189,8 @@ class SimEconomy:
             for _t in self._coast_plot_terr:
                 wet_w = wet_w | (tw == _t)
                 wet_c = wet_c | (tc == _t)
+            # a plot the sea took is Coast without these rows (`cityPlotBonus`)
+            wet_w = wet_w & ~self.tile_submerged.gather(1, stf).reshape(B, n, M)
             bare_w = self.improvement.gather(1, stf).reshape(B, n, M) < 0
             bare_c = self.improvement.gather(1, ctr) < 0
             for _cbi, _cy6, _cun in _cp_live:
@@ -7521,6 +7523,11 @@ class SimEconomy:
                 _pct = _pct + (_adjv >= float(_r6[4])).double() * float(_r6[5])
                 _mine = (selb & (self._b_req_district.reshape(1, 1, -1) == _di)).double()
                 _base = torch.einsum("bjn,bn->bj", _mine, bcol["yields"][:, :, _yi])
+                # the percent reads the building's whole row, its powered
+                # half included (`cityBuildingYields`)
+                _base = _base + torch.einsum(
+                    "bjn,bn->bj", _mine * self.city_powered[:, row, sl].double().unsqueeze(2),
+                    bcol["powY"][:, :, _yi])
                 bld_y[:, :, _yi] = bld_y[:, :, _yi] + torch.where(
                     _live, _base * _pct, torch.zeros_like(_base))
         # CIV6 (`Building_YieldsPerEra`, the Dar-e Mehr): per game era since
