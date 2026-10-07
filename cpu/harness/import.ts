@@ -64,7 +64,7 @@ import { FEATURES, clearableFeatures, isFloodplains } from '../../world/features
 import { RESOURCES } from '../../world/resources';
 import { hexDistance, neighborTile } from '../../world/hex';
 import { YIELD_KEYS } from '../../world/types';
-import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_CLASS_DISTRICT, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, GP_CITY_PERM, GP_CLASSES, GP_CLASS_DISTRICT, GP_INVENTED_LUXURY, GP_PERM, GP_RESOURCE_REVEAL, GP_TILE_PERM, GREAT_PEOPLE, gpChargesOf, gpEffectOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import {
   GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GWO_ARTIFACT, GWO_LANDSCAPE, GWO_MUSIC, GWO_PORTRAIT, GWO_RELIC, GWO_RELIGIOUS,
   GWO_NAMES, GWO_SCULPTURE, GWO_WRITING, holderSlots, type GreatWork,
@@ -84,6 +84,9 @@ import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from './aliases';
+
+/** the game's `CityMadePurchase` purchase type of a plot: the hash of its kind's name */
+const PURCHASE_PLOT_HASH = gameHash('PLOT');
 
 export interface Imported {
   state: GameState;
@@ -162,6 +165,7 @@ const FEATURE_ID: Record<string, string> = {
   FEATURE_CLIFFS_DOVER: 'CLIFFS_OF_DOVER', FEATURE_BURNING_FOREST: 'BURNING_WOODS',
   FEATURE_BURNT_FOREST: 'BURNT_WOODS', FEATURE_BURNING_JUNGLE: 'BURNING_RAINFOREST',
   FEATURE_BURNT_JUNGLE: 'BURNT_RAINFOREST', FEATURE_DEVILSTOWER: 'DEVILS_TOWER',
+  FEATURE_WHITEDESERT: 'WHITE_DESERT',
 };
 /** the game's six river / cliff direction bits per plot: 1 = the plot lies NE
  *  of the edge (the edge is its SW side), 2 = NW of it (SE side), 4 = W of it
@@ -475,8 +479,11 @@ export interface History {
   /** the last record a project only one scored competition counts stood in
    *  a queue, by `COMPETITIONS` place */
   competitionSeen: Map<number, number>;
+  /** each running competition's project score per player, by `COMPETITIONS`
+   *  place, off the record's event log */
+  competitionScore: Map<number, Map<number, number>>;
   /** the competitions each player took the podium's top of, [competition,
-   *  0 gold (the top tier alone) / 1 the top tier shared] */
+   *  0 gold and the top tier / 1 the top tier alone / 2 the gold alone] */
   podium: Map<number, [number, number][]>;
   /** each major's lifetime culture as the game counts it (`Seat.cultureTotal`):
    *  every gain of civic progress — a turn's culture while a civic is
@@ -587,7 +594,7 @@ export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
-    competitionSeen: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
+    competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null, stockpile: new Map() };
 }
 
@@ -1075,6 +1082,14 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       h.gpSpent.set(u.owner, spent);
     }
     const before = new Map(h.last.cities.map((c) => [c.y * W + c.x, c]));
+    // the plots the record's event log says were bought this turn; null
+    // where the record carries no log
+    const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+    const boughtPlots = Array.isArray(rows) ? new Set<number>() : null;
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!Array.isArray(r) || r[2] !== 'CityMadePurchase' || r[7] !== PURCHASE_PLOT_HASH) continue;
+      boughtPlots!.add((r[6] as number) * W + (r[5] as number));
+    }
     h.nextPlotUnheld.clear();
     for (const c of rec.cities) {
       const k = c.y * W + c.x;
@@ -1093,8 +1108,18 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       // it (a box that falls with no plot gained and none to claim moves no
       // price: runs/h1_duelw1108, Xi'an's 307 from t207 while its box
       // emptied every nine turns)
-      const paid = num(c.culture) < num(b.culture) - 0.01
-        && (c.plots.length > b.plots.length || num(b.nextPlot) >= 0);
+      // A turn whose culture outran the price claims the next plot with the
+      // box standing higher than before (runs/h1_duelw1117 Handan t103: box
+      // 4.8 -> 6.4, plot 391 taken, the price 5 -> 10): the plot the record
+      // named next joined the city alone and the event log bought none of it.
+      // Several plots at once came another way (a culture bomb, a wonder's
+      // free tiles: Handan t145 took 434 and 438 with its price standing).
+      const gainedNow = c.plots.filter((q) => !b.plots.includes(q));
+      const claimedNext = boughtPlots !== null && num(b.nextPlot) >= 0
+        && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
+        && !boughtPlots.has(num(b.nextPlot));
+      const paid = claimedNext || (num(c.culture) < num(b.culture) - 0.01
+        && (c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
       if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
       // a box pays for one plot; any more came another way
       if (c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
@@ -1362,18 +1387,43 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const seen = h.competitionSeen.get(k);
       return seen !== undefined && rec.turn - seen <= COMPETITION_TURNS ? [k] : [];
     });
+    // each running competition's projects completed, scored per player off
+    // the record's event log (`CityProjectCompleted`: owner, city, project)
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!Array.isArray(r) || r[2] !== 'CityProjectCompleted') continue;
+      const name = cat.projects[r[5] as number];
+      for (const k of running) {
+        for (const s of COMPETITIONS[k]!.scored) {
+          if (s.source !== 'project' || `PROJECT_${s.of}` !== name) continue;
+          const sc = h.competitionScore.get(k) ?? new Map<number, number>();
+          h.competitionScore.set(k, sc.set(r[3] as number, (sc.get(r[3] as number) ?? 0) + s.amount));
+        }
+      }
+    }
     if (running.length === 1) {
       const def = COMPETITIONS[running[0]]!;
       const top = rec.players.filter((p) => {
         const was = h.last!.players.find((q) => q.id === p.id);
         return bool(p.major) && was && num(p.favor) - num(was.favor) - num(was.favorPerTurn) === def.silverFavor;
       });
-      for (const p of top) {
-        const won = h.podium.get(p.id) ?? [];
-        won.push([running[0], top.length === 1 ? 0 : 1]);
-        h.podium.set(p.id, won);
+      // the gold: where the log scored the run, every player on the best
+      // score (runs/h1_duelw1118 t201: China's Training Athletes t191 and
+      // Rome's t193 tied, China took the Campus Tourism, Rome alone the
+      // Favor); else the top tier's seat when it stands alone there
+      const sc = h.competitionScore.get(running[0]);
+      const best = sc ? Math.max(0, ...sc.values()) : 0;
+      const golds = new Set(best > 0 ? [...sc!].filter(([, n]) => n === best).map(([pid]) => pid)
+        : top.length === 1 ? [top[0].id] : []);
+      if (top.length) {
+        for (const pid of new Set([...top.map((p) => p.id), ...golds])) {
+          const won = h.podium.get(pid) ?? [];
+          const silver = top.some((p) => p.id === pid);
+          won.push([running[0], golds.has(pid) ? (silver ? 0 : 2) : 1]);
+          h.podium.set(pid, won);
+        }
+        h.competitionSeen.delete(running[0]);
+        h.competitionScore.delete(running[0]);
       }
-      if (top.length) h.competitionSeen.delete(running[0]);
     }
   }
   // the competitions a queued project tells running: the projects only one
@@ -1589,8 +1639,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     // permanent channels and the top tier's
     for (const [k, tier] of history?.podium.get(p.id) ?? []) {
       const def = COMPETITIONS[k]!;
-      if (tier === 0 && def.goldPerm) addSeatPerm(seat, def.goldPerm);
-      if (def.silverPerm) addSeatPerm(seat, def.silverPerm);
+      if (tier !== 1 && def.goldPerm) addSeatPerm(seat, def.goldPerm);
+      if (tier !== 2 && def.silverPerm) addSeatPerm(seat, def.silverPerm);
     }
     state.seats.push(seat);
     seatOfPlayer.set(p.id, i);
@@ -1727,6 +1777,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     }
     const ii = p[P.improvement] as number;
     if (ii >= 0 && cat.improvements[ii] === 'IMPROVEMENT_BARBARIAN_CAMP') state.barbSeat.camps.push(t.index);
+    // a major holding a `firstBuildTechs` row has been paid its techs
+    const holder = t.improvement && IMPROVEMENTS[t.improvement as ImprovementId].firstBuildTechs
+      ? seatOf(state, t.ownerSeat) : undefined;
+    if (holder) holder.firstImpTech = true;
   }
 
   const shortfallRead = importShortfalls(rec, state, seatOfGame, history);
@@ -2577,8 +2631,15 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
                            seatOfGame: (pid: number) => number, history?: History): number[] {
   const unrecorded: number[] = [];
   const grants = new Map<number, number>(); // seat -> copies a spent person may have granted
+  // seat -> the invented luxuries its spent people made (`gpLuxuries`)
+  const invented = new Map<number, Set<string>>();
   for (const [ind, p] of history?.people ?? []) {
     const person = p.spent !== null ? personOf(cat, ind) : undefined;
+    const res = person ? GP_INVENTED_LUXURY[person.id] : undefined;
+    if (res) {
+      const set = invented.get(seatOfGame(p.player)) ?? new Set<string>();
+      invented.set(seatOfGame(p.player), set.add(res));
+    }
     const n = person ? (gpEffectOf(person).plotLuxury ?? 0) * gpChargesOf(person) : 0;
     if (n > 0) grants.set(seatOfGame(p.player), (grants.get(seatOfGame(p.player)) ?? 0) + n);
   }
@@ -2611,6 +2672,9 @@ function importLuxuryDeals(ctx: Ctx, state: GameState, players: DumpPlayer[], ca
     for (const [rname, [held, exported]] of rows) {
       const id = strip(rname, 'RESOURCE_');
       const imported = held + exported - (spare.get(id) ?? 0);
+      // an invented luxury its own spent person made is the seat's
+      // `gpLuxuries` pass, traded nowhere
+      if (!LUXURY_IDS.includes(id) && exported === 0 && invented.get(seat)?.has(id)) continue;
       if (!LUXURY_IDS.includes(id) || imported < 0) {
         remember(seat, rname, imported < 0 ? 'luxury-held' : 'luxury-imported');
         continue;
@@ -2992,7 +3056,7 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
     for (let k = 0; k < charges; k++) {
       addSeatPerm(s, fx.perm ?? {});
       (s.gpActivated ??= []).push(person.id);
-      if (fx.luxuryCopies) for (let i = 0; i < fx.luxuryCopies; i++) (s.gpLuxuries ??= []).push(fx.luxuryAmenities ?? 1);
+      if (fx.luxuryCopies) (s.gpLuxuries ??= []).push(fx.luxuryAmenities ?? 1);
     }
     const cityPerm = Object.entries(fx.cityPerm ?? {}).filter(([, n]) => n);
     const tilePerm = Object.entries(fx.tilePerm ?? {}).filter(([, n]) => n);

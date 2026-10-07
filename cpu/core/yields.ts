@@ -196,10 +196,12 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     addYields(out, improvementAdjacency(ctx, tile, imp));
     const idef = IMPROVEMENTS[imp];
     // CIV6 (`YieldFromAppeal` / `YieldFromAppealPercent`): the Chemamull pays
-    // 75% of its tile's APPEAL as Culture. Floored, and never negative.
+    // 75% of its tile's APPEAL as Culture, the Alcázar 50% as Science — a
+    // negative Appeal a negative yield (runs/h1_duelw1119 plot 313: Appeal -2,
+    // Science -1), cut toward zero.
     if (idef.appealYield) {
       const ap = tileAppeal(ctx.map, tile, ctx.camps, ctx.gpAppeal);
-      out[idef.appealYield.yield] += Math.floor(Math.max(0, ap) * idef.appealYield.pct / 100);
+      out[idef.appealYield.yield] += Math.trunc(ap * idef.appealYield.pct / 100);
     }
     // CIV6 (`Improvement_BonusYieldChanges`): "additional yields as you
     // advance through the Technology and Civics Tree".

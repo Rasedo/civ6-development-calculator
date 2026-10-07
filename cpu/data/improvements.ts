@@ -156,7 +156,8 @@ export interface ImprovementDef {
   minAppeal?: number;
   /** CIV6 (`YieldFromAppeal` / `YieldFromAppealPercent`): the row pays this
    *  share of its tile's APPEAL as the named yield (the Chemamull's 75%
-   *  Culture). Floored, as every other tile yield here is. */
+   *  Culture, the Alcázar's 50% Science), cut toward zero — negative on a
+   *  negative Appeal. */
   appealYield?: { yield: YieldKey; pct: number };
   /** CIV6 (`DefenseModifier`): what a unit standing on it adds to its own
    *  defence, and CIV6 (`GrantFortification`): the turns of fortification it
@@ -248,6 +249,11 @@ export interface ImprovementDef {
   /** CIV6 (`Improvements.Workable` = false): no citizen works its plot, a
    *  mountain Mit'a opens included (`workableTiles`). */
   unworkable?: boolean;
+  /** CIV6 (MODIFIER_PLAYER_GRANT_RANDOM_TECHNOLOGY, Permanent, behind a
+   *  REQUIREMENT_PLAYER_HAS_IMPROVEMENT set): the random technologies a seat
+   *  is granted the first time it lays this row — once per seat, ever
+   *  (`Seat.firstImpTech`). */
+  firstBuildTechs?: number;
 }
 
 /** the BREATHTAKING appeal bar a Seaside Resort needs (real Civ 6
@@ -798,6 +804,97 @@ export const IMPROVEMENTS: Record<ImprovementId, ImprovementDef> = {
       'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Monastery_DistrictAdjacency', 'TilesRequired'),
       'adjacency.0.yields.faith': xml('Adjacency_YieldChanges', 'ID=Monastery_DistrictAdjacency', 'YieldChange'),
       religiousHeal: xml('Improvements', 'ImprovementType=IMPROVEMENT_MONASTERY', 'ReligiousUnitHealRate'),
+    },
+  },
+  // CIV6 (Babylon_Improvements.xml, Nalanda): "+2 Science and +1 Housing.
+  // +1 Faith for every adjacent Holy Site district and +1 Science for every
+  // adjacent Campus district. After researching Scientific Theory receive an
+  // additional +1 Science for every adjacent Campus ... Must be built on flat
+  // terrain not adjacent to another Mahavihara."
+  MAHAVIHARA: {
+    id: 'MAHAVIHARA',
+    name: 'Mahavihara',
+    code: 'Mv',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { science: 2 },
+    housing: 1,
+    resourceOnly: false,
+    suzerainOf: 'Nalanda',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT'],
+    noAdjacentSame: true,
+    // the Campus rows: 1 per neighbour until Scientific Theory obsoletes it,
+    // 2 per neighbour from the tech on. The Holy Site row and the Lavra row
+    // are one rule here: the engine's Lavra IS a Holy Site tile, and a plot
+    // answers one of the two install rows either way.
+    adjacency: [
+      { district: 'CAMPUS', per: 1, yields: { science: 1 }, upgradeTech: 'SCIENTIFIC_THEORY', upgradeYields: { science: 2 } },
+      { district: 'HOLY_SITE', per: 1, yields: { faith: 1 } },
+    ],
+    // CIV6 (MINOR_CIV_NALANDA_FREE_TECHNOLOGY): "When a player constructs
+    // their first Mahavihara receive a random technology."
+    firstBuildTechs: 1,
+    description: '+2 science, +1 per adjacent Campus (+2 with Scientific Theory), +1 faith per adjacent Holy Site, +1 housing. Flat, not beside another Mahavihara.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'PlunderAmount'),
+      'yields.science': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_MAHAVIHARA&YieldType=YIELD_SCIENCE', 'YieldChange'),
+      housing: { derived: 'Housing / TilesRequired — the install writes the CLUSTER total', inputs: [xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'Housing'), xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'TilesRequired')] },
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'TraitType', { expect: 'MINOR_CIV_NALANDA_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_MAHAVIHARA, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_MAHAVIHARA', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'TerrainType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_MAHAVIHARA', 'SameAdjacentValid', { expect: false }),
+      'adjacency.0.district': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Campus_Science_Early', 'AdjacentDistrict', { expect: 'DISTRICT_CAMPUS' }),
+      'adjacency.0.per': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Campus_Science_Early', 'TilesRequired'),
+      'adjacency.0.yields.science': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Campus_Science_Early', 'YieldChange'),
+      'adjacency.0.upgradeTech': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Campus_Science_Late', 'PrereqTech', { expect: 'TECH_SCIENTIFIC_THEORY' }),
+      'adjacency.0.upgradeYields.science': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Campus_Science_Late', 'YieldChange'),
+      'adjacency.1.district': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Holy_Site_Faith', 'AdjacentDistrict', { expect: 'DISTRICT_HOLY_SITE' }),
+      'adjacency.1.per': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Holy_Site_Faith', 'TilesRequired'),
+      'adjacency.1.yields.faith': xml('Adjacency_YieldChanges', 'ID=Mahavihara_Holy_Site_Faith', 'YieldChange'),
+      firstBuildTechs: xml('ModifierArguments', 'ModifierId=MINOR_CIV_NALANDA_FREE_TECHNOLOGY_MODIFIER&Name=Amount', 'Value'),
+    },
+  },
+  // CIV6 (VikingsLandmarks_CityStates.xml with its _Expansion2.xml update,
+  // Granada): "+2 Culture. Occupying unit receives +4 Defense Strength, and
+  // automatically gains 2 turns of fortification. Cannot be built next to
+  // another Alcázar." — and Science of half its plot's Appeal
+  // (YieldFromAppeal), Tourism of its Culture after Flight.
+  ALCAZAR: {
+    id: 'ALCAZAR',
+    name: 'Alcázar',
+    code: 'Az',
+    plunder: { kind: 'faith', amount: 25 },
+    yields: { culture: 2 },
+    housing: 0,
+    resourceOnly: false,
+    suzerainOf: 'Granada',
+    terrains: ['DESERT', 'GRASSLAND', 'PLAINS', 'SNOW', 'TUNDRA'],
+    elevations: ['FLAT', 'HILLS'],
+    noAdjacentSame: true,
+    defenseCS: 4,
+    grantsFortification: 2,
+    appealYield: { yield: 'science', pct: 50 },
+    tourismFrom: 'culture',
+    tourismTech: 'FLIGHT',
+    description: '+2 culture, Science of half its Appeal, +4 defence and 2 turns of fortification to its occupant. Not beside another Alcázar.',
+    src: {
+      'plunder.kind': xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'PlunderType', { expect: 'PLUNDER_FAITH' }),
+      'plunder.amount': xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'PlunderAmount'),
+      'yields.culture': xml('Improvement_YieldChanges', 'ImprovementType=IMPROVEMENT_ALCAZAR&YieldType=YIELD_CULTURE', 'YieldChange'),
+      housing: xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'Housing'),
+      resourceOnly: { derived: 'true where the install writes Improvement_ValidResources rows for the row', inputs: [xml('Improvement_ValidResources', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'ResourceType')] },
+      suzerainOf: xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'TraitType', { expect: 'MINOR_CIV_GRANADA_TRAIT' }),
+      terrains: { derived: 'the Improvement_ValidTerrains rows of IMPROVEMENT_ALCAZAR, as engine terrain ids', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'TerrainType')] },
+      elevations: { derived: 'the HILLS / MOUNTAIN half of the Improvement_ValidTerrains rows of IMPROVEMENT_ALCAZAR', inputs: [xml('Improvement_ValidTerrains', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'TerrainType')] },
+      noAdjacentSame: xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'SameAdjacentValid', { expect: false }),
+      defenseCS: xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'DefenseModifier'),
+      grantsFortification: xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'GrantFortification'),
+      'appealYield.yield': xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'YieldFromAppeal', { expect: 'YIELD_SCIENCE' }),
+      'appealYield.pct': xml('Improvements', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'YieldFromAppealPercent'),
+      tourismFrom: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'TourismSource', { expect: 'TOURISMSOURCE_CULTURE' }),
+      tourismTech: xml('Improvement_Tourism', 'ImprovementType=IMPROVEMENT_ALCAZAR', 'PrereqTech', { expect: 'TECH_FLIGHT' }),
     },
   },
   // CIV6 (Offshore Wind Farm): "+2 Production", "Provides 2 Power per turn",

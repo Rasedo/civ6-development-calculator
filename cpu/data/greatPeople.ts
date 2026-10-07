@@ -729,6 +729,15 @@ export const GP_TILE_PERM = [
 ] as const;
 type GpTilePermKey = (typeof GP_TILE_PERM)[number];
 
+/** CIV6 (GREATPERSON_GRANT_TOYS / _COSMETICS / _JEANS / _PERFUME,
+ *  MODIFIER_SINGLE_CITY_GRANT_RESOURCE_IN_CITY ResourceType): the resource
+ *  each invented luxury is, by the Great Person who invents it. */
+export const GP_INVENTED_LUXURY: Readonly<Record<string, string>> = Object.fromEntries(
+  ([['GP_JOHN_SPILSBURY', 'TOYS'], ['GP_HELENA_RUBINSTEIN', 'COSMETICS'], ['GP_LEVI_STRAUSS', 'JEANS'],
+    ['GP_ESTEE_LAUDER', 'PERFUME']] as const).map(([gp, res]) => [gp, srcConst(`gp.inventedLuxury.${gp}`, res,
+    xml('ModifierArguments', `ModifierId=GREATPERSON_GRANT_${res}&Name=ResourceType`, 'Value', { expect: `RESOURCE_${res}` }))]),
+);
+
 /** CIV6 (Kenzo Tange): the share of a district's ADJACENCY yield the city
  *  counts as Tourism — Science, Culture and Production whole, Gold and
  *  Faith half (`GREATPERSON_DISTRICT_*_ADJACENCY_AS_TOURISM` Amount 100 / 50). */
@@ -859,8 +868,10 @@ export interface GpEffect {
   /** `amount` of `yield` per neighbouring tile carrying `source`, and for the
    *  activating tile itself when `here`. */
   perAdjacent?: { source: 'MOUNTAIN' | 'NATURAL_WONDER' | 'RAINFOREST'; yield: GpYieldKey; amount: number; here?: boolean };
-  /** invented luxuries: `luxuryCopies` of them, each serving
-   *  `luxuryAmenities` cities the way a worked luxury resource does. */
+  /** an invented luxury: `luxuryCopies` copies of ONE resource, which serve
+   *  `luxuryAmenities` cities as one luxury, the way a worked luxury's copies
+   *  do (runs/h1_duelw1117 t234: Levi Strauss's two Jeans raised China's
+   *  luxury amenities 16 -> 20, one pass of four). */
   luxuryCopies?: number;
   luxuryAmenities?: number;
   /** CIV6 (MODIFIER_PLAYER_GRANT_FREE_RESOURCE_FROM_UNIT_PLOT): copies of the

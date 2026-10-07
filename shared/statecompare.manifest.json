@@ -1114,6 +1114,17 @@
           "note": "the Apostle's Launch Inquisition, which is what unlocks the Inquisitor purchase."
         },
         {
+          "name": "firstImpTech",
+          "compare": "exact",
+          "covers": [
+            "Seat.firstImpTech"
+          ],
+          "planes": [
+            "civ_first_imp_tech"
+          ],
+          "note": "the first Mahavihara's random technology, paid once per seat."
+        },
+        {
           "name": "pantheonDone",
           "compare": "exact",
           "covers": [

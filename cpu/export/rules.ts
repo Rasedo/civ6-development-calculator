@@ -2458,6 +2458,8 @@ export function buildRules() {
           relHeal: def.religiousHeal ?? 0,
           tourY: def.tourismFrom ? YIELD_KEYS.indexOf(def.tourismFrom) : -1,
           tourTech: def.tourismTech ? techIdx.get(def.tourismTech) ?? -3 : -1,
+          // the random techs a seat's FIRST one of these pays (the Mahavihara's)
+          firstTechs: def.firstBuildTechs ?? 0,
           // THE MILITARY ENGINEER'S ROWS, and the appeal every improvement
           // takes off its neighbours.
           eng: def.engineer ? 1 : 0,

@@ -56,7 +56,7 @@ export type SuzEffect =
   | 'faithBuildings'     // Valletta
   | 'wallsFullDamage'    // Akkad
   | 'routePostGold'      // Jakarta
-  | 'suzImprovement'     // Caguana / La Venta / Armagh
+  | 'suzImprovement'     // Caguana / La Venta / Armagh / Nalanda / Granada
   | 'sciencePeace'       // Geneva
   | 'districtGpp'        // Bologna
   | 'waterDistrictCulture' // Nan Madol
@@ -73,7 +73,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'xpDouble', 'militaryBuildingLoyalty', 'regionalReach', 'worksScience', 'csRouteYields', 'holySitePressure',
   'apostlePromoChoice', 'eraInspiration', 'harborPower', 'faithBuildings',
   'wallsFullDamage',
-  // the three whose whole perk is "your Builders can build X improvements",
+  // the five whose perk is "your Builders can build X improvements",
   // which `validImprovementsIn`'s suzerain block answers off `suzerainOf`.
   'suzImprovement',
   'routePostGold',
@@ -234,6 +234,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% bonus Science output when you are not at war with any civilization.', suz: 'sciencePeace' },
   Bologna: { name: 'Bologna', type: 'scientific', bonus: 'Your districts with a building provide +1 Great Person point of their type (Writer, Artist, and Musician for Theater Square districts with a building).', suz: 'districtGpp' },
   Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience' },
+  Nalanda: { name: 'Nalanda', type: 'scientific', bonus: 'Your Builders can now make Mahavihara improvements. When a player constructs their first Mahavihara receive a random technology.', suz: 'suzImprovement' },
   Vilnius: { name: 'Vilnius', type: 'cultural', bonus: 'When you enter a new era, earn 1 random Inspiration from that era.', suz: 'eraInspiration' },
   'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', suz: 'waterDistrictCulture' },
   Kumasi: { name: 'Kumasi', type: 'cultural', bonus: 'Your Trade Routes to any city-state provide +2 Culture and +1 Gold for every specialty district in the origin city.', suz: 'csRouteYields' },
@@ -253,6 +254,7 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Ngazargamu: { name: 'Ngazargamu', type: 'militaristic', bonus: 'Land combat or support units are 20% cheaper to purchase with Gold for each Encampment district building in that city.', suz: 'landPurchaseDiscount' },
   Preslav: { name: 'Preslav', type: 'militaristic', bonus: 'You receive +2 Loyalty per turn in cities for each Encampment district building.', suz: 'militaryBuildingLoyalty' },
   Valletta: { name: 'Valletta', type: 'militaristic', bonus: 'City Center buildings and Encampment district buildings can be bought with Faith. Cost of purchasing Ancient, Medieval, and Renaissance Walls is reduced, but they can only be bought with Faith.', suz: 'faithBuildings' },
+  Granada: { name: 'Granada', type: 'militaristic', bonus: 'Your Builders can now make Alcázar improvements.', suz: 'suzImprovement' },
   Jerusalem: { name: 'Jerusalem', type: 'religious', bonus: 'Your cities with Holy Sites exert pressure as if they were Holy Cities (4x religious pressure on all cities within 10 tiles).', suz: 'holySitePressure' },
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
@@ -269,11 +271,11 @@ export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Objec
  * tables are kept in step by `tests/cpu/data/cityStateRoster.test.ts` instead.
  */
 export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
-  scientific: ['Geneva', 'Bologna', 'Anshan'],
+  scientific: ['Geneva', 'Bologna', 'Anshan', 'Nalanda'],
   cultural: ['Vilnius', 'Nan Madol', 'Kumasi', 'Caguana'],
   trade: ['Amsterdam', 'Zanzibar', 'Jakarta', 'Hunza', 'Antioch'],
   industrial: ['Mexico City', 'Buenos Aires', 'Hong Kong', 'Cardiff', 'Auckland'],
-  militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad'],
+  militaristic: ['Kabul', 'Ngazargamu', 'Preslav', 'Valletta', 'Akkad', 'Granada'],
   religious: ['Jerusalem', 'La Venta', 'Yerevan', 'Armagh'],
 };
 

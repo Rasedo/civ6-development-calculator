@@ -43,6 +43,7 @@ export const FEATURE_APPEAL: Readonly<Record<string, number>> = Object.fromEntri
   feature('PIOPIOTAHI', 'PIOPIOTAHI', 2),
   feature('TSINGY', 'TSINGY', 2),
   feature('DEVILS_TOWER', 'DEVILSTOWER', 2),
+  feature('WHITE_DESERT', 'WHITEDESERT', 2),
   feature('GIANTS_CAUSEWAY', 'GIANTS_CAUSEWAY', 2),
   feature('LAKE_RETBA', 'LAKE_RETBA', 2),
   feature('PAMUKKALE', 'PAMUKKALE', 2),

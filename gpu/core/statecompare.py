@@ -692,6 +692,7 @@ SEAT = {
     # fact and could not see the two coming apart.
     "religionFounded": lambda sim, b, rows: [1 if bool(sim.civ_religion_done[b, c]) else 0 for c in rows],
     "inquisition": lambda sim, b, rows: [1 if bool(sim.civ_inquisition[b, c]) else 0 for c in rows],
+    "firstImpTech": lambda sim, b, rows: [1 if bool(sim.civ_first_imp_tech[b, c]) else 0 for c in rows],
     "pantheonDone": lambda sim, b, rows: [1 if bool(sim.civ_pantheon_done[b, c]) else 0 for c in rows],
     "beliefsEarned": lambda sim, b, rows: [int(sim.civ_beliefs_earned[b, c]) for c in rows],
     "gpPoints": lambda sim, b, rows: [[float(x) for x in sim.civ_gpp[b, c].tolist()] for c in rows],

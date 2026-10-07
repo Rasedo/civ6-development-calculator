@@ -73,7 +73,11 @@ describe('the unique improvement catalog', () => {
     expect(IMPROVEMENT_IDS.indexOf('SEASTEAD')).toBe(40);
     // ...and the Offshore Oil Rig after that
     expect(IMPROVEMENT_IDS.indexOf('OFFSHORE_OIL_RIG')).toBe(41);
-    expect(IMPROVEMENT_IDS.length).toBe(42);
+    // ...and Nalanda's Mahavihara after that
+    expect(IMPROVEMENT_IDS.indexOf('MAHAVIHARA')).toBe(42);
+    // ...and Granada's Alcázar after that
+    expect(IMPROVEMENT_IDS.indexOf('ALCAZAR')).toBe(43);
+    expect(IMPROVEMENT_IDS.length).toBe(44);
   });
 
   it('gives one civilization at most one unique improvement', () => {
@@ -141,6 +145,26 @@ describe('the three new adjacency sources', () => {
     at(s.state, 16, 17).terrain = 'TUNDRA';
     at(s.state, 15, 16).terrain = 'GRASSLAND';
     expect(improvementAdjacency(makeYieldCtx(s.state, 0), t, 'ICE_HOCKEY_RINK').culture).toBe(2);
+  });
+
+  it('pays the Mahavihara per adjacent Campus (doubled at Scientific Theory) and Holy Site', () => {
+    const s = scene(null);
+    const t = at(s.state, 16, 16);
+    t.improvement = 'MAHAVIHARA';
+    for (const [col, row, d] of [[17, 16, 'CAMPUS'], [15, 16, 'HOLY_SITE']] as const) {
+      const n = at(s.state, col, row);
+      n.district = d;
+      n.districtComplete = true;
+    }
+    // runs/h1_duelw1118 plot 913: 2 Science of its own, 2 more from its
+    // Campus after Scientific Theory, 1 Faith from its Holy Site
+    let y = improvementAdjacency(makeYieldCtx(s.state, 0), t, 'MAHAVIHARA');
+    expect([y.science, y.faith]).toEqual([1, 1]);
+    grantTechs(s.state, 'SCIENTIFIC_THEORY');
+    y = improvementAdjacency(makeYieldCtx(s.state, 0), t, 'MAHAVIHARA');
+    expect([y.science, y.faith]).toEqual([2, 1]);
+    expect(IMPROVEMENTS.MAHAVIHARA.yields).toEqual({ science: 2 });
+    expect(IMPROVEMENTS.MAHAVIHARA.housing).toBe(1);
   });
 
   it('pays the Mekewap gold per adjacent LUXURY, once Cartography is in', () => {

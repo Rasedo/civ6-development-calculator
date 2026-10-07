@@ -581,6 +581,7 @@ const SEAT: Record<string, Extractor> = {
   holyTile: overSeats((s) => s.religion.holyTile ?? -1),
   religionFounded: overSeats((s) => (s.religion.founded ? 1 : 0)),
   inquisition: overSeats((s) => (s.religion.inquisition ? 1 : 0)),
+  firstImpTech: overSeats((s) => (s.firstImpTech ? 1 : 0)),
   // The GPU carries a DONE bit beside the chosen pantheon; this side gates on
   // the id being set. Comparing them is what would show the two coming apart
   // (a seat that has spent its pick but holds no belief).

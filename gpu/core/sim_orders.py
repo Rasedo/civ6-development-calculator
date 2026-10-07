@@ -1206,6 +1206,18 @@ class SimOrders:
                     _live = _bcol >= 0
                     if bool(_live.count_nonzero()):
                         self._culture_bomb(row, _br[_live], hc[_br][_live], _bcol[_live])
+                # CIV6 (Nalanda): "When a player constructs their first
+                # Mahavihara receive a random technology" — the seat's first
+                # `firstBuildTechs` row laid underfoot pays, once ever.
+                if _did_any:
+                    _laid = self.improvement.gather(1, hc.unsqueeze(1)).squeeze(1)
+                    for _k, _nt in enumerate(self._imp_first_techs):
+                        if _nt <= 0:
+                            continue
+                        _ft = did & (_laid == _k) & ~self.civ_first_imp_tech[:, row]
+                        if bool(_ft.count_nonzero()):
+                            self.civ_first_imp_tech[:, row] = self.civ_first_imp_tech[:, row] | _ft
+                            self._grant_free_research(row, _ft.long() * _nt, torch.zeros_like(_ft, dtype=torch.long))
                 did = did | did_adj
                 if _did_any or bool(did_adj.count_nonzero()):
                     _r = did.nonzero(as_tuple=True)[0]

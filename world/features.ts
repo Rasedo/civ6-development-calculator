@@ -274,3 +274,12 @@ Object.assign(FEATURES, {
   UBSUNUR_HOLLOW: { id: 'UBSUNUR_HOLLOW', name: 'Ubsunur Hollow', yields: { food: 1, production: 1, faith: 2 }, ...NW },
   HA_LONG_BAY: { id: 'HA_LONG_BAY', name: 'Ha Long Bay', yields: { food: 3, production: 1, culture: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// THE WHITE DESERT, appended after Ha Long Bay; the engines' map generator
+// lays none, an imported world carries it. CIV6 (Expansion2_Features.xml):
+// four plots of Desert, flat, hills or mountain, passable, no
+// SightThroughModifier; Feature_YieldChanges Culture 1 Gold 4 Science 1, its
+// plots' whole yields (runs/h1_duelw1119).
+Object.assign(FEATURES, {
+  WHITE_DESERT: { id: 'WHITE_DESERT', name: 'White Desert', yields: { culture: 1, gold: 4, science: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

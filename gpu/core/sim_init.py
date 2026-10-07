@@ -567,6 +567,8 @@ class SimInit:
             ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
             ("religion_done", torch.bool, 0),
             ("inquisition", torch.bool, 0),
+            # a `firstBuildTechs` row (the Mahavihara) has paid its techs
+            ("first_imp_tech", torch.bool, 0),
         )
         for _nm, _dt, _fill in _civ_scalars:
             setattr(self, f"civ_{_nm}", torch.full((B, self.n_majors), _fill, dtype=_dt, device=device))
@@ -2203,6 +2205,9 @@ class SimInit:
             [float(r["relHeal"]) for r in imp["rows"]], dtype=dtype, device=device)
         self._imp_tour_y = [int(r["tourY"]) for r in imp["rows"]]
         self._imp_tour_tech = [int(r["tourTech"]) for r in imp["rows"]]
+        # CIV6 (Nalanda): the random techs a seat is granted the first time it
+        # lays the row (`firstBuildTechs`), once per seat (`civ_first_imp_tech`)
+        self._imp_first_techs = [int(r["firstTechs"]) for r in imp["rows"]]
         # THE MILITARY ENGINEER'S ROWS. `eng` marks the ones it — and only it —
         # builds; `air` is what an Airstrip bases; `appeal` is what ANY
         # improvement takes off its neighbours, the `DistrictDef.appealAdjacent`

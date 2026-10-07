@@ -7448,10 +7448,11 @@ class SimSeats:
             self._dedication_event(row, self._ded_pen_brush, (got > i).long())
 
     def _competition_podium(self, done: torch.Tensor) -> None:
-        """CIV6 (Competition): "the civilization with the highest score wins the
-        Gold Tier rewards", every civ in the top 25% including it takes Silver,
-        and the next quarter takes Bronze. Ties break on the LOWER row, one
-        total order both engines share. `payPodium`'s twin."""
+        """CIV6 (Competition): the Gold Tier goes to the best score and to every
+        member that scored as much (runs/h1_duelw1118 t201); Silver to the top
+        25% of the field by rank, Bronze to the next quarter, rank ties broken
+        on the LOWER row, one total order both engines share. `payPodium`'s
+        twin."""
         nrow = self.n_majors
         for b in done.nonzero(as_tuple=True)[0].tolist():
             k = int(self.comp_kind[b])
@@ -7464,8 +7465,11 @@ class SimSeats:
             field.sort(key=lambda r: (-float(self.comp_score[b, r]), r))
             silver = -(-len(field) * self._comp_silver_pct // 100)
             bronze = -(-len(field) * self._comp_bronze_pct // 100)
+            best = float(self.comp_score[b, field[0]])
+            golds = {rank for rank, r in enumerate(field)
+                     if rank == 0 or (best > 0 and float(self.comp_score[b, r]) == best)}
             for rank, r in enumerate(field):
-                if rank == 0:
+                if rank in golds:
                     self.civ_diplo_points[b, r] += int(row["gold"])
                     # CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the
                     # winner also takes Great Person points, spread over the
@@ -7496,7 +7500,7 @@ class SimSeats:
                                               int(row["boostHi"]))
                 # CIV6 (WORLD_GAMES_*_TOURISM, ISS_*): the PERMANENT rewards ride
                 # the seat's perm run — the winner's own, then its tier's
-                _gpm = row["goldPerm"] if rank == 0 else None
+                _gpm = row["goldPerm"] if rank in golds else None
                 _tpm = (row["silverPerm"] if rank < silver
                         else row["bronzePerm"] if rank < bronze else None)
                 for _pm in (_gpm, _tpm):
@@ -8620,14 +8624,15 @@ class SimSeats:
         # the improvements standing live anywhere, read once: a row of one
         # standing nowhere pays nothing
         standing = set(torch.unique(self.improvement[live]).tolist())
-        # CIV6 (`YieldFromAppeal`): floored, and never negative.
+        # CIV6 (`YieldFromAppeal`): a negative Appeal a negative yield, cut
+        # toward zero (`appealYield`).
         if self._imp_appeal_y_any:
-            ap = self._tile_appeal().clamp(min=0).double()
+            ap = self._tile_appeal().double()
             for k, (yi, pct) in enumerate(self._imp_appeal_y):
                 if yi < 0 or k not in standing:
                     continue
                 here = live & (self.improvement == k)
-                out[:, :, yi] = out[:, :, yi] + torch.floor(ap * pct / 100.0).to(self.dtype) * here.to(self.dtype)
+                out[:, :, yi] = out[:, :, yi] + torch.trunc(ap * pct / 100.0).to(self.dtype) * here.to(self.dtype)
         # CIV6 (`Improvement_BonusYieldChanges`)
         if self._imp_res_y_any:
             tv, cv = self._seat_techs(row), self._seat_civics(row)

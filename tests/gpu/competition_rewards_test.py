@@ -161,6 +161,27 @@ def main() -> int:
     assert int(sim.comp_kind[B0]) == -1 and int(sim.comp_target[B0]) == -1 and int(sim.comp_left[B0]) == 0
     assert not bool(sim.comp_member[B0].any()) and float(sim.comp_score[B0].abs().sum()) == 0.0
     print("  3 Aid Request OK — triggered against the lowest victim, gold / project / war / pollution scored, 2 DVP + 100 Favor to the winner")
+
+    # ---- 4. a tie at the top shares the gold; the tiers stay by rank
+    # (runs/h1_duelw1118 t201: China and Rome on one Training Athletes each)
+    k = cids.index("WORLD_GAMES")
+    sim.civ_gp_perm[B0] = 0
+    dv = [float(x) for x in sim.civ_diplo_points[B0, :3]]
+    fv = [float(x) for x in sim.civ_diplo_favor[B0, :3]]
+    sim.comp_kind[B0] = k
+    sim.comp_left[B0] = 0
+    sim.comp_score[B0] = 0
+    sim.comp_member[B0, :sim.n_majors] = False
+    sim.comp_member[B0, :3] = True
+    sim.comp_score[B0, 0], sim.comp_score[B0, 1], sim.comp_score[B0, 2] = 50.0, 50.0, 0.0
+    sim._competition_podium(torch.tensor([True]))
+    sim.comp_kind[B0] = -1
+    assert perm(0, "campusTourism") == 2 and perm(1, "campusTourism") == 2, "both on the best score take the gold"
+    assert perm(2, "campusTourism") == 0
+    assert [float(sim.civ_diplo_points[B0, r]) - dv[r] for r in range(3)] == [1.0, 1.0, 0.0]
+    gained = [float(sim.civ_diplo_favor[B0, r]) - fv[r] for r in range(3)]
+    assert gained[0] == 50.0 and gained[1] == 0.0, f"the top tier by rank: the lower row alone {gained}"
+    print("  4 tie OK — the gold to every seat on the best score, the top tier by rank")
     print("COMPETITION REWARDS OK")
     return 0
 

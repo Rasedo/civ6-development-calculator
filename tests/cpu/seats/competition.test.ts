@@ -167,13 +167,16 @@ describe('a scored competition', () => {
     expect(state.seats[0].diplomaticFavor ?? 0).toBe(0);
   });
 
-  it('a tie takes the lower seat, one total order both engines share', () => {
+  it('a tie at the top shares the gold; the tiers go by rank, the lower seat first', () => {
     const state = table();
     startCompetition(state, COMPETITION_CLIMATE, [0, 1, 2]);
     // seats 1 and 2 emit nothing, so both trail seat 0 by the same gap
     for (let i = 0; i < COMPETITION_TURNS; i++) burn(state, [10, 0, 0]);
     expect(state.seats[1].diplomaticPoints).toBe(CLIMATE.goldPoints);
-    expect(state.seats[2].diplomaticPoints ?? 0).toBe(0);
+    expect(state.seats[2].diplomaticPoints).toBe(CLIMATE.goldPoints);
+    expect(state.seats[0].diplomaticPoints ?? 0).toBe(0);
+    expect(state.seats[1].diplomaticFavor).toBe(CLIMATE.silverFavor);
+    expect(state.seats[2].diplomaticFavor).toBe(CLIMATE.bronzeFavor);
   });
 });
 

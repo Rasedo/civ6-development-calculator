@@ -1498,6 +1498,25 @@ The engines' pantheon pick (`_seat_pantheon_race`) and the Free Cities' grant
 draw of the game's, so the engines' integer draw there is the driver's stand-in
 (AUDIT BUILD).
 
+## H-1: a wonder's and an improvement's tourism — PARTLY READ
+
+- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders):
+  TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCED_ERA_WONDER
+  (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the
+  wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's
+  (+0x220 → +0xc8), else 1 — where the owner's is later; then times the
+  city's tourism percent (0x1abe50 on +0x1ac8) over 100 when not 100
+  (`wonderTourism`, `WONDER_TOURISM_BASE`).
+- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its
+  Improvement_Tourism row pays only with its PrereqTech (+0x60, the
+  player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0)
+  held; source 6 (Appeal) reads the plot's appeal (vcall +0x28); any other
+  source the plot's yield of that type from 0x82280 (→ 0x538a60) with its
+  last flag false less the same with it true, times ScalingFactor / 100
+  when not 100, then the city's percent (+0x1b20) when positive. The flag
+  is 0x538a60's fifth argument, unread: which yields it leaves out is the
+  open question behind 1117 t222 (docs/AUDIT.md C-94).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

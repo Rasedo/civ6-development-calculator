@@ -814,6 +814,9 @@ export interface Seat {
   prevAge?: number;
   dedications?: number;
   dedicationPicks?: number[];
+  /** the seat has been paid a `firstBuildTechs` row's technologies (the
+   *  Mahavihara's) — latched at its first one, never cleared. */
+  firstImpTech?: boolean;
   /** This seat's ORIGINAL capital tile. Static once founded; capture moves
    *  the owner, never the tile. */
   capitalTile?: number;

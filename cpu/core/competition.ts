@@ -152,9 +152,11 @@ const FAIR_CLASSES: readonly GreatPersonClass[] = [
   'GENERAL', 'ADMIRAL', 'ENGINEER', 'MERCHANT', 'SCIENTIST', 'WRITER', 'ARTIST', 'MUSICIAN',
 ];
 
-/** The podium, by RANK: gold is the single best, and the two lower tiers are
- *  the published quarters of the field. Ties break on the lower seat id, one
- *  total order both engines share. */
+/** The podium. The two lower tiers go by RANK, the published quarters of the
+ *  field, ties broken on the lower seat id (one total order both engines
+ *  share); the gold goes to the best and to every member that scored as much
+ *  (runs/h1_duelw1118 t201: China and Rome on one Training Athletes each,
+ *  China took the Campus Tourism, Rome alone the top tier's Favor). */
 function payPodium(state: GameState, c: Competition): void {
   const def = COMPETITIONS[c.kind];
   if (!def) return;
@@ -162,15 +164,17 @@ function payPodium(state: GameState, c: Competition): void {
   for (let i = 0; i < c.member.length; i++) if (c.member[i]) field.push(i);
   if (field.length === 0) return;
   field.sort((a, b) => (c.score[b] - c.score[a]) || (a - b));
+  const best = c.score[field[0]];
+  const gold = (r: number): boolean => r === 0 || (best > 0 && c.score[field[r]] === best);
   const silver = Math.ceil(field.length * COMPETITION_SILVER_PCT / 100);
   const bronze = Math.ceil(field.length * COMPETITION_BRONZE_PCT / 100);
   for (let r = 0; r < field.length; r++) {
     const sx = seatOf(state, field[r]);
     if (!sx) continue;
-    if (r === 0) sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + def.goldPoints;
+    if (gold(r)) sx.diplomaticPoints = (sx.diplomaticPoints ?? 0) + def.goldPoints;
     // CIV6 (WORLD_FAIR_FIRST_PLACE_GREAT_PERSON_POINTS): the winner also
     // takes Great Person points, spread over the classes it scored.
-    if (r === 0 && def.goldGpp) {
+    if (gold(r) && def.goldGpp) {
       for (const cls of FAIR_CLASSES) sx.gpp[cls] = (sx.gpp[cls] ?? 0) + def.goldGpp;
     }
     // CIV6 (Faces of Peace): "+100% Diplomatic Favor from successfully
@@ -189,7 +193,7 @@ function payPodium(state: GameState, c: Competition): void {
     }
     // CIV6 (WORLD_GAMES_*_TOURISM, ISS_*): the PERMANENT rewards ride the
     // seat's perm run — the winner's own, then its tier's.
-    if (r === 0 && def.goldPerm) addSeatPerm(sx, def.goldPerm);
+    if (gold(r) && def.goldPerm) addSeatPerm(sx, def.goldPerm);
     if (r < silver) {
       if (def.silverPerm) addSeatPerm(sx, def.silverPerm);
     } else if (r < bronze && def.bronzePerm) addSeatPerm(sx, def.bronzePerm);

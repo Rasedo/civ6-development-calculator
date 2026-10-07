@@ -77,7 +77,8 @@ export type FeatureId =
   | 'PAMUKKALE'
   | 'DELICATE_ARCH'
   | 'UBSUNUR_HOLLOW'
-  | 'HA_LONG_BAY';
+  | 'HA_LONG_BAY'
+  | 'WHITE_DESERT';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 
@@ -126,7 +127,9 @@ export type ImprovementId =
   | 'MOUNTAIN_ROAD'
   | 'SKI_RESORT'
   | 'SEASTEAD'
-  | 'OFFSHORE_OIL_RIG';
+  | 'OFFSHORE_OIL_RIG'
+  | 'MAHAVIHARA'
+  | 'ALCAZAR';
 
 export type DistrictId =
   | 'CITY_CENTER'

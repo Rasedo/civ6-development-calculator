@@ -739,34 +739,33 @@ class SimGp:
         """CIV6 (Colaeus, Magellan): "free copy of the Luxury resource on this
         tile" — a copy of THAT resource, the row's own. CIV6 (John Spilsbury
         and the three after him): an INVENTED luxury serves cities exactly
-        like a worked one, and the row says how many."""
+        like a worked one — its copies are ONE luxury, one pass of the row's
+        reach."""
         if self._n_lux > 0:
             lux = self.lux_id.gather(1, hc.clamp(min=0).unsqueeze(1)).squeeze(1)
             pn = self._gp_fx(cls, at, "plotLuxury").long() * (m & (lux >= 0)).long()
             if bool((pn > 0).count_nonzero()):
                 self.civ_gp_lux_copies[:, row].scatter_add_(1, lux.clamp(min=0).unsqueeze(1), pn.unsqueeze(1))
-        n = self._gp_fx(cls, at, "luxuryCopies").long() * m.long()
-        if not bool((n > 0).count_nonzero()):
+        want = (self._gp_fx(cls, at, "luxuryCopies") > 0) & m
+        if not bool(want.count_nonzero()):
             return
         reach = self._gp_fx(cls, at, "luxuryAmenities").long().clamp(min=1)
-        for k in range(int(n.max())):
-            want = n > k
-            slot = self.civ_gp_lux_n[:, row]
-            fits = want & (slot < simbase.GP_LUX_MAX)
-            if not bool(fits.count_nonzero()):
-                continue
-            r = fits.nonzero(as_tuple=True)[0]
-            self.civ_gp_lux[r, row, slot[r]] = reach[r]
-            self.civ_gp_lux_n[r, row] = slot[r] + 1
-            # THE GRANT, stamped. `gpLuxuries` compares clean at the dump
-            # while the walk reads different counts, so what the log still
-            # has to separate is a whole-turn offset from a double grant.
-            if self._log_diff:
-                for _gb in r.tolist():
-                    self._diff_events.setdefault(_gb, []).append(
-                        f"g:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
-                        f" cls{int(cls[_gb])} at{int(at[_gb])}"
-                        f" n{int(self.civ_gp_lux_n[_gb, row])}")
+        slot = self.civ_gp_lux_n[:, row]
+        fits = want & (slot < simbase.GP_LUX_MAX)
+        if not bool(fits.count_nonzero()):
+            return
+        r = fits.nonzero(as_tuple=True)[0]
+        self.civ_gp_lux[r, row, slot[r]] = reach[r]
+        self.civ_gp_lux_n[r, row] = slot[r] + 1
+        # THE GRANT, stamped. `gpLuxuries` compares clean at the dump
+        # while the walk reads different counts, so what the log still
+        # has to separate is a whole-turn offset from a double grant.
+        if self._log_diff:
+            for _gb in r.tolist():
+                self._diff_events.setdefault(_gb, []).append(
+                    f"g:{int(self._ROW_SEAT[row])} t{int(self.turn)}"
+                    f" cls{int(cls[_gb])} at{int(at[_gb])}"
+                    f" n{int(self.civ_gp_lux_n[_gb, row])}")
 
     def _gp_unit_grants(self, row: int, m: torch.Tensor, cls: torch.Tensor,
                         at: torch.Tensor, hc: torch.Tensor, ccol: torch.Tensor) -> None:

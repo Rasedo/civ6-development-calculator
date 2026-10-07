@@ -44,7 +44,7 @@ import { WONDER_FREE_TILES } from '../data/constants';
  *  / civic to grant based on era"): ONE pool of the rows researchable before
  *  the first grant, each draw removing its pick (a row the grants open is not
  *  in it), so a seat with nothing available advances the stream not at all. */
-function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
+export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
   const open = kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)];
   for (let i = 0; i < n; i++) {

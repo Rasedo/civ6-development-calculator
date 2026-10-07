@@ -5,7 +5,7 @@ import { advanceGreatPeople, passGreatPerson, patronizeGreatPerson } from './gre
 import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
-import { completeQueueItem, dropQueuedBuilding, cultureBomb } from './production';
+import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch } from './production';
 import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
@@ -2185,6 +2185,12 @@ export function applySeatUnitOrders(state: GameState, actor: Seat, steps: number
             if (getModifiers(state, actor.seat).cultureBombs.some((r) => r.improvement === imp)) {
               const bombCity = cityAtTile(state, here);
               if (bombCity) cultureBomb(state, bombCity, here.index, false);
+            }
+            // CIV6 (Nalanda): "When a player constructs their first
+            // Mahavihara receive a random technology."
+            if (idef.firstBuildTechs && !actor.firstImpTech) {
+              actor.firstImpTech = true;
+              grantFreeResearch(state, actor, 'tech', idef.firstBuildTechs);
             }
             unit.charges = (unit.charges ?? 0) - 1;
             unit.movesLeft = 0;
