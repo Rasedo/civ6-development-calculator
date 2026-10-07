@@ -14,11 +14,14 @@ the main menu, then the engine's report over the dump (`.report.json`, `.report.
 the loop. One manifest line per game: host, seeds, dump and report paths,
 turns recorded, the end, wall time, and the report's pass / fail / skip
 counts per check. `summary` folds a manifest's reports into one table.
-The game's own draw log (Logs/RandCalls.csv: every draw's turn, range,
-value, seed and label) grows across games; the bytes a game appended are
-copied beside its dump (`.randcalls.csv`). The instances share one Logs
-folder, so with several hosts a game's slice holds the others' draws too
-(`randcallsMixed` in its manifest line).
+The game's own logs (Logs/*.csv and CultureBordersLog.txt: the per-draw
+RandCalls.csv, the war-weariness and combat ledgers, the AI's build,
+policy and research choices, boosts, barbarians, borders) grow across
+games or restart with one; the bytes a game wrote to each are copied to
+`<dump stem>.logs/` (RandCalls.csv also beside the dump as
+`.randcalls.csv`). The instances share one Logs folder, so with several
+hosts a game's slices hold the others' rows too (`logsMixed` in its
+manifest line).
 The instances must already stand at the main menu (`h4.py spawn` / `menu`).
 """
 from __future__ import annotations
@@ -38,21 +41,32 @@ LAB = HERE.parent
 ROOT = LAB.parents[1]
 RUNS = LAB / "runs"
 PY = sys.executable
-RANDCALLS = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI" / "Logs" / "RandCalls.csv"
+LOGS = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI" / "Logs"
 
 
-def randcalls_size() -> int:
+# the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
+SKIP_LOGS = {"AI_Behavior_Trees.csv"}
+
+
+def log_files() -> list[pathlib.Path]:
+    return sorted([f for f in LOGS.glob("*.csv") if f.name not in SKIP_LOGS] + [LOGS / "CultureBordersLog.txt"])
+
+
+def log_sizes() -> dict[str, int]:
+    out = {}
+    for f in log_files():
+        try:
+            out[f.name] = f.stat().st_size
+        except OSError:
+            pass
+    return out
+
+
+def save_slice(src: pathlib.Path, start: int, out: pathlib.Path) -> int:
+    """Copy `src`'s bytes past `start` (the game's own) to `out` with the
+    file's header; a file that restarted below `start` is copied whole."""
     try:
-        return RANDCALLS.stat().st_size
-    except OSError:
-        return 0
-
-
-def save_randcalls(start: int, out: pathlib.Path) -> int:
-    """Copy the draw log's bytes past `start` (the game's own) to `out` with
-    the log's header; the log restarting below `start` copies it whole."""
-    try:
-        data = RANDCALLS.read_bytes()
+        data = src.read_bytes()
     except OSError:
         return 0
     head, _, _ = data.partition(b"\n")
@@ -61,6 +75,19 @@ def save_randcalls(start: int, out: pathlib.Path) -> int:
         body = body[len(head) + 1:]
     out.write_bytes(head + b"\n" + body)
     return body.count(b"\n")
+
+
+def save_logs(starts: dict[str, int], dump: pathlib.Path) -> dict[str, int]:
+    """Every log's slice to `<dump stem>.logs/`; RandCalls.csv also beside the dump."""
+    folder = dump.with_suffix(".logs")
+    folder.mkdir(exist_ok=True)
+    rows = {}
+    for f in log_files():
+        if f.exists():
+            rows[f.name] = save_slice(f, starts.get(f.name, 0), folder / f.name)
+    if (folder / "RandCalls.csv").exists():
+        dump.with_suffix(".randcalls.csv").write_bytes((folder / "RandCalls.csv").read_bytes())
+    return rows
 
 
 def bounded(cmd: list[str], seconds: float, log: pathlib.Path) -> tuple[int, str]:
@@ -99,7 +126,7 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     if rc != 0:
         rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
         return rec
-    rc_start = randcalls_size()  # the new game's set-up draws are its own
+    log_start = log_sizes()  # the new game's set-up rows are its own
     rc, tail = bounded([PY, str(LAB / "game.py"), "--host", host, "new", "--config", a.config,
                         "--map-seed", str(seed), "--game-seed", str(seed + 1000), "--wait", str(a.chunk - 10)],
                        a.chunk + 10, log)
@@ -127,8 +154,8 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     rec["turn"] = last
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
-    rec["randcalls"] = save_randcalls(rc_start, dump.with_suffix(".randcalls.csv"))
-    rec["randcallsMixed"] = a.hosts.count(",") > 0
+    rec["logs"] = save_logs(log_start, dump)
+    rec["logsMixed"] = a.hosts.count(",") > 0
     with lock:  # the report is CPU work; one at a time keeps the box for the games
         rc, tail = bounded(["npx.cmd" if sys.platform == "win32" else "npx", "vite-node", "cpu/harness/run.ts", "--",
                             str(dump)], a.report_timeout, log)
