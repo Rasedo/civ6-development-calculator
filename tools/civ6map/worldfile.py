@@ -145,7 +145,10 @@ def world_file(w: World, script: str, size: str, map_seed: int) -> dict:
                 # list as its edges were set) and volcano vector (placement
                 # order): `GameMap.rivers`, `GameMap.volcanoes`
                 "rivers": [lst for rid, lst in w.river_plots().items() if rid >= 0],
-                "volcanoOrder": [i for i in dict.fromkeys(w.volcano_order) if w.feature[i] == w.fix["FEATURE_VOLCANO"]]},
+                "volcanoOrder": [i for i in dict.fromkeys(w.volcano_order) if w.feature[i] == w.fix["FEATURE_VOLCANO"]],
+                # StampContinents' partition, Plot:GetContinentType() per
+                # plot (-1 the sea): `GameMap.continents`
+                "continent": list(w.continent)},
         "civs": civs,
         "cityStates": city_states,
         "rngInit": (map_seed ^ 0x9E3779B9) & 0xFFFFFFFF,

@@ -85,7 +85,7 @@ import { builderCost, traderCost, unitDomain } from '../core/units';
 import { carryLayout, computeUnlocks, governmentSlots } from '../core/effects';
 import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
-import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
+import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from './aliases';
 import type { RandLog } from './randLog';
 
@@ -759,7 +759,7 @@ export function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
   const tiles: Tile[] = [];
   for (let i = 0; i < rec.head.W * rec.head.H; i++) tiles.push(tileOf(ctx, rec, i));
   const map: GameMap = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
-    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes };
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents };
   for (const t of tiles) t.riverMask = edgeMask(map, rec, t, P.riverBits);
   return map;
 }
@@ -1878,10 +1878,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     for (const l of labels) gap(ctx, 'event-draw', l);
   }
   ctx.scopeTile = undefined;
-  // the game's river and volcano vectors (`Catalog.orders`); a dump without
-  // them leaves the engine its own orders, a gap on the turn's event pick
+  // the game's river and volcano vectors (`Catalog.orders`) and its continents
+  // (the catalog's, else the map script's); a dump without them leaves the
+  // engine its own orders, a gap on the turn's event pick, and its landmasses
   const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
-    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes };
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes, continents: cat.continents ?? cat.orders?.continents };
   for (const t of tiles) {
     t.riverMask = edgeMask(map, rec, t, P.riverBits);
     t.cliffMask = edgeMask(map, rec, t, P.cliffBits);
@@ -1925,6 +1926,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (tier !== 1 && def.goldPerm) addSeatPerm(seat, def.goldPerm);
       if (tier !== 2 && def.silverPerm) addSeatPerm(seat, def.silverPerm);
     }
+    // the plots it has revealed, where the record carries them; else none is
+    // read and every plot counts as explored (`isExplored`)
+    seat.explored = revealedPlots(rec, p.id, W * H) ?? [];
     state.seats.push(seat);
     seatOfPlayer.set(p.id, i);
     playerOfSeat.set(i, p.id);

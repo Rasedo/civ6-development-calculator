@@ -62,7 +62,7 @@ export function loadWorld(world: WorldFile): GameState {
     });
   }
   const map: GameMap = { width: m.width, height: m.height, wrapX: m.wrapX, seed: world.gen.seed, tiles,
-    rivers: m.rivers, volcanoes: m.volcanoOrder };
+    rivers: m.rivers, volcanoes: m.volcanoOrder, continents: m.continent };
 
   const state = createGameFromMap(map, world.rngInit);
 

@@ -133,8 +133,8 @@ export function revealAround(
     }
   }
   // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
-  // a new Continent or natural wonder" — one continent here, so wonders are
-  // the whole event.
+  // a new Continent or natural wonder" — no continent's discovery is tracked,
+  // so wonders are the whole event.
   if (found > 0) dedicationEvent(state, seat, DED_DRACONES, DRACONES_DISCOVERY_SCORE * found);
   // CIV6 (Kandy): a Relic for each natural wonder first revealed
   if (wonders > 0) {

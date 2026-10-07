@@ -1531,7 +1531,7 @@ class SimMasks:
                 who = who & ((foe_seat == FREE_SEAT)
                              | ((foe_seat >= 0) & (foe_seat < self.n_majors) & _fg))
             elif when == 6:
-                # CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
+                # CIV6 (Roosevelt Corollary): the ORIGINAL capital's continent
                 who = who & self._seat_on_home_continent(seat, tc.reshape(seat.shape))
             elif when == 7:
                 # CIV6 (El Escorial, REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION): the
@@ -2872,8 +2872,8 @@ class SimMasks:
             if bool(_seen.count_nonzero()):
                 self._meet_citystates(rows, seat_row, _seen)
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
-        # discover a new Continent or natural wonder" — one continent here,
-        # so wonders are the whole event.
+        # discover a new Continent or natural wonder" — no continent's discovery
+        # is tracked, so wonders are the whole event.
         # CIV6 (Poundmaker): "...all alliances provide shared visibility" — an
         # ally sees what this seat uncovers, and the clause is MUTUAL, so
         # either side carrying it opens both. The discovery event below is the

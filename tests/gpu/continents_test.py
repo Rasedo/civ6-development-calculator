@@ -5,7 +5,8 @@
 
 The TS twin is tests/cpu/map/continents.test.ts.
 
-CIV6 (Continents): every contiguous LANDMASS gets an id; water is -1. A
+CIV6 (Continents): a map carrying the game's continents stamps them, else
+every contiguous LANDMASS gets an id; water is -1. A
 seat's HOME continent is its ORIGINAL capital's, which is what the install's
 requirements read (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT and its
 city/unit siblings).
@@ -51,6 +52,17 @@ def test_the_plane_is_the_fixture(rules, path) -> None:
     assert got == want, "the shipped continent ids did not survive the load"
     assert len(want) == sim.T
     print("  1 the plane OK —", sim.T, "tiles carried across intact")
+
+
+def test_the_area_plane_is_the_fixture(rules, path) -> None:
+    """The exporter's AreaBuilder areas (`deriveAreas`) arrive unchanged:
+    the barbarians' island test and camp regions read them."""
+    sim = build(path)
+    fx = json.loads(Path(path).read_text(encoding="utf-8"))
+    want = [int(t.get("area", -1)) for t in fx["tiles"]]
+    assert sim.tile_area[B0].tolist() == want, "the shipped area ids did not survive the load"
+    assert min(want) == 0, "a tile without an area"
+    print("  1b the area plane OK")
 
 
 def test_water_carries_none(rules, path) -> None:
@@ -129,6 +141,7 @@ def main() -> int:
     else:
         raise AssertionError("no fixture carries two landmasses")
     test_the_plane_is_the_fixture(rules, path)
+    test_the_area_plane_is_the_fixture(rules, path)
     test_water_carries_none(rules, path)
     test_home_is_the_original_capital(rules, path)
     test_a_seat_with_no_capital_reads_minus_one(rules, path)

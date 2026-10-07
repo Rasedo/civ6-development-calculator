@@ -52,7 +52,7 @@ import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, FeatureId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
-import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
+import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import { Civ6Random, drawsBetween } from './civ6Random';
 import { placeCitizens, replaceAllCitizens } from './citizens';
 import type { LoggedDraw } from './randLog';
@@ -2395,17 +2395,19 @@ export function seedMoments(state: GameState, imp: Imported, history?: History):
 /** the Moments rows the engines record (each one's `eras.moment.*` source) */
 const RECORDED_MOMENTS = new Set(SRC_REGISTRY.filter((r) => r.name.startsWith('eras.moment.') && 'xml' in r.src
   && r.src.col === 'EraScore').map((r) => (r.src as { where: string }).where.replace('MomentType=', '')));
-/** what the record cannot show of a recorded moment: no plot's revealed
- *  state, no Trading Post */
+/** what the record cannot show of a recorded moment: no Trading Post */
 const RECORD_BLIND_MOMENTS = new Set([
-  'MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD',
   'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV', 'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV_FIRST_IN_WORLD',
 ]);
+/** the moments a major's revealed plots decide, blind on a pair whose
+ *  records do not both carry them (`TurnRecord.revealed`) */
+const REVEAL_MOMENTS = new Set(['MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD']);
 
 /** the gaps a pair's own moments leave the comparison: a paying row the
  *  engines do not record, or one the record cannot show */
-function momentGaps(moments: readonly [number, string, number, number][]): string[] {
-  return moments.filter((m) => m[2] !== 0 && (!RECORDED_MOMENTS.has(m[1]) || RECORD_BLIND_MOMENTS.has(m[1])))
+function momentGaps(moments: readonly [number, string, number, number][], revealed: boolean): string[] {
+  return moments.filter((m) => m[2] !== 0 && (!RECORDED_MOMENTS.has(m[1]) || RECORD_BLIND_MOMENTS.has(m[1])
+    || (!revealed && REVEAL_MOMENTS.has(m[1]))))
     .map((m) => `moment:${strip(m[1], 'MOMENT_')}`);
 }
 
@@ -2482,12 +2484,11 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
       ...(!Array.isArray(p0.commemorations) && (state.gameEra ?? 0) > 0 ? ['commemorations'] : []),
       ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
         .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:'))),
-      ...momentGaps(fresh),
+      ...momentGaps(fresh, revealedPlots(a, p0.id, 0) !== null && revealedPlots(b, p0.id, 0) !== null),
       // a city founded across the pair on what the engine's landmasses call
-      // a new continent: the game's continents are map-generation regions the
-      // record does not hold (1118 t195 Taiyuan, 1117 t246 Yiyang: no
-      // CITY_BUILT_NEW_CONTINENT across a strait)
-      ...(b.cities.some((c) => c.owner === p0.id && !a.cities.some((q) => q.x === c.x && q.y === c.y)
+      // a new continent, on a map whose continents neither the dump nor the
+      // map script gave
+      ...(!state.map.continents && b.cities.some((c) => c.owner === p0.id && !a.cities.some((q) => q.x === c.x && q.y === c.y)
         && newContinent(state, seat, c.y * a.head.W + c.x)) ? ['continent: not recorded'] : []),
       // a natural wonder's moment over a map whose wonder the importer dropped
       ...(fresh.some((m) => m[1].includes('NATURAL_WONDER'))

@@ -3068,7 +3068,7 @@ export function seatPhase(state: GameState): void {
         if (q.kind === 'building') _em *= congressEnergyProdMult(state, q.building);
         // CIV6 (EFFECT_ADJUST_BUILDING_PRODUCTION): the roster's building rows
         // CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
-        // the seat's home continent — its original capital's landmass
+        // the seat's home continent — its original capital's continent
         const _offHome = !onHomeContinent(state, civCity.seat, civCity.centerIndex);
         if (q.kind === 'building') _em *= prodMultFor(seatMods.prodMults, { kind: 'building', building: q.building, district: BUILDINGS[q.building]?.district }, _offHome);
         // CIV6 (Public Works Program): "+100% / -50% Production towards this

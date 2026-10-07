@@ -36,7 +36,7 @@ import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
 import { competitionOf } from './competition';
 import { canRunProject, chargeUnitResource } from './stockpile';
 import { FEATURES } from '../../world/features';
-import { isWater, deriveContinents, deriveMountainRanges } from '../../world/query';
+import { isWater, deriveAreas, deriveContinents, deriveMountainRanges } from '../../world/query';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
@@ -203,6 +203,7 @@ export function createGameFromMap(map: GameState['map'], rngInit: number): GameS
   // re-derived from a map the game has already changed.
   deriveLowlands(map);
   deriveContinents(map);
+  deriveAreas(map);
   deriveMountainRanges(map);
   return {
     map,
@@ -372,7 +373,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   }
   // CIV6 (Pax Britannica / Treasure Fleet): a city founded on a continent
   // other than the HOME one. The first city can never qualify — `capitalTile`
-  // is stamped by then, so its own landmass IS the home one.
+  // is stamped by then, so its own continent IS the home one.
   const foreign = !onHomeContinent(state, seat, tile.index);
   for (const g of cmods.grantUnits) {
     if (!(g.firstCity && list.length === 1) && !(g.foreignContinent && foreign)) continue;

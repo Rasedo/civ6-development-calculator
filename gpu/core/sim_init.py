@@ -2451,11 +2451,16 @@ class SimInit:
         self.tile_wh = torch.tensor([[float(t.get("wh", 2)) for t in f["tiles"]] for f in fixtures], dtype=torch.float64, device=device)  # water housing at a hypothetical center
         # Chop planes: grant key (0 none/1 food/2 prod) + removal-unlock tech
         self.tile_ftr = torch.tensor([[int(t.get("ftr", 0)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
-        # CIV6 (Continents): the landmass id per tile, -1 for water. A seat's
+        # CIV6 (Continents): the continent per tile, -1 for the sea. A seat's
         # HOME continent is its ORIGINAL capital's (`civ_cap_tile`, which
         # deliberately does not move).
         self.tile_continent = torch.tensor(
             [[int(t.get("cont", -1)) for t in f["tiles"]] for f in fixtures],
+            dtype=torch.long, device=device)
+        # CIV6 (AreaBuilder): the area per tile (`deriveAreas`) — the
+        # barbarians' island test and camp regions read it
+        self.tile_area = torch.tensor(
+            [[int(t.get("area", -1)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=device)
         # CIV6 (Mountain Tunnel): the connected MOUNTAIN component per tile, -1
         # off a mountain — "a movement portal on a mountain range".
@@ -4458,7 +4463,7 @@ class SimInit:
         self._apply_roster_start()
         # [civ, leaderRow, yield, amount, intercontinental] — the last gates
         # the row on the route's two ENDPOINTS sitting on different
-        # landmasses (`_route_intercontinental`)
+        # continents (`_route_intercontinental`)
         self._intl_route_rows: list[tuple[int, int, int, float, int]] = [
             (int(r[0]), int(r[1]), int(r[2]), float(r[3]), int(r[4]))
             for r in _uq["intlRouteYields"]]

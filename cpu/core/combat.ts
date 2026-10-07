@@ -1318,7 +1318,7 @@ export function rosterCS(state: GameState, own: { type: string; seat: number; ti
       // civilization in a golden age — a HEROIC age is a golden one here
       : r.when === 'foeGolden' ? isFreeSeat(foeSeat)
         || (isCiv(foeSeat) && (seatOf(state, foeSeat)?.age ?? 0) === AGE_GOLDEN)
-      // CIV6 (Roosevelt Corollary): the ORIGINAL capital's landmass
+      // CIV6 (Roosevelt Corollary): the ORIGINAL capital's continent
       : r.when === 'onHomeContinent' ? onHomeContinent(state, own.seat, own.tileIndex)
       // CIV6 (El Escorial): the foe's player follows another majority religion
       : r.when === 'foeOtherReligion' ? foeOtherReligion(state, own.seat, foeSeat)

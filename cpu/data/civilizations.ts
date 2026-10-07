@@ -777,7 +777,7 @@ export interface ProdMultRow {
   /** a DISTRICT item */
   districtItem?: DistrictId;
   /** CIV6 (Treasure Fleet): the row pays only in a city that is NOT on the
-   *  seat's home continent — its ORIGINAL capital's landmass. */
+   *  seat's home continent — its ORIGINAL capital's continent. */
   offHomeContinent?: boolean;
   /** every item of a queue kind */
   every?: 'building' | 'unit' | 'district';
@@ -856,7 +856,7 @@ export interface RouteYieldRow {
   yield: YieldKey;
   amount: number;
   /** CIV6 (Treasure Fleet, the install's `Intercontinental` argument): the row
-   *  pays only where the route's two ENDPOINTS sit on different landmasses.
+   *  pays only where the route's two ENDPOINTS sit on different continents.
    *  It ADDS to the plain row rather than replacing it — the install ships 3
    *  and 6, and the text reads "triple these numbers". */
   intercontinental?: boolean;
@@ -967,7 +967,7 @@ export const COMBAT_CS_ROWS: readonly CombatCsRow[] = withSrc([
   { leader: 'LAUTARO', amount: 10, when: 'foeGolden' },
   // CIV6 (Roosevelt Corollary): "Units receive a +5 Combat Strength on their
   // home continent" — REQUIREMENTS_UNIT_ON_HOME_CONTINENT, the ORIGINAL
-  // capital's landmass.
+  // capital's continent.
   { leader: 'T_ROOSEVELT', amount: 5, when: 'onHomeContinent' },
   // CIV6 (El Escorial, PHILIP_II_COMBAT_BONUS_OTHER_RELIGION Amount 5,
   // REQUIREMENTS_OPPONENT_IS_OTHER_RELIGION): against a player of another

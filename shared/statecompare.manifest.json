@@ -3572,6 +3572,10 @@
         "why": "the world's volcano vector, fixed at build; both engines read it through the fixture's volcanoes list."
       },
       {
+        "path": "GameMap.continents",
+        "why": "the world's continent partition, fixed at build; `deriveContinents` stamps it on `Tile.continent`, which both engines read through the fixture's cont plane."
+      },
+      {
         "path": "Seat.name",
         "why": "presentation."
       },
@@ -3669,7 +3673,11 @@
       },
       {
         "path": "Tile.continent",
-        "why": "a derived MAP fact, not state: `deriveContinents` flood-fills the landmasses once at map creation and the exporter ships the ids per tile, so the GPU reads exactly these rather than filling its own. Nothing mutates it — a tile the sea later takes keeps the id it was born with on BOTH engines, since neither recomputes — so there is nothing per-turn for a digest to compare."
+        "why": "a MAP fact, not state: `deriveContinents` stamps the map's continents (or its landmasses) once at map creation and the exporter ships the ids per tile, so the GPU reads exactly these rather than deriving its own. Nothing mutates it — a tile the sea later takes keeps the id it was born with on BOTH engines, since neither recomputes — so there is nothing per-turn for a digest to compare."
+      },
+      {
+        "path": "Tile.area",
+        "why": "a derived MAP fact, not state, static like `continent`: `deriveAreas` fills AreaBuilder's areas once at map creation and the exporter ships the ids per tile (the area plane)."
       }
     ],
     "gpu": [

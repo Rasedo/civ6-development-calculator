@@ -746,7 +746,7 @@ export function warDenounceHeld(state: GameState, a: number, b: number, turns: n
 }
 
 /**
- * CIV6 (Continents): the landmass a seat calls HOME — its ORIGINAL capital's,
+ * CIV6 (Continents): the continent a seat calls HOME — its ORIGINAL capital's,
  * which is what every "home continent" requirement in the install reads
  * (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT and its city/unit siblings).
  * `Seat.capitalTile` is the twin of the GPU's `civ_cap_tile`: both are
@@ -769,7 +769,7 @@ export function onHomeContinent(state: GameState, seat: number, tileIndex: numbe
 }
 
 /** CIV6 (Treasure Fleet): "Trade Routes between multiple continents" — the
- *  two ENDPOINTS sit on different landmasses. A route touching water-only
+ *  two ENDPOINTS sit on different continents. A route touching water-only
  *  ground (-1) is not intercontinental: the test is two KNOWN, different ids. */
 export function routeIntercontinental(state: GameState, fromTile: number, toTile: number): boolean {
   const a = state.map.tiles[fromTile]?.continent ?? -1;

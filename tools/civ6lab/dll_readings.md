@@ -1568,7 +1568,11 @@ clans' 0x8e1bf0 (no clans in these games).
   sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps
   (+0x170); the first step that adds adds
   BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33) % of it, every later
-  one 1. The regions are the continents of more than 10 plots; each keeps its
+  one 1. The regions are the map's Map_Region list (+0x620, filled at 0x153290
+  from the map's region container, vfunc +0x108): a region is taken when its
+  plot count (+4) or its area's (Map_Region +0xc m_area, looked up through
+  vfunc +0xd8) is over 10 — NOT the continents (see "the map's regions"
+  below); each keeps its
   best-scored plots (stable order). "Barbarian camp region placement" weighs
   the regions at the global top score by their plot counts, "Barbarian camp
   location" is uniform over the region's plots, the region's weight goes to
@@ -1578,7 +1582,9 @@ clans' 0x8e1bf0 (no clans in these games).
   camp within 7; score = max(0, nearest + second-nearest tribe distance, dead
   tribes counted) + the farthest major city within 7.
 - Tribe kind 0x154220: the first BarbarianTribes row the camp meets — NAVAL
-  on a landmass under 15 plots or with 4 water neighbours one not lake,
+  on an AREA under 15 plots (0x153d60 reads the plot's +8, the CvArea
+  pointer Plot:GetArea returns (0x25990), and its +4 plot count; +0 is the id
+  GetAreaID reads, 0x259c0) or with 4 water neighbours one not lake,
   CAVALRY with an unowned Horses plot within ResourceRange 3, else MELEE.
   "Barb Tribe Roll" 0x152460 draws over the kind's names no tribe holds.
 - Tribe init 0x147fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts
@@ -1596,8 +1602,36 @@ clans' 0x8e1bf0 (no clans in these games).
 LAB: the max camps at +0x110 is taken as 3 per living major, a fit to the
 recorded camp counts; its writer is unread. The sight the score and
 the target read is the engines' line of sight plus each centre's two rings
-and each owned plot's ring — a fit; the t1 picks also hang on the game's
-continent partition, which the dumps do not record.
+and each owned plot's ring — a fit.
+
+### The map's regions (Region_Builder, XP2 MapGen) — READ, not ported
+
+The camp step's regions are not the continents: every Duel map of
+1103–1128 but 1125 is ONE continent (Plot:GetContinentType(), the record's
+`continents` and the map script's StampContinents alike), yet the first
+camp step draws "Barbarian camp region placement" over more than one
+region — 1126 t1 range 19 then "location" range 7, 1127 8 / 7, 1128 15 / 1,
+1124 7 / 4. Nor are they the areas: 1124's 7 top plots and 1128's 17 lie in
+one passable-land area each (353 and 337 plots), and the game splits them
+(4 + 3; at least two regions).
+
+The regions are Map_Region objects (Core/Common/MapGen/Map_Region.cpp: +0
+id, +4 m_plotCount (0x37180 adds, asserts "m_plotCount >= 0"), +0xc m_area
+(0x38200, asserts "m_area == INVALID_ID || m_area == area")). Region_Builder
+(0x887810, XP2/Common/MapGen/Region_Builder.cpp) walks the plots in index
+order; a plot with no region (+0x18), not impassable (byte +0x3a bit 3) and
+not water (0x834d0) seeds a new region, and a pathfinder flood (0x77d10)
+from it adds plots through the visitor 0x886dd0 (the region's plot count,
+the plot's region pointer, the plot's area) under the step test 0x887aa0:
+the target passable land and in no region yet, and the step from plot to
+plot not crossing any chokepoint's line — the map's chokepoint list
+(vfunc +0x110, +0x88), each chokepoint's plots at +0x40 (count +0x50), its
+ends 0x886bb0 / 0x886b50, a segment test 0x8808f0 and an orientation test
+0x881ed0. The chokepoints are TerrainBuilder.AnalyzeChokepoints' (the map
+scripts call it last; "Choke Points" 0x8783c0, the medial graph and its
+pruning 0x87a1d0 / 0x87f100; Plot:IsChokepoint reads them) — not read. The
+engines hold neither: they take each area as one region (`Tile.area`),
+which agrees with the game only where no chokepoint splits an area.
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 

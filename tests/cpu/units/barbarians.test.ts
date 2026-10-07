@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, FREE_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { deriveAreas } from '../../../world/query';
 import { hostileUnitAct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
 import { barbarianRules, barbarianTechs, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
@@ -55,6 +56,21 @@ describe('the barbarians\' rules', () => {
     expect(tribeKindAt(state, camp.index).kind).toBe('MELEE');
     tileAtCoords(state.map, 8, 6).resource = 'HORSES';
     expect(tribeKindAt(state, camp.index).kind).toBe('CAVALRY');
+  });
+
+  it('give a naval tribe a camp on an area under 15 plots, mountains walling it', () => {
+    const state = land();
+    // mountains everywhere but a 9-plot pocket of land: its own area
+    const camp = tileAtCoords(state.map, 6, 6);
+    for (const t of state.map.tiles) {
+      const d = Math.max(Math.abs(t.col - 6), Math.abs(t.row - 6));
+      if (d >= 2) t.elevation = 'MOUNTAIN';
+    }
+    deriveAreas(state.map);
+    const size = state.map.tiles.filter((t) => t.area === camp.area).length;
+    expect(size).toBeLessThan(15);
+    expect(tribeKindAt(state, camp.index).kind).toBe(BARB_TRIBES[0].kind);
+    expect(BARB_TRIBES[0].coastal).toBe(true);
   });
 
   it('raise a new camp\'s defender on it and its scout beside it', () => {

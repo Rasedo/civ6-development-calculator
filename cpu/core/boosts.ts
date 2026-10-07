@@ -133,7 +133,7 @@ function ownUnits(state: GameState, seat: number, keep: (type: string, formation
  * read at the seat's turn (`detectBoosts`). An EVENT class (a kill, a camp
  * cleared, a declaration of war received, a park, an artifact) lands where
  * the event happens; a class neither engine models (`MEET_CIV`: no contact
- * between majors; `DISCOVER_CONTINENT`: no Civ 6 continents on the map;
+ * between majors; `DISCOVER_CONTINENT`: no continent discovery tracked;
  * `HAVE_X_THEMED_BUILDINGS`, `DISTRICT_APPEAL_LEVEL_MINIMUM_X`,
  * `AIRBASE_FOREIGN_CONTINENT`) and the late game's
  * `NONE_LATE_GAME_CRITICAL_TECH` never trigger.

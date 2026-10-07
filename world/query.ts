@@ -4,63 +4,65 @@ import { TERRAINS } from './terrains';
 import { FEATURES } from './features';
 import type { GameMap, Tile } from './types';
 
-/**
- * CIV6 (Continents): every contiguous LANDMASS gets an id, counting from 0
- * in ascending tile index; water is -1. A flood fill over land, which is what
- * a continent IS — mountains and impassable ground belong to the landmass
- * they sit in, and a lake never splits one because the ring of land around it
- * stays connected.
- *
- * Derived at map creation like `deriveLowlands`, so the world FILE is
- * unchanged and both engines read the same ids: the exporter ships this field
- * per tile and the GPU reads it back.
- */
-export function deriveContinents(map: GameMap): void {
-  const cont = new Int32Array(map.tiles.length).fill(-1);
+/** the connected components of the tiles `cls` gives a class (-1 none),
+ *  numbered from 0 in the order of their lowest tile; -1 off every class */
+function components(map: GameMap, cls: (t: Tile) => number): Int32Array {
+  const out = new Int32Array(map.tiles.length).fill(-1);
   let next = 0;
   for (const seed of map.tiles) {
-    if (isWater(seed) || cont[seed.index] >= 0) continue;
+    const k = cls(seed);
+    if (k < 0 || out[seed.index] >= 0) continue;
     const id = next++;
-    // ascending tile index out of the seed, so the walk is order-free
     const stack: Tile[] = [seed];
-    cont[seed.index] = id;
+    out[seed.index] = id;
     while (stack.length) {
       const t = stack.pop()!;
       for (const n of neighbors(map, t)) {
-        if (isWater(n) || cont[n.index] >= 0) continue;
-        cont[n.index] = id;
+        if (out[n.index] >= 0 || cls(n) !== k) continue;
+        out[n.index] = id;
         stack.push(n);
       }
     }
   }
+  return out;
+}
+
+/**
+ * CIV6 (Continents): each plot's continent, Plot:GetContinentType() — the
+ * map script's TerrainBuilder.StampContinents partition (`GameMap.
+ * continents`: land, mountain and lake plots carry one, the sea -1). A map
+ * whose generator kept none takes each contiguous landmass as a continent,
+ * counting from 0 in ascending tile index, water -1.
+ *
+ * Stamped at map creation like `deriveLowlands`; the exporter ships it per
+ * tile and the GPU reads it back.
+ */
+export function deriveContinents(map: GameMap): void {
+  const cont = map.continents ?? components(map, (t) => (isWater(t) ? -1 : 0));
   for (const t of map.tiles) t.continent = cont[t.index];
+}
+
+/**
+ * CIV6 (AreaBuilder.Recalculate): each plot's AREA — a connected component of
+ * one class, water (lakes included), mountains, or the rest of the land —
+ * numbered from 0 in the order of its lowest plot (tools/civ6map world.py
+ * `recalculate_areas`). The barbarians read it: a naval tribe's island
+ * (0x153d60 reads the plot's area size, Plot:GetArea) and the camp step's
+ * regions, which never cross an area. Static at creation like `continent`.
+ */
+export function deriveAreas(map: GameMap): void {
+  const area = components(map, (t) => (isWater(t) ? 0 : isMountain(t) ? 2 : 1));
+  for (const t of map.tiles) t.area = area[t.index];
 }
 
 /**
  * CIV6 (Mountain Tunnel): "Acts as a movement portal on a mountain range."
  * No table names a range, so one is the connected component of MOUNTAIN tiles
- * — the same flood fill `deriveContinents` runs over land, and static for the
- * same reason: mountains never move, so this bakes at export and never has to
+ * — static: mountains never move, so this bakes at export and never has to
  * be a mutable plane.
  */
 export function deriveMountainRanges(map: GameMap): void {
-  const rng = new Int32Array(map.tiles.length).fill(-1);
-  let next = 0;
-  for (const seed of map.tiles) {
-    if (!isMountain(seed) || rng[seed.index] >= 0) continue;
-    const id = next++;
-    // ascending tile index out of the seed, so the walk is order-free
-    const stack: Tile[] = [seed];
-    rng[seed.index] = id;
-    while (stack.length) {
-      const t = stack.pop()!;
-      for (const n of neighbors(map, t)) {
-        if (!isMountain(n) || rng[n.index] >= 0) continue;
-        rng[n.index] = id;
-        stack.push(n);
-      }
-    }
-  }
+  const rng = components(map, (t) => (isMountain(t) ? 0 : -1));
   for (const t of map.tiles) t.mountainRange = rng[t.index];
 }
 

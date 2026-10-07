@@ -1133,7 +1133,7 @@ class SimPhase:
         # a named building, every building of a district, EVERY building, or a
         # DISTRICT item (EFFECT_ADJUST_DISTRICT_PRODUCTION); the unit arms below
         # CIV6 (Treasure Fleet): a row may be keyed on the city sitting OFF
-        # the seat's home continent — its ORIGINAL capital's landmass
+        # the seat's home continent — its ORIGINAL capital's continent
         # at THIS call's city column — `cur` is [B], one city per call, so a
         # full-width read would broadcast against the wrong axis. Nothing but
         # such a row reads it, so it is derived on FIRST DEMAND rather than

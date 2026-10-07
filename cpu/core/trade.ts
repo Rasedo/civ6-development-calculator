@@ -479,7 +479,7 @@ export function rosterRouteCapacity(state: GameState, seat: number): number {
     if (r.govTier !== undefined && !cities.some((c) => c.buildings.some((b) => BUILDINGS[b]?.govTier === r.govTier))) continue;
     if (r.perForeignCity) {
       // CIV6 (Pax Britannica): once per city this seat holds off its home
-      // continent — the ORIGINAL capital's landmass
+      // continent — the ORIGINAL capital's continent
       cap += r.amount * cities.filter((c) => !onHomeContinent(state, seat, c.centerIndex)).length;
       continue;
     }

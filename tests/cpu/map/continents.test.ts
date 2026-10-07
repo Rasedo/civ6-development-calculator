@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
-import { deriveContinents, isWater } from '../../../world/query';
+import { deriveAreas, deriveContinents, isWater } from '../../../world/query';
 import { homeContinent, onHomeContinent, routeIntercontinental, emptySeat, seatOf } from '../../../cpu/core/seats';
 import { neighbors } from '../../../world/hex';
 
 /**
- * CIV6 (Continents): every contiguous LANDMASS gets an id; water is -1. A
+ * CIV6 (Continents): a map carrying the game's continents stamps them, else
+ * every contiguous LANDMASS gets an id; water is -1. A
  * seat's HOME continent is its ORIGINAL capital's, which is what the
  * install's requirements read (REQUIREMENT_PLOT_IS_OWNER_CAPITAL_CONTINENT
  * and its city/unit siblings).
@@ -62,6 +63,36 @@ describe('the continent fill', () => {
       if (c >= 0 && !seen.includes(c)) seen.push(c);
     }
     expect(seen).toEqual(seen.slice().sort((a, b) => a - b));
+  });
+});
+
+describe('the game\'s continents', () => {
+  it('a map carrying them stamps them, one continent across a strait', () => {
+    const map = makeMap(12, 12, 'GRASSLAND');
+    for (const t of map.tiles) if (t.col === 6) t.terrain = 'OCEAN';
+    map.continents = map.tiles.map((t) => (isWater(t) ? -1 : 34));
+    deriveContinents(map);
+    expect(tileAtCoords(map, 2, 5).continent).toBe(34);
+    expect(tileAtCoords(map, 9, 5).continent).toBe(34);
+    expect(tileAtCoords(map, 6, 5).continent).toBe(-1);
+  });
+});
+
+describe('the areas (AreaBuilder)', () => {
+  it('splits water, mountains and the other land, numbered by lowest plot', () => {
+    const map = makeMap(12, 12, 'GRASSLAND');
+    // a mountain column cuts the land in two; an ocean column beside it
+    for (const t of map.tiles) if (t.col === 6) t.elevation = 'MOUNTAIN';
+    for (const t of map.tiles) if (t.col === 9) t.terrain = 'OCEAN';
+    deriveAreas(map);
+    const west = tileAtCoords(map, 2, 5).area!;
+    const ridge = tileAtCoords(map, 6, 5).area!;
+    const mid = tileAtCoords(map, 7, 5).area!;
+    const sea = tileAtCoords(map, 9, 5).area!;
+    const east = tileAtCoords(map, 11, 5).area!;
+    expect(new Set([west, ridge, mid, sea, east]).size).toBe(5);
+    expect(map.tiles[0].area).toBe(0);
+    for (const t of map.tiles) if (t.col === 6) expect(t.area).toBe(ridge);
   });
 });
 

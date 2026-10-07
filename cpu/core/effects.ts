@@ -2181,7 +2181,7 @@ export interface YieldCtx {
   preserve?: ReadonlyMap<number, Yields>;
   /** the appeal an owner city adds to its own tiles. */
   gpAppeal?: GpAppeal;
-  /** CIV6 (Mission): is this tile on a landmass OTHER than the seat's
+  /** CIV6 (Mission): is this tile on a continent OTHER than the seat's
    *  original capital's? Absent leaves the clause unpaid, which is what the
    *  BASE context (nobody's seat) wants. */
   offHomeContinent?: (t: Tile) => boolean;

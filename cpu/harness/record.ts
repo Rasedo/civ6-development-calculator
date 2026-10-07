@@ -329,6 +329,9 @@ export interface Catalog {
   greatPersonClasses?: string[];
   randomEvents?: string[];
   coastalLowlands?: string[];
+  /** per plot its Plot:GetContinentType(), -1 none — absent from catalogs
+   *  the dumper wrote before it read them */
+  continents?: number[];
 }
 
 /** The game's river and volcano vectors in their own orders (`GameMap.rivers`,
@@ -339,6 +342,9 @@ export interface MapOrders {
   source: string;
   rivers: number[][];
   volcanoes: number[];
+  /** per plot its continent (the catalog's where the dump read them, else
+   *  the map script's StampContinents); absent where neither is known */
+  continents?: number[];
 }
 
 /** A dump's catalog (`<stem>.cat.json`) with the map orders beside it
@@ -350,9 +356,20 @@ export function loadCatalog(dumpPath: string): Catalog {
   const ordersPath = dumpPath.replace(/\.jsonl$/, '.orders.json');
   if (existsSync(ordersPath)) {
     const o = JSON.parse(readFileSync(ordersPath, 'utf8')) as MapOrders;
-    cat.orders = { source: o.source, rivers: o.rivers, volcanoes: o.volcanoes };
+    cat.orders = { source: o.source, rivers: o.rivers, volcanoes: o.volcanoes, continents: o.continents };
   }
   return cat;
+}
+
+/** A major's revealed plots in the record (`TurnRecord.revealed`), one 0/1
+ *  per plot: four plots a hex digit, plot 4k the digit's lowest bit; null
+ *  where the record does not carry them. */
+export function revealedPlots(rec: TurnRecord, player: number, n: number): number[] | null {
+  const hex = rec.revealed?.[String(player)];
+  if (typeof hex !== 'string') return null;
+  const out = new Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) out[i] = (parseInt(hex[i >> 2] ?? '0', 16) >> (i & 3)) & 1;
+  return out;
 }
 
 /** The plot at game (x, y) of a record: rows are y, plots x. */

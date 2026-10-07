@@ -30,7 +30,10 @@ generated map differs from the record.
 Writes `<stem>.orders.json`: `rivers` (per river in vector order its plot
 list as its edges were set, each edge adding its own plot then the plot
 across, each plot once, -1 for a partner off the map), `volcanoes` (plots in
-vector order), `source` ("game" or "map script") and the check's notes.
+vector order), `continents` (per plot its Plot:GetContinentType(): the
+catalog's `continents` where the dump read them, else StampContinents' on the
+generated map, null where neither is known), `source` ("game" or "map
+script") and the check's notes.
 """
 from __future__ import annotations
 
@@ -116,6 +119,17 @@ def orders(dump: pathlib.Path, map_seed: int | None = None, config: str | None =
                 if named and [i for i in order if i in named] != named:
                     notes.append(f"the named volcanoes reordered: {named} then {order}")
                 named = order
+    # the continents: the catalog's (Plot:GetContinentType() per plot) where
+    # the dump read them, the generator's a check; else the generator's
+    rec_cont = cat.get("continents")
+    gen_cont = list(world.continent)
+    if isinstance(rec_cont, list) and rec_cont:
+        continents = [int(c) for c in rec_cont]
+        if gen_ok:
+            off = sum(1 for g, c in zip(gen_cont, continents) if g != c)
+            notes.append("the map script's continents " + ("match" if not off else f"DIFFER on {off} plots"))
+    else:
+        continents = gen_cont if gen_ok else None
     if isinstance(live, list) and live:
         rivers = [[int(q) for q in r.get("plots", [])] for r in live]
         fp = {i for i, p in enumerate(plots) if p[1] >= 0 and "FLOODPLAINS" in cat["features"][p[1]]}
@@ -134,11 +148,11 @@ def orders(dump: pathlib.Path, map_seed: int | None = None, config: str | None =
         if gen_ok and [i for i in gen_volc if i in named] != named:
             notes.append(f"the named volcanoes {named} DIFFER from the map script's order {gen_volc}")
         return {"mapSeed": int(row["map_seed"]), "script": script, "size": cfg["size"], "source": "game",
-                "rivers": rivers, "volcanoes": volcanoes, "notes": notes}
+                "rivers": rivers, "volcanoes": volcanoes, "continents": continents, "notes": notes}
     if not gen_ok:
         raise SystemExit(f"{dump.name}: {notes[-1]}; no orders written")
     return {"mapSeed": int(row["map_seed"]), "script": script, "size": cfg["size"], "source": "map script",
-            "rivers": gen_rivers, "volcanoes": gen_volc, "notes": notes}
+            "rivers": gen_rivers, "volcanoes": gen_volc, "continents": continents, "notes": notes}
 
 
 def main() -> int:

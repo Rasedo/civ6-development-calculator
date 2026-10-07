@@ -6685,7 +6685,7 @@ class SimSeats:
         return out
 
     def _home_continent(self, row: int) -> torch.Tensor:
-        """[B] — the landmass seat `row` calls HOME: its ORIGINAL capital's,
+        """[B] — the continent seat `row` calls HOME: its ORIGINAL capital's,
         which is what every "home continent" requirement in the install reads.
         `civ_cap_tile` is the twin of TS's `Seat.capitalTile`: both are
         stamped at the first founding and neither MOVES, so a relocated Palace
@@ -7039,7 +7039,7 @@ class SimSeats:
     def _seat_on_home_continent(self, seat: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """The per-SEAT twin of `_on_home_continent`, for the sites that hold a
         seat TENSOR rather than a row: is each tile on that seat's home
-        landmass? False for a non-major, for a seat with no capital and for
+        continent? False for a non-major, for a seat with no capital and for
         water, so a clause keyed on it never pays by accident
         (`onHomeContinent`)."""
         ok = (seat >= 0) & (seat < self.n_majors)
@@ -7054,7 +7054,7 @@ class SimSeats:
 
     def _route_intercontinental(self, from_tile: torch.Tensor, to_tile: torch.Tensor) -> torch.Tensor:
         """CIV6 (Treasure Fleet): "Trade Routes between multiple continents" —
-        the two ENDPOINTS sit on different landmasses. A route touching
+        the two ENDPOINTS sit on different continents. A route touching
         water-only ground (-1) is NOT intercontinental: the test is two known,
         different ids (`routeIntercontinental`)."""
         a = self.tile_continent.gather(1, from_tile.clamp(min=0).reshape(self.B, -1)).reshape(from_tile.shape)
@@ -9325,7 +9325,7 @@ class SimSeats:
                     _rk_add(_kc, _irr[:, _kc].unsqueeze(1) * pays_i.double())
             # CIV6 (EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL): the roster's rows.
             # An INTERCONTINENTAL row pays only where the two ENDPOINTS sit
-            # on different landmasses, and it ADDS to the plain row rather
+            # on different continents, and it ADDS to the plain row rather
             # than replacing it (`addRouteRows`).
             _octr_i = self.city_center[:, row].gather(1, from_j)  # [B, K]
             _across_i = self._route_intercontinental(_octr_i, _dctr)
@@ -12040,7 +12040,7 @@ class SimSeats:
         # CIV6 (Pax Britannica / Treasure Fleet): a city founded on a
         # continent other than the HOME one. The FIRST city can never
         # qualify — `civ_cap_tile` is stamped by then, so its own
-        # landmass IS the home one.
+        # continent IS the home one.
         _foreign = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         _foreign[rows] = ~self._on_home_continent(row, tile.clamp(min=0))[rows]
         for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
@@ -15214,7 +15214,7 @@ class SimSeats:
                              & (self._b_gov_tier == _tier).reshape(1, 1, -1)).any(dim=2).any(dim=1)
             if _pfc:
                 # CIV6 (Pax Britannica): once PER city this seat holds off its
-                # home continent — the ORIGINAL capital's landmass
+                # home continent — the ORIGINAL capital's continent
                 _far = (alive & ~self._on_home_continent(row, self.city_center[:, row])).sum(dim=1)
                 cap = cap + who.long() * _amt * _far
                 continue

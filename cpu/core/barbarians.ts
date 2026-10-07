@@ -154,8 +154,12 @@ function campScore(state: GameState, t: Tile, seen: Uint8Array, hidden: Readonly
  * (BARBARIAN_CAMP_MAX_PER_MAJOR_CIV each) times the share of the land no
  * major sees now, less the camps standing; the first step that adds lays
  * BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD of it, every later one
- * a single camp. The candidates are scored per region — a continent of more
- * than 10 plots — each region keeping its best-scoring plots in plot order
+ * a single camp. The candidates are scored per region — the map's regions
+ * (0x153290: a region of more than 10 plots or on an area of more than 10)
+ * are its areas split at the map script's chokepoints (Region_Builder's flood
+ * 0x887810 stops at a chokepoint's line, 0x887aa0); the engines hold no
+ * chokepoints and take each area (`Tile.area`) as one region — each region
+ * keeping its best-scoring plots in plot order
  * (the evaluation's stable sort); the regions holding the best score of all
  * are weighed by how many such plots each holds ("Barbarian camp region
  * placement"), a plot of the chosen one is drawn ("Barbarian camp
@@ -186,10 +190,10 @@ export function campStep(state: GameState): void {
   const hidden = hiddenResourcesFor(state, BARB_SEAT);
   const majorCentres = majors.flatMap((s) => state.seats[s].cities.map((c) => c.centerIndex));
   const size = new Map<number, number>();
-  for (const t of map.tiles) if ((t.continent ?? -1) >= 0) size.set(t.continent!, (size.get(t.continent!) ?? 0) + 1);
+  for (const t of map.tiles) if ((t.area ?? -1) >= 0) size.set(t.area!, (size.get(t.area!) ?? 0) + 1);
   const best = new Map<number, { score: number; plots: number[] }>();
   for (const t of map.tiles) {
-    const reg = t.continent ?? -1;
+    const reg = t.area ?? -1;
     if (reg < 0 || (size.get(reg) ?? 0) <= BARB_REGION_MIN) continue;
     const s = campScore(state, t, seen, hidden, majorCentres);
     if (s === null) continue;
@@ -215,18 +219,18 @@ export function campStep(state: GameState): void {
   }
 }
 
-/** the land plots in this plot's landmass */
-function landmassSize(state: GameState, t: Tile): number {
-  const c = t.continent ?? -1;
-  return c < 0 ? 0 : state.map.tiles.filter((x) => x.continent === c).length;
+/** the plots in this plot's area (Plot:GetArea's plot count) */
+function areaSize(state: GameState, t: Tile): number {
+  const a = t.area ?? -1;
+  return a < 0 ? 0 : state.map.tiles.filter((x) => x.area === a).length;
 }
 
-/** does a tribe of this kind take the camp (0x154220): a naval one an island
+/** does a tribe of this kind take the camp (0x154220): a naval one an area
  *  under 15 plots or a shore with four water plots round it, one of them no
  *  lake (0x153d60); a cavalry one an unowned Horses plot within its range */
 function tribeFits(state: GameState, def: BarbTribeDef, t: Tile): boolean {
   if (def.coastal) {
-    if (landmassSize(state, t) < BARB_ISLAND_PLOTS) return true;
+    if (areaSize(state, t) < BARB_ISLAND_PLOTS) return true;
     const water = neighbors(state.map, t).filter((n) => isWater(n) && !isImpassable(n));
     return water.length >= BARB_COAST_WATER && water.some((n) => n.terrain !== 'LAKE');
   }

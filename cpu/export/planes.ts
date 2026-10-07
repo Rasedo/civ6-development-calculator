@@ -292,10 +292,12 @@ export function buildFixture(state: GameState, world: WorldFile): object {
           ? resourceImprovement(t) === 'MINE'
           : !isWater(t) && t.elevation === 'HILLS')
           ? 1 : 0,
-      // CIV6 (Continents): the landmass id, -1 for water. Derived at map
-      // creation by `deriveContinents`, shipped so both engines read the
-      // SAME ids rather than each flood-filling its own.
+      // CIV6 (Continents): the plot's continent, -1 for the sea, stamped at
+      // map creation by `deriveContinents`, shipped so both engines read the
+      // SAME ids.
       cont: t.continent ?? -1,
+      // CIV6 (AreaBuilder): the plot's area (`deriveAreas`)
+      area: t.area ?? -1,
       // CIV6 (Mountain Tunnel): the connected MOUNTAIN component this tile
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,

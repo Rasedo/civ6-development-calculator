@@ -133,13 +133,13 @@ class SimBarb:
 
     def _barb_tribe_kind(self, plot: torch.Tensor) -> torch.Tensor:
         """[B] long — `tribeKindAt`: the first BarbarianTribes row the camp
-        meets — a naval tribe an island under BARBARIAN islandPlots or a shore
+        meets — a naval tribe an area under BARBARIAN islandPlots or a shore
         with four water plots round it, one no lake; a cavalry one an unowned
         Horses plot within its range; else melee."""
         bidx = torch.arange(self.B, device=self.device)
         p = plot.clamp(min=0)
-        cont = self.tile_continent[bidx, p]
-        size = (self.tile_continent == cont.unsqueeze(1)).sum(dim=1)
+        area = self.tile_area[bidx, p]
+        size = (self.tile_area == area.unsqueeze(1)).sum(dim=1)
         nb = self.neigh[p]  # [B, 6]
         nbc = nb.clamp(min=0)
         wat = (nb >= 0) & self.wpass.gather(1, nbc)
@@ -148,7 +148,7 @@ class SimBarb:
         decided = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         for i, (coastal, res, rng, _pct, _every, _sc, _me, _ra, _de) in enumerate(self._bb["tribes"]):
             if coastal:
-                fits = ((cont >= 0) & (size < self._bb["islandPlots"])) | (
+                fits = ((area >= 0) & (size < self._bb["islandPlots"])) | (
                     (wat.sum(dim=1) >= self._bb["coastWater"]) & (wat & ~lake).any(dim=1))
             elif res >= 0:
                 near = self.pair_dist[p] <= rng  # [B, T]
@@ -277,22 +277,22 @@ class SimBarb:
             n1 = torch.where(nearer, d, n1)
         score = (n1 + n2).clamp(min=0) + far
         cand = ground & ~bad
-        # the regions: continents of more than regionMin plots
-        cont = self.tile_continent
-        R = int(cont.max()) + 1 if cont.numel() else 0
+        # the regions: the areas (`Tile.area`) of more than regionMin plots
+        reg = self.tile_area
+        R = int(reg.max()) + 1 if reg.numel() else 0
         if R <= 0:
             return
         size = torch.zeros(B, R, dtype=torch.long, device=self.device)
-        size.scatter_add_(1, cont.clamp(min=0), (cont >= 0).long())
-        big = size.gather(1, cont.clamp(min=0)) > bb["regionMin"]
-        cand = cand & (cont >= 0) & big
+        size.scatter_add_(1, reg.clamp(min=0), (reg >= 0).long())
+        big = size.gather(1, reg.clamp(min=0)) > bb["regionMin"]
+        cand = cand & (reg >= 0) & big
         sc = torch.where(cand, score, torch.full_like(score, -1))
         best = torch.full((B, R), -1, dtype=torch.long, device=self.device)
-        best.scatter_reduce_(1, cont.clamp(min=0), sc, reduce="amax", include_self=True)
+        best.scatter_reduce_(1, reg.clamp(min=0), sc, reduce="amax", include_self=True)
         top = best.max(dim=1).values
         at_top = cand & (sc == top.unsqueeze(1)) & (top >= 0).unsqueeze(1)
         weights = torch.zeros(B, R, dtype=torch.long, device=self.device)
-        weights.scatter_add_(1, cont.clamp(min=0), at_top.long())
+        weights.scatter_add_(1, reg.clamp(min=0), at_top.long())
         nadd = int(add[go].max())
         arR = torch.arange(R, device=self.device)
         for i in range(nadd):
@@ -303,7 +303,7 @@ class SimBarb:
             rc = r.clamp(min=0)
             n_in = weights.gather(1, rc.unsqueeze(1)).squeeze(1)
             idx = self._rand_range(on, n_in)
-            inr = at_top & (cont == rc.unsqueeze(1))
+            inr = at_top & (reg == rc.unsqueeze(1))
             pick = inr & (inr.long().cumsum(dim=1) == (idx + 1).unsqueeze(1))
             plot = pick.long().argmax(dim=1)
             weights = torch.where(on.unsqueeze(1) & (arR.unsqueeze(0) == rc.unsqueeze(1)), torch.zeros_like(weights), weights)

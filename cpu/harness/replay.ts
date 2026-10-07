@@ -1465,6 +1465,14 @@ export function compareState(state: GameState, read: Imported): Tallies {
     note(t, 'seat.government', es.government.chosen === rsx.government.chosen
       && setOf(es.government.policies) === setOf(rsx.government.policies), name,
     [rsx.government.chosen, ...rsx.government.policies], [es.government.chosen, ...es.government.policies]);
+    // the plots it has revealed, where the record carries them
+    if (rsx.explored.length && es.explored.length) {
+      const missing = rsx.explored.flatMap((v, i) => (v && !es.explored[i] ? [i] : []));
+      const extra = es.explored.flatMap((v, i) => (v && !rsx.explored[i] ? [i] : []));
+      note(t, 'fog.revealed', missing.length + extra.length === 0, name, { n: missing.length, plots: missing.slice(0, 8) },
+        { n: extra.length, plots: extra.slice(0, 8) },
+        missing.length + extra.length);
+    }
   });
   // units: each seat's roster, by type
   const roster = (st: GameState) => {
@@ -1666,9 +1674,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // say (`syncUnits`, `battle`): the engine's walk for it is its AI's
   holdMinorWalk(true);
   const state = first.state;
-  // the record holds no plot's revealed state: each seat starts on what its
-  // own plots, cities and units reveal (`initFog`), which its moments read
+  // each seat starts on the plots the record says it revealed
+  // (`TurnRecord.revealed`), else on what its own plots, cities and units
+  // reveal (`initFog`); its moments read them
+  const read = state.seats.map((s) => s.explored);
   initFog(state);
+  state.seats.forEach((s, i) => { if (read[i]?.length) s.explored = read[i]; });
   seedMoments(state, first, history);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
