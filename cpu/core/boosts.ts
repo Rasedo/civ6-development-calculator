@@ -6,8 +6,8 @@ import { isExplored } from './fog';
 import { BOOSTLESS, BOOSTS, type BoostDef } from '../data/boosts';
 import { getModifiers, seatGovernment } from './effects';
 import { DISTRICTS } from '../data/districts';
-import { ERAS, TECHS } from '../data/techs';
-import { CIVICS } from '../data/civics';
+import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
+import { CIVICS, CIVIC_TABLE_ORDER } from '../data/civics';
 import { GOVERNMENTS } from '../data/policies';
 import { UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
@@ -299,10 +299,11 @@ export function detectBoosts(state: GameState, seat: number): string[] {
  * for civics: "Choosing random tech / civic boost to grant based on era,
  * Player: n"): the rows of the eras `lo`..`hi` that carry a `Boosts` row
  * (`BOOSTLESS`), neither held nor boosted — era by era, each era's rows in
- * the catalog's order —, each weight 1.
+ * the install table's order (`TECH_TABLE_ORDER` / `CIVIC_TABLE_ORDER`) —,
+ * each weight 1.
  */
 export function boostPool(rsr: ResearchState, kind: 'tech' | 'civic', lo: number, hi: number): string[] {
-  const rows = kind === 'tech' ? Object.values(TECHS) : Object.values(CIVICS);
+  const rows = kind === 'tech' ? TECH_TABLE_ORDER.map((id) => TECHS[id]) : CIVIC_TABLE_ORDER.map((id) => CIVICS[id]);
   const held = kind === 'tech' ? rsr.techs : rsr.civics;
   const out: string[] = [];
   for (let e = Math.max(0, lo); e <= hi && e < ERAS.length; e++) {

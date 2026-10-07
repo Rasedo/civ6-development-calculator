@@ -1083,6 +1083,7 @@ _MUTABLE = [
     "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_first_imp_tech",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_camp", "seat_citystate_quest_issued",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
+    "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_faith",
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window

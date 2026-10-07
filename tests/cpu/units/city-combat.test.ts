@@ -18,17 +18,20 @@ import type { City, CityState, DistrictId, GameState, Tile } from '../../../cpu/
 // for the perimeter.
 
 describe('the wound penalty', () => {
-  it('CIV6: round(10 - HP/10) вЂ” 30 HP loses 7, 1 HP loses 10', () => {
+  it('the wounded law (0x522630): 10 x the damage percent, each percent cut to 1/256', () => {
     expect(woundPenalty({ hp: 100 })).toBe(0);
-    expect(woundPenalty({ hp: 30 })).toBe(7);
-    expect(woundPenalty({ hp: 1 })).toBe(10);
+    // 82 damage: 0.82 is 209/256, so 2,090/256 lost (dll_readings C-94)
+    expect(woundPenalty({ hp: 18 })).toBe(2090 / 256);
+    expect(woundPenalty({ hp: 30 })).toBe(1790 / 256);
     expect(woundPenalty({ hp: 0 })).toBe(10);
   });
 
-  it('rounds rather than trailing off вЂ” every CS term is an integer now', () => {
-    for (let hp = 0; hp <= 100; hp++) expect(Number.isInteger(woundPenalty({ hp }))).toBe(true);
-    expect(woundPenalty({ hp: 95 })).toBe(1); // 10 - 9.5 = 0.5 rounds up
-    expect(woundPenalty({ hp: 94 })).toBe(1);
+  it('is fractional: 18 damage loses 460/256, not 2 (runs/h1_duelw1117 t5)', () => {
+    expect(woundPenalty({ hp: 82 })).toBe(460 / 256);
+  });
+
+  it('a chassis with no wound penalty loses nothing', () => {
+    expect(woundPenalty({ hp: 30, type: 'SAMURAI' })).toBe(0);
   });
 });
 

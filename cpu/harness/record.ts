@@ -209,6 +209,8 @@ export interface DumpUnit {
   spreadCharges: Read<number>;
   religion: Read<number>;
   embarked: Read<boolean>;
+  /** the turns of fortification the unit holds (0..FORTIFY_TURN_MAX) */
+  fortify?: Read<number>;
   /** the UnitPromotions indices the unit holds */
   promotions?: number[];
 }

@@ -989,9 +989,13 @@ export interface CityState extends Seat {
    *  waits until that item completes (`minorBuild`). */
   repairWait?: boolean;
   outerHp?: number;
-  /** the build pot: the city's own Production, banked until the build
-   *  table's next item is covered (`minorPhase`). */
+  /** the item in hand (`minorItemKey`), its progress, the progress kept on
+   *  each item it switched away from, and the overflow store a completion or
+   *  an idle step leaves for the next step (`minorBuild`). */
+  prodItem?: string;
   prodProgress?: number;
+  prodRetained?: Record<string, number>;
+  prodOverflow?: number;
   /** the yield its last build step converted from a district project
    *  (`City.projectYield`, which `minorCity` hands its city) */
   projectYield?: ProjectYield;

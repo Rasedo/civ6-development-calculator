@@ -167,9 +167,9 @@ def main() -> int:
     post(s3, row, AMANI, 0)
     s3.civ_gov_establish[b, row, AMANI] = 2
     assert int(s3._envoys_here(row)[b, 0]) == 1, "an establishing posting counts for nothing"
-    s3._governor_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
+    s3._governor_establish_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
     assert int(s3.civ_gov_establish[b, row, AMANI]) == 1, "the clock must run abroad"
-    s3._governor_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
+    s3._governor_establish_tick(row, s3.civ_alive[:, row] & s3.city_alive[:, row].any(dim=1))
     assert int(s3.civ_gov_establish[b, row, AMANI]) == 0
     assert int(s3._envoys_here(row)[b, 0]) == 3, "and now Messenger counts"
     print("  2 the establishment clock runs abroad and gates the ability")

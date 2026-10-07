@@ -333,10 +333,10 @@ class SimMasks:
         # the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
         roll = self._rand_range(mask, self._dmg_max_extra)
         q = js_round(diff * 10).to(torch.long)
-        # `damageExponent`: the difference at 1/1000, D = floor(256 * diff),
+        # `damageExponent`: the difference at 1/65536, D = floor(256 * diff),
         # x = (k * D) >> 8 — integer floors on both engines
-        milli = js_round(diff.to(torch.float64) * 1000).to(torch.long)
-        d256 = torch.div(milli * 256, 1000, rounding_mode="floor")
+        q16 = js_round(diff.to(torch.float64) * 65536).to(torch.long)
+        d256 = torch.div(q16, 256, rounding_mode="floor")
         x = torch.div(self._dmg_k256 * d256, 256, rounding_mode="floor")
         # the table's reach, as `damageOf` holds x: past it every draw clamps
         # to the same damage
@@ -760,16 +760,18 @@ class SimMasks:
         return torch.where(self._type_bombard.take(t) > 0, self._type_bombard.take(t).double(), base)
 
     def _wound(self, hp: torch.Tensor, types: torch.Tensor | None = None) -> torch.Tensor:
-        """CIV6: "Damage of wounded units is diminished... The formula is
-        `round(10 - HP/10)`". The `woundPenalty` twin, RELIGIOUS Strength
-        included. hp is a unit-HP tensor; cities / city-states / walls are NOT
-        units and never pass through here.
+        """THE WOUNDED LAW on a unit's strength (0x522630): the damage
+        percent's loss in 1/256 (`_wounded_loss`), fractional. The
+        `woundPenalty` twin, RELIGIOUS Strength included. hp is a unit-HP
+        tensor; cities / city-states / walls are NOT units and never pass
+        through here.
 
         CIV6 (Samurai): "This unit does not suffer combat penalties when
         damaged" — the curve reads zero for that chassis. `types` is the
         chassis at each slot; the callers that hold no type pass none, and a
         build whose roster carries the clause must pass it."""
-        w = js_round(10.0 - hp.double().clamp(min=0.0) / 10.0)
+        dpct = (float(self.rules.combat["unitHp"]) - hp.double()).clamp(min=0.0, max=100.0).trunc().long()
+        w = self._wounded_loss.take(dpct).double() / 256.0
         if types is None:
             return w
         return torch.where(self._type_no_wound.take(types.clamp(min=0, max=self.NU - 1)),
@@ -2779,8 +2781,9 @@ class SimMasks:
         THERE can see (`canSee` over `tilesWithin`): CIV6 (measured ask 11)
         OCCLUSION BY ELEVATION — every tile strictly between (`_los_mid`) must
         put no more in the way than the observer's own height (flat 0, hills
-        1, mountain 2). The range is the caller's; a hill adds height, never
-        reach. `see_through` [K] bool is the Sentry flag per look."""
+        1, mountain 2) or the target's own. The range is the caller's; a hill
+        adds height, never reach. `see_through` [K] bool is the Sentry flag
+        per look."""
         K = rows.numel()
         rad = radius if torch.is_tensor(radius) else torch.full((K,), int(radius), dtype=torch.long, device=self.device)
         rad = rad.reshape(-1).expand(K) if rad.numel() == 1 else rad
@@ -2794,7 +2797,10 @@ class SimMasks:
         mth = torch.where(mid >= 0, mth, torch.zeros_like(mth))
         obs_h = (self.hills[rows, tiles].long() * self._sight_hills
                  + self.tile_mountain[rows, tiles].long() * self._sight_mountain)  # [K]
-        blocked = mth.max(dim=2).values > obs_h.reshape(K, 1)
+        # the target's own height (its elevation's plus its feature's, the
+        # Sentry flag aside): a tall plot shows over a lower one
+        tgt_h = th_all.gather(1, tgt.clamp(min=0))  # [K, N]
+        blocked = mth.max(dim=2).values > torch.maximum(obs_h.reshape(K, 1), tgt_h)
         d = self.pair_dist[tiles].gather(1, tgt.clamp(min=0)).to(torch.long)
         vis = (tgt >= 0) & ~blocked & (d <= rad.reshape(K, 1))
         disk = torch.zeros(K, self.T, dtype=torch.bool, device=self.device)

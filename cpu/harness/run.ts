@@ -191,9 +191,11 @@ function main() {
       + ` turns off: ${streams.turns.filter((t) => t.engine !== t.game).length} of ${streams.turns.length}; by point ${JSON.stringify(streams.byKind)}`);
     writeFileSync(opt.replay.replace(/\.json$/, '.md'), replayMarkdown(r));
     console.log(`replay (${r.source}): ${r.perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${opt.replay}`);
-    console.log('subsystem'.padEnd(28), 'held'.padStart(5), 'matched'.padStart(8), ' first');
+    console.log(`every subsystem held, nothing imposed: ${r.cleanEvery} pairs`);
+    console.log('subsystem'.padEnd(28), 'held'.padStart(5), 'clean'.padStart(6), 'imposed'.padStart(8), 'matched'.padStart(8), ' first');
     for (const [k, s] of Object.entries(r.subsystems)) {
-      console.log(k.padEnd(28), String(s.held).padStart(5), `${s.matched}/${s.compared}`.padStart(8), ' ', s.first ? `t${s.first.turn} ${s.first.subject}` : '-');
+      console.log(k.padEnd(28), String(s.held).padStart(5), String(s.clean).padStart(6), (s.imposedFrom ? `t${s.imposedFrom}` : '-').padStart(8),
+        `${s.matched}/${s.compared}`.padStart(8), ' ', s.first ? `t${s.first.turn} ${s.first.subject}` : '-');
     }
     return;
   }

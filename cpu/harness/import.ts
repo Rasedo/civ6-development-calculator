@@ -28,6 +28,7 @@
  */
 import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, GameState, GreatPersonClass, ImprovementId, Seat, TerrainId, Tile, TradeRoute, Unit, Yields } from '../core/types';
 import { NO_SEAT } from '../core/types';
+import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
@@ -266,6 +267,28 @@ export function unitId(ctx: Pick<Ctx, 'cat' | 'uReplace' | 'gaps'>, idx: number)
 
 /** A catalog row's engine id, as the importer maps it, outside an import: a
  *  building, district or unit index of `cat`. */
+/** A city-state city's item in hand as the record's queue holds it: nothing
+ *  for an empty queue, undefined for a row the engine does not know. */
+export function minorHead(cat: Catalog, c: DumpCity, W: number): MinorItem | undefined {
+  const head = c.queue?.[0];
+  if (!head || typeof head !== 'object' || !Object.keys(head).some((k) => k.endsWith('Type'))) return { none: true };
+  if (head.UnitType !== undefined) {
+    const unit = engineRowOf(cat, 'unit', head.UnitType);
+    return unit ? { unit } : undefined;
+  }
+  if (head.BuildingType !== undefined) {
+    const building = engineRowOf(cat, 'building', head.BuildingType);
+    return building ? { building } : undefined;
+  }
+  if (head.DistrictType !== undefined) {
+    const district = engineRowOf(cat, 'district', head.DistrictType) as DistrictId | null;
+    const at = head.Location;
+    return district && at && at.x >= 0 ? { district, site: at.y * W + at.x } : undefined;
+  }
+  const project = head.ProjectType !== undefined ? engineId('project', cat.projects[head.ProjectType] ?? '', 'PROJECT_', PROJECTS) : null;
+  return project ? { project } : undefined;
+}
+
 export function engineRowOf(cat: Catalog, kind: 'building' | 'district' | 'unit', idx: number): string | null {
   const ctx: Ctx = {
     cat, gaps: new Map(), bReplace: new Map(cat.buildingReplaces), dReplace: new Map(cat.districtReplaces),
@@ -2033,6 +2056,15 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         ? engineId('project', cat.projects[head.ProjectType] ?? '', 'PROJECT_', PROJECTS) : null;
       if (project) minor.buildProject = project;
       else delete minor.buildProject;
+      // the item in hand and its progress, as the record's queue holds them
+      // (the overflow store and the progress kept on other items are not
+      // recorded)
+      const item = minorHead(cat, c, W);
+      const key = item ? minorItemKey(item) : '';
+      if (key) {
+        minor.prodItem = key;
+        minor.prodProgress = num(c.queueProgress?.[0]) || 0;
+      }
       dumpOfMinor.set(minor, c);
       for (const q of c.plots) setTileOwner(tiles[q], seat);
       // its citizens pinned as a major's are: the minor's walk works the

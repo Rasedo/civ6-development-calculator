@@ -88,8 +88,10 @@ describe("the minor's city rides the yield walk", () => {
     minorPhase(state);
     expect(cs.research.techProgress).toBe(y.science);
     expect(cs.research.civicProgress).toBe(y.culture);
-    // so the pot takes the city's Production under the minor's own percent
-    expect(cs.prodProgress).toBe(y.production * ((100 + MINOR_PRODUCTION_PCT) / 100) * 1);
+    // so nothing is in hand and the step adds the city's Production (the
+    // minor's -50% among its percents) to the overflow store
+    expect(cs.prodOverflow).toBe(y.production);
+    expect(MINOR_PRODUCTION_PCT).toBe(-50);
     // the spent Builder costs no upkeep; a city whose buildings' maintenance
     // outruns its Gold leaves the balance at 0
     expect(cs.treasury).toBe(Math.max(0, y.gold));

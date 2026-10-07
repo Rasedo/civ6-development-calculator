@@ -84,7 +84,7 @@ const slotsOf = (xs: number[]): number[] => {
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS, DISTRICT_ROUTE_YIELDS, type AdjacencySource } from '../data/districts';
 import { FEATURE_ADD_CIVIC } from '../data/appeal';
 import { ENGINEER_FINISH_FRACTION } from '../core/game';
-import { TECHS, ERAS, MODERN_ERA_INDEX, type ResearchEffect } from '../data/techs'; // era scale
+import { TECHS, ERAS, MODERN_ERA_INDEX, TECH_TABLE_RANK, type ResearchEffect } from '../data/techs'; // era scale
 import {
   SPY_CAPACITY_CIVICS, SPY_CAPACITY_TECHS, SPY_CAPACITY_MAX, SPY_MAX_LEVEL, SPY_SECRET_AGENT_LEVEL,
   SPY_IDLE, SPY_TRAVELLING, SPY_TRAVEL_COLS, SPY_MISSIONS, SPY_SURVEILLANCE_REACH,
@@ -97,7 +97,7 @@ import {
   SPY_PARTISANS_MIN, SPY_PARTISANS_MAX,
   SPY_ESCAPE_ROUTES, SPY_SCANDAL_ENVOYS_BASE, SPY_SCANDAL_PER_LEVEL,
 } from '../data/espionage';
-import { CIVICS } from '../data/civics';
+import { CIVICS, CIVIC_TABLE_RANK } from '../data/civics';
 import { GOVERNMENTS, POLICIES, SLOT_KINDS, type SlotKind, type BuildingYieldBoost, type PolicyEffects, type GovernmentDef } from '../data/policies';
 
 /** A `buildingYieldBoost` as the GPU reads it:
@@ -1183,6 +1183,9 @@ export function buildRules() {
       enlightenmentCidx: civicIdx.get(ENLIGHTENMENT_CIVIC) ?? -3,
       techEra: techList.map((t) => Math.max(0, ERAS.indexOf(t.era))),
       civicEra: civicList.map((c) => Math.max(0, ERAS.indexOf(c.era))),
+      // each row's place in the install table's order, the random pickers' walk
+      techTableRank: techList.map((t) => TECH_TABLE_RANK[t.id]),
+      civicTableRank: civicList.map((c) => CIVIC_TABLE_RANK[c.id]),
       // the rows a random boost picker may offer (a `Boosts` row, `BOOSTLESS`)
       techBoostable: techList.map((t) => !BOOSTLESS.has(t.id)),
       civicBoostable: civicList.map((c) => !BOOSTLESS.has(c.id)),

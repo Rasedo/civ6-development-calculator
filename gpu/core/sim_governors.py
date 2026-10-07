@@ -52,7 +52,7 @@ class SimGovernors:
     def _governor_phase(self, row: int, active: torch.Tensor) -> None:
         """The seat's governor turn, at the top of its own turn and before
         anything reads the roster: spend the available titles, seat every idle
-        governor, then tick both clocks.
+        governor, then tick the neutralization clock.
 
         The CHOICE is a deterministic heuristic both engines mirror exactly —
         appoint in catalog order, promote the first legal promotion in catalog
@@ -301,7 +301,7 @@ class SimGovernors:
             taken[rows, sl] = True
 
     def _governor_tick(self, row: int, live: torch.Tensor) -> None:
-        """Both clocks, and the governor whose city is gone goes back to the
+        """The neutralization clock, and the governor whose city is gone goes back to the
         Palace."""
         NG = self.n_governors
         ap = self.civ_gov_appointed[:, row]
@@ -333,8 +333,17 @@ class SimGovernors:
             mgone = posted & ~mstill & live
             minor[:, g] = torch.where(mgone, torch.full_like(minor[:, g], -1), minor[:, g])
             est[:, g] = torch.where(mgone, torch.zeros_like(est[:, g]), est[:, g])
-            ticking = ((seated & still) | (posted & mstill)) & (est[:, g] > 0)
-            est[:, g] = torch.where(ticking, est[:, g] - 1, est[:, g])
+
+    def _governor_establish_tick(self, row: int, live: torch.Tensor) -> None:
+        """`tickGovernors`: the establishment clock ticks after the seat's
+        cities have yielded and before its tallies, for every appointed
+        governor holding a city or a city-state. `live` is the seat block's
+        city guard."""
+        ap = self.civ_gov_appointed[:, row]
+        est = self.civ_gov_establish[:, row]
+        held = (self.civ_gov_city[:, row] >= 0) | (self.civ_gov_minor[:, row] >= 0)
+        ticking = ap & held & (est > 0) & live.unsqueeze(1)
+        self.civ_gov_establish[:, row] = torch.where(ticking, est - 1, est)
 
     def neutralize_governor(self, b: int, row: int, g: int, turns: int) -> None:
         """CIV6 (Neutralize Governor / Governance Doctrine B): the governor

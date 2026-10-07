@@ -799,6 +799,10 @@ CITY_STATE = {
     "techProgress": lambda sim, b, rows: [float(sim.citystate_tech_prog[b, s]) for s in rows],
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "prodProgress": lambda sim, b, rows: [float(sim.citystate_prod[b, s]) for s in rows],
+    "minorProdItem": lambda sim, b, rows: [int(sim.citystate_item[b, s]) for s in rows],
+    "minorProdOverflow": lambda sim, b, rows: [float(sim.citystate_ovf[b, s]) for s in rows],
+    "minorProdKept": lambda sim, b, rows: [
+        [x for i, v in enumerate(sim.citystate_kept[b, s].tolist()) if v != 0 for x in (i, v)] for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
         for s in rows

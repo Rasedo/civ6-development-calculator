@@ -28,7 +28,7 @@ import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from '
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
 import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
-import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
+import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES, MINOR_PRODUCTION_PCT } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
@@ -1819,6 +1819,11 @@ export function computeCityStats(
       for (const k of Object.keys(mult) as YieldKey[]) pct[k] += (mult[k] ?? 1) - 1;
     }
   }
+  // CIV6 (MINOR_CIV_PRODUCTION_PENALTY, MODIFIER_PLAYER_CITIES_ADJUST_CITY_
+  // YIELD_MODIFIER -50): a city-state's city yield percent, in the same sum
+  // (runs/h1_duelw1117 Valletta t27: 6 Production Displeased reads
+  // 2.40234375, 6 x (1 - 0.5 - 0.1))
+  if (isCityStateSeat(city.seat)) pct.production += MINOR_PRODUCTION_PCT / 100;
   // the city's PLAIN Production (City_BuildQueue 0x16f050's read with no
   // item, 0x1c5350): the same sum without the flat toward the head
   const plainProduction = withPercent256(total.production - itemFlat, pct.production);

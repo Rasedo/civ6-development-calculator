@@ -7766,6 +7766,10 @@ class SimEconomy:
                 if compw is not None:
                     pct = pct + torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
                 pct = pct + torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
+        # CIV6 (MINOR_CIV_PRODUCTION_PENALTY, a city yield percent): a
+        # city-state's city takes the minor's -50% in the same sum
+        if self._CITY_MINOR0 <= row < self.FREE_ROW:
+            pct[:, :, 1] = pct[:, :, 1] + float(self.rules.citystate["productionPct"]) / 100.0
         # CIV6 (GameAttribute::Value 0xaa740): base + base x percent / 100 in
         # the game's 24.8 fixed point, the divide truncating toward zero
         # (`withPercent256`)

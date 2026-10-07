@@ -7071,7 +7071,8 @@ class SimSeats:
 
     def _draw_boosts(self, row: int, is_civic: bool, pool: torch.Tensor, n: torch.Tensor) -> torch.Tensor:
         """`drawBoosts`'s twin: `n` [B] draws over `pool` [B, k] in the pool's
-        order — era by era, each era's rows in column order —, each removing
+        order — era by era, each era's rows in the install table's order
+        (`_tech_rank` / `_civic_rank`) —, each removing
         its pick, the picks boosted. Returns the draws taken [B]; a game with
         nothing left takes none."""
         drawn = torch.zeros(self.B, dtype=torch.long, device=self.device)
@@ -7079,7 +7080,8 @@ class SimSeats:
             return drawn
         k = pool.shape[1]
         era_of = (self._civic_era if is_civic else self._tech_era)[:k]
-        perm = torch.argsort(era_of * k + torch.arange(k, device=self.device), stable=True)
+        rank = (self._civic_rank if is_civic else self._tech_rank)[:k]
+        perm = torch.argsort(era_of * (int(rank.max()) + 1) + rank, stable=True)
         live = pool[:, perm].clone()
         for i in range(int(n.max())):
             want = (n > i) & live.any(dim=1)
@@ -8019,7 +8021,8 @@ class SimSeats:
     def _grant_free_research(self, row: int, n_tech: torch.Tensor, n_civic: torch.Tensor) -> None:
         """`grantFreeResearch` — complete N techs and N civics outright, DRAWN
         AT RANDOM (the DLL's 0x4caeb0 / 0x39cd90): ONE pool of the rows
-        available before the first grant, each draw removing its pick, then
+        available before the first grant, in the install table's order, each
+        draw removing its pick, then
         clearing the pick and its parked progress the way the paid completion
         does. Techs before civics; a seat with nothing available spends none
         of the stream."""
@@ -8030,6 +8033,8 @@ class SimSeats:
             done0 = self.civ_civics[:, row] if is_civic else self.civ_techs[:, row]
             pre = self._prereq_c if is_civic else self._prereq_t
             avail = self._available_mask(done0, pre, self._c_repeat if is_civic else self._t_repeat).clone()
+            # the pool in the install table's order (`grantFreeResearch`)
+            perm = torch.argsort((self._civic_rank if is_civic else self._tech_rank)[:avail.shape[1]], stable=True)
             for k in range(int(n.max())):
                 want = n > k
                 if not bool(want.count_nonzero()):
@@ -8037,7 +8042,7 @@ class SimSeats:
                 hit = want & avail.any(dim=1)
                 if not bool(hit.count_nonzero()):
                     continue
-                pick = self._pick_live(hit, avail)[1]
+                pick = perm[self._pick_live(hit, avail[:, perm])[1]]
                 r = hit.nonzero(as_tuple=True)[0]
                 avail[r, pick[r]] = False
                 if is_civic:

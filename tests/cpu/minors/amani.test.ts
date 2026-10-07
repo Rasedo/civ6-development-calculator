@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { tilesWithin } from '../../../world/hex';
-import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor } from '../../../cpu/core/governors';
+import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor, tickGovernors } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { envoysHere, envoysOf, isSuzerain, minorLuxuries, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
 import { luxuryAmenities } from '../../../cpu/core/city';
@@ -67,8 +67,8 @@ describe('the governor at a city-state', () => {
     expect(roster[AMANI].minorId).toBe(far.id);
     expect(roster[AMANI].minorId).not.toBe(unmet.id);
     expect(roster[AMANI].cityId).toBe(-1);       // she took no city
-    // seated, then ticked, inside the one phase — exactly as a city posting is
-    expect(roster[AMANI].establishTurns).toBe(GOVERNORS[AMANI].establishTurns - 1);
+    // seated with the clock full, exactly as a city posting is
+    expect(roster[AMANI].establishTurns).toBe(GOVERNORS[AMANI].establishTurns);
     for (let i = 0; i < roster.length; i++) {
       if (i !== AMANI) expect(roster[i].minorId).toBe(-1);
     }
@@ -82,9 +82,9 @@ describe('the governor at a city-state', () => {
     g.establishTurns = 2;
     expect(minorGovernorEffects(state, 0, cs.id)).toEqual([]);
     expect(envoysHere(state, cs, 0)).toBe(1);
-    governorPhase(state, 0);
+    tickGovernors(state, 0);
     expect(g.establishTurns).toBe(1);
-    governorPhase(state, 0);
+    tickGovernors(state, 0);
     expect(g.establishTurns).toBe(0);
     // ...and now Messenger counts
     expect(envoysHere(state, cs, 0)).toBe(3);

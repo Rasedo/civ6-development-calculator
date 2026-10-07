@@ -23,7 +23,8 @@ import { emitCarbon, repairBehindBarrier } from './climate';
 import { PROJECTS, gpClassesOf, gppFractionOf } from '../data/projects';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY } from '../data/seats';
-import { ERAS, TECHS } from '../data/techs';
+import { ERAS, TECHS, TECH_TABLE_RANK } from '../data/techs';
+import { CIVIC_TABLE_RANK } from '../data/civics';
 import { buildingDedications, dedicationEvent, wonderMoment } from './eras';
 import { districtMoment } from './moments';
 import { spawnUnit, bestTrainableNaval } from './units';
@@ -43,11 +44,14 @@ import { WONDER_FREE_TILES } from '../data/constants';
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
  *  are DRAWN AT RANDOM — the DLL's 0x4caeb0 / 0x39cd90 ("Choosing random tech
  *  / civic to grant based on era"): ONE pool of the rows researchable before
- *  the first grant, each draw removing its pick (a row the grants open is not
- *  in it), so a seat with nothing available advances the stream not at all. */
+ *  the first grant in the install table's order (`TECH_TABLE_RANK`, the
+ *  random boosts' walk), each draw removing its pick (a row the grants open
+ *  is not in it), so a seat with nothing available advances the stream not
+ *  at all. */
 export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 'civic', n: number): void {
   const rsr = owner.research;
-  const open = kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)];
+  const rank = kind === 'tech' ? TECH_TABLE_RANK : CIVIC_TABLE_RANK;
+  const open = (kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)]).sort((a, b) => rank[a.id] - rank[b.id]);
   for (let i = 0; i < n; i++) {
     if (open.length === 0) return; // the tree is exhausted
     const next = open.splice(randRange(state, open.length), 1)[0];
@@ -324,9 +328,6 @@ export function completeQueueItem(
         city.nextPlot = -1;
       }
       wonderMoment(state, city.seat, WONDER_ERA_INDEX[item.wonder] ?? 0);
-      // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
-      // THE WONDER, before any other completion payout draws
-      grantEraBoosts(state, city.seat, ERAS[WONDER_ERA_INDEX[item.wonder] ?? 0]);
       const fx = BUILT_WONDERS[item.wonder]?.effects;
       // CIV6: Statue of Liberty pays +4 Diplomatic Victory points on
       // completion, Potala Palace +1.
@@ -393,6 +394,11 @@ export function completeQueueItem(
         }
         dedicationEvent(state, city.seat, DED_FREE_INQUIRY, fired);
       }
+      // CIV6 (Dynastic Cycle): a random Eureka and Inspiration from the ERA OF
+      // THE WONDER, after the wonder's own grants (runs/h1_duelw1117 t26:
+      // Stonehenge's Prophet draws its replacement, then the tech boost over
+      // 4 and the civic boost over 2)
+      grantEraBoosts(state, city.seat, ERAS[WONDER_ERA_INDEX[item.wonder] ?? 0]);
       break;
     }
     case 'settler':

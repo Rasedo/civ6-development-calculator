@@ -1,7 +1,7 @@
 
 import type { DistrictId, ImprovementId, Yields } from '../core/types';
 import { GAME_SPEED, scaleByGameSpeed } from './constants';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export type Era =
   | 'Ancient'
@@ -848,3 +848,33 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
       ]), repeatable: true },
   ].map((t) => [t.id, t]),
 );
+
+/**
+ * THE TECHNOLOGIES TABLE'S ROW ORDER, the order the install's rows load
+ * (`GameInfo.Technologies`' index, the records' catalog): the order the DLL
+ * walks an era's techs when it draws a random boost or a free tech
+ * (0x4ca470 / 0x4caa50 / 0x4caeb0; runs/h1_duelw1121 t17: China's Dynastic
+ * Cycle draws 1 of 6 Ancient techs — Sailing, Irrigation, Archery, Writing,
+ * Masonry, Bronze Working — and boosts Irrigation). `TECHS`' own key order is
+ * the engines' column order, which this is not.
+ */
+export const TECH_TABLE_ORDER: readonly string[] = srcConst('techs.tableOrder', [
+  'POTTERY', 'ANIMAL_HUSBANDRY', 'MINING', 'SAILING', 'ASTROLOGY', 'IRRIGATION', 'ARCHERY', 'WRITING', 'MASONRY',
+  'BRONZE_WORKING', 'WHEEL', 'CELESTIAL_NAVIGATION', 'CURRENCY', 'HORSEBACK_RIDING', 'IRON_WORKING', 'SHIPBUILDING',
+  'MATHEMATICS', 'CONSTRUCTION', 'ENGINEERING', 'MILITARY_TACTICS', 'APPRENTICESHIP', 'MACHINERY', 'EDUCATION',
+  'STIRRUPS', 'MILITARY_ENGINEERING', 'CASTLES', 'CARTOGRAPHY', 'MASS_PRODUCTION', 'BANKING', 'GUNPOWDER', 'PRINTING',
+  'SQUARE_RIGGING', 'ASTRONOMY', 'METAL_CASTING', 'SIEGE_TACTICS', 'INDUSTRIALIZATION', 'SCIENTIFIC_THEORY',
+  'BALLISTICS', 'MILITARY_SCIENCE', 'STEAM_POWER', 'SANITATION', 'ECONOMICS', 'RIFLING', 'FLIGHT', 'REPLACEABLE_PARTS',
+  'STEEL', 'ELECTRICITY', 'RADIO', 'CHEMISTRY', 'COMBUSTION', 'ADVANCED_FLIGHT', 'ROCKETRY', 'ADVANCED_BALLISTICS',
+  'COMBINED_ARMS', 'PLASTICS', 'COMPUTERS', 'NUCLEAR_FISSION', 'SYNTHETIC_MATERIALS', 'TELECOMMUNICATIONS',
+  'SATELLITES', 'GUIDANCE_SYSTEMS', 'LASERS', 'COMPOSITES', 'STEALTH_TECHNOLOGY', 'ROBOTICS', 'NANOTECHNOLOGY',
+  'NUCLEAR_FUSION', 'BUTTRESS', 'REFINING', 'SEASTEADS', 'ADVANCED_AI', 'ADVANCED_POWER_CELLS', 'CYBERNETICS',
+  'SMART_MATERIALS', 'PREDICTIVE_SYSTEMS', 'OFFWORLD_MISSION', 'FUTURE_TECH',
+], {
+  derived: 'the Technologies rows in the game database load order (Base Technologies.xml, then '
+    + 'Expansion2_Technologies.xml: Buttress, Refining, the Future era; read off GameInfo.Technologies in the records\' catalog)',
+  inputs: Object.keys(TECH_SRC).map((id) => xml('Technologies', (TECH_SRC[id].era as { where: string }).where, 'TechnologyType')),
+});
+
+/** each tech's place in `TECH_TABLE_ORDER` */
+export const TECH_TABLE_RANK: Readonly<Record<string, number>> = Object.fromEntries(TECH_TABLE_ORDER.map((id, i) => [id, i]));

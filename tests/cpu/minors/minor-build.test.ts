@@ -74,14 +74,23 @@ function idleBuilder(state: GameState, cs: CityState): void {
   u.charges = 0;
 }
 
-const half = (100 + MINOR_PRODUCTION_PCT) / 100;
+/** a turn from nothing in hand and an empty overflow store; the city's
+ *  Production (the minor's -50% among its percents) */
 function turnOf(state: GameState, cs: CityState): number {
   state.turn = 1;
   cs.prodProgress = 0;
+  cs.prodOverflow = 0;
+  delete cs.prodItem;
   const p = computeCityStats(state, minorCity(cs)).total.production;
   expect(p).toBeGreaterThan(0);
   minorPhase(state);
   return p;
+}
+/** the item in hand set by hand, with its progress and an empty store */
+function inHand(cs: CityState, key: string, progress: number): void {
+  cs.prodItem = key;
+  cs.prodProgress = progress;
+  cs.prodOverflow = 0;
 }
 function hold(cs: CityState, district: 'CAMPUS' | 'INDUSTRIAL_ZONE', t: Tile): void {
   setTileOwner(t, cs.seat);
@@ -141,6 +150,55 @@ describe('the build table', () => {
 });
 
 // ---------------------------------------------------------------------------
+describe("the minor's item in hand", () => {
+  it('keeps the progress of an item it turns from and resumes it when it turns back', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    idleBuilder(state, cs);
+    plan(cs, [buildingRow('ANCIENT_WALLS')]);
+    cs.research.techs = ['MINING', 'MASONRY'];
+    const p = turnOf(state, cs);
+    expect(cs.prodItem).toBe('building:ANCIENT_WALLS');
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_WALLS_PROD_PCT) / 100));
+    // the Builder is gone: the Builder row wants one, the walls keep theirs
+    state.units = state.units.filter((u) => !(u.seat === cs.seat && u.type === 'BUILDER'));
+    minorPhase(state);
+    expect(cs.prodItem).toBe('unit:BUILDER');
+    expect(cs.prodRetained).toEqual({ 'building:ANCIENT_WALLS': p * 3 });
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_BUILDER_PROD_PCT) / 100));
+    // a Builder stands again: the walls resume where they stopped
+    idleBuilder(state, cs);
+    minorPhase(state);
+    expect(cs.prodItem).toBe('building:ANCIENT_WALLS');
+    expect(cs.prodRetained).toEqual({ 'unit:BUILDER': p * 3 });
+    expect(cs.prodProgress).toBe(p * 3 + p * 3);
+  });
+
+  it('a completion leaves the store the Production less what the item lacked; the store joins the next item under its row', () => {
+    const state = makeState(makeMap(24, 24));
+    const cs = addCs(state, 12, 12);
+    idleBuilder(state, cs);
+    plan(cs, [buildingRow('ANCIENT_WALLS')], 20); // the army row after the walls
+    cs.research.techs = ['MINING', 'MASONRY'];
+    state.turn = 1;
+    const p = computeCityStats(state, minorCity(cs)).total.production;
+    const cost = BUILDINGS.ANCIENT_WALLS.cost;
+    // one point short: the step's 3p covers it, the store keeps p - 1
+    inHand(cs, 'building:ANCIENT_WALLS', cost - 1);
+    minorPhase(state);
+    expect(cs.buildings).toContain('ANCIENT_WALLS');
+    expect(cs.prodItem).toBeUndefined();
+    expect(cs.prodProgress).toBe(0);
+    expect(cs.prodOverflow).toBe(p - 1);
+    // the army row's unit takes A plus the store under its +200%
+    minorPhase(state);
+    expect(cs.prodItem).toMatch(/^unit:/);
+    expect(cs.prodProgress).toBe((p + p - 1) * ((100 + MINOR_MILITARY_PROD_PCT) / 100));
+    expect(cs.prodOverflow).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 describe("the minor's repair of a pillaged building", () => {
   it('waits for the item in hand, then comes first and resumes at 75% of its cost', () => {
     const state = makeState(makeMap(24, 24));
@@ -154,23 +212,24 @@ describe("the minor's repair of a pillaged building", () => {
     plan(cs, [buildingRow('ANCIENT_WALLS')]);
     cs.research.techs = ['MINING', 'MASONRY'];
     const p = turnOf(state, cs);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_WALLS_PROD_PCT) / 100));
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_WALLS_PROD_PCT) / 100));
     expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
     // the walls complete: the wait ends
-    cs.prodProgress = BUILDINGS.ANCIENT_WALLS.cost;
+    inHand(cs, 'building:ANCIENT_WALLS', BUILDINGS.ANCIENT_WALLS.cost);
     minorPhase(state);
     expect(cs.buildings).toContain('ANCIENT_WALLS');
     expect(cs.repairWait).toBe(false);
     // the repair is the item now, ahead of every row, under no toward-row
     const p2 = computeCityStats(state, minorCity(cs)).total.production;
-    cs.prodProgress = 0;
+    cs.prodOverflow = 0;
     minorPhase(state);
-    expect(cs.prodProgress).toBe(p2 * half);
+    expect(cs.prodItem).toBe('repair:LIBRARY');
+    expect(cs.prodProgress).toBe(p2);
     expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
     expect(MINOR_REPAIR_RESUME_PCT).toBe(75);
     const full = BUILDINGS.LIBRARY.cost;
     const left = full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
-    cs.prodProgress = left - p2 * half;
+    inHand(cs, 'repair:LIBRARY', left - p2);
     minorPhase(state);
     expect(cs.pillagedBuildings ?? []).toEqual([]);
     expect(cs.prodProgress).toBe(0);
@@ -186,7 +245,7 @@ describe("the minor's repair of a pillaged building", () => {
     cs.buildings = [...(cs.buildings ?? []), 'LIBRARY'];
     cs.pillagedBuildings = ['LIBRARY'];
     plan(cs, []);
-    cs.prodProgress = 1000;
+    inHand(cs, 'repair:LIBRARY', 1000);
     state.turn = 1;
     minorPhase(state);
     expect(cs.pillagedBuildings).toEqual(['LIBRARY']);
@@ -195,16 +254,19 @@ describe("the minor's repair of a pillaged building", () => {
 
 // ---------------------------------------------------------------------------
 describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
-  it('with nothing wanted the pot takes half the yield', () => {
+  it('the minor\'s -50% is a city yield percent, and with nothing wanted the step adds it all to the store', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12);
     idleBuilder(state, cs);
     plan(cs, []);
+    expect(MINOR_PRODUCTION_PCT).toBe(-50);
     const p = turnOf(state, cs);
-    expect(cs.prodProgress).toBe(p * half);
+    expect(cs.prodItem).toBeUndefined();
+    expect(cs.prodProgress).toBe(0);
+    expect(cs.prodOverflow).toBe(p);
   });
 
-  it('toward the walls: +200%, and the walls complete off that pot', () => {
+  it('toward the walls: +200%, and the walls complete', () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12);
     idleBuilder(state, cs);
@@ -212,9 +274,9 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     cs.research.techs = ['MINING', 'MASONRY'];
     const p = turnOf(state, cs);
     expect(MINOR_WALLS_PROD_PCT).toBe(200);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_WALLS_PROD_PCT) / 100));
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_WALLS_PROD_PCT) / 100));
     expect(cs.buildings ?? []).not.toContain('ANCIENT_WALLS');
-    cs.prodProgress = BUILDINGS.ANCIENT_WALLS.cost - p * half * 3 + 1;
+    inHand(cs, 'building:ANCIENT_WALLS', BUILDINGS.ANCIENT_WALLS.cost - p * 3 + 1);
     minorPhase(state);
     expect(cs.buildings).toContain('ANCIENT_WALLS');
     expect(cs.outerHp).toBe(WALLS_TIER_HP[1]);
@@ -228,11 +290,13 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     cs.buildFrom![buildingRow('ANCIENT_WALLS')] = 50;
     cs.research.techs = ['MINING', 'MASONRY'];
     const p = turnOf(state, cs);
-    expect(cs.prodProgress).toBe(p * half);
+    expect(cs.prodItem).toBeUndefined();
+    expect(cs.prodOverflow).toBe(p);
     state.turn = 50;
-    cs.prodProgress = 0;
+    cs.prodOverflow = 0;
     minorPhase(state);
-    expect(cs.prodProgress).toBe(p * half * 3);
+    expect(cs.prodItem).toBe('building:ANCIENT_WALLS');
+    expect(cs.prodProgress).toBe(p * 3);
   });
 
   it("toward the type's district: +500%; toward its tier-1 building: no row", () => {
@@ -243,7 +307,7 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     cs.research.techs = ['POTTERY', 'WRITING'];
     const p = turnOf(state, cs);
     expect(MINOR_TYPE_DISTRICT_PROD_PCT.scientific).toBe(500);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_TYPE_DISTRICT_PROD_PCT.scientific) / 100));
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_TYPE_DISTRICT_PROD_PCT.scientific) / 100));
     expect(cs.districts ?? []).toEqual([]);
 
     const b = makeState(makeMap(24, 24));
@@ -253,7 +317,8 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     cs2.research.techs = ['POTTERY', 'WRITING'];
     hold(cs2, 'CAMPUS', tileAtCoords(b.map, 13, 12));
     const p2 = turnOf(b, cs2);
-    expect(cs2.prodProgress).toBe(p2 * half * 1);
+    expect(cs2.prodItem).toBe('building:LIBRARY');
+    expect(cs2.prodProgress).toBe(p2);
   });
 
   it('toward the Harbor: +500%', () => {
@@ -266,7 +331,7 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     cs.research.techs = ['SAILING', 'ASTROLOGY', 'CELESTIAL_NAVIGATION'];
     const p = turnOf(state, cs);
     expect(MINOR_HARBOR_PROD_PCT).toBe(500);
-    expect(cs.prodProgress).toBe(p * half * ((100 + MINOR_HARBOR_PROD_PCT) / 100));
+    expect(cs.prodProgress).toBe(p * ((100 + MINOR_HARBOR_PROD_PCT) / 100));
   });
 
   it('toward a Builder: +200% while none stands, and the next one costs more', () => {
@@ -275,9 +340,9 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     plan(cs, []);
     const p = turnOf(state, cs);
     expect(MINOR_BUILDER_PROD_PCT).toBe(200);
-    expect(cs.prodProgress).toBe(p * half * 3);
+    expect(cs.prodProgress).toBe(p * 3);
     const cost0 = builderCost(state, cs.seat);
-    cs.prodProgress = cost0;
+    inHand(cs, 'unit:BUILDER', cost0);
     minorPhase(state);
     const builders = state.units.filter((u) => u.seat === cs.seat && u.type === 'BUILDER');
     expect(builders).toHaveLength(1);
@@ -293,7 +358,7 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     plan(cs, [], 20); // the army row wants one while fewer than 20 stand
     const p = turnOf(state, cs);
     expect(MINOR_MILITARY_PROD_PCT).toBe(200);
-    expect(cs.prodProgress).toBe(p * half * 3);
+    expect(cs.prodProgress).toBe(p * 3);
     const b = makeState(makeMap(40, 40));
     const cs2 = addCs(b, 20, 20);
     idleBuilder(b, cs2);
@@ -301,7 +366,7 @@ describe("the minor's production rows (MINOR_CIV_PRODUCTION_*)", () => {
     const far = tilesWithin(b.map, 20, 20, 3).filter((t) => hexDistance(state.map, t.col, t.row, 20, 20) >= 2);
     for (let k = 0; k < MINOR_SMALL_MILITARY; k++) spawnUnit(b, 'WARRIOR', far[k].index, cs2.seat);
     const p2 = turnOf(b, cs2);
-    expect(cs2.prodProgress).toBe(p2 * half);
+    expect(cs2.prodProgress).toBe(p2);
   });
 });
 
@@ -315,18 +380,18 @@ describe("the minor's training", () => {
     spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
     spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
     state.turn = 1;
-    cs.prodProgress = UNITS.WARRIOR.cost;
+    inHand(cs, 'unit:WARRIOR', UNITS.WARRIOR.cost);
     minorPhase(state);
     const army = state.units.filter((u) => u.seat === cs.seat && u.type === 'WARRIOR');
     expect(army).toHaveLength(3);
     // the new unit lands beside the centre, under the minor's seat
     expect(hexDistance(state.map, state.map.tiles[army[2].tileIndex].col, state.map.tiles[army[2].tileIndex].row, 12, 12))
       .toBeLessThanOrEqual(1);
-    // three stand: the row wants no fourth
-    const pot = cs.prodProgress!;
+    // three stand: the row wants no fourth, and the store fills
+    const store = cs.prodOverflow!;
     minorPhase(state);
     expect(state.units.filter((u) => u.seat === cs.seat && u.type === 'WARRIOR')).toHaveLength(3);
-    expect(cs.prodProgress).toBeGreaterThan(pot);
+    expect(cs.prodOverflow).toBeGreaterThan(store);
   });
 
   it("the ranged row trains the minor's strongest ranged chassis while none stands", () => {
@@ -335,11 +400,11 @@ describe("the minor's training", () => {
     idleBuilder(state, cs);
     plan(cs, [RANGED_ROW()]);
     state.turn = 1;
-    cs.prodProgress = 500;
+    inHand(cs, 'unit:SLINGER', 500);
     minorPhase(state);
     expect(state.units.filter((u) => u.seat === cs.seat && u.type === 'SLINGER')).toHaveLength(1);
     cs.research.techs = ['ANIMAL_HUSBANDRY', 'ARCHERY'];
-    cs.prodProgress = 500;
+    inHand(cs, 'unit:ARCHER', 500);
     minorPhase(state);
     expect(state.units.some((u) => u.seat === cs.seat && u.type === 'ARCHER')).toBe(false); // a ranged unit stands
   });
@@ -353,7 +418,7 @@ describe("the minor's training", () => {
     cs.research.techs = ['MINING', 'BRONZE_WORKING'];
     spawnUnit(state, 'SLINGER', cs.centerIndex, cs.seat);
     state.turn = 1;
-    cs.prodProgress = 500;
+    inHand(cs, 'unit:SPEARMAN', 500);
     minorPhase(state);
     // RANGED 140 (one held: 2/140) against ANTICAV 92 (none: 1/92): the Spearman
     const trained = state.units.filter((u) => u.seat === cs.seat && u.type !== 'BUILDER' && u.type !== 'SLINGER');
@@ -371,9 +436,10 @@ describe("the minor's training", () => {
     }
     state.turn = 1;
     const cost = builderCost(state, cs.seat);
-    cs.prodProgress = cost;
+    inHand(cs, 'unit:BUILDER', cost);
     minorPhase(state);
     expect(state.units.filter((u) => u.seat === cs.seat)).toHaveLength(0);
+    expect(cs.prodItem).toBe('unit:BUILDER');
     expect(cs.prodProgress).toBeGreaterThan(cost);
     expect(cs.buildersTrained).toBe(0);
   });
@@ -476,7 +542,7 @@ describe('the rows the table grew', () => {
     // no Foreign Trade: no capacity, no Trader
     expect(state.units.some((u) => u.seat === cs.seat && u.type === 'TRADER')).toBe(false);
     cs.research.civics = ['CODE_OF_LAWS', 'FOREIGN_TRADE'];
-    cs.prodProgress = traderCost(state, cs.seat);
+    inHand(cs, 'unit:TRADER', traderCost(state, cs.seat));
     minorPhase(state);
     expect(state.units.filter((u) => u.seat === cs.seat && u.type === 'TRADER')).toHaveLength(1);
   });
@@ -495,7 +561,7 @@ describe('the rows the table grew', () => {
     state.turn = 20;
     const cost = projectCost(state, cs.seat, 'REPAIR_DEFENSES', minorCity(cs));
     expect(cost).toBe(WALLS_TIER_HP[1] - 20);
-    cs.prodProgress = cost;
+    inHand(cs, 'project:REPAIR_DEFENSES', cost);
     minorPhase(state);
     expect(cs.outerHp).toBe(WALLS_TIER_HP[1]);
   });
@@ -511,7 +577,7 @@ describe('the rows the table grew', () => {
     const sci0 = cs.research.techProgress;
     hold(cs, 'CAMPUS', tileAtCoords(state.map, 13, 12));
     const cost = projectCost(state, cs.seat, 'RESEARCH_GRANTS');
-    cs.prodProgress = cost;
+    inHand(cs, 'project:RESEARCH_GRANTS', cost);
     const stats = computeCityStats(state, minorCity(cs)).total;
     minorPhase(state);
     // the completion pays no lump: the turn's Science alone
@@ -539,7 +605,7 @@ describe('the rows the table grew', () => {
     expect(cs.powered).toBe(true);
     // (a tech landing this turn may raise the price, so the pot holds plenty)
     const pot = projectCost(state, cs.seat, 'LOGISTICS') + 100;
-    cs.prodProgress = pot;
+    inHand(cs, 'project:LOGISTICS', pot);
     minorPhase(state); // it completes
     expect(cs.prodProgress).toBeLessThan(pot);
     expect(cs.fullyPowered).toBe(false);
@@ -563,7 +629,7 @@ describe('the rows the table grew', () => {
     state.seats[0].religion = { ...state.seats[0].religion, founded: true, worship: 'CATHEDRAL' };
     cs.religionPressure = [1000];
     state.turn = 1;
-    cs.prodProgress = BUILDINGS.CATHEDRAL.cost;
+    inHand(cs, 'building:CATHEDRAL', BUILDINGS.CATHEDRAL.cost);
     minorPhase(state);
     expect(cs.buildings).toContain('CATHEDRAL');
   });
@@ -582,7 +648,7 @@ describe('the rows the table grew', () => {
     low.lowland = 1;
     const cost = floodBarrierCost(state, minorCity(cs));
     expect(cost).toBeGreaterThan(0);
-    cs.prodProgress = cost;
+    inHand(cs, 'building:FLOOD_BARRIER', cost);
     minorPhase(state);
     expect(cs.buildings).toContain('FLOOD_BARRIER');
   });
@@ -600,7 +666,7 @@ describe('the rows the table grew', () => {
     site.improvement = 'FARM';
     site.resource = 'WHEAT';
     state.turn = 1;
-    cs.prodProgress = 1000;
+    inHand(cs, 'district:CAMPUS', 1000);
     minorPhase(state);
     expect(cs.districts?.[0]).toEqual({ type: 'CAMPUS', tileIndex: site.index });
     expect(site.district).toBe('CAMPUS');

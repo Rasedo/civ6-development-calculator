@@ -1,7 +1,7 @@
 
 import type { Era, ResearchEffect } from './techs';
 import { GAME_SPEED, scaleByGameSpeed } from './constants';
-import { xml, type SrcMap } from './provenance';
+import { srcConst, xml, type SrcMap } from './provenance';
 
 export interface CivicDef {
   id: string;
@@ -800,3 +800,31 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       ]), repeatable: true },
   ].map((c) => [c.id, c]),
 );
+
+/**
+ * THE CIVICS TABLE'S ROW ORDER, the order the install's rows load
+ * (`GameInfo.Civics`' index, the records' catalog): the order the DLL walks
+ * an era's civics when it draws a random inspiration or a free civic
+ * (0x39c330 / 0x39c930 / 0x39cd90; `TECH_TABLE_ORDER`'s twin). `CIVICS`' own
+ * key order is the engines' column order, which this is not.
+ */
+export const CIVIC_TABLE_ORDER: readonly string[] = srcConst('civics.tableOrder', [
+  'CODE_OF_LAWS', 'CRAFTSMANSHIP', 'FOREIGN_TRADE', 'MILITARY_TRADITION', 'STATE_WORKFORCE', 'EARLY_EMPIRE',
+  'MYSTICISM', 'GAMES_AND_RECREATION', 'POLITICAL_PHILOSOPHY', 'DRAMA_AND_POETRY', 'MILITARY_TRAINING',
+  'DEFENSIVE_TACTICS', 'RECORDED_HISTORY', 'THEOLOGY', 'NAVAL_TRADITION', 'FEUDALISM', 'CIVIL_SERVICE', 'MERCENARIES',
+  'MEDIEVAL_FAIRES', 'GUILDS', 'DIVINE_RIGHT', 'EXPLORATION', 'HUMANISM', 'DIPLOMATIC_SERVICE', 'REFORMED_CHURCH',
+  'MERCANTILISM', 'ENLIGHTENMENT', 'COLONIALISM', 'CIVIL_ENGINEERING', 'NATIONALISM', 'OPERA_AND_BALLET',
+  'NATURAL_HISTORY', 'SCORCHED_EARTH', 'URBANIZATION', 'CONSERVATION', 'CAPITALISM', 'NUCLEAR_PROGRAM', 'MASS_MEDIA',
+  'MOBILIZATION', 'IDEOLOGY', 'SUFFRAGE', 'TOTALITARIANISM', 'CLASS_STRUGGLE', 'COLD_WAR', 'PROFESSIONAL_SPORTS',
+  'CULTURAL_HERITAGE', 'RAPID_DEPLOYMENT', 'SPACE_RACE', 'GLOBALIZATION', 'SOCIAL_MEDIA', 'FUTURE_CIVIC',
+  'ENVIRONMENTALISM', 'CORPORATE_LIBERTARIANISM', 'DIGITAL_DEMOCRACY', 'SYNTHETIC_TECHNOCRACY',
+  'NEAR_FUTURE_GOVERNANCE', 'GLOBAL_WARMING_MITIGATION', 'SMART_POWER_DOCTRINE', 'INFORMATION_WARFARE',
+  'EXODUS_IMPERATIVE', 'CULTURAL_HEGEMONY',
+], {
+  derived: 'the Civics rows in the game database load order (Base Civics.xml, the packs\' rows after; read off '
+    + 'GameInfo.Civics in the records\' catalog)',
+  inputs: Object.keys(CIVIC_SRC).map((id) => xml('Civics', (CIVIC_SRC[id].era as { where: string }).where, 'CivicType')),
+});
+
+/** each civic's place in `CIVIC_TABLE_ORDER` */
+export const CIVIC_TABLE_RANK: Readonly<Record<string, number>> = Object.fromEntries(CIVIC_TABLE_ORDER.map((id, i) => [id, i]));

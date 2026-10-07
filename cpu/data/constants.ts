@@ -644,12 +644,12 @@ export const COMBAT_POWER_SCALING_256 = Math.trunc(COMBAT_POWER_SCALING * 256);
 export const DAMAGE_EXPONENT_REACH = 2000;
 
 /** the damage law's exponent x, in 1/256ths, for a strength difference. The
- *  difference is rounded to 1/1000 first, so both engines floor one integer
- *  whatever float noise their sums carry; then D = floor(256·Δ) and
- *  x = (k·D) >> 8, both floors as the DLL's shifts are. */
+ *  difference is rounded to 1/65536 first, so both engines floor one integer
+ *  whatever float noise their sums carry and a 24.8 strength (the wounded
+ *  law's) floors to itself; then D = floor(256·Δ) and x = (k·D) >> 8, both
+ *  floors as the DLL's shifts are. */
 export function damageExponent(strengthDiff: number): number {
-  const milli = Math.round(strengthDiff * 1000);
-  const d256 = Math.floor((milli * 256) / 1000);
+  const d256 = Math.floor(Math.round(strengthDiff * 65536) / 256);
   return Math.floor((COMBAT_POWER_SCALING_256 * d256) / 256);
 }
 

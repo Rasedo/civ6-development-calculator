@@ -153,8 +153,9 @@ describe('governors / era score', () => {
     expect(roster[1].cityId).toBe(civ.cities[1].id);
     expect(governorAt(state, civ.cities[2])).toBe(-1);
     expect(governorAt(state, civ.cities[0])).toBe(-1); // the capital pins at LOYALTY_MAX and ranks last
-    // the establishment clock has already ticked one turn of its own phase
-    expect(roster[0].establishTurns).toBe(GOVERNORS[0].establishTurns - 1);
+    // the establishment clock starts full: it ticks after the seat's yields
+    // (`tickGovernors`), not in the phase that seats her
+    expect(roster[0].establishTurns).toBe(GOVERNORS[0].establishTurns);
     expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
   });
 

@@ -177,6 +177,25 @@ const TECH_IDX = new Map(Object.keys(TECHS).map((id, i) => [id, i]));
 const CIVIC_IDX = new Map(Object.keys(CIVICS).map((id, i) => [id, i]));
 const BUILDING_IDX = new Map(LAYOUT.buildings.map((id, i) => [id, i]));
 const UNIT_IDX = new Map(LAYOUT.units.map((id, i) => [id, i]));
+const PROJECT_IDX = new Map(Object.keys(PROJECTS).map((id, i) => [id, i]));
+
+/** a minor's item key (`minorItemKey`) as the GPU's index (`_minor_switch`):
+ *  a unit its chassis, then a building, a district, a project, a pillaged
+ *  building's repair */
+function minorItemIdx(key: string): number {
+  const at = key.indexOf(':');
+  const kind = key.slice(0, at);
+  const id = key.slice(at + 1);
+  const b0 = UNIT_IDX.size;
+  const d0 = b0 + BUILDING_IDX.size;
+  const p0 = d0 + PLACEABLE_DISTRICTS.length;
+  const r0 = p0 + PROJECT_IDX.size;
+  const [base, at0] = kind === 'unit' ? [0, UNIT_IDX.get(id)]
+    : kind === 'building' ? [b0, BUILDING_IDX.get(id)]
+      : kind === 'district' ? [d0, (PLACEABLE_DISTRICTS as readonly string[]).indexOf(id)]
+        : kind === 'project' ? [p0, PROJECT_IDX.get(id)] : [r0, BUILDING_IDX.get(id)];
+  return at0 === undefined || at0 < 0 ? -2 : base + at0;
+}
 const WONDER_IDX = new Map(LAYOUT.wonders.map((id, i) => [id, i]));
 const GP_CLASS_OF = new Map<string, number>();
 for (const [cls, defs] of Object.entries(GREAT_PEOPLE)) {
@@ -707,6 +726,10 @@ const CITY_STATE_G: Record<string, Extractor> = {
   techProgress: overCityStates((cityState) => cityState.research.techProgress),
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   prodProgress: overCityStates((cityState) => cityState.prodProgress ?? 0),
+  minorProdItem: overCityStates((cityState) => (cityState.prodItem ? minorItemIdx(cityState.prodItem) : -1)),
+  minorProdOverflow: overCityStates((cityState) => cityState.prodOverflow ?? 0),
+  minorProdKept: overCityStates((cityState) => Object.entries(cityState.prodRetained ?? {})
+    .map(([k, v]) => [minorItemIdx(k), v] as const).sort((a, b) => a[0] - b[0]).flat()),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),

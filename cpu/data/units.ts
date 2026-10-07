@@ -924,7 +924,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 0,
       settler: true,
       description: 'Founds a new city (consumed on founding).',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_SETTLER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_SETTLER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SETTLER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_SETTLER', 'BaseMoves'),
@@ -981,7 +983,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       naturalist: true,
       requiresCivic: 'CONSERVATION',
       description: 'Designates a National Park over four contiguous tiles (consumed).',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_NATURALIST', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_NATURALIST', 'Cost', { scale: GAME_SPEED }),
         costStep: xml('Units', 'UnitType=UNIT_NATURALIST', 'CostProgressionParam1', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_NATURALIST', 'Maintenance'),
@@ -1292,7 +1296,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       requiresTech: 'CARTOGRAPHY',
       upgradesTo: 'IRONCLAD',
       description: 'Renaissance naval melee.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_CARAVEL', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_CARAVEL', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_CARAVEL', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_CARAVEL', 'BaseMoves'),
@@ -1516,7 +1522,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceUpkeep: 1,
       upgradesTo: 'DESTROYER',
       description: 'Industrial naval melee: 1 Coal to train and 1 per turn to run.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_IRONCLAD', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_IRONCLAD', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_IRONCLAD', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_IRONCLAD', 'BaseMoves'),
@@ -1865,7 +1873,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       description: 'Atomic light cavalry: 1 Aluminum to train and 1 per turn to run.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_HELICOPTER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_HELICOPTER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_HELICOPTER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_HELICOPTER', 'BaseMoves'),
@@ -1994,7 +2004,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       description: 'Information siege engine: full damage to city and district defenses.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_ROCKET_ARTILLERY', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_ROCKET_ARTILLERY', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_ROCKET_ARTILLERY', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_ROCKET_ARTILLERY', 'BaseMoves'),
@@ -2048,7 +2060,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       description: 'Information naval ranged: 1 Oil to train and 1 per turn to run.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_MISSILE_CRUISER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_MISSILE_CRUISER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_MISSILE_CRUISER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_MISSILE_CRUISER', 'BaseMoves'),
@@ -2117,7 +2131,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 3,
       description: 'The strongest chassis in the game: 1 Uranium to train and 3 per turn to run.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_GIANT_DEATH_ROBOT', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_GIANT_DEATH_ROBOT', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_GIANT_DEATH_ROBOT', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_GIANT_DEATH_ROBOT', 'BaseMoves'),
@@ -2169,7 +2185,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceUpkeep: 1,
       upgradesTo: 'FIGHTER',
       description: 'The first air fighter: 1 Oil to train and 1 per turn to run.',
+      sight: 4,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_BIPLANE', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_BIPLANE', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_BIPLANE', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_BIPLANE', 'BaseMoves'),
@@ -2199,7 +2217,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceUpkeep: 1,
       upgradesTo: 'JET_FIGHTER',
       description: 'Atomic air fighter: 1 Aluminum to train and 1 per turn to run.',
+      sight: 4,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_FIGHTER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_FIGHTER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_FIGHTER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_FIGHTER', 'BaseMoves'),
@@ -2230,7 +2250,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceUpkeep: 1,
       upgradesTo: 'JET_BOMBER',
       description: 'Atomic air bomber: 1 Aluminum to train and 1 per turn to run.',
+      sight: 4,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_BOMBER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_BOMBER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_BOMBER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_BOMBER', 'BaseMoves'),
@@ -2260,7 +2282,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       description: 'Information air fighter: 1 Aluminum to train and 1 per turn to run.',
+      sight: 5,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_JET_FIGHTER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_JET_FIGHTER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_JET_FIGHTER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_JET_FIGHTER', 'BaseMoves'),
@@ -2289,7 +2313,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       resourceCost: 1,
       resourceUpkeep: 1,
       description: 'Information air bomber: 1 Aluminum to train and 1 per turn to run.',
+      sight: 5,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_JET_BOMBER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_JET_BOMBER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_JET_BOMBER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_JET_BOMBER', 'BaseMoves'),
@@ -2319,7 +2345,9 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       spy: true,
       noGold: true,
       description: 'Runs secret missions in foreign cities and guards your own.',
+      sight: 3,
       src: {
+        sight: xml('Units', 'UnitType=UNIT_SPY', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_SPY', 'Cost', { scale: GAME_SPEED }),
         costStep: xml('Units', 'UnitType=UNIT_SPY', 'CostProgressionParam1', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SPY', 'Maintenance'),

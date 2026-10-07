@@ -71,11 +71,15 @@ export function hexLineBetween(map: GameMap, a: Tile, b: Tile): Tile[] {
 /**
  * CIV6 (measured, ask 11): can an eye standing on `from` see `to`?
  * OCCLUSION BY ELEVATION — every tile strictly between must put no more in
- * the way than the observer's own height (flat 0, hills 1, mountain 2); the
- * range is the caller's, a hill adds height and never reach.
+ * the way than the observer's own height (flat 0, hills 1, mountain 2) or
+ * the target's own (its elevation's plus its feature's, Sentry or not: a
+ * tall plot shows over a lower one — runs/h1_duelw1121 t7: Rome's Scout on
+ * flat (33,10) finds Kilimanjaro (2) past the wooded hill at (33,9); 1116
+ * China's natural-wonder Astrology boost at t13; LAB, no DLL reading); the range is the
+ * caller's, a hill adds height and never reach.
  */
 export function canSee(map: GameMap, from: Tile, to: Tile, seeThrough: boolean): boolean {
-  const h = ELEVATION_SIGHT[from.elevation] ?? 0;
+  const h = Math.max(ELEVATION_SIGHT[from.elevation] ?? 0, sightThrough(to, false));
   for (const m of hexLineBetween(map, from, to)) if (sightThrough(m, seeThrough) > h) return false;
   return true;
 }

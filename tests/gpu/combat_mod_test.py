@@ -153,16 +153,28 @@ def find_melee(rules, paths):
     raise AssertionError("no adjacent-hostile melee situation found in scripted play")
 
 
+def wounded_loss(d: int) -> float:
+    """The wounded law (0x522630) for a damage percent `d`, in Combat: 10 x
+    the percent as a float32 product with 0.01, cut to 1/256."""
+    def f32(x: float) -> float:
+        return struct.unpack("f", struct.pack("f", x))[0]
+    f = f32(f32(float(d)) * f32(0.01))
+    whole = int(f)
+    frac = int(f32((f - whole) * 256.0)) & 0xFF
+    return ((2560 * (whole * 256 + frac)) // 256) / 256.0
+
+
 def test_wound(sim) -> None:
     hp = torch.arange(0, 101, dtype=torch.long)
     got = sim._wound(hp)
-    # CIV6: round(10 - HP/10) — the `woundPenalty` twin. Python's round() is
-    # banker's rounding, so the expectation is spelled the way JS rounds.
-    want = torch.tensor([float(math.floor(10.0 - h / 10.0 + 0.5)) for h in range(101)], dtype=torch.float64)
-    assert torch.equal(got, want), "wound penalty diverges from TS round(10 - hp/10)"
+    # the wounded law (0x522630), the `woundPenalty` twin: 10 x the damage
+    # percent, each percent a float32 product with 0.01 cut to 1/256
+    want = torch.tensor([wounded_loss(100 - h) for h in range(101)], dtype=torch.float64)
+    assert torch.equal(got, want), "wound penalty diverges from TS woundedLoss256"
+    assert float(got[18]) == 2090 / 256 and float(got[82]) == 460 / 256
     assert float(sim._wound(torch.tensor([100]))[0]) == 0.0
-    assert float(sim._wound(torch.tensor([30]))[0]) == 7.0
-    assert float(sim._wound(torch.tensor([1]))[0]) == 10.0
+    assert float(sim._wound(torch.tensor([30]))[0]) == 1790 / 256
+    assert float(sim._wound(torch.tensor([1]))[0]) == 2530 / 256
     print("  A. _wound == TS woundPenalty, bit-exact for HP 0..100")
 
 
@@ -418,14 +430,16 @@ def test_integrated(sim, p, code, name) -> None:
     b7_flank, b7_support = flank_support_ref()
 
     # reference (TS assembly): atk_e = combat - wound(64) - 5*river + 2*flank;
-    #                    def_e = combat + terrain + fortify - wound(88) + 2*support
+    #                    def_e = combat + terrain + fortify - wound(88) + 2*support,
+    # the wound the wounded law
     def wound(hp):
-        return math.floor(10.0 - hp / 10.0 + 0.5)  # CIV6 round(10 - HP/10)
+        return wounded_loss(100 - hp)
 
     def ref_q(river):
         atk_e = atk_combat - wound(ATK_HP) - (5.0 if river else 0.0) + FLANKING_CS * b7_flank
         def_e = def_combat + tdef + 3 * def_fort - wound(DEF_HP) + SUPPORT_CS * b7_support
-        return round((atk_e - def_e) * 10), round((def_e - atk_e) * 10)
+        # the log's diff is JS Math.round of ten times it
+        return math.floor((atk_e - def_e) * 10 + 0.5), math.floor((def_e - atk_e) * 10 + 0.5)
 
     ev0 = run(False)
     q_mel0, q_melc0 = ref_q(False)

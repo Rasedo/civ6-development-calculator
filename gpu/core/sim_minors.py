@@ -627,6 +627,20 @@ class SimMinors:
                          for r in cs["freeBuildRows"]]
         self._tech_era = torch.tensor([int(x) for x in rules.seats["techEra"]], dtype=torch.long, device=dev)
         self._civic_era = torch.tensor([int(x) for x in rules.seats["civicEra"]], dtype=torch.long, device=dev)
+        # THE ITEM KEYS (`minorItemKey`'s index): a unit its chassis, then a
+        # building, a district, a project, a pillaged building's repair
+        n_u, n_b = len(rules.units or [None]), len(rules.b_cost)
+        n_d, n_p = len(rules.districts), len(rules.projects["rows"])
+        self._mk_b0 = n_u
+        self._mk_d0 = n_u + n_b
+        self._mk_p0 = self._mk_d0 + n_d
+        self._mk_r0 = self._mk_p0 + n_p
+        B, S = self.citystate_prod.shape
+        # the item in hand (-1 nothing), the overflow store, and the progress
+        # each item it switched away from keeps (`minorBuild`)
+        self.citystate_item = torch.full((B, S), -1, dtype=torch.long, device=dev)
+        self.citystate_ovf = torch.zeros(B, S, dtype=torch.float64, device=dev)
+        self.citystate_kept = torch.zeros(B, S, self._mk_r0 + n_b, dtype=torch.float64, device=dev)
 
     def _minor_plan(self, s: int) -> None:
         """`minorPlan` — the episode's draws, once, at the minor's first turn:
@@ -748,12 +762,30 @@ class SimMinors:
             ok = ok & (self.city_outer_hp[:, row, 0] >= self._walls_tier_hp.take(self._minor_walls_tier(s)))
         return ok
 
-    def _minor_train(self, s: int, pay: torch.Tensor, ui: torch.Tensor, cost: torch.Tensor) -> torch.Tensor:
-        """A unit the pot covers lands (`_minor_spawn`); only a unit that lands
-        is paid for. Returns where one landed."""
-        landed = self._minor_spawn(s, pay, ui)
-        self.citystate_prod[:, s] -= torch.where(landed, cost, torch.zeros_like(cost))
-        return landed
+    def _minor_switch(self, s: int, mask: torch.Tensor, key) -> None:
+        """`minorBuild`'s change of the item in hand where `mask` (`key` an int
+        or [B] long, `minorItemKey`'s index; -1 nothing): the item left keeps
+        its progress (`citystate_kept`, where it holds any), and the one taken
+        resumes at what it kept."""
+        k_all = key if torch.is_tensor(key) else torch.full((self.B,), int(key), dtype=torch.long, device=self.device)
+        cur = self.citystate_item[:, s]
+        ch = mask & (cur != k_all)
+        if not bool(ch.count_nonzero()):
+            return
+        rr = ch.nonzero(as_tuple=True)[0]
+        old = cur[rr]
+        prog = self.citystate_prod[rr, s]
+        keep = (old >= 0) & (prog > 0)
+        if bool(keep.any()):
+            self.citystate_kept[rr[keep], s, old[keep]] = prog[keep]
+        k = k_all[rr]
+        has = k >= 0
+        resume = torch.zeros_like(prog)
+        if bool(has.any()):
+            resume[has] = self.citystate_kept[rr[has], s, k[has]]
+            self.citystate_kept[rr[has], s, k[has]] = 0
+        self.citystate_prod[rr, s] = resume
+        self.citystate_item[rr, s] = k
 
     def _minor_repair_target(self, s: int) -> torch.Tensor:
         """[B] long — `minorRepairTarget`: the pillaged building minor `s`
@@ -770,23 +802,24 @@ class SimMinors:
         first = torch.where(ok, torch.arange(NB, device=self.device).unsqueeze(0), torch.full_like(dt, NB)).min(dim=1).values
         return torch.where(first < NB, first, torch.full_like(first, -1))
 
-    def _minor_repair_now(self, s: int, mask: torch.Tensor, target: torch.Tensor, toward) -> None:
-        """The repair where `mask`: the pot takes the turn's Production and the
-        building (`target`) completes when the pot covers what is left past
-        `MINOR_REPAIR_RESUME_PCT` of its cost (`minorBuild`'s `repairNow`)."""
+    def _minor_repair_now(self, s: int, mask: torch.Tensor, target: torch.Tensor, toward, complete) -> None:
+        """The repair where `mask`: the pillaged building (`target`) is the item
+        in hand, the step pays into it, and it completes when its progress
+        covers what is left past `MINOR_REPAIR_RESUME_PCT` of its cost
+        (`minorBuild`'s repair item)."""
         if not bool(mask.count_nonzero()):
             return
-        toward(mask, 0.0)
         row = self._CITY_MINOR0 + s
         tc = target.clamp(min=0)
+        before, _paid = toward(mask, 0.0, self._mk_r0 + tc)
         full = self.rules_dev.b_cost.to(torch.float64)[tc]
         if self._barrier_bidx >= 0:
             full = torch.where(tc == self._barrier_bidx, self._flood_barrier_cost(row)[:, 0].double(), full)
         cost = full - torch.floor(full * self._mb_repair_resume_pct / 100)
         pay = mask & (self.citystate_prod[:, s] >= cost)
+        complete(pay, cost, before)
         if bool(pay.count_nonzero()):
             rr = pay.nonzero(as_tuple=True)[0]
-            self.citystate_prod[rr, s] -= cost[rr]
             self.city_bldg_pillaged[rr, row, 0, tc[rr]] = False
             self._bldg_version += 1
             self._eff_version += 1
@@ -819,20 +852,24 @@ class SimMinors:
     def _minor_build(self, s: int, prod: torch.Tensor | None = None) -> None:
         """`minorBuild` — the first row of the build table (`MINOR_BUILD_ROWS`,
         fitted to C-38's census) that wants an item the minor can make now is
-        the one the turn's Production (`prod`, [B], `_minor_production`'s; none is
-        zero) goes toward: the pot takes it under the minor's percent on its
-        city's Production and that item's toward-row (walls +200%, the Harbor
-        and the type's district +500%, a Builder +200%, a military unit +200%
-        while it holds fewer than ten military units — the MINOR_CIV rows of
-        Leaders.xml), and the item completes when the pot covers it, at most
-        one a turn; a unit also needs a free tile on or beside the centre.
-        With no row wanting anything the pot takes it under the percent alone.
-        A drawn row wants nothing before its drawn turn (`_minor_plan`). A
+        the item in hand. The city keeps each item's progress apart: the item
+        it turns from keeps what it holds and one it turns back to resumes
+        there (`_minor_switch`, `citystate_kept`). The step pays the turn's
+        Production (`prod`, [B], `_minor_production`'s, the minor's -50% among
+        its percents; none is zero) plus the overflow store, the sum under the
+        item's toward-row (walls +200%, the Harbor and the type's district
+        +500%, a Builder +200%, a military unit +200% while it holds fewer than
+        ten military units — the MINOR_CIV rows of Leaders.xml), and the item
+        completes when its progress covers its cost, at most one a turn; a
+        unit also needs a free tile on or beside the centre. A completion
+        leaves the store the Production less what the item lacked, never below
+        0; with nothing in hand the step adds the Production to the store. A
+        drawn row wants nothing before its drawn turn (`_minor_plan`). A
         Trader waits on a route open to it and room under its capacity; the
         repair restores the walls at the HP it puts back; a district project
-        pays its yield conversion into the minor's own pot; a district paves
-        its plot (`_pave_plot`). A pillaged building is queued behind the item
-        in hand when it fell (`citystate_repair_wait`, cleared as an item
+        converts its percent of what the step paid in; a district paves its
+        plot (`_pave_plot`). A pillaged building is queued behind the item in
+        hand when it fell (`citystate_repair_wait`, cleared as an item
         completes or when no row wants one) and then comes first
         (`_minor_repair_target`, `_minor_repair_now`)."""
         if self.S == 0:
@@ -852,19 +889,35 @@ class SimMinors:
         bidx = self._bidx
         dcp = self.rules.district_cost
         cs_rules = self.rules.citystate
-        pen = (100 + float(cs_rules["productionPct"])) / 100
         walls_pct = float(cs_rules["wallsProdPct"])
         harbor_pct = float(cs_rules["harborProdPct"])
         type_pct = torch.tensor([float(x) for x in cs_rules["typeDistrictProdPct"]],
                                 dtype=torch.float64, device=dev)
         zero_b = torch.zeros(B, dtype=torch.float64, device=dev)
         ones_b = torch.ones(B, dtype=torch.bool, device=dev)
+        # A, the city's Production (the minor's -50% among its percents),
+        # which is its plain Production too: a minor holds no flat toward its head
         turn = prod if prod is not None else zero_b
 
-        def toward(avail: torch.Tensor, pct) -> None:
-            # `minorProduction`: the city's Production under the minor's
-            # percent, then the item's toward-row, paid where it is the target
-            self.citystate_prod[:, s] += torch.where(avail, turn * pen * ((100 + pct) / 100), zero_b)
+        def toward(avail: torch.Tensor, pct, key) -> tuple[torch.Tensor, torch.Tensor]:
+            # the item in hand becomes `key` where `avail` (`_minor_switch`),
+            # and the step pays A plus the overflow store under the item's
+            # row; returns the progress before the step and what it paid in
+            self._minor_switch(s, avail, key)
+            before = self.citystate_prod[:, s].clone()
+            paid = turn + self.citystate_ovf[:, s]
+            self.citystate_prod[:, s] += torch.where(avail, paid * ((100 + pct) / 100), zero_b)
+            self.citystate_ovf[:, s] = torch.where(avail, zero_b, self.citystate_ovf[:, s])
+            return before, paid
+
+        def complete(done: torch.Tensor, cost: torch.Tensor, before: torch.Tensor) -> None:
+            # a completion leaves the store A less what the item lacked before
+            # the step, never below 0, and nothing in hand
+            lacked = (cost - before).clamp(min=0)
+            self.citystate_ovf[:, s] = torch.where(done, (turn - lacked).clamp(min=0), self.citystate_ovf[:, s])
+            self.citystate_prod[:, s] = torch.where(done, zero_b, self.citystate_prod[:, s])
+            self.citystate_item[:, s] = torch.where(done, torch.full_like(self.citystate_item[:, s], -1),
+                                                    self.citystate_item[:, s])
 
         typ = self.citystate_type[:, s].clamp(min=0)
         # the minor's units, counted once before the walk
@@ -889,7 +942,7 @@ class SimMinors:
         # that item is done (`citystate_repair_wait`)
         rep = self._minor_repair_target(s)
         rep_now = alive & (rep >= 0) & ~self.citystate_repair_wait[:, s]
-        self._minor_repair_now(s, rep_now, rep, toward)
+        self._minor_repair_now(s, rep_now, rep, toward, complete)
         halt = ~alive | rep_now
         for r, kind in enumerate(self._mb_kind):
             if bool(halt.all()):
@@ -906,10 +959,11 @@ class SimMinors:
                 avail = gate & (n_builder == 0)
                 if not bool(avail.count_nonzero()):
                     continue
-                toward(avail, self._mb_builder_pct)
+                bk = torch.full((B,), self._builder_idx, dtype=torch.long, device=dev)
+                before, _paid = toward(avail, self._mb_builder_pct, bk)
                 cost = self._builder_cost(self.citystate_builders_trained[:, s]).double()
-                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
-                                         torch.full((B,), self._builder_idx, dtype=torch.long, device=dev), cost)
+                done = self._minor_spawn(s, avail & (self.citystate_prod[:, s] >= cost), bk)
+                complete(done, cost, before)
                 self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
@@ -926,9 +980,10 @@ class SimMinors:
                 avail = gate & want & (ui >= 0)
                 if not bool(avail.count_nonzero()):
                     continue
-                toward(avail, mil_pct)
+                before, _paid = toward(avail, mil_pct, ui)
                 cost = self._type_cost[ui.clamp(min=0)].double()
-                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost), ui, cost)
+                done = self._minor_spawn(s, avail & (self.citystate_prod[:, s] >= cost), ui)
+                complete(done, cost, before)
                 self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
@@ -947,10 +1002,11 @@ class SimMinors:
                 avail = avail & self._minor_route_candidate(s, avail)[0]
                 if not bool(avail.count_nonzero()):
                     continue
-                toward(avail, 0.0)
+                tk = torch.full((B,), self._trader_idx, dtype=torch.long, device=dev)
+                before, _paid = toward(avail, 0.0, tk)
                 cost = self._trader_cost(row).double()
-                done = self._minor_train(s, avail & (self.citystate_prod[:, s] >= cost),
-                                         torch.full((B,), self._trader_idx, dtype=torch.long, device=dev), cost)
+                done = self._minor_spawn(s, avail & (self.citystate_prod[:, s] >= cost), tk)
+                complete(done, cost, before)
                 self.citystate_repair_wait[:, s] &= ~done
                 halt = halt | avail
                 continue
@@ -959,15 +1015,15 @@ class SimMinors:
                 avail = gate & ok_r
                 if not bool(avail.count_nonzero()):
                     continue
-                toward(avail, 0.0)
+                before, _paid = toward(avail, 0.0, self._mk_p0 + self._repair_proj_idx)
                 pay = avail & (self.citystate_prod[:, s] >= cost_r)
                 self.citystate_build_proj[:, s] = torch.where(
                     avail & ~pay, torch.full_like(self.citystate_build_proj[:, s], self._repair_proj_idx),
                     self.citystate_build_proj[:, s])
                 self.citystate_repair_wait[:, s] &= ~pay
+                complete(pay, cost_r.double(), before)
                 if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
-                    self.citystate_prod[rr, s] -= cost_r[rr]
                     full = self._walls_tier_hp[self._minor_walls_tier(s)]
                     self.city_outer_hp[rr, row, 0] = full[rr]
                     self._fit_encamp_outer(rr, row, torch.zeros_like(rr), full[rr])
@@ -986,7 +1042,7 @@ class SimMinors:
                              & ~self._fallout()[bidx, d0])
                     if not bool(avail.count_nonzero()):
                         continue
-                    toward(avail, 0.0)
+                    before, paid = toward(avail, 0.0, self._mk_p0 + pi)
                     # `projectCost`: the row's own Cost, or `progressCost` over
                     # its install Cost and climb
                     cost_p = (self._progress_cost(int(prow["pgb"]), int(prow["pk"]), _mpct).double()
@@ -994,10 +1050,10 @@ class SimMinors:
                               else torch.full_like(zero_b, float(max(int(prow["pc"]), 0))))
                     yi = int(prow["y"])
                     if yi >= 0:
-                        # the row's percent of the turn's Production, never
+                        # the row's percent of what the step paid in, never
                         # above its cost, converted into its yield, which the
                         # city's yields read until the next step
-                        _cv = torch.minimum(turn, cost_p) * self._proj_rate_t[pi]
+                        _cv = torch.minimum(paid, cost_p) * self._proj_rate_t[pi]
                         self.city_proj_conv[:, row, 0] = torch.where(avail, _cv, self.city_proj_conv[:, row, 0])
                         self.city_proj_yield[:, row, 0] = torch.where(
                             avail, torch.full_like(self.city_proj_yield[:, row, 0], yi), self.city_proj_yield[:, row, 0])
@@ -1010,8 +1066,7 @@ class SimMinors:
                         # a project still running lights the next turn's grid
                         self.citystate_full_power[:, s] |= avail & ~pay
                     self.citystate_repair_wait[:, s] &= ~pay
-                    if bool(pay.count_nonzero()):
-                        self.citystate_prod[:, s] -= torch.where(pay, cost_p, zero_b)
+                    complete(pay, cost_p, before)
                     halt = halt | avail
                 continue
             if kind in ("building", "worship"):
@@ -1023,16 +1078,16 @@ class SimMinors:
                     if not bool(avail.count_nonzero()):
                         continue
                     is_walls = int(rd.b_walls[bi]) > 0
-                    toward(avail, walls_pct if is_walls else 0.0)
+                    before, _paid = toward(avail, walls_pct if is_walls else 0.0, self._mk_b0 + bi)
                     # a Flood Barrier is priced off the lowland it covers
                     cost_b = (self._flood_barrier_cost(row)[:, 0].double() if bi == self._barrier_bidx
                               else torch.full_like(zero_b, float(rd.b_cost[bi])))
                     pay = avail & (self.citystate_prod[:, s] >= cost_b)
                     self.citystate_repair_wait[:, s] &= ~pay
+                    complete(pay, cost_b, before)
                     if bool(pay.count_nonzero()):
                         rr = pay.nonzero(as_tuple=True)[0]
                         self.city_bldg[rr, row, 0, bi] = True
-                        self.citystate_prod[rr, s] -= cost_b[rr]
                         if bi == self._barrier_bidx:
                             self._repair_behind_barrier(row, torch.zeros(B, dtype=torch.long, device=dev), pay)
                         if is_walls:
@@ -1070,7 +1125,7 @@ class SimMinors:
                     continue
                 pct = (torch.full_like(zero_b, harbor_pct) if dv == int(self._harbor_didx)
                        else torch.where(self._citystate_didx[:, s] == dv, type_pct[typ], zero_b))
-                toward(avail, pct)
+                before, _paid = toward(avail, pct, self._mk_d0 + dv)
                 # the row's OWN install Cost and climb — a minor builds real
                 # districts (`districtScaledBase`)
                 _b_dv = int(d_per[dv]) if dv < len(d_per) else int(dcp["base"])
@@ -1087,6 +1142,7 @@ class SimMinors:
                             f" pot{int(float(self.citystate_prod[_b, s]))}")
                 pay = avail & (self.citystate_prod[:, s] >= d_cost)
                 self.citystate_repair_wait[:, s] &= ~pay
+                complete(pay, d_cost, before)
                 if bool(pay.count_nonzero()):
                     rr = pay.nonzero(as_tuple=True)[0]
                     tt = splane.long().argmax(dim=1)[rr]
@@ -1097,15 +1153,17 @@ class SimMinors:
                     if dv == self._encamp_didx:
                         self.encamp_hp[rr, tt] = self._encamp_hp_max
                         self.encamp_outer_hp[rr, tt] = self._walls_tier_hp[self._minor_walls_tier(s)][rr]
-                    self.citystate_prod[rr, s] -= d_cost[rr]
                     self._eff_version += 1
                 halt = halt | avail
         # no item in hand: a pillaged building is the item now
         idle = ~halt
         self.citystate_repair_wait[:, s] &= ~idle
         rep_idle = idle & (rep >= 0)
-        self._minor_repair_now(s, rep_idle, rep, toward)
-        toward(idle & ~rep_idle, 0.0)
+        self._minor_repair_now(s, rep_idle, rep, toward, complete)
+        # nothing at all: the step adds A to the overflow store
+        none = alive & idle & ~rep_idle
+        self._minor_switch(s, none, -1)
+        self.citystate_ovf[:, s] += torch.where(none, turn, zero_b)
 
     def _minor_upgrades(self, s: int, gained: torch.Tensor) -> None:
         """`minorUpgrades` — CIV6 (Leaders.xml, MinorCivTriggeredTrees): a

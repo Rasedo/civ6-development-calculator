@@ -114,7 +114,7 @@ import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
-import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, tickGovernors, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -2627,7 +2627,7 @@ export function seatPhase(state: GameState): void {
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
     // THE GOVERNORS, before anything reads the roster: earned titles are
-    // spent, idle governors take a city, and both clocks tick. Every
+    // spent, idle governors take a city, and the neutralization clock ticks. Every
     // ability the city walk reads is settled here.
     governorPhase(state, actor.seat);
     // A posting is an envoy count, so the minors' stored answer moves with it.
@@ -2918,6 +2918,11 @@ export function seatPhase(state: GameState): void {
         culSum += ALLIANCE_C3_CUL_PCT * (o.culRate ?? 0);
       }
     }
+    // THE ESTABLISHMENT CLOCK, between the cities' yields and the seat's
+    // tallies: a governor established now pays no Culture this turn, while
+    // the envoys she brings count toward its Favor (`tickGovernors`)
+    tickGovernors(state, actor.seat);
+    resolveSuzerains(state);
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes
     seatAccumulators(state, actor.seat, rGovIds);
@@ -3147,15 +3152,14 @@ export function seatPhase(state: GameState): void {
         _em *= 1 + prodBoostPct(seatMods, q, actor.gpPerm) + _bpct;
         const progressBefore = q.progress;
         const banked = civCity.productionBank ?? 0;
-        // the city's Production holds its envoys' flat toward this item
-        // (`computeCityStats`)
-        q.progress += production * _em;
-        // Pay in the bank right after the production add, so the field
-        // written below is read back.
-        if (civCity.productionBank) {
-          q.progress += civCity.productionBank;
-          civCity.productionBank = 0;
-        }
+        // CIV6 (City_BuildQueue 0x16f050 → the order's step, 0x1853d0 for a
+        // unit): the turn's Production toward the item (with its envoys'
+        // flat, `computeCityStats`) plus the overflow store, the SUM under
+        // the item's percents (0x1856ed multiplies it by the item's
+        // multiplier before 0x0ac650 adds it to the item's progress;
+        // runs/h1_duelw1118 Rome t16, a Warrior on Agoge)
+        q.progress += (production + banked) * _em;
+        civCity.productionBank = 0;
         repairDrip(state, civCity, progressBefore);
         const cost =
           q.kind === 'unit'
@@ -3178,16 +3182,17 @@ export function seatPhase(state: GameState): void {
           civCity.queue.shift();
           completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
           // CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
-          // smaller of the Production toward the item and the city's plain
-          // Production (no city-state flat toward the head: runs/h1_duelw1117
-          // Rome t15, a Warrior done at 12 + 9 of 20 with one Militaristic
-          // envoy's +1, the next Warrior at 9 on 9), less what the item still
-          // lacked before this step (the bank paid in not counted), never
-          // below 0. It goes to the city's overflow store, which the next step
-          // pays into whatever heads the queue then: one completion per city
-          // per turn.
+          // smaller of the Production toward the item before its percents
+          // (0x16f3cb reads the step's own argument, not the multiplied sum)
+          // and the city's plain Production (no city-state flat toward the
+          // head: runs/h1_duelw1117 Rome t15, a Warrior done at 12 + 9 of 20
+          // with one Militaristic envoy's +1, the next Warrior at 9 on 9),
+          // less what the item still lacked before this step (the bank paid
+          // in not counted), never below 0. It goes to the city's overflow
+          // store, which the next step pays into whatever heads the queue
+          // then: one completion per city per turn.
           const lacked = Math.max(0, cost - progressBefore);
-          const made = Math.min(production * _em, plainOf.get(civCity.id)!);
+          const made = Math.min(production, plainOf.get(civCity.id)!);
           if (made > lacked) civCity.productionBank = (civCity.productionBank ?? 0) + made - lacked;
         }
       } else if (!q) {

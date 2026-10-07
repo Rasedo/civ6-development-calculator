@@ -4,16 +4,19 @@
     python tests/gpu/minor_builds_test.py
 
 CIV6 (City-state): the minor's city produces what the build table
-(`MINOR_BUILD_ROWS`, fitted to C-38's census) wants first. The city's
-Production goes into a pot under the minor's production rows (Leaders.xml's
-MINOR_CIV set: -50% on the yield, +200% toward walls, a Builder and a military
+(`MINOR_BUILD_ROWS`, fitted to C-38's census) wants first. The step pays the
+city's Production (the minor's -50% among its yield percents) plus the
+overflow store into the item in hand under the minor's production rows
+(Leaders.xml's MINOR_CIV set: +200% toward walls, a Builder and a military
 unit, +500% toward the Harbor and the type's district), and the item
-completes when the pot covers it, at most one a turn. Each scene sets the
-rows it wants due by hand (`plan`), so only the row under test reaches the pot.
+completes when its progress covers it, at most one a turn. Each scene sets
+the rows it wants due by hand (`plan`), so only the row under test is in hand;
+`pot` loads the overflow store the next item takes, `in_hand` an item's
+progress.
 
 Proven here:
-  * the pot takes the city's Production under those rows, the item the turn
-    goes toward choosing the row;
+  * the step pays the city's Production under those rows, the item in hand
+    choosing the row, and nothing in hand banks it in the store;
   * Ancient Walls land only once their tech is in the minor's OWN record,
     fill the perimeter pool, and never land twice;
   * a Builder trains into the majors' pool under the minor's seat, and the
@@ -131,6 +134,23 @@ def idle_builder(sim, s: int) -> None:
     sim.unit_charges[B0, g] = 0
 
 
+def pot(sim, s: int, v: float) -> None:
+    """nothing in hand, nothing kept, and `v` in the overflow store: the next
+    item the step works takes it under its row"""
+    sim.citystate_item[B0, s] = -1
+    sim.citystate_prod[B0, s] = 0.0
+    sim.citystate_kept[B0, s] = 0.0
+    sim.citystate_ovf[B0, s] = v
+
+
+def in_hand(sim, s: int, key: int, v: float) -> None:
+    """item `key` (`_minor_switch`'s index) in hand with progress `v`, the store
+    empty"""
+    sim.citystate_item[B0, s] = key
+    sim.citystate_prod[B0, s] = v
+    sim.citystate_ovf[B0, s] = 0.0
+
+
 def walls_row(sim, rules) -> int:
     return row_of(rules, "building", walls_rows(sim)[0])
 
@@ -153,37 +173,38 @@ def test_walls_first_and_only_once(rules, path) -> None:
     row = sim._CITY_MINOR0 + s
     anc = walls_rows(sim)[0]
     cost = float(sim.rules_dev.b_cost[anc])
-    sim.citystate_prod[B0, s] = 0.0
-    # the pot takes the city's OWN Production — the yield walk's, not a
-    # population clock (`tests/gpu/minor_yields_test.py` pins the walk itself)
+    pot(sim, s, 0.0)
+    # the step pays the city's OWN Production — the yield walk's, the minor's
+    # -50% among its percents (`tests/gpu/minor_yields_test.py` pins the walk)
     yf = sim._seat_amenity(row)[2][:, 0:1]
     prod = float(sim._seat_city_walk(row, 0, amen_yf=yf)[B0, 0, 1])
     assert prod > 0, "a live minor's city produces something"
+    assert prod == float(sim._minor_production(s)[B0])
 
-    # no tech: the pot takes the city's Production under the minor's own
-    # percent alone, and nothing lands
+    # no tech: nothing in hand, the Production goes to the overflow store
     sim._minor_build(s, sim._minor_production(s))
-    pen = (100 + float(rules.citystate["productionPct"])) / 100
-    assert float(sim.citystate_prod[B0, s]) == prod * pen * 1.0, "the pot did not take the city's Production"
+    assert int(sim.citystate_item[B0, s]) == -1
+    assert float(sim.citystate_ovf[B0, s]) == prod, "the store did not take the city's Production"
     assert not bool(sim.city_bldg[B0, row, 0, anc]), "walls landed without their tech"
 
-    # the tech in, the pot covering: the walls land and the perimeter fills
+    # the tech in, the walls in hand at their price: they land, nothing stays
+    # in hand, the perimeter fills
     grant_walls_tech(sim, s, anc)
-    sim.citystate_prod[B0, s] = cost + 3.0
+    in_hand(sim, s, sim._mk_b0 + anc, cost)
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, anc]), "Ancient Walls did not land"
-    assert float(sim.citystate_prod[B0, s]) == 3.0, \
-        f"the pot did not pay the walls price ({float(sim.citystate_prod[B0, s])})"
+    assert float(sim.citystate_prod[B0, s]) == 0.0 and int(sim.citystate_item[B0, s]) == -1, \
+        f"the walls left progress ({float(sim.citystate_prod[B0, s])})"
     tier1 = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     assert int(sim.city_outer_hp[B0, row, 0]) == tier1, "the perimeter pool did not fill"
 
-    # never twice — the next call moves down the ladder instead
-    sim.citystate_prod[B0, s] = cost * 10
-    before = float(sim.citystate_prod[B0, s])
+    # never twice — nothing else is due, so the store keeps what it holds
+    pot(sim, s, cost * 10)
+    before = float(sim.citystate_ovf[B0, s])
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, anc])
-    assert float(sim.citystate_prod[B0, s]) >= before, \
-        "the pot paid for walls that already stand"
+    assert float(sim.citystate_ovf[B0, s]) >= before, \
+        "the store paid for walls that already stand"
     print("  1 walls OK — tech-gated, paid once, the pool filled")
 
 
@@ -201,7 +222,7 @@ def test_the_type_district_lands_on_the_first_plot(rules, path) -> None:
     grant_walls_tech(sim, s, anc)
     sim.city_bldg[B0, row, 0, anc] = True
     sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
-    sim.citystate_prod[B0, s] = 10_000.0
+    pot(sim, s, 10_000.0)
     plc = next(int(p) for (di, _ut, _uc, p, _fc) in sim._scaffold if int(di) == dv)
     # the engine's surface: an unseen strategic is plain ground to the minor
     surface = sim.coastal_water if plc == 2 else (sim.d_usable | (sim.d_usable0 & sim._res_hidden(row)))
@@ -236,7 +257,7 @@ def test_the_landlocked_minor_never_harbors(rules, path) -> None:
         plan(sim, s, [row_of(rules, "district", hv)])
         grant_district_tech(sim, s, hv)
         coastal = bool((sim._minor_district_site(s) & sim.coastal_water)[B0].any())
-        sim.citystate_prod[B0, s] = 100_000.0
+        pot(sim, s, 100_000.0)
         for _ in range(8):
             sim._minor_build(s)
         built = int(sim.city_dist_tile[B0, row, 0, hv]) >= 0
@@ -263,11 +284,12 @@ def test_damaged_walls_block_the_higher_tier(rules, path) -> None:
     sim.city_bldg[B0, row, 0, anc] = True
     full = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     sim.city_outer_hp[B0, row, 0] = full - 7   # breached
-    sim.citystate_prod[B0, s] = 100_000.0
+    pot(sim, s, 100_000.0)
     sim._minor_build(s)
     assert not bool(sim.city_bldg[B0, row, 0, med]), \
         "a damaged perimeter accepted a higher wall"
     sim.city_outer_hp[B0, row, 0] = full
+    pot(sim, s, 100_000.0)
     for _ in range(4):
         sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, med]), "an intact perimeter refused the higher wall"
@@ -288,7 +310,7 @@ def test_the_conquest_carries_the_build(rules, path) -> None:
     sim.city_last_hit[B0, row, 0] = int(sim.turn)  # just hit: no repair yet
     dv = int(sim._citystate_didx[B0, s])
     grant_district_tech(sim, s, dv)
-    sim.citystate_prod[B0, s] = 10_000.0
+    pot(sim, s, 10_000.0)
     sim._minor_build(s)
     dt = int(sim.city_dist_tile[B0, row, 0, dv])
     cols_before = sim.city_alive[B0, 0].sum()
@@ -375,12 +397,13 @@ def test_the_tier1_building_follows_the_district(rules, path) -> None:
     sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     grant_district_tech(sim, s, dv)
     grant_building_research(sim, s, bi)
-    sim.citystate_prod[B0, s] = 100_000.0
+    pot(sim, s, 100_000.0)
     sim._minor_build(s)
     if int(sim.city_dist_tile[B0, row, 0, dv]) < 0:
         print("  7 tier-1 building SKIPPED — no legal plot for the type district")
         return
     assert not bool(sim.city_bldg[B0, row, 0, bi]), "the building landed the same tick as its district"
+    pot(sim, s, 100_000.0)
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, bi]), "the tier-1 building did not follow its district"
     print(f"  7 tier-1 building OK — row {bi} follows district {dv}, one item a tick")
@@ -449,11 +472,11 @@ def test_the_production_rows(rules, path) -> None:
     assert [float(x) for x in cs["typeDistrictProdPct"]] == [500.0] * 6
 
     def turn(sim, s: int) -> float:
-        sim.citystate_prod[B0, s] = 0.0
+        pot(sim, s, 0.0)
         sim._minor_build(s, torch.ones(sim.B, dtype=torch.float64))
         return float(sim.citystate_prod[B0, s])
 
-    # the walls: 0.5 x 3
+    # the walls: x 3 on a Production of 1 (the minor's -50% is in the yield)
     sim = build(rules, path)
     s = a_minor(sim)
     row = sim._CITY_MINOR0 + s
@@ -461,10 +484,10 @@ def test_the_production_rows(rules, path) -> None:
     plan(sim, s, [walls_row(sim, rules)])
     anc = walls_rows(sim)[0]
     grant_walls_tech(sim, s, anc)
-    assert turn(sim, s) == 1.5, "toward the walls the pot did not take half the yield times 3"
+    assert turn(sim, s) == 3.0, "toward the walls the step did not pay the Production times 3"
     assert not bool(sim.city_bldg[B0, row, 0, anc])
 
-    # the type's district: 0.5 x 6; then its tier-1 building: 0.5
+    # the type's district: x 6; then its tier-1 building: x 1
     sim.city_bldg[B0, row, 0, anc] = True
     sim.city_outer_hp[B0, row, 0] = int(sim._walls_tier_hp[int(sim.rules_dev.b_walls[anc])])
     dv = int(sim._citystate_didx[B0, s])
@@ -482,15 +505,15 @@ def test_the_production_rows(rules, path) -> None:
     if plc == 3:
         plane = plane & (sim._adj_center_count() == 0)
     if bool(plane[B0].any()):
-        assert turn(sim, s) == 3.0, "toward the type's district the pot did not take half the yield times 6"
-        sim.citystate_prod[B0, s] = 10_000.0
+        assert turn(sim, s) == 6.0, "toward the type's district the step did not pay the Production times 6"
+        pot(sim, s, 10_000.0)
         sim._minor_build(s)
         assert int(sim.city_dist_tile[B0, row, 0, dv]) >= 0, "the type district did not land"
-        assert turn(sim, s) == 0.5, "toward the tier-1 building the pot took a row"
+        assert turn(sim, s) == 1.0, "toward the tier-1 building the step took a row"
     else:
         print("  9 type district SKIPPED — no legal plot on this fixture")
 
-    # the Harbor: 0.5 x 6, on a coastal minor whose type district is not yet open
+    # the Harbor: x 6, on a coastal minor whose type district is not yet open
     hv = int(sim._harbor_didx)
     sim = build(rules, path)
     for s in range(sim.S):
@@ -514,8 +537,8 @@ def test_the_production_rows(rules, path) -> None:
         grant_district_tech(sim, s, hv)
         if int(sim.city_dist_tile[B0, row, 0, dv]) >= 0 or int(sim.city_dist_tile[B0, row, 0, hv]) >= 0:
             continue
-        assert turn(sim, s) == 3.0, "toward the Harbor the pot did not take half the yield times 6"
-        print("  9 production rows OK — walls x1.5, type district and Harbor x3, tier-1 x0.5")
+        assert turn(sim, s) == 6.0, "toward the Harbor the step did not pay the Production times 6"
+        print("  9 production rows OK — walls x3, type district and Harbor x6, tier-1 x1")
         return
     print("  9 production rows OK — walls and type district (no coastal minor for the Harbor)")
 
@@ -565,7 +588,7 @@ def test_the_district_paves_an_improved_plot(rules, path) -> None:
     # an improvement on the plot leaves it a site
     sim.improvement[B0, t] = IMP.index("FARM")
     assert bool(sim._minor_district_site(s)[B0, t]), "an improved plot stopped being a site"
-    sim.citystate_prod[B0, s] = 10_000.0
+    pot(sim, s, 10_000.0)
     sim._minor_build(s)
     got = int(sim.city_dist_tile[B0, row, 0, dv])
     if got != t:
@@ -587,13 +610,13 @@ def test_the_repair_row(rules, path) -> None:
     full = int(sim._walls_tier_hp[sim._minor_walls_tier(s)][B0])
     sim.city_outer_hp[B0, row, 0] = full - 7
     sim.city_last_hit[B0, row, 0] = int(sim.turn)
-    sim.citystate_prod[B0, s] = 10_000.0
+    pot(sim, s, 10_000.0)
     sim._minor_build(s)
     assert int(sim.city_outer_hp[B0, row, 0]) == full - 7, "repaired while the city is under attack"
     sim.city_last_hit[B0, row, 0] = int(sim.turn) - 10
     ok, cost = sim._minor_repair(s)
     assert bool(ok[B0]) and float(cost[B0]) == 7.0, "the repair's price is the HP it puts back"
-    sim.citystate_prod[B0, s] = 7.0
+    pot(sim, s, 7.0)
     sim._minor_build(s)
     assert int(sim.city_outer_hp[B0, row, 0]) == full, "the repair did not restore the walls"
     assert abs(float(sim.citystate_prod[B0, s])) < 1e-9, "the repair did not spend its price"
@@ -618,7 +641,7 @@ def test_the_project_row(rules, path) -> None:
     prow = sim._proj_rows[grants]
     pct = int(sim._progress_pct_of(sim.citystate_techs[:, s].sum(dim=1), sim.citystate_civics[:, s].sum(dim=1))[B0])
     cost = float((int(prow["pgb"]) * 50 * (100 + int(prow["pk"]) * pct)) // 10000)
-    sim.citystate_prod[B0, s] = cost
+    in_hand(sim, s, sim._mk_p0 + grants, cost)
     sci0 = float(sim.citystate_tech_prog[B0, s])
     turn = 4.0
     sim._minor_build(s, torch.full((sim.B,), turn, dtype=torch.float64))
@@ -653,12 +676,12 @@ def test_the_logistics_power(rules, path) -> None:
     sim._eff_version += 1
     sim._minor_power(s)
     assert not bool(sim.city_powered[B0, row, 0]), "the Factory's load, nothing to meet it"
-    sim.citystate_prod[B0, s] = 0.0
+    pot(sim, s, 0.0)
     sim._minor_build(s)
     assert bool(sim.citystate_full_power[B0, s]), "the pot went toward Logistics"
     sim._minor_power(s)
     assert bool(sim.city_powered[B0, row, 0]), "a running Logistics meets the whole load"
-    sim.citystate_prod[B0, s] = 1.0e4
+    pot(sim, s, 1.0e4)
     sim._minor_build(s)
     assert float(sim.citystate_prod[B0, s]) < 1.0e4, "the project completes"
     assert not bool(sim.citystate_full_power[B0, s])
@@ -691,7 +714,7 @@ def test_the_worship_row(rules, path) -> None:
     sim.city_bldg[B0, row, 0, BLD.index("TEMPLE")] = True
     sim._bldg_version += 1
     sim._eff_version += 1
-    sim.citystate_prod[B0, s] = float(sim.rules_dev.b_cost[cath])
+    pot(sim, s, float(sim.rules_dev.b_cost[cath]))
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, cath]), "the worship row did not raise the Cathedral"
     print("  13 worship OK — the building its religion names")
@@ -718,7 +741,7 @@ def test_the_pillaged_repair(rules, path) -> None:
     sim._bldg_version += 1
     sim._eff_version += 1
     # the walls are the item in hand: they land, the Library waits
-    sim.citystate_prod[B0, s] = float(sim.rules_dev.b_cost[anc])
+    pot(sim, s, float(sim.rules_dev.b_cost[anc]))
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, anc]), "the walls in hand did not land"
     assert not bool(sim.citystate_repair_wait[B0, s]), "the wait outlived the item in hand"
@@ -727,17 +750,17 @@ def test_the_pillaged_repair(rules, path) -> None:
     assert sim._mb_repair_resume_pct == 75.0
     full = float(sim.rules_dev.b_cost[lib])
     left = full - (full * 75 // 100)
-    sim.citystate_prod[B0, s] = left - 1
+    in_hand(sim, s, sim._mk_r0 + lib, left - 1)
     sim._minor_build(s)
     assert bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "repaired short of its price"
-    sim.citystate_prod[B0, s] = left
+    in_hand(sim, s, sim._mk_r0 + lib, left)
     sim._minor_build(s)
     assert not bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "the Library was not repaired"
     assert float(sim.citystate_prod[B0, s]) == 0.0, float(sim.citystate_prod[B0, s])
     # a pillaged district holds its buildings' repair back
     sim.city_bldg_pillaged[B0, row, 0, lib] = True
     sim.district_pillaged[B0, t] = True
-    sim.citystate_prod[B0, s] = 1000.0
+    pot(sim, s, 1000.0)
     sim._minor_build(s)
     assert bool(sim.city_bldg_pillaged[B0, row, 0, lib]), "repaired inside a pillaged district"
     print(f"  17 repair OK — after the item in hand, {left:.0f} of {full:.0f} left to build")
@@ -751,7 +774,7 @@ def test_the_flood_barrier_row(rules, path) -> None:
     fb = sim._barrier_bidx
     plan(sim, s, [row_of(rules, "building", fb)])
     sim.citystate_techs[B0, s] = True
-    sim.citystate_prod[B0, s] = 100_000.0
+    pot(sim, s, 100_000.0)
     sim.tile_lowland[B0] = 0
     sim._minor_build(s)
     assert not bool(sim.city_bldg[B0, row, 0, fb]), "a barrier with no lowland to cover"
@@ -760,7 +783,7 @@ def test_the_flood_barrier_row(rules, path) -> None:
     sim.tile_lowland[B0, low] = 1
     cost = float(sim._flood_barrier_cost(row)[B0, 0])
     assert cost > 0
-    sim.citystate_prod[B0, s] = cost
+    pot(sim, s, cost)
     sim._minor_build(s)
     assert bool(sim.city_bldg[B0, row, 0, fb]), "the barrier did not land on its lowland"
     assert abs(float(sim.citystate_prod[B0, s])) < 1e-9, "the barrier's price is not the lowland's"
@@ -785,13 +808,13 @@ def test_the_trader_row(rules, path) -> None:
         before = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
                       & (sim.major_unit_type[B0] == sim._trader_idx)).sum())
         cost = float(sim._trader_cost(row)[B0])
-        sim.citystate_prod[B0, s] = cost
+        pot(sim, s, cost)
         sim._minor_build(s)
         after = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
                      & (sim.major_unit_type[B0] == sim._trader_idx)).sum())
         assert after == before + 1, "the Trader row trained no Trader"
         # at capacity: no second one
-        sim.citystate_prod[B0, s] = cost * 10
+        pot(sim, s, cost * 10)
         sim._minor_build(s)
         again = int((sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
                      & (sim.major_unit_type[B0] == sim._trader_idx)).sum())

@@ -2098,6 +2098,24 @@ city's plots (runs/h1_duelw1123: Jiaodong's Cotton and Cocoa +2, Chengdu's
 Coal mine nothing before Industrialization shows Coal; city.yields 1,091 ->
 266 gap-free). `suzerainResourceTypeProduction` / `_res_type_prod`.
 
+## H-1: a completion's overflow and the item multiplier — READ
+
+City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the
+stored overflow) × the item's percent multiplier — 0x1856ed multiplies the
+SUM, so the banked overflow is raised with the turn's Production. On
+completion the stored overflow is min(A, B) − what the item lacked, A the
+turn's Production unmultiplied (0x16f3cb) and B the city's plain
+Production. The engines: the seat production step (`(production + banked)
+× the item multiplier`, the made share capped at the plain Production) on
+both twins.
+
+## H-1: the flood's river walk — READ
+
+0xa2cfc0 walks the map's river vector in its stored order, weighting each
+river's flood site with no reveal check in the function itself. The order
+is map-generation state no record carries (docs/AUDIT.md C-94, ASK); the
+action replay holds the record's site (`holdFloodRiver`).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

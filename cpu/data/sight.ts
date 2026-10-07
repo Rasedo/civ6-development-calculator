@@ -56,8 +56,10 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
 };
 
 /** the farthest any chassis looks — the reach of the static line table both
- *  engines precompute (the Mountie's 4 plus a Spyglass is 5). */
+ *  engines precompute (the Jet Fighter's, the Jet Bomber's and the Drone's
+ *  BaseSightRange 5, which no sight promotion reaches; the Mountie's 4 plus a
+ *  Spyglass is 5). */
 export const SIGHT_MAX = srcConst('improvements.sightMax', 5, {
   stylized: 'the precomputed line table\'s reach, sized to the deepest chassis this roster '
-    + 'fields (the Mountie\'s BaseSightRange 4 plus a Spyglass); no install row states a ceiling',
+    + 'fields (BaseSightRange 5; the Mountie\'s 4 plus a Spyglass); no install row states a ceiling',
 });

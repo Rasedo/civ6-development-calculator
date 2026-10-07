@@ -71,6 +71,17 @@ export type Decision = Base & (
   | { kind: 'capture'; player: number; city: number }
   | { kind: 'congress' }
   | { kind: 'combat'; player: number; unit: string; hp: number }
+  /** a hit the log names that no battle of the pair holds (a city's shot, a
+   *  strike whose shooter the log does not name): the damage it dealt */
+  | { kind: 'hit'; player: number; unit: string; dmg: number }
+  /** a battle the log names, in the attacker's player's turn: melee
+   *  (`UnitDamageChanged` on the defender, then on the attacker) or ranged
+   *  (the defender's alone, struck by the actor's unit last activated): the
+   *  two units, the plots they stood on as the log's steps had them, and the
+   *  battle's place among its player's hits of the pair (its "Unit Combat
+   *  Damage" draws, `battle`) */
+  | { kind: 'battle'; player: number; attacker: string; defender: string; from: number; at: number;
+      ranged: boolean; seq: number }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
@@ -628,6 +639,49 @@ export class RecordedActions implements ActionSource {
       levies.set(key, d);
     });
     out0.push(...levies.values());
+    // the melee battles: the defender's damage, then the attacker's, in the
+    // attacker's player's turn; every unit where the log's steps had it
+    {
+      const pos = new Map(a.units.map((u) => [unitKey(u), u.y * W + u.x]));
+      let actor = act;
+      // the damage the actor's turn dealt so far: one "Unit Combat Damage"
+      // draw per hit
+      let hits = 0;
+      // the actor's unit the log last set acting: a ranged hit's shooter
+      let acting: string | undefined;
+      const hit = (r: ActionRow | undefined) => !!r && r[2] === 'UnitDamageChanged' && n(r, 2) > n(r, 3);
+      ev.forEach((r, i) => {
+        if (r[2] === 'PlayerTurnActivated' && n(r, 0) !== actor) {
+          actor = n(r, 0);
+          hits = 0;
+          acting = undefined;
+        } else if (r[2] === 'UnitMoved' || r[2] === 'UnitTeleported') pos.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 3) * W + n(r, 2));
+        else if (r[2] === 'UnitActivityChanged' && n(r, 0) === actor) acting = `${n(r, 0)}:${n(r, 1)}`;
+        if (!hit(r)) return;
+        const k = hits;
+        hits += 1;
+        if (n(r, 0) === actor) {
+          // the actor's own unit struck with no foe's hit before it: a blow
+          // it took on its own attack on a city, which no battle holds
+          const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
+          if (!pv || !hit(pv) || n(pv, 0) === actor) {
+            out0.push({ kind: 'hit', phase: phaseOf(actor), player: actor, unit: `${n(r, 0)}:${n(r, 1)}`, dmg: n(r, 2) - n(r, 3) });
+          }
+          return;
+        }
+        const nx = ev.slice(i + 1, i + 4).find((x) => x[2] === 'UnitDamageChanged');
+        const melee = !!nx && hit(nx) && n(nx, 0) === actor;
+        const defender = `${n(r, 0)}:${n(r, 1)}`;
+        const attacker = melee ? `${n(nx, 0)}:${n(nx, 1)}` : acting;
+        const from = attacker === undefined ? undefined : pos.get(attacker);
+        const at = pos.get(defender);
+        if (attacker === undefined || from === undefined || at === undefined) {
+          out0.push({ kind: 'hit', phase: phaseOf(actor), player: n(r, 0), unit: defender, dmg: n(r, 2) - n(r, 3) });
+          return;
+        }
+        out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k });
+      });
+    }
     const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     for (const r of ev) {
       if (r[2] !== 'UnitAddedToMap') continue;

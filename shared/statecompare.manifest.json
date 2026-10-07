@@ -1836,6 +1836,36 @@
           ]
         },
         {
+          "name": "minorProdItem",
+          "compare": "exact",
+          "covers": [
+            "CityState.prodItem"
+          ],
+          "planes": [
+            "citystate_item"
+          ]
+        },
+        {
+          "name": "minorProdOverflow",
+          "compare": "milli",
+          "covers": [
+            "CityState.prodOverflow"
+          ],
+          "planes": [
+            "citystate_ovf"
+          ]
+        },
+        {
+          "name": "minorProdKept",
+          "compare": "milli",
+          "covers": [
+            "CityState.prodRetained"
+          ],
+          "planes": [
+            "citystate_kept"
+          ]
+        },
+        {
           "name": "minorProjectYield",
           "compare": "milli",
           "covers": [

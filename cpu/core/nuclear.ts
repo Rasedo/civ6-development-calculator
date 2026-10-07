@@ -113,7 +113,7 @@ export function nukeVictims(state: GameState, seat: number, tiles: readonly Tile
  * and every OTHER qualifying unit supports it by NUKE_AA_SUPPORT · hp/100
  * (fractional — the game sums float terms; three half-health supporters
  * read +7 in the preview). The firer's health term is CONTINUOUS, not the
- * rounded `woundPenalty`. 0 where nobody qualifies. `_nuke_intercept_strength`
+ * wounded law `woundPenalty`. 0 where nobody qualifies. `_nuke_intercept_strength`
  * is the twin.
  */
 function nukeInterceptors(state: GameState, seat: number, tileIndex: number): Unit[] {

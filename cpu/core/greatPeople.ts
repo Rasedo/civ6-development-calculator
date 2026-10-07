@@ -32,7 +32,7 @@ export function gpOfferCost(state: GameState, cls: GreatPersonClass): number {
 }
 
 /** the standing offer's roster index (-1 pending, -2 exhausted) — a READ;
- *  only `ensureGpOffer` moves it, and only the seat-phase loop calls that. */
+ *  only `ensureGpOffer` moves it: the seat-phase loop and every claim (`recruit`). */
 export function gpOffer(state: GameState, cls: GreatPersonClass): number {
   return state.gpOffer?.[GP_CLASSES.indexOf(cls)] ?? -1;
 }
@@ -43,8 +43,8 @@ export function gpOffer(state: GameState, cls: GreatPersonClass): number {
  * been claimed" — the pool is the FIRST era at or past the world's with an
  * unclaimed member, and the price freezes with the pick. No pool anywhere
  * ahead = the class is exhausted for good (-2), and that verdict draws no
- * random. ONLY the seat-phase loop may call this — a draw consumes the
- * shared RNG stream, and the GPU twin sits at the same loop position.
+ * random. The seat-phase loop and every claim (`recruit`) call it — a draw consumes the
+ * shared RNG stream, and the GPU twin sits at the same positions.
  */
 export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
   const i = GP_CLASSES.indexOf(cls);
@@ -276,7 +276,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
   // retired, since `gpOfferCost` answers Infinity once it is (`GP_REFUND_ROWS`)
   const refundPct = getModifiers(state, seat).gpRefundPct;
   const refund = refundPct ? Math.floor((gpOfferCost(state, cls) * refundPct) / 100) : 0;
-  (state.gpOffer ??= GP_CLASSES.map(() => -1))[GP_CLASSES.indexOf(cls)] = -1; // the loop draws the replacement
+  (state.gpOffer ??= GP_CLASSES.map(() => -1))[GP_CLASSES.indexOf(cls)] = -1; // the replacement is drawn below
 
   // CIV6: the recruit is a UNIT. Nothing is paid out here — the person walks
   // to a site their ability may be spent at and spends a charge there.
@@ -321,6 +321,10 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
       if (pick) markBoost(state, o.seat, pick);
     }
   }
+  // the person leaves the timeline and the class draws its replacement at
+  // once (0x2f74b0 -> 0x2f8f70; runs/h1_duelw1117 t26: Stonehenge's Prophet,
+  // "Generating a random new Great Person" before Dynastic Cycle's boosts)
+  ensureGpOffer(state, cls);
   return refund;
 }
 
@@ -336,7 +340,7 @@ export function passGreatPerson(state: GameState, seat: number, clsIdx: number):
   const owner = cls ? seatOf(state, seat) : undefined;
   if (!cls || !owner || gpCapped(owner, cls)) return { ok: false };
   // a READ of the standing offer, never the draw: `ensureGpOffer` is the
-  // seat-phase loop's alone, and a pass while the redraw is pending refuses
+  // loop's and the claims', and a pass while the redraw is pending refuses
   // on both engines rather than moving the RNG stream here
   if (gpOffer(state, cls) < 0) return { ok: false };
   if ((state.gpPassedBy?.[clsIdx] ?? -1) >= 0) return { ok: false };
@@ -381,7 +385,6 @@ export function advanceGreatPeople(state: GameState, seat: number): void {
         if (!Number.isFinite(cost) || pts < cost) break;
         pts -= cost;
         pts += recruit(state, seat, cls); // the refund joins the LIVE local
-        ensureGpOffer(state, cls); // the replacement, drawn at once
       }
     }
     // CIV6: "GPPs that can no longer be used are converted to Faith, in a

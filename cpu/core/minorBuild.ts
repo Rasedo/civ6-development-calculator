@@ -25,7 +25,7 @@ import {
   MINOR_BUILDER_BUY_SLOTS, MINOR_BUILDER_PROD_PCT, MINOR_BUILDER_RADIUS, MINOR_BUILDER_RATE_PERMILLE,
   MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS,
   MINOR_MILITARY_BUY_BP, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS,
-  MINOR_PRODUCTION_PCT, MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
+  MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
   MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_WEIGHTS_PEACE,
   MINOR_WALK_WEIGHTS_WAR, MINOR_WALLS_PROD_PCT, type MinorBuildRow, FREE_CITY_BUILD_ROWS,
   MINOR_REPAIR_RESUME_PCT,
@@ -189,12 +189,6 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
   cityState.cultureBox = city.cultureBox;
   cityState.nextPlot = city.nextPlot;
   cityState.tilesAcquired = city.tilesAcquired;
-}
-
-/** What the turn's Production puts toward an item: the city's yield under the
- *  minor's own percent (`MINOR_PRODUCTION_PCT`), then the item's toward-row. */
-function minorProduction(production: number, towardPct: number): number {
-  return production * ((100 + MINOR_PRODUCTION_PCT) / 100) * ((100 + towardPct) / 100);
 }
 
 /** The cheapest available row completes (table order on a price tie), at most
@@ -659,45 +653,40 @@ function minorRepairTarget(state: GameState, cityState: CityState): string | und
   });
 }
 
-/** The first row that wants an item it can make now is the one the turn's
- *  Production goes toward — the pot takes it under that item's rows
- *  (`minorProduction`) — and the item completes when the pot covers it, at
- *  most one a turn; a unit also needs a free tile on or beside the centre.
- *  With no row wanting anything the pot takes it under the city's percent
- *  alone. A district paves its plot (`paveGround`). The repair restores the
- *  walls, the city's and its Encampment's, at the HP it puts back
- *  (`projectCost`); a district project converts the row's `yieldPct` of the
- *  turn's Production (never above its cost) into its yield, which the city's
- *  yields read until the next step (`CityState.projectYield`; a city-state
- *  earns no Great People, so its points go nowhere). The step clears the
- *  last conversion first.
- *  A PILLAGED building is queued after the item the minor was working on
- *  when it fell (`CityState.repairWait`, cleared as an item completes or when
- *  no row wants one) and then comes first: it resumes at
- *  `MINOR_REPAIR_RESUME_PCT` of its cost and the rest is built with the pot
- *  (`minorRepairTarget`). */
-function minorBuild(state: GameState, cityState: CityState, production: number): void {
-  cityState.fullyPowered = false;
-  delete cityState.buildProject;
-  delete cityState.projectYield;
-  let pot = cityState.prodProgress ?? 0;
-  const toward = (pct: number) => {
-    pot += minorProduction(production, pct);
-    cityState.prodProgress = pot;
-  };
+/** What a minor's step may hold: a unit it trains, a building it raises, a
+ *  district it lays on its plot, a project it runs, a pillaged building it
+ *  repairs, or nothing. */
+export type MinorItem = { unit: string } | { building: string } | { district: DistrictId; site: number }
+  | { project: string } | { repair: string } | { none: true };
+
+/** The item's key: the progress it keeps (`CityState.prodRetained`) and the
+ *  item in hand (`CityState.prodItem`) are filed under it. */
+export function minorItemKey(item: MinorItem): string {
+  if ('unit' in item) return `unit:${item.unit}`;
+  if ('building' in item) return `building:${item.building}`;
+  if ('district' in item) return `district:${item.district}`;
+  if ('project' in item) return `project:${item.project}`;
+  if ('repair' in item) return `repair:${item.repair}`;
+  return '';
+}
+
+let minorHold: ((state: GameState, cityState: CityState) => MinorItem | undefined) | null = null;
+
+/** The action replay's hold on a minor's item (`cpu/harness/replay.ts`): the
+ *  city-state's AI picks what its city builds, which the game's record
+ *  carries; where `fn` answers, the step works the record's item in place of
+ *  the build table's pick. Null outside a replay. */
+export function holdMinorItem(fn: ((state: GameState, cityState: CityState) => MinorItem | undefined) | null): void {
+  minorHold = fn;
+}
+
+/** The first row that wants an item it can make now — a pillaged building
+ *  queued behind the item in hand first once that item is done
+ *  (`CityState.repairWait`), and with no row wanting anything the pillaged
+ *  building — or nothing. */
+function minorPick(state: GameState, cityState: CityState): MinorItem {
   const repair = minorRepairTarget(state, cityState);
-  const repairNow = (id: string): void => {
-    toward(0);
-    const full = minorBuildingCost(state, cityState, id);
-    const cost = full - Math.floor((full * MINOR_REPAIR_RESUME_PCT) / 100);
-    if (pot < cost) return;
-    cityState.prodProgress = pot - cost;
-    repairBuilding(cityState, id);
-  };
-  if (repair && !cityState.repairWait) {
-    repairNow(repair);
-    return;
-  }
+  if (repair && !cityState.repairWait) return { repair };
   const unlocks = computeUnlocksIn(cityState.research, []); // a MINOR carries no roster row
   const units = state.units.filter((u) => u.seat === cityState.seat);
   const military = units.filter((u) => unitIsMilitary(u.type)).length;
@@ -708,95 +697,146 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     const from = cityState.buildFrom![r];
     if (row.from && (from < 0 || state.turn < from)) continue;
     const want = minorWant(state, cityState, row, units, military, lazyTrainable, unlocks);
-    if (!want) continue;
-    if ('unit' in want) {
-      const builder = want.unit === 'BUILDER';
-      toward(builder ? MINOR_BUILDER_PROD_PCT
-        : unitIsMilitary(want.unit) && military < MINOR_SMALL_MILITARY ? MINOR_MILITARY_PROD_PCT : 0);
-      const cost = builder ? builderCost(state, cityState.seat)
-        : want.unit === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[want.unit].cost;
-      if (pot < cost) return;
-      const unit = spawnUnit(state, want.unit, cityState.centerIndex, cityState.seat);
-      if (!unit) return;
-      applyTrainingGrants(state, minorCity(cityState), unit);
-      cityState.prodProgress = pot - cost;
-      cityState.repairWait = false;
-      if (builder) cityState.buildersTrained += 1;
-      return;
-    }
-    if ('building' in want) {
-      const def = BUILDINGS[want.building];
-      toward(def.walls ? MINOR_WALLS_PROD_PCT : 0);
-      const cost = minorBuildingCost(state, cityState, want.building);
-      if (pot < cost) return;
-      cityState.prodProgress = pot - cost;
-      cityState.repairWait = false;
-      cityState.buildings = [...(cityState.buildings ?? []), want.building];
-      if (def.floodBarrier) repairBehindBarrier(state, minorCity(cityState));
-      if (def.walls) {
-        cityState.outerHp = wallsMax(state, { buildings: cityState.buildings, seat: cityState.seat });
-        // the Encampment's own pool refits at the walls tier (`fitEncampOuter`)
-        for (const d of cityState.districts ?? []) {
-          const t = state.map.tiles[d.tileIndex];
-          if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = cityState.outerHp;
-        }
-      }
-      return;
-    }
-    if ('project' in want) {
-      toward(0);
-      const city = minorCity(cityState);
-      const cost = projectCost(state, cityState.seat, want.project, city);
-      const def = PROJECTS[want.project];
-      if (def.yield) {
-        cityState.projectYield = { key: def.yield, amount: Math.min(production, cost) * projectConversionRate(def) };
-      }
-      if (pot < cost) {
-        cityState.fullyPowered = !!def.fullyPowered;
-        cityState.buildProject = want.project;
-        return;
-      }
-      cityState.prodProgress = pot - cost;
-      cityState.repairWait = false;
-      if (def.repair) {
-        cityState.outerHp = wallsMax(state, city);
-        fitEncampOuter(state, city);
-      }
-      return;
-    }
-    const district = want.district;
-    // the row's OWN base, not the specialty one: a minor builds real
-    // districts too and the install prices an Aqueduct at 36
-    const cost = districtScaledBase(cityState.research, district);
-    toward(district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
-      : district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0);
-    // the MINOR's own price and the pool it is judged against. A minor's
-    // district feeds its suzerain's yields, so a build one turn apart is a
-    // small, permanent drift in a MAJOR's purse with no other symptom.
-    const _dl = (globalThis as { __diffLog?: string[] }).__diffLog;
-    if (_dl) _dl.push(`dm:${cityState.seat}:${state.turn}:${district}`
-      + ` t${cost} pot${Math.floor(pot)}`);
-    if (pot < cost) return;
-    cityState.prodProgress = pot - cost;
-    cityState.repairWait = false;
-    const t = state.map.tiles[want.site];
-    t.district = district;
-    t.districtComplete = true;
-    paveGround(t);
-    (cityState.districts ??= []).push({ type: district, tileIndex: want.site });
-    if (district === 'ENCAMPMENT') {
-      t.encampHp = ENCAMPMENT_HP;
-      t.encampOuterHp = wallsMax(state, { buildings: cityState.buildings ?? [], seat: cityState.seat });
-    }
-    return;
+    if (want) return want;
   }
   // no item in hand: a pillaged building is the item now
   cityState.repairWait = false;
-  if (repair) {
-    repairNow(repair);
+  return repair ? { repair } : { none: true };
+}
+
+/**
+ * THE MINOR'S BUILD STEP (City_BuildQueue 0x16f050, the step every city
+ * takes; `tools/civ6lab/dll_readings.md` "H-1: the build queue's overflow").
+ * What it works is the city-state AI's pick (`minorPick`, the fitted build
+ * table, C-38's census; the record's item under a replay, `holdMinorItem`).
+ * The city keeps each item's progress apart: an item it turns from keeps
+ * what it holds, and one it turns back to resumes there
+ * (`CityState.prodRetained`; runs/h1_duelw1117 Caguana's Monument, 2.5 at
+ * t2, resumed at 2 after its Builder). The step pays the city's Production
+ * (A, its yield, the minor's -50% among its percents) plus the overflow
+ * store, the sum under the item's own row (a Builder or a military
+ * unit +200%, walls +200%, the Harbor and the type's district +500%:
+ * 0x1856ed multiplies the sum; 1117 Caguana's Builder 0 → 15 on 2.5 with an
+ * idle step's 2.5 stored, its Warrior 0 → 16 on 3.5 with the Monument's 2).
+ * An item completes when its progress covers its cost, one a turn — a unit
+ * also needs a free tile on or beside the centre — and leaves the store A
+ * less what it lacked before the step, never below 0 (A is the city's plain
+ * Production: a minor holds no flat toward its head). With nothing in hand
+ * the step adds A to the store. A district paves its plot (`paveGround`).
+ * The walls' repair restores the walls, the city's and its Encampment's, at
+ * the HP it puts back (`projectCost`); a district project converts the row's
+ * `yieldPct` of what the step paid in (never above its cost) into its yield,
+ * which the city's yields read until the next step (`CityState.projectYield`;
+ * a city-state earns no Great People, so its points go nowhere). The step
+ * clears the last conversion first. A PILLAGED building is queued after the
+ * item the minor was working on when it fell (`CityState.repairWait`) and
+ * then comes first: it resumes at `MINOR_REPAIR_RESUME_PCT` of its cost and
+ * the rest is built (`minorRepairTarget`).
+ */
+function minorBuild(state: GameState, cityState: CityState, production: number): void {
+  cityState.fullyPowered = false;
+  delete cityState.buildProject;
+  delete cityState.projectYield;
+  // A, which is the city's plain Production too: a minor holds no flat
+  // toward its head
+  const made = production;
+  const item = minorHold?.(state, cityState) ?? minorPick(state, cityState);
+  const key = minorItemKey(item);
+  // the item in hand changes: the one left keeps its progress
+  if (key !== (cityState.prodItem ?? '')) {
+    const kept = { ...cityState.prodRetained };
+    if (cityState.prodItem && (cityState.prodProgress ?? 0) > 0) kept[cityState.prodItem] = cityState.prodProgress!;
+    cityState.prodProgress = kept[key] ?? 0;
+    delete kept[key];
+    if (Object.keys(kept).length) cityState.prodRetained = kept;
+    else delete cityState.prodRetained;
+    if (key) cityState.prodItem = key;
+    else delete cityState.prodItem;
+  }
+  if ('none' in item) {
+    cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;
     return;
   }
-  toward(0);
+  const military = state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type)).length;
+  const city = minorCity(cityState);
+  const pct = 'unit' in item
+    ? (item.unit === 'BUILDER' ? MINOR_BUILDER_PROD_PCT
+      : unitIsMilitary(item.unit) && military < MINOR_SMALL_MILITARY ? MINOR_MILITARY_PROD_PCT : 0)
+    : 'building' in item ? (BUILDINGS[item.building].walls ? MINOR_WALLS_PROD_PCT : 0)
+      : 'district' in item ? (item.district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
+        : item.district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0)
+        : 0;
+  const cost = 'unit' in item
+    ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
+      : item.unit === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[item.unit].cost)
+    : 'building' in item ? minorBuildingCost(state, cityState, item.building)
+      // the row's OWN base, not the specialty one: a minor builds real
+      // districts too and the install prices an Aqueduct at 36
+      : 'district' in item ? districtScaledBase(cityState.research, item.district)
+        : 'project' in item ? projectCost(state, cityState.seat, item.project, city)
+          : minorBuildingCost(state, cityState, item.repair)
+            - Math.floor((minorBuildingCost(state, cityState, item.repair) * MINOR_REPAIR_RESUME_PCT) / 100);
+  const before = cityState.prodProgress ?? 0;
+  const paid = made + (cityState.prodOverflow ?? 0);
+  cityState.prodProgress = before + paid * ((100 + pct) / 100);
+  cityState.prodOverflow = 0;
+  const def = 'project' in item ? PROJECTS[item.project] : undefined;
+  if (def?.yield) cityState.projectYield = { key: def.yield, amount: Math.min(paid, cost) * projectConversionRate(def) };
+  if ('district' in item) {
+    // the MINOR's own price and the progress it is judged against. A
+    // minor's district feeds its suzerain's yields, so a build one turn
+    // apart is a small, permanent drift in a MAJOR's purse with no other
+    // symptom.
+    const _dl = (globalThis as { __diffLog?: string[] }).__diffLog;
+    if (_dl) _dl.push(`dm:${cityState.seat}:${state.turn}:${item.district}`
+      + ` t${cost} pot${Math.floor(cityState.prodProgress)}`);
+  }
+  if (cityState.prodProgress < cost) {
+    if (def && 'project' in item) {
+      cityState.fullyPowered = !!def.fullyPowered;
+      cityState.buildProject = item.project;
+    }
+    return;
+  }
+  if ('unit' in item) {
+    const unit = spawnUnit(state, item.unit, cityState.centerIndex, cityState.seat);
+    if (!unit) return;
+    applyTrainingGrants(state, minorCity(cityState), unit);
+    if (item.unit === 'BUILDER') cityState.buildersTrained += 1;
+  } else if ('building' in item) {
+    const b = BUILDINGS[item.building];
+    cityState.buildings = [...(cityState.buildings ?? []), item.building];
+    if (b.floodBarrier) repairBehindBarrier(state, minorCity(cityState));
+    if (b.walls) {
+      cityState.outerHp = wallsMax(state, { buildings: cityState.buildings, seat: cityState.seat });
+      // the Encampment's own pool refits at the walls tier (`fitEncampOuter`)
+      for (const d of cityState.districts ?? []) {
+        const t = state.map.tiles[d.tileIndex];
+        if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = cityState.outerHp;
+      }
+    }
+  } else if ('district' in item) {
+    const t = state.map.tiles[item.site];
+    t.district = item.district;
+    t.districtComplete = true;
+    paveGround(t);
+    (cityState.districts ??= []).push({ type: item.district, tileIndex: item.site });
+    if (item.district === 'ENCAMPMENT') {
+      t.encampHp = ENCAMPMENT_HP;
+      t.encampOuterHp = wallsMax(state, { buildings: cityState.buildings ?? [], seat: cityState.seat });
+    }
+  } else if ('project' in item) {
+    if (def!.repair) {
+      cityState.outerHp = wallsMax(state, city);
+      fitEncampOuter(state, city);
+    }
+  } else {
+    repairBuilding(cityState, item.repair);
+  }
+  if (!('repair' in item)) cityState.repairWait = false;
+  cityState.prodOverflow = Math.max(0, made - Math.max(0, cost - before));
+  cityState.prodProgress = 0;
+  delete cityState.prodItem;
 }
 
 /**

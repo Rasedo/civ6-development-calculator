@@ -1960,6 +1960,9 @@ class SimInit:
         self._route_dom_gold = int(rr["routeGoldCulturalDominance"])
         self._tech_era = torch.tensor(rr["techEra"] or [0], dtype=torch.long, device=device)
         self._civic_era = torch.tensor(rr["civicEra"] or [0], dtype=torch.long, device=device)
+        # each row's place in the install table's order, the random pickers' walk
+        self._tech_rank = torch.tensor(rr["techTableRank"] or [0], dtype=torch.long, device=device)
+        self._civic_rank = torch.tensor(rr["civicTableRank"] or [0], dtype=torch.long, device=device)
         self._tech_boostable = torch.tensor(rr["techBoostable"] or [False], dtype=torch.bool, device=device)
         self._civic_boostable = torch.tensor(rr["civicBoostable"] or [False], dtype=torch.bool, device=device)
         # each row's `Boosts.Boost` percent, 0 with no row (`_land_boosts`)

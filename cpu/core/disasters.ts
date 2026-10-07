@@ -851,12 +851,39 @@ function randomEvent(state: GameState): void {
     for (let k = 0; k < pairs[i].length; k++) {
       cum += pairs[i][k];
       if (at >= cum) continue;
-      const key = keys[i]?.[k];
+      const site = rows[i].family === 'flood' ? heldFloodSite(state, sites, rows[i].sev, k) : k;
+      const key = keys[i]?.[site];
       if (key) key.eventFired = (key.eventFired ?? 0) | (1 << i);
-      fireEvent(state, rows[i], sites, k);
+      fireEvent(state, rows[i], sites, site);
       return;
     }
   }
+}
+
+let floodHold: ((state: GameState, sev: number) => number | undefined) | null = null;
+let floodHeld: (() => void) | null = null;
+
+/** The action replay's hold on a flood's river (`cpu/harness/replay.ts`):
+ *  the game walks its rivers in the map generator's list order, which no
+ *  record carries, so a replayed flood row strikes the river the record's
+ *  flood of that row names — a plot of it, as `fn` returns it for the step
+ *  the engine's `state.turn` is; `held` hears each flood the hold moved
+ *  off the draw's own river. Null outside a replay. */
+export function holdFloodRiver(fn: ((state: GameState, sev: number) => number | undefined) | null,
+  held: (() => void) | null = null): void {
+  floodHold = fn;
+  floodHeld = held;
+}
+
+/** The flood site a drawn flood row strikes: the held river's where a replay
+ *  holds one among the revealed rivers, else the draw's own. */
+function heldFloodSite(state: GameState, sites: EventSites, sev: number, k: number): number {
+  const plot = floodHold?.(state, sev);
+  if (plot === undefined) return k;
+  const j = sites.flood.findIndex((r) => r.plots.some((t) => t.index === plot));
+  if (j < 0 || j === k) return k;
+  floodHeld?.();
+  return j;
 }
 
 function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number): void {

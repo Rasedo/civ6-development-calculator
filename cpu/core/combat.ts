@@ -143,17 +143,19 @@ export function terrainDefense(tile: Tile): number {
 export const FORT_DEFENSE_CS = 4; // the FORT improvement, physical and theological alike
 const RIVER_ATTACK_PENALTY = 5; // melee across a river, attacker CS −5
 /**
- * CIV6: "Damage of wounded units is diminished... The formula is
- * `round(10 - HP/10)`... units with 30 HP will lose 7 Combat Strength and units
- * with 1 HP will lose 10". The same penalty applies to RELIGIOUS Strength in
- * theological combat. Cities / city-states / walls are not units and never call
- * this. CIV6 (Samurai): "This unit does not suffer combat penalties when
- * damaged" — the wound curve reads zero for that chassis, attacking and
- * defending.
+ * THE WOUNDED LAW on a unit's strength (0x522630, `woundedLoss256`): the
+ * Combat a unit loses is COMBAT_WOUNDED_DAMAGE_MULTIPLIER times its damage
+ * percent, in 1/256 — fractional, not rounded (runs/h1_duelw1117 t5: a
+ * city-state's Warrior 18 damaged struck a Spearman 21 damaged at -3.7, the
+ * logged hits 24 and 38 on draws 4 and 9). RELIGIOUS Strength in theological
+ * combat reads the same law. Cities / city-states / walls are not units and
+ * never call this. CIV6 (Samurai): "This unit does not suffer combat
+ * penalties when damaged" — its reduction is the whole loss.
  */
 export function woundPenalty(unit: { hp: number; type?: string }): number {
   if (unit.type !== undefined && UNITS[unit.type]?.noWoundPenalty) return 0;
-  return Math.round(10 - Math.max(0, unit.hp) / (UNIT_HP / 10));
+  const pct = Math.min(100, Math.max(0, Math.trunc(((UNIT_HP - unit.hp) * 100) / UNIT_HP)));
+  return woundedLoss256(pct) / 256;
 }
 
 /** CIV6 (Impi): "+100% Flanking bonus" — the chassis's own multiplier on the

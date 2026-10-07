@@ -30,13 +30,13 @@
  */
 import { readFileSync } from 'node:fs';
 import type { City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
-import { NO_SEAT } from '../core/types';
+import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost } from '../core/game';
 import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, sueForPeace, transferCity } from '../core/phase';
-import { declareWarOnCityState, minorCity, placeCityStateAt, resolveSuzerain, sueForPeaceWithCityState } from '../core/cityStates';
+import { addEnvoys, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements } from '../core/rules';
 import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, grantedMoves, restUnit, upgradeUnit } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
@@ -45,9 +45,11 @@ import { congressPolicyBlocked } from '../core/congress';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield } from '../core/economy';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
+import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '../core/governors';
+import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
-import { applyTrainingGrants, clearCampFor } from '../core/combat';
+import { applyTrainingGrants, clearCampFor, meleeAttack, rangedAttack } from '../core/combat';
 import { goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, seatOf, setTileOwner, setWar, BARB_SEAT } from '../core/seats';
@@ -62,11 +64,13 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
+import { holdFloodRiver } from '../core/disasters';
+import { holdMinorItem, type MinorItem } from '../core/minorBuild';
 import type { Catalog, DumpCity, TurnRecord } from './record';
 import { num, bool } from './record';
-import { advanceHistory, engineRowOf, importTurn, newHistory, type History, type Imported } from './import';
+import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
-import { loadRandLog, randLogPath } from './randLog';
+import { loadRandLog, randLogPath, type RandLog } from './randLog';
 import { loggedStep } from './drawSites';
 import { lcgStep } from './civ6Random';
 import { holdRng, type RngPoint } from '../core/rand';
@@ -109,12 +113,20 @@ interface Ctx {
   tally: Map<string, Record<Outcome, number>>;
   /** this pair's fallbacks, by player id */
   fellBack: Map<number, string[]>;
+  /** this pair's imposed outcomes (every fallback), by kind */
+  imposed: Map<string, number>;
   /** why the engine refused a decision, by kind and its rule's reason */
   reasons: Map<string, Map<string, number>>;
   /** the record's units (`owner:id`) the engine's own turn destroyed */
   engineKilled: Set<string>;
   /** this pair's moved units' steps (`move`'s path), by `owner:id` */
   paths: Map<string, number[]>;
+  /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
+  envoys: EnvoyDecision[];
+  /** the record's units (`owner:id`) a battle of this pair the engine fought */
+  battled: Set<string>;
+  /** the game's draw log, where the recording kept it */
+  log?: RandLog;
 }
 
 /** REPLAY_TRACE=<subsystem or decision kind>,... prints every mismatch of
@@ -128,6 +140,7 @@ function count(ctx: Ctx, kind: string, out: Outcome, player?: number, why?: stri
   const t = ctx.tally.get(kind) ?? { applied: 0, fallback: 0, refused: 0 };
   t[out] += 1;
   ctx.tally.set(kind, t);
+  if (out === 'fallback') ctx.imposed.set(kind, (ctx.imposed.get(kind) ?? 0) + 1);
   if (out !== 'applied' && player !== undefined) {
     if (!ctx.fellBack.has(player)) ctx.fellBack.set(player, []);
     ctx.fellBack.get(player)!.push(`${kind}:${out}`);
@@ -319,16 +332,124 @@ function policyIds(ctx: Ctx, d: PolicyDecision): { gid: string | null; ids: stri
 function stagePolicies(ctx: Ctx, ds: Decision[]): PolicyDecision[] {
   const staged = ds.filter((d): d is PolicyDecision => d.kind === 'policies');
   const turn: Record<number, SeatActionRecord> = {};
+  const recOf = (seat: number): SeatActionRecord => (turn[seat] ??= { production: [], tech: null, civic: null, units: [] });
   for (const d of staged) {
     const seat = seatOfP(ctx, d.player);
     if (seat === NO_SEAT || seat >= ctx.state.seats.length) continue;
     const { gid, ids } = policyIds(ctx, d);
     const gi = gid ? GOVERNMENT_LIST.findIndex((g) => g.id === gid) : -1;
-    turn[seat] = { production: [], tech: null, civic: null, units: [], government: gi >= 0 ? gi : null,
-      policies: ids.map((id) => POLICY_LIST.findIndex((p) => p.id === id)).filter((i) => i >= 0) };
+    Object.assign(recOf(seat), { government: gi >= 0 ? gi : null,
+      policies: ids.map((id) => POLICY_LIST.findIndex((p) => p.id === id)).filter((i) => i >= 0) });
+  }
+  for (const d of ctx.envoys) {
+    const seat = seatOfP(ctx, d.player);
+    const ms = seatOfP(ctx, d.minor);
+    const r = recOf(seat);
+    r.envoys = [...(r.envoys ?? []), ...new Array(d.n).fill(cityStateOfSeat(ms))];
   }
   ctx.state.seatActions = { [ctx.state.turn - 1]: turn };
   return staged;
+}
+
+type EnvoyDecision = Extract<Decision, { kind: 'envoy' }>;
+
+/** each staged envoy the engine's turn did not land is the record's */
+function verifyEnvoys(ctx: Ctx, was: Map<EnvoyDecision, number>): void {
+  const { state } = ctx;
+  for (const [d, n0] of was) {
+    const seat = seatOfP(ctx, d.player);
+    const cs = state.cityStates.find((c) => c.id === cityStateOfSeat(seatOfP(ctx, d.minor)));
+    const got = cs ? (cs.envoys[seat] ?? 0) - n0 : d.n;
+    if (cs && got < d.n) {
+      addEnvoys(state, cs, seat, d.n - got);
+      count(ctx, 'envoy', 'fallback', d.player, 'the staged envoy did not land');
+    }
+  }
+}
+
+/** the generator a player's start between record b's predecessor and record
+ *  b began and completed from: the last of each record b witnesses */
+type BattleDecision = Extract<Decision, { kind: 'battle' }>;
+
+/** the generator a battle's damage draws begin from: the actions of its
+ *  player's turn run from the state its start completed with (`wit`'s
+ *  witness) to the next player's start, and each hit the turn dealt took one
+ *  "Unit Combat Damage" draw in order — the battle's first is its `seq`-th
+ *  (the action log's battles, `RecordedActions`) */
+function battleDraw(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): number | undefined {
+  const log = ctx.log;
+  const post = startSeeds(wit, d.player).post;
+  const from = log && post !== undefined ? log.index(post) : undefined;
+  if (!log || from === undefined) return undefined;
+  const stops = new Set<number>();
+  for (const w of [...(b.witness ?? []), ...(wit.witness ?? [])]) {
+    if (w.point === 'pre' && w.player !== d.player && typeof w.seed === 'number') stops.add(w.seed >>> 0);
+  }
+  let k = 0;
+  for (let i = from; i < log.draws.length; i++) {
+    if (i > from && stops.has(log.stateAt(i))) return undefined;
+    if (log.draws[i].label !== 'Unit Combat Damage') continue;
+    if (k === d.seq) return log.stateAt(i);
+    k += 1;
+  }
+  return undefined;
+}
+
+function startSeeds(b: TurnRecord, player: number): { pre?: number; post?: number } {
+  const out: { pre?: number; post?: number } = {};
+  const at = { pre: -Infinity, post: -Infinity };
+  for (const w of b.witness ?? []) {
+    if (w.player !== player || typeof w.seed !== 'number' || (w.point !== 'pre' && w.point !== 'post') || w.turn < at[w.point]) continue;
+    at[w.point] = w.turn;
+    out[w.point] = w.seed >>> 0;
+  }
+  return out;
+}
+
+/** does the giver send its envoys in its start: its start draws more border
+ *  picks than its cities (one each) — the minors' annexes — by the game's
+ *  log; with no log, the start (the DLL's reading) */
+function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, player: number): boolean {
+  const { pre, post } = startSeeds(b, player);
+  const draws = log && pre !== undefined && post !== undefined ? log.between(pre, post) : undefined;
+  if (!draws) return true;
+  const picks = draws.filter((x) => x.label === 'GetNextBuyablePlot picker').length;
+  return picks > a.cities.filter((c) => c.owner === player).length;
+}
+
+/**
+ * THE OTHER PLAYERS' ENVOYS. A player's AI sends its envoys in its start,
+ * before its cities, or in its actions after it (`tools/civ6lab/
+ * dll_readings.md` "H-1: the envoy annex"; the game's log places them,
+ * `envoysInStart`), and the minor annexes a plot for each with a draw there.
+ * The start's go on the wire, which the engine's turn spends at that seat's
+ * start (`applySeatActionRecord`); an envoy the engine's purse holds no token
+ * for — the game's civic paid one in that same start, the engine's only
+ * after its actions — is the record's: the token is put in its purse first
+ * (runs/h1_duelw1117 t28: China's two to Caguana annex 526 and 612 before
+ * Xi'an's pick). The actions' land after the engine's turn, on the
+ * generator the giver's start completed with (`applyPhase`; t24: China's
+ * envoy to Caguana annexes 702 on the first draw past its start). Returns the
+ * staged envoys' minors' counts before the turn.
+ */
+function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log: RandLog | undefined): Map<EnvoyDecision, number> {
+  const { state } = ctx;
+  ctx.envoys = [];
+  const was = new Map<EnvoyDecision, number>();
+  for (const d of ds) {
+    if (d.kind !== 'envoy' || d.phase !== 'after' || !envoysInStart(log, a, b, d.player)) continue;
+    const seat = seatOfP(ctx, d.player);
+    const s = seatOf(state, seat) as Seat | undefined;
+    const ms = seatOfP(ctx, d.minor);
+    const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
+    if (!s || !cs || seat >= state.seats.length || !cs.met.includes(seat)) continue;
+    const short = d.n - (s.envoysAvailable ?? 0);
+    if (short > 0) s.envoysAvailable = (s.envoysAvailable ?? 0) + short;
+    ctx.envoys.push(d);
+    was.set(d, cs.envoys[seat] ?? 0);
+    count(ctx, 'envoy', short > 0 ? 'fallback' : 'applied', d.player, short > 0 ? 'no token in the engine purse at its start' : undefined);
+  }
+  return was;
 }
 
 /** each staged set the engine refused is the record's */
@@ -445,12 +566,26 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
  *  gives the queue its city), then the seats, the cities' orders, the plots,
  *  the units */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'research', 'civic', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'unitGone', 'unitNew', 'move', 'combat', 'kill', 'promote', 'upgrade', 'camp', 'village'];
+  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'battle', 'unitGone', 'unitNew', 'move', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'village'];
 
-function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord): void {
+function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
   const { state, next } = ctx;
   const mine = ds.filter((d) => d.phase === phase).sort((x, y) => ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind));
+  // EACH PLAYER'S ACTIONS draw on the stream its start completed with (its
+  // `PlayerTurnStartComplete` witness in `wit`: record t for the active
+  // player's, record t + 1 for the others'), each player's draws its own
+  // run of it (runs/h1_duelw1117 t24: China's envoy annexes Caguana's 702 on
+  // the first draw past its start; t26: Stonehenge's two free plots)
+  const streams = new Map<number, number>();
+  let drawing: number | undefined;
   for (const d of mine) {
+    const p = 'player' in d ? d.player : undefined;
+    if (p !== undefined && p !== drawing) {
+      if (drawing !== undefined) streams.set(drawing, state.rngState);
+      const post = streams.get(p) ?? startSeeds(wit, p).post;
+      if (post !== undefined) state.rngState = post;
+      drawing = p;
+    }
     switch (d.kind) {
       case 'queue': applyQueue(ctx, d); break;
       case 'research': applyResearch(ctx, d.player, d.tech, false); break;
@@ -550,6 +685,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'envoy': {
+        // the other players' envoys went to the engine's turn (`stageEnvoys`)
+        if (ctx.envoys.includes(d)) break;
         const seat = seatOfP(ctx, d.player);
         const s = seatOf(state, seat) as Seat | undefined;
         const ms = seatOfP(ctx, d.minor);
@@ -558,11 +695,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const was = cs.envoys[seat] ?? 0;
         applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(d.n).fill(cs.id) });
         const got = (cs.envoys[seat] ?? 0) - was;
-        // every envoy write ends at the stored contest (`resolveSuzerain`)
-        if (got < d.n) {
-          cs.envoys[seat] = was + d.n;
-          resolveSuzerain(state, cs);
-        }
+        // the envoys the engine's purse could not send land as the engine
+        // receives any (`addEnvoys`): the stored contest, and the ground the
+        // minor annexes for them
+        if (got < d.n) addEnvoys(state, cs, seat, d.n - got);
         count(ctx, 'envoy', got >= d.n ? 'applied' : 'fallback', d.player);
         break;
       }
@@ -608,16 +744,37 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'governors': {
+        // each appointment, promotion and assignment the record's player
+        // made, through the engine's own verbs: the clocks are the engine's
         const seat = seatOfP(ctx, d.player);
         const s = seatOf(state, seat);
         const g = seatOf(next.state, seat)?.governors;
         if (!s || !g) { count(ctx, 'governors', 'refused', d.player); break; }
-        s.governors = g.map((x) => {
+        const roster = governorsOf(s);
+        g.forEach((x, i) => {
           const from = x.cityId >= 0 ? next.state.seats[seat]?.cities.find((c) => c.id === x.cityId) : undefined;
           const to = from ? cityAt(state, from.centerIndex) : undefined;
-          return { ...x, cityId: to && to.seat === seat ? to.id : -1 };
+          const cityId = to && to.seat === seat ? to.id : -1;
+          const e = roster[i];
+          const same = () => x.appointed === e.appointed && x.promotions === e.promotions
+            && cityId === e.cityId && x.minorId === e.minorId;
+          if (same()) return;
+          if (x.appointed && !e.appointed) appointGovernor(state, seat, i);
+          for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+            if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) promoteGovernor(state, seat, i, p);
+          }
+          if (cityId >= 0 || x.minorId >= 0) {
+            if (cityId !== e.cityId || x.minorId !== e.minorId) {
+              assignGovernor(state, seat, i, x.minorId >= 0 ? { minorId: x.minorId } : { cityId });
+            }
+          }
+          if (same()) { count(ctx, 'governors', 'applied'); return; }
+          // the record's roster, on the engine's clock where the posting
+          // stands (a record reads an unestablished governor's full count)
+          const kept = e.appointed && e.cityId === cityId && e.minorId === x.minorId && cityId + x.minorId > -2;
+          roster[i] = { ...x, cityId, establishTurns: kept ? e.establishTurns : x.establishTurns };
+          count(ctx, 'governors', 'fallback', d.player);
         });
-        count(ctx, 'governors', 'fallback', d.player);
         break;
       }
       case 'routes': {
@@ -793,11 +950,43 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         count(ctx, 'kill', 'applied', d.player);
         break;
       }
+      case 'battle': {
+        // the battle is the engine's: its melee or ranged combat resolves it
+        // from where the log's steps had the two units, on the game's own
+        // damage draws
+        const atk = unitOf(ctx, d.attacker);
+        const def = unitOf(ctx, d.defender);
+        if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        const s0 = battleDraw(ctx, wit, b, d);
+        if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); break; }
+        atk.tileIndex = d.from;
+        def.tileIndex = d.at;
+        atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
+        atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
+        state.rngState = s0;
+        const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
+        if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); break; }
+        ctx.battled.add(d.attacker);
+        ctx.battled.add(d.defender);
+        for (const k of [d.attacker, d.defender]) if (!state.units.includes(ctx.units.get(k)!)) ctx.engineKilled.add(k);
+        count(ctx, 'battle', 'applied');
+        break;
+      }
       case 'combat': {
         const u = unitOf(ctx, d.unit);
-        if (!u) break;
+        if (!u || ctx.battled.has(d.unit)) break;
         u.hp = d.hp;
         count(ctx, 'combat', 'fallback', d.player);
+        break;
+      }
+      case 'hit': {
+        // a blow no battle holds, on a unit whose battles were the engine's:
+        // the record's damage (a unit with no battle takes the record's
+        // health whole, `combat`)
+        const u = unitOf(ctx, d.unit);
+        if (!u || !ctx.battled.has(d.unit) || !state.units.includes(u)) break;
+        u.hp = Math.max(1, u.hp - d.dmg);
+        count(ctx, 'hit', 'fallback', d.player);
         break;
       }
     }
@@ -848,6 +1037,43 @@ function matchNewUnits(ctx: Ctx, b: TurnRecord): void {
   }
 }
 
+/** THE GOVERNORS are their player's decisions (`governors`): what the
+ *  engine's own script (`governorPhase`) appointed, promoted or assigned in
+ *  the turn is undone, while its clocks run — an assignment it made leaves
+ *  the slot as it stood, a turn further on its establishment. */
+function undoGovernorScript(state: GameState, rosters: Map<number, Governor[]>): void {
+  for (const s of state.seats) {
+    const was = rosters.get(s.seat);
+    if (!was) continue;
+    const roster = governorsOf(s);
+    roster.forEach((g, i) => {
+      const w = was[i];
+      if (!w.appointed && g.appointed) { roster[i] = w; return; }
+      g.promotions = w.promotions;
+      const moved = (g.cityId >= 0 || g.minorId >= 0) && (g.cityId !== w.cityId || g.minorId !== w.minorId);
+      if (!moved) return;
+      g.cityId = w.cityId;
+      g.minorId = w.minorId;
+      g.establishTurns = w.cityId >= 0 || w.minorId >= 0 ? Math.max(0, w.establishTurns - 1) : 0;
+    });
+  }
+}
+
+/** THE FORTIFY ORDER is its player's decision: a unit digs in only while it
+ *  holds the order, never by standing (runs/h1_duelw1117: 41 barbarian
+ *  Scouts and 6 city-state Warriors stood a turn with every move unspent and
+ *  stayed at 0; every unit that dug in spent its moves on the order). A unit
+ *  record t+1 holds undug gave no order, so the engine's dig-in for standing
+ *  does not land on it. */
+function fortifyOrders(ctx: Ctx, b: TurnRecord): void {
+  for (const r of b.units) {
+    const u = unitOf(ctx, `${r.owner}:${r.id}`);
+    if (!u || num(r.fortify) > 0 || !(u.fortifyTurns ?? 0)) continue;
+    u.fortifyTurns = 0;
+    count(ctx, 'fortify', 'applied');
+  }
+}
+
 /** every unit the replay knows stands where record t+1 shows it, with the
  *  moves it has left and its charges; the record's units the engine never
  *  made stay missing (a production difference) */
@@ -858,6 +1084,10 @@ function syncUnits(ctx: Ctx, b: TurnRecord): void {
     const at = r.y * ctx.W + r.x;
     if (u.tileIndex !== at) {
       count(ctx, 'move', 'applied');
+      // a unit that moved spent its moves and holds no fortification
+      // (runs/h1_duelw1117 t3: the barbarian Scout that walked to (12,10)
+      // took 38 from China's... city-state Warrior at +10, unfortified)
+      u.fortifyTurns = 0;
       // the unit sees from every plot the log's steps entered, and from where
       // it stopped
       for (const p of [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at]) {
@@ -900,12 +1130,12 @@ function syncDraws(ctx: Ctx, b: TurnRecord): void {
     t.feature = r.feature;
     soil++;
   }
-  if (soil) count(ctx, 'draw:eventSoil', 'applied');
+  if (soil) count(ctx, 'draw:eventSoil', 'fallback');
   // the barbarians' camps: where a new one rises is the barbarians' draw
   const camps = ctx.next.state.barbSeat.camps;
   if ([...state.barbSeat.camps].sort().join() !== [...camps].sort().join()) {
     state.barbSeat.camps = [...camps];
-    count(ctx, 'draw:camps', 'applied');
+    count(ctx, 'draw:camps', 'fallback');
   }
   for (const c of b.cities) {
     const at = c.y * ctx.W + c.x;
@@ -915,7 +1145,7 @@ function syncDraws(ctx: Ctx, b: TurnRecord): void {
     const t = state.map.tiles[want];
     const free = t.ownerSeat === NO_SEAT;
     if (free) city.nextPlot = want;
-    count(ctx, 'draw:nextPlot', free ? 'applied' : 'refused');
+    count(ctx, 'draw:nextPlot', free ? 'fallback' : 'refused');
   }
 }
 
@@ -1142,8 +1372,36 @@ export interface ReplayTurn {
   subsystems: Tallies;
   /** the decisions that fell back or were refused, by kind */
   fallbacks: Record<string, number>;
+  /** the recorded outcomes the replay imposed on the pair (every fallback),
+   *  by kind */
+  imposed: Record<string, number>;
   /** the generator was re-seeded from the record's witness */
   reseeded: boolean;
+}
+
+const ALL_SUBSYSTEMS = '*';
+const UNITS_SUBS = ['units.health', 'units.roster'];
+const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read.plot.yields'];
+/** THE SUBSYSTEMS AN IMPOSED OUTCOME TOUCHES, by kind (the part before the
+ *  first `:`, else the whole kind): a kind not named reaches every one —
+ *  a seat's purse, research, government, or a city's state flows into all */
+const IMPOSES_ON: Record<string, readonly string[]> = {
+  combat: UNITS_SUBS, hit: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
+  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:walk': UNITS_SUBS,
+  'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
+  'draw:nextPlot': ['read.city.nextPlot', 'read.city.nextPlotDraw', 'city.plots', 'plots.owner'],
+  'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
+  'draw:camps': ['plots.improvement'],
+  'draw:floodRiver': [...UNITS_SUBS, 'plots.feature', 'read.plot.yields'],
+  // a village paid as the record paid it: its Gold, Faith, boosts, citizen,
+  // the unit's price climb, its moment and the hut's plot
+  village: ['seat.gold', 'seat.faith', 'seat.boosts', 'seat.science', 'seat.culture', 'seat.techs', 'seat.civics',
+    'seat.eraScore', 'city.pop', 'city.food', 'city.pressure', 'plots.improvement', 'read.buy.unitCost', 'read.buy.unitGold'],
+};
+
+function imposesOn(kind: string, sub: string): boolean {
+  const on = IMPOSES_ON[kind] ?? IMPOSES_ON[kind.split(':')[0]] ?? [ALL_SUBSYSTEMS];
+  return on.includes(ALL_SUBSYSTEMS) || on.includes(sub);
 }
 
 export interface Divergence {
@@ -1167,8 +1425,14 @@ export interface ReplayReport {
   source: string;
   turns: number[];
   /** per subsystem: turns held exactly from the first pair, turns matched in
-   *  all, turns compared, and the first divergence */
-  subsystems: Record<string, { held: number; matched: number; compared: number; first?: Divergence }>;
+   *  all, turns compared, and the first divergence; the first pair on which
+   *  the replay imposed a recorded outcome touching it (`IMPOSES_ON`), and
+   *  the turns held from the first pair before it — the engine's own */
+  subsystems: Record<string, { held: number; matched: number; compared: number; first?: Divergence;
+    imposedFrom?: number; clean: number }>;
+  /** the pairs from the first on which every subsystem held with nothing
+   *  imposed on it */
+  cleanEvery: number;
   /** per decision kind: how many applied through the engine's verbs, fell
    *  back to the recorded outcome, or were refused */
   decisions: Record<string, Record<Outcome, number>>;
@@ -1222,11 +1486,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     history.randLog = loadRandLog(logPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   }
   history.replay = replayEvents(recs, cat, history.randLog);
-  const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {} };
+  const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {} };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
   holdRng(gameStream(recs, first.playerOfSeat, history));
+  holdMinorItem(minorItems(recs, cat));
   const state = first.state;
   // the record holds no plot's revealed state: each seat starts on what its
   // own plots, cities and units reveal (`initFog`), which its moments read
@@ -1234,9 +1499,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   seedMoments(state, first, history);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
-    units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(),
+    units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
+    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), log: history.randLog,
   };
+  holdFloodRiver(floodRivers(recs, cat), () => count(ctx, 'draw:floodRiver', 'fallback'));
   // the record's units in the importer's order
   let k = 0;
   for (const u of recs[0].units) {
@@ -1268,10 +1534,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const read = importTurn(b, cat, history);
     ctx.next = read;
     ctx.fellBack = new Map();
+    ctx.imposed = new Map();
+    ctx.battled = new Set();
     ctx.paths = new Map();
     traceTurn = b.turn;
     const ds = source.decisions(a, b, cat);
-    applyPhase(ctx, ds, 'before', b);
+    applyPhase(ctx, ds, 'before', b, a);
+    const envoysWere = stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`gameStream`)
     const seed = turnSeed(b);
@@ -1286,7 +1555,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // the record's moves stand in for outside the turn: a unit that spent its
     // moves keeps none of the turn's rest heal (runs/h1_duelw1118 China's
     // Warrior moved at t5 and read 38 at t6, unhealed)
-    const fought = new Set(ds.flatMap((d) => (d.kind === 'combat' ? [d.unit] : [])));
+    // a unit struck in another player's turn spent nothing of its own: only
+    // the blows it dealt count (runs/h1_duelw1118 t8: a city-state's Warrior
+    // that stood its turn, then took a barbarian Spearman's attack, held the
+    // turn's fortification against it)
+    const struckOnly = new Set(ds.flatMap((d) => (d.kind === 'battle' ? [d.defender] : [])));
+    const fought = new Set(ds.flatMap((d) => (d.kind === 'combat' && !struckOnly.has(d.unit) ? [d.unit] : d.kind === 'battle' ? [d.attacker] : [])));
     const was = new Map(a.units.map((u) => [`${u.owner}:${u.id}`, u.y * ctx.W + u.x]));
     // where the record carries its log, a unit walked when the log names its
     // steps — a unit pushed off its plot (`UnitTeleported`) spent nothing
@@ -1298,6 +1572,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // engine's own walk for it (`minorWalk`) is its script's decision, which
     // the record's moves stand in for
     const restedMinor = new Map<Unit, { at: number; from: number; hp: number; fortifyTurns?: number }>();
+    const struckHp = new Map<Unit, number>();
+    // a barbarian unit's rest: whether it stood the turn through and struck
+    // no blow
+    const barbRest = new Map<Unit, boolean>();
+    const struck = new Set(ds.flatMap((d) => (d.kind === 'battle' ? [d.attacker] : [])));
     for (const r of b.units) {
       const key = `${r.owner}:${r.id}`;
       const u = unitOf(ctx, key);
@@ -1306,7 +1585,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const rested = stood && !fought.has(key);
       u.movesLeft = rested ? grantedMoves(state, u) : 0;
       if (!rested) spent.set(u, u.hp);
+      else if (struckOnly.has(key)) struckHp.set(u, u.hp);
       else if (isCityStateSeat(u.seat)) restedMinor.set(u, { at: r.y * ctx.W + r.x, from: u.tileIndex, hp: u.hp, fortifyTurns: u.fortifyTurns });
+      if (isBarbSeat(u.seat)) barbRest.set(u, stood && !struck.has(key) && num(r.fortify) > 0);
     }
     // THE BARBARIANS' TURN IS THE RECORD'S: their units are its units
     // (`syncUnits`), their battles its battles (`combat`, `kill`) and their
@@ -1319,12 +1600,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // draw took a citizen of Rome the game's spared)
     const barbs = state.units.filter((u) => isBarbSeat(u.seat));
     state.units = state.units.filter((u) => !isBarbSeat(u.seat));
+    // A CITY-STATE'S BUILDERS lay what its AI picks, which the record's
+    // improvements carry (`improve`): the engine's own pick sits the turn out,
+    // its charges kept (runs/h1_duelw1115 Yerevan's Builder: the engine's
+    // pick spent its last charge at t8, the game's held it to t9)
+    const minorBuilders = state.units.filter((u) => isCityStateSeat(u.seat) && u.type === 'BUILDER' && (u.charges ?? 0) > 0)
+      .map((u) => [u, u.charges] as const);
+    for (const [u] of minorBuilders) u.charges = 0;
     // A PANTHEON is its player's decision (`pantheon`), which the game's AI
     // takes when it will, not on the first turn its faith covers the price
     // (runs/h1_duelw1118 China: 12 Faith at t28, founded at t29): the
     // engine's own race finds none open in the turn
     const claimed = state.claimedPantheons;
     state.claimedPantheons = Object.keys(PANTHEONS);
+    const rosters = new Map(state.seats.map((s) => [s.seat, structuredClone(governorsOf(s))]));
     try {
       endTurn(state);
     } catch (e) {
@@ -1333,9 +1622,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     } finally {
       state.claimedPantheons = claimed;
     }
+    undoGovernorScript(state, rosters);
     for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
+    // a rested unit struck in a later player's turn heals at its own next
+    // turn's start, after the blow (runs/h1_duelw1118 t8: a city-state's
+    // Warrior 23 damaged, fortified, took the barbarians' two attacks at 77
+    // health and read +10 after them)
+    const heals = new Map<Unit, number>();
+    for (const [u, hp] of struckHp) {
+      if (u.hp > hp) heals.set(u, u.hp - hp);
+      u.hp = Math.min(u.hp, hp);
+    }
     state.units.push(...barbs);
+    for (const [u, charges] of minorBuilders) u.charges = charges;
     verifyPolicies(ctx, staged);
+    verifyEnvoys(ctx, envoysWere);
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
     // that the record's players did not: their decision, undone
@@ -1358,9 +1659,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       u.hp = w.hp;
       u.fortifyTurns = w.fortifyTurns;
       restUnit(state, u, true);
+      count(ctx, 'minorAi:walk', 'fallback', ctx.playerOfSeat.get(u.seat));
     }
-    applyPhase(ctx, ds, 'after', b);
+    fortifyOrders(ctx, b);
+    applyPhase(ctx, ds, 'after', b, b);
+    for (const [u, heal] of heals) if (state.units.includes(u)) u.hp = Math.min(UNIT_HP, u.hp + heal);
     syncUnits(ctx, b);
+    // the barbarians' units sat the engine's turn out, so their rest — the
+    // fortification a unit holding the Fortify order digs in (`fortifyOrders`)
+    // — is the engine's own step, run here where their turn closes the log's.
+    // Being attacked spends nothing (runs/h1_duelw1117 t4: the camp's
+    // Spearman, struck at t4, still two turns dug in at t5, took 21 from a
+    // city-state's Warrior at -4)
+    for (const [u, stood] of barbRest) {
+      if (state.units.includes(u)) restUnit(state, u, stood);
+    }
     syncDraws(ctx, b);
     syncPillage(ctx);
     syncDedications(ctx);
@@ -1391,9 +1704,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     opts.onPair?.(state, b, ds);
     const fallbacks: Record<string, number> = {};
     for (const xs of ctx.fellBack.values()) for (const x of xs) fallbacks[x] = (fallbacks[x] ?? 0) + 1;
-    report.perTurn.push({ turn: b.turn, subsystems: t, fallbacks, reseeded: seed !== undefined });
+    report.perTurn.push({ turn: b.turn, subsystems: t, fallbacks, imposed: Object.fromEntries(ctx.imposed), reseeded: seed !== undefined });
     for (const [sub, x] of Object.entries(t)) {
-      const s = report.subsystems[sub] ?? (report.subsystems[sub] = { held: 0, matched: 0, compared: 0 });
+      const s = report.subsystems[sub] ?? (report.subsystems[sub] = { held: 0, matched: 0, compared: 0, clean: 0 });
       s.compared += 1;
       const bad = sub.startsWith('read.') ? (x.drift ?? 0) > 0 : x.fail > 0;
       if (!bad) {
@@ -1414,7 +1727,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     prev = a;
   }
-  for (const [sub, s] of Object.entries(report.subsystems)) s.held = held.get(sub) ?? 0;
+  for (const [sub, s] of Object.entries(report.subsystems)) {
+    s.held = held.get(sub) ?? 0;
+    const at = report.perTurn.findIndex((p) => Object.keys(p.imposed).some((k) => imposesOn(k, sub)));
+    if (at >= 0) s.imposedFrom = report.perTurn[at].turn;
+    s.clean = at >= 0 ? Math.min(s.held, at) : s.held;
+  }
+  report.cleanEvery = Math.min(report.perTurn.length, ...Object.values(report.subsystems).map((s) => s.clean));
   report.turns = report.perTurn.length ? [report.perTurn[0].turn, report.perTurn[report.perTurn.length - 1].turn] : [];
   report.decisions = Object.fromEntries([...ctx.tally].sort(([x], [y]) => x.localeCompare(y)));
   report.refusals = Object.fromEntries([...ctx.reasons].sort(([x], [y]) => x.localeCompare(y)).map(([k, m]) => [k, Object.fromEntries(m)]));
@@ -1424,23 +1743,72 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
+  holdFloodRiver(null);
+  holdMinorItem(null);
   return report;
 }
 
 /**
+ * THE CITY-STATES' ITEMS: what a city-state's city builds is its AI's pick,
+ * taken after its step (on a completion, or idle), so the item its step of
+ * turn t works is the one record t shows at its queue's head (runs/h1_duelw1117
+ * Caguana: the Monument done in the step of t15, the Warrior at 0 in record
+ * t16 and at 16 in t17). The engine's own build step works it.
+ */
+function minorItems(recs: readonly TurnRecord[], cat: Catalog) {
+  const byTurn = new Map(recs.map((r) => [r.turn, r]));
+  return (state: GameState, cs: CityState): MinorItem | undefined => {
+    const rec = byTurn.get(state.turn);
+    const c = rec?.cities.find((x) => x.y * rec.head.W + x.x === cs.centerIndex);
+    return rec && c ? minorHead(cat, c, rec.head.W) : undefined;
+  };
+}
+
+const FLOOD_ROWS = ['RANDOM_EVENT_FLOOD_MODERATE', 'RANDOM_EVENT_FLOOD_MAJOR', 'RANDOM_EVENT_FLOOD_1000_YEAR'];
+
+/**
+ * THE FLOODS' RIVERS: the game weighs its rivers in the map generator's list
+ * order, which no record carries (runs/h1_duelw1117 t13: the roll 107 lands
+ * on the second river of the major row, the Amur at plot 608, where the
+ * rivers by plot index put the Tiber second). The replay's flood of a row
+ * strikes the river the record's flood of that row and turn names (its start
+ * plot); the roll and its row stay the engine's.
+ */
+function floodRivers(recs: readonly TurnRecord[], cat: Catalog) {
+  const plot = new Map<string, number>();
+  for (const r of recs) {
+    for (const e of r.events ?? []) {
+      const sev = FLOOD_ROWS.indexOf(cat.randomEvents?.[num(e[1])] ?? '');
+      if (sev >= 0 && num(e[3]) >= 0) plot.set(`${num(e[0])}:${sev}`, num(e[3]));
+    }
+  }
+  // the engine's step of turn t is the game's of turn t + 1 (`gameStream`)
+  return (state: GameState, sev: number): number | undefined => plot.get(`${state.turn + 1}:${sev}`);
+}
+
+/**
  * THE GAME'S RANDOM STREAM, held at the points the records witness (\`holdRng\`):
- * the engine's seat phase of turn t is the game's starts of turn t + 1 (the
- * replay steps from record t to record t + 1), so each seat, a city-state's
- * included, takes the generator its player's start of turn t + 1 began from
- * (its \`PlayerTurnStarted\` witness); the random-event step that follows,
+ * the engine's seat phase of turn t is each player's start between record t
+ * and record t + 1 (the active player's of turn t + 1, the others' of turn
+ * t), so each seat, a city-state's included, takes the generator that start
+ * began from (its \`PlayerTurnStarted\` witness); the random-event step that follows,
  * the game's step of turn t + 2, takes the state its first draw was taken
  * from — the game's log places it (\`loggedStep\`), else the event replay's
  * start (\`EventReplay.steps\`).
  */
 function gameStream(recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History) {
+  // each player's start between record t and record t + 1: the last one
+  // record t + 1 witnesses — the active player's of turn t + 1, every other
+  // player's of turn t (runs/h1_duelw1117 record 25 holds China's 24 start
+  // at 142670580, and its 25 start, 3965475004, falls after the record)
   const pre = new Map<string, number>();
   for (const r of recs) {
-    for (const w of r.witness ?? []) if (w.point === 'pre' && typeof w.seed === 'number') pre.set(`${w.turn}:${w.player}`, w.seed >>> 0);
+    const last = new Map<number, number>();
+    for (const w of r.witness ?? []) {
+      if (w.point !== 'pre' || typeof w.seed !== 'number' || (last.get(w.player) ?? -Infinity) > w.turn) continue;
+      last.set(w.player, w.turn);
+      pre.set(`${r.turn}:${w.player}`, w.seed >>> 0);
+    }
   }
   return (_: GameState, point: RngPoint): number | undefined => {
     if (point.kind === 'seat') {
@@ -1469,17 +1837,26 @@ function gameStream(recs: readonly TurnRecord[], playerOfSeat: Map<number, numbe
 export function replayMarkdown(r: ReplayReport): string {
   const out = [`# Action replay: ${r.dump}`, '', `Source: ${r.source}. Pairs replayed: ${r.perTurn.length}, turns ${r.turns.join('-')}.`
     + (r.stopped ? ` Stopped: ${r.stopped}.` : ''), '',
-  '| subsystem | held from start | turns matched / compared | first divergence | subject | game | engine | per-turn step | per-turn fails on the subject |',
-  '|---|---:|---:|---:|---|---|---|---|---|'];
+  `Pairs from the first on which every subsystem held with nothing imposed on it: ${r.cleanEvery}.`, '',
+  '| subsystem | held from start | held, nothing imposed | first imposed | turns matched / compared | first divergence | subject | game | engine | per-turn step | per-turn fails on the subject |',
+  '|---|---:|---:|---:|---:|---:|---|---|---|---|---|'];
   const cut = (v: unknown) => JSON.stringify(v)?.slice(0, 80) ?? '';
   for (const [sub, s] of Object.entries(r.subsystems)) {
     const f = s.first;
-    out.push(`| ${sub} | ${s.held} | ${s.matched} / ${s.compared} | ${f ? f.turn : '-'} | ${f ? f.subject : ''} | ${f ? cut(f.game) : ''} | `
-      + `${f ? cut(f.ours) : ''} | ${f?.perTurn ?? ''} | ${(f?.perTurnFails ?? []).join(', ')} |`);
+    out.push(`| ${sub} | ${s.held} | ${s.clean} | ${s.imposedFrom ?? '-'} | ${s.matched} / ${s.compared} | ${f ? f.turn : '-'} | ${f ? f.subject : ''} | `
+      + `${f ? cut(f.game) : ''} | ${f ? cut(f.ours) : ''} | ${f?.perTurn ?? ''} | ${(f?.perTurnFails ?? []).join(', ')} |`);
   }
   out.push('', 'Reader subsystems (`read.*`) count a turn as diverged only where the per-turn harness passes the same check on the',
-    'imported record; the state subsystems count every mismatch.', '', '## Decisions', '',
-    '| kind | applied | fell back to the record | refused |', '|---|---:|---:|---:|');
+    'imported record; the state subsystems count every mismatch. "Held, nothing imposed" stops at the first pair on which the',
+    'replay imposed a recorded outcome touching the subsystem (a fallback; `IMPOSES_ON` names what each kind touches, every',
+    'subsystem where it names none).', '', '## Imposed outcomes per pair', '',
+    '| pair | imposed (kind × count) |', '|---:|---|');
+  for (const p of r.perTurn) {
+    const ks = Object.entries(p.imposed);
+    if (ks.length) out.push(`| ${p.turn} | ${ks.map(([k, n]) => `${k} ×${n}`).join(', ')} |`);
+  }
+  out.push('', '## Decisions', '',
+    '| kind | applied | imposed (fell back to the record) | refused |', '|---|---:|---:|---:|');
   for (const [k, d] of Object.entries(r.decisions)) out.push(`| ${k} | ${d.applied} | ${d.fallback} | ${d.refused} |`);
   if (Object.keys(r.settled).length) {
     out.push('', '## What the event log settles', '', 'Per decision kind the log names outright: the decisions it names, the ones the',

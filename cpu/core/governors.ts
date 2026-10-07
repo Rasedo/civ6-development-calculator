@@ -252,6 +252,51 @@ export function governorFlag(state: GameState, city: City, pick: (e: GovernorEff
  * city (quantized milli loyalty, ties by array position). Which governor to
  * hire is a strategy decision no rule of the game settles.
  */
+/** APPOINT governor `i` with a title. False when it already serves or the
+ *  seat holds no title to spend. */
+export function appointGovernor(state: GameState, seat: number, i: number): boolean {
+  const s = seatOf(state, seat);
+  const g = s ? governorsOf(s)[i] : undefined;
+  if (!s || !g || g.appointed || governorTitlesAvailable(state, seat) <= 0) return false;
+  g.appointed = true;
+  payGovernanceDoctrine(state, s, i);
+  return true;
+}
+
+/** PROMOTE governor `i` with title `p` (an index of GOVERNOR_PROMOTIONS).
+ *  False when the promotion is not open to it or no title is left. */
+export function promoteGovernor(state: GameState, seat: number, i: number, p: number): boolean {
+  const s = seatOf(state, seat);
+  const g = s ? governorsOf(s)[i] : undefined;
+  if (!s || !g || !promotionLegal(g, i, p) || governorTitlesAvailable(state, seat) <= 0) return false;
+  g.promotions += promotionBitValue(p);
+  payGovernanceDoctrine(state, s, i);
+  return true;
+}
+
+/** ASSIGN appointed governor `i` to one of the seat's cities (`cityId`) or,
+ *  for a governor the catalog sends abroad, a city-state (`minorId`); the
+ *  establishment clock starts over. A neutralized governor "cannot be
+ *  assigned to any city", and a city holds one governor. */
+export function assignGovernor(state: GameState, seat: number, i: number, to: { cityId?: number; minorId?: number }): boolean {
+  const s = seatOf(state, seat);
+  const roster = s ? governorsOf(s) : [];
+  const g = roster[i];
+  if (!s || !g || !g.appointed || g.outTurns > 0) return false;
+  if (to.minorId !== undefined) {
+    if (!GOVERNORS[i].cityStates || !(state.cityStates ?? []).some((m) => m.id === to.minorId)) return false;
+    g.cityId = -1;
+    g.minorId = to.minorId;
+  } else {
+    if (!citiesOf(state, seat).some((c) => c.id === to.cityId)) return false;
+    if (roster.some((o, k) => k !== i && o.appointed && o.cityId === to.cityId)) return false;
+    g.cityId = to.cityId!;
+    g.minorId = -1;
+  }
+  g.establishTurns = GOVERNORS[i].establishTurns;
+  return true;
+}
+
 export function governorPhase(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -261,8 +306,7 @@ export function governorPhase(state: GameState, seat: number): void {
   while (titles > 0) {
     const next = roster.findIndex((g) => !g.appointed);
     if (next >= 0) {
-      roster[next].appointed = true;
-      payGovernanceDoctrine(state, s, next);
+      appointGovernor(state, seat, next);
       titles -= 1;
       continue;
     }
@@ -270,8 +314,7 @@ export function governorPhase(state: GameState, seat: number): void {
     for (let i = 0; i < roster.length && !took; i++) {
       for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
         if (!promotionLegal(roster[i], i, p)) continue;
-        roster[i].promotions += promotionBitValue(p);
-        payGovernanceDoctrine(state, s, i);
+        promoteGovernor(state, seat, i, p);
         took = true;
         break;
       }
@@ -299,8 +342,7 @@ export function governorPhase(state: GameState, seat: number): void {
       if (n > bestN) { bestN = n; best = m.id; }
     }
     if (best < 0) continue;
-    g.minorId = best;
-    g.establishTurns = GOVERNORS[i].establishTurns;
+    assignGovernor(state, seat, i, { minorId: best });
   }
 
   // Seat every idle governor. A city already holding one is not a candidate,
@@ -317,8 +359,7 @@ export function governorPhase(state: GameState, seat: number): void {
     const g = roster[i];
     if (!g.appointed || g.cityId >= 0 || g.minorId >= 0 || g.outTurns > 0) continue;
     if (at >= free.length) break;
-    g.cityId = free[at].c.id;
-    g.establishTurns = GOVERNORS[i].establishTurns;
+    assignGovernor(state, seat, i, { cityId: free[at].c.id });
     taken.add(g.cityId);
     at += 1;
   }
@@ -348,7 +389,23 @@ export function governorClocks(state: GameState, seat: number): void {
       g.minorId = -1;
       g.establishTurns = 0;
     }
-    if ((g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
+  }
+}
+
+/** THE ESTABLISHMENT CLOCK ticks after the seat's cities have yielded and
+ *  before its tallies: a governor assigned with N turns to go reads
+ *  established N records on, her city abilities paying from the turn after
+ *  (runs/h1_duelw1117 China's Pingala: assigned at t28, established at t33,
+ *  her +15% Culture first in the progress t33→t34) while the envoys she
+ *  brings count in that turn's Favor (runs/h1_duelw1118 China's Amani:
+ *  assigned at t29, established at t34 with China's first Favor). 1116 /
+ *  1117 / 1118: every one of 30 assignments established its EstablishTurns
+ *  records on. */
+export function tickGovernors(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  for (const g of governorsOf(s)) {
+    if (g.appointed && (g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
   }
 }
 

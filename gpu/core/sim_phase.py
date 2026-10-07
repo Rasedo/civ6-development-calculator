@@ -200,7 +200,7 @@ class SimPhase:
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
         # THE GOVERNORS, before anything reads the roster: earned titles are
-        # spent, idle governors take a city, and both clocks tick. Every
+        # spent, idle governors take a city, and the neutralization clock ticks. Every
         # ability the city walk reads is settled here.
         self._governor_phase(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
@@ -1386,16 +1386,16 @@ class SimPhase:
                     _add = _add + (_isp & _hit).to(_add.dtype) * (_spc / 100)
         _emall = _emall * (1 + _add)
         raw = prod
-        # the city's Production holds its envoys' flat toward this item (the
-        # walk's bonuses, `computeCityStats`)
-        prod = prod * _emall
-        # VETERANCY multiplies FIRST, then the banked chop adds unmultiplied —
-        # phase.ts spends the bank right after the production add.
         prog = self.city_progress[bidx, row, col, 0]
         bank = self.city_prod_bank[bidx, row, col]
+        # CIV6 (City_BuildQueue 0x16f050 → the order's step): the city's
+        # Production toward the item (its envoys' flat, the walk's bonuses,
+        # `computeCityStats`) plus the overflow store, the SUM under the
+        # item's percents (0x1856ed)
+        prod = (prod + bank.to(prod.dtype)) * _emall
         _drip0 = self.city_progress[:, row, :, 0].clone()
         # f64 intermediates, stored at the PLANE's dtype (see _seat_city_loyalty)
-        self.city_progress[bidx, row, col, 0] = torch.where(has_q, prog + prod + bank, prog).to(prog.dtype)
+        self.city_progress[bidx, row, col, 0] = torch.where(has_q, prog + prod, prog).to(prog.dtype)
         self.city_prod_bank[bidx, row, col] = torch.where(has_q, torch.zeros_like(bank), bank)
         # the perimeter takes its share BEFORE the completion below zeroes the
         # progress it is measured against
@@ -1425,12 +1425,12 @@ class SimPhase:
         if not bool(done.count_nonzero()):
             return
         # CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
-        # smaller of the Production toward the item and the city's plain
-        # Production, less what the item still lacked before this step (the
-        # bank paid in not counted), never below 0. It goes to the city's
-        # overflow store, which the next step pays into whatever heads the
-        # queue then: one completion per city per turn.
-        ovf = (torch.minimum(prod, raw if plain is None else plain.to(raw.dtype))
+        # smaller of the Production toward the item before its percents and
+        # the city's plain Production, less what the item still lacked before
+        # this step (the bank paid in not counted), never below 0. It goes to
+        # the city's overflow store, which the next step pays into whatever
+        # heads the queue then: one completion per city per turn.
+        ovf = (torch.minimum(raw, raw if plain is None else plain.to(raw.dtype))
                - (cost - prog).clamp(min=0)).clamp(min=0)
         # queue.shift() — the head goes BEFORE completeQueueItem runs
         self._q_pop(row, col, done)
@@ -1579,13 +1579,6 @@ class SimPhase:
                 _wcur[wr] = self._wonder_era[wi[wr].clamp(min=0, max=self._wond_n - 1)] >= self.game_era[wr]
                 self._add_era_score(row, self._moment_wonder_game, (made_w & _wcur).long())
                 self._add_era_score(row, self._moment_wonder_past, (made_w & ~_wcur).long())
-                # CIV6 (Dynastic Cycle): a random Eureka and Inspiration from
-                # the ERA OF THE WONDER, at TS's position — right after the
-                # era score and before any other completion payout draws
-                if self._wonder_era_boost_rows:
-                    _wera = torch.zeros(self.B, dtype=torch.long, device=self.device)
-                    _wera[wr] = self._wonder_era[wi[wr].clamp(min=0, max=self._wond_n - 1)]
-                    self._grant_era_boosts(row, made_w, _wera)
                 # CIV6: Statue of Liberty +4 Diplomatic Victory points on
                 # completion, Potala Palace +1.
                 self.civ_diplo_points[wr, row] += self._wond_dvp[wi[wr]]
@@ -1683,6 +1676,13 @@ class SimPhase:
                     sto = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     sto[wr] = self._wond_grant_prophet[wi[wr]]
                     self._grant_free_prophet(row, sto & made_w, self.city_center[bidx, row, col])
+                # CIV6 (Dynastic Cycle): a random Eureka and Inspiration from
+                # the ERA OF THE WONDER, after the wonder's own grants (TS's
+                # position: the Prophet's replacement draw first)
+                if self._wonder_era_boost_rows:
+                    _wera = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    _wera[wr] = self._wonder_era[wi[wr].clamp(min=0, max=self._wond_n - 1)]
+                    self._grant_era_boosts(row, made_w, _wera)
 
         if self._proj_rows:
             made_p = done & (cur >= self.PROJECT_BASE) & (cur < self.PROJECT_BASE + len(self._proj_rows))
@@ -2311,6 +2311,11 @@ class SimPhase:
             if bool(_c3a.count_nonzero()):
                 cul_sum = cul_sum + torch.where(
                     _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
+        # THE ESTABLISHMENT CLOCK, between the cities' yields and the seat's
+        # tallies (`tickGovernors`, then `resolveSuzerains`)
+        self._governor_establish_tick(row, active)
+        if self.S:
+            self._cs_resolve_suzerain()
         _tin = self._tourism_inputs(row, gov)
         _nat_gen = self._seat_tourism_general(row, _tin)
         # CIV6 (Film Studio): the per-rival extra, read with the same snapshot
@@ -2715,9 +2720,9 @@ class SimPhase:
         `recruit` twin): mark the person claimed, retire the offer, pay era
         score and the dedication, and stand the person up as a UNIT — in the
         city holding a completed district of its own class (lowest centre
-        tile), the capital otherwise. Nothing is paid out here; the redraw
-        waits for the race loop. The ONE draw is the Great Library's — a
-        SCIENTIST claim hands every other holder a random boost."""
+        tile), the capital otherwise. Nothing is paid out here. Its draws: the
+        Great Library's — a SCIENTIST claim hands every other holder a random
+        boost — then the class's replacement (`_gp_ensure_offer`)."""
         if not bool(hit.count_nonzero()):
             return
         maxN = self._gp_effects.shape[1]
@@ -2778,6 +2783,9 @@ class SimPhase:
                     want = torch.zeros_like(self.civ_techs[:, o])
                     want[b, int(pool[k])] = True
                     self._land_boosts(o, want, False)
+        # the person leaves the timeline and the class draws its replacement
+        # at once (`recruit`)
+        self._gp_ensure_offer(hit, cls)
         guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
         if guidx < 0:
             return
