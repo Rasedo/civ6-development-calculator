@@ -158,11 +158,10 @@ def main() -> None:
     # 3 — ONE site at weight 6: with the rest zeroed every draw strikes, and
     # spends the event draw, the plot's pick and its strike's two damage rows
     only(sim, "meteor")
-    strip = sim._desertification_live()
     for _ in range(20):
         sim.tile_meteor.zero_()
         s0 = int(sim.rng_state[B0])
-        sim._random_event(strip)
+        sim._random_event()
         assert int(sim.tile_meteor[B0].sum()) == 1
         hit = int(sim.tile_meteor[B0].nonzero()[0][0])
         assert bool(cand[hit])
@@ -418,7 +417,7 @@ def main() -> None:
         real(hit, ring, row)
 
     sim._erupt = spy
-    sim._random_event(sim._desertification_live())
+    sim._random_event()
     assert got and got[0][0] and got[0][2] == 4, f"Vesuvius's row did not fire: {got}"
     want9 = [int(sim.neigh[v][d]) for d in sim._DIRECTION_TYPES]
     assert [n for n in got[0][1] if n >= 0] == [n for n in want9 if n >= 0], "its ring is its plot's neighbours"

@@ -299,6 +299,10 @@ export interface Tile {
   /** the fire's place in the order the live fires began (`GameState.
    *  fireSerial` at its start): the order their turns run in. */
   fireSeq?: number;
+  /** a storm's walk struck this plot, its record live or ended: the game
+   *  keeps every storm's record and struck list (Game_Climate m_aStorms), and
+   *  no drought starts where any of them reaches (0x28de40). Absent = never. */
+  stormStruck?: boolean;
   /** CIV6 (IMPROVEMENT_METEOR_GOODY): a METEOR SITE a shower left here, taken
    *  by the first civilization unit to enter it. */
   meteor?: boolean;

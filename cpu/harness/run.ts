@@ -22,7 +22,8 @@ import { advanceHistory, importTurn, newHistory } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
 import { loadRandLog, randLogPath } from './randLog';
-import { turnDraws, type DrawLedger } from './drawLedger';
+import { streamLedger, turnDraws, type DrawLedger } from './drawLedger';
+import { rngHolds } from '../core/rand';
 import { replayMarkdown, runReplay } from './replay';
 
 interface Tally {
@@ -180,7 +181,13 @@ function main() {
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
   if (opt.replay) {
     const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined });
-    writeFileSync(opt.replay, JSON.stringify(r, null, 1) + '\n');
+    // the engine's draws between the held points against the game's
+    const logPath = randLogPath(dump);
+    const holds = rngHolds();
+    const streams = streamLedger(holds, logPath ? loadRandLog(logPath, holds.map((h) => h.held)) : undefined);
+    writeFileSync(opt.replay, JSON.stringify({ ...r, streams }, null, 1) + '\n');
+    console.log(`streams: ${streams.exact} / ${streams.stretches} stretches between held points drew as the game did;`
+      + ` turns off: ${streams.turns.filter((t) => t.engine !== t.game).length} of ${streams.turns.length}; by point ${JSON.stringify(streams.byKind)}`);
     writeFileSync(opt.replay.replace(/\.json$/, '.md'), replayMarkdown(r));
     console.log(`replay (${r.source}): ${r.perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${opt.replay}`);
     console.log('subsystem'.padEnd(28), 'held'.padStart(5), 'matched'.padStart(8), ' first');

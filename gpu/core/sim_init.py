@@ -1868,6 +1868,10 @@ class SimInit:
         # rule, the slot-type acceptance table and the per-object yields.
         _gw = rr["greatWorks"]
         self.GW_W = int(_gw["w"])
+        # the Relics the game may create, and each game's Relics created
+        # (`GameState.relicsMade`)
+        self._relic_count = int(_gw["relicCount"])
+        self.relics_made = torch.zeros(B, dtype=torch.long, device=device)
         self._gw_slot_holder = torch.tensor([int(x) for x in _gw["slotHolder"]], dtype=torch.long, device=device)
         self._gw_slot_type = torch.tensor([int(x) for x in _gw["slotType"]], dtype=torch.long, device=device)
         self._gw_slot_extra = torch.tensor([int(x) for x in _gw["slotExtraRank"]], dtype=torch.long, device=device)
@@ -4370,6 +4374,8 @@ class SimInit:
              int(r["unit"]), str(r["promoClass"]))
             for r in _gh["subTypes"]
         ]
+        # 0x42c980's other gates per subtype: (CityState, StrategicResources, Relic)
+        self._goody_gates = [(int(r["cityState"]), int(r["strategic"]), int(r["relic"])) for r in _gh["subTypes"]]
         # every channel the wire names must have an arm, or a reward silently
         # pays nothing (the disjoint-arms class)
         self._goody_ch = {k: i for i, k in enumerate(self._goody_payload_kinds)}
@@ -4709,6 +4715,9 @@ class SimInit:
         self.fire_seq = torch.full((B, T), -1, dtype=torch.long, device=dev)
         self.fire_serial = torch.zeros(B, dtype=torch.long, device=dev)
         self.tile_meteor = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        # every plot a storm's walk struck, its record live or ended
+        # (`Tile.stormStruck`): no drought starts where any reaches
+        self.storm_scar = torch.zeros(B, T, dtype=torch.bool, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
         # the phase the climate step stood at before its crossing, while the
@@ -4726,14 +4735,15 @@ class SimInit:
                                                 dtype=torch.long, device=dev)
         self._ice_at_start = (self.feat_id == self._ice_fid).sum(dim=1)
 
-        # [points, flood band, submerge band, iceMelt, fertility, desertify]
+        # [points, flood band, submerge band, iceMelt, haltsFlood, haltsStorm, fertilityRemoval]
         _ph = c["phases"]
         self._cl_points = torch.tensor([r[0] for r in _ph], dtype=torch.long, device=dev)
         self._cl_flood = torch.tensor([int(r[1]) for r in _ph], dtype=torch.long, device=dev)
         self._cl_submerge = torch.tensor([int(r[2]) for r in _ph], dtype=torch.long, device=dev)
         self._cl_ice_melt = [float(r[3]) for r in _ph]
-        self._cl_fertility = [bool(r[4]) for r in _ph]
-        self._cl_desertify = [bool(r[5]) for r in _ph]
+        self._cl_halts_flood = [bool(r[4]) for r in _ph]
+        self._cl_halts_storm = [bool(r[5]) for r in _ph]
+        self._cl_removal = [int(r[6]) for r in _ph]
         self._defor_cuts = [(float(a), float(b)) for a, b in c["deforestation"]]
 
         self._carbon_per_resource = torch.tensor(

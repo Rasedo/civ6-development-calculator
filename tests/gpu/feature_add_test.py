@@ -254,13 +254,12 @@ def main() -> None:
     sim4._erupt = lambda hit, ring, row: [seen.__setitem__(int(x) - VOLC0, seen[int(x) - VOLC0] + 1)
                                           for x in row[hit].tolist()]
     sim4._flood_river = lambda hit, tile, sev: None
-    strip = sim4._desertification_live()
     for _ in range(8000):
         # no turn passes between the draws: empty the storm and drought
         # tables a real turn would have aged
         sim4.storm_left.zero_()
         sim4.drought_left.zero_()
-        sim4._random_event(strip)
+        sim4._random_event()
     del sim4._erupt, sim4._flood_river
     sim4._eruption_weight = ew
     n = sum(seen)
@@ -300,9 +299,8 @@ def main() -> None:
         tiles_seen.update(int(n) for n in ring[B0].tolist() if int(n) >= 0)
 
     sim5._erupt = spy
-    strip = sim5._desertification_live()
     for _ in range(3000):
-        sim5._random_event(strip)
+        sim5._random_event()
     del sim5._erupt
     want = {int(n) for n in sim5.neigh[kt].tolist() if int(n) >= 0}
     assert tiles_seen == want, f"Kilimanjaro's ring {tiles_seen}, its plot's neighbours {want}"

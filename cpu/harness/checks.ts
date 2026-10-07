@@ -272,6 +272,7 @@ function goodyRewardDraws(sub: GoodySubType): string[] {
   if (p.kind === 'techBoost') return Array(n).fill('Choosing random tech boost to grant based on era');
   if (p.kind === 'civicBoost') return Array(n).fill('Choosing random civic boost to grant based on era');
   if (p.kind === 'tech') return Array(n).fill('Choosing random tech to grant based on era');
+  if (p.kind === 'relic') return Array(n).fill('Choosing a Relic');
   return [];
 }
 
@@ -565,7 +566,7 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
           }
         }
         if (num(dump.nextPlotCost) > num(was.nextPlotCost)) {
-          const stored = num(was.nextPlot);
+          const stored = storedPlot(imp, key, p);
           const sp = stored >= 0 ? plotAt(rec, stored) : undefined;
           // the claim the event log names: the stored plot taken, or another
           // after a fresh pick (the record may hold the plot elsewhere by
@@ -886,12 +887,32 @@ export function startLogged(s: StartReplay, l: LoggedStart): boolean {
   return !l.extra.length && !l.range.length && s.draws.every((d, n) => d.choice || l.at[n] >= 0);
 }
 
+/** Was the record read before player `p`'s start of its turn finished (its
+ *  event log holds rows of the turn but no PlayerTurnActivated of the player
+ *  whose turn the recorder reads: runs/h1_duelw1120 t95, Rome's culture and
+ *  next plot as the turn before left them)? Its cities show no start. */
+export function readBeforeStart(rec: TurnRecord | null, p: number): boolean {
+  const rows = (rec as (TurnRecord & { actions?: unknown }) | null)?.actions;
+  if (!rec || !Array.isArray(rows) || p !== rec.head.localPlayer) return false;
+  const turn = (rows as unknown[][]).filter((r) => r[1] === rec.turn);
+  return turn.length > 0 && !turn.some((r) => r[2] === 'PlayerTurnActivated' && r[3] === p);
+}
+
+/** A city's stored next plot as its start of the record's turn found it:
+ *  the record before's, or — that record read before the player's start of
+ *  its turn — the plot that start drew (`History.startPicks`). */
+function storedPlot(imp: Imported, key: string, p: number): number {
+  const before = imp.recordBefore;
+  const drawn = before && readBeforeStart(before, p) ? imp.startPicks.get(`${before.turn}:${key}`) : undefined;
+  return drawn ?? num(imp.cityBefore.get(key)?.nextPlot ?? -1);
+}
+
 /** Each city's closing pick, by `owner:id`: the pick and the record's plot,
  *  or why it was not replayed. With the game's log the pick is the logged
  *  draw the city's pick lands on (`logStart`) over the city's ties, its range
  *  theirs; without it, drawn on the game's generator where the start's
  *  replay accounts for every draw between its seeds (`resolveStart`). */
-function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, StartPick | string> {
+function startBorderPicks(starts: StartReplay[], imp: Imported, rec: TurnRecord): Map<string, StartPick | string> {
   const out = new Map<string, StartPick | string>();
   const nextOf = new Map<string, number>();
   for (const [, c] of imp.dumpOfCity) nextOf.set(`${c.owner}:${c.id}`, num(c.nextPlot));
@@ -914,7 +935,7 @@ function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, Sta
       // a city with nothing in reach draws nothing and keeps the plot it
       // stored while it stands unowned (none after a founding or its claim)
       for (const k of keys) {
-        const stored = num(imp.cityBefore.get(k)?.nextPlot ?? -1);
+        const stored = storedPlot(imp, k, s.player);
         const keep = stored >= 0 && imp.state.map.tiles[stored]?.ownerSeat === NO_SEAT ? stored : -1;
         out.set(k, { pick: keep, game: nextOf.get(k) ?? -1, ties: [], range: 0, logged: true });
       }
@@ -923,6 +944,10 @@ function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, Sta
         const x = l.at[n] >= 0 ? logged[l.at[n]] : undefined;
         if (!x) { out.set(d.city, 'the log holds no pick for it'); return; }
         const pick = x.range === d.ties.length ? d.ties[x.value] : -1;
+        if (pick >= 0) imp.startPicks.set(`${s.turn}:${d.city}`, pick);
+        // the record read before this start shows the plot the start before
+        // stored: the pick waits for the next start's claim (`storedPlot`)
+        if (s.turn === rec.turn && readBeforeStart(rec, s.player)) { out.set(d.city, 'the record was read before the start'); return; }
         // a pick another owner took after the start (a city-state's envoy
         // annex in the actions): the city's reader answers the plot its
         // scorer names now (runs/h1_duelw1118 t144: Handan's 916, Armagh's
@@ -953,7 +978,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
   const state = imp.state;
   const starts = startDraws(rec, state, imp, cat);
   sink?.push(...starts);
-  const startPicks = startBorderPicks(starts, imp);
+  const startPicks = startBorderPicks(starts, imp, rec);
   const turn = rec.turn;
   // each player's start: the replay's draws against the game's log of the
   // draws between its witnesses' seeds, label by label; without the log,

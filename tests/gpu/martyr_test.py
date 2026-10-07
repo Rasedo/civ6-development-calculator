@@ -3,9 +3,9 @@
     python tests/gpu/martyr_test.py
 
 CIV 6 creates a relic when the Apostle killed in theological combat carried the
-MARTYR promotion — one of the nine it chose from at purchase. The death itself
-draws nothing, so this lane pins both halves: the relic follows the BIT, and the
-RNG stream is untouched by a fight's outcome.
+MARTYR promotion — one of the nine it chose from at purchase. The death draws
+only the Relic's "Choosing a Relic", so this lane pins both halves: the relic follows
+the BIT, and the stream moves by the Relics alone.
 """
 
 from __future__ import annotations
@@ -75,8 +75,8 @@ def main() -> None:
     sim.unit_next[0] += 2
 
     grants: list[int] = []
-    real_grant = sim._grant_relic
-    sim._grant_relic = lambda rows, seat: grants.append(int(rows.numel()))
+    real_grant = sim._create_relic
+    sim._create_relic = lambda rows, seat: grants.append(int(rows.numel()))
 
     # Both sides at 20 HP and equal religious strength: an even fight rolls
     # 24-36, so every pass offers TWO deaths — and only the bit decides.
@@ -96,9 +96,9 @@ def main() -> None:
         assert got == want, f"promos {promos_a}/{promos_b} granted {got} relics, expected {want}"
     print("  the relic follows the MARTYR bit, on either side of the duel")
 
-    # No draw at the death: the two damage rolls are the whole stream cost, so
-    # a martyr and a non-martyr advance it by exactly the same amount.
-    sim._grant_relic = real_grant
+    # Each dead martyr's Relic draws "Choosing a Relic" (0x296c00) over the
+    # Relics left: two martyrs dying cost two draws past the damage rolls.
+    sim._create_relic = real_grant
 
     def stream_cost(promos: int) -> int:
         place_apostle(sim, sa, ta, 0, 20, promos)
@@ -114,10 +114,10 @@ def main() -> None:
         raise AssertionError("the stream moved more than 256 steps")
 
     plain, martyr = stream_cost(0), stream_cost(1 << mcol)
-    assert plain == martyr, f"a martyr's death cost {martyr} of stream, a plain one {plain}"
-    print("  a death draws nothing — the promotion is not a roll")
+    assert martyr == plain + 2, f"two martyrs' deaths cost {martyr} of stream, a plain pair {plain}"
+    print("  a death draws only its Relic — the promotion is not a roll")
 
-    print("MARTYR OK — the relic rides the promotion, and the stream never asks")
+    print("MARTYR OK — the relic rides the promotion, and the stream pays for the Relic alone")
 
 
 if __name__ == "__main__":

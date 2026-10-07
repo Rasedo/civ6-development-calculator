@@ -20,7 +20,8 @@ Proven here:
   * `_warming_degrees` reads the carbon at `CO2For1DegreeTempRise` a
     degree, and each flood, storm and drought row grows by its own
     `ChanceIncreasePerDegree` (`_event_rows`), and
-    `_fertility_live` / `_desertification_live` flip at IV and V;
+    `_flood_halted` / `_storm_halted` / `_fertility_removal` read the sea's
+    phase (RISE4 halts, RISE5 on removes);
   * `_pollution_favor_penalty` is -1 per 3 points over average, capped at 20;
   * `_flood_barrier_cost` is the published formula and `_seat_buildable`
     refuses the row to a city with no lowland;
@@ -77,8 +78,9 @@ def main() -> int:
     assert [r[3] for r in cj["phases"]] == [0.10, 0.20, 0.30, 0.40, 0.55, 0.70, 0.85]
     assert sim._cl_flood.tolist() == [0, 1, 2, 0, 3, 0, 0]
     assert sim._cl_submerge.tolist() == [0, 0, 0, 1, 0, 2, 3]
-    assert sim._cl_fertility == [True, True, True, False, False, False, False]
-    assert sim._cl_desertify == [False, False, False, False, True, True, True]
+    assert sim._cl_halts_flood == [False, False, False, True, True, True, True]
+    assert sim._cl_halts_storm == [False, False, False, True, True, True, True]
+    assert sim._cl_removal == [0, 0, 0, 0, 15, 30, 45]
     assert sim._defor_cuts == [(0.5, 0.5), (0.4, 0.3), (0.25, 0.1), (0.1, 0.0), (0.0, -0.2)]
     assert sim._co2_per_point == 250_000, "the Duel row, and this world is 44x26"
     assert sim._co2_per_degree == 500_000, "Maps_XP2.CO2For1DegreeTempRise, MAPSIZE_DUEL"
@@ -339,7 +341,7 @@ def main() -> int:
 
     # --- 9) a warmed world's weather --------------------------------------
     s9 = fresh(rules, paths[0])
-    assert bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
+    assert not bool(s9._flood_halted()[b]) and int(s9._fertility_removal()[b]) == 0
     assert s9._flood_cipd == [20, 20, 20] and s9._drought_cipd == [0, 50]
     assert s9._st_cipd == [0, 50, 0, 50, 0, 50, 0, 50]
     cold = [float(w[b]) for _f, _s, w in s9._event_rows()]
@@ -359,19 +361,29 @@ def main() -> int:
         # weight x (1 + CIPD/100 x degrees): the floods x1.4, a worse storm
         # or the EXTREME drought x2, every row without the column held
         assert abs(float(w[b]) - c0 * (1 + pct / 100 * 2.0)) < 1e-9, (_f, _s, float(w[b]), c0, pct)
-    s9.climate_idx[b] = 3  # Phase IV
-    assert not bool(s9._fertility_live()[b]) and not bool(s9._desertification_live()[b])
-    s9.climate_idx[b] = 4  # Phase V
-    assert bool(s9._desertification_live()[b])
-    # and the silt comes back off
-    t9 = torch.tensor([0], dtype=torch.long)
-    r9 = torch.tensor([b], dtype=torch.long)
-    s9.fertility[b, 0] = 2
-    s9.fertility_prod[b, 0] = 1
-    s9._defertilize(r9, t9)
-    assert int(s9.fertility[b, 0]) == 1 and int(s9.fertility_prod[b, 0]) == 0
-    s9._defertilize(r9, t9)
-    assert int(s9.fertility[b, 0]) == 0 and int(s9.fertility_prod[b, 0]) == 0
+    s9.climate_idx[b] = 3  # Phase IV, its rise still waiting for its step
+    s9.sea_rise_from[b] = 2
+    assert not bool(s9._flood_halted()[b])
+    s9.sea_rise_from[b] = -2
+    assert bool(s9._flood_halted()[b]) and bool(s9._storm_halted()[b])
+    assert int(s9._fertility_removal()[b]) == 0
+    s9.climate_idx[b] = 6  # Phase VII: 45%
+    assert int(s9._fertility_removal()[b]) == 45
+    # x = 45 * 3 = 135: one rand(100) under 35 takes 2, else 1; no draw on
+    # a yield with none
+    t9 = torch.zeros(s9.B, dtype=torch.long)
+    on9 = torch.zeros(s9.B, dtype=torch.bool)
+    on9[b] = True
+    s9.fertility[b, 0] = 3
+    s9.fertility_prod[b, 0] = 0
+    s9.fertility_sci[b, 0] = 0
+    s9.fertility_cul[b, 0] = 0
+    st0 = int(s9.rng_state[b])
+    s9._remove_fertility(on9, t9)
+    nxt = (1103515245 * st0 + 12345) & 0xFFFFFFFF
+    v = ((nxt >> 16) * 100) >> 16
+    assert int(s9.fertility[b, 0]) == (1 if v < 35 else 2)
+    assert int(s9.rng_state[b]) == nxt, "one draw: the Food's alone"
     print("  9 severity + fertility gates OK")
 
     # --- 10) what pollution costs in the Congress -------------------------

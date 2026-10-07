@@ -1065,6 +1065,8 @@ _MUTABLE = [
     "tile_locked", "drought", "improvement", "pillaged", "district",
     "storm_event", "storm_at", "storm_left",  # the live STORM records: row, centre, turns left
     "storm_id", "storm_struck", "storm_serial",  # each one's serial and struck plots, the counter
+    "storm_scar",  # every plot a storm's walk struck, its record live or ended
+    "relics_made",  # the Relics created this game
     "drought_left", "drought_plots",  # the live DROUGHT records: turns left, footprint
     "fire_start", "fire_seq", "fire_serial",  # each plot's FIRE: its start turn and its place among the live fires, -1 none; the counter
     "tile_meteor",  # METEOR SITES: laid by the draw, taken by the first unit in

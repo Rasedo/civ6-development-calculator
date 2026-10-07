@@ -728,10 +728,9 @@ def test_reactor_accident(sim) -> None:
     sim._nuclear_accident = lambda h, c, s: seen.add(s) if bool(h[0]) and int(c[0]) == centre else None
     sim._flood_river = lambda h, t, s: None
     sim._erupt = lambda h, v, s: None
-    sim._drought = lambda g, t, v, s: None   # 400 turns of droughts would outlive the table
+    sim._drought = lambda g, t, v: None   # 400 turns of droughts would outlive the table
     w0 = sim._accident_weight
     sim._accident_weight = [60.0, 60.0, 60.0]   # make the accident a common draw
-    strip = sim._desertification_live()
     for age, want in ((9, set()), (10, {0}), (25, {0, 1}), (30, {0, 1, 2})):
         seen.clear()
         sim.city_reactor_age[0, row, j] = age
@@ -739,7 +738,7 @@ def test_reactor_accident(sim) -> None:
         # a hundred turns miss one — or a row wrongly open — at odds near 1e-12
         for _ in range(100):
             sim.storm_left.zero_()
-            sim._random_event(strip)
+            sim._random_event()
         assert seen == want, f"reactor age {age} opened {sorted(seen)}, not {sorted(want)}"
     del sim._nuclear_accident, sim._flood_river, sim._erupt, sim._drought
     sim._accident_weight = w0

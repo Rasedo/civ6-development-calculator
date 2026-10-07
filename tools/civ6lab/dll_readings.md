@@ -270,7 +270,8 @@ Per family, after the roll:
   plot list as its edges were laid from the source (the source edge its own
   plot, IsNE/NW/WOfRiver, then the plot across; each later edge the plot
   across it, each plot once), reversed (rivers start inland), the first
-  unbroken run of 4–10 plots taking Floodplains. Read off the record's river
+  unbroken run of 4–10 plots taking Floodplains (REVISED: "H-1: the
+  Floodplains list"). Read off the record's river
   edges from the flood's start plot (`floodplainList`); two rivers meeting
   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,
   told apart by which river holds which list. 1115 river 181 (446 / 490,
@@ -588,9 +589,8 @@ on 1116).
 
 ## C-74 tail: "under an event" for a drought start — READ
 
-0x28de40 (the drought predicate's event test): true when the plot is in any
-live storm record's struck list (m_aStorms +0x8b0, stride 0x68, the vector at
-+0x38..+0x40). Droughts' and fires' plots are not read. A burning plot fails
+0x28de40 (the drought predicate's event test): true when the plot is in any storm record's struck list, live or ended (m_aStorms +0x8b0, stride 0x68, the vector at
++0x38..+0x40; "C-74: the drought's storm bar"). Droughts' and fires' plots are not read. A burning plot fails
 the predicate anyway (it carries a feature).
 
 ## Border plot: GetNextBuyablePlot — READ
@@ -1227,8 +1227,9 @@ then SPECIFIC_IMPROVEMENT_PILLAGED: one draw a plot or two. Then, when the
 climate's fertility-loss value (+0x750) is above 0, 0xa1c0c0: per yield
 type, "Remove Fertility Chance" (0xa19bd0) — on a plot holding that yield's
 event fertility c > 0, x = min(value, 100) × c, one rand(100) < x mod 100
-removes x // 100 + 1, else x // 100. The engines draw the rows; the strip
-phase's per-yield draws are a LAB line (the value at +0x750 is unread).
+removes x // 100 + 1, else x // 100. The value at +0x750 is the last
+sea rise's FertilityRemovalChance ("C-74: the sea's rise halts and removes
+fertility").
 
 ## C-74: the volcano roll's gate — READ
 
@@ -1784,10 +1785,8 @@ over 20). A subtype's Turn is read at the game's speed (0x42c980 through
 Gold, t16's seven kinds hold Faith). The engines follow (`goodyKindWeight`,
 `drawGoodyReward` / `_goody_kind_weight`, `_draw_goody_reward`;
 `Seat.goodyKinds` / `civ_goody_kinds`; `goodyEligible`'s Turn through
-`scaleByGameSpeed`); the other gates of 0x42c980 (CityState — the Envoy row
-closed until a city-state is met, so 1117's first villages draw over five
-kinds —, RequiresUnit, StrategicResources, the relic's slot) are AUDIT C-74
-BUILD.
+`scaleByGameSpeed`); the other gates of 0x42c980 ("H-1: the goody hut's
+other gates and the Relic").
 
 ## H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)
 
@@ -1815,11 +1814,9 @@ draw for draw. The engines follow (`eruptionRings`, `erupt` / `_eruption_ring`,
   t232): the climate step crossing a phase leaves the sea for the next
   event step. The engines follow (`seaRiseFrom` / `sea_rise_from`,
   `seaRise` / `_sea_rise`; a world with no random events rises at once).
-- 1124 t162, t194, t234: the drought's start draws over 1, 3, 3 where every
-  clause of 0x28eb60 passes on 3, 4, 6 plots of the record — the game
-  leaves out 277, 278 (its t28 / t30 droughts' plots) and 319 beside them,
-  while 1118 (780 twice), 1123 (388 three times) and 1124's own 579 draw on
-  a former drought's plot again (AUDIT C-74 LAB).
+- 1124 t162, t194, t234: the drought's start leaves out 277, 278 and 319,
+  a storm's walk's plots and their neighbours ("C-74: the drought's storm
+  bar").
 
 ## H-1: draws with no game site
 
@@ -1918,6 +1915,121 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   made embarked raises nothing (1122 t131's Line Infantry). The importer
   reads CityProductionCompleted (order 0), CityMadePurchase of a unit and
   UnitUpgraded off the action log (`advanceHistory`).
+
+## C-74: the drought's storm bar — READ
+
+0x28de40, the drought predicate's "under an event" (0x28eb60's last
+clause), walks EVERY record of m_aStorms (+0x8b0..+0x8b8, stride 0x68) and
+its struck list (+0x38..+0x40). A storm's end (0x28ecd0 → 0x291940) clears
+the record's live flag (+0x58) and drops its handle from the live list
+(+0x8d0) — the record and its struck list stay (0x28e240 rebuilds the live
+list from +0x58 on a load). So a plot any storm's walk ever struck bars a
+drought start, and its six neighbours with it, for the rest of the game;
+a newborn storm's first strike marks a copy (0x291a20), so its birth plots
+are not on the list. Droughts (m_aDroughts +0x948) are read only by the
+spacing score 0x28ff20 → 0x28ce90 (every record, the last footprint plot),
+which never drops a candidate. Cases: runs/h1_duelw1124 — no drought start
+at t112 and t115 (the records' predicate passes 277 and 278), and t162
+(over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319
+while 535, 578 and 579 (a drought's own plots) stay: the t49 blizzard's
+walk struck their neighbours; a drought's plots drawn again (1118's 780,
+1123's 388, 1124's 579) are no storm's. 1124 t194 reads the ground as the
+step found it — the record after (624's Rainforest cut on the turn
+before). The engines keep the bar on the plot (`Tile.stormStruck` /
+`storm_scar`, set by a walk's strikes; `droughtCandidate` / `_drought_cands`).
+
+## C-74: the sea's rise halts and removes fertility — READ
+
+A RANDOM_EVENT_SEA_LEVEL_RISE row firing (0x291a20's rise arm) writes the
+climate's tracked values: the row's +0xc8 bit 2 to the bool at +0x588
+(HaltsFloodFertility), bit 3 to +0x5e8 (HaltsStormFertility), +0x2c to the
+int at +0x648 (FertilityRemovalChance) — RISE4 on halts both, RISE5 / 6 / 7
+remove 15 / 30 / 45 (Expansion2_RandomEvents.xml). From the step after the
+rise:
+- a flood (0xa2f200) skips its yield pass 0xa2ed80 — no "Boosted Yield
+  Chance" draw at all (runs/h1_duelw1124 t243, t245; 1123 t245, t248; 1122
+  t242);
+- a storm's strike (0x286f80), per plot off water and impassable, draws no
+  yield row; where the removal is above 0 it runs 0xa1c0c0 instead and
+  takes the removed count off the event's FertilityAdded (1123 t243: the
+  hurricane's walk after t242's RISE4, damage rows alone; 1122 t247–249);
+- a drought's strike (0x286530) runs 0xa1c0c0 on each plot after its rows
+  whenever the removal is above 0.
+0xa1c0c0 → 0xa19bd0 "Remove Fertility Chance": per yield type, where the
+plot's event fertility c (the random-events map +0x110) is above 0, x =
+min(chance, 100) · c, ONE rand(100) under x mod 100 removes x // 100 + 1,
+else x // 100. A fire's Turn 2 (burnt, Food 1) and Turn 6 (regrown,
+Production 1) rows add to c (1122 t248: the t245 fire at 158, burnt at
+t247, takes the second removal draw). Eruptions and fires draw their yield
+rows whatever the sea (0x2867f0 and 0xa219e0 read no flag; 1123 t244's
+eruption adds 3). **This reverses the engines' climate gate** (fertility
+off from the climate's Phase IV crossing, a draw-free strip of one Food
+and one Production from Phase V): the flags follow the rise's event
+(`floodFertilityHalted`, `stormFertilityHalted`, `fertilityRemoval`,
+`removeFertility` / `_flood_halted`, `_storm_halted`, `_fertility_removal`,
+`_remove_fertility`; the phase table's columns now the RISE rows').
+
+## H-1: the Floodplains list — READ (REVISES the river walk)
+
+0xa2aca0 (GenerateFloodplains' per-river pass): the river's plot list as
+its edges were laid, read from the mouth (the reverse flag), each plot
+asked 0xa2c060 (the Floodplains feature it takes, -1 none): a plot that
+takes one joins the run, the run full at the maximum (10) ends it; a plot
+that takes none ends a run of the minimum (4) or more, else clears it.
+The list itself: from the source, each edge adds its own plot (the IsNE /
+NW / WOfRiver plot) then the plot across, each plot once — so read from the
+mouth a plot stands where the river reached it LAST. **This revises the
+earlier walk** (each later edge adding only the plot the next edge up does
+not border, a plot kept at its first place from the mouth): runs/h1_duelw1123
+river 181 at 480 (t78, t128): the old walk stopped at 7 plots (480 … 391,
+then 347), the game's draws strike 10 (… 391, 392, 393, 349) — 347 and
+348 stand where the source edges laid them. Every other recorded flood of
+1113–1124 walks the same list either way (the harness's `floodplainList`).
+The engines' own rivers keep no flow (`floodRanks`), so this is the
+harness's reading of the record.
+
+## H-1: the goody hut's other gates and the Relic — READ
+
+0x42c980 per subtype row (+0x50 flags): bit 3 RequiresUnit — no unit (a
+culture claim), not eligible; bit 1 MinOneCity (0x4bd370 ≥ 1); bit 2 Relic
+— 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's
+cities; +0x1c the Turn at the speed; then the XP2 row (+0x18): +0x28 bit 0
+CityState — a city-state in the minor list the player has met (0x3daaf0);
+bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose
+condition the player meets (0x4ac140) with its stockpile (0x4aa790) below
+the cap (0x4aabe0). The engines take CityState, StrategicResources and
+Relic (`goodyEligible` / `_goody_eligible`). A Relic, however it comes —
+a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture
+0x296c00: ONE "Choosing a Relic" draw over the 24 GREATWORK_RELIC rows not
+yet created, none left no Relic (runs/h1_duelw1119 t13 over 24 after the
+village's Culture / One Relic; 1120 t83 over 24, t92 over 23; 1123 t168
+over 24). The engines draw it (`createRelic` / `_create_relic`,
+`GameState.relicsMade` / `relics_made`).
+
+## H-1: draws the AI takes, draws the engines lack
+
+- "NameManager::GetUnitNamePart" (0x328760) is called only through
+  0x327d50 / 0x327de0 from the behaviour tree — "HL: Rock Band Move"
+  (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a
+  unit's name for its log (the band template over 118 and 155): the AI's.
+- A plot first revealed to a player (0x534950, from the sight update
+  0x58aa90) names its river (0xa29730 → 0xa292a0, "Random River") and its
+  territory (0xa36ff0: "Random Desert", "Sea", "Ocean", "Mountain Range",
+  "Volcano"; 0xa36400 "Random Lake Range") — one draw over the names left.
+  The engines name no region (AUDIT C-74 BUILD).
+- Game_Quests 0x939980 (on a game era's or a player era's change, and
+  0x93ae70) draws "Selecting a random new quest" over the quest types valid
+  for the pair, then the type's picker (0x84d870, a tech boost's). The
+  engines' quest issuer draws nothing (AUDIT C-74 BUILD).
+- A record read before its player's start of the turn (its event log holds
+  rows of the turn but no PlayerTurnActivated of the recorder's player:
+  1117 t168, 1118 t101, 1119 t4 and t112, 1120 t95, 1121 t134, 1122 t108,
+  1123 t101, 1124 t196) shows the city's culture and next plot as the turn
+  before left them; the next start's stored plot is the one that start drew
+  (runs/h1_duelw1120 t96: Rome claims 1051, the t95 pick).
+- A plot a city gains in its owner's actions, after its start (a unit's
+  move: runs/h1_duelw1120 t161, Xi'an's stored 275), is no culture claim:
+  the city holds no next plot after it.
 
 ## DLL rules the engines contradict
 

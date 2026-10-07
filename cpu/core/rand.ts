@@ -43,16 +43,30 @@ export type RngPoint = { kind: 'seat' | 'step'; seat: number; turn: number };
 
 let witness: ((state: GameState, point: RngPoint) => number | undefined) | null = null;
 
+/** One hold of the generator: the point, the engine's state as it reached it
+ *  and the game's state there. */
+export interface RngHold { point: RngPoint; before: number; held: number }
+let holds: RngHold[] = [];
+
 /** The action replay's hold on the generator (`cpu/harness/replay.ts`): at
  *  each witnessed point the generator takes the state the game's held there,
- *  so a free run stays on the game's random stream. Null outside a replay. */
+ *  so a free run stays on the game's random stream. Null outside a replay.
+ *  A new hold starts a new list of holds (`rngHolds`). */
 export function holdRng(w: ((state: GameState, point: RngPoint) => number | undefined) | null): void {
   witness = w;
+  if (w) holds = [];
+}
+
+/** The holds of the last replay, in the order the engine reached them. */
+export function rngHolds(): readonly RngHold[] {
+  return holds;
 }
 
 /** The generator at a witnessed point: the game's state there where a replay
  *  holds it, else as it stands. */
 export function atRngPoint(state: GameState, point: RngPoint): void {
   const s = witness?.(state, point);
-  if (s !== undefined) state.rngState = s >>> 0;
+  if (s === undefined) return;
+  holds.push({ point, before: state.rngState >>> 0, held: s >>> 0 });
+  state.rngState = s >>> 0;
 }

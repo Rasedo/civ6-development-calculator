@@ -32,7 +32,7 @@ import { effectiveAdjacency, buildingVariantAdjacency, darkBuildings, gameEraInd
 import { BUILDINGS } from '../data/buildings';
 import { cityAppealResolver, governorTileFlag, governorTileSum } from './governors';
 import { randRange } from './rand';
-import { gwHasRoom, placeGreatWork } from './greatWorks';
+import { createRelic, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT } from '../data/greatWorks';
 import { clearCampFor, conquerEncampment } from './combat';
 import { emergencyHeal, emergencyMoveBonus } from './emergency';
@@ -2177,13 +2177,13 @@ export function claimMeteorSite(state: GameState, unit: Unit): void {
 export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void {
   const owner = seatOf(state, unit.seat);
   if (!owner) return;
-  const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0, owner);
+  const sub = drawGoodyReward(state, owner);
   if (!sub) return;
   const p = sub.payload;
   const amount = goodyAmount(sub);
   switch (p.kind) {
     case 'relic':
-      owner.relicReserve += amount;
+      for (let k = 0; k < amount; k++) createRelic(state, unit.seat);
       break;
     case 'gold':
       owner.treasury += amount;

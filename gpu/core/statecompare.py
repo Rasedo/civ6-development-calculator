@@ -306,6 +306,7 @@ GAME = {
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
+    "relicsMade": lambda sim, b, rows: [int(sim.relics_made[b])],
     "seaRiseFrom": lambda sim, b, rows: [int(sim.sea_rise_from[b])],
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
@@ -1078,6 +1079,7 @@ TILE = {
     "droughtTurns": _tile("drought"),
     "fireStart": _tile("fire_start"),
     "fireSeq": _tile("fire_seq"),
+    "stormStruck": _tile("storm_scar"),
     "featureId": lambda sim, b, rows: sim.feat_id[b].masked_fill(sim.feat_stripped[b], -1).numpy(),
     "terrainId": lambda sim, b, rows: (sim.terrain[b] * 2 + sim.hills[b].long()).numpy(),
     "lowland": lambda sim, b, rows: sim.tile_lowland[b].long().numpy(),

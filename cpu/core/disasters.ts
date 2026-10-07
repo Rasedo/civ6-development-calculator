@@ -33,7 +33,7 @@ import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY } from '../data
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_ROWS, WIND_ROWS, STORM_UNIT_ROWS, stormFamilyAt, gameLatitude, stormFootprintOffsets, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
-import { defertilize, desertificationLive, fertilityLive, seaRise, warmingDegrees } from './climate';
+import { floodFertilityHalted, removeFertility, seaRise, stormFertilityHalted, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
 function log(state: GameState, text: string): void {
@@ -246,8 +246,7 @@ export function paintVolcanicSoil(t: Tile): void {
   t.feature = 'VOLCANIC_SOIL';
 }
 
-function fertilize(state: GameState, tile: Tile): void {
-  if (!fertilityLive(state)) return;
+function fertilize(tile: Tile): void {
   if (!isWater(tile) && tile.elevation !== 'MOUNTAIN') {
     tile.fertility += 1;
   }
@@ -512,7 +511,7 @@ function floodStart(map: GameMap, river: readonly Tile[]): Tile {
  * (`FLOOD_DAMAGE_ROWS`), for each plot: a plot whose owner is immune to the
  * flood (`floodImmune`) takes no draw, any other ONE draw rand(100) <
  * Percentage applies the row through the shared applier (`eventDamage`).
- * Then, unless the climate has stopped laying fertility down, for each
+ * Then, unless the sea's rise halts a flood's fertility (`floodFertilityHalted`: no draw), for each
  * `RandomEvent_Yields` row of the severity in order (`FLOOD_YIELD_ROWS`),
  * EVERY plot draws once rand(100) < Percentage — on a shielded river
  * (100 − `FLOOD_MITIGATED_YIELD_REDUCTION`) × Percentage // 100 — and +1 of
@@ -531,12 +530,12 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
       }
     }
   }
-  if (!fertilityLive(state)) return reach;
+  if (floodFertilityHalted(state)) return reach;
   for (const row of FLOOD_YIELD_ROWS[sev]) {
     const pct = mitigated ? Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * row.pct) / 100) : row.pct;
     for (const t of reach) {
       if (randRange(state, 100) >= pct || t.feature !== row.feature) continue;
-      silt(state, t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
+      silt(t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
     }
   }
   return reach;
@@ -655,11 +654,6 @@ export function fireCandidate(t: Tile, row: number): boolean {
 /** The plots under a live event, where no drought may start: every plot a
  *  live storm has struck (GameCore_XP2 0x28de40 reads m_aStorms' struck
  *  lists alone — a drought's or a fire's plot is no bar). */
-export function liveEventPlots(state: GameState): Tile[] {
-  const struck = new Set((state.storms ?? []).filter((s) => s.left > 0).flatMap((s) => s.struck));
-  return state.map.tiles.filter((t) => struck.has(t.index));
-}
-
 /**
  * May a drought start on this plot now? (Game_Climate "Pick Drought Start
  * Plot", GameCore_XP2 0x287e80 and its predicate 0x28eb60;
@@ -668,12 +662,15 @@ export function liveEventPlots(state: GameState): Tile[] {
  * ground (`droughtGround`: featureless Plains or Grassland, hills included,
  * a district's plot or a city centre counting as featureless), with no river,
  * beside no Coast or Ocean (`isCoastalLand`; a lake is no ocean-sized body)
- * and under no live event (`live`). A plot on the map's edge lacks a
- * neighbour and never qualifies. `centres` holds every live city centre.
+ * and where no storm has struck (`struck`: 0x28de40 reads every storm
+ * record the game keeps, live or ended — runs/h1_duelw1124 t112, t115, t162,
+ * t194, t234 leave out 277, 278 and 319, the t49 blizzard's walk). A plot on
+ * the map's edge lacks a neighbour and never qualifies. `centres` holds every
+ * live city centre.
  */
-export function droughtCandidate(map: GameMap, t: Tile, centres: ReadonlySet<number>, live: ReadonlySet<number>): boolean {
+export function droughtCandidate(map: GameMap, t: Tile, centres: ReadonlySet<number>, struck: (u: Tile) => boolean): boolean {
   const dry = (u: Tile) => droughtGround(u, (u.district !== null && u.district !== 'CITY_CENTER') || centres.has(u.index))
-    && !hasRiver(u) && !isCoastalLand(map, u) && !live.has(u.index);
+    && !hasRiver(u) && !isCoastalLand(map, u) && !struck(u);
   if (!dry(t)) return false;
   for (let d = 0; d < 6; d++) {
     const n = neighborTile(map, t, d);
@@ -696,8 +693,7 @@ export function droughtStart(state: GameState): Tile | undefined {
   const centres = new Set<number>();
   for (const s of cityHolders(state)) for (const c of s.cities) centres.add(c.centerIndex);
   for (const cs of state.cityStates) centres.add(cs.centerIndex);
-  const live = new Set(liveEventPlots(state).map((t) => t.index));
-  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, live));
+  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, (u) => !!u.stormStruck));
   if (!cands.length) return undefined;
   return cands[randRange(state, cands.length)];
 }
@@ -832,7 +828,7 @@ export function sitePairWeight(row: EventRow, pct: number, degrees: number): num
  * storm's, the meteor's and the fire's plot is a second draw over their start
  * plots, the drought's a weighted one over the map (`droughtStart`).
  */
-function randomEvent(state: GameState, strip: boolean): void {
+function randomEvent(state: GameState): void {
   // a sea level rise the climate step left waiting is the turn's event by
   // force: the roll is a draw over its one row (`seaRise`)
   if (state.seaRiseFrom !== undefined) {
@@ -857,13 +853,13 @@ function randomEvent(state: GameState, strip: boolean): void {
       if (at >= cum) continue;
       const key = keys[i]?.[k];
       if (key) key.eventFired = (key.eventFired ?? 0) | (1 << i);
-      fireEvent(state, rows[i], sites, k, strip);
+      fireEvent(state, rows[i], sites, k);
       return;
     }
   }
 }
 
-function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number, strip: boolean): void {
+function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number): void {
   switch (row.family) {
     case 'flood': {
       const start = sites.flood[k].start;
@@ -876,13 +872,13 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       return;
     }
     case 'storm': {
-      stormBirth(state, row.sev, strip);
+      stormBirth(state, row.sev);
       return;
     }
     case 'drought': {
       const center = droughtStart(state);
       if (!center) return;
-      drought(state, center, row.sev, strip);
+      drought(state, center, row.sev);
       return;
     }
     case 'accident': {
@@ -952,13 +948,13 @@ function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
     } else if (age === FIRE_BURNT_TURN) {
       randRange(state, 100);
       t.feature = FIRE_BURNT_FEATURE[row] as Tile['feature'];
-      fertilize(state, t);
+      fertilize(t);
     } else if (age === FIRE_REGROW_TURN) {
       randRange(state, 100);
       t.feature = FIRE_START_FEATURE[row] as Tile['feature'];
       t.fireStart = undefined;
       t.fireSeq = undefined;
-      silt(state, t, 'fertilityProd');
+      silt(t, 'fertilityProd');
     }
   }
   const owner = tileSeat(t);
@@ -1022,13 +1018,13 @@ export function fireTurn(state: GameState): void {
  * record (`GameState.droughts`) keeps the footprint and its turns
  * (`DROUGHT_TURNS`).
  */
-export function drought(state: GameState, center: Tile, sev: number, strip: boolean): void {
+export function drought(state: GameState, center: Tile, sev: number): void {
   const turns = DROUGHT_TURNS[sev];
   const plots: number[] = [];
   for (const t of stormFootprint(state.map, center, DROUGHT_HEXES)) {
     if (isWater(t)) continue;
     plots.push(t.index);
-    droughtTile(state, t, sev, turns, strip);
+    droughtTile(state, t, sev, turns);
   }
   (state.droughts ??= []).push({ plots, left: turns });
   log(state, `Drought around (${center.col}, ${center.row}) — food suffers for ${turns} turns.`);
@@ -1040,9 +1036,10 @@ export function drought(state: GameState, center: Tile, sev: number, strip: bool
  * rand(100), whatever stands there — EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED
  * (`DROUGHT_DESTROY_P`) takes a listed improvement away, then both rows'
  * SPECIFIC_IMPROVEMENT_PILLAGED 100 pillages it. The plot dries for the
- * row's turns; a warmed world strips the plot's silt.
+ * row's turns; then the climate takes its event fertility back
+ * (`removeFertility`).
  */
-function droughtTile(state: GameState, t: Tile, sev: number, turns: number, strip: boolean): void {
+function droughtTile(state: GameState, t: Tile, sev: number, turns: number): void {
   const listed = () => !!t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t);
   if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100) < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
     destroyImprovement(state, t);
@@ -1050,7 +1047,7 @@ function droughtTile(state: GameState, t: Tile, sev: number, turns: number, stri
   randRange(state, 100);
   if (listed()) t.pillaged = true;
   t.droughtTurns = Math.max(t.droughtTurns, turns);
-  if (strip) defertilize(t);
+  removeFertility(state, t);
 }
 
 /**
@@ -1091,10 +1088,9 @@ function eruptionDamageP(kind: EruptionDamage, row: number): number {
   }
 }
 
-/** +1 of a silt channel on a land, non-mountain plot, while the climate
- *  still lays fertility down. */
-function silt(state: GameState, tile: Tile, key: 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'): void {
-  if (!fertilityLive(state) || isWater(tile) || tile.elevation === 'MOUNTAIN') return;
+/** +1 of a silt channel on a land, non-mountain plot. */
+function silt(tile: Tile, key: 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'): void {
+  if (isWater(tile) || tile.elevation === 'MOUNTAIN') return;
   tile[key] = (tile[key] ?? 0) + 1;
 }
 
@@ -1143,7 +1139,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
         if (!soilPaintable(n)) continue;
         if (randRange(state, 100) >= Math.round(p * 100)) continue;
         if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
-        silt(state, n, key);
+        silt(n, key);
       }
     }
   }
@@ -1276,7 +1272,6 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
 export function disasterPhase(state: GameState): void {
   atRngPoint(state, { kind: 'step', seat: -1, turn: state.turn });
   const map = state.map;
-  const strip = desertificationLive(state);
 
   for (const t of map.tiles) {
     if (t.droughtTurns > 0) t.droughtTurns -= 1;
@@ -1292,10 +1287,10 @@ export function disasterPhase(state: GameState): void {
   // CIV6 (RANDOM_EVENT_START_TURN): before its first turn the step takes no
   // draw at all
   if (state.turn >= RANDOM_EVENT_START_TURN) {
-    stormsTurn(state, strip);
+    stormsTurn(state);
     fireTurn(state);
     volcanoRoll(state);
-    randomEvent(state, strip);
+    randomEvent(state);
   } else seaRise(state);
   // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
   // phase's LOWEST victim civilization asks for aid — resolved once at the
@@ -1313,11 +1308,11 @@ export function disasterPhase(state: GameState): void {
  * `STORM_LAST_TURN_PCT` of its rows' chances (`stormWalk`). A record whose
  * turns run out leaves the list.
  */
-function stormsTurn(state: GameState, strip: boolean): void {
+function stormsTurn(state: GameState): void {
   for (const s of state.storms ?? []) {
     const ev = STORM_EVENTS[s.event];
     const age = ev.duration - s.left;
-    stormWalk(state, s, age + 1 >= ev.duration ? STORM_LAST_TURN_PCT : 100, strip);
+    stormWalk(state, s, age + 1 >= ev.duration ? STORM_LAST_TURN_PCT : 100);
     s.left -= 1;
   }
   if (state.storms) state.storms = state.storms.filter((s) => s.left > 0);
@@ -1343,7 +1338,7 @@ function windRowsAt(row: number, height: number): typeof WIND_ROWS {
  * step strikes the footprint at the new centre (`stormStrike` at `pct`).
  * Then a "Storm Direction Preview" (`stormPreview`). `_storm_walk` is the twin.
  */
-export function stormWalk(state: GameState, s: StormRecord, pct: number, strip: boolean): void {
+export function stormWalk(state: GameState, s: StormRecord, pct: number): void {
   const map = state.map;
   const ev = STORM_EVENTS[s.event];
   let left = STORM_MOVEMENT;
@@ -1358,7 +1353,8 @@ export function stormWalk(state: GameState, s: StormRecord, pct: number, strip: 
     if (cost > left) break;
     left -= cost;
     s.at = to.index;
-    stormStrike(state, s, pct, strip);
+    stormStrike(state, s, pct);
+    for (const i of s.struck) map.tiles[i].stormStruck = true;
   }
   stormPreview(state, s.at);
 }
@@ -1400,7 +1396,7 @@ export function stormNamer(state: GameState, t: Tile): number {
   return best;
 }
 
-export function stormBirth(state: GameState, e: number, strip: boolean): void {
+export function stormBirth(state: GameState, e: number): void {
   const ev = STORM_EVENTS[e];
   const center = stormStart(state, ev);
   if (!center) return;
@@ -1409,7 +1405,7 @@ export function stormBirth(state: GameState, e: number, strip: boolean): void {
   if (namer >= 0) drawCitizenName(state, namer);
   state.stormSerial = (state.stormSerial ?? 0) + 1;
   (state.storms ??= []).push({ id: state.stormSerial, event: e, at: center.index, left: ev.duration - 1, struck: [] });
-  stormStrike(state, { id: 0, event: e, at: center.index, left: 0, struck: [] }, 100, strip);
+  stormStrike(state, { id: 0, event: e, at: center.index, left: 0, struck: [] }, 100);
   log(state, `Storm: ${ev.id} at (${center.col}, ${center.row}) — ${ev.hexes} tiles for ${ev.duration} turns.`);
 }
 
@@ -1438,11 +1434,11 @@ function barren(t: Tile): boolean {
  * is struck (`stormPlot`) and joins the struck list. `_storm_strike` is the
  * twin.
  */
-export function stormStrike(state: GameState, s: StormRecord, pct: number, strip: boolean): void {
+export function stormStrike(state: GameState, s: StormRecord, pct: number): void {
   const ev = STORM_EVENTS[s.event];
   for (const t of stormFootprint(state.map, state.map.tiles[s.at], ev.hexes)) {
     if (s.struck.includes(t.index)) continue;
-    stormPlot(state, t, s.event, pct, strip);
+    stormPlot(state, t, s.event, pct);
     s.struck.push(t.index);
   }
 }
@@ -1452,13 +1448,14 @@ export function stormStrike(state: GameState, s: StormRecord, pct: number, strip
  * `RandomEvent_Damages` row (XML order, `STORM_ROWS`) draws ONE rand(100)
  * against Percentage × pct // 100 — the row's CoastalLowlandPercentage on a
  * coastal-lowland plot — a landed row applied at once through the shared
- * applier (`eventDamage`, its unit rolls straight after); then, past Phase
- * IV, the plot loses its silt (`defertilize`), else off water and impassable
- * plots each `RandomEvent_Yields` row draws one rand(100) against
- * Percentage × pct // 100, +1 of its yield where it falls under.
+ * applier (`eventDamage`, its unit rolls straight after); then, off water
+ * and impassable plots, each `RandomEvent_Yields` row draws one rand(100)
+ * against Percentage × pct // 100, +1 of its yield where it falls under —
+ * where the sea's rise halts a storm's fertility (`stormFertilityHalted`),
+ * the plot's event fertility is taken back instead (`removeFertility`).
  * `_storm_plot` is the twin.
  */
-export function stormPlot(state: GameState, t: Tile, e: number, pct: number, strip: boolean): void {
+export function stormPlot(state: GameState, t: Tile, e: number, pct: number): void {
   const ev = STORM_EVENTS[e];
   const rows = STORM_ROWS[e];
   const lowland = (t.lowland ?? 0) > 0;
@@ -1466,11 +1463,12 @@ export function stormPlot(state: GameState, t: Tile, e: number, pct: number, str
     const chance = row.lowland >= 0 && lowland ? row.lowland : Math.floor((row.pct * pct) / 100);
     if (randRange(state, 100) < chance) eventDamage(state, t, row.kind as DamageKind, row.lo, row.hi, ev);
   }
-  if (strip) defertilize(t);
-  else if (!barren(t)) {
+  if (stormFertilityHalted(state)) {
+    if (!barren(t)) removeFertility(state, t);
+  } else if (!barren(t)) {
     for (const row of rows.yields) {
       if (randRange(state, 100) >= Math.floor((row.pct * pct) / 100)) continue;
-      silt(state, t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
+      silt(t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
     }
   }
 }

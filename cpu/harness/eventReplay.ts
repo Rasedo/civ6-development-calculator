@@ -28,9 +28,10 @@ import { drawsBetween, type Civ6Random } from './civ6Random';
 import type { RandLog } from './randLog';
 import { loggedStep, sameDraw } from './drawSites';
 import {
-  droughtDraws, eruptionDraws, floodDraws, floodplainList, newOutcome, replayAtEnd, stormBirth, stormStartPlots, stormWalk, unitRolls,
-  type EventOutcome, type StormState, type StruckPlot,
+  droughtDraws, eruptionDraws, floodDraws, floodplainList, newClimate, newOutcome, replayAtEnd, stormBirth, stormStartPlots, stormWalk, unitRolls,
+  type EventClimate, type EventOutcome, type StormState, type StruckPlot,
 } from './eventDraws';
+import { CLIMATE_PHASES } from '../data/climate';
 
 /** the game's turns N the event roll's total is ten times (0x339020: the
  *  game speed's turns, online) */
@@ -169,6 +170,9 @@ interface SpreadFire {
 
 interface Step {
   st: StormState[];
+  /** the climate as the step leaves it: its own copy of the plots' event
+   *  fertility */
+  climate: EventClimate;
   out: EventOutcome;
   soil: Map<number, number[]>;
   born?: StormState;
@@ -230,6 +234,12 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
   // the list each river was found to hold
   const riverHolds = new Map<number, string>();
   let live: { storm: StormState; key: string }[] = [];
+  // every plot a storm has struck, its walk over or not: the game keeps
+  // each storm's record, struck list and all, after its last turn
+  const scarred = new Set<number>();
+  // the climate the sea's rises left, and the event fertility the placed
+  // steps laid on each plot
+  let climate = newClimate();
   // the fires a spread lit (the records keep no event row for them)
   const spread: SpreadFire[] = [];
   // the events a turn with an unknown start drew for
@@ -276,12 +286,12 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
         let lists = resolved.get(key) ?? [];
         if (riverHolds.has(river)) lists = lists.filter((l) => sig(l) === riverHolds.get(river));
         else lists = lists.filter((l) => ![...riverHolds.values()].includes(sig(l)));
-        const list = lists.length === 1 ? lists[0] : chooseList(lists, sev, e, before, cat, ctx, a, draws);
+        const list = lists.length === 1 ? lists[0] : chooseList(lists, sev, e, before, cat, ctx, a, draws, climate.haltFlood);
         if (list) riverHolds.set(river, sig(list));
         if (!list) { unsupported = `${name} t${T}: the river's Floodplains list is not known`; continue; }
         const mit = mitigated(cat, before, list);
         parts.push((rng, step) => {
-          const fd = floodDraws(rng, sev, list.map((t) => ctx(t.index)), mit);
+          const fd = floodDraws(rng, sev, list.map((t) => ctx(t.index)), mit, step.climate.haltFlood);
           let n = 0;
           for (const [i, [f, p]] of fd.gains) { addGain(step.soil, i, [f, p, 0, 0]); n += f + p; }
           step.out.damage = fd.damage;
@@ -296,7 +306,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
           continue;
         }
         parts.push((rng, step) => {
-          step.born = stormBirth(rng, map, storm, T, ctx, step.out);
+          step.born = stormBirth(rng, map, storm, T, ctx, step.out, step.climate);
           step.bornOk = step.born?.at === at && step.born.added === num(e[4]) && (e[13] === undefined || step.born.dir === num(e[13]));
           return step.bornOk;
         });
@@ -317,11 +327,14 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
         // a drought that found no start plot draws nothing after the roll
         continue;
       } else if (DROUGHTS.includes(name)) {
+        // the ground as the step found it: the record after it (a feature
+        // the players cleared on the turn before is gone: runs/h1_duelw1124
+        // t194, 624's Rainforest), every plot a storm ever struck left out
         const at = num(e[3]);
         const centres = new Set(before.cities.map((c) => c.y * before.head.W + c.x));
         parts.push((rng, step) => {
-          const live = new Set(step.st.flatMap((s) => [...s.struck]));
-          const start = droughtDraws(rng, map, DROUGHTS.indexOf(name), centres, live);
+          const live = new Set([...scarred, ...step.st.flatMap((s) => [...s.struck])]);
+          const start = droughtDraws(rng, afterMap, DROUGHTS.indexOf(name), centres, live, step.climate);
           return start === at;
         });
       } else if (FIRE_EVENTS.includes(name)) {
@@ -388,7 +401,16 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
       const taken = new Set(fires.map((f) => f.plot));
       for (const f of fires) {
         const age = T - f.start;
-        if (age === FIRE_BURNT_TURN || age === FIRE_REGROW_TURN) rng.get(100, 'Boosted Yield Chance');
+        if (age === FIRE_BURNT_TURN || age === FIRE_REGROW_TURN) {
+          // its 100% row: the burnt plot's Food, the regrown plot's
+          // Production, as the plot's event fertility (runs/h1_duelw1122
+          // t248: the fire of t245 at 158, burnt at t247, takes a
+          // "Remove Fertility Chance")
+          rng.get(100, 'Boosted Yield Chance');
+          const g = step.climate.fert.get(f.plot) ?? [0, 0, 0, 0];
+          g[age === FIRE_BURNT_TURN ? 0 : 1] += 1;
+          step.climate.fert.set(f.plot, g);
+        }
         if (age < FIRE_DAMAGE_TURNS[0] || age > FIRE_DAMAGE_TURNS[1]) continue;
         for (let i = 0; i < 4; i++) rng.get(100, 'Pillage Improvement Chance');
         unitRolls(rng, ctx(f.plot).landUnits, FIRE_DMG[1] - FIRE_DMG[0]);
@@ -433,8 +455,9 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
     let chosenAt = -1;
     for (const [v, extra, tail] of variants) {
       const replay = (rng: Civ6Random): Step => {
-        const step: Step = { st: live.map((s) => ({ ...s.storm, struck: new Set(s.storm.struck) })), out: newOutcome(), soil: new Map(), bornOk: true, roll: -1 };
-        for (const s of step.st) stormWalk(rng, map, s, T, ctx, step.out);
+        const step: Step = { st: live.map((s) => ({ ...s.storm, struck: new Set(s.storm.struck) })), out: newOutcome(), soil: new Map(), bornOk: true, roll: -1,
+          climate: { ...climate, fert: new Map([...climate.fert].map(([i, f]) => [i, [...f]])) } };
+        for (const s of step.st) stormWalk(rng, map, s, T, ctx, step.out, step.climate);
         fireTurns(rng, step);
         if (v > 0) rng.get(volcanoD, 'Active Volcano Roll');
         if (v > 1) rng.get(1, 'Choose Active Volcano Roll');
@@ -517,10 +540,21 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
       mark(key, familyOf(names[e[1]] ?? ''), T, g);
     }
     live = step.st.map((s, i) => ({ storm: s, key: live[i].key }));
+    for (const s of step.st) for (const i of s.struck) scarred.add(i);
     spread.push(...(step.births ?? []));
+    // the step's fertility: what its storms took back, then what it laid; a
+    // sea's rise sets the climate's flags for the steps after it
+    climate = step.climate;
+    for (const [i, f] of g) climate.fert.set(i, (climate.fert.get(i) ?? [0, 0, 0, 0]).map((v, k) => v + f[k]));
+    for (const e of news) {
+      const k = /^RANDOM_EVENT_SEA_LEVEL_RISE(\d)$/.exec(names[e[1]] ?? '');
+      const ph = k ? CLIMATE_PHASES[Number(k[1]) - 1] : undefined;
+      if (ph) climate = { ...climate, haltFlood: ph.haltsFlood, haltStorm: ph.haltsStorm, removal: ph.fertilityRemoval };
+    }
     if (step.born) {
       const e = news.find((x) => STORM_EVENTS[step.born!.event] && `RANDOM_EVENT_${STORM_EVENTS[step.born!.event].id}` === names[x[1]])!;
       live.push({ storm: step.born, key: `${e[0]}:${e[1]}` });
+      for (const i of step.born.struck) scarred.add(i);
     }
   }
   // an event is replayed when every turn its draws fell on was placed
@@ -653,13 +687,13 @@ function addGain(m: Map<number, number[]>, i: number, g: number[]): void {
  * otherwise.
  */
 function chooseList(lists: Tile[][], sev: number, e: EventRow, before: TurnRecord, cat: Catalog,
-  ctx: (plot: number) => StruckPlot, from: number, draws: number): Tile[] | undefined {
+  ctx: (plot: number) => StruckPlot, from: number, draws: number, haltFlood: boolean): Tile[] | undefined {
   if (lists.length <= 1) return lists[0];
   const fits = lists.filter((list) => {
     const mit = mitigated(cat, before, list);
     const r = replayAtEnd(from, draws, (rng) => {
       rng.get(EVENT_ROLL_TOTAL, 'Random Event Roll');
-      return floodDraws(rng, sev, list.map((t) => ctx(t.index)), mit);
+      return floodDraws(rng, sev, list.map((t) => ctx(t.index)), mit, haltFlood);
     })[0];
     if (!r) return false;
     let n = 0;

@@ -503,6 +503,9 @@ export interface GameState {
   stormSerial?: number;
   /** the last fire serial handed out (`Tile.fireSeq`) */
   fireSerial?: number;
+  /** the Relics created this game (`createRelic`): the "Choosing a Relic"
+   *  draw runs over the rest of `RELIC_COUNT` */
+  relicsMade?: number;
   /** the live STORMS (Game_Climate m_aStorms), in the order they began */
   storms?: StormRecord[];
   /** the live DROUGHTS (Game_Climate m_aDroughts), in the order they began */

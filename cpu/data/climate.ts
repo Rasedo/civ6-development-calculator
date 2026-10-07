@@ -98,13 +98,15 @@ interface ClimatePhase {
   submerge: number;
   /** the fraction of the map's original Ice that has melted. */
   iceMelt: number;
-  /** CIV6: "In Phase IV and beyond, Storms and Floods will no longer provide
-   *  fertility." */
-  fertility: boolean;
-  /** CIV6: "a new desertification mechanic comes into play after climate
-   *  change progresses past Phase IV: all Storms and Droughts now start
-   *  removing fertility from tiles instead of adding it." */
-  desertification: boolean;
+  /** the phase's sea-level rise stops a flood's fertility rows
+   *  (RandomEvents.HaltsFloodFertility of its RANDOM_EVENT_SEA_LEVEL_RISE
+   *  row; Game_Climate 0x291a20 sets it, 0xa2f200 reads it) */
+  haltsFlood: boolean;
+  /** ... a storm's (HaltsStormFertility; 0x286f80 reads it) */
+  haltsStorm: boolean;
+  /** the percent of each event fertility a halted storm or a drought takes
+   *  back off a struck plot (FertilityRemovalChance; 0xa1c0c0) */
+  fertilityRemoval: number;
 }
 
 /** CIV6 (Phases of Climate Change), read row by row off the page's table.
@@ -112,30 +114,36 @@ interface ClimatePhase {
  *  row, which `climatePhase` returns as -1. */
 
 /**
- * PROVENANCE (cpu/data/provenance.ts). The install's readable Gameplay data
- * ships no climate-phase table at all — no `ClimateChangeLevels`, no
- * `GameClimate` rows survive the layering — so every column of this ladder is
- * the Gathering Storm Climate page's own "Phases of Climate Change" table,
- * read row by row (the file header says so).
+ * PROVENANCE (cpu/data/provenance.ts). The page's columns are the Gathering
+ * Storm Climate page's "Phases of Climate Change" table, read row by row;
+ * the fertility columns are the install's RANDOM_EVENT_SEA_LEVEL_RISE row of
+ * the phase (Phase I its RISE1).
  */
 const CLIMATE_PHASE_SRC: SrcMap = Object.fromEntries(
-  ['points', 'seaLevel', 'flood', 'submerge', 'iceMelt', 'fertility', 'desertification'].map((k) => [k, {
-    pedia: 'the GS Climate page "Phases of Climate Change" table; the install ships no readable '
-      + 'climate-phase rows',
+  ['points', 'seaLevel', 'flood', 'submerge', 'iceMelt'].map((k) => [k, {
+    pedia: 'the GS Climate page "Phases of Climate Change" table',
   }]),
 );
+const riseRow = (p: number) => `RandomEventType=RANDOM_EVENT_SEA_LEVEL_RISE${p + 1}`;
 
 const RAW_CLIMATE_PHASES: readonly ClimatePhase[] = [
-  { points: 2, seaLevel: 0.5, flood: 0, submerge: 0, iceMelt: 0.10, fertility: true, desertification: false },
-  { points: 3, seaLevel: 1.0, flood: 1, submerge: 0, iceMelt: 0.20, fertility: true, desertification: false },
-  { points: 4, seaLevel: 1.5, flood: 2, submerge: 0, iceMelt: 0.30, fertility: true, desertification: false },
-  { points: 5, seaLevel: 2.0, flood: 0, submerge: 1, iceMelt: 0.40, fertility: false, desertification: false },
-  { points: 6, seaLevel: 2.5, flood: 3, submerge: 0, iceMelt: 0.55, fertility: false, desertification: true },
-  { points: 7, seaLevel: 3.0, flood: 0, submerge: 2, iceMelt: 0.70, fertility: false, desertification: true },
-  { points: 8, seaLevel: 3.5, flood: 0, submerge: 3, iceMelt: 0.85, fertility: false, desertification: true },
+  { points: 2, seaLevel: 0.5, flood: 0, submerge: 0, iceMelt: 0.10, haltsFlood: false, haltsStorm: false, fertilityRemoval: 0 },
+  { points: 3, seaLevel: 1.0, flood: 1, submerge: 0, iceMelt: 0.20, haltsFlood: false, haltsStorm: false, fertilityRemoval: 0 },
+  { points: 4, seaLevel: 1.5, flood: 2, submerge: 0, iceMelt: 0.30, haltsFlood: false, haltsStorm: false, fertilityRemoval: 0 },
+  { points: 5, seaLevel: 2.0, flood: 0, submerge: 1, iceMelt: 0.40, haltsFlood: true, haltsStorm: true, fertilityRemoval: 0 },
+  { points: 6, seaLevel: 2.5, flood: 3, submerge: 0, iceMelt: 0.55, haltsFlood: true, haltsStorm: true, fertilityRemoval: 15 },
+  { points: 7, seaLevel: 3.0, flood: 0, submerge: 2, iceMelt: 0.70, haltsFlood: true, haltsStorm: true, fertilityRemoval: 30 },
+  { points: 8, seaLevel: 3.5, flood: 0, submerge: 3, iceMelt: 0.85, haltsFlood: true, haltsStorm: true, fertilityRemoval: 45 },
 ];
-export const CLIMATE_PHASES: readonly ClimatePhase[] =
-  RAW_CLIMATE_PHASES.map((p) => ({ ...p, src: CLIMATE_PHASE_SRC }));
+export const CLIMATE_PHASES: readonly ClimatePhase[] = RAW_CLIMATE_PHASES.map((p, i) => ({
+  ...p,
+  src: {
+    ...CLIMATE_PHASE_SRC,
+    haltsFlood: xml('RandomEvents', riseRow(i), 'HaltsFloodFertility'),
+    haltsStorm: xml('RandomEvents', riseRow(i), 'HaltsStormFertility'),
+    fertilityRemoval: xml('RandomEvents', riseRow(i), 'FertilityRemovalChance'),
+  },
+}));
 
 /**
  * CIV6 (Deforestation Level): "a percentage of number of features cleared

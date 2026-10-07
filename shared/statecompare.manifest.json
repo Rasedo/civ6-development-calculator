@@ -277,6 +277,17 @@
           "note": "the CLIMATE PHASE the world has reached, -1 before Phase I. Monotone on both engines."
         },
         {
+          "name": "relicsMade",
+          "compare": "exact",
+          "covers": [
+            "GameState.relicsMade"
+          ],
+          "planes": [
+            "relics_made"
+          ],
+          "note": "the Relics created this game: the Choosing a Relic draw runs over the rest of the 24."
+        },
+        {
           "name": "seaRiseFrom",
           "compare": "exact",
           "covers": [
@@ -3234,6 +3245,17 @@
             "fire_serial"
           ],
           "note": "the fire's place in the order the live fires began, -1 when none — the serial handed out at its start, the order the fires' turns run in."
+        },
+        {
+          "name": "stormStruck",
+          "compare": "exact",
+          "covers": [
+            "Tile.stormStruck"
+          ],
+          "planes": [
+            "storm_scar"
+          ],
+          "note": "1 where a storm's walk ever struck the plot, its record live or ended: no drought starts where any reaches."
         },
         {
           "name": "featureId",

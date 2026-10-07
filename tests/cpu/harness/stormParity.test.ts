@@ -8,7 +8,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { drought, droughtStart, stormBirth, stormWalk } from '../../../cpu/core/disasters';
 import { STORM_EVENTS, STORM_LAST_TURN_PCT } from '../../../cpu/data/disasters';
 import { Civ6Random } from '../../../cpu/harness/civ6Random';
-import { droughtDraws, newOutcome, stormBirth as replayBirth, stormWalk as replayWalk, type StruckPlot } from '../../../cpu/harness/eventDraws';
+import { droughtDraws, newClimate, newOutcome, stormBirth as replayBirth, stormWalk as replayWalk, type StruckPlot } from '../../../cpu/harness/eventDraws';
 import type { GameState, Tile } from '../../../cpu/core/types';
 
 /** a board of `terrain` with a band of the other ground through it, one
@@ -45,8 +45,8 @@ describe('the engine\'s storm draws as the replay does', () => {
         // as it goes, which the replay's draws do not see
         const out = newOutcome();
         // the board's seats play no civilization: the storm is named for nobody
-        const replayed = replayBirth(rng, map, e, 10, ctx, out, false);
-        stormBirth(state, e, false);
+        const replayed = replayBirth(rng, map, e, 10, ctx, out, newClimate(), false);
+        stormBirth(state, e);
         const rec = state.storms![0];
         expect(rec.at).toBe(replayed!.at);
         expect(state.rngState).toBe(rng.state);
@@ -54,8 +54,8 @@ describe('the engine\'s storm draws as the replay does', () => {
         for (const [turn, pct] of [[11, 100], [12, STORM_LAST_TURN_PCT]] as const) {
           const was = map.tiles.map((t) => t.fertility + t.fertilityProd);
           const added0 = replayed!.added;
-          replayWalk(rng, map, replayed!, turn, ctx, out);
-          stormWalk(state, rec, pct, false);
+          replayWalk(rng, map, replayed!, turn, ctx, out, newClimate());
+          stormWalk(state, rec, pct);
           expect(rec.at).toBe(replayed!.at);
           expect(new Set(rec.struck)).toEqual(replayed!.struck);
           expect(state.rngState).toBe(rng.state);
@@ -74,9 +74,9 @@ describe('the engine\'s drought draws as the replay does', () => {
         for (const t of state.map.tiles) if (t.col === 15) t.terrain = 'COAST';
         state.rngState = seed;
         const rng = new Civ6Random(seed);
-        const at = droughtDraws(rng, state.map, sev, new Set(), new Set());
+        const at = droughtDraws(rng, state.map, sev, new Set(), new Set(), newClimate());
         const centre = droughtStart(state)!;
-        drought(state, centre, sev, false);
+        drought(state, centre, sev);
         expect(centre.index).toBe(at);
         expect(state.rngState).toBe(rng.state);
       }

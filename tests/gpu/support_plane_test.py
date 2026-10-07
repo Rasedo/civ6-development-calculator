@@ -95,7 +95,7 @@ def main() -> None:
     #       to kill it (the noncombat branch)
     crip = [i for i, e in enumerate(sim._st_ids) if e == "BLIZZARD_CRIPPLING"][0]
     hp0 = int(sim.major_unit_hp[0, g2 - sim.POOL_LO["major"]])
-    sim._storm_plot(torch.tensor([True]), torch.tensor([lone]), torch.tensor([crip]), torch.tensor([False]))
+    sim._storm_plot(torch.tensor([True]), torch.tensor([lone]), torch.tensor([crip]))
     alive = bool(sim.major_unit_alive[0, g2 - sim.POOL_LO["major"]])
     hp1 = int(sim.major_unit_hp[0, g2 - sim.POOL_LO["major"]]) if alive else 0
     assert hp1 < hp0, f"the crippling blizzard (landP 1) left the support unit untouched ({hp0} -> {hp1})"

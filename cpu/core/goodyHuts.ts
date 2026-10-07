@@ -2,6 +2,12 @@ import { randRange } from './rand';
 import { GOODY_KINDS, GOODY_SUBTYPES, goodyKindWeight, type GoodyKind, type GoodySubType } from '../data/goodyHuts';
 import { scaleByGameSpeed } from '../data/constants';
 import type { GameState, Seat } from './types';
+import { hasMet } from './cityStates';
+import { hiddenResourcesFor } from './seats';
+import { stockOf, stockpileCap } from './stockpile';
+import { STRATEGIC_IDS } from '../data/constants';
+import { gwHasRoom } from './greatWorks';
+import { GWO_RELIC } from '../data/greatWorks';
 
 /**
  * THE TRIBAL VILLAGE DRAW (0x42bdd0, dll_readings "H-1: the goody hut's
@@ -18,28 +24,34 @@ import type { GameState, Seat } from './types';
  *
  * The GPU twin is `_draw_goody_reward`.
  */
-export function goodyEligible(sub: GoodySubType, turn: number, hasCity: boolean): boolean {
+export function goodyEligible(state: GameState, sub: GoodySubType, claimer: Seat): boolean {
   // a weight of 0 is a subtype this ruleset turns OFF, not a free one
   if (sub.weight <= 0) return false;
   // the row's Turn at the game's speed (0x42c980 through 0x5254d0;
   // runs/h1_duelw1117 t13: Medium Gold's Turn 20 open, the Gold pick over 85)
-  if (sub.turn != null && turn < scaleByGameSpeed(sub.turn)) return false;
-  if (sub.minOneCity && !hasCity) return false;
+  if (sub.turn != null && state.turn < scaleByGameSpeed(sub.turn)) return false;
+  if (sub.minOneCity && !claimer.cities.length) return false;
+  // 0x42c980's other gates: a Relic slot in one of the claimer's cities
+  // (0x497030), a city-state the claimer has met (the XP2 row's CityState),
+  // a strategic resource it sees below its stockpile's ceiling
+  // (StrategicResources: 0x4ac140, 0x4aa790 against 0x4aabe0)
+  if (sub.relic && !claimer.cities.some((c) => gwHasRoom(state, c, GWO_RELIC))) return false;
+  if (sub.cityState && !state.cityStates.some((cs) => hasMet(cs, claimer.seat))) return false;
+  if (sub.strategic) {
+    const hidden = hiddenResourcesFor(state, claimer.seat);
+    const cap = stockpileCap(state, claimer.seat);
+    if (!STRATEGIC_IDS.some((r) => !hidden.has(r) && stockOf(state, claimer.seat, r) < cap)) return false;
+  }
   return true;
 }
 
-export function eligibleGoodyKinds(turn: number, hasCity: boolean): GoodyKind[] {
+export function eligibleGoodyKinds(state: GameState, claimer: Seat): GoodyKind[] {
   return GOODY_KINDS.filter((k) =>
-    GOODY_SUBTYPES.some((s) => s.hut === k && goodyEligible(s, turn, hasCity)));
+    GOODY_SUBTYPES.some((s) => s.hut === k && goodyEligible(state, s, claimer)));
 }
 
-export function drawGoodyReward(
-  state: GameState,
-  turn: number,
-  hasCity: boolean,
-  claimer: Seat,
-): GoodySubType | null {
-  const kinds = eligibleGoodyKinds(turn, hasCity);
+export function drawGoodyReward(state: GameState, claimer: Seat): GoodySubType | null {
+  const kinds = eligibleGoodyKinds(state, claimer);
   if (!kinds.length) return null;
   const had = claimer.goodyKinds ?? GOODY_KINDS.map(() => 0);
   const weights = kinds.map((k) => goodyKindWeight(had[GOODY_KINDS.indexOf(k)]));
@@ -50,7 +62,7 @@ export function drawGoodyReward(
     at -= weights[i];
     if (at < 0) { kind = kinds[i]; break; }
   }
-  const subs = GOODY_SUBTYPES.filter((s) => s.hut === kind && goodyEligible(s, turn, hasCity));
+  const subs = GOODY_SUBTYPES.filter((s) => s.hut === kind && goodyEligible(state, s, claimer));
   const total = subs.reduce((n, s) => n + s.weight, 0);
   let r = randRange(state, total);
   let out = subs[subs.length - 1];

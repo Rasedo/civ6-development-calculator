@@ -32,7 +32,7 @@ import { GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP,
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_STRENGTH_PCT, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
+import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
 import { TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
 import { TRADE_BASE_RANGE, TRADE_LAND_REFUEL, TRADE_WATER_REFUEL, TRADE_DEST_REFUEL, TRADE_COST_STEP, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_WATER, TRADE_COST_LAND, TRADE_COST_SWITCH, TRADE_EMBARK_DISTRICTS, TRADE_DANGER_FEATURES } from '../core/tradePath';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
@@ -543,6 +543,8 @@ function greatWorksWire() {
   });
   return {
     w: GW_LAYOUT_W,
+    // the Relics the game may create (`createRelic`)
+    relicCount: RELIC_COUNT,
     slotHolder: GW_LAYOUT.map((s) => s.holder),
     slotType: GW_LAYOUT.map((s) => s.type),
     slotExtraRank: GW_LAYOUT.map((s) => s.extraRank),
@@ -660,6 +662,10 @@ export function buildRules() {
           // the row's Turn at the game's speed (`goodyEligible`)
           turn: g.turn ? scaleByGameSpeed(g.turn) : 0,
           minOneCity: g.minOneCity ? 1 : 0,
+          // 0x42c980's other gates (`goodyEligible`)
+          cityState: g.cityState ? 1 : 0,
+          strategic: g.strategic ? 1 : 0,
+          relic: g.relic ? 1 : 0,
           payload: GOODY_PAYLOAD_KINDS.indexOf(pl.kind),
           amount: goodyAmount(g),
           // a unit row names its chassis by roster index, -1 for a CLASS row
@@ -1805,9 +1811,9 @@ export function buildRules() {
       pollutionDivisor: POLLUTION_DISPLAY_DIVISOR,
       favorPerOver: FAVOR_PER_POLLUTION_OVER,
       favorCap: FAVOR_POLLUTION_CAP,
-      // [points, flood band, submerge band, iceMelt, fertility, desertify]
+      // [points, flood band, submerge band, iceMelt, haltsFlood, haltsStorm, fertilityRemoval]
       phases: CLIMATE_PHASES.map((p) => [
-        p.points, p.flood, p.submerge, p.iceMelt, p.fertility ? 1 : 0, p.desertification ? 1 : 0,
+        p.points, p.flood, p.submerge, p.iceMelt, p.haltsFlood ? 1 : 0, p.haltsStorm ? 1 : 0, p.fertilityRemoval,
       ]),
       // descending [cut, modifier] — the first cut the level clears wins
       deforestation: DEFORESTATION_BANDS.map((b) => [b[0], b[1]]),

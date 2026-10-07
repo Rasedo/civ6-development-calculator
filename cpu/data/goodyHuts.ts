@@ -96,6 +96,13 @@ export interface GoodySubType {
   turn?: number;
   /** the row needs the claimer to hold at least one city */
   minOneCity?: boolean;
+  /** GoodyHutSubTypes_XP2 CityState: the claimer has met a city-state */
+  cityState?: boolean;
+  /** StrategicResources: a strategic resource the claimer sees stands below
+   *  its stockpile's ceiling */
+  strategic?: boolean;
+  /** Relic: a city of the claimer has a slot a Relic takes */
+  relic?: boolean;
   /** the install scales this row's amount by the game speed (`Scale: true`,
    *  or an `Amount` typed `ScaleByGameSpeed`) */
   scale?: boolean;
@@ -104,7 +111,7 @@ export interface GoodySubType {
 
 export const GOODY_SUBTYPES: readonly GoodySubType[] = [
   // ----- CULTURE
-  { id: 'ONE_RELIC', hut: 'CULTURE', weight: 15, minOneCity: true,
+  { id: 'ONE_RELIC', hut: 'CULTURE', weight: 15, minOneCity: true, relic: true,
     payload: { kind: 'relic', amount: 1 } },
   { id: 'TWO_CIVIC_BOOSTS', hut: 'CULTURE', weight: 30, turn: 30,
     payload: { kind: 'civicBoost', amount: 2 } },
@@ -135,7 +142,7 @@ export const GOODY_SUBTYPES: readonly GoodySubType[] = [
   { id: 'HEAL', hut: 'MILITARY', weight: 25,
     payload: { kind: 'heal', amount: 100 } },
   // GOODY_MILITARY_ADJUST_STRATEGIC_RESOURCES: Amount 20, typed ScaleByGameSpeed
-  { id: 'RESOURCES', hut: 'MILITARY', weight: 20, scale: true,
+  { id: 'RESOURCES', hut: 'MILITARY', weight: 20, scale: true, strategic: true,
     payload: { kind: 'strategic', amount: 20 } },
   // ----- SCIENCE
   { id: 'ONE_TECH', hut: 'SCIENCE', weight: 15, turn: 50, minOneCity: true,
@@ -157,7 +164,7 @@ export const GOODY_SUBTYPES: readonly GoodySubType[] = [
   // ----- DIPLOMACY
   { id: 'GOVERNOR_TITLE', hut: 'DIPLOMACY', weight: 15, turn: 30,
     payload: { kind: 'governorTitle', amount: 1 } },
-  { id: 'ENVOY', hut: 'DIPLOMACY', weight: 40,
+  { id: 'ENVOY', hut: 'DIPLOMACY', weight: 40, cityState: true,
     payload: { kind: 'envoy', amount: 1 } },
   { id: 'FAVOR', hut: 'DIPLOMACY', weight: 45, turn: 30,
     payload: { kind: 'favor', amount: 20 } },

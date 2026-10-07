@@ -35,6 +35,13 @@ export const GWO_COUNT = srcConst('greatWorks.GWO_COUNT', 8, {
   derived: 'the number of `GreatWorkObjectTypes` rows',
   inputs: [xml('GreatWorkObjectTypes', 'GreatWorkObjectType=GREATWORKOBJECT_RELIC', 'Value')],
 });
+/** the Relics the game may create: the install's GREATWORKOBJECT_RELIC
+ *  GreatWorks rows, GREATWORK_RELIC_1 .. 24 (Game_Culture 0x296c00 draws one
+ *  of those not yet created, "Choosing a Relic") */
+export const RELIC_COUNT = srcConst('greatWorks.RELIC_COUNT', 24, {
+  derived: 'the number of GreatWorks rows of GreatWorkObjectType GREATWORKOBJECT_RELIC (GREATWORK_RELIC_1 .. _24)',
+  inputs: [xml('GreatWorks', 'GreatWorkType=GREATWORK_RELIC_24', 'GreatWorkObjectType', { expect: 'GREATWORKOBJECT_RELIC' })],
+});
 const GWO_ART = [GWO_SCULPTURE, GWO_PORTRAIT, GWO_LANDSCAPE, GWO_RELIGIOUS] as const;
 /** the object types by name, in `Value` order — the index a work's `obj` holds */
 export const GWO_NAMES = ['SCULPTURE', 'PORTRAIT', 'LANDSCAPE', 'RELIGIOUS', 'ARTIFACT', 'WRITING', 'MUSIC', 'RELIC'] as const;

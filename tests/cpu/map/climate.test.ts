@@ -3,7 +3,7 @@ import { makeMap, makeState, tileAtCoords, settleAt, expandBorders, grantTechs, 
 import {
   deriveLowlands, standingRemovable, deforestationLevel, worldCarbon, climatePoints,
   emitCarbon, plantCarbon, unitCarbon, climateTurn, floodLevel, floodBarrierCost,
-  cityLowlands, repairBehindBarrier, fertilityLive, desertificationLive, defertilize,
+  cityLowlands, repairBehindBarrier, floodFertilityHalted, stormFertilityHalted, fertilityRemoval, removeFertility,
   pollutionFavorPenalty, CARBON_PER_RESOURCE, warmingDegrees,
 } from '../../../cpu/core/climate';
 import {
@@ -148,10 +148,11 @@ describe('the seven phases', () => {
     // Phase II floods the 1m band, III the 2m, V the 3m; IV/VI/VII submerge.
     expect(CLIMATE_PHASES.map((p) => p.flood)).toEqual([0, 1, 2, 0, 3, 0, 0]);
     expect(CLIMATE_PHASES.map((p) => p.submerge)).toEqual([0, 0, 0, 1, 0, 2, 3]);
-    // CIV6: "In Phase IV and beyond, Storms and Floods will no longer provide
-    // fertility"; desertification starts "past Phase IV".
-    expect(CLIMATE_PHASES.map((p) => p.fertility)).toEqual([true, true, true, false, false, false, false]);
-    expect(CLIMATE_PHASES.map((p) => p.desertification)).toEqual([false, false, false, false, true, true, true]);
+    // RandomEvents' RANDOM_EVENT_SEA_LEVEL_RISE rows: RISE4 on halts the
+    // floods' and storms' fertility, RISE5 on takes it back
+    expect(CLIMATE_PHASES.map((p) => p.haltsFlood)).toEqual([false, false, false, true, true, true, true]);
+    expect(CLIMATE_PHASES.map((p) => p.haltsStorm)).toEqual([false, false, false, true, true, true, true]);
+    expect(CLIMATE_PHASES.map((p) => p.fertilityRemoval)).toEqual([0, 0, 0, 0, 15, 30, 45]);
   });
 
   it('points come from the world total over the Duel threshold', () => {
@@ -393,25 +394,30 @@ describe('what a warmed world does to its weather', () => {
     });
   });
 
-  it('fertility stops at Phase IV and reverses at Phase V', () => {
+  it('the sea risen to Phase IV halts fertility, Phase V takes it back', () => {
     const state = makeState();
-    expect(fertilityLive(state)).toBe(true);
-    expect(desertificationLive(state)).toBe(false);
-    state.climateIdx = 3; // Phase IV
-    expect(fertilityLive(state)).toBe(false);
-    expect(desertificationLive(state)).toBe(false);
-    state.climateIdx = 4; // Phase V
-    expect(desertificationLive(state)).toBe(true);
+    expect(floodFertilityHalted(state)).toBe(false);
+    expect(stormFertilityHalted(state)).toBe(false);
+    state.climateIdx = 3; // Phase IV, its rise still waiting for its step
+    state.seaRiseFrom = 2;
+    expect(floodFertilityHalted(state)).toBe(false);
+    state.seaRiseFrom = undefined;
+    expect(floodFertilityHalted(state)).toBe(true);
+    expect(stormFertilityHalted(state)).toBe(true);
+    expect(fertilityRemoval(state)).toBe(0);
+    state.climateIdx = 6; // Phase VII: 45%
+    expect(fertilityRemoval(state)).toBe(45);
 
+    // x = 45 * 3 = 135: one rand(100) under 35 takes 2, else 1
     const t = state.map.tiles[0];
-    t.fertility = 2;
-    t.fertilityProd = 1;
-    defertilize(t);
-    expect(t.fertility).toBe(1);
-    expect(t.fertilityProd).toBe(0);
-    defertilize(t);
-    expect(t.fertility).toBe(0);
-    expect(t.fertilityProd).toBe(0); // floors, never negative
+    t.fertility = 3;
+    t.fertilityProd = 0;
+    const s0 = state.rngState;
+    removeFertility(state, t);
+    const v = Math.floor(((Math.imul(1103515245, s0) + 12345) >>> 16 & 0xffff) * 100 / 65536);
+    expect(t.fertility).toBe(v < 35 ? 1 : 2);
+    expect(t.fertilityProd).toBe(0); // no fertility, no draw
+    expect(state.rngState).toBe((Math.imul(1103515245, s0) + 12345) >>> 0);
   });
 });
 

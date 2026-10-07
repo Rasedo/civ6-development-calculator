@@ -15,6 +15,8 @@ import { logStart, resolveStart } from './checks';
 import type { EventReplay } from './eventReplay';
 import type { LoggedDraw, RandLog } from './randLog';
 import { DRAW_SITES, loggedStep, sameDraw, siteLabel } from './drawSites';
+import { drawsBetween } from './civ6Random';
+import type { RngHold } from '../core/rand';
 
 export interface DrawLedger {
   /** the log's draws in the game */
@@ -145,4 +147,43 @@ export function turnDraws(starts: readonly StartReplay[], replay: EventReplay | 
       ...(ok ? {} : { state: { ...(why.length ? { why } : {}), labels: diff } }) });
   }
   return { results, ledger };
+}
+
+/** The action replay's stream between its holds (`rngHolds`): per stretch
+ *  from one witnessed point to the next, the draws the engine took and the
+ *  draws the game took (with the game's log, their labels). */
+export interface StreamLedger {
+  stretches: number;
+  /** per kind of the point a stretch ends at (`seat`, `step`): stretches, exact */
+  byKind: Record<string, [number, number]>;
+  /** the stretches the engine took as many draws as the game */
+  exact: number;
+  /** per turn of the points the stretches end at: the engine's draws, the
+   *  game's, and where they differ the game's labels */
+  turns: { turn: number; engine: number; game: number; labels?: Record<string, number> }[];
+}
+
+export function streamLedger(holds: readonly RngHold[], log: RandLog | undefined, limit = 1 << 15): StreamLedger {
+  const out: StreamLedger = { stretches: 0, byKind: {}, exact: 0, turns: [] };
+  const byTurn = new Map<number, { engine: number; game: number; labels: Record<string, number> }>();
+  for (let i = 1; i < holds.length; i++) {
+    const from = holds[i - 1].held;
+    const engine = drawsBetween(from, holds[i].before, limit) ?? -1;
+    const game = drawsBetween(from, holds[i].held, limit) ?? -1;
+    out.stretches++;
+    if (engine === game) out.exact++;
+    const k = (out.byKind[holds[i].point.kind] ??= [0, 0]);
+    k[0]++;
+    if (engine === game) k[1]++;
+    const T = holds[i].point.turn;
+    const t = byTurn.get(T) ?? { engine: 0, game: 0, labels: {} };
+    t.engine += engine;
+    t.game += game;
+    if (engine !== game) for (const d of log?.between(from, holds[i].held) ?? []) t.labels[siteLabel(d.label)] = (t.labels[siteLabel(d.label)] ?? 0) + 1;
+    byTurn.set(T, t);
+  }
+  for (const [turn, t] of [...byTurn].sort((a, b) => a[0] - b[0])) {
+    out.turns.push({ turn, engine: t.engine, game: t.game, ...(t.engine !== t.game ? { labels: t.labels } : {}) });
+  }
+  return out;
 }

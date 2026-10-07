@@ -138,6 +138,9 @@ export interface Imported {
   /** the closing picks' ties each record computed for the starts the next
    *  record witnesses (`History.startTies`) */
   startTies: Map<string, StartTies>;
+  /** by `${turn}:${owner}:${city id}`, the plot a city's closing pick of that
+   *  turn's start drew on the game's log (`History.startPicks`) */
+  startPicks: Map<string, number>;
   /** the gaps met importing each seat (its research, government, policies,
    *  pantheon, its religion's beliefs) and each plot (a feature, resource or
    *  improvement dropped) */
@@ -550,6 +553,10 @@ export interface History {
    *  record witnesses: with no plot claimed (`open`) and with the stored plot
    *  claimed by culture (`claimed`) (`startDraws`) */
   startTies: Map<string, StartTies>;
+  /** by `${turn}:${owner}:${city id}`, the plot each city's closing pick of
+   *  that turn's start drew on the game's log: the stored plot where the
+   *  record was read before the start (`readBeforeStart`) */
+  startPicks: Map<string, number>;
   /** the sea level the records' `events` reached: the highest
    *  RANDOM_EVENT_SEA_LEVEL_RISE<n> named */
   seaLevel: number;
@@ -632,7 +639,7 @@ export function newHistory(): History {
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
+    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
 }
 
 /** Fold a record's `events` into the history: the floods (each with its
@@ -1161,6 +1168,19 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (!Array.isArray(r) || r[2] !== 'CityMadePurchase' || r[7] !== PURCHASE_PLOT_HASH) continue;
       boughtPlots!.add((r[6] as number) * W + (r[5] as number));
     }
+    // the plots a city gained in its owner's actions, after its start (a
+    // culture claim lands in the start, before the player's
+    // PlayerTurnActivated: runs/h1_duelw1120 t161, Xi'an's stored 275 taken
+    // by a unit's move in the actions, its next plot -1)
+    const gainedInActions = new Set<string>();
+    const active = new Set<string>();
+    for (const r of Array.isArray(rows) ? rows : []) {
+      if (!Array.isArray(r)) continue;
+      if (r[2] === 'PlayerTurnActivated') active.add(`${r[1]}:${r[3]}`);
+      else if (r[2] === 'CityTileOwnershipChanged' && active.has(`${r[1]}:${r[3]}`)) {
+        gainedInActions.add(`${r[3]}:${r[4]}:${(r[6] as number) * W + (r[5] as number)}`);
+      }
+    }
     h.nextPlotUnheld.clear();
     for (const c of rec.cities) {
       const k = c.y * W + c.x;
@@ -1188,7 +1208,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const gainedNow = c.plots.filter((q) => !b.plots.includes(q));
       const claimedNext = boughtPlots !== null && num(b.nextPlot) >= 0
         && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
-        && !boughtPlots.has(num(b.nextPlot));
+        && !boughtPlots.has(num(b.nextPlot)) && !gainedInActions.has(`${c.owner}:${c.id}:${num(b.nextPlot)}`);
       // a wonder the log completes in the city takes its free tiles
       // (WONDER_FREE_TILES_UPON_COMPLETION) before the box can: a box that
       // fell with no more than those gained bought nothing (1118 Beijing t224:
@@ -2230,6 +2250,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     recordBefore: b1,
     randLog: history?.randLog,
     startTies: history?.startTies ?? new Map(),
+    startPicks: history?.startPicks ?? new Map(),
   };
 }
 

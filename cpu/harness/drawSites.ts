@@ -7,8 +7,9 @@
  *
  * `owner`:
  *  - `rule`: an engine rule both engines draw where the game does;
- *  - `lacking`: an engine rule the engines do not draw (unit and region names,
- *    quests, the dig sites' eras, the barbarians' camp step as the DLL runs it);
+ *  - `lacking`: an engine rule the engines do not draw (region names, quests,
+ *    the dig sites' eras and artifacts, the barbarians' camp step as the DLL
+ *    runs it);
  *  - `ai`: a choice of the game's AI — the driver's, not the engines';
  *  - `setup`: the game's set-up, before the first player's first start.
  * `step`: a draw of the turn's random-event step, the last the turn takes
@@ -51,6 +52,7 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Random Event Unit Damage Roll': { owner: 'rule', step: true, cpu: 'unitDamageDraws, eventDamage', gpu: '_unit_damage_draws, _event_damage', dll: '0x3366a0', n: [28, 28] },
   'Pick One Off Start Plot': { owner: 'rule', step: true, cpu: 'fireEvent, meteor (pick)', gpu: '_random_event', n: [5, 9] },
   'Pick Drought Start Plot': { owner: 'rule', step: true, cpu: 'droughtStart', gpu: '_drought_start', dll: '0x287e80', n: [0, 4] },
+  'Remove Fertility Chance': { owner: 'rule', step: true, cpu: 'removeFertility', gpu: '_remove_fertility', dll: '0xa19bd0', n: [0, 0] },
   // a player's start and actions
   'GetNextBuyablePlot picker': { owner: 'rule', cpu: 'drawBorderPlot', gpu: '_seat_border_draw', dll: '0x1ab1c0', n: [2187, 2766] },
   'Unit Combat Damage': { owner: 'rule', cpu: 'damageRoll', gpu: '_damage_roll', n: [607, 705] },
@@ -61,7 +63,8 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Choosing random civic boost to grant based on era': { owner: 'rule', cpu: 'drawBoosts', gpu: '_draw_boosts', dll: '0x39c330, 0x39c930', n: [8, 7] },
   'Choosing random tech to grant based on era': { owner: 'rule', cpu: 'grantFreeResearch, freeTechs', gpu: '_grant_free_research', dll: '0x4caeb0', n: [4, 1] },
   'Choosing a Goody Hut Type': { owner: 'rule', cpu: 'drawGoodyReward', gpu: '_draw_goody_reward', n: [9, 11] },
-  'Choosing a Sub Type': { owner: 'rule', cpu: 'drawGoodyReward', gpu: '_draw_goody_reward', n: [9, 11] },
+  'Choosing a Sub Type': { owner: 'rule', cpu: 'drawGoodyReward', gpu: '_draw_goody_reward', dll: '0x42c980', n: [9, 11] },
+  'Choosing a Relic': { owner: 'rule', cpu: 'createRelic', gpu: '_create_relic', dll: '0x296c00', n: [0, 0] },
   // the engines' rules not drawn where the game draws
   'Barbarian Ranged unit roll': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x1488a0', n: [40, 48] },
   'Barbarian camp region placement': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x14fcc0', n: [5, 6] },
@@ -69,21 +72,26 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Barb Tribe Roll': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x152460', n: [5, 6] },
   'Choosing a City Name': { owner: 'rule', cpu: 'foundCityAt', gpu: '_found_city_at', dll: '0x327c30', n: [11, 10] },
   'Choosing a Citizen Name': { owner: 'rule', cpu: 'drawCitizenName (a Spy, an Archaeologist, a storm)', gpu: '_draw_citizen_name', dll: '0x486c20', n: [13, 34] },
-  'NameManager::GetUnitNamePart': { owner: 'lacking', n: [10, 24] },
-  'Random River': { owner: 'lacking', n: [9, 7] },
-  'Random Sea': { owner: 'lacking', n: [2, 4] },
-  'Random Desert': { owner: 'lacking', n: [3, 2] },
-  'Random Volcano': { owner: 'lacking', n: [2, 2] },
-  'Random Mountain Range': { owner: 'lacking', n: [1, 3] },
-  'Random Ocean': { owner: 'lacking', n: [2, 1] },
-  'Random Lake Range': { owner: 'lacking', n: [1, 0] },
-  'Selecting a random new quest': { owner: 'lacking', n: [12, 11] },
-  'Choosing random tech type for Trigger Tech Boost quest': { owner: 'lacking', n: [4, 2] },
+  // a plot first revealed (0x534950, from the sight update 0x58aa90) names
+  // its river (0xa29730 -> 0xa292a0) and its territory (0xa36ff0: desert,
+  // sea, ocean, lake, mountain range, volcano)
+  'Random River': { owner: 'lacking', dll: '0xa292a0', n: [9, 7] },
+  'Random Sea': { owner: 'lacking', dll: '0xa36ff0', n: [2, 4] },
+  'Random Desert': { owner: 'lacking', dll: '0xa36ff0', n: [3, 2] },
+  'Random Volcano': { owner: 'lacking', dll: '0xa36ff0', n: [2, 2] },
+  'Random Mountain Range': { owner: 'lacking', dll: '0xa36ff0', n: [1, 3] },
+  'Random Ocean': { owner: 'lacking', dll: '0xa36ff0', n: [2, 1] },
+  'Random Lake Range': { owner: 'lacking', dll: '0xa36400', n: [1, 0] },
+  // a city-state's quest for a major (Game_Quests 0x939980, on an era's
+  // change, a meeting, the refresh): one uniform pick over the quest types
+  // valid for the pair, then the type's own picker
+  'Selecting a random new quest': { owner: 'lacking', dll: '0x939980', n: [12, 11] },
+  'Choosing random tech type for Trigger Tech Boost quest': { owner: 'lacking', dll: '0x84d870', n: [4, 2] },
   'Choosing random civic type for Trigger Civic Boost quest': { owner: 'lacking', n: [3, 2] },
   'Choosing random unit type for Train Unit quest': { owner: 'lacking', n: [3, 1] },
   'Choosing random district type for Zone District quest': { owner: 'lacking', n: [1, 1] },
   'Choosing random class type for Recruit Great Person Class quest': { owner: 'lacking', n: [0, 2] },
-  'Random Era for Antiquity Site': { owner: 'lacking', n: [3, 0] },
+  'Random Era for Antiquity Site': { owner: 'lacking', dll: '0x280140', n: [3, 0] },
   'Choosing Artifact': { owner: 'lacking', n: [0, 3] },
   // the AI's
   'Random Direction': { owner: 'ai', n: [12754, 10982] },
@@ -92,6 +100,11 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Random Civic Choice': { owner: 'ai', dll: '0x626600', n: [1, 0] },
   'Random congress resolution target': { owner: 'ai', dll: '0x611140', n: [18, 12] },
   'Choose random agenda': { owner: 'ai', n: [3, 3] },
+  // a unit's name the AI's behaviour builds for its log (NameManager
+  // 0x328760 through 0x327de0, called only from the behaviour tree: "HL:
+  // Rock Band Move" 0x710f40 and the CITY_ASSAULT operation 0x722690): two
+  // parts, the band names over 118 and 155
+  'NameManager::GetUnitNamePart': { owner: 'ai', dll: '0x328760', n: [10, 24] },
   // the set-up
   'Random Diplomatic Value': { owner: 'setup', n: [896, 896] },
   'Unknown': { owner: 'setup', n: [96, 96] },

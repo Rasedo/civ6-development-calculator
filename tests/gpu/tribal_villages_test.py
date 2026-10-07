@@ -42,7 +42,7 @@ def build(path, games: int = 1) -> BatchSim:
     return warm_base((str(path), games),
                      lambda: settle_all(BatchSim([load_fixture(path) for _ in range(games)], load_rules(),
                                                  device="cpu", dtype=torch.float64)),
-                     _STATIC, ("_goody_sub",))
+                     _STATIC, ("_goody_sub", "_goody_gates"))
 
 
 def _hut_with_unit(sim):
@@ -81,7 +81,7 @@ def test_every_payload_channel_has_a_paying_arm(rules, path) -> None:
     pays NOTHING and no compiler can see it. Force each subtype to be the only
     drawable one and check its own plane actually moved."""
     watch = {
-        "relic": lambda s: int(s.civ_relic_reserve[B0, ROW]),
+        "relic": lambda s: int(s.relics_made[B0]),
         "gold": lambda s: int(s.civ_treasury[B0, ROW]),
         "faith": lambda s: int(s.civ_faith[B0, ROW]),
         "civicBoost": lambda s: int(s.civ_civic_boosted[B0, ROW].sum()),
@@ -112,6 +112,7 @@ def test_every_payload_channel_has_a_paying_arm(rules, path) -> None:
         tile, mask, seat = _hut_with_unit(sim)
         # this subtype is the ONLY drawable one, so the draw cannot miss it
         sim._goody_sub = [(name, 0, 100, 0, 0, pay, amt, unit_i, pcls)]
+        sim._goody_gates = [(0, 0, 0)]
         sim.turn = 250
         before = watch[ch](sim)
         sim._claim_goody_hut(mask, tile, seat)
@@ -128,13 +129,20 @@ def test_the_gates_are_the_installs(rules, path) -> None:
     assert len(sim._goody_sub) == 24
     # LARGE_GOLD's Turn 40 at the online speed is turn 20
     sim.turn = 19
-    early = [sim._goody_sub[i][0] for i in sim._goody_eligible(True)]
+    early = [sim._goody_sub[i][0] for i in sim._goody_eligible(B0, ROW)]
     assert "LARGE_GOLD" not in early, "LARGE_GOLD was drawable before its turn 40 at the speed"
     sim.turn = 20
-    elig = [sim._goody_sub[i][0] for i in sim._goody_eligible(True)]
+    elig = [sim._goody_sub[i][0] for i in sim._goody_eligible(B0, ROW)]
     assert "LARGE_GOLD" in elig, "LARGE_GOLD was not drawable at turn 40 at the speed"
-    nocity = [sim._goody_sub[i][0] for i in sim._goody_eligible(False)]
+    alive = sim.city_alive[B0, ROW].clone()
+    sim.city_alive[B0, ROW] = False
+    nocity = [sim._goody_sub[i][0] for i in sim._goody_eligible(B0, ROW)]
+    sim.city_alive[B0, ROW] = alive
     assert "LARGE_GOLD" not in nocity, "a city-less claimer drew a MinOneCity row"
+    assert "ONE_RELIC" not in nocity, "a city-less claimer has a Relic slot"
+    # the Envoy waits on a city-state met (the XP2 row's CityState)
+    met = bool((sim.seat_citystate_met[B0, ROW, : sim.S] & sim.citystate_alive[B0, : sim.S]).any())
+    assert ("ENVOY" in elig) == met, "the Envoy row ignored the city-states met"
     assert "GRANT_UPGRADE" not in elig, "a weight-0 row was drawable"
     # a kind weighs 800, halved per village of it the claimer has had
     assert [sim._goody_kind_weight(n) for n in (0, 1, 2, 3, 9, 10)] == [800, 400, 200, 100, 2, 1]
@@ -159,7 +167,7 @@ def test_the_draw_moves_one_games_stream(rules, path) -> None:
     one = torch.zeros(wide.B, dtype=torch.bool)
     one[B0] = True
     rng0 = wide.rng_state.clone()
-    sub = wide._draw_goody_reward(one, B0, True, ROW)
+    sub = wide._draw_goody_reward(one, B0, ROW)
     assert sub is not None, "nothing was drawable at turn 250 with a city"
     assert not bool(torch.equal(wide.rng_state, rng0)), "the draw did not move the stream"
     assert bool(torch.equal(wide.rng_state[1:], rng0[1:])), "another game's stream moved"
@@ -204,7 +212,7 @@ def test_epic_quests_outpost_pays_the_same_table(rules, path) -> None:
     # the reward is RANDOM, so watch every channel and require one to move
     def snap():
         return (int(sim.civ_treasury[B0, ROW]), int(sim.civ_faith[B0, ROW]),
-                int(sim.civ_relic_reserve[B0, ROW]), int(sim.civ_granted_titles[B0, ROW]),
+                int(sim.relics_made[B0]), int(sim.civ_granted_titles[B0, ROW]),
                 int(sim.civ_envoys_avail[B0, ROW]), int(sim.civ_diplo_favor[B0, ROW]),
                 int(sim.civ_stockpile[B0, ROW].sum()), int(sim.civ_techs[B0, ROW].sum()),
                 int(sim.civ_tech_boosted[B0, ROW].sum()),

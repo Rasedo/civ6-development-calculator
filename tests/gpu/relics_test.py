@@ -69,18 +69,18 @@ def main() -> None:
     sim.city_bldg[:, 0, 2, b] = True  # ... and city 2
     rows = torch.zeros(1, dtype=torch.long)
     seat0 = torch.zeros(1, dtype=torch.long)
-    sim._grant_relic(rows, seat0)
+    sim._create_relic(rows, seat0)
     assert [works_of(sim, 0, 0, c, [RELIC]) for c in range(3)] == [0, 1, 0], "the LOWEST temple city takes the relic"
-    sim._grant_relic(rows, seat0)
+    sim._create_relic(rows, seat0)
     assert [works_of(sim, 0, 0, c, [RELIC]) for c in range(3)] == [0, 1, 1], "a full slot must not overfill; the next open temple takes it"
     sim.civ_relic_reserve[:, 0] = 0
-    sim._grant_relic(rows, seat0)
+    sim._create_relic(rows, seat0)
     assert [works_of(sim, 0, 0, c, [RELIC]) for c in range(3)] == [0, 1, 1], "a relic with no slot must not be stuffed"
     assert int(sim.civ_relic_reserve[0, 0]) == 1, "... it is HELD"
     clear_works(sim)
     sim.civ_relic_reserve[:, 0] = 0
     sim.city_alive[:, 0, 1] = False
-    sim._grant_relic(rows, seat0)
+    sim._create_relic(rows, seat0)
     assert works_of(sim, 0, 0, 1, [RELIC]) == 0, "a dead city must never hold a relic"
     assert works_of(sim, 0, 0, 2, [RELIC]) == 1, "placement falls through to the next live temple city"
 
@@ -99,7 +99,7 @@ def main() -> None:
     sim._eff_version += 1
     assert bool(sim._gw_room(0, RELIC)[0, 0]), "a temple-less wonder city must hold a relic"
     for _ in range(nslot):
-        sim._grant_relic(rows, seat0)
+        sim._create_relic(rows, seat0)
     assert works_of(sim, 0, 0, 0, [RELIC]) == nslot, f"the wonder's {nslot} slots must all fill"
     sb_slots = (sim._gw_slot_holder == H_SB).nonzero(as_tuple=True)[0].tolist()
     assert (sim.city_gw_obj[0, 0, 0] == RELIC).nonzero().flatten().tolist() == sb_slots, "in the wonder's OWN slots"
@@ -112,7 +112,7 @@ def main() -> None:
     sim.city_bldg[:, 0, 0, b] = True
     sim._eff_version += 1
     for _ in range(nslot + 1):
-        sim._grant_relic(rows, seat0)
+        sim._create_relic(rows, seat0)
     assert works_of(sim, 0, 0, 0, [RELIC]) == nslot + 1, "temple slots must ADD to the wonder's"
     print(f"  wonder relic slots OK — {nslot} from St. Basil's, additive with the Temple")
 
@@ -124,7 +124,7 @@ def main() -> None:
     s6.city_alive[:, 0, :] = True
     s6.civ_relic_reserve[:, 0] = 0
     s6._eff_version += 1
-    s6._grant_relic(rows, seat0)
+    s6._create_relic(rows, seat0)
     assert int(s6.civ_relic_reserve[0, 0]) == 1, "a relic with no slot must be HELD"
     assert works_of(s6, 0, 0, 0, [RELIC]) == 0, "nothing must be placed while every slot is shut"
     act = torch.ones(B, dtype=torch.bool)

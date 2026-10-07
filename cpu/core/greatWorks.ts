@@ -21,11 +21,12 @@ import type { City, GameState } from './types';
 import { darkBuildings } from './yields';
 import { buildingVariantFor } from '../data/buildings';
 import { rowIsFor } from '../data/civilizations';
-import { civOf, leaderOf, seatOf } from './seats';
+import { citiesOf, civOf, leaderOf, seatOf } from './seats';
+import { randRange } from './rand';
 import { getModifiers } from './effects';
 import {
   AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
-  GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, THEMING_MULT, gwKindObjects, gwKindOf,
+  GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, RELIC_COUNT, THEMING_MULT, gwKindObjects, gwKindOf,
   holderSlots, slotAccepts, type GreatWork,
 } from '../data/greatWorks';
 import { GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GW_PRINTING_WRITING_MULT, gpCityPermOf, gpPermOf } from '../data/greatPeople';
@@ -332,6 +333,26 @@ export function relicTourism(state: GameState, city: WorkCity, omult?: readonly 
 export function placeGreatWorkIn(state: GameState, cities: WorkCity[], work: Omit<GreatWork, 'slot'>): WorkCity | undefined {
   for (const c of cities) if (placeGreatWork(state, c, work) >= 0) return c;
   return undefined;
+}
+
+/**
+ * A RELIC CREATED for `seat` (Game_Culture 0x296c00, every source — a
+ * martyred Apostle, a Tribal Village, a Great Person): ONE "Choosing a Relic"
+ * draw over the Relics not yet created (`RELIC_COUNT` less `relicsMade`; none
+ * left, no draw and no Relic), then the Relic in the seat's first city with
+ * room (`placeGreatWorkIn`), else held (`relicReserve`). Whether a Relic came.
+ * `_create_relic` is the twin.
+ */
+export function createRelic(state: GameState, seat: number): boolean {
+  const made = state.relicsMade ?? 0;
+  if (made >= RELIC_COUNT) return false;
+  randRange(state, RELIC_COUNT - made);
+  state.relicsMade = made + 1;
+  if (!placeGreatWorkIn(state, citiesOf(state, seat), { obj: GWO_RELIC, maker: -1, era: -1, seat })) {
+    const owner = seatOf(state, seat);
+    if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
+  }
+  return true;
 }
 
 /** Hand out held Relics — one per open slot, first city first, until the

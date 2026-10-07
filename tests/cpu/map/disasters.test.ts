@@ -4,7 +4,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, liveEventPlots, volcanoRoll } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, volcanoRoll } from '../../../cpu/core/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_TURNS, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
@@ -465,9 +465,9 @@ describe('the flood\'s row walk', () => {
     expect(dam.plots[0].pillaged).toBeFalsy();
   });
 
-  it('no yield draw once the climate stops laying fertility down', () => {
+  it('no yield draw once the sea\'s rise halts a flood\'s fertility', () => {
     const { state, plots } = river();
-    state.climateIdx = CLIMATE_PHASES.findIndex((p) => !p.fertility);
+    state.climateIdx = CLIMATE_PHASES.findIndex((p) => p.haltsFlood);
     expect(state.climateIdx).toBeGreaterThanOrEqual(0);
     expect(draws(state, () => floodRiver(state, plots[0], 1))).toBe(FLOOD_DAMAGE_ROWS[1].length * plots.length);
   });
@@ -825,13 +825,11 @@ describe('the turn\'s one random event', () => {
     ev.droughtTurns = 5;
     state.droughts = [{ plots: [first.index, ev.index], left: 5 }];
     const storm = tileAtCoords(state.map, 20, 20);
-    state.storms = [{ id: 1, event: 0, at: storm.index, left: 2, struck: [storm.index] }];
-    const live = new Set(liveEventPlots(state).map((t) => t.index));
-    // a plot a live storm struck is under an event; a drought's is not
-    expect(live.has(storm.index)).toBe(true);
-    expect(live.has(ev.index)).toBe(false);
+    storm.stormStruck = true;
+    // a plot a storm struck is left out; a drought's is not
+    const struck = (u: Tile) => !!u.stormStruck;
     const none = new Set<number>();
-    const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, live));
+    const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, struck));
     const near = (t: Tile) => hexDistance(state.map, t.col, t.row, ev.col, ev.row) <= 4;
     const pNear = cands.filter(near).length / cands.length;
     const N = 6000;
@@ -1302,37 +1300,38 @@ describe('the drought\'s rules', () => {
     const state = makeState(makeMap(12, 12));
     const map = state.map;
     const none = new Set<number>();
+    const never = () => false;
     const c = tileAtCoords(map, 5, 5);
     const ring = neighbors(map, c);
-    expect(droughtCandidate(map, c, none, none)).toBe(true);
-    expect(droughtCandidate(map, tileAtCoords(map, 0, 5), none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(true);
+    expect(droughtCandidate(map, tileAtCoords(map, 0, 5), none, never)).toBe(false);
     ring[2].feature = 'WOODS';
-    expect(droughtCandidate(map, c, none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(false);
     // a district's plot counts as featureless, whatever lies under it
     ring[2].feature = 'FLOODPLAINS';
     ring[2].district = 'CAMPUS';
-    expect(droughtCandidate(map, c, none, none)).toBe(true);
+    expect(droughtCandidate(map, c, none, never)).toBe(true);
     // and so does a live city centre's
     ring[2].district = null;
-    expect(droughtCandidate(map, c, new Set([ring[2].index]), none)).toBe(true);
+    expect(droughtCandidate(map, c, new Set([ring[2].index]), never)).toBe(true);
     ring[2].feature = null;
     ring[4].terrain = 'DESERT';
-    expect(droughtCandidate(map, c, none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(false);
     ring[4].terrain = 'PLAINS';
     ring[4].elevation = 'HILLS';
-    expect(droughtCandidate(map, c, none, none)).toBe(true);
+    expect(droughtCandidate(map, c, none, never)).toBe(true);
     // a river on any of the seven plots, a live event on one, a Coast beside one
     ring[1].riverMask = 1;
-    expect(droughtCandidate(map, c, none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(false);
     ring[1].riverMask = 0;
-    expect(droughtCandidate(map, c, none, new Set([ring[3].index]))).toBe(false);
+    expect(droughtCandidate(map, c, none, (u) => u === ring[3])).toBe(false);
     const beyond = neighbors(map, ring[0]).find((t) => t !== c && !ring.includes(t))!;
     beyond.terrain = 'COAST';
-    expect(droughtCandidate(map, c, none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(false);
     beyond.terrain = 'LAKE';
-    expect(droughtCandidate(map, c, none, none)).toBe(true);
+    expect(droughtCandidate(map, c, none, never)).toBe(true);
     c.feature = 'MARSH';
-    expect(droughtCandidate(map, c, none, none)).toBe(false);
+    expect(droughtCandidate(map, c, none, never)).toBe(false);
   });
 
   it('pillages its listed improvements, and EXTREME takes 30 of them away; a Mine stands', () => {
@@ -1347,7 +1346,7 @@ describe('the drought\'s rules', () => {
           t.pillaged = false;
           t.droughtTurns = 0;
         }
-        drought(state, c, sev, false);
+        drought(state, c, sev);
         for (const t of plots) {
           expect(t.droughtTurns).toBe(DROUGHT_TURNS[sev]);
           if (t === mine) {

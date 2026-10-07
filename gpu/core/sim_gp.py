@@ -436,7 +436,8 @@ class SimGp:
         # the site already asked that one has it
         _rel = m & (col("grantRelic") != 0)
         if bool(_rel.count_nonzero()):
-            self._gw_place_first(row, _rel, 7)  # 7 = GWO_RELIC
+            _rr = _rel.nonzero(as_tuple=True)[0]
+            self._create_relic(_rr, torch.full_like(_rr, row))
 
         # ---- the seat's own ledgers
         self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + col("envoys").to(self.civ_envoys_avail.dtype)

@@ -2,8 +2,7 @@
 import type { City, DistrictId, GameState, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { GP_CLASSES } from '../data/greatPeople';
-import { placeGreatWorkIn } from './greatWorks';
-import { GWO_RELIC } from '../data/greatWorks';
+import { createRelic } from './greatWorks';
 import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
@@ -1799,20 +1798,11 @@ function theologicalCombatPhase(state: GameState): void {
     // promotion — one of the nine it chose from at purchase. A dead Missionary
     // or Inquisitor yields nothing; neither carries the promotion list.
     // Granted in the SAME order as the two disbands below (defender first,
-    // then attacker) so the relic's slot is order-exact across engines.
+    // then attacker) so the relic's draw and slot are order-exact across
+    // engines (`createRelic`).
     const martyrs = (u: Unit): boolean => promoFlag(u, 'MARTYR');
-    // The Relic lands in the owner's first city with an open slot that takes
-    // one. CIV6: a Relic that finds no open slot waits in reserve for one to
-    // open; `drainRelicReserve` hands it out at the owner's next turn.
-    const reserve = (sx: number) => {
-      const owner = seatOf(state, sx);
-      if (owner) owner.relicReserve = (owner.relicReserve ?? 0) + 1;
-    };
-    const relic = (sx: number) => ({ obj: GWO_RELIC, maker: -1, era: -1, seat: sx });
-    if (def.hp <= 0 && martyrs(def)
-        && !placeGreatWorkIn(state, citiesOf(state, unitSeat(def)), relic(unitSeat(def)))) reserve(unitSeat(def));
-    if (att.hp <= 0 && martyrs(att)
-        && !placeGreatWorkIn(state, citiesOf(state, g), relic(g))) reserve(g);
+    if (def.hp <= 0 && martyrs(def)) createRelic(state, unitSeat(def));
+    if (att.hp <= 0 && martyrs(att)) createRelic(state, g);
     if (def.hp <= 0) disbandUnit(state, def.id);
     if (att.hp <= 0) disbandUnit(state, att.id);
     // CIV6: "If the defender is killed, the attacker enters its tile, just like

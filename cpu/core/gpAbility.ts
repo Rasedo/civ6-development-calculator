@@ -20,7 +20,7 @@ import {
   gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
   type GpEffect, type GpSite, type GreatPersonDef,
 } from '../data/greatPeople';
-import { gwCountsByObj, gwHasRoom, placeGreatWork, placeGreatWorkIn } from './greatWorks';
+import { createRelic, gwCountsByObj, gwHasRoom, placeGreatWork } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, gwKindObjects } from '../data/greatWorks';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { isSuzerain, receiveEnvoyTiles, resolveSuzerains } from './cityStates';
@@ -391,7 +391,7 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   }
   // CIV6 (Jeanne d'Arc): a Relic, into the seat's first city with room —
   // the site already asked that one has it
-  if (fx.grantRelic) placeGreatWorkIn(state, citiesOf(state, unit.seat), { obj: GWO_RELIC, maker: -1, era: -1, seat: unit.seat });
+  if (fx.grantRelic) createRelic(state, unit.seat);
   // THE SEAT'S OWN LEDGERS.
   if (fx.envoys) owner.envoysAvailable = (owner.envoysAvailable ?? 0) + fx.envoys;
   if (fx.governorTitles) owner.grantedTitles += fx.governorTitles;

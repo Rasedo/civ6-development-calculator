@@ -70,7 +70,7 @@ function bandOf(state: GameState, tile: Tile, ev: string, type: string, seat: nu
   for (let i = 0; i < n; i++) {
     const u = spawnUnit(state, type, tile.index, seat)!;
     expect(u.tileIndex).toBe(tile.index);
-    stormPlot(state, tile, EVI(ev), 100, false);
+    stormPlot(state, tile, EVI(ev), 100);
     const alive = state.units.find((x) => x.id === u.id);
     seen.add(alive ? 100 - alive.hp : 100);
     state.units = state.units.filter((x) => x.id !== u.id);
@@ -165,7 +165,7 @@ describe('the eight storms are the install\'s table', () => {
     settleAt(state, tileAtCoords(state.map, 15, 15).index, 0);
     const e = EVI('BLIZZARD_SIGNIFICANT');
     const s0 = state.rngState;
-    stormBirth(state, e, false);
+    stormBirth(state, e);
     const rec = state.storms![0];
     expect(rec.struck).toEqual([]);
     const fp = stormFootprint(state.map, state.map.tiles[rec.at], 7);
@@ -183,7 +183,7 @@ describe('the eight storms are the install\'s table', () => {
     const rec: StormRecord = { id: 7, event: idx, at: start.index, left: 2, struck: [] };
     state.storms = [rec];
     const s0 = state.rngState;
-    stormWalk(state, rec, 100, false);
+    stormWalk(state, rec, 100);
     const struck = rec.struck.length;
     expect(struck).toBeGreaterThan(0);
     expect(new Set(rec.struck).size).toBe(struck);
@@ -204,7 +204,7 @@ describe('the eight storms are the install\'s table', () => {
     const hur: StormRecord = { id: 3, event: cat4, at: sea.index, left: 2, struck: [] };
     land.storms = [hur];
     const s1 = land.rngState;
-    stormWalk(land, hur, 100, false);
+    stormWalk(land, hur, 100);
     expect(hur.at).not.toBe(sea.index);
     // the sea plot takes no yield draw
     const yieldRows = STORM_ROWS[cat4].yields.length;
@@ -216,7 +216,7 @@ describe('the eight storms are the install\'s table', () => {
     snow.storms = [walker];
     for (let d = 0; d < 6; d++) snow.storms.push({ id: 2 + d, event: idx, at: neighborTile(snow.map, c, d)!.index, left: 1, struck: [] });
     const s2 = snow.rngState;
-    stormWalk(snow, walker, 100, false);
+    stormWalk(snow, walker, 100);
     expect(walker.at).not.toBe(c.index);
     expect(draws(s2, snow.rngState, 1000)).toBe(9 + 1 + plotDraws(idx) * walker.struck.length);
   });
@@ -227,12 +227,12 @@ describe('the eight storms are the install\'s table', () => {
     const c = tileAtCoords(state.map, 8, 8);
     const rec: StormRecord = { id: 1, event: idx, at: c.index, left: 2, struck: [] };
     const s0 = state.rngState;
-    stormStrike(state, rec, 100, false);
+    stormStrike(state, rec, 100);
     expect(rec.struck).toHaveLength(7);
     expect(draws(s0, state.rngState, 200)).toBe(7 * plotDraws(idx));
     // a second strike on the same plots draws nothing
     const s1 = state.rngState;
-    stormStrike(state, rec, 100, false);
+    stormStrike(state, rec, 100);
     expect(state.rngState).toBe(s1);
     // the last turn halves every damage row's chance: a certain pillage row
     // lands half the time
@@ -246,7 +246,7 @@ describe('the eight storms are the install\'s table', () => {
     for (let i = 0; i < 2000; i++) {
       t.improvement = 'FARM';
       t.pillaged = false;
-      stormPlot(g, t, e, STORM_LAST_TURN_PCT, false);
+      stormPlot(g, t, e, STORM_LAST_TURN_PCT);
       if (t.pillaged || !t.improvement) hit++;
     }
     // destroyed at half its row, else pillaged at half its certain row
@@ -260,7 +260,7 @@ describe('the eight storms are the install\'s table', () => {
       for (let i = 0; i < 3000; i++) {
         const u = tileAtCoords(g.map, 9, 9);
         u.fertility = 0;
-        stormPlot(g, u, cat5, pct, false);
+        stormPlot(g, u, cat5, pct);
         if (u.fertility > 0) n++;
       }
       return n / 3000;
@@ -332,19 +332,19 @@ describe('the eight storms are the install\'s table', () => {
     const state = board(null);
     const tile = tileAtCoords(state.map, 5, 5);
     const s0 = state.rngState;
-    stormPlot(state, tile, EVI('TORNADO_FAMILY'), 100, false);
+    stormPlot(state, tile, EVI('TORNADO_FAMILY'), 100);
     expect(draws(s0, state.rngState)).toBe(4);
     // CAT_5: eight damage rows (UNIT_DAMAGE_LAND 100 always lands: the
     // warrior's own roll straight after it, 0x3366a0), two yield rows
     spawnUnit(state, 'WARRIOR', tile.index, 0);
     const s1 = state.rngState;
-    stormPlot(state, tile, EVI('HURRICANE_CAT_5'), 100, false);
+    stormPlot(state, tile, EVI('HURRICANE_CAT_5'), 100);
     expect(draws(s1, state.rngState, 20)).toBe(8 + 1 + 2);
     // water takes no yield draw
     const sea = board(null, 'COAST');
     const w = tileAtCoords(sea.map, 5, 5);
     const s2 = sea.rngState;
-    stormPlot(sea, w, EVI('HURRICANE_CAT_4'), 100, false);
+    stormPlot(sea, w, EVI('HURRICANE_CAT_4'), 100);
     expect(draws(s2, sea.rngState)).toBe(5);
   });
 
@@ -361,7 +361,7 @@ describe('the eight storms are the install\'s table', () => {
     // stream whose district draw misses
     const e = EVI('BLIZZARD_CRIPPLING');
     state.rngState = streamWhere(3, (v) => v >= 50);
-    stormPlot(state, dt, e, 100, false);
+    stormPlot(state, dt, e, 100);
     expect(dt.districtPillaged).toBeFalsy();
     expect(city.pillagedBuildings ?? []).toContain('LIBRARY');
     expect(city.pillagedBuildings ?? []).not.toContain('MONUMENT');
@@ -370,7 +370,7 @@ describe('the eight storms are the install\'s table', () => {
     const centre = state.map.tiles[city.centerIndex];
     expect(centre.district).toBe('CITY_CENTER');
     const before = [...(city.pillagedBuildings ?? [])];
-    stormPlot(state, centre, e, 100, false);
+    stormPlot(state, centre, e, 100);
     expect(city.pillagedBuildings ?? []).toEqual(before);
   });
 
@@ -387,17 +387,17 @@ describe('the eight storms are the install\'s table', () => {
     city.districts.push({ type: 'CAMPUS', tileIndex: dt.index });
     city.buildings.push('LIBRARY', 'UNIVERSITY');
     state.rngState = bldgOnly;
-    stormPlot(state, dt, e, 100, false);
+    stormPlot(state, dt, e, 100);
     expect(city.pillagedBuildings).toEqual(['UNIVERSITY']);
     // the next hit takes the next standing one
     state.rngState = bldgOnly;
-    stormPlot(state, dt, e, 100, false);
+    stormPlot(state, dt, e, 100);
     expect(city.pillagedBuildings).toEqual(['UNIVERSITY', 'LIBRARY']);
     // a pillaged district takes every building with it, and a building hit on
     // it takes nothing more
     city.pillagedBuildings = [];
     state.rngState = both;
-    stormPlot(state, dt, e, 100, false);
+    stormPlot(state, dt, e, 100);
     expect(dt.districtPillaged).toBe(true);
     expect([...(city.pillagedBuildings ?? [])].sort()).toEqual(['LIBRARY', 'UNIVERSITY']);
     // a city-state's district: the top alone, and its repair waits
@@ -409,7 +409,7 @@ describe('the eight storms are the install\'s table', () => {
     cs.districts = [{ type: 'CAMPUS', tileIndex: ct.index }];
     cs.buildings = [...(cs.buildings ?? []), 'LIBRARY', 'UNIVERSITY'];
     state.rngState = bldgOnly;
-    stormPlot(state, ct, e, 100, false);
+    stormPlot(state, ct, e, 100);
     expect(cs.pillagedBuildings).toEqual(['UNIVERSITY']);
     expect(cs.repairWait).toBe(true);
     // a Dar-e Mehr on top of the chain: nothing falls (it cannot be pillaged),
@@ -422,11 +422,11 @@ describe('the eight storms are the install\'s table', () => {
     city.buildings.push('TEMPLE', 'DAR_E_MEHR');
     city.pillagedBuildings = [];
     state.rngState = bldgOnly;
-    stormPlot(state, hs, e, 100, false);
+    stormPlot(state, hs, e, 100);
     expect(city.pillagedBuildings).toEqual([]);
     city.buildings = city.buildings.filter((b) => b !== 'DAR_E_MEHR');
     state.rngState = bldgOnly;
-    stormPlot(state, hs, e, 100, false);
+    stormPlot(state, hs, e, 100);
     expect(city.pillagedBuildings).toEqual(['TEMPLE']);
   });
 
@@ -529,7 +529,7 @@ describe('the storm\'s unit damage and the eight roster rows', () => {
     for (let i = 0; i < 300; i++) {
       low.improvement = 'FARM';
       low.pillaged = false;
-      stormPlot(state, low, EVI('HURRICANE_CAT_4'), 100, false);
+      stormPlot(state, low, EVI('HURRICANE_CAT_4'), 100);
       if (low.pillaged || low.improvement === null) pillaged++;
     }
     expect(pillaged).toBe(300);

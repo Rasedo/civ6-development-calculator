@@ -10,6 +10,9 @@ import { CIV_LEADERS } from '../../../cpu/data/seats';
 import { STRATEGIC_IDS, scaleByGameSpeed } from '../../../cpu/data/constants';
 import { governorTitlesEarned } from '../../../cpu/core/governors';
 import type { GameState, Unit } from '../../../cpu/core/types';
+import { RESOURCES } from '../../../world/resources';
+import { placeGreatWorkIn } from '../../../cpu/core/greatWorks';
+import { GWO_RELIC } from '../../../cpu/data/greatWorks';
 
 /**
  * TRIBAL VILLAGES — the install's `GoodyHuts` + `GoodyHutSubTypes`.
@@ -69,23 +72,48 @@ describe('the tribal village table', () => {
 
   it('gates on the install`s own Turn at the game`s speed and MinOneCity', () => {
     const of = (id: string) => GOODY_SUBTYPES.find((s) => s.id === id)!;
+    const { state } = scene();
+    const claimer = seatOf(state, 0)!;
     // Turn 40 at the online speed is turn 20
-    expect(goodyEligible(of('LARGE_GOLD'), scaleByGameSpeed(40) - 1, true)).toBe(false);
-    expect(goodyEligible(of('LARGE_GOLD'), scaleByGameSpeed(40), true)).toBe(true);
-    expect(goodyEligible(of('LARGE_GOLD'), 40, false)).toBe(false);  // MinOneCity
-    expect(goodyEligible(of('ONE_CIVIC_BOOST'), 1, false)).toBe(true);
+    state.turn = scaleByGameSpeed(40) - 1;
+    expect(goodyEligible(state, of('LARGE_GOLD'), claimer)).toBe(false);
+    state.turn = scaleByGameSpeed(40);
+    expect(goodyEligible(state, of('LARGE_GOLD'), claimer)).toBe(true);
+    const bare = scene(false);
+    bare.state.turn = 40;
+    expect(goodyEligible(bare.state, of('LARGE_GOLD'), seatOf(bare.state, 0)!)).toBe(false);  // MinOneCity
+    bare.state.turn = 1;
+    expect(goodyEligible(bare.state, of('ONE_CIVIC_BOOST'), seatOf(bare.state, 0)!)).toBe(true);
     // a weight of 0 is OFF, never free
-    expect(goodyEligible(of('GRANT_UPGRADE'), 250, true)).toBe(false);
+    state.turn = 250;
+    expect(goodyEligible(state, of('GRANT_UPGRADE'), claimer)).toBe(false);
+  });
+
+  it('gates the Envoy on a city-state met, the Resources on a strategic below its ceiling, the Relic on a slot', () => {
+    const of = (id: string) => GOODY_SUBTYPES.find((s) => s.id === id)!;
+    const { state } = scene();
+    const claimer = seatOf(state, 0)!;
+    state.turn = 100;
+    // no city-state met (0x42c980: the XP2 row's CityState)
+    expect(goodyEligible(state, of('ENVOY'), claimer)).toBe(state.cityStates.some((cs) => cs.met.includes(0)));
+    // the Palace's slot takes a Relic (0x497030); the slot filled, none
+    expect(goodyEligible(state, of('ONE_RELIC'), claimer)).toBe(true);
+    for (let k = 0; k < 9; k++) placeGreatWorkIn(state, claimer.cities, { obj: GWO_RELIC, maker: -1, era: -1, seat: 0 });
+    expect(goodyEligible(state, of('ONE_RELIC'), claimer)).toBe(false);
+    // no strategic seen yet; Horses seen, its stockpile below the ceiling
+    expect(goodyEligible(state, of('RESOURCES'), claimer)).toBe(false);
+    claimer.research.techs.push(RESOURCES.HORSES.revealTech!);
+    expect(goodyEligible(state, of('RESOURCES'), claimer)).toBe(true);
   });
 
   it('offers a city-less claimer only the kinds that need no city', () => {
-    const early = eligibleGoodyKinds(1, false);
+    const bare = scene(false);
+    bare.state.turn = 1;
+    const early = eligibleGoodyKinds(bare.state, seatOf(bare.state, 0)!);
     expect(early).not.toContain('GOLD');       // every GOLD row is MinOneCity
     expect(early).not.toContain('SURVIVORS');  // as is every SURVIVORS row
     expect(early).toContain('CULTURE');
     expect(early).toContain('SCIENCE');
-    // ...and with a city, and late, every kind is reachable
-    expect(eligibleGoodyKinds(250, true).sort()).toEqual([...GOODY_KINDS].sort());
   });
 });
 
@@ -102,7 +130,7 @@ describe('claiming a village', () => {
     // the draw is kind-then-subtype; only the pooled rewards draw further
     const { state } = scene();
     const rng0 = state.rngState;
-    const sub = drawGoodyReward(state, 1, true, seatOf(state, 0)!);
+    const sub = drawGoodyReward(state, seatOf(state, 0)!);
     expect(sub).not.toBeNull();
     expect(state.rngState).not.toBe(rng0);
     // ...and a claimer that can draw NOTHING leaves the stream alone
@@ -110,7 +138,7 @@ describe('claiming a village', () => {
     const r0 = bare.rngState;
     // no eligible subtype at all is impossible in this table, so assert the
     // property the engine relies on rather than a fabricated empty case
-    expect(eligibleGoodyKinds(1, false).length).toBeGreaterThan(0);
+    expect(eligibleGoodyKinds(bare, emptySeat(0)).length).toBeGreaterThan(0);
     expect(bare.rngState).toBe(r0);
   });
 
@@ -118,7 +146,7 @@ describe('claiming a village', () => {
     expect([0, 1, 2, 3, 9, 10, 11].map(goodyKindWeight)).toEqual([800, 400, 200, 100, 2, 1, 1]);
     const { state } = scene();
     const claimer = seatOf(state, 0)!;
-    const sub = drawGoodyReward(state, 1, true, claimer)!;
+    const sub = drawGoodyReward(state, claimer)!;
     const k = GOODY_KINDS.indexOf(sub.hut);
     expect(claimer.goodyKinds).toEqual(GOODY_KINDS.map((_, i) => (i === k ? 1 : 0)));
   });

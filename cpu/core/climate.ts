@@ -24,6 +24,7 @@ import { citiesOf, isCityStateSeat, seatOf } from './seats';
 import { cityAtIndex, disbandUnit, unitsAt, waterWalks } from './units';
 import { displaceAirFrom } from './air';
 import { UNITS } from '../data/units';
+import { randRange } from './rand';
 
 /** Whether this seat's units emit at the reduced rate. */
 export function powerCells(state: GameState, seat: number): boolean {
@@ -338,23 +339,50 @@ export function pollutionFavorPenalty(state: GameState, seat: number): number {
   return Math.min(FAVOR_POLLUTION_CAP, Math.floor(over / FAVOR_PER_POLLUTION_OVER));
 }
 
-/** Whether the world still fertilizes after a storm or a flood. */
-export function fertilityLive(state: GameState): boolean {
-  const p = state.climateIdx ?? -1;
-  return p < 0 || CLIMATE_PHASES[p].fertility;
+/** The phase the sea has risen to: the climate's phase, short of a rise
+ *  still waiting for its random-event step (`seaRiseFrom`). Its
+ *  RANDOM_EVENT_SEA_LEVEL_RISE row's flags hold from the step that raised
+ *  it on (Game_Climate 0x291a20). */
+function seaPhase(state: GameState): number {
+  return state.seaRiseFrom ?? state.climateIdx ?? -1;
 }
 
-/** Whether storms and droughts now strip the ground to desert. */
-export function desertificationLive(state: GameState): boolean {
-  const p = state.climateIdx ?? -1;
-  return p >= 0 && CLIMATE_PHASES[p].desertification;
+/** HaltsFloodFertility: a flood draws no fertility rows (0xa2f200). */
+export function floodFertilityHalted(state: GameState): boolean {
+  const p = seaPhase(state);
+  return p >= 0 && CLIMATE_PHASES[p].haltsFlood;
 }
 
-/** CIV6 (Phase V+): "all Storms and Droughts now start removing fertility
- *  from tiles instead of adding it" — the same silt the earlier phases laid
- *  down, taken back off the same tiles. */
-export function defertilize(tile: Tile): void {
-  if (isWater(tile) || tile.elevation === 'MOUNTAIN') return;
-  tile.fertility = Math.max(0, tile.fertility - 1);
-  tile.fertilityProd = Math.max(0, tile.fertilityProd - 1);
+/** HaltsStormFertility: a storm draws no fertility rows (0x286f80). */
+export function stormFertilityHalted(state: GameState): boolean {
+  const p = seaPhase(state);
+  return p >= 0 && CLIMATE_PHASES[p].haltsStorm;
+}
+
+/** FertilityRemovalChance: the percent of each event fertility a halted
+ *  storm or a drought takes back off a plot it strikes. */
+export function fertilityRemoval(state: GameState): number {
+  const p = seaPhase(state);
+  return p >= 0 ? CLIMATE_PHASES[p].fertilityRemoval : 0;
+}
+
+/**
+ * "Remove Fertility Chance" (0xa1c0c0 → 0xa19bd0): per yield type in the
+ * game's YieldTypes order (Food, Production, Science, Culture — the event
+ * fertility a plot can hold), where the plot holds c > 0 of it and the
+ * climate removes (`fertilityRemoval`), x = min(chance, 100) · c: ONE
+ * rand(100) under x mod 100 takes x // 100 + 1 away, else x // 100.
+ * `_remove_fertility` is the twin.
+ */
+export function removeFertility(state: GameState, tile: Tile): void {
+  const chance = Math.min(fertilityRemoval(state), 100);
+  if (chance <= 0) return;
+  for (const key of ['fertility', 'fertilityProd', 'fertilitySci', 'fertilityCul'] as const) {
+    const c = tile[key] ?? 0;
+    if (c <= 0) continue;
+    const x = chance * c;
+    const q = Math.floor(x / 100);
+    const n = randRange(state, 100) < x - 100 * q ? q + 1 : q;
+    tile[key] = Math.max(0, c - n);
+  }
 }

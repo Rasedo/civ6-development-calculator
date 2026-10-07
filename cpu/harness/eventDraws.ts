@@ -60,7 +60,6 @@ function riverGraph(map: GameMap): { edges: RiverEdge[]; at: Map<string, RiverEd
 }
 
 const other = (e: RiverEdge, p: number) => (e.plots[0] === p ? e.plots[1] : e.plots[0]);
-const shared = (e: RiverEdge, f: RiverEdge) => (f.plots.includes(e.plots[0]) ? e.plots[0] : e.plots[1]);
 
 /**
  * A FLOOD'S PLOTS, in the order its draws walk them: the river's Floodplains
@@ -81,43 +80,37 @@ export function floodplainList(map: GameMap, start: Tile): Tile[][] {
   const { edges, at } = riverGraph(map);
   const fp = (i: number) => isFloodplains(map.tiles[i].feature);
   const runs = new Set<string>();
-  // the run a walk's plots give, once it is over (a plot without
-  // Floodplains, or the run full)
-  const over = (seq: number[]) => seq.length >= FLOODPLAIN_MAX || !fp(seq[seq.length - 1]);
-  const finish = (seq: number[]) => {
-    const run: number[] = [];
-    for (const p of seq) {
-      if (!fp(p) || run.length >= FLOODPLAIN_MAX) break;
-      run.push(p);
+  // the river's plots from the source edge down to `path[0]`, each edge its
+  // own plot then the plot across, each plot once; read from the mouth up,
+  // the first run of FLOODPLAIN_MIN or more plots taking Floodplains (a plot
+  // that takes none ends a run long enough, else clears it), FLOODPLAIN_MAX
+  // at most (0xa2aca0)
+  const finish = (path: RiverEdge[]) => {
+    const fromSource: number[] = [];
+    for (let k = path.length - 1; k >= 0; k--) {
+      for (const p of [path[k].owner, other(path[k], path[k].owner)]) if (!fromSource.includes(p)) fromSource.push(p);
     }
-    if (run.length >= FLOODPLAIN_MIN) runs.add(run.join(','));
+    const run: number[] = [];
+    for (const p of fromSource.reverse()) {
+      if (fp(p)) {
+        run.push(p);
+        if (run.length >= FLOODPLAIN_MAX) break;
+      } else if (run.length >= FLOODPLAIN_MIN) break;
+      else run.length = 0;
+    }
+    if (run.length >= FLOODPLAIN_MIN && run[0] === start.index) runs.add(run.join(','));
   };
-  const walk = (path: RiverEdge[], top: string, seq: number[]) => {
-    const last = path[path.length - 1];
+  const walk = (path: RiverEdge[], top: string) => {
     const next = (at.get(top) ?? []).filter((g) => !path.includes(g));
     if (!next.length) {
-      // the source edge laid its plot then the plot across: read from the
-      // mouth, the plot across comes first
-      const tail = [...seq];
-      for (const p of [other(last, last.owner), last.owner]) if (!tail.includes(p)) tail.push(p);
-      finish(tail);
+      finish(path);
       return;
     }
-    for (const g of next) {
-      const add = other(last, shared(last, g));
-      // the first edge adds `start`: the edge above it must not border it
-      if (path.length === 1 && add !== start.index) continue;
-      const s2 = seq.includes(add) ? seq : [...seq, add];
-      if (over(s2)) {
-        finish(s2);
-        continue;
-      }
-      walk([...path, g], g.ends[0] === top ? g.ends[1] : g.ends[0], s2);
-    }
+    for (const g of next) walk([...path, g], g.ends[0] === top ? g.ends[1] : g.ends[0]);
   };
   for (const e of edges) {
     if (!e.plots.includes(start.index)) continue;
-    for (const up of e.ends) walk([e], up, []);
+    for (const up of e.ends) walk([e], up);
   }
   return [...runs].map((r) => r.split(',').map((i) => map.tiles[Number(i)]));
 }
@@ -160,14 +153,53 @@ export function unitRolls(rng: Civ6Random, known: number, range: number): void {
   for (let i = 0; i < n; i++) rng.get(range, 'Random Event Unit Damage Roll');
 }
 
+/**
+ * The climate the sea's rises left (Game_Climate 0x291a20 on a
+ * RANDOM_EVENT_SEA_LEVEL_RISE row): HaltsFloodFertility stops a flood's
+ * yield rows (0xa2f200 skips 0xa2ed80, no draw), HaltsStormFertility a
+ * storm's (0x286f80), and FertilityRemovalChance above 0 takes event
+ * fertility back off each plot a halted storm or a drought strikes
+ * (`removeFertility`); `fert` holds each plot's event fertility, [Food,
+ * Production, Science, Culture].
+ */
+export interface EventClimate {
+  haltFlood: boolean;
+  haltStorm: boolean;
+  removal: number;
+  fert: Map<number, number[]>;
+}
+
+export function newClimate(): EventClimate {
+  return { haltFlood: false, haltStorm: false, removal: 0, fert: new Map() };
+}
+
+/** "Remove Fertility Chance" (0xa1c0c0 → 0xa19bd0): per yield type, in the
+ *  game's YieldTypes order, where the plot holds c > 0 of that yield's event
+ *  fertility, x = min(chance, 100) · c: ONE rand(100) under x mod 100 takes
+ *  x // 100 + 1 away, else x // 100. The yields taken. */
+export function removeFertility(rng: Civ6Random, climate: EventClimate, plot: number): number {
+  const f = climate.fert.get(plot);
+  if (!f || climate.removal <= 0) return 0;
+  let gone = 0;
+  for (let c = 0; c < f.length; c++) {
+    if (f[c] <= 0) continue;
+    const x = Math.min(climate.removal, 100) * f[c];
+    const q = Math.floor(x / 100);
+    const n = rng.get(100, 'Remove Fertility Chance') < x - 100 * q ? q + 1 : q;
+    f[c] = Math.max(0, f[c] - n);
+    gone += n;
+  }
+  return gone;
+}
+
 /** One flood's draws (0xa2f200): unless the river is mitigated, the damage
  *  rows (0xa2a4d0), each over the plots, one "Pillage Improvement Chance"
  *  rand(100) a plot its owner is not immune on (a landed row's own rolls
- *  straight after it); then the yield rows (0xa2ed80), each over the plots,
- *  one "Boosted Yield Chance" rand(100) a plot, +1 of the row's yield where
- *  it falls under the row's Percentage — on a mitigated river (100 −
- *  MitigatedYieldReduction)% of it — and the plot carries the row's
- *  Floodplains. */
+ *  straight after it); then, unless the climate halts a flood's fertility,
+ *  the yield rows (0xa2ed80), each over the plots, one "Boosted Yield
+ *  Chance" rand(100) a plot, +1 of the row's yield where it falls under the
+ *  row's Percentage — on a mitigated river (100 − MitigatedYieldReduction)%
+ *  of it — and the plot carries the row's Floodplains. */
 export interface FloodDraws {
   /** +[Food, Production] by plot */
   gains: Map<number, [number, number]>;
@@ -175,7 +207,7 @@ export interface FloodDraws {
   damage: Map<number, string[]>;
 }
 
-export function floodDraws(rng: Civ6Random, sev: number, plots: readonly StruckPlot[], mitigated: boolean): FloodDraws {
+export function floodDraws(rng: Civ6Random, sev: number, plots: readonly StruckPlot[], mitigated: boolean, halted = false): FloodDraws {
   const damage = new Map<number, string[]>();
   if (!mitigated) {
     for (const row of FLOOD_DAMAGE_ROWS[sev]) {
@@ -188,6 +220,7 @@ export function floodDraws(rng: Civ6Random, sev: number, plots: readonly StruckP
     }
   }
   const gains = new Map<number, [number, number]>();
+  if (halted) return { gains, damage };
   for (const row of FLOOD_YIELD_ROWS[sev]) {
     const pct = mitigated ? Math.trunc(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * row.pct) / 100) : row.pct;
     for (const p of plots) {
@@ -275,11 +308,12 @@ function barren(t: Tile): boolean {
  * against Percentage × pct // 100 — the row's CoastalLowlandPercentage on a
  * coastal-lowland plot — a landed row's own rolls straight after it; then,
  * unless the plot is water or impassable, each yield row's "Boosted Yield
- * Chance" rand(100) against Percentage × pct // 100, +1 of its yield; and
- * joins the struck list.
+ * Chance" rand(100) against Percentage × pct // 100, +1 of its yield — where
+ * the climate halts a storm's fertility, the plot's event fertility taken
+ * back instead (`removeFertility`) —; and joins the struck list.
  */
 export function stormStrike(rng: Civ6Random, map: GameMap, storm: StormState, pct: number,
-  ctx: (plot: number) => StruckPlot, out: EventOutcome): void {
+  ctx: (plot: number) => StruckPlot, out: EventOutcome, climate: EventClimate): void {
   const ev = STORM_EVENTS[storm.event];
   const rows = STORM_ROWS[storm.event];
   for (const t of stormFootprint(map, map.tiles[storm.at], ev.hexes)) {
@@ -291,7 +325,9 @@ export function stormStrike(rng: Civ6Random, map: GameMap, storm: StormState, pc
       damaged(out, t.index, row.kind);
       damageRolls(rng, row.kind, row.lo, row.hi, p);
     }
-    if (!barren(t)) {
+    if (climate.haltStorm) {
+      if (!barren(t)) storm.added -= removeFertility(rng, climate, t.index);
+    } else if (!barren(t)) {
       for (const row of rows.yields) {
         if (rng.get(100, 'Boosted Yield Chance') >= Math.trunc((row.pct * pct) / 100)) continue;
         gain(out, t.index, row.yield);
@@ -341,7 +377,7 @@ export function stormStartPlots(map: GameMap, ev: number): Tile[] {
 }
 
 export function stormBirth(rng: Civ6Random, map: GameMap, ev: number, turn: number,
-  ctx: (plot: number) => StruckPlot, out: EventOutcome, named = true): StormState | undefined {
+  ctx: (plot: number) => StruckPlot, out: EventOutcome, climate: EventClimate, named = true): StormState | undefined {
   const plots = stormStartPlots(map, ev);
   if (!plots.length) return undefined;
   const storm: StormState = { event: ev, start: turn, at: plots[rng.get(plots.length, 'Pick Storm Start Plot')].index, struck: new Set(), added: 0, dir: -1 };
@@ -352,7 +388,7 @@ export function stormBirth(rng: Civ6Random, map: GameMap, ev: number, turn: numb
   // the record is stored before this strike, which marks a copy: the stored
   // storm's struck list starts empty
   const copy = { ...storm, struck: new Set<number>() };
-  stormStrike(rng, map, copy, 100, ctx, out);
+  stormStrike(rng, map, copy, 100, ctx, out, climate);
   storm.added = copy.added;
   return storm;
 }
@@ -367,7 +403,7 @@ export function stormBirth(rng: Civ6Random, map: GameMap, ev: number, turn: numb
  * each step taken strikes; then a "Storm Direction Preview".
  */
 export function stormWalk(rng: Civ6Random, map: GameMap, storm: StormState, turn: number,
-  ctx: (plot: number) => StruckPlot, out: EventOutcome): void {
+  ctx: (plot: number) => StruckPlot, out: EventOutcome, climate: EventClimate): void {
   const ev = STORM_EVENTS[storm.event];
   const pct = turn - storm.start + 1 >= ev.duration ? STORM_LAST_TURN_PCT : 100;
   let left = STORM_MOVEMENT;
@@ -379,7 +415,7 @@ export function stormWalk(rng: Civ6Random, map: GameMap, storm: StormState, turn
     if (cost > left) break;
     left -= cost;
     storm.at = to.index;
-    stormStrike(rng, map, storm, pct, ctx, out);
+    stormStrike(rng, map, storm, pct, ctx, out, climate);
   }
   storm.dir = stormPreview(rng, map, storm.at);
 }
@@ -461,21 +497,23 @@ export function eruptionDraws(rng: Civ6Random, map: GameMap, plots: readonly Til
  * A NEW DROUGHT's draws (`droughtStart` / `drought` in core/disasters.ts):
  * "Pick Drought Start Plot" (0x287e80), one uniform draw over every map
  * plot `droughtCandidate` admits — `centres` the live city centres, `live`
- * the plots the live storms have struck; then the strike 0x286530: on each
- * land plot of its footprint one draw per `RandomEvent_Damages` row of
- * severity `sev` (EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED, then
- * SPECIFIC_IMPROVEMENT_PILLAGED). The start plot's index, -1 where no plot
- * qualifies (no draw).
+ * the plots any storm has struck; then the strike 0x286530: on each land
+ * plot of its footprint one draw per `RandomEvent_Damages` row of severity
+ * `sev` (EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED, then
+ * SPECIFIC_IMPROVEMENT_PILLAGED), then the plot's event fertility taken back
+ * where the climate removes it (`removeFertility`). The start plot's index,
+ * -1 where no plot qualifies (no draw).
  */
 export function droughtDraws(rng: Civ6Random, map: GameMap, sev: number, centres: ReadonlySet<number>,
-  live: ReadonlySet<number>): number {
-  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, live));
+  live: ReadonlySet<number>, climate: EventClimate): number {
+  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, (u) => live.has(u.index)));
   if (!cands.length) return -1;
   const at = cands[rng.get(cands.length, 'Pick Drought Start Plot')];
   const rows = DROUGHT_DESTROY_P[sev] > 0 ? 2 : 1;
   for (const t of stormFootprint(map, at, DROUGHT_HEXES)) {
     if (isWater(t)) continue;
     for (let r = 0; r < rows; r++) rng.get(100, 'Pillage Improvement Chance');
+    removeFertility(rng, climate, t.index);
   }
   return at.index;
 }

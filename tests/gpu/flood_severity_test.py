@@ -232,7 +232,7 @@ def spent_by_walk(sim, reach: list[int], sev: int, egypt: list[int]) -> int:
                 if kind == "CITY_WALLS":
                     assert pct == 100
                     n += int(int(sim._centre_outer_hp(tt)[0]) > 0)
-    if bool(sim._fertility_live()[0]):
+    if not bool(sim._flood_halted()[0]):
         n += len(sim._flood_yields[sev]) * len(reach)
     return n
 

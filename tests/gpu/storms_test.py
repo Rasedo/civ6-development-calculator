@@ -139,7 +139,6 @@ def band(sim, tile: int, ev: int, kind: str, seat: int, n: int = 300) -> set[int
     """run `_storm_plot` n times with a fresh unit each time; the damages seen (100 = died)."""
     hit = torch.tensor([True])
     evt = torch.tensor([ev])
-    strip = torch.tensor([False])
     seen: set[int] = set()
     # ONE slot, re-armed each round — the pool is finite
     slot = put(sim, seat, tile, kind)
@@ -149,7 +148,7 @@ def band(sim, tile: int, ev: int, kind: str, seat: int, n: int = 300) -> set[int
         sim.major_unit_alive[0, s] = True
         sim.major_unit_hp[0, s] = 100
         plane[0, tile] = slot
-        sim._storm_plot(hit, torch.tensor([tile]), evt, strip)
+        sim._storm_plot(hit, torch.tensor([tile]), evt)
         seen.add(100 - int(sim.major_unit_hp[0, s]) if bool(sim.major_unit_alive[0, s]) else 100)
     drop(sim, slot)
     plane[0, tile] = -1
@@ -193,14 +192,14 @@ def main() -> int:
         return len(sim._st_dmg_rows[ev]) + (0 if barren else len(sim._st_yield_rows[ev]))
 
     s0 = int(sim.rng_state[0])
-    sim._storm_plot(hit, torch.tensor([land]), torch.tensor([TOR1]), torch.tensor([False]))
+    sim._storm_plot(hit, torch.tensor([land]), torch.tensor([TOR1]))
     assert draws(s0, int(sim.rng_state[0])) == plot_draws(TOR1, land) == 4, "a Tornado Family plot draws its four rows"
     put(sim, FOE, land, "WARRIOR")
     s0 = int(sim.rng_state[0])
     # CAT_5: its eight damage rows — UNIT_DAMAGE_LAND 100 lands, the struck
     # unit's own roll straight after it (GameCore_XP2_Release.dll 0x3366a0) —
     # and its two yield rows
-    sim._storm_plot(hit, torch.tensor([land]), torch.tensor([CAT5]), torch.tensor([False]))
+    sim._storm_plot(hit, torch.tensor([land]), torch.tensor([CAT5]))
     assert draws(s0, int(sim.rng_state[0])) == plot_draws(CAT5, land) + 1 == 11, "...then the unit's own roll"
     if bool(sim.military_at[0, land] >= 0):
         drop(sim, int(sim.military_at[0, land]))
@@ -220,13 +219,13 @@ def main() -> int:
         fp = sorted(set(tiles_from_offsets(torch.tensor([centre]), sim._foot_offs[int(sim._st_hexes[ev])],
                                            sim.W, sim.H, sim.wrap_x)[0].tolist()))
         s0 = int(sim.rng_state[0])
-        sim._storm_strike(hit, torch.tensor([ev]), torch.tensor([centre]), struck, torch.tensor([False]),
+        sim._storm_strike(hit, torch.tensor([ev]), torch.tensor([centre]), struck,
                           torch.tensor([100]))
         assert draws(s0, int(sim.rng_state[0]), 400) == sum(plot_draws(ev, t) for t in fp), f"{ids[ev]} footprint"
         assert int(struck.sum()) == n == len(fp)
         # the same storm strikes no plot twice
         s0 = int(sim.rng_state[0])
-        sim._storm_strike(hit, torch.tensor([ev]), torch.tensor([centre]), struck, torch.tensor([False]),
+        sim._storm_strike(hit, torch.tensor([ev]), torch.tensor([centre]), struck,
                           torch.tensor([100]))
         assert int(sim.rng_state[0]) == s0, f"{ids[ev]} struck a plot twice"
     print("  2 the draws OK — one per row, the yield rows off water, a footprint of 1 / 3 / 7 / 19 plots")
@@ -334,11 +333,10 @@ def main() -> int:
         sim9.storm_struck[0, k] = False
 
     seat_storm(0, sea, 2, 9)
-    no = torch.tensor([False])
     full = torch.tensor([100])
     seed = int(sim9.rng_state[0])
     s0 = seed
-    sim9._storm_walk(torch.tensor([True]), 0, no, full)
+    sim9._storm_walk(torch.tensor([True]), 0, full)
     end = int(sim9.storm_at[0, 0])
     struck = int(sim9.storm_struck[0, 0].sum())
     spent = draws(s0, int(sim9.rng_state[0]), 2000)
@@ -364,13 +362,13 @@ def main() -> int:
     for k in range(1, sim9.storm_left.shape[1]):
         seat_storm(k, nbrs[k - 1], 1, 9 + k)
     sim9.rng_state[0] = seed
-    sim9._storm_walk(torch.tensor([True]), 0, no, full)
+    sim9._storm_walk(torch.tensor([True]), 0, full)
     assert int(sim9.storm_at[0, 0]) == end and draws(seed, int(sim9.rng_state[0]), 2000) == spent, \
         "another storm's centre changed the walk"
     # a game with `walk` off draws nothing and keeps its centre
     seat_storm(0, sea, 2, 9)
     s0 = int(sim9.rng_state[0])
-    sim9._storm_walk(torch.tensor([False]), 0, no, full)
+    sim9._storm_walk(torch.tensor([False]), 0, full)
     assert int(sim9.storm_at[0, 0]) == sea and int(sim9.rng_state[0]) == s0
     for k in range(sim9.storm_left.shape[1]):
         sim9.storm_left[0, k] = 0
@@ -396,7 +394,6 @@ def main() -> int:
     sim10._erupt = lambda hit, ring, sev: turn.__setitem__("volcano", bool(hit[0]))
     sim10._nuclear_accident = lambda hit, centre, sev: turn.__setitem__("accident", bool(hit[0]))
     sim10._ignite = lambda rows, tiles, start: turn.__setitem__("fire", bool((rows == 0).any()))
-    strip = sim10._desertification_live()
     N = 4000
     for _ in range(N):
         turn.clear()
@@ -407,7 +404,7 @@ def main() -> int:
         sim10._compact_droughts()
         sim10.tile_meteor.zero_()
         s0 = int(sim10.rng_state[0])
-        sim10._random_event(strip)
+        sim10._random_event()
         turn["storm"] = bool((sim10.storm_left[0] > 0).any())
         turn["drought"] = bool((sim10.drought[0] > 0).any())
         turn["meteor"] = bool(sim10.tile_meteor[0].any())
@@ -431,7 +428,7 @@ def main() -> int:
     storm_lands = [bool(sim10._storm_cands(e)[0].any()) for e in range(len(sim10._st_weight))]
     span = sim10._event_occ_scale * sim10._event_turns
     assert span == 2500
-    has_dry = bool(sim10._drought_cands(sim10._live_event_plots())[0].any())
+    has_dry = bool(sim10._drought_cands(sim10.storm_scar)[0].any())
     has_met = bool(sim10._meteor_cands()[0].any())
     has_fire = [bool(sim10._fire_cands(s)[0].any()) for s in range(2)]
     # each row's mass at the world's warming (`_event_rows`), what each
@@ -488,7 +485,7 @@ def main() -> int:
     # improvements pillaged (EXTREME destroys 30), barred from building and
     # repair while it lasts, and a PreventsDrought city keeps its food
     s12 = fresh(rules)
-    live12 = s12._live_event_plots()
+    live12 = s12.storm_scar
     cand = s12._drought_cands(live12)[0]
     assert bool((cand <= s12.drought_cand[0]).all()), "a candidate is drought ground"
     paved = (s12.district[0] >= 0) | s12._centre_plane()[0]
@@ -508,7 +505,6 @@ def main() -> int:
                                                   s12.W, s12.H, s12.wrap_x)[0].tolist()
             if int(t) >= 0 and not bool(s12.water[0, int(t)])]
     one = torch.tensor([True])
-    strip = torch.tensor([False])
     for sev, want in ((0, 0.0), (1, 0.3)):
         farms = gone = 0
         for it in range(200):
@@ -518,7 +514,7 @@ def main() -> int:
                 s.improvement[0, t] = s.FARM if t != area[-1] else s.MINE
                 s.pillaged[0, t] = False
             r0 = int(s.rng_state[0])
-            s._drought(one, torch.tensor([c]), torch.tensor([sev]), strip)
+            s._drought(one, torch.tensor([c]), torch.tensor([sev]))
             # one draw per damage row a land plot: MAJOR's pillage row, EXTREME's
             # destroy and pillage rows (0x286530)
             assert draws(r0, int(s.rng_state[0]), 40) == (1 + sev) * len(area), "one draw per row per land plot"
@@ -593,7 +589,7 @@ def main() -> int:
     s13.drought.zero_()
     s13.drought_left.zero_()
     s13._compact_droughts()
-    cand0 = s13._drought_cands(s13._live_event_plots())[0]
+    cand0 = s13._drought_cands(s13.storm_scar)[0]
     assert bool(cand0.any()), "the fixture holds no drought start"
     # a live drought beside a candidate: no weight tilts the pick
     ev = int(cand0.nonzero().flatten()[0])
@@ -608,8 +604,8 @@ def main() -> int:
     s13.storm_at[0, 0] = far
     s13.storm_left[0, 0] = 2
     s13.storm_struck[0, 0, far] = True
-    live13 = s13._live_event_plots()
-    assert bool(live13[0, far]), "a plot a live storm struck is under a live event"
+    s13.storm_scar[0, far] = True
+    live13 = s13.storm_scar
     cand = s13._drought_cands(live13)[0]
     # a drought's own plot is no bar (0x28de40 reads the storms alone)
     assert bool(cand[ev]), "a drought's plot barred a new drought"
@@ -706,7 +702,7 @@ def main() -> int:
         for _ in range(n):
             sim.fertility[0, plot] = 0
             sim._storm_plot(torch.tensor([True]), torch.tensor([plot]), torch.tensor([fe]),
-                            torch.tensor([False]), pct)
+                            pct)
             got += int(sim.fertility[0, plot] > 0)
         return got / n
 

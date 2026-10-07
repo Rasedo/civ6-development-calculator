@@ -5042,13 +5042,13 @@ class SimSeats:
                 _keep = self._promo_flag(self.major_unit_type[_dr, _dj],
                                          self.major_unit_promos[_dr, _dj], "MARTYR")
                 if bool(_keep.count_nonzero()):
-                    self._grant_relic(_dr[_keep], self.major_unit_seat[_dr, _dj][_keep])
+                    self._create_relic(_dr[_keep], self.major_unit_seat[_dr, _dj][_keep])
             _ar = rows[atk_dead]
             if _ar.numel():
                 _keep = self._promo_flag(self.major_unit_type[_ar, u],
                                          self.major_unit_promos[_ar, u], "MARTYR")
                 if bool(_keep.count_nonzero()):
-                    self._grant_relic(_ar[_keep], a_seat[_ar][_keep])
+                    self._create_relic(_ar[_keep], a_seat[_ar][_keep])
             # A killed unit must also LEAVE ITS TILE: TS's `disbandUnit` drops
             # it from `state.units` entirely, so clearing `alive` alone would
             # leave the occupancy plane pointing at the corpse and block the
@@ -5145,11 +5145,28 @@ class SimSeats:
         self._occ_clear(rows, getattr(self, f"{pool}_unit_tile")[rows, slots],
                         slots + self.POOL_LO[pool])
 
-    def _grant_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
-        """A RELIC for each listed game's seat row, placed in the row's FIRST
-        live city with an open slot that takes one (`placeGreatWorkIn`).
-        CIV6: a homeless Relic is HELD, not lost — `_drain_relic_reserve`
-        hands it out at the owner's next turn."""
+    def _create_relic(self, rows: torch.Tensor, seat: torch.Tensor) -> None:
+        """`createRelic` — a RELIC for each listed game's seat row (Game_Culture
+        0x296c00): ONE "Choosing a Relic" draw over the Relics not yet created
+        (`_relic_count` less `relics_made`; none left, no draw and no Relic),
+        then the Relic in the row's FIRST live city with an open slot that
+        takes one (`placeGreatWorkIn`), else HELD — `_drain_relic_reserve`
+        hands it out at the owner's next turn. A game listed twice draws in
+        list order."""
+        if rows.numel() == 0:
+            return
+        keep = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
+        for i in range(rows.numel()):
+            b = int(rows[i])
+            left = self._relic_count - int(self.relics_made[b])
+            if left <= 0:
+                continue
+            one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            one[b] = True
+            self._rand_range(one, left)
+            self.relics_made[b] += 1
+            keep[i] = True
+        rows, seat = rows[keep], seat[keep]
         if rows.numel() == 0:
             return
         placed = torch.zeros(rows.numel(), dtype=torch.bool, device=self.device)
@@ -6686,22 +6703,53 @@ class SimSeats:
         return (home >= 0) & (got == home)
 
     # ------------------------------------------------- THE TRIBAL VILLAGE
-    def _goody_eligible(self, has_city: bool) -> list[int]:
-        """Indices into `_goody_sub` a claimer may draw right now.
+    def _goody_eligible(self, b: int, row: int) -> list[int]:
+        """Indices into `_goody_sub` major `row` of game `b` may draw now.
 
         A weight of 0 is a subtype this ruleset turns OFF, not a free one.
+        0x42c980's other gates: a Relic slot in one of its cities (0x497030),
+        a city-state it has met (the XP2 row's CityState), a strategic
+        resource it sees below its stockpile's ceiling (StrategicResources).
         `goodyEligible`'s twin — the two must filter in the SAME order,
         because the weighted pick below walks the surviving rows in it."""
+        has_city = bool(self.city_alive[b, row].any())
+        met_cs = bool((self.seat_citystate_met[b, row, : self.S] & self.citystate_alive[b, : self.S]).any())
         out = []
         for i, (_id, _hut, w, turn, moc, _p, _a, _u, _pc) in enumerate(self._goody_sub):
+            cs, strat, relic = self._goody_gates[i]
             if w <= 0:
                 continue
             if turn and self.turn < turn:
                 continue
             if moc and not has_city:
                 continue
+            if cs and not met_cs:
+                continue
+            if strat and not self._strategic_room(b, row):
+                continue
+            if relic and not self._relic_room(b, row):
+                continue
             out.append(i)
         return out
+
+    def _strategic_room(self, b: int, row: int) -> bool:
+        """A strategic resource major `row` of game `b` sees (its revealing
+        tech, a Great Person's reveal) stands below its stockpile's ceiling."""
+        cap = int(self._stockpile_cap(row)[b])
+        for k, rid in enumerate(self._strat_rid):
+            rt = int(self._res_reveal_tech[rid])
+            seen = rt < 0 or bool(self._seat_techs(row)[b, rt])
+            for _pk, _ri in self._gp_resource_reveal:
+                if _ri == rid and int(self._gp_perm(row, self._gp_perm_names[_pk])[b]) > 0:
+                    seen = True
+            if seen and int(self.civ_stockpile[b, row, k]) < cap:
+                return True
+        return False
+
+    def _relic_room(self, b: int, row: int) -> bool:
+        """A live city of major `row` of game `b` has a slot a Relic takes."""
+        room = self._gw_room(row, 7)[b]
+        return bool((room & self.city_alive[b, row, : room.shape[0]]).any())
 
     def _goody_kind_weight(self, had: int) -> int:
         """`goodyKindWeight` — a kind's weight in the kind draw (0x42bdd0):
@@ -6712,7 +6760,7 @@ class SimSeats:
             w = 0x100 if w < 0x200 else w // 2
         return (w >> 8) + (1 if w & 0x80 else 0)
 
-    def _draw_goody_reward(self, one: torch.Tensor, b: int, has_city: bool, row: int) -> int | None:
+    def _draw_goody_reward(self, one: torch.Tensor, b: int, row: int) -> int | None:
         """The subtype game `b` draws for major `row`, or None if it can draw
         nothing.
 
@@ -6722,7 +6770,7 @@ class SimSeats:
         eligible subtype, each weighing `_goody_kind_weight` of the times the
         claimer has had it, then a subtype within it by its own weight; the
         kind drawn counts (`civ_goody_kinds`)."""
-        elig = self._goody_eligible(has_city)
+        elig = self._goody_eligible(b, row)
         if not elig:
             return None
         kinds = [k for k in range(len(self._goody_kinds))
@@ -6863,7 +6911,7 @@ class SimSeats:
         cap = int(self.rules.combat["unitHp"])
         tile = torch.full((self.B,), t, dtype=torch.long, device=self.device)
         alive = self.city_alive[b, srow]
-        sub = self._draw_goody_reward(one, b, bool(alive.count_nonzero()), srow)
+        sub = self._draw_goody_reward(one, b, srow)
         if sub is None:
             return
         _id, _hut, _w, _turn, _moc, pay, amt, unit_i, pcls = self._goody_sub[sub]
@@ -6875,7 +6923,8 @@ class SimSeats:
             d = self.pair_dist[self.city_center[b, srow, cols].clamp(min=0), t]
             near = int(cols[int(d.argmin())])
         if pay == ch["relic"]:
-            self.civ_relic_reserve[b, srow] += amt
+            for _ in range(amt):
+                self._create_relic(torch.tensor([b], device=self.device), torch.tensor([srow], device=self.device))
         elif pay == ch["gold"]:
             self.civ_treasury[b, srow] += amt
         elif pay == ch["faith"]:
