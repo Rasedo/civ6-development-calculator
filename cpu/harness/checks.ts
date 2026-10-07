@@ -91,7 +91,10 @@ export interface CheckResult {
 }
 
 const TOL = 0.02;
-const near = (a: number, b: number, tol = TOL) => Math.abs(a - b) <= tol;
+// H1_STRICT=1: every tolerance narrows to half the game's 1/256 step, so a
+// pass is the game's own value, not one near it
+const STRICT_TOL = process.env.H1_STRICT === '1' ? 1 / 512 : Infinity;
+const near = (a: number, b: number, tol = TOL) => Math.abs(a - b) <= Math.min(tol, STRICT_TOL);
 const round3 = (v: number) => Math.round(v * 1000) / 1000;
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
 
