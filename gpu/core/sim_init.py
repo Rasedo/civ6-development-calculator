@@ -2474,6 +2474,7 @@ class SimInit:
         # district idxs and scaffold slots (the queue head codes for the
         # district and its buildings — cpu/core/game.ts isEncampHarborItem).
         self._encamp_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "ENCAMPMENT"), -1)
+        self._canal_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "CANAL"), -1)
         self._harbor_didx = next((i for i, d in enumerate(self.districts_cat) if d["id"] == "HARBOR"), -1)
         # The Urban Development Treaty ban on HOLY_SITE also refuses the
         # worship faith-buy (a purchase still CREATES the building).

@@ -54,14 +54,15 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import { Civ6Random, drawsBetween } from './civ6Random';
+import { placeCitizens, replaceAllCitizens } from './citizens';
 import type { LoggedDraw } from './randLog';
 import { DRAW_SITES, siteLabel } from './drawSites';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, recordMap, recordRoutes, routeChanges, routeKey,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, leviesAcross, majorEras, notStarted, citiesNotStarted, recordMap, recordRoutes, routeChanges, routeKey,
   type History, type Imported,
 } from './import';
 import {
-  ERA_BEGINS, buildingDedications, campMoment, diploVictoryMoment, levyMoment, enterEra, eraCountdownStep, foundingKeys,
+  ERA_BEGINS, buildingDedications, campMoment, canalMoment, diploVictoryMoment, levyMoment, metAllMajorsMoment, newContinent, enterEra, eraCountdownStep, foundingKeys,
   dedicationEvent, foundingMoments, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments,
   wonderMoment,
 } from '../core/eras';
@@ -1634,13 +1635,6 @@ const PURCHASE_UNIT_HASH = gameHash('UNIT');
 /** a production the log completes by a purchase: `CityProductionCompleted`'s last cell */
 const PURCHASED = 65535;
 
-/** pin the city's citizens to the plots the later record works — the step
- *  after a citizen left with a Settler grows the city the game kept */
-function relockWorked(state: GameState, city: City, was: DumpCity, next: DumpCity): void {
-  for (const q of was.worked) state.map.tiles[q].locked = false;
-  for (const q of next.worked) if (q !== city.centerIndex && !state.map.tiles[q].district) state.map.tiles[q].locked = true;
-}
-
 export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, history?: History,
   prev?: TurnRecord): CheckResult[] {
   const out: CheckResult[] = [];
@@ -1817,24 +1811,24 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     perSeat.set(city.seat, list);
   }
   for (const [seat, list] of perSeat) {
-    // the cities read the luxury allocation the last rebuild left: the
-    // player's resources rebuild it after the cities in its turn (Player
-    // DoTurn 0x4e4560: the cities 0x4e4665, then the resources 0x4e46c0 ->
-    // 0x4a6110), so a governor established in this processing moves no
-    // luxury before the next record (1122 t200: Reyna seated in Changsha,
-    // Civil Prestige's amenity re-ranks the luxuries only at t201); a
-    // policy change at the processing's start rebuilds it before the cities
-    // (the 9 recorded policy-change turns of 1117, 1118, 1121, 1122 read the
-    // new ranking, the 6 others the standing one)
+    // the cities read the luxury allocation the player's resources rebuild
+    // before its governors' clocks and its cities' turns (Player DoTurn
+    // 0x4e4560: the resources 0x4e46c0 -> 0x4a6110, the governors 0x4e46df,
+    // the city turns 0x1fa1d0 at 0x4e4813), so a governor established in
+    // this processing moves no luxury before the next (1122 t200: Reyna
+    // seated in Changsha, Civil Prestige's amenity re-ranks the luxuries
+    // only at t201); a policy change at the processing's start rebuilds it
+    // before the cities (the 9 recorded policy-change turns of 1117, 1118,
+    // 1121, 1122 read the new ranking, the 6 others the standing one)
     const standing = luxuryAmenities(state, seat);
-    // the governors' clocks run first in the seat's processing
+    // the governors' clocks, before the cities (`governorClocks`)
     governorClocks(state, seat);
     // the turn's processing places the citizens the record caught idle
     // (`seatPhase`)
     placeIdleCitizens(list.map(({ city }) => city));
     // the loyalty step's stats, on the turn-start cities (`landProduction`)
     const startStats = new Map(list.map(({ city }) => [city, computeCityStats(state, city)]));
-    const sides: ((landed: boolean) => void)[] = [];
+    const sides = new Map<City, (landed: boolean) => void>();
     // a Settler trained or bought beside the city across the pair: its
     // citizen leaves with the turn's production, before the city grows
     // (tools/civ6lab/turn_order_civ6.md, armS: pop 6 -> 5, then the pop-5
@@ -1844,7 +1838,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     for (const { city, dump: c } of list) {
       const next = after.get(`${c.owner}:${c.id}`);
       if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
-      sides.push(landProduction(state, cat, city, next, a.head.W, c.owner === seatInTurn, lateBuilt.get(`${c.owner}:${c.id}`),
+      sides.set(city, landProduction(state, cat, city, next, a.head.W, c.owner === seatInTurn, lateBuilt.get(`${c.owner}:${c.id}`),
         (q) => b.units.some((u) => u.y * b.head.W + u.x === q && u.owner !== c.owner
           && (u.owner === seatInTurn ? -1 : activatedAt.get(u.owner) ?? -1) > (activatedAt.get(c.owner) ?? Infinity))));
       // the Settler stands beside the city, or the city trained it (its
@@ -1863,16 +1857,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         if (c.owner !== seatInTurn && lateSettlers.has(`${c.owner}:${c.id}`)) leftLate.add(city);
         else if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
           city.population = Math.max(1, city.population - 1);
-          // the citizen that left is the one the later record no longer works,
-          // also where the city grew one back (1117 Xi'an t21: 562 left, the
-          // pop-5 surplus 5, the regrown citizen on 563)
-          if (next.pop === city.population) relockWorked(state, city, c, next);
-          else if (next.pop === city.population + 1) {
-            for (const q of c.worked) state.map.tiles[q].locked = false;
-            for (const q of c.worked) {
-              if (next.worked.includes(q) && q !== city.centerIndex && !state.map.tiles[q].district) state.map.tiles[q].locked = true;
-            }
-          }
+          // the citizens re-placed on the loss, all of them (the citizen
+          // manager, `replaceAllCitizens`: 1121 t21 Xi'an grows back on the
+          // Spices, t231 Shanghai's five specialists back on plots)
+          replaceAllCitizens(state, city);
         }
       }
     }
@@ -1898,10 +1886,42 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       if (!Number.isNaN(balance) && !Number.isNaN(num(pb.gold))) payer.goldShortfall = num(pb.gold) > 0 ? 0 : goldShortfall(balance);
     }
     const lux = JSON.stringify(pa?.policies) !== JSON.stringify(pb?.policies) ? luxuryAmenities(state, seat) : standing;
-    const mods = getModifiers(state, seat);
     const relaidSeat = relayImprovements(imp.playerOfSeat.get(seat) ?? -1);
-    const stats = new Map(list.map(({ city }) => [city, computeCityStats(state, city, lux, mods)]));
-    for (const { city, dump: c } of list) {
+    // each city's turn reads the productions its own and the earlier cities'
+    // turns completed, not a later city's (Player DoTurn walks the cities in
+    // order, each its production, growth and border; 1121 t199: Jiaodong's
+    // completion after Taiyuan's turn moves Taiyuan's trade route only for
+    // the next); what the log shows no completion for, or with no log what
+    // a player who spent Gold in the pair may have bought (1110 t238:
+    // Handan's Audience Chamber lifts Xi'an's amenities before its border),
+    // stands before every city
+    const completedIn = (c: DumpCity) => (logged
+      ? logged.some((x) => x[2] === 'CityProductionCompleted' && x[3] === c.owner && x[4] === c.id)
+      : !((acts.goldSpent.get(c.owner) ?? 0) > 0));
+    const landTo = (i: number) => list.forEach(({ city, dump }, j) => sides.get(city)?.(j <= i || !completedIn(dump)));
+    // cards the player re-slots in its processing (a GovernmentPolicyChanged
+    // row before its turn start) reach the cities whose turns come after
+    // them: a completion in an earlier city that opens a slot re-slots the
+    // cards mid-walk (1121 t206: Xi'an's Alhambra, then Taiyuan and Shanghai
+    // bank their culture without Liberalism's and Civil Prestige's
+    // amenities), and cards re-slotted before any city's turn reach them all
+    const ownerId = imp.playerOfSeat.get(seat) ?? -1;
+    const startRow = logged ? (activatedAt.get(ownerId) ?? -1) : -1;
+    const policyRow = logged && startRow >= 0 && isCiv(seat)
+      ? logged.findIndex((x, j) => j < startRow && x[2] === 'GovernmentPolicyChanged' && x[3] === ownerId) : -1;
+    // the processing opens where the player before it closed its turn
+    const opened = policyRow < 0 ? -1 : logged!.slice(0, policyRow).map((x) => x[2]).lastIndexOf('PlayerTurnDeactivated');
+    const policyFrom = policyRow < 0 ? Infinity
+      : 1 + list.reduce((m, { dump }, j) => (logged!.some((x, r) => r > opened && r < policyRow
+        && String(x[2]).startsWith('City') && x[3] === ownerId && x[4] === dump.id) ? j : m), -1);
+    for (const [i, { city, dump: c }] of list.entries()) {
+      landTo(i);
+      if (i === policyFrom && pb) {
+        const sp = seatOf(state, seat)!;
+        sp.government.policies = (pb.policies ?? []).map((x) => num(x)).filter((q) => q >= 0)
+          .map((q) => engineId('policy', cat.policies[q], 'POLICY_', POLICIES))
+          .filter((x): x is string => !!x) as typeof sp.government.policies;
+      }
       const k = `${c.owner}:${c.id}`;
       const next = after.get(k);
       const subject = subjectOf(c);
@@ -1911,7 +1931,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // the boxes of a city whose own turn start the pair missed
       const boxSkip = skipAll ?? (lateCities.has(k) ? 'a turn start missing from a record' : null);
       const granted = grant > 0 && !!next && !acts.cityChanged.has(k);
-      const st = stats.get(city)!;
+      const st = computeCityStats(state, city, lux, getModifiers(state, seat));
       const res = (check: string, ok: boolean, game: unknown, ours: unknown, s?: Record<string, unknown>) =>
         out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !s ? {} : { state: s }) });
 
@@ -1930,7 +1950,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const starts = c.owner === seatInTurn ? inTurnStarts : 1;
       for (let k = 0; k < starts; k++) {
         // a second start grows the city the first left
-        const sk = k === 0 ? st : computeCityStats(state, city, lux, mods);
+        const sk = k === 0 ? st : computeCityStats(state, city, lux, getModifiers(state, seat));
         seatGrowth(city, sk.effectiveFoodSurplus, sk.growthNeeded, state.turn);
       }
       // the actions after the turn start: the turn's border step stands on
@@ -1970,13 +1990,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       for (const q of boughtPlots) setTileOwner(state.map.tiles[q], seat, city.id);
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
-      // the citizen the growth added works the one plot the later record
-      // shows: the city's own placement is the player's choice
-      if (next && city.population > before.pop && next.pop === city.population) {
-        const added = next.worked.filter((q) => !c.worked.includes(q));
-        const t = added.length === 1 && c.worked.every((q) => next.worked.includes(q)) ? state.map.tiles[added[0]] : undefined;
-        if (t && !t.district && t.index !== city.centerIndex) t.locked = true;
-      }
+      // the citizen the growth added is placed beside the rest, and a city
+      // that starved re-places them all (the citizen manager, `citizens.ts`)
+      if (city.population === before.pop + 1) placeCitizens(state, city, 1);
+      else if (city.population < before.pop) replaceAllCitizens(state, city);
       const culture = cultureAfterGrowth(state, city, before.pop, st);
       // the culture turn reads the session the next record shows: a Border
       // Control Treaty holds the target's boxes from the pair it opens on
@@ -2006,9 +2023,9 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const loyBefore = city.loyalty;
       const hasGov = num(c.governor) >= 0;
       const st0 = startStats.get(city)!;
-      for (const side of sides) side(false);
+      for (const side of sides.values()) side(false);
       for (let k = 0; k < starts; k++) applyLoyalty(state, city, st0.amenities.tier.name, hasGov, st0.foodSurplus < 0);
-      for (const side of sides) side(true);
+      landTo(i);
       const loySkip = skipAll;
       if (loySkip || !next) out.push({ turn, check: 'step.loyalty', subject, ok: true, skip: loySkip ?? 'no t+1' });
       else {
@@ -2037,6 +2054,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
           { followersBefore: c.religions, majority: num(c.majorityReligion) });
       }
     }
+    landTo(list.length);
     relaidSeat();
   }
 
@@ -2187,6 +2205,7 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
           // Monumentality dedication's, then the district's moment
           if (DISTRICTS[type]?.countsTowardLimit) dedicationEvent(st, seat, DED_MONUMENTALITY);
           if (city) districtMoment(st, seat, city, tile, type);
+          if (type === 'CANAL') canalMoment(st, seat);
         }]);
       }
       const had = new Set(was.buildings.map(([bi]) => bi));
@@ -2228,13 +2247,39 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
   // class's points spent across the pair (one claimed and activated before
   // t+1 shows its unit); the record names no individual, so the person is
   // read as of the game era
-  const gp = (st: GameState, seat: number) => greatPersonMoment(st, seat, st.gameEra ?? 0, null);
+  // one recruited by patronage whose purse paid more than half the price
+  // records the PATRONAGE moment (`patronizeGreatPerson`): the purse's drop
+  // across the pair, read as a patronage price (Faith 150 + 10 per point
+  // lacked, Gold 200 + 15, `patronageCost`), lacks more points than the
+  // class held (1117 t73/87/148, 1118 t70, 1121 t125 Faith; 1121 t148 Gold;
+  // none of the points-earned persons beside a large purchase: 1117 t138,
+  // 1121 t140, 1118 t83)
+  const purses = new Map<number, { faith: number; gold: number }>();
+  for (const p1 of b.players) {
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (!p0) continue;
+    purses.set(p1.id, { faith: num(p0.faith) + num(p0.faithYield) - num(p1.faith),
+      gold: num(p0.gold) + num(p0.goldYield) - num(p0.maintTotal) - num(p1.gold) });
+  }
+  const patronOf = (pid: number, cls: string): 'faith' | 'gold' | null => {
+    const p0 = a.players.find((q) => q.id === pid);
+    const k = (cat.greatPersonClasses ?? []).indexOf(`GREAT_PERSON_CLASS_${cls}`);
+    const purse = purses.get(pid);
+    if (!p0 || k < 0 || !purse || !Array.isArray(p0.gpp)) return null;
+    const held = num(p0.gpp[k]);
+    // half exactly is no patronage moment (1121 t155: 430 Faith for 28 of 56)
+    const over = (lacked: number) => lacked > held + 0.5;
+    const by: 'faith' | 'gold' | null = over((purse.faith - 150) / 10) ? 'faith' : over((purse.gold - 200) / 15) ? 'gold' : null;
+    if (by) purse[by] = 0;
+    return by;
+  };
+  const gp = (patron: 'faith' | 'gold' | null) => (st: GameState, seat: number) => greatPersonMoment(st, seat, st.gameEra ?? 0, patron);
   const before = new Set(a.units.map((u) => `${u.owner}:${u.id}`));
   const gpUnits = new Map<number, number>();
   for (const u of b.units) {
     const name = cat.units[u.type] ?? '';
     if (!before.has(`${u.owner}:${u.id}`) && name.startsWith('UNIT_GREAT_')) {
-      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`, gp]);
+      of(u.owner).events.push([`great person ${strip(name, 'UNIT_GREAT_')}`, gp(patronOf(u.owner, strip(name, 'UNIT_GREAT_')))]);
       gpUnits.set(u.owner, (gpUnits.get(u.owner) ?? 0) + 1);
     }
   }
@@ -2242,7 +2287,7 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
     const p0 = a.players.find((q) => q.id === p1.id);
     if (!p0 || !bool(p1.major) || !Array.isArray(p0.gpp) || !Array.isArray(p1.gpp)) continue;
     const spent = p1.gpp.filter((v, k) => num(v) < num(p0.gpp[k])).length;
-    for (let n = gpUnits.get(p1.id) ?? 0; n < spent; n++) of(p1.id).events.push(['great person (points spent)', gp]);
+    for (let n = gpUnits.get(p1.id) ?? 0; n < spent; n++) of(p1.id).events.push(['great person (points spent)', gp(null)]);
   }
   // a city-state's military levied: a major's unit new at t+1 is a unit of
   // the same type a city-state lost within 3 plots of it (the importer's
@@ -2298,6 +2343,19 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
       }
     }
   }
+  // a major that has met every living major by t+1 and had not at t: the
+  // first in the world while no major had at t
+  const metAll = (r: TurnRecord, p: DumpPlayer) => {
+    const met = new Set(Array.isArray(p.met) ? p.met : []);
+    return r.players.every((q) => q.id === p.id || !bool(q.major) || met.has(q.id));
+  };
+  const firstMet = !a.players.some((p) => bool(p.major) && metAll(a, p));
+  for (const p1 of b.players) {
+    const p0 = a.players.find((q) => q.id === p1.id);
+    if (p0 && bool(p1.major) && metAllAcross(a, b, p0, p1)) {
+      of(p1.id).events.push(['met all majors', (st, seat) => metAllMajorsMoment(st, seat, firstMet)]);
+    }
+  }
   // the Diplomatic Victory resolution a new session passed for its target
   for (const r of Object.values(b.congress ?? {})) {
     if (typeof r !== 'object' || !r || !r.IsNew) continue;
@@ -2335,11 +2393,10 @@ export function seedMoments(state: GameState, imp: Imported, history?: History):
 const RECORDED_MOMENTS = new Set(SRC_REGISTRY.filter((r) => r.name.startsWith('eras.moment.') && 'xml' in r.src
   && r.src.col === 'EraScore').map((r) => (r.src as { where: string }).where.replace('MomentType=', '')));
 /** what the record cannot show of a recorded moment: no plot's revealed
- *  state, no Trading Post, no patronage's purse */
+ *  state, no Trading Post */
 const RECORD_BLIND_MOMENTS = new Set([
   'MOMENT_FIND_NATURAL_WONDER', 'MOMENT_FIND_NATURAL_WONDER_FIRST_IN_WORLD',
   'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV', 'MOMENT_TRADING_POST_CONSTRUCTED_IN_EVERY_CIV_FIRST_IN_WORLD',
-  'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_FAITH_OVER_HALF', 'MOMENT_GREAT_PERSON_CREATED_PATRONAGE_GOLD_OVER_HALF',
 ]);
 
 /** the gaps a pair's own moments leave the comparison: a paying row the
@@ -2368,7 +2425,8 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
   const imp = importTurn(a, cat, history);
   const state = imp.state;
   const events = eraEvents(a, b, cat, prev);
-  const ib = importTurn(b, cat, history);
+  // t+1 read with the pair's own levies held as levies (`leviesAcross`)
+  const ib = importTurn(b, cat, history && { ...history, levied: new Map([...history.levied, ...leviesAcross(a, b)]) });
   seedMoments(state, imp, history);
   for (const p0 of a.players) {
     if (!bool(p0.major)) continue;
@@ -2417,14 +2475,17 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
     const gaps = [...new Set([...(s.civ < 0 ? ['leader'] : []),
       ...[...(imp.seatGaps.get(seat) ?? []), ...(seatB === undefined ? [] : ib.seatGaps.get(seatB) ?? [])]
         .filter((g) => g.startsWith('commemoration:')),
-      // the player has met every living major by t+1 and had not at t: the
-      // engines hold no contact between majors (PLAYER_MET_ALL_MAJORS)
-      ...(metAllAcross(a, b, p0, p1) ? ['moment:PLAYER_MET_ALL_MAJORS'] : []),
       // a record without dedications past the Ancient era (which offers none)
       ...(!Array.isArray(p0.commemorations) && (state.gameEra ?? 0) > 0 ? ['commemorations'] : []),
       ...[...imp.cityByKey].filter(([, c]) => c.seat === seat)
         .flatMap(([k]) => [...(imp.cityGaps.get(k) ?? [])].filter((g) => g.startsWith('building:'))),
       ...momentGaps(fresh),
+      // a city founded across the pair on what the engine's landmasses call
+      // a new continent: the game's continents are map-generation regions the
+      // record does not hold (1118 t195 Taiyuan, 1117 t246 Yiyang: no
+      // CITY_BUILT_NEW_CONTINENT across a strait)
+      ...(b.cities.some((c) => c.owner === p0.id && !a.cities.some((q) => q.x === c.x && q.y === c.y)
+        && newContinent(state, seat, c.y * a.head.W + c.x)) ? ['continent: not recorded'] : []),
       // a natural wonder's moment over a map whose wonder the importer dropped
       ...(fresh.some((m) => m[1].includes('NATURAL_WONDER'))
         ? [...imp.gaps.keys()].filter((g) => g.startsWith('feature:')) : []),

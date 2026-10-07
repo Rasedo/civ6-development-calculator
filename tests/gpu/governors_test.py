@@ -311,6 +311,8 @@ def poke_governor_civ(rules, path):
         sim.restore(snap)
         _grant_titles(sim, r + 1, nc)
         titles = int(sim._governor_titles_earned(r + 1)[0])
+        # the turn that seats them, then the turn their loyalty first pays
+        sim._seat_phase()
         sim._seat_phase()
         return titles, {s: float(sim.city_loyalty[0, r + 1, s]) for s in [cap] + noncap}
 

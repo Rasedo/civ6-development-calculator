@@ -281,7 +281,7 @@ def main() -> None:
     assert int(sim._governor_at(foe)[0, theirs]) < 0, "a neutralized governor holds no city"
     mm = mask_row(sim, row, v)[sim._A_SPY_MISSION:sim._A_SPY_MISSION + sim._n_spy_missions]
     assert not bool(mm[sim._spy_m_governor]), "no governor, no Neutralize Governor"
-    sim._governor_tick(foe, sim.civ_alive[:, foe] & sim.city_alive[:, foe].any(dim=1))
+    sim._governor_clocks(foe, sim.civ_alive[:, foe] & sim.city_alive[:, foe].any(dim=1))
     assert int(sim.civ_gov_out[0, foe, gi]) == sim._spy_gov_turns - 1
     sim.civ_gov_out[0, foe, gi] = 0
 

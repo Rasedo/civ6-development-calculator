@@ -25,7 +25,7 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { CULTURE_BOMB_RANGE, DED_FREE_INQUIRY, DED_MONUMENTALITY } from '../data/seats';
 import { ERAS, TECHS, TECH_TABLE_RANK } from '../data/techs';
 import { CIVIC_TABLE_RANK } from '../data/civics';
-import { buildingDedications, dedicationEvent, wonderMoment } from './eras';
+import { buildingDedications, canalMoment, dedicationEvent, wonderMoment } from './eras';
 import { districtMoment } from './moments';
 import { spawnUnit, bestTrainableNaval } from './units';
 import { grantFreeProphet } from './greatPeople';
@@ -263,6 +263,7 @@ export function completeQueueItem(
       // t101 and t107, 1118 t98, 1120 t94, 1124 t97)
       if (dt.district && DISTRICTS[dt.district]?.countsTowardLimit) dedicationEvent(state, city.seat, DED_MONUMENTALITY);
       if (dt.district) districtMoment(state, city.seat, city, dt.index, dt.district);
+      if (dt.district === 'CANAL') canalMoment(state, city.seat);
       if (dt.district === 'ENCAMPMENT') {
         dt.encampHp = ENCAMPMENT_HP;
         // its OWN perimeter arrives at whatever tier the city's walls

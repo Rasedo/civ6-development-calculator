@@ -11073,8 +11073,10 @@ class SimSeats:
             ch = self.civ_gov_chosen[:, row]
             tier = torch.where(ch >= 0, self._gov_tier.take(ch.clamp(min=0)), torch.zeros_like(ch))
             self._moment_scatter(held, self._mk_gov_tier.take(tier).unsqueeze(1))
-        # a unit held by levy is the city-state's (`momentKeysHeld`)
-        ua = self.major_unit_alive & (self.major_unit_seat == row) & ~self.major_unit_levied
+        # a unit held by levy is the city-state's (`momentKeysHeld`); its
+        # formation still counts
+        mine = self.major_unit_alive & (self.major_unit_seat == row)
+        ua = mine & ~self.major_unit_levied
         uk = self._mk_unit[self.major_unit_type.clamp(min=0)]
         self._moment_scatter(held, torch.where(ua.unsqueeze(2), uk, torch.full_like(uk, -1)))
         # a living unit of a formation (`FORMATION_KEY`)
@@ -11082,7 +11084,7 @@ class SimSeats:
         nav = self.unit_naval.take(ut).long()
         form = self.major_unit_formation.clamp(min=0, max=self._mk_formation.shape[1] - 1)
         fk = self._mk_formation[nav, form]
-        self._moment_scatter(held, torch.where(ua & (self.major_unit_formation > 0), fk, torch.full_like(fk, -1)))
+        self._moment_scatter(held, torch.where(mine & (self.major_unit_formation > 0), fk, torch.full_like(fk, -1)))
         # a city holding every Encampment building set, and a city lit by a
         # plant's burned resource: powered, its own supply short and no
         # fully-powering project at its queue's head (`_resolve_seat_power`)
@@ -11674,7 +11676,9 @@ class SimSeats:
                              + _bp["fol"]["borderPct"].take(self.civ_follower[:, row] + 1)
                              + _bp["fou"]["borderPct"].take(self._eff_founder(row) + 1))
         cul = cul_c.double()
-        cul = torch.where(_gpct != 0, cul * (100.0 + _gpct) / 100.0, cul)
+        # the game's 1/256 fixed point, each step truncating (`cityBorderGrowth`)
+        cul = torch.where(_gpct != 0,
+                          torch.floor(torch.floor(cul * 256.0 + 1e-6) * (100.0 + _gpct) / 100.0) / 256.0, cul)
         box = self.city_cbox[bidx, row, col]
         if bool(self._row_annex_culture[row]):
             self.city_cbox[bidx, row, col] = torch.where(act, box + cul.to(box.dtype), box)

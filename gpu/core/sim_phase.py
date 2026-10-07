@@ -199,10 +199,6 @@ class SimPhase:
         self._seat_accrue_stockpile(row)
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
-        # THE GOVERNORS, before anything reads the roster: earned titles are
-        # spent, idle governors take a city, and the neutralization clock ticks. Every
-        # ability the city walk reads is settled here.
-        self._governor_phase(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
         # resolving, and the clocks their missions left behind tick down.
         self._tick_spies(row)
@@ -406,8 +402,8 @@ class SimPhase:
 
     def _seat_governor_seats(self, row: int) -> torch.Tensor:
         """[B, RC] — the row's governor-held cities, straight off the roster.
-        Read once per seat block, after `_governor_phase` seated every idle
-        governor and before any loyalty moves."""
+        Read once per seat block, before its economy (where `_governor_phase`
+        runs) and before any loyalty moves."""
         return self._governor_at(row) >= 0
 
     def _gov_chan(self, row: int, kind: str, channel: str) -> torch.Tensor:
@@ -1889,6 +1885,13 @@ class SimPhase:
         mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
         mon[dr] = self._is_specialty[self.district[dr, dt].clamp(min=0)] & (self.district[dr, dt] >= 0)
         self._dedication_event(row, 0, mon)
+        # CIV6 (DISTRICT_CONSTRUCTED_CANAL): every Canal a major completes
+        # (`canalMoment`)
+        if row < self.n_majors and self._canal_didx >= 0:
+            _cw = torch.zeros(self.B, dtype=torch.long, device=self.device)
+            _cw[dr] = (self.district[dr, dt] == self._canal_didx).long()
+            if bool(_cw.count_nonzero()):
+                self._add_era_score(row, int(self._mom[canal]), _cw)
         # CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): `districtMoment` — a
         # major's first district of a type whose yield where it completed,
         # before any percent (its adjacency and Nan Madol's Culture beside
@@ -2333,9 +2336,10 @@ class SimPhase:
             if bool(_c3a.count_nonzero()):
                 cul_sum = cul_sum + torch.where(
                     _c3a, self._al_c3_cul_pct * self.civ_cul_rate[:, _o], torch.zeros_like(cul_sum))
-        # THE ESTABLISHMENT CLOCK, between the cities' yields and the seat's
-        # tallies (`tickGovernors`, then `resolveSuzerains`)
-        self._governor_establish_tick(row, active)
+        # THE GOVERNORS, after the Culture is summed and before the tallies and
+        # the cities: the clocks, then this seat's choices (`governorPhase`);
+        # a posting is an envoy count (`resolveSuzerains`)
+        self._governor_phase(row, active)
         if self.S:
             self._cs_resolve_suzerain()
         _tin = self._tourism_inputs(row, gov)

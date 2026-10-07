@@ -150,7 +150,7 @@ def poke_establish(rules, path):
     seat = cols[0]
     gi = int(sim._governor_at(row)[0, seat])
     assert gi >= 0, "the lowest-loyalty city takes the governor"
-    want = int(sim._gov_establish[gi])  # the clock ticks after the yields, not in the phase
+    want = int(sim._gov_establish[gi])  # the phase runs its clocks before it seats
     assert int(sim.civ_gov_establish[0, row, gi]) == want, \
         f"governor {gi} establishes in {int(sim._gov_establish[gi])} turns"
     # SEATED but not established: loyalty yes, abilities no
@@ -159,7 +159,7 @@ def poke_establish(rules, path):
     assert not bool(sim._governor_mask(row)[0, seat].any()), "…so it pays no promotion, not even its default"
 
     for _ in range(want):
-        sim._governor_establish_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+        sim._governor_clocks(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim.civ_gov_establish[0, row, gi]) == 0
     assert bool(sim._governor_established(row)[0, seat]), "the clock runs out and it establishes"
     base = int(sim._gov_base_promo[gi])
@@ -214,11 +214,11 @@ def poke_city_lost(rules, path):
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     gi = int(sim._governor_at(row)[0, cols[0]])
     for _ in range(int(sim._gov_establish[gi])):
-        sim._governor_establish_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+        sim._governor_clocks(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert bool(sim._governor_established(row)[0, cols[0]])
 
     sim.city_alive[0, row, cols[0]] = False
-    sim._governor_tick(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+    sim._governor_clocks(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim.civ_gov_city[0, row, gi]) < 0, "the city is gone, so is the posting"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and the establishment with it"
     assert bool(sim.civ_gov_appointed[0, row, gi]), "the APPOINTMENT survives — the title is spent"

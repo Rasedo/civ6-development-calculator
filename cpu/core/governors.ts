@@ -297,9 +297,15 @@ export function assignGovernor(state: GameState, seat: number, i: number, to: { 
   return true;
 }
 
+/** THE SEAT'S GOVERNOR TURN, in its processing after the culture tally and
+ *  before its cities: the clocks (`governorClocks`), then this script's
+ *  choices — titles spent, Amani posted, idle governors seated. A governor
+ *  seated here starts its establishment clock on the next processing, as the
+ *  game's AI seats after its clocks. */
 export function governorPhase(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
+  governorClocks(state, seat);
   const roster = governorsOf(s);
 
   let titles = governorTitlesAvailable(state, seat);
@@ -363,13 +369,20 @@ export function governorPhase(state: GameState, seat: number): void {
     taken.add(g.cityId);
     at += 1;
   }
-  governorClocks(state, seat);
 }
 
-/** The seat's governor clocks, in its turn processing before its cities: the
- *  neutralize clock, a governor whose city or minor is gone back to the
- *  Palace, and the establishment clock (the processing that brings it to 0
- *  already reads the governor established). */
+/** THE SEAT'S GOVERNOR CLOCKS, one pass over the roster in its turn
+ *  processing (Player DoTurn 0x4e4560 -> 0x432980), after its culture tally
+ *  (0x396860) and before its cities' turns (0x1fa1d0): each posting's
+ *  establishment count rises (0x35df30) and the governor is established on
+ *  the tick that reaches its EstablishTurns, so the cities of that same
+ *  processing read her abilities while the culture already tallied did not;
+ *  the neutralize clock runs down (0x35e1f0 / 0x35d220); a governor whose
+ *  city or minor is gone goes back to the Palace. Recorded: runs/h1_duelw1117
+ *  Reyna seated in Handan in China's t94 start, established at t99's (record
+ *  100), the border banking her +20% that processing; Pingala seated t27,
+ *  the border +15% at t32's, the civic progress from t33's; 1116 / 1117 /
+ *  1118: each of 30 postings established its EstablishTurns processings on. */
 export function governorClocks(state: GameState, seat: number): void {
   const s = seatOf(state, seat);
   if (!s) return;
@@ -389,23 +402,7 @@ export function governorClocks(state: GameState, seat: number): void {
       g.minorId = -1;
       g.establishTurns = 0;
     }
-  }
-}
-
-/** THE ESTABLISHMENT CLOCK ticks after the seat's cities have yielded and
- *  before its tallies: a governor assigned with N turns to go reads
- *  established N records on, her city abilities paying from the turn after
- *  (runs/h1_duelw1117 China's Pingala: assigned at t28, established at t33,
- *  her +15% Culture first in the progress t33→t34) while the envoys she
- *  brings count in that turn's Favor (runs/h1_duelw1118 China's Amani:
- *  assigned at t29, established at t34 with China's first Favor). 1116 /
- *  1117 / 1118: every one of 30 assignments established its EstablishTurns
- *  records on. */
-export function tickGovernors(state: GameState, seat: number): void {
-  const s = seatOf(state, seat);
-  if (!s) return;
-  for (const g of governorsOf(s)) {
-    if (g.appointed && (g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
+    if ((g.cityId >= 0 || g.minorId >= 0) && g.establishTurns > 0) g.establishTurns -= 1;
   }
 }
 

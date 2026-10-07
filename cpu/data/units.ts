@@ -176,6 +176,9 @@ export interface UnitDef {
   /** a NAVAL unit lives on water natively (never `embarked`);
    * passability/spawn/combat branch on it. Default false. */
   naval?: boolean;
+  /** the install's Domain is DOMAIN_SEA on a unit with no naval chassis (the
+   *  Great Admiral): the sea-unit moment's key reads it with `naval` */
+  seaDomain?: boolean;
   /** CIV 6 unit class: LIGHT cavalry (Horseman) and HEAVY cavalry (Knight).
    * The pair real suzerain/policy text addresses as "light and heavy
    * cavalry"; nothing else in this roster is mounted. */
@@ -810,6 +813,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 1,
       spawnOnly: true,
+      seaDomain: true,
       description: 'Great Admiral — +5 CS to own naval/embarked units within 2 tiles (spawned on claim).',
       src: {
         cost: { stylized: 'great people arrive by points, never production — this model prices the chassis at 0 (units.ts header)' },
@@ -818,6 +822,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         combat: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'Combat'),
         charges: { stylized: 'a placeholder the great-person recruit overwrites with that PERSON\'s charge count' },
         spawnOnly: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'CanTrain', { expect: false }),
+        seaDomain: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'Domain', { expect: 'DOMAIN_SEA' }),
       },
     }),
     // The APOSTLE — appended LAST, because roster indices ARE the

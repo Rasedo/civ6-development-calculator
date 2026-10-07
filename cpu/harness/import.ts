@@ -266,6 +266,40 @@ export function unitId(ctx: Pick<Ctx, 'cat' | 'uReplace' | 'gaps'>, idx: number)
   return rowId(ctx as Ctx, 'unit', ctx.cat.units[idx], 'UNIT_', UNITS, ctx.uReplace);
 }
 
+/** The specialists a record's city keeps in its districts, a count per
+ *  PLACEABLE_DISTRICTS index (-1 where the record shows none: the automatic
+ *  rule): each worked district plot's workers (`City.specialistPref`). */
+export function specialistPins(rec: TurnRecord, cat: Catalog, c: DumpCity): number[] {
+  const pins = PLACEABLE_DISTRICTS.map(() => -1);
+  for (const d of c.districts) {
+    const [ti, dx, dy] = d as [number, number, number];
+    const id = engineRowOf(cat, 'district', ti) as DistrictId | null;
+    const di = id ? PLACEABLE_DISTRICTS.indexOf(id) : -1;
+    const at = dy * rec.head.W + dx;
+    const workers = num(plotAt(rec, at)[P.workers] as number);
+    if (di >= 0 && workers > 0 && c.worked.includes(at)) pins[di] = workers;
+  }
+  return pins;
+}
+
+/** The units a major took by levy across two records, by `owner:id`, with
+ *  the city-state it came from: a unit new at the later record beside (within
+ *  3 plots) one of its type a city-state lost (`Unit.leviedFrom`). */
+export function leviesAcross(last: TurnRecord, rec: TurnRecord): Map<string, number> {
+  const out = new Map<string, number>();
+  const seen = new Set(last.units.map((u) => `${u.owner}:${u.id}`));
+  const live = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+  const handed = last.units.filter((u) => !live.has(`${u.owner}:${u.id}`));
+  const shape = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
+  const minors = new Set(rec.players.filter((p) => bool(p.minor)).map((p) => p.id));
+  for (const u of rec.units) {
+    if (seen.has(`${u.owner}:${u.id}`) || minors.has(u.owner)) continue;
+    const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
+    if (from && minors.has(from.owner)) out.set(`${u.owner}:${u.id}`, from.owner);
+  }
+  return out;
+}
+
 /** A catalog row's engine id, as the importer maps it, outside an import: a
  *  building, district or unit index of `cat`. */
 /** A city-state city's item in hand as the record's queue holds it: nothing
@@ -1197,11 +1231,12 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
     const handed = h.last.units.filter((u) => !live.has(`${u.owner}:${u.id}`));
     const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
     const minors = new Set(rec.players.filter((p) => bool(p.minor)).map((p) => p.id));
+    const levies = leviesAcross(h.last, rec);
     for (const u of rec.units) {
       if (seen.has(`${u.owner}:${u.id}`)) continue;
       const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
-      // a city-state's unit handed to a major is a levy (`Unit.leviedFrom`)
-      if (from && minors.has(from.owner) && !minors.has(u.owner)) h.levied.set(`${u.owner}:${u.id}`, from.owner);
+      const levy = levies.get(`${u.owner}:${u.id}`);
+      if (levy !== undefined) h.levied.set(`${u.owner}:${u.id}`, levy);
       // a levied unit upgraded is a new unit of the type it upgrades into,
       // beside where it stood and as wounded: it stays levied (1118 China's
       // levied Catapult, a Trebuchet from t87, still costs no upkeep)
@@ -2061,7 +2096,6 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       if (pil) pillaged.push(id);
     }
     const districts: City['districts'] = [];
-    const pins = PLACEABLE_DISTRICTS.map(() => -1);
     let hp = CITY_MAX_HP;
     let outerHp: number | undefined;
     for (const d of c.districts) {
@@ -2083,10 +2117,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
         t.districtPillaged = dpil === true;
       }
       districts.push({ type: id, tileIndex: at });
-      const di = PLACEABLE_DISTRICTS.indexOf(id);
-      const workers = num(plotAt(rec, at)[P.workers] as number);
-      if (di >= 0 && workers > 0 && c.worked.includes(at)) pins[di] = workers;
     }
+    const pins = specialistPins(rec, cat, c);
     if (!districts.some((d) => d.type === 'CITY_CENTER')) {
       markCityCentre(tiles[center]);
       districts.unshift({ type: 'CITY_CENTER', tileIndex: center });

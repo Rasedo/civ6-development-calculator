@@ -153,8 +153,8 @@ describe('governors / era score', () => {
     expect(roster[1].cityId).toBe(civ.cities[1].id);
     expect(governorAt(state, civ.cities[2])).toBe(-1);
     expect(governorAt(state, civ.cities[0])).toBe(-1); // the capital pins at LOYALTY_MAX and ranks last
-    // the establishment clock starts full: it ticks after the seat's yields
-    // (`tickGovernors`), not in the phase that seats her
+    // the establishment clock starts full: the phase's clocks run before it
+    // seats her (`governorClocks`)
     expect(roster[0].establishTurns).toBe(GOVERNORS[0].establishTurns);
     expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
   });
@@ -234,6 +234,9 @@ describe('governors / era score', () => {
       addCity(state, r0, 3, 5, 40); // weakest non-capital
       addCity(state, r0, 7, 5, 60); // stronger non-capital
       addCiv(state, 10, 10); // a second civ so r0's cities feel foreign pressure (loyalty runs)
+      // the phase seats her after its cities' loyalty is read: she pays
+      // from the next turn
+      seatPhase(state);
       seatPhase(state);
       return { weak: r0.cities[1].loyalty!, strong: r0.cities[2].loyalty! };
     }

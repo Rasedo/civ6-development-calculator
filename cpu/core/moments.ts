@@ -70,7 +70,9 @@ const STRATEGIC_KEY = new Map(STRATEGIC_IDS.map((r) => [r, add(`STRATEGIC:${r}`,
  *  the strategic resource it uses, a unique one */
 export const UNIT_KEYS: Record<string, number[]> = Object.fromEntries(Object.entries(UNITS).map(([id, u]) => {
   const ks: number[] = [];
-  if (u.naval) ks.push(UNIT_SEA_KEY);
+  // CIV6 (UNIT_CREATED_FIRST_DOMAIN_SEA): any unit of DOMAIN_SEA, the Great
+  // Admiral among them (1121 China t109: its first sea unit an Admiral)
+  if (u.naval || u.seaDomain) ks.push(UNIT_SEA_KEY);
   if (u.air) ks.push(UNIT_AIR_KEY);
   const r = u.requiresResource ? STRATEGIC_KEY.get(u.requiresResource) : undefined;
   if (r !== undefined) ks.push(r);
@@ -219,9 +221,11 @@ export function momentKeysHeld(state: GameState, seat: number): number[] {
   // a unit held by levy is the city-state's: its keys are no unit this seat
   // created (runs/h1_duelw1112 China: the levy's ship at t56, its own first
   // ship's UNIT_CREATED_FIRST_DOMAIN_SEA_IN_WORLD at t70)
+  // (a levied formation still counts: 1121 China t180, a levied Corps of
+  // Line Infantry pays FORMATION_CORPS_FIRST_IN_WORLD and no Niter moment)
   for (const u of state.units) {
-    if (u.seat !== seat || u.leviedFrom !== undefined) continue;
-    for (const k of UNIT_KEYS[u.type] ?? []) out.add(k);
+    if (u.seat !== seat) continue;
+    if (u.leviedFrom === undefined) for (const k of UNIT_KEYS[u.type] ?? []) out.add(k);
     const fk = FORMATION_KEY[UNITS[u.type]?.naval ? 1 : 0][u.formation ?? 0] ?? -1;
     if (fk >= 0) out.add(fk);
   }

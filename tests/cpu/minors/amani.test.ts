@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { tilesWithin } from '../../../world/hex';
-import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor, tickGovernors } from '../../../cpu/core/governors';
+import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor, governorClocks } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { envoysHere, envoysOf, isSuzerain, minorLuxuries, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
 import { luxuryAmenities } from '../../../cpu/core/city';
@@ -82,9 +82,9 @@ describe('the governor at a city-state', () => {
     g.establishTurns = 2;
     expect(minorGovernorEffects(state, 0, cs.id)).toEqual([]);
     expect(envoysHere(state, cs, 0)).toBe(1);
-    tickGovernors(state, 0);
+    governorClocks(state, 0);
     expect(g.establishTurns).toBe(1);
-    tickGovernors(state, 0);
+    governorClocks(state, 0);
     expect(g.establishTurns).toBe(0);
     // ...and now Messenger counts
     expect(envoysHere(state, cs, 0)).toBe(3);
@@ -141,7 +141,7 @@ describe('the governor at a city-state', () => {
     const cs = addCs(state, 10, 10, { envoys: { 0: 1 } });
     const g = post(state, cs);
     state.cityStates = state.cityStates.filter((m) => m.id !== cs.id);
-    governorPhase(state, 0);
+    governorClocks(state, 0);
     expect(g.minorId).toBe(-1);
     expect(g.establishTurns).toBe(0);
   });

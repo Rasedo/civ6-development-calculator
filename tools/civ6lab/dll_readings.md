@@ -1911,12 +1911,19 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
 
 ## H-1: the luxury allocation's rebuilds — PARTLY READ
 
-- Player DoTurn 0x4e4560 runs its cities (Player_Cities +0x12f0, 0x36f420 at
-  0x4e4665) before its resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the
-  holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation).
-  So a city's growth and border read the allocation the previous rebuild
-  left. Recorded: 1122 t200, Reyna established in Changsha (Civil Prestige's
-  amenity) leaves the ranking standing to t201.
+- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the
+  civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the
+  holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation),
+  the governors' clocks (0x432980 at 0x4e46df), and only then each city's
+  turn (0x1fa1d0 at 0x4e4813, in the loop over Player_Cities +0x12f0 from
+  0x4e47bc). 0x36f420 at 0x4e4665 is not the city turn. This REVERSES the
+  earlier reading (cities at 0x4e4665 before the resources); both give the
+  same answer on the recorded cases: 1122 t200, Reyna established in
+  Changsha (Civil Prestige's amenity) leaves the ranking standing to t201
+  (the rebuild precedes her clock), and the 9 policy changes at a
+  processing's start re-rank the cities' luxuries before their growth
+  (the rebuild follows them) — the new order explains the second without
+  an extra rebuild.
 - ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the
   allocation at once (0x4a77d4, unless the game's flag +0x45e) for any
   ownership-0 change and any non-accumulated import / export. Its callers:
@@ -1929,6 +1936,50 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   changes at the processing's start re-rank the cities' luxuries before
   their growth), and which change re-runs it after a founding in the
   action phase (AUDIT C-94 LAB).
+
+## H-1: the governors' clocks — READ
+
+- 0x432980 (from Player DoTurn 0x4e46df, after the culture and the
+  resources, before the city turns) walks the roster: 0x35df30(location, 1)
+  raises the posting's count (+0x28) and, on reaching the type's
+  EstablishTurns (0x433180), raises "Governor Established" (0x35e5f0);
+  then the neutralize clock (0x35e1f0 > 0 -> 0x35d220(-1), "returning to
+  service" at 0); every governor logs GovernorChanged (0x8b9120, hash
+  0xcb6c9e05) — the per-turn GovernorChanged rows, which stand before the
+  city rows in every recorded processing.
+- So the cities of the processing whose tick establishes her read her, the
+  culture already tallied does not. Recorded: 1117 Reyna seated in Handan
+  in China's t94 start (after its cities), established at record 100, the
+  border +20% in the t99 -> t100 processing; Pingala seated t27, border
+  +15% at t32, civic progress from t33; the AI seats after its clocks, so
+  a seating counts its EstablishTurns processings from the next. Engines:
+  `governorPhase` = `governorClocks` then the script, after the Culture
+  tally, before the cities (`_governor_phase` / `_governor_clocks`).
+
+## H-1: the border bank in fixed point — READ
+
+- The border turn 0x1a9bc0 banks the city's culture c (1/256 raw, 0x1ab060)
+  scaled by the border percent [+0x14] when not 0:
+  ((c x ((pct + 100) << 8)) >> 8) / (100 << 8), the shift and the
+  FixedPoint divide (0x16e940) each truncating (0x1a9d25..0x1a9e16).
+  Recorded: 1121 Taiyuan t40-45, 153/256 a turn banking 175/256 at +15%;
+  strict step.border over the 22 duels 24,988 -> 35,259 passes.
+  `cityBorderGrowth` / `_seat_border_growth`.
+
+## H-1: war weariness per combat — PARTLY READ
+
+- 0x1fb680, per side, the attacker logged "Attacking": loc = 1 in lands
+  allied to the unit (GP +0x76c), else 2 (+0x770), +3 killed (+0x774), +10
+  a WMD (+0x778); base = WAR_WEARINESS_WARMONGER_BASE 16 (+0x780) +
+  Eras.WarmongerPoints of the era row (+0x30) x X / 100, X = min(the war's
+  DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450);
+  amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808
+  [+ +0x1868 in allied land]) / 100.
+- Ledger (Player_WarWeariness.csv, 1119-1124, 74 rows, one game t216-223):
+  Rome 104 / 260 / 52 / 208 = (2 / 5 / 1 / 4) x 52, 52 = 16 + 24 x 150%;
+  China 124 / 62 = (2 / 1) x 124 x 50%, 124 = 16 + 24 x 450% (its surprise
+  war); China's later 78s unread; one "Getting Attacked" row in 74 — the
+  defender's branch unread. Not shipped (AUDIT C-94).
 
 ## H-1: the best melee from the log — READ (as above)
 
@@ -2196,7 +2247,9 @@ citizen incrementally; starvation re-places every citizen.
 food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption
 0x5276c0 of the new population. One entry per free slot of each plot of the
 city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial
-dq, dr per index — the centre, then rings 1, 2, 3; the order the DP walks),
+dq, dr per index — the centre, then rings 1, 2, 3; the order the DP walks: (0,0) (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1), ring 2
+from (0,2) clockwise to (-1,2), ring 3 from (0,3) to (-1,3); 0x5cc00 maps
+q = x - floor(y/2) + dq, y' = y + dr, x' = q + floor(y'/2), x wrapped),
 the plot's capacity 0x195940 (0 on the centre, 0 where no yield is above 0,
 a district's specialist slots, else 1) less its workers. An entry's score
 (0x195f90): food (+0x08) the plot's Food; each yield not disfavored
@@ -2219,7 +2272,14 @@ growth pick Food-first, Plains 1/2 over a Great Wall 0/0/4/0/2, the
 re-placement Culture-first on the Great Walls; the border banks 25.5 and
 27.2 where an unfavored DP banks 27.5) and Guangzhou t173-249. The engines'
 own placement (`assignWorkedTiles` / the GPU walk: locked plots, then
-FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD).
+FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD). The H-1
+harness places by it (`cpu/harness/citizens.ts`, no favored yields): a
+Settler's citizen lost re-places them all, a grown citizen goes beside the
+rest, a starved city re-places them all (1121 t21 Xi'an grows back on the
+Spices; t231 Shanghai's five specialists back on plots): over the 22
+duels step.growth +11 / step.border +73 passes against reading the next
+record's worked set. AI_CityBuild.csv logs per-city yield values
+("YIELD_FOOD: -0.1, ..."), not the favored / disfavored flags.
 
 ## H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ
 

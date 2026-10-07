@@ -56,7 +56,8 @@ describe('pantheons', () => {
     expect(getModifiers(state, 0).borderExpansionPct).toBe(15);
     city.cultureBox = 0;
     cityBorderGrowth(state, city, 0, 2);
-    expect(city.cultureBox).toBeCloseTo(2.3, 9);
+    // 2 x 115% in the 1/256 fixed point, truncated: 588/256
+    expect(city.cultureBox).toBe(588 / 256);
   });
 });
 

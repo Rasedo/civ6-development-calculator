@@ -50,9 +50,9 @@ class SimGovernors:
     # ------------------------------------------------------------ the phase
 
     def _governor_phase(self, row: int, active: torch.Tensor) -> None:
-        """The seat's governor turn, at the top of its own turn and before
-        anything reads the roster: spend the available titles, seat every idle
-        governor, then tick the neutralization clock.
+        """`governorPhase`: the seat's governor turn, after its Culture is
+        summed and before its tallies and cities: the clocks, then spend the
+        available titles and seat every idle governor.
 
         The CHOICE is a deterministic heuristic both engines mirror exactly —
         appoint in catalog order, promote the first legal promotion in catalog
@@ -62,7 +62,7 @@ class SimGovernors:
         if NG == 0:
             return
         # `active` is the TS loop's `cities.length === 0` continue, which sits
-        # ABOVE governorPhase in seatPhase: a seat with no city runs none of
+        # ABOVE the seat's economy in seatPhase: a seat with no city runs none of
         # this and its roster is left exactly as it stood. `civ_alive` is not
         # that predicate — a seat can be alive and cityless — and at B=1 the
         # seat turn's own `active.any()` early return hid the difference. A
@@ -73,13 +73,13 @@ class SimGovernors:
         if not bool(live.count_nonzero()):
             return
 
+        _fp = self._governor_appeal_fingerprint(row)
+        self._governor_clocks(row, live)
         titles = (self._governor_titles_earned(row) - self._governor_titles_spent(row)).clamp(min=0)
         titles = torch.where(live, titles, torch.zeros_like(titles))
-        _fp = self._governor_appeal_fingerprint(row)
         self._governor_spend(row, titles)
         self._governor_post_minor(row, live)
         self._governor_seat(row, live)
-        self._governor_tick(row, live)
         # Appointing, promoting, seating and the establishment clock all move
         # `_appeal_lend_plane`, and `_tile_appeal` is version-cached — without
         # this the appeal a governor grants arrives a turn late, and the
@@ -87,10 +87,6 @@ class SimGovernors:
         # keeps a quiet turn from invalidating anything.
         if self._gov_appeal_any and int(_fp) != int(self._governor_appeal_fingerprint(row)):
             self._eff_version += 1
-        # A posting is an envoy count, so the minors' stored answer moves with
-        # it — `resolveSuzerains`' position.
-        if self.S:
-            self._cs_resolve_suzerain()
 
     def _governor_appeal_fingerprint(self, row: int) -> torch.Tensor:
         """A scalar that moves whenever this row's governors could grant a
@@ -300,9 +296,10 @@ class SimGovernors:
             est[rows, g] = self._gov_establish[g]
             taken[rows, sl] = True
 
-    def _governor_tick(self, row: int, live: torch.Tensor) -> None:
-        """The neutralization clock, and the governor whose city is gone goes back to the
-        Palace."""
+    def _governor_clocks(self, row: int, live: torch.Tensor) -> None:
+        """`governorClocks`: the neutralization clock, the governor whose city
+        or minor is gone back to the Palace, and the establishment clock of
+        every appointed governor holding a city or a city-state."""
         NG = self.n_governors
         ap = self.civ_gov_appointed[:, row]
         city = self.civ_gov_city[:, row]
@@ -333,17 +330,8 @@ class SimGovernors:
             mgone = posted & ~mstill & live
             minor[:, g] = torch.where(mgone, torch.full_like(minor[:, g], -1), minor[:, g])
             est[:, g] = torch.where(mgone, torch.zeros_like(est[:, g]), est[:, g])
-
-    def _governor_establish_tick(self, row: int, live: torch.Tensor) -> None:
-        """`tickGovernors`: the establishment clock ticks after the seat's
-        cities have yielded and before its tallies, for every appointed
-        governor holding a city or a city-state. `live` is the seat block's
-        city guard."""
-        ap = self.civ_gov_appointed[:, row]
-        est = self.civ_gov_establish[:, row]
-        held = (self.civ_gov_city[:, row] >= 0) | (self.civ_gov_minor[:, row] >= 0)
-        ticking = ap & held & (est > 0) & live.unsqueeze(1)
-        self.civ_gov_establish[:, row] = torch.where(ticking, est - 1, est)
+            held = live_g & ((city[:, g] >= 0) | (minor[:, g] >= 0))
+            est[:, g] = torch.where(held & (est[:, g] > 0), est[:, g] - 1, est[:, g])
 
     def neutralize_governor(self, b: int, row: int, g: int, turns: int) -> None:
         """CIV6 (Neutralize Governor / Governance Doctrine B): the governor

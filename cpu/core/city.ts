@@ -236,7 +236,7 @@ export function effectiveSpecialists(state: GameState, city: City): Map<number, 
 
 /** A specialist's yields in this city: the base row, upgraded when the
  * district's TOP building stands ('WORSHIP' = any worship building). */
-function specialistYields(district: import('./types').DistrictId, buildings: readonly string[]): Partial<Yields> | undefined {
+export function specialistYields(district: import('./types').DistrictId, buildings: readonly string[]): Partial<Yields> | undefined {
   const base = SPECIALIST_YIELDS[district];
   if (!base) return undefined;
   const tier = SPECIALIST_TIERS[district];

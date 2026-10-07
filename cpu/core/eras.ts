@@ -21,7 +21,7 @@ import { recordMoment, LARGEST_KEY, NEAR_WONDER_KEY, NEAR_FLOOD_KEY, NEAR_VOLCAN
 import {
   MOMENT_LARGEST_MARGIN, MOMENT_NEAR_RANGE, MOMENT_GP_GAME_ERA, MOMENT_GP_PAST_ERA, MOMENT_GP_FAITH_HALF,
   MOMENT_GP_GOLD_HALF, MOMENT_GOODY, MOMENT_GOODY_MAX_ERA, MOMENT_CAMP, MOMENT_CAMP_NEAR, MOMENT_CAMP_MAX_ERA,
-  MOMENT_CAMP_NEAR_RANGE, MOMENT_DIPLO_VP, MOMENT_LEVIED,
+  MOMENT_CAMP_NEAR_RANGE, MOMENT_DIPLO_VP, MOMENT_LEVIED, MOMENT_CANAL, MOMENT_MET_ALL,
 } from '../data/seats';
 import {
   MOMENT_ON_DESERT, MOMENT_ON_SNOW, MOMENT_ON_TUNDRA, MOMENT_NEW_CONTINENT, MOMENT_NEAR_CIV_CITY, MOMENT_NEAR_CIV_RANGE,
@@ -71,15 +71,20 @@ export function foundingMoments(state: GameState, seat: number, centre: number):
       break;
     }
   }
-  const cont = tile.continent ?? -1;
-  const others = citiesOf(state, seat).filter((c) => c.centerIndex !== centre);
-  if (cont >= 0 && others.length > 0 && others.every((c) => (map.tiles[c.centerIndex].continent ?? -1) !== cont)) {
-    addEraScore(state, seat, MOMENT_NEW_CONTINENT);
-  }
+  if (newContinent(state, seat, centre)) addEraScore(state, seat, MOMENT_NEW_CONTINENT);
   const terrain = tile.terrain === 'DESERT' ? MOMENT_ON_DESERT : tile.terrain === 'SNOW' ? MOMENT_ON_SNOW
     : tile.terrain === 'TUNDRA' ? MOMENT_ON_TUNDRA : 0;
   if (terrain > 0) addEraScore(state, seat, terrain);
   for (const k of foundingKeys(state, seat, centre)) recordMoment(state, seat, k);
+}
+
+/** Does major `seat`'s city at `centre` stand on a continent none of its
+ *  other cities stands on (CITY_BUILT_NEW_CONTINENT)? */
+export function newContinent(state: GameState, seat: number, centre: number): boolean {
+  const map = state.map;
+  const cont = map.tiles[centre].continent ?? -1;
+  const others = citiesOf(state, seat).filter((c) => c.centerIndex !== centre);
+  return cont >= 0 && others.length > 0 && others.every((c) => (map.tiles[c.centerIndex].continent ?? -1) !== cont);
 }
 
 /** The once-a-game keys a city of major `seat` at `centre` holds, ascending:
@@ -157,6 +162,19 @@ export function levyMoment(state: GameState, seat: number): void {
 /** The Diplomatic Victory resolution's points earned by major `seat`. */
 export function diploVictoryMoment(state: GameState, seat: number): void {
   if (isCiv(seat)) addEraScore(state, seat, MOMENT_DIPLO_VP);
+}
+
+/** A Canal district major `seat` completed. */
+export function canalMoment(state: GameState, seat: number): void {
+  if (isCiv(seat)) addEraScore(state, seat, MOMENT_CANAL);
+}
+
+/** Major `seat` has met every living major: FIRST_IN_WORLD when no major had
+ *  before this turn (two meeting each other both take it: 1121 t127, Rome
+ *  and China 5 each), else the plain row. The engines hold no contact
+ *  between majors, so only the H-1 harness calls it. */
+export function metAllMajorsMoment(state: GameState, seat: number, first: boolean): void {
+  if (isCiv(seat)) addEraScore(state, seat, MOMENT_MET_ALL[first ? 1 : 0]);
 }
 
 /** A city passing from `fromSeat` to major `toSeat`: TO_ORIGINAL_OWNER when

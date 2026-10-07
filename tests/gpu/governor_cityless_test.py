@@ -82,7 +82,7 @@ def test_the_mask_is_the_ts_predicate(sim) -> None:
     import inspect
     src = inspect.getsource(type(sim)._governor_phase)
     assert "live = active" in src, "the phase does not gate on the seat's active flag"
-    tick = inspect.getsource(type(sim)._governor_tick)
+    tick = inspect.getsource(type(sim)._governor_clocks)
     assert "& live" in tick, "the tick is not masked by the seat's active flag"
     print("  4 the gate OK — phase and tick both read the seat's `active`, never civ_alive")
 

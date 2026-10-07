@@ -114,7 +114,7 @@ import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
-import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, tickGovernors, governedCityIds, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -527,7 +527,8 @@ export function cultureAfterGrowth(state: GameState, city: City, popBefore: numb
 /**
  * CIV6 (City_Culture, the DLL's border turn 0x1a9bc0): the box banks the
  * culture — the border-expansion percents (Land Acquisition's, Religious
- * Settlements') scale what is banked, never the price.
+ * Settlements') scale what is banked, truncated to the 1/256 step, never the
+ * price.
  * A box that covers the price pays it and takes at most ONE plot: the stored
  * `nextPlot` while still unowned, else a fresh draw, and nothing when nothing
  * is in reach (the price is spent all the same). Then, every turn, the city
@@ -546,7 +547,10 @@ export function cityBorderGrowth(state: GameState, city: City, seat: number, cul
   const annex = civLevelOf(seat).canAnnexTilesWithCulture;
   if (annex) {
     const pct = governorSum(state, city, (e) => e.borderExpansionPct) + getModifiers(state, seat).borderExpansionPct;
-    city.cultureBox += pct ? (culture * (100 + pct)) / 100 : culture;
+    // in the game's 1/256 fixed point: (c * ((100 + pct) << 8)) >> 8, then
+    // divided by 100 << 8, each step truncating (0x1a9d25..0x1a9e16; 1121
+    // Taiyuan t40-45: 153/256 a turn banks 175/256 at +15%)
+    city.cultureBox += pct ? Math.floor((Math.floor(culture * 256 + 1e-6) * (100 + pct)) / 100) / 256 : culture;
   }
   const cost = borderGrowthCost(city.tilesAcquired);
   if (annex && city.cultureBox >= cost) {
@@ -2626,12 +2630,6 @@ export function seatPhase(state: GameState): void {
     accrueStockpiles(state, actor.seat);
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
-    // THE GOVERNORS, before anything reads the roster: earned titles are
-    // spent, idle governors take a city, and the neutralization clock ticks. Every
-    // ability the city walk reads is settled here.
-    governorPhase(state, actor.seat);
-    // A posting is an envoy count, so the minors' stored answer moves with it.
-    resolveSuzerains(state);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
     tickSpies(state, actor.seat);
@@ -2762,8 +2760,9 @@ export function seatPhase(state: GameState): void {
     // technology, the shortfall or the policies, a civic.
     const grantedNow: string[] = []; // the roster's technology grants, spawned after the upkeep
     const econMods = getModifiers(state, actor.seat);
-    // this seat's governor seats for THIS turn — persistent assignments the
-    // roster already carries, read once before the walk moves any loyalty.
+    // this seat's governor seats for THIS turn — the assignments the roster
+    // carries into it, read before its governor phase (one it seats this
+    // turn holds the city from the next) and before any loyalty moves.
     const rGovIds = governedCityIds(actor);
     const readYields = (): CityStats['total'][] => {
       const lux = luxuryAmenities(state, actor.seat);
@@ -2918,10 +2917,13 @@ export function seatPhase(state: GameState): void {
         culSum += ALLIANCE_C3_CUL_PCT * (o.culRate ?? 0);
       }
     }
-    // THE ESTABLISHMENT CLOCK, between the cities' yields and the seat's
-    // tallies: a governor established now pays no Culture this turn, while
-    // the envoys she brings count toward its Favor (`tickGovernors`)
-    tickGovernors(state, actor.seat);
+    // THE GOVERNORS, after the Culture is summed and before the tourism,
+    // favor and grievance tallies and the cities: the clocks, then this
+    // seat's choices (`governorPhase`). A governor established now paid no
+    // Culture this turn; her abilities reach the city walk below, and the
+    // envoys she brings count toward the Favor. A posting is an envoy count,
+    // so the minors' stored answer moves with it.
+    governorPhase(state, actor.seat);
     resolveSuzerains(state);
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes

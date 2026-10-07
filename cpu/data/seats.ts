@@ -412,6 +412,12 @@ export const MOMENT_LEVIED = moment('PLAYER_LEVIED_MILITARY', 1);
 /** CIV6 (PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT): "You have won the
  *  Diplomatic Victory resolution and earned Victory Points." */
 export const MOMENT_DIPLO_VP = moment('PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT', 2);
+/** CIV6 (DISTRICT_CONSTRUCTED_CANAL): every Canal a major completes (one
+ *  row, no first-in-world twin) */
+export const MOMENT_CANAL = moment('DISTRICT_CONSTRUCTED_CANAL', 2);
+/** CIV6 (PLAYER_MET_ALL_MAJORS): a major has met every living major, as
+ *  [plain, first in the world] */
+export const MOMENT_MET_ALL = [moment('PLAYER_MET_ALL_MAJORS', 3), moment('PLAYER_MET_ALL_MAJORS_FIRST_IN_WORLD', 5)] as const;
 /**
  * THE ONCE MOMENTS (`MOMENT_KEYS`, cpu/core/moments.ts): what a player
  * records the first time it holds something, as [plain, first in the world]
