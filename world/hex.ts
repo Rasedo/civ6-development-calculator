@@ -42,6 +42,13 @@ export const DIR_SE = 5;
  *  the game's north is this grid's south. */
 export const DIRECTION_TYPES: readonly number[] = [DIR_SE, DIR_E, DIR_NE, DIR_NW, DIR_W, DIR_SW];
 
+/** The order the DLL's ring walk visits a plot's neighbours (0x6b1b0 ->
+ *  0x691f0, its cube steps at 0xf0bf40: (0, 1), (-1, 0), (1, -1), (0, -1),
+ *  (1, 0), (-1, 1) in the game's (x - y // 2, y)), as this grid's
+ *  directions: the fire's spread lights its neighbours so
+ *  (runs/h1_duelw1118 t22: Rainforest 664 west of 665 lit before 621). */
+export const RING_DIRS: readonly number[] = [DIR_SE, DIR_W, DIR_NE, DIR_NW, DIR_E, DIR_SW];
+
 export function oppositeDir(d: number): number {
   return (d + 3) % 6;
 }

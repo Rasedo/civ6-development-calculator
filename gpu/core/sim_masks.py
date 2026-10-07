@@ -291,6 +291,22 @@ class SimMasks:
         s = self._lcg_step(mask)
         return ((s >> 16) * (torch.as_tensor(mx, device=self.device).long() & 0xFFFF)) >> 16
 
+    def _draw_citizen_name(self, mask: torch.Tensor, row: torch.Tensor) -> None:
+        """`drawCitizenName` — where `mask` [B], major row `row` [B] gives one
+        of its civilization's citizen names it has not given: ONE draw over the
+        names left, the name then given; none left (or no civilization), no
+        draw."""
+        if not bool(mask.count_nonzero()):
+            return
+        r = row.clamp(min=0, max=self.n_majors - 1)
+        bidx = torch.arange(self.B, device=self.device)
+        civ = self.row_civ[bidx, r]
+        pool = torch.tensor(self._citizen_name_rows + [0], dtype=torch.long, device=self.device)
+        left = pool[torch.where(civ >= 0, civ, torch.full_like(civ, len(self._citizen_name_rows)))] - self.civ_citizen_names[bidx, r]
+        on = mask & (row >= 0) & (row < self.n_majors) & (left > 0)
+        self._rand_range(on, left)
+        self.civ_citizen_names[bidx, r] += on.long()
+
     def _rand_weighted(self, mask: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
         """The game's weighted picker (0x287c00) in the games of `mask` over
         each game's integer weights `w` [B, K]: ONE draw over their total, the
@@ -2984,6 +3000,10 @@ class SimMasks:
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none #{_why}")
         if not bool(can.count_nonzero()):
             return can
+        # a major's Spy is named at its birth ("Choosing a Citizen Name")
+        if not minor and row < self.n_majors and self._spy_idx >= 0:
+            _ti_s = type_idx if torch.is_tensor(type_idx) and type_idx.dim() > 0 else torch.full_like(at_tile, int(type_idx))
+            self._draw_citizen_name(can & (_ti_s == self._spy_idx), torch.full_like(at_tile, row))
         rows = can.nonzero(as_tuple=True)[0]
         if self._log_diff:
             for _sb in rows.tolist():

@@ -67,7 +67,7 @@ import { promiseIncursion } from './grievance';
 import { PROMISE_DIG } from '../data/promises';
 import { FEATURES } from '../../world/features';
 import { RESOURCES } from '../../world/resources';
-import { BARB_SEAT, NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
+import { BARB_SEAT, NO_SEAT, borderTurnsFrom, capsOf, campTiles, cityAtTile, cityHolders, civHasStrategic, civOf, drawCitizenName, civsAtWar, isCiv, isCityStateSeat, leaderOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { suzerainOf } from './cityStates';
 import { canPayStockpile, canPayUpgradeGold, spendStockpile, upgradeGoldCost, upgradeResourceCost } from './stockpile';
 import { canTrainAir, carryAirWith, isAirUnit } from './air';
@@ -1661,6 +1661,8 @@ export function spawnUnit(
     }
     return null;
   }
+  // a major's Spy is named at its birth ("Choosing a Citizen Name")
+  if (isSpy(unitType) && seat < state.seats.length) drawCitizenName(state, seat);
   const unit: Unit = {
     id: state.nextUnitId++,
     type: unitType,

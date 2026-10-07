@@ -14,6 +14,8 @@ import { GREAT_PEOPLE } from '../data/greatPeople';
 import { CIV_LEVELS, type CivLevelDef, type CivLevelId } from '../data/civLevels';
 
 import { NO_SEAT } from './types';
+import { randRange } from './rand';
+import { CITIZEN_NAME_ROWS, CITIZEN_NAME_ROWS_FRANCE } from '../data/seats';
 export { NO_SEAT };
 const CITY_STATE_SEAT_BASE = 100;
 export const BARB_SEAT = 200;
@@ -81,7 +83,29 @@ export function tileClaimed(t: Tile): boolean {
  *  is a player too and reads its own research; a seat with no research (the
  *  Free Cities) sees none of them; a seat with no record here at all (a
  *  test's phantom owner) hides nothing. A Great Person's reveal
- *  (`GP_RESOURCE_REVEAL`, James Young's Oil) shows one before its technology. */
+ *  (`GP_RESOURCE_REVEAL`, James Young's Oil) shows one before its technology.
+ *  A city-state sees every resource its suzerain sees (0x4ac140 asks the
+ *  suzerain's resources before its own research: runs/h1_duelw1117
+ *  Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95 score the Niter
+ *  beside their next plots once their suzerain holds Military Engineering,
+ *  before they do). */
+/**
+ * "Choosing a Citizen Name" (0x486c20): a name from the seat's civilization's
+ * citizen names it has not given — ONE draw over the names left, the name
+ * then given (a major's Spy at its birth, a storm named for the seat). A
+ * seat with none left, or no civilization, draws nothing.
+ */
+export function drawCitizenName(state: GameState, seat: number): void {
+  const s = state.seats[seat];
+  if (!s) return;
+  const civ = CIV_LEADERS[s.civ]?.civ;
+  if (!civ) return;
+  const left = (civ === 'FRANCE' ? CITIZEN_NAME_ROWS_FRANCE : CITIZEN_NAME_ROWS) - (s.citizenNames ?? 0);
+  if (left <= 0) return;
+  randRange(state, left);
+  s.citizenNames = (s.citizenNames ?? 0) + 1;
+}
+
 export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<string> {
   const s = seatOf(state, seat);
   if (!s) return NOTHING_HIDDEN;
@@ -90,6 +114,11 @@ export function hiddenResourcesFor(state: GameState, seat: number): ReadonlySet<
   for (const def of Object.values(RESOURCES)) {
     if (def.revealTech && !techs.includes(def.revealTech)
       && !GP_RESOURCE_REVEAL.some((r) => r.resource === def.id && gpPermOf(s, r.perm) > 0)) out.add(def.id);
+  }
+  const suz = isCityStateSeat(seat) ? (s as CityState).suzerain ?? -1 : -1;
+  if (suz >= 0 && out.size) {
+    const seen = hiddenResourcesFor(state, suz);
+    for (const r of [...out]) if (!seen.has(r)) out.delete(r);
   }
   return out;
 }

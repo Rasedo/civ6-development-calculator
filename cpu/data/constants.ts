@@ -36,6 +36,17 @@ export const PLOT_INFLUENCE = {
   yieldPointCost: srcConst('constants.plotInfluence.yieldPointCost', -1, gp('PLOT_INFLUENCE_YIELD_POINT_COST')),
 } as const;
 
+/** "Choosing a City Name" (0x327c30 -> 0x328de0): a major's city past its
+ *  capital (which takes its leader's CapitalName, no draw) takes ONE draw
+ *  over the first 10 of its civilization's unused CityNames rows, weighted
+ *  10, 9, ... 1 — a draw over 55 (runs/h1_duelw1117 and 1118: 21 of 21
+ *  foundings past a capital). The DLL reads the count from a row's +0x1c
+ *  where one is set, else 10. */
+export const CITY_NAME_CHOICES = srcConst('constants.cityNameChoices', 10, {
+  lab: 'C-74', note: 'GameCore_XP2 0x327c30 (edi = 0xa unless the row 0x28a940 returns sets +0x1c); runs/h1_duelw1117 + 1118 "Choosing a City Name" range 55 on all 21',
+});
+export const CITY_NAME_DRAW = (CITY_NAME_CHOICES * (CITY_NAME_CHOICES + 1)) / 2;
+
 export const CULTURE_COST_FIRST_PLOT =srcConst('constants.cultureCostFirstPlot', 10,
   gp('CULTURE_COST_FIRST_PLOT'));
 export const CULTURE_COST_LATER_PLOT_MULTIPLIER = srcConst('constants.cultureCostLaterPlotMultiplier', 6,

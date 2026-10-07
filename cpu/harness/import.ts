@@ -85,6 +85,13 @@ import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
 import { aliases, engineId, gameHash } from './aliases';
+import type { RandLog } from './randLog';
+
+/** A city's closing-pick ties as a record left them (`History.startTies`). */
+export interface StartTies {
+  open: number[];
+  claimed: number[];
+}
 
 /** the game's `CityMadePurchase` purchase type of a plot: the hash of its kind's name */
 const PURCHASE_PLOT_HASH = gameHash('PLOT');
@@ -116,6 +123,11 @@ export interface Imported {
   cityBefore: Map<string, DumpCity>;
   /** the record of the turn before (null without it) */
   recordBefore: TurnRecord | null;
+  /** the game's own draw log of this game (`History.randLog`) */
+  randLog?: RandLog;
+  /** the closing picks' ties each record computed for the starts the next
+   *  record witnesses (`History.startTies`) */
+  startTies: Map<string, StartTies>;
   /** the gaps met importing each seat (its research, government, policies,
    *  pantheon, its religion's beliefs) and each plot (a feature, resource or
    *  improvement dropped) */
@@ -514,6 +526,14 @@ export interface History {
   /** the recorded random events the game's generator replays from the
    *  witnesses' states (`replayEvents`): their fertility, placed by the draws */
   replay?: EventReplay;
+  /** the game's own draw log (`Logs/RandCalls.csv`, `randLog.ts`), where the
+   *  recording kept it */
+  randLog?: RandLog;
+  /** by `${turn}:${owner}:${city id}`, a city's closing-pick ties as the
+   *  record of that turn left them, for the start of that turn the next
+   *  record witnesses: with no plot claimed (`open`) and with the stored plot
+   *  claimed by culture (`claimed`) (`startDraws`) */
+  startTies: Map<string, StartTies>;
   /** the sea level the records' `events` reached: the highest
    *  RANDOM_EVENT_SEA_LEVEL_RISE<n> named */
   seaLevel: number;
@@ -596,7 +616,7 @@ export function newHistory(): History {
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
-    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, seaLevel: 0, people: null, stockpile: new Map() };
+    dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
 }
 
 /** Fold a record's `events` into the history: the floods (each with its
@@ -2124,6 +2144,8 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
     cityBefore: prevCities,
     recordBefore: b1,
+    randLog: history?.randLog,
+    startTies: history?.startTies ?? new Map(),
   };
 }
 

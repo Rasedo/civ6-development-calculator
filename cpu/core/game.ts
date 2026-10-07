@@ -45,7 +45,8 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { ERAS } from '../data/techs';
 import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
-import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
+import { CITY_NAMES, CITY_NAME_DRAW, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
+import { randRange } from './rand';
 import { srcConst, xml } from '../data/provenance';
 import { rowIsFor } from '../data/civilizations';
 import type { CivId, LeaderId } from '../../world/roster';
@@ -276,6 +277,10 @@ export function trajansColumn(state: GameState, seat: number, city: City): void 
 
 export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: Seat | null): City {
   const list: City[] = owner ? owner.cities : seatOf(state, seat)!.cities;
+  // a major's city past its capital draws its name ("Choosing a City Name",
+  // 0x328de0): ONE draw over the first CITY_NAME_CHOICES unused names
+  // weighted n, n - 1, ... 1 (the engines keep their own name list)
+  if (seat < state.seats.length && list.length > 0) randRange(state, CITY_NAME_DRAW);
   const id = owner ? owner.nextCityId++ : seatOf(state, seat)!.nextCityId++;
   const city: City = {
     id,

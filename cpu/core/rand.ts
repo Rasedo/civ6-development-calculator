@@ -35,3 +35,24 @@ export function randWeighted(state: GameState, weights: readonly number[]): numb
   }
   return -1;
 }
+
+/** A point of the turn the game's own record witnesses the generator at: a
+ *  seat's start of turn (`seat`, a city-state's included) or the turn's
+ *  random-event step (`step`). */
+export type RngPoint = { kind: 'seat' | 'step'; seat: number; turn: number };
+
+let witness: ((state: GameState, point: RngPoint) => number | undefined) | null = null;
+
+/** The action replay's hold on the generator (`cpu/harness/replay.ts`): at
+ *  each witnessed point the generator takes the state the game's held there,
+ *  so a free run stays on the game's random stream. Null outside a replay. */
+export function holdRng(w: ((state: GameState, point: RngPoint) => number | undefined) | null): void {
+  witness = w;
+}
+
+/** The generator at a witnessed point: the game's state there where a replay
+ *  holds it, else as it stands. */
+export function atRngPoint(state: GameState, point: RngPoint): void {
+  const s = witness?.(state, point);
+  if (s !== undefined) state.rngState = s >>> 0;
+}

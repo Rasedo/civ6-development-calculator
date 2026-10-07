@@ -3,14 +3,14 @@ import type { City, CityState, GameState, StormRecord, Tile } from './types';
 import { logPopWrite } from './difflog';
 import type { GameMap, ImprovementId } from '../../world/types';
 import { IMPROVEMENTS } from '../data/improvements';
-import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIRECTION_TYPES } from '../../world/hex';
+import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIRECTION_TYPES, RING_DIRS } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
-import { randRange, randWeighted } from './rand';
+import { atRngPoint, randRange, randWeighted } from './rand';
 import { fogActive, isExplored } from './fog';
-import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders } from './seats';
+import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, drawCitizenName } from './seats';
 import { raiseAidRequest } from './competition';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -27,7 +27,7 @@ import { unitDomain } from './units';
 import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
-import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING } from '../data/disasters';
+import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE } from '../data/disasters';
 import { TURN_LIMIT } from './game';
 import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY } from '../data/disasters';
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
@@ -660,13 +660,6 @@ export function liveEventPlots(state: GameState): Tile[] {
   return state.map.tiles.filter((t) => struck.has(t.index));
 }
 
-/** The plots a drought start keeps its distance from: each live drought at
- *  the LAST plot of its footprint (Game_Climate 0x28ce90 over m_aDroughts). */
-export function droughtEnds(state: GameState): Tile[] {
-  return (state.droughts ?? []).filter((d) => d.plots.length > 0)
-    .map((d) => state.map.tiles[d.plots[d.plots.length - 1]]);
-}
-
 /**
  * May a drought start on this plot now? (Game_Climate "Pick Drought Start
  * Plot", GameCore_XP2 0x287e80 and its predicate 0x28eb60;
@@ -690,11 +683,13 @@ export function droughtCandidate(map: GameMap, t: Tile, centres: ReadonlySet<num
 }
 
 /**
- * A drought's start plot: ONE weighted draw over every candidate plot of the
- * map (`droughtCandidate`) in ascending order, each weighing 1 + min(its hex
- * distance to the nearest live drought's last footprint plot (`droughtEnds`),
- * `DROUGHT_SPACING`) — no city anchor (GameCore_XP2 0x287e80). No candidate,
- * no draw. `_drought_start` is the twin.
+ * A drought's start plot: ONE uniform draw over every candidate plot of the
+ * map (`droughtCandidate`) in ascending order — no city anchor
+ * (GameCore_XP2 0x287e80: each candidate's score 0x28ff20, 1 + min(distance
+ * to a live drought, Spacing), keeps it in the list, and the draw is over the
+ * list's count, the scores unread; runs/h1_duelw1118 t92 and t102 draw over
+ * 1, t138 and t151 over 3). No candidate, no draw. `_drought_start` is the
+ * twin.
  */
 export function droughtStart(state: GameState): Tile | undefined {
   const map = state.map;
@@ -702,26 +697,9 @@ export function droughtStart(state: GameState): Tile | undefined {
   for (const s of cityHolders(state)) for (const c of s.cities) centres.add(c.centerIndex);
   for (const cs of state.cityStates) centres.add(cs.centerIndex);
   const live = new Set(liveEventPlots(state).map((t) => t.index));
-  const events = droughtEnds(state);
-  const cands: Tile[] = [];
-  const weights: number[] = [];
-  let total = 0;
-  for (const t of map.tiles) {
-    if (!droughtCandidate(map, t, centres, live)) continue;
-    let d: number = DROUGHT_SPACING;
-    for (const e of events) d = Math.min(d, hexDistance(state.map, t.col, t.row, e.col, e.row));
-    cands.push(t);
-    weights.push(1 + d);
-    total += 1 + d;
-  }
-  if (total === 0) return undefined;
-  const at = randRange(state, total);
-  let cum = 0;
-  for (let i = 0; i < cands.length; i++) {
-    cum += weights[i];
-    if (at < cum) return cands[i];
-  }
-  return cands[cands.length - 1];
+  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, live));
+  if (!cands.length) return undefined;
+  return cands[randRange(state, cands.length)];
 }
 
 /**
@@ -730,7 +708,9 @@ export function droughtStart(state: GameState): Tile | undefined {
  * roll's gate"). V the volcanoes, N the NAMED ones (`volcanoNamed`; the
  * count 0xa1d2b0(true), entries whose name is set), A the active ones, W the
  * volcanic wonders standing (always active); the active share pct =
- * 100·(A + W) // (V + W) and D = `VOLCANO_ROLL_TURNS` // (2V). No named
+ * 100·(A + W) // (V + W) and D = `TURN_LIMIT` // (2V), the game's turns as the
+ * event roll reads them (0x339020; runs/h1_duelw1117 / 1118: 62 on every roll
+ * with V = 2, and 1118 t152's sleep over two active volcanoes). No named
  * volcano, no draw. Below `PERCENT_VOLCANOES_ACTIVE`, while a named volcano
  * sleeps: D //= (70 − pct)·N // 100 when that product reaches 200, and
  * rand(D) = 0 wakes ONE sleeping named volcano, drawn uniformly in ascending
@@ -746,7 +726,7 @@ export function volcanoRoll(state: GameState): void {
   const w = new Set(ERUPTION_WONDER.filter((f): f is string => !!f && state.map.tiles.some((t) => t.feature === f))).size;
   const active = volcanoes.filter((t) => t.volcanoActive);
   const pct = Math.floor((100 * (active.length + w)) / (v + w));
-  let d = Math.floor(VOLCANO_ROLL_TURNS / (2 * v));
+  let d = Math.floor(TURN_LIMIT / (2 * v));
   const wake = pct < PERCENT_VOLCANOES_ACTIVE;
   if (wake) {
     if (named.length - active.length <= 0) return;
@@ -953,7 +933,7 @@ export function fireBirth(state: GameState, t: Tile, row: number): void {
  * POPULATION_LOSS (age `FIRE_POP_TURN`), UNIT_KILLED_CIVILIAN and
  * UNIT_DAMAGE_LAND (`FIRE_DAMAGE_TURNS`, each land unit its own draw), and
  * SPREAD at `FIRE_SPREAD_P` on `FIRE_SPREAD_TURNS`: every neighbour, in
- * DirectionTypes order, standing on the row's own live feature starts a fire
+ * the ring walk's order (`RING_DIRS`), standing on the row's own live feature starts a fire
  * of its own (`fireBirth`). `_fire_strike` is the twin.
  */
 function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
@@ -993,7 +973,7 @@ function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
   }
   if (age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1]
       && randRange(state, 100) < Math.round(FIRE_SPREAD_P * 100)) {
-    for (const d of DIRECTION_TYPES) {
+    for (const d of RING_DIRS) {
       const n = neighborTile(map, t, d);
       if (n && n.fireStart === undefined && fireCandidate(n, row)) fireBirth(state, n, row);
     }
@@ -1284,6 +1264,7 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
  * the last draws before the first player's turn.
  */
 export function disasterPhase(state: GameState): void {
+  atRngPoint(state, { kind: 'step', seat: -1, turn: state.turn });
   const map = state.map;
   const strip = desertificationLive(state);
 
@@ -1388,12 +1369,34 @@ function stormPreview(state: GameState, at: number): void {
  * list, so its first walk strikes its birth plots again. It walks the next
  * `duration` − 1 turns.
  */
+/**
+ * The seat a new storm is named for (Game_Climate 0x28d4f0): the major whose
+ * plot it starts on, else the major whose city stands nearest it (the first
+ * in seat order at the least distance); -1 with no major city, and the storm
+ * goes unnamed with no draw. `_storm_namer` is the twin.
+ */
+export function stormNamer(state: GameState, t: Tile): number {
+  const own = tileSeat(t);
+  if (own >= 0 && own < state.seats.length) return own;
+  let best = -1;
+  let bd = Infinity;
+  for (const s of state.seats) {
+    for (const c of s.cities) {
+      const ct = state.map.tiles[c.centerIndex];
+      const d = hexDistance(state.map, t.col, t.row, ct.col, ct.row);
+      if (d < bd) { bd = d; best = s.seat; }
+    }
+  }
+  return best;
+}
+
 export function stormBirth(state: GameState, e: number, strip: boolean): void {
   const ev = STORM_EVENTS[e];
   const center = stormStart(state, ev);
   if (!center) return;
   stormPreview(state, center.index);
-  randRange(state, 1);
+  const namer = stormNamer(state, center);
+  if (namer >= 0) drawCitizenName(state, namer);
   state.stormSerial = (state.stormSerial ?? 0) + 1;
   (state.storms ??= []).push({ id: state.stormSerial, event: e, at: center.index, left: ev.duration - 1, struck: [] });
   stormStrike(state, { id: 0, event: e, at: center.index, left: 0, struck: [] }, 100, strip);

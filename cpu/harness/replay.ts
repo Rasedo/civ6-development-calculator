@@ -23,8 +23,10 @@
  * carried out through the engine's own verbs (the engine refuses it, or no
  * verb takes it), the recorded outcome of THAT decision is imposed and
  * counted per kind (`fallbacks`), so a divergence can be told apart from a
- * decision the replay could not express. The generator is re-seeded each
- * turn from the record's witness of the first major's start of turn.
+ * decision the replay could not express. The generator is held on the
+ * game's stream (`holdRng`, `gameStream`): each seat's start from its
+ * player's witness, the random-event step from the game's draw log where
+ * the recording kept it.
  */
 import { readFileSync } from 'node:fs';
 import type { City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
@@ -64,6 +66,10 @@ import type { Catalog, DumpCity, TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, engineRowOf, importTurn, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
+import { loadRandLog, randLogPath } from './randLog';
+import { loggedStep } from './drawSites';
+import { lcgStep } from './civ6Random';
+import { holdRng, type RngPoint } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId } from './aliases';
 import { InferredActions, RecordedActions, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
@@ -1116,11 +1122,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const { cat, recs } = loadRecords(dumpPath, opts.from ?? -Infinity, opts.to ?? Infinity);
   const source = opts.source ?? (recs.some((r) => Array.isArray((r as { actions?: unknown }).actions)) ? new RecordedActions() : new InferredActions());
   const history: History = newHistory();
-  history.replay = replayEvents(recs, cat);
+  // the game's own draw log, where the recording kept it
+  const logPath = randLogPath(dumpPath);
+  if (logPath) {
+    history.randLog = loadRandLog(logPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+  }
+  history.replay = replayEvents(recs, cat, history.randLog);
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {} };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
+  holdRng(gameStream(recs, first.playerOfSeat, history));
   const state = first.state;
   // the record holds no plot's revealed state: each seat starts on what its
   // own plots, cities and units reveal (`initFog`), which its moments read
@@ -1167,8 +1179,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const ds = source.decisions(a, b, cat);
     applyPhase(ctx, ds, 'before', b);
     const staged = stagePolicies(ctx, ds);
+    // the generator: held at each witnessed point (`gameStream`)
     const seed = turnSeed(b);
-    if (seed !== undefined) state.rngState = seed;
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
     // what each unit did in its player's actions of the turn, which the
@@ -1294,7 +1306,45 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     report.settled = Object.fromEntries(source.settled);
   }
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
+  holdRng(null);
   return report;
+}
+
+/**
+ * THE GAME'S RANDOM STREAM, held at the points the records witness (\`holdRng\`):
+ * the engine's seat phase of turn t is the game's starts of turn t + 1 (the
+ * replay steps from record t to record t + 1), so each seat, a city-state's
+ * included, takes the generator its player's start of turn t + 1 began from
+ * (its \`PlayerTurnStarted\` witness); the random-event step that follows,
+ * the game's step of turn t + 2, takes the state its first draw was taken
+ * from — the game's log places it (\`loggedStep\`), else the event replay's
+ * start (\`EventReplay.steps\`).
+ */
+function gameStream(recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History) {
+  const pre = new Map<string, number>();
+  for (const r of recs) {
+    for (const w of r.witness ?? []) if (w.point === 'pre' && typeof w.seed === 'number') pre.set(`${w.turn}:${w.player}`, w.seed >>> 0);
+  }
+  return (_: GameState, point: RngPoint): number | undefined => {
+    if (point.kind === 'seat') {
+      const player = playerOfSeat.get(point.seat);
+      return player === undefined ? undefined : pre.get(`${point.turn + 1}:${player}`);
+    }
+    const T = point.turn + 1;
+    const gap = history.replay?.gaps.get(T);
+    if (!gap) return undefined;
+    const log = history.randLog;
+    const gapDraws = log?.between(gap[0], gap[1]);
+    if (log && gapDraws) {
+      const b = loggedStep(gapDraws);
+      return b ? log.stateAt(log.index(gap[0])! + b[0]) : undefined;
+    }
+    const at = history.replay?.steps.get(T)?.at ?? -1;
+    if (at < 0) return undefined;
+    let st = gap[0];
+    for (let k = 0; k < at; k++) st = lcgStep(st);
+    return st;
+  };
 }
 
 /** the replay report as Markdown: per subsystem the turns held, the first

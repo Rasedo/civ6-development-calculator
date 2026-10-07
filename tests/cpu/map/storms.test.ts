@@ -160,7 +160,9 @@ describe('the eight storms are the install\'s table', () => {
   });
 
   it('a birth draws its plot, the preview, the name, then strikes a copy at full strength', () => {
-    const state = board(null, 'SNOW');
+    // a seat playing a civilization with a city names the storm
+    const state = board('QIN', 'SNOW');
+    settleAt(state, tileAtCoords(state.map, 15, 15).index, 0);
     const e = EVI('BLIZZARD_SIGNIFICANT');
     const s0 = state.rngState;
     stormBirth(state, e, false);

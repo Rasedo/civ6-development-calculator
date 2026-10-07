@@ -8,10 +8,10 @@
  */
 
 import type { GameMap, Tile } from '../../world/types';
-import { hexDistance, neighborTile } from '../../world/hex';
+import { neighborTile } from '../../world/hex';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
-import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, DROUGHT_SPACING, gameLatitude, stormFamilyAt } from '../data/disasters';
+import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, gameLatitude, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
 import { droughtCandidate, stormFootprint } from '../core/disasters';
 
@@ -147,8 +147,17 @@ export interface StruckPlot {
  *  MinHP + rand(MaxHP − MinHP) per unit, garrison or walls struck */
 function damageRolls(rng: Civ6Random, kind: string, lo: number, hi: number, p: StruckPlot): void {
   const n = kind === 'UNIT_DAMAGE_LAND' ? p.landUnits : kind === 'UNIT_DAMAGE_NAVAL' ? p.navalUnits
-    : kind === 'CITY_GARRISON' ? Number(p.garrison) : kind === 'CITY_WALLS' ? Number(p.walls) : 0;
-  for (let i = 0; i < n; i++) rng.get(hi - lo, 'Random Event Unit Damage Roll');
+    : kind === 'CITY_GARRISON' ? Number(p.garrison) : kind === 'CITY_WALLS' ? Number(p.walls) : -1;
+  if (n >= 0) unitRolls(rng, n, hi - lo);
+}
+
+/** The unit rolls of a landed row that strikes units, a garrison or walls:
+ *  `known` from the records, or with the game's log the rolls it holds
+ *  there — a unit that moved onto the plot and died in the event is in no
+ *  record. */
+export function unitRolls(rng: Civ6Random, known: number, range: number): void {
+  const n = rng.upcoming('Random Event Unit Damage Roll') ?? known;
+  for (let i = 0; i < n; i++) rng.get(range, 'Random Event Unit Damage Roll');
 }
 
 /** One flood's draws (0xa2f200): unless the river is mitigated, the damage
@@ -332,12 +341,14 @@ export function stormStartPlots(map: GameMap, ev: number): Tile[] {
 }
 
 export function stormBirth(rng: Civ6Random, map: GameMap, ev: number, turn: number,
-  ctx: (plot: number) => StruckPlot, out: EventOutcome): StormState | undefined {
+  ctx: (plot: number) => StruckPlot, out: EventOutcome, named = true): StormState | undefined {
   const plots = stormStartPlots(map, ev);
   if (!plots.length) return undefined;
   const storm: StormState = { event: ev, start: turn, at: plots[rng.get(plots.length, 'Pick Storm Start Plot')].index, struck: new Set(), added: 0, dir: -1 };
   storm.dir = stormPreview(rng, map, storm.at);
-  rng.get(1, 'storm name');
+  // its name: a draw over its naming major's citizen names left (none
+  // where no major names it: `stormNamer`)
+  if (named) rng.get(1, 'Choosing a Citizen Name');
   // the record is stored before this strike, which marks a copy: the stored
   // storm's struck list starts empty
   const copy = { ...storm, struck: new Set<number>() };
@@ -435,36 +446,21 @@ export function eruptionDraws(rng: Civ6Random, map: GameMap, plots: readonly Til
   }
 }
 
-/** The turn's random-event step placed at the end of the gap's draws: the
- *  `draws` the generator took from `from` to the witness, and the replay of
- *  the step (the storms' walks, the volcano roll, the event roll and the
- *  event's own draws — the last things the turn draws). Every start where,
- *  run there, the replay takes exactly the draws left to the witness, the
- *  latest first. */
 /**
  * A NEW DROUGHT's draws (`droughtStart` / `drought` in core/disasters.ts):
- * "Pick Drought Start Plot" (0x287e80), one weighted draw over every map
+ * "Pick Drought Start Plot" (0x287e80), one uniform draw over every map
  * plot `droughtCandidate` admits — `centres` the live city centres, `live`
- * the plots the live storms have struck — each weighing 1 + min(its hex
- * distance to the nearest live drought's last footprint plot (`ends`),
- * `DROUGHT_SPACING`); then the strike 0x286530: on each land plot of its
- * footprint one draw per `RandomEvent_Damages` row of severity `sev`
- * (EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED, then SPECIFIC_IMPROVEMENT_
- * PILLAGED). The start plot's index, -1 where no plot qualifies (no draw).
+ * the plots the live storms have struck; then the strike 0x286530: on each
+ * land plot of its footprint one draw per `RandomEvent_Damages` row of
+ * severity `sev` (EXTREME's SPECIFIC_IMPROVEMENT_DESTROYED, then
+ * SPECIFIC_IMPROVEMENT_PILLAGED). The start plot's index, -1 where no plot
+ * qualifies (no draw).
  */
 export function droughtDraws(rng: Civ6Random, map: GameMap, sev: number, centres: ReadonlySet<number>,
-  live: ReadonlySet<number>, ends: readonly Tile[]): number {
-  const cands: Tile[] = [];
-  const weights: number[] = [];
-  for (const t of map.tiles) {
-    if (!droughtCandidate(map, t, centres, live)) continue;
-    let d: number = DROUGHT_SPACING;
-    for (const e of ends) d = Math.min(d, hexDistance(map, t.col, t.row, e.col, e.row));
-    cands.push(t);
-    weights.push(1 + d);
-  }
+  live: ReadonlySet<number>): number {
+  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, live));
   if (!cands.length) return -1;
-  const at = cands[pickWeighted(rng, weights, 'Pick Drought Start Plot')];
+  const at = cands[rng.get(cands.length, 'Pick Drought Start Plot')];
   const rows = DROUGHT_DESTROY_P[sev] > 0 ? 2 : 1;
   for (const t of stormFootprint(map, at, DROUGHT_HEXES)) {
     if (isWater(t)) continue;
@@ -473,14 +469,21 @@ export function droughtDraws(rng: Civ6Random, map: GameMap, sev: number, centres
   return at.index;
 }
 
-export function replayAtEnd<T>(from: number, draws: number, replay: (rng: Civ6Random) => T): { k: number; value: T }[] {
+/** The turn's random-event step placed at the end of the gap's draws: the
+ *  `draws` the generator took from `from` to the witness, and the replay of
+ *  the step (the storms' walks, the volcano roll, the event roll and the
+ *  event's own draws — the last things the turn draws). Every start where,
+ *  run there, the replay takes exactly the draws left to the witness, the
+ *  latest first, each with the draws it took (`trace`). */
+export function replayAtEnd<T>(from: number, draws: number, replay: (rng: Civ6Random) => T,
+  ahead?: readonly { label: string }[]): { k: number; value: T; trace: NonNullable<Civ6Random['trace']> }[] {
   const states = [from >>> 0];
   for (let i = 0; i < draws; i++) states.push(lcgStep(states[i]));
-  const out: { k: number; value: T }[] = [];
+  const out: { k: number; value: T; trace: NonNullable<Civ6Random['trace']> }[] = [];
   for (let k = draws - 1; k >= 0; k--) {
-    const rng = new Civ6Random(states[k]);
+    const rng = new Civ6Random(states[k], true, ahead ? ahead.slice(k) : null);
     const value = replay(rng);
-    if (rng.count === draws - k) out.push({ k, value });
+    if (rng.count === draws - k) out.push({ k, value, trace: rng.trace! });
   }
   return out;
 }

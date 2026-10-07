@@ -1494,7 +1494,7 @@ class SimEconomy:
         """`volcanoRoll` — ONE roll a turn for the whole map: V the volcanoes,
         N the named ones (`_volcano_named`), A the active ones, W the volcanic
         wonders standing (always active); pct = 100(A + W) // (V + W), D = the
-        roll's turns // 2V. No named volcano, no draw. Below the realism's
+        roll's turns (the event roll's, `_event_turns`) // 2V. No named volcano, no draw. Below the realism's
         percent, while a named volcano sleeps: D //= (target - pct)N // 100
         when that product reaches 200, and rand(D) = 0 wakes ONE sleeping named
         volcano drawn uniformly in tile order; at or above it, with an active
@@ -1511,7 +1511,7 @@ class SimEconomy:
         act = vol & self.volcano_active
         a = act.sum(dim=1)
         pct = torch.div(100 * (a + w), (v + w).clamp(min=1), rounding_mode="floor")
-        d = torch.div(torch.full_like(v, self._volcano_roll_turns), (2 * v).clamp(min=1), rounding_mode="floor")
+        d = torch.div(torch.full_like(v, self._event_turns), (2 * v).clamp(min=1), rounding_mode="floor")
         wake = pct < self._pct_volcanoes_active
         x = (self._pct_volcanoes_active - pct) * n
         d = torch.where(wake & (x >= 200), torch.div(d, torch.div(x, 100, rounding_mode="floor").clamp(min=1),
@@ -1597,6 +1597,10 @@ class SimEconomy:
     # WEST, NORTHWEST) as `neigh` columns (`DIRECTION_TYPES`): the game's
     # north is the grid's south
     _DIRECTION_TYPES = (5, 0, 1, 2, 3, 4)
+    # the DLL's ring walk (0x6b1b0 -> 0x691f0: SOUTHEAST, WEST, NORTHEAST,
+    # NORTHWEST, EAST, SOUTHWEST as `neigh` columns, `RING_DIRS`): the order a
+    # fire's spread lights its neighbours
+    _RING_DIRS = (5, 3, 1, 2, 0, 4)
 
     def _eruption_ring(self, hit: torch.Tensor, plots: torch.Tensor) -> torch.Tensor:
         """[B, K] `eruptionRing` — each of each game's `plots` [B, T] (where
@@ -1742,8 +1746,8 @@ class SimEconomy:
         district pillaged (an owned plot), at the population turn one citizen,
         the civilians killed, each land unit its own UNIT_DAMAGE_LAND draw; and
         SPREAD on the spread turns: under the spread chance every neighbour,
-        in DirectionTypes order, on the row's own live feature starts a fire of
-        its own (`_fire_birth`)."""
+        in the ring walk's order (`_RING_DIRS`), on the row's own live feature
+        starts a fire of its own (`_fire_birth`)."""
         if not bool(hit.count_nonzero()):
             return
         B, dev = self.B, self.device
@@ -1796,7 +1800,7 @@ class SimEconomy:
         if not bool(sp.count_nonzero()):
             return
         sfid = torch.tensor(self._fire_start_fid, dtype=torch.long, device=dev)[row.clamp(min=0)]
-        for d in self._DIRECTION_TYPES:
+        for d in self._RING_DIRS:
             n = self.neigh[t, d]
             nc = n.clamp(min=0)
             cand = (sp & (n >= 0) & (self.fire_start[bidx, nc] < 0) & (self.feat_id[bidx, nc] == sfid)
@@ -1839,14 +1843,6 @@ class SimEconomy:
         """[B, T] `liveEventPlots` — every plot a live storm has struck
         (0x28de40): where no drought may start."""
         return (self.storm_struck & (self.storm_left > 0).unsqueeze(2)).any(dim=1)
-
-    def _drought_ends(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """`droughtEnds` — each drought record's LAST footprint plot [B, D]
-        and whether the slot holds a live drought with a footprint [B, D]:
-        what a drought start keeps its distance from (0x28ce90)."""
-        n = (self.drought_plots >= 0).sum(dim=2)
-        end = self.drought_plots.gather(2, (n - 1).clamp(min=0).unsqueeze(2)).squeeze(2)
-        return end, (self.drought_left > 0) & (n > 0)
 
     def _drought_cands(self, live: torch.Tensor) -> torch.Tensor:
         """[B, T] `droughtCandidate` — the plots a drought may start on now:
@@ -1892,24 +1888,10 @@ class SimEconomy:
 
     def _drought_start(self, hit: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """`droughtStart` — a drought's start plot where `hit` [B]: ONE
-        weighted draw over every candidate plot (`_drought_cands`) in tile
-        order, each weighing 1 + min(its distance to the nearest live
-        drought's last footprint plot (`_drought_ends`), the spacing). No
-        candidate, no draw. Returns (got, tile)."""
-        B, T, dev = self.B, self.T, self.device
-        cand = self._drought_cands(self._live_event_plots()) & hit.unsqueeze(1)
-        end, ok = self._drought_ends()
-        dist = torch.full((B, T), self._drought_spacing, dtype=torch.long, device=dev)
-        for b in (hit & ok.any(dim=1)).nonzero(as_tuple=True)[0].tolist():
-            near = self.pair_dist[:, end[b][ok[b]]].long().min(dim=1).values
-            dist[b] = near.clamp(max=self._drought_spacing)
-        w = torch.where(cand, 1 + dist, torch.zeros_like(dist))
-        total = w.sum(dim=1)
-        got = hit & (total > 0)
-        at = self._rand_range(got, total)
-        cum = w.cumsum(dim=1)
-        tile = (cand & (cum > at.unsqueeze(1))).long().argmax(dim=1)
-        return got, tile
+        uniform draw over every candidate plot (`_drought_cands`) in tile
+        order (0x287e80 draws over the list's count). No candidate, no draw.
+        Returns (got, tile)."""
+        return self._pick_live(hit, self._drought_cands(self._live_event_plots()) & hit.unsqueeze(1))
 
     def _drought_barred(self) -> torch.Tensor:
         """[B, T] `droughtBars` for the improvement standing on each plot: a
@@ -2511,6 +2493,21 @@ class SimEconomy:
         w = self._wind_w[at]
         self._rand_weighted(hit & (w.sum(dim=1) > 0), w)
 
+    def _storm_namer(self, tile: torch.Tensor) -> torch.Tensor:
+        """[B] `stormNamer` — the major a storm starting on `tile` [B] is
+        named for: the plot's major owner, else the major whose city stands
+        nearest (the first row at the least distance); -1 with no major
+        city (0x28d4f0)."""
+        bidx = torch.arange(self.B, device=self.device)
+        t = tile.clamp(min=0)
+        own = self.tile_seat[bidx, t]
+        ctr = self.city_center[:, : self.n_majors].clamp(min=0)                  # [B, R, C]
+        d = self.pair_dist[t.view(-1, 1, 1), ctr].long()
+        d = torch.where(self.city_alive[:, : self.n_majors], d, torch.full_like(d, 1 << 30))
+        best = d.min(dim=2).values                                               # [B, R]
+        near = torch.where(best.min(dim=1).values < (1 << 30), best.argmin(dim=1), torch.full_like(own, -1))
+        return torch.where((own >= 0) & (own < self.n_majors), own, near)
+
     def _storm_birth(self, hit: torch.Tensor, e: int, strip: torch.Tensor) -> None:
         """`stormBirth` — a new storm of row `e` where `hit` [B]: its start
         plot (`_storm_start`), the "Storm Direction Preview", its name (ONE
@@ -2523,7 +2520,7 @@ class SimEconomy:
         if not bool(got.count_nonzero()):
             return
         self._storm_preview(got, tile)
-        self._rand_range(got, 1)
+        self._draw_citizen_name(got, self._storm_namer(tile))
         fr = got.nonzero(as_tuple=True)[0]
         slot = (self.storm_left[fr] > 0).sum(dim=1)
         if bool((slot >= self.storm_left.shape[1]).count_nonzero()):
@@ -4537,11 +4534,13 @@ class SimEconomy:
         had a minor working Horses it could not yet see), and the Free row's
         none (it holds no research). A Great Person's reveal
         (`_gp_resource_reveal`, James Young's Oil) shows one before its
-        technology.
+        technology. A city-state sees every resource its suzerain
+        (`citystate_suzerain`) sees (0x4ac140).
 
         Memoised per row under the write counters of the planes it reads
         (`simbase.plane_stamp`); callers never write into the answer."""
-        planes = (self.res_id, self.res_stripped, self.civ_techs, self.citystate_techs, self.civ_gp_perm)
+        planes = (self.res_id, self.res_stripped, self.civ_techs, self.citystate_techs, self.civ_gp_perm,
+                  self.citystate_suzerain)
         ent = self._res_hidden_cache.get(row)
         if ent is not None and simbase.stamp_holds(ent[0], planes):
             return ent[1]
@@ -4554,11 +4553,24 @@ class SimEconomy:
         gated = (rt >= 0) & self._res_live()
         if not bool(gated.count_nonzero()):
             return gated
+        have = self._res_seen_own(row, rt)
+        s = row - self._CITY_MINOR0
+        if 0 <= s < self.S:
+            suz = self.citystate_suzerain[:, s]                                # [B]
+            for x in range(self.n_majors):
+                on = suz == x
+                if bool(on.count_nonzero()):
+                    have = have | (self._res_seen_own(x, rt) & on.unsqueeze(1))
+        return gated & ~have
+
+    def _res_seen_own(self, row: int, rt: torch.Tensor) -> torch.Tensor:
+        """[B, T] the plots whose resource this row's own research (or its
+        Great Person's reveal) shows, `rt` each plot's revealing tech."""
         have = self._seat_techs(row).gather(1, rt.clamp(min=0))
         for _pk, _ri in self._gp_resource_reveal:
             seen = self._gp_perm(row, self._gp_perm_names[_pk]) > 0          # [B]
             have = have | ((self.res_id == _ri) & seen.unsqueeze(1))
-        return gated & ~have
+        return have
 
     def _plane_seen(self, name: str, row: int) -> torch.Tensor:
         """A baked tile flag as THIS row sees it. The fixture folds "a resource

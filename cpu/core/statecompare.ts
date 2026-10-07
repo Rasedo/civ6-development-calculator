@@ -502,6 +502,7 @@ const SEAT: Record<string, Extractor> = {
   ]),
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
+  citizenNames: overSeats((s) => s.citizenNames ?? 0),
   // the craft's speed above its base 1 LY/turn, and the terrestrial stations
   // standing behind it (the powered ones are what the speed counts)
   laserSpeed: overSeats((s, st) => laserSpeed(st, s.seat)),

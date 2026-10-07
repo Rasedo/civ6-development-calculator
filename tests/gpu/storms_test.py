@@ -584,11 +584,10 @@ def main() -> int:
     print(f"  12 drought OK — featureless start, pillage and destroy, the bar, the shield")
 
     # 13 — THE DROUGHT'S START (`droughtStart`, GameCore_XP2 0x287e80): ONE
-    # weighted draw over every candidate plot of the map, each weighing 1 +
-    # min(its distance to the nearest live drought's LAST footprint plot, the
-    # spacing 15); no city anchor, and a storm's centre spaces nothing
+    # uniform draw over every candidate plot of the map (the draw is over the
+    # list's count); no city anchor, and a storm's centre bars nothing but
+    # the plots it struck
     s13 = fresh(rules)
-    assert s13._drought_spacing == 15
     s13.storm_left.zero_()
     s13._compact_storms()
     s13.drought.zero_()
@@ -596,8 +595,7 @@ def main() -> int:
     s13._compact_droughts()
     cand0 = s13._drought_cands(s13._live_event_plots())[0]
     assert bool(cand0.any()), "the fixture holds no drought start"
-    # a live drought whose footprint ENDS on a candidate's far side: the
-    # weights tilt away from its last plot
+    # a live drought beside a candidate: no weight tilts the pick
     ev = int(cand0.nonzero().flatten()[0])
     head = int(s13.neigh[ev][0])
     s13.drought[0, ev] = 5
@@ -615,16 +613,15 @@ def main() -> int:
     cand = s13._drought_cands(live13)[0]
     # a drought's own plot is no bar (0x28de40 reads the storms alone)
     assert bool(cand[ev]), "a drought's plot barred a new drought"
-    wts = (1 + s13.pair_dist[ev].long().clamp(max=15)) * cand.long()
     near = cand & (s13.pair_dist[ev] <= 6)
-    p_near = float(wts[near].sum()) / float(wts.sum())
+    p_near = float(near.sum()) / float(cand.sum())
     one = torch.tensor([True])
     N13 = 3000
     hits = 0
     for _ in range(N13):
         s0 = int(s13.rng_state[0])
         got, tile = s13._drought_start(one)
-        assert bool(got[0]) and draws(s0, int(s13.rng_state[0])) == 1, "one weighted draw"
+        assert bool(got[0]) and draws(s0, int(s13.rng_state[0])) == 1, "one uniform draw"
         t = int(tile[0])
         assert bool(cand[t]), "the start is a drought candidate"
         hits += int(bool(near[t]))

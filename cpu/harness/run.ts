@@ -20,7 +20,9 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import type { Catalog, TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
 import { replayEvents } from './eventReplay';
-import { stateChecks, transitionChecks, type CheckResult } from './checks';
+import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
+import { loadRandLog, randLogPath } from './randLog';
+import { turnDraws, type DrawLedger } from './drawLedger';
 import { replayMarkdown, runReplay } from './replay';
 
 interface Tally {
@@ -69,7 +71,16 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   const failures = new Map<string, Failure>();
   const gaps = new Map<string, number>();
   const history = newHistory();
-  history.replay = replayEvents(turns.map((t) => byTurn.get(t)!), cat);
+  // the game's own draw log, where the recording kept it: its game is the one
+  // whose chain holds the records' witness seeds
+  const logPath = randLogPath(dumpPath);
+  if (logPath) {
+    const seeds: number[] = [];
+    for (const r of byTurn.values()) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
+    history.randLog = loadRandLog(logPath, seeds);
+  }
+  history.replay = replayEvents(turns.map((t) => byTurn.get(t)!), cat, history.randLog);
+  const starts: StartReplay[] = [];
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);
@@ -98,14 +109,21 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     advanceHistory(history, rec, cat);
     const imp = importTurn(rec, cat, history);
     for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
-    for (const r of stateChecks(rec, cat, imp)) add(r);
+    for (const r of stateChecks(rec, cat, imp, starts)) add(r);
     const next = byTurn.get(t + 1);
     if (next) for (const r of transitionChecks(rec, next, cat, history, byTurn.get(t - 1))) add(r);
+  }
+  let draws: DrawLedger | undefined;
+  if (history.randLog) {
+    const td = turnDraws(starts, history.replay, history.randLog);
+    for (const r of td.results) add(r);
+    draws = td.ledger;
   }
   return {
     dump: dumpPath,
     turns: turns.length ? [turns[0], turns[turns.length - 1]] : [],
     records: turns.length,
+    ...(draws ? { draws } : {}),
     checks: Object.fromEntries([...tallies].sort(([a], [b]) => a.localeCompare(b))),
     gaps: Object.fromEntries([...gaps].sort(([a], [b]) => a.localeCompare(b))),
     failures: [...failures.values()].sort((a, b) => a.check.localeCompare(b.check) || b.count - a.count),
@@ -165,6 +183,10 @@ function main() {
     console.log(k.padEnd(26), String(t.pass).padStart(7), String(t.fail).padStart(7), String(t.failGapped).padStart(7), ' ', skips);
   }
   console.log(`distinct failures ${report.failures.length}; gaps ${Object.keys(report.gaps).length}`);
+  const d = report.draws;
+  if (d) {
+    console.log(`draws: the log ${d.logged}, in replayed stretches ${d.replayed}; starts ${d.starts.after} / ${d.starts.logged} landed (by the records alone ${d.starts.byRecords}; the AI's ${d.starts.ai}); steps ${d.steps.after} / ${d.steps.logged} (by the records alone ${d.steps.byRecords})`);
+  }
 }
 
 main();

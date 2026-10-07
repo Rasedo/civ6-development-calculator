@@ -66,6 +66,18 @@ export const SEAT_CAPS: Record<SeatClass, SeatCaps> = {
 export type { CivId, LeaderId } from '../../world/roster';
 export { CIV_IDS, CIV_LEADERS } from '../../world/roster';
 
+/** A civilization's CivilizationCitizenNames rows — the pool a Spy's and a
+ *  named storm's "Choosing a Citizen Name" draws from (0x486c20, each name
+ *  drawn leaving it): 40 for every civilization the roster seats, France 42
+ *  (runs/h1_duelw1117 / 1118: China's pool 40, 39, 38 ... as its storms and
+ *  Spies took names). `citizenNameRows` reads it by roster row. */
+export const CITIZEN_NAME_ROWS = srcConst('seats.citizenNameRows', 40, {
+  derived: 'the count of CivilizationCitizenNames rows of each roster civilization (Base, Expansion1, Expansion2): 40',
+});
+export const CITIZEN_NAME_ROWS_FRANCE = srcConst('seats.citizenNameRowsFrance', 42, {
+  derived: 'the count of CivilizationCitizenNames rows of CIVILIZATION_FRANCE: 42',
+});
+
 /** The cities a seat may FOUND, and the count at which a conquest razes.
  *  Civ 6 caps neither: this is the engines' capacity bound, under the
  *  per-seat storage (CITY_SLOTS_PER_SEAT) so loyalty flips keep headroom,

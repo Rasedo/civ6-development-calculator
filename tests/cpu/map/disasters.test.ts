@@ -8,7 +8,7 @@ import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_TURNS, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
-import { EVENT_OCC_SCALE, STANDARD_MAP_AREA, FIRST_TIME_OCCURRENCE_BOOST, PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS, DROUGHT_SPACING, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P, ERUPTION_CIV_KILL_P } from '../../../cpu/data/disasters';
+import { EVENT_OCC_SCALE, STANDARD_MAP_AREA, FIRST_TIME_OCCURRENCE_BOOST, PERCENT_VOLCANOES_ACTIVE, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P, ACCIDENT_LAND_P, ACCIDENT_CIV_KILL_P, ERUPTION_CIV_KILL_P } from '../../../cpu/data/disasters';
 import { NO_SEAT } from '../../../cpu/core/types';
 import { hexDistance } from '../../../world/hex';
 import { validImprovementsIn } from '../../../cpu/core/rules';
@@ -743,8 +743,8 @@ describe('the turn\'s one random event', () => {
   });
 
   it('every volcano starts dormant; ONE roll a turn wakes one below the active share, sleeps one above it', () => {
-    expect([PERCENT_VOLCANOES_ACTIVE, VOLCANO_ROLL_TURNS]).toEqual([70, 500]);
-    // many volcanoes: D = 500 // 2V is 0, read as 1 — the roll always lands
+    expect([PERCENT_VOLCANOES_ACTIVE, TURN_LIMIT]).toEqual([70, 250]);
+    // many volcanoes: D = 250 // 2V is 0, read as 1 — the roll always lands
     const map = makeMap(40, 40);
     for (const t of map.tiles) {
       t.volcano = t.index % 3 !== 0;
@@ -763,8 +763,8 @@ describe('the turn\'s one random event', () => {
     const all = count();
     volcanoRoll(state);
     expect(count()).toBe(all - 1);
-    // four volcanoes, all dormant: D = 500 // 8 = 62, (70 - 0) x 4 = 280
-    // reaches 200, so D // 2 = 31 — one wake in 31 turns
+    // four volcanoes, all dormant: D = 250 // 8 = 31, (70 - 0) x 4 = 280
+    // reaches 200, so D // 2 = 15 — one wake in 15 turns
     const small = makeMap(20, 20);
     const vs = [small.tiles[41], small.tiles[97], small.tiles[213], small.tiles[355]];
     for (const t of vs) { t.volcano = true; t.elevation = 'MOUNTAIN'; }
@@ -776,7 +776,7 @@ describe('the turn\'s one random event', () => {
       volcanoRoll(s2);
       woke += vs.filter((t) => t.volcanoActive).length;
     }
-    expect(Math.abs(woke / N - 1 / 31)).toBeLessThan(0.008);
+    expect(Math.abs(woke / N - 1 / 15)).toBeLessThan(0.012);
     // a volcano no major has revealed has no name: with none named, no draw
     // (0x335040 reads the named count first)
     for (const t of vs) t.volcanoActive = false;
@@ -815,8 +815,7 @@ describe('the turn\'s one random event', () => {
     expect([...DROUGHT_TURNS]).toEqual([2, 5]);
   });
 
-  it('a drought starts anywhere on the map, each candidate weighing 1 + min(its distance to a live drought\'s last plot, 15)', () => {
-    expect(DROUGHT_SPACING).toBe(15);
+  it('a drought starts anywhere on the map, one uniform draw over the candidates (0x287e80 draws over the list\'s count)', () => {
     // a 24 x 24 grassland, no city; a live drought whose footprint ends at
     // `ev`, and a storm far off — under an event, yet no spacing
     const state = makeState(makeMap(24, 24));
@@ -833,10 +832,8 @@ describe('the turn\'s one random event', () => {
     expect(live.has(ev.index)).toBe(false);
     const none = new Set<number>();
     const cands = state.map.tiles.filter((t) => droughtCandidate(state.map, t, none, live));
-    const w = (t: Tile) => 1 + Math.min(hexDistance(state.map, t.col, t.row, ev.col, ev.row), DROUGHT_SPACING);
-    const total = cands.reduce((x, t) => x + w(t), 0);
     const near = (t: Tile) => hexDistance(state.map, t.col, t.row, ev.col, ev.row) <= 4;
-    const pNear = cands.filter(near).reduce((x, t) => x + w(t), 0) / total;
+    const pNear = cands.filter(near).length / cands.length;
     const N = 6000;
     let hits = 0;
     for (let i = 0; i < N; i++) {

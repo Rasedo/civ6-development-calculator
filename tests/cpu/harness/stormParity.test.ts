@@ -44,7 +44,8 @@ describe('the engine\'s storm draws as the replay does', () => {
         // the replay reads the board as it stood: the engine lays fertility
         // as it goes, which the replay's draws do not see
         const out = newOutcome();
-        const replayed = replayBirth(rng, map, e, 10, ctx, out);
+        // the board's seats play no civilization: the storm is named for nobody
+        const replayed = replayBirth(rng, map, e, 10, ctx, out, false);
         stormBirth(state, e, false);
         const rec = state.storms![0];
         expect(rec.at).toBe(replayed!.at);
@@ -73,7 +74,7 @@ describe('the engine\'s drought draws as the replay does', () => {
         for (const t of state.map.tiles) if (t.col === 15) t.terrain = 'COAST';
         state.rngState = seed;
         const rng = new Civ6Random(seed);
-        const at = droughtDraws(rng, state.map, sev, new Set(), new Set(), []);
+        const at = droughtDraws(rng, state.map, sev, new Set(), new Set());
         const centre = droughtStart(state)!;
         drought(state, centre, sev, false);
         expect(centre.index).toBe(at);

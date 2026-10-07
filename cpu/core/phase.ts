@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
-import { randRange, randWeighted } from './rand';
+import { atRngPoint, randRange, randWeighted } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
@@ -2596,6 +2596,7 @@ export function seatPhase(state: GameState): void {
   dealPhase(state);
 
   for (const actor of state.seats) {
+    atRngPoint(state, { kind: 'seat', seat: actor.seat, turn: state.turn });
     const recU = state.seatActions?.[state.turn - 1]?.[actor.seat];
     if (actor.cities.length === 0) {
       // No city means no economy — but the UNITS still walk. A settler start

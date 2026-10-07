@@ -11643,6 +11643,10 @@ class SimSeats:
         )
         if not bool(found.count_nonzero()):
             return found
+        # a major's city past its capital draws its name ("Choosing a City
+        # Name", `CITY_NAME_DRAW`), the founding's first draw
+        if row < self.n_majors:
+            self._rand_range(found & alive_row.any(dim=1), self._city_name_draw)
         rows = found.nonzero(as_tuple=True)[0]
         # Append at last-alive+1 — the TS push mirror. The alive COUNT is not a
         # free slot while a hole stands (it would land on a live city); the

@@ -26,20 +26,37 @@ export class Civ6Random {
   state: number;
   /** the number of draws taken */
   count = 0;
-  /** the draws taken, `label=value/max`, when tracing */
-  trace: string[] | null;
+  /** the draws taken, with the DLL's label of each, when tracing */
+  trace: { label: string; range: number; value: number }[] | null;
 
-  constructor(state: number, trace = false) {
+  /** the game's log of the draws to come from this state, where the
+   *  harness has it (`RandLog`): what the records cannot show — how many
+   *  units an event struck — is read from it (`upcoming`) */
+  ahead: readonly { label: string }[] | null = null;
+  private aheadAt = 0;
+
+  constructor(state: number, trace = false, ahead: readonly { label: string }[] | null = null) {
     this.state = state >>> 0;
     this.trace = trace ? [] : null;
+    this.ahead = ahead;
+  }
+
+  /** how many of the next draws the game's log labels `label`; undefined
+   *  without the log */
+  upcoming(label: string): number | undefined {
+    if (!this.ahead) return undefined;
+    let n = 0;
+    while (this.ahead[this.aheadAt + n]?.label === label) n++;
+    return n;
   }
 
   /** a draw in [0, max): max is read as 16 bits, as the game's argument is */
   get(max: number, label = ''): number {
     this.state = lcgStep(this.state);
     this.count += 1;
+    this.aheadAt += 1;
     const v = ((this.state >>> 16) * (max & 0xffff)) >>> 16;
-    if (this.trace) this.trace.push(`${label}=${v}/${max}`);
+    if (this.trace) this.trace.push({ label, range: max, value: v });
     return v;
   }
 

@@ -1187,6 +1187,16 @@
           ]
         },
         {
+          "name": "citizenNames",
+          "compare": "exact",
+          "covers": [
+            "Seat.citizenNames"
+          ],
+          "planes": [
+            "civ_citizen_names"
+          ]
+        },
+        {
           "name": "laserSpeed",
           "compare": "exact",
           "covers": [

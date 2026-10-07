@@ -1001,6 +1001,7 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
+    "civ_citizen_names",  # the citizen names each major has given (its Spies, its storms)
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
     "civ_stockpile", "civ_fuel_short", "city_powered",  # GS strategic banks, the slots short at the last fuel bill, and the grid they run
     "civ_wmd",  # nuclear devices held, dense over the device catalog

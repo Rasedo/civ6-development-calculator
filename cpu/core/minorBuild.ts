@@ -51,7 +51,7 @@ import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
 import { FREE_SEAT, civsAtWar, hiddenResourcesFor, majorityReligionOf, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestMelee, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
-import { randRange } from './rand';
+import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { landWalker, walkUnit } from './walker';
 import { worldEraIndex } from './eras';
@@ -89,6 +89,7 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
  *  from the minor's centre strength), and last its army's walk. */
 export function minorPhase(state: GameState): void {
   for (const cityState of state.cityStates) {
+    atRngPoint(state, { kind: 'seat', seat: cityState.seat, turn: state.turn });
     minorLevyReturn(state, cityState);
     const military = minorMilitary(state, cityState).length;
     if (cityState.armySeen !== undefined && military < cityState.armySeen) cityState.lossTurn = state.turn;

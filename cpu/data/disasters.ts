@@ -83,13 +83,6 @@ export const FIRST_TIME_OCCURRENCE_BOOST = srcConst('disasters.firstTimeOccurren
  *  one active volcano to sleep at or above it. Only an active one erupts. */
 export const PERCENT_VOLCANOES_ACTIVE = srcConst('disasters.percentVolcanoesActive', 70,
   xml('RealismSettings', 'RealismSettingType=REALISM_SETTING_MODERATE', 'PercentVolcanoesActive'));
-/** The roll's N, the turns the game's span is read at: the Duel wakes fit
- *  500 (15.3 expected against 15 read, 2.7 sleeps against 2; logL -93.8) and
- *  not the event draw's 250 (31.1 wakes, logL -100.3). */
-export const VOLCANO_ROLL_TURNS = srcConst('disasters.volcanoRollTurns', 500, {
-  lab: '(dll_volcano.py on runs/c74s2_turn_c74s2_duel1_20260926T074416Z.jsonl to '
-    + 'runs/c74s2_turn_c74s2_duel8_20260926T084042Z.jsonl): the wakes fit N 500, the event draw 250',
-});
 
 /** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
  *  turn a random event may fire. */
@@ -127,13 +120,6 @@ export const DROUGHT_CIPD = srcConst('disasters.droughtCipd', [0, 50] as const, 
 export function droughtTerrain(t: { terrain: string; elevation: string }): boolean {
   return (t.terrain === 'GRASSLAND' || t.terrain === 'PLAINS') && t.elevation !== 'MOUNTAIN';
 }
-
-/** THE DROUGHT'S SPACING (`RandomEvents.Spacing`, both drought rows): a
- *  start plot's weight in the map-wide pick is 1 + min(its distance to the
- *  nearest live event, this) (GameCore_XP2 0x287e80, `droughtStart`). */
-export const DROUGHT_SPACING = srcConst('disasters.droughtSpacing', 15, drought('DROUGHT_MAJOR', 'Spacing'));
-/** A storm row's `Spacing` (15 on every storm row): the distance past which
- *  a live storm's centre no longer lowers a start plot's weight. */
 
 /** Dry ground for a drought's patch: its terrain above the sea and CIV6
  *  (LOC_CLIMATE_DROUGHT_EVENT_DESCRIPTION_TOOLTIP) "Drought targets areas that

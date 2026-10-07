@@ -26,6 +26,7 @@
  * report can separate a clean failure from one an unimported row explains.
  */
 import type { City, CityState, GameState, Tile, Unit } from '../core/types';
+import { NO_SEAT } from '../core/types';
 import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
 import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, placeIdleCitizens, seatTourism, seatTourismReligious } from '../core/city';
@@ -52,6 +53,8 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import { Civ6Random, drawsBetween } from './civ6Random';
+import type { LoggedDraw } from './randLog';
+import { DRAW_SITES, siteLabel } from './drawSites';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, congressOfRecord, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
@@ -67,6 +70,7 @@ import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOIC
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId } from './aliases';
+import { unitPromoRows } from '../core/promotions';
 import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -163,14 +167,24 @@ function citiesOfImport(imp: Imported): { city: City; dump: DumpCity; minor: boo
   return out;
 }
 
-/** One draw of a player's start: the DLL's label, and for a city's
- *  closing pick its `owner:id` and the ties it draws over. `choice` marks a
- *  draw the player's AI takes or not by a plan the records do not show. */
+/** the border pick's label in the game's log (0x1ab1c0) */
+const PICKER = 'GetNextBuyablePlot picker';
+
+/** One draw of a player's start: the DLL's label (the game's log names it
+ *  so), what drew it (`note`), and for a city's closing pick its `owner:id`
+ *  and the ties it draws over. `choice` marks a draw the player's AI takes
+ *  or not by a plan the records do not show. */
 export interface StartDraw {
   label: string;
+  note?: string;
   city?: string;
   ties?: number[];
+  /** other tie lists the records allow (a purchase before the pick or after
+   *  it); the game's log, where held, chooses by its range */
+  alts?: number[][];
   choice?: boolean;
+  /** a choice drawn at its place among the fixed draws when taken */
+  inPlace?: boolean;
 }
 
 /** A player's start of turn as the records give it: the draws between its
@@ -180,6 +194,7 @@ export interface StartReplay {
   player: number;
   turn: number;
   pre?: number;
+  post?: number;
   game?: number;
   /** its cities' `owner:id`, in the player's city order */
   cities: string[];
@@ -213,7 +228,7 @@ export interface StartReplay {
  * when the record before held none or another city holds it now. The
  * closing picks draw over `borderBestPlots` on the record's state.
  */
-export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): StartReplay[] {
+export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat: Catalog): StartReplay[] {
   const out: StartReplay[] = [];
   const before = imp.recordBefore;
   const latest = new Map<number, number>();
@@ -229,9 +244,15 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): St
     const pre = wit.find((w) => w.point === 'pre' && w.player === p);
     const a = typeof pre?.seed === 'number' ? pre.seed >>> 0 : undefined;
     const b = typeof post.seed === 'number' ? post.seed >>> 0 : undefined;
-    const r: StartReplay = { player: p, turn: post.turn, pre: a, game: a !== undefined && b !== undefined ? drawsBetween(a, b, 4096) : undefined,
+    const r: StartReplay = { player: p, turn: post.turn, pre: a, post: b, game: a !== undefined && b !== undefined ? drawsBetween(a, b, 4096) : undefined,
       cities: post.cities.map((c) => `${p}:${num(c.id)}`), draws: [] };
     out.push(r);
+    // a start of the turn before the record's: the plots gained after it
+    // stand unowned at its picks (`lateClaims`)
+    const { late: undo, unsure, claims } = post.turn < rec.turn && before ? lateClaims(rec, before, imp, p, latest)
+      : { late: [], unsure: [], claims: new Map<string, number[]>() };
+    const kept = undo.map((i) => [state.map.tiles[i].ownerSeat, state.map.tiles[i].ownerCity] as const);
+    for (const i of undo) { state.map.tiles[i].ownerSeat = NO_SEAT; state.map.tiles[i].ownerCity = -1; }
     const minor = imp.minorOfPlayer.get(p);
     if (minor && pre) {
       if (num(pre.researching) !== num(post.researching)) r.draws.push({ label: 'BT Research Choice', choice: true });
@@ -239,6 +260,36 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): St
     }
     for (const g of rec.greatPeople ?? []) {
       if (g[1] === p && g[4] === post.turn) r.draws.push({ label: 'Generating a random new Great Person', choice: true });
+    }
+    // a Spy the player gained between the records, trained in its start or
+    // bought in its actions: its name ("Choosing a Citizen Name") and, with
+    // a level offer, the shuffle of its class's rows ("Random Promotion")
+    if (before) {
+      const had = new Set(before.units.filter((u) => u.owner === p).map((u) => u.id));
+      for (const u of rec.units) {
+        if (u.owner !== p || had.has(u.id) || cat.units[u.type] !== 'UNIT_SPY') continue;
+        r.draws.push({ label: 'Choosing a Citizen Name', note: 'spy', choice: true });
+        for (let k = unitPromoRows({ type: 'SPY' }).length; k > 0; k--) r.draws.push({ label: 'Random Promotion', note: 'spy', choice: true });
+      }
+    }
+    // the envoys the player sent between the records — the AI sends them
+    // in its start, before its cities, or in its actions (a choice): a
+    // city-state that holds fewer plots past its starting ones than envoys
+    // received annexes the rest (0x1abf40 -> AnnexPlots), one border pick
+    // each (runs/h1_duelw1118 t33: Armagh's two for its two envoys from
+    // China; t148, Kumasi's two before China's seven cities)
+    if (before && !minor) {
+      for (const m of rec.players) {
+        if (!bool(m.minor)) continue;
+        const was = before.players.find((x) => x.id === m.id);
+        const sent = (q: DumpPlayer | undefined) => num((q?.envoysReceived ?? []).find(([g]) => g === p)?.[1] ?? 0);
+        if (!was || sent(m) <= sent(was)) continue;
+        const d = rec.cities.find((c) => c.owner === m.id);
+        if (!d) continue;
+        let gained = 0;
+        for (const q of d.plots) if (num(plotAt(before, q)[P.owner] as Read<number>) !== m.id) gained++;
+        for (let k = 0; k < Math.min(gained, sent(m) - sent(was)); k++) r.draws.push({ label: PICKER, note: 'envoy annex', city: `${m.id}:${d.id}`, choice: true, inPlace: true });
+      }
     }
     for (const wc of post.cities) {
       const key = `${p}:${num(wc.id)}`;
@@ -254,6 +305,7 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): St
       if (!city || !dump) { r.why = 'a city the import does not hold'; continue; }
       const was = imp.cityBefore.get(key);
       let annexed = false;
+      let claimed = false;
       if (was && before) {
         const q0 = was.queue?.[0];
         const head = typeof q0 === 'object' ? q0 : undefined;
@@ -261,26 +313,139 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): St
           const gp = plotAt(rec, q);
           const w = gp[P.wonder] as number;
           if (w < 0 || gp[P.wonderComplete] !== 1 || doneBefore.has(q)) continue;
-          const loc = head?.Location;
+          // (a wonder no Gold buys carries no price in the record: its
+          // completion at the queue's head is the start's)
           const price = was.buy.find((x) => x[0] === 'B' && x[1] === w)?.[2];
-          const inStart = head?.BuildingType === w && loc !== undefined && loc.y * W + loc.x === q && price !== undefined
-            && num(was.queueProgress?.[0] ?? 0) + num(was.productionYield ?? 0) >= num(price);
+          const inStart = head?.BuildingType === w
+            && (price === undefined || num(was.queueProgress?.[0] ?? 0) + num(was.productionYield ?? 0) >= num(price));
           if (!inStart) continue;
-          for (let k = 0; k < WONDER_FREE_TILES; k++) r.draws.push({ label: 'GetNextBuyablePlot picker (wonder)' });
+          for (let k = 0; k < WONDER_FREE_TILES; k++) r.draws.push({ label: PICKER, note: 'wonder', city: key });
           annexed = true;
+          // the wonder's grants: the Dynastic Cycle's boosts of its era, a
+          // wonder's free techs and civics (each pool may hold none: a choice)
+          const fx = BUILT_WONDERS[(cat.buildings[w] ?? '').replace(/^BUILDING_/, '')]?.effects;
+          for (const row of getModifiers(state, city.seat).wonderEraBoost) {
+            for (let k = 0; k < row.techs; k++) r.draws.push({ label: 'Choosing random tech boost to grant based on era', note: 'wonder', choice: true });
+            for (let k = 0; k < row.civics; k++) r.draws.push({ label: 'Choosing random civic boost to grant based on era', note: 'wonder', choice: true });
+          }
+          for (let k = 0; k < (fx?.freeTechs ?? 0); k++) r.draws.push({ label: 'Choosing random tech to grant based on era', note: 'wonder', choice: true });
+          for (let k = 0; k < (fx?.freeCivics ?? 0); k++) r.draws.push({ label: 'Choosing random civic to grant based on era', note: 'wonder', choice: true });
         }
         if (num(dump.nextPlotCost) > num(was.nextPlotCost)) {
           const stored = num(was.nextPlot);
           const sp = stored >= 0 ? plotAt(rec, stored) : undefined;
           const gone = annexed || !sp || num(sp[P.owner] as Read<number>) !== p || num(sp[P.ownerCity] as Read<number>) !== num(wc.id);
-          if (gone) r.draws.push({ label: 'GetNextBuyablePlot picker (stored plot gone)' });
+          if (gone) r.draws.push({ label: PICKER, note: 'stored plot gone', city: key });
+          claimed = !gone;
         }
       }
-      const ties = congressBorderFrozen(state, city.seat) ? [] : borderBestPlots(state, city);
-      if (ties.length) r.draws.push({ label: 'GetNextBuyablePlot picker', city: key, ties });
+      const frozen = congressBorderFrozen(state, city.seat);
+      const ties = frozen ? [] : borderBestPlots(state, city);
+      // a major's start of the turn before, its cities in order: the plots it
+      // bought stand unowned at the pick (bought in its actions after it),
+      // so do the culture claims of its cities after this one
+      const after = new Set(post.cities.slice(post.cities.indexOf(wc) + 1).flatMap((c) => claims.get(`${p}:${num(c.id)}`) ?? []));
+      const hide = minor || frozen ? [] : [...unsure, ...after];
+      const seq = hide.length ? withoutOwners(state, hide, () => borderBestPlots(state, city)) : ties;
+      // the plots the player gained by purchase between the records: in its
+      // start, before this pick, or in its actions after it — the records do
+      // not say which, so each choice's ties stand beside the record's
+      const alts: number[][] = [];
+      if (!frozen && unsure.length && unsure.length <= 4) {
+        for (let m = 1; m < 2 ** unsure.length; m++) {
+          const off = unsure.filter((_, k) => Math.floor(m / 2 ** k) % 2 !== 1);
+          alts.push(withoutOwners(state, [...off, ...after], () => borderBestPlots(state, city)));
+        }
+      }
+      // a start of the turn before: the record before left the plots as the
+      // start found them, but for its own culture claim (\`startTies\`); the
+      // record's own ties stand beside them
+      const prior = post.turn < rec.turn ? imp.startTies.get(`${post.turn}:${key}`) : undefined;
+      // (a city-state, whose plots come by its envoys during the turns
+      // before its own, takes the record's first)
+      const before0 = prior ? [claimed ? prior.claimed : prior.open] : [];
+      const lists = (minor ? [ties, ...before0, ...alts] : [seq, ...alts, ties, ...before0]).filter((t) => t.length);
+      const uniq = lists.filter((t, k) => lists.findIndex((x) => x.join() === t.join()) === k);
+      if (uniq.length) r.draws.push({ label: PICKER, note: 'next plot', city: key, ties: uniq[0], ...(uniq.length > 1 ? { alts: uniq.slice(1) } : {}) });
     }
+    undo.forEach((i, k) => { state.map.tiles[i].ownerSeat = kept[k][0]; state.map.tiles[i].ownerCity = kept[k][1]; });
+  }
+  // the ties of every city whose start of this turn the next record
+  // witnesses (every player but the one whose start this record holds):
+  // as this record left the plots, and with the city's stored plot claimed
+  const own = [...latest].filter(([, t]) => t === rec.turn).map(([q]) => q);
+  const holders: [City, DumpCity][] = [...imp.dumpOfCity];
+  for (const [m, d] of imp.dumpOfMinor) holders.push([minorCity(m), d]);
+  for (const [city, d] of holders) {
+    const key = `${d.owner}:${d.id}`;
+    if (own.includes(d.owner) || congressBorderFrozen(state, city.seat)) continue;
+    const openTies = borderBestPlots(state, city);
+    const stored = num(d.nextPlot);
+    let claimedTies = openTies;
+    const t = stored >= 0 ? state.map.tiles[stored] : undefined;
+    if (t && t.ownerSeat === NO_SEAT) {
+      t.ownerSeat = city.seat;
+      t.ownerCity = city.id;
+      claimedTies = borderBestPlots(state, city);
+      t.ownerSeat = NO_SEAT;
+      t.ownerCity = -1;
+    }
+    imp.startTies.set(`${rec.turn}:${key}`, { open: openTies, claimed: claimedTies });
   }
   return out;
+}
+
+/**
+ * The plots the record holds that player `p`'s start of the turn before
+ * had not seen taken (`late`): plots unowned in the record before, gained
+ * since by a player after `p` (its start and actions follow `p`'s) or by a
+ * player whose start the record's own turn witnessed through that start's
+ * culture claim; and the plots `p` gained other than its cities' culture
+ * claims (`unsure`: a purchase the AI makes before its cities' turn or in
+ * its actions after it). A city's claim is its stored plot where its
+ * culture price rose; where the stored plot went elsewhere, every plot the
+ * city gained is its claim.
+ */
+function lateClaims(rec: TurnRecord, before: TurnRecord, imp: Imported, p: number, latest: Map<number, number>):
+  { late: number[]; unsure: number[]; claims: Map<string, number[]> } {
+  const claims = new Map<string, number>();
+  for (const c of rec.cities) {
+    const was = imp.cityBefore.get(`${c.owner}:${c.id}`);
+    if (!was || num(c.nextPlotCost) <= num(was.nextPlotCost)) continue;
+    const stored = num(was.nextPlot);
+    const sp = stored >= 0 ? plotAt(rec, stored) : undefined;
+    const took = sp && num(sp[P.owner] as Read<number>) === c.owner && num(sp[P.ownerCity] as Read<number>) === c.id;
+    claims.set(`${c.owner}:${c.id}`, took ? stored : -1);
+  }
+  const out: number[] = [];
+  const unsure: number[] = [];
+  const byCity = new Map<string, number[]>();
+  const n = rec.head.W * rec.map.length;
+  for (let i = 0; i < n; i++) {
+    const now = num(plotAt(rec, i)[P.owner] as Read<number>);
+    if (now < 0 || num(plotAt(before, i)[P.owner] as Read<number>) >= 0) continue;
+    const claim = claims.get(`${now}:${num(plotAt(rec, i)[P.ownerCity] as Read<number>)}`);
+    if (now > p) out.push(i);
+    else if (now < p && (latest.get(now) ?? -1) === rec.turn && claim === i) out.push(i);
+    else if (now === p && (claim === undefined || (claim >= 0 && claim !== i))) unsure.push(i);
+    else if (now === p) {
+      const key = `${now}:${num(plotAt(rec, i)[P.ownerCity] as Read<number>)}`;
+      if (!byCity.has(key)) byCity.set(key, []);
+      byCity.get(key)!.push(i);
+    }
+  }
+  return { late: out, unsure, claims: byCity };
+}
+
+/** `fn` on the state with the plots `hide` unowned, their owners restored after. */
+function withoutOwners<T>(state: GameState, hide: readonly number[], fn: () => T): T {
+  const kept = hide.map((i) => [state.map.tiles[i].ownerSeat, state.map.tiles[i].ownerCity] as const);
+  for (const i of hide) { state.map.tiles[i].ownerSeat = NO_SEAT; state.map.tiles[i].ownerCity = -1; }
+  try {
+    return fn();
+  } finally {
+    hide.forEach((i, k) => { state.map.tiles[i].ownerSeat = kept[k][0]; state.map.tiles[i].ownerCity = kept[k][1]; });
+  }
 }
 /** The draws of a start the seeds account for: its fixed draws with as many
  *  of its AI's choices (all before its cities) as the count leaves, or null
@@ -288,17 +453,119 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported): St
 export function resolveStart(s: StartReplay): StartDraw[] | null {
   if (s.game === undefined) return null;
   const fixed = s.draws.filter((d) => !d.choice);
-  const choices = s.draws.length - fixed.length;
+  // the choices before the cities (a city-state's research and civic, a
+  // recruit's replacement); the ones placed among them (a Spy, a wonder's
+  // grants) only the log places
+  const first = s.draws.filter((d) => d.choice && !d.note);
   const k = s.game - fixed.length;
-  if (k < 0 || k > choices) return null;
-  return [...s.draws.filter((d) => d.choice).slice(0, k), ...fixed];
+  if (k < 0 || k > first.length) return null;
+  return [...first.slice(0, k), ...fixed];
 }
 
-/** Each city's closing pick, drawn on the game's generator where the start's
- *  replay accounts for every draw between its seeds (`resolveStart`), by
- *  `owner:id`: the pick and the record's plot, or why it was not replayed. */
-function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, { pick: number; game: number; ties: number[] } | string> {
-  const out = new Map<string, { pick: number; game: number; ties: number[] } | string>();
+/** A city's closing pick (`startBorderPicks`): the plot drawn, the record's
+ *  next plot, the ties, and with the game's log the logged draw's range. */
+interface StartPick {
+  pick: number;
+  game: number;
+  ties: number[];
+  range?: number;
+  /** placed on the game's log */
+  logged?: boolean;
+}
+
+/** Does the start's pick stand for the record's next plot? The pick is the
+ *  record's plot; or the record holds none where a plot the city gained
+ *  after the start cleared it (`nextPlotUnheld`), and the log's draw fell
+ *  over the city's ties — the pick the record could not keep. */
+function pickHolds(sp: StartPick, unheld: boolean): boolean {
+  if (sp.pick === sp.game) return true;
+  return unheld && sp.game < 0 && !!sp.logged && sp.range === sp.ties.length;
+}
+
+/** A start's draws laid on the game's log of them (`LoggedStart`). */
+export interface LoggedStart {
+  /** the log's draws between the start's seeds */
+  logged: LoggedDraw[];
+  /** per replayed draw, the index in `logged` it lands on, -1 for none */
+  at: number[];
+  /** the logged draws no replayed draw lands on */
+  extra: number[];
+  /** the replayed draws whose range the log contradicts (a closing pick's
+   *  ties against the logged range), by index in `draws` */
+  range: number[];
+  /** the logged draws the game's AI took (its choices), by index */
+  ai: number[];
+  /** the tie list the logged range chose among a draw's `alts`, by index */
+  swap: Map<number, number[]>;
+}
+
+/** A start's draws laid on the game's log (`RandLog.between` its seeds):
+ * its fixed draws in order, each on the next logged draw of its label; then
+ * each AI choice or draw the records cannot place (`choice`) on the first
+ * logged draw of its label left; then every logged draw left that the
+ * game's AI takes (`DRAW_SITES` owner `ai`: an agenda, a city-state's
+ * research) is the AI's. Every other logged draw landed on, every fixed draw
+ * landing and every known range agreeing is the start replayed draw for
+ * draw. */
+export function logStart(s: StartReplay, logged: LoggedDraw[]): LoggedStart {
+  // a choice drawn in place (an envoy's annex before the cities) is taken
+  // as a fixed draw or left out, whichever lays the start better on the log
+  const placed = s.draws.some((d) => d.inPlace) ? [true, false] : [false];
+  let best: LoggedStart | undefined;
+  let bestCost = Infinity;
+  for (const take of placed) {
+    const l = layStart(s, logged, take);
+    const cost = l.extra.length + l.range.length + s.draws.filter((d, n) => !d.choice && l.at[n] < 0).length;
+    if (cost < bestCost) { best = l; bestCost = cost; }
+  }
+  for (const [n, t] of best!.swap) s.draws[n].ties = t;
+  return best!;
+}
+
+function layStart(s: StartReplay, logged: LoggedDraw[], inPlace: boolean): LoggedStart {
+  const fixed = (d: StartDraw) => !d.choice || (inPlace && d.inPlace);
+  const at: number[] = s.draws.map(() => -1);
+  const range: number[] = [];
+  const swap = new Map<number, number[]>();
+  const used = new Set<number>();
+  let i = 0;
+  s.draws.forEach((d, n) => {
+    if (!fixed(d)) return;
+    let j = i;
+    while (j < logged.length && siteLabel(logged[j].label) !== d.label) j++;
+    if (j >= logged.length) return;
+    at[n] = j;
+    used.add(j);
+    i = j + 1;
+    // the tie list the records leave open (`alts`) the logged range picks
+    const alt = d.ties && logged[j].range !== d.ties.length ? d.alts?.find((t) => t.length === logged[j].range) : undefined;
+    if (alt) swap.set(n, alt);
+    if (d.ties && logged[j].range !== (alt ?? d.ties).length) range.push(n);
+  });
+  s.draws.forEach((d, n) => {
+    if (fixed(d) || d.inPlace) return;
+    const j = logged.findIndex((x, k) => !used.has(k) && siteLabel(x.label) === d.label);
+    if (j < 0) return;
+    at[n] = j;
+    used.add(j);
+  });
+  const ai = logged.map((_, k) => k).filter((k) => !used.has(k) && DRAW_SITES[siteLabel(logged[k].label)]?.owner === 'ai');
+  for (const k of ai) used.add(k);
+  return { logged, at, extra: logged.map((_, k) => k).filter((k) => !used.has(k)), range, ai, swap };
+}
+
+/** Is the start replayed draw for draw on the log? */
+export function startLogged(s: StartReplay, l: LoggedStart): boolean {
+  return !l.extra.length && !l.range.length && s.draws.every((d, n) => d.choice || l.at[n] >= 0);
+}
+
+/** Each city's closing pick, by `owner:id`: the pick and the record's plot,
+ *  or why it was not replayed. With the game's log the pick is the logged
+ *  draw the city's pick lands on (`logStart`) over the city's ties, its range
+ *  theirs; without it, drawn on the game's generator where the start's
+ *  replay accounts for every draw between its seeds (`resolveStart`). */
+function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, StartPick | string> {
+  const out = new Map<string, StartPick | string>();
   const nextOf = new Map<string, number>();
   for (const [, c] of imp.dumpOfCity) nextOf.set(`${c.owner}:${c.id}`, num(c.nextPlot));
   for (const [, c] of imp.dumpOfMinor) nextOf.set(`${c.owner}:${c.id}`, num(c.nextPlot));
@@ -307,6 +574,24 @@ function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, { p
     const why = (reason: string) => { for (const k of keys) out.set(k, reason); };
     if (s.game === undefined || s.pre === undefined) { why('no witness seed'); continue; }
     if (s.why) { why(s.why); continue; }
+    const logged = s.post !== undefined ? imp.randLog?.between(s.pre, s.post) : undefined;
+    if (logged) {
+      const l = logStart(s, logged);
+      // a city with nothing in reach draws nothing and keeps the plot it
+      // stored while it stands unowned (none after a founding or its claim)
+      for (const k of keys) {
+        const stored = num(imp.cityBefore.get(k)?.nextPlot ?? -1);
+        const keep = stored >= 0 && imp.state.map.tiles[stored]?.ownerSeat === NO_SEAT ? stored : -1;
+        out.set(k, { pick: keep, game: nextOf.get(k) ?? -1, ties: [], range: 0, logged: true });
+      }
+      s.draws.forEach((d, n) => {
+        if (!d.city || !d.ties || d.note !== 'next plot') return;
+        const x = l.at[n] >= 0 ? logged[l.at[n]] : undefined;
+        if (!x) { out.set(d.city, 'the log holds no pick for it'); return; }
+        out.set(d.city, { pick: x.range === d.ties.length ? d.ties[x.value] : -1, game: nextOf.get(d.city) ?? -1, ties: d.ties, range: x.range, logged: true });
+      });
+      continue;
+    }
     const draws = resolveStart(s);
     if (!draws) { why('the start drew besides the picks'); continue; }
     for (const k of keys) out.set(k, 'no plot in reach');
@@ -323,20 +608,32 @@ function subjectOf(c: DumpCity): string {
   return `city ${c.owner}:${c.id} ${strip(c.name, 'LOC_CITY_NAME_')}`;
 }
 
-export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = importTurn(rec, cat)): CheckResult[] {
+export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = importTurn(rec, cat), sink?: StartReplay[]): CheckResult[] {
   const out: CheckResult[] = [];
   const state = imp.state;
-  const starts = startDraws(rec, state, imp);
+  const starts = startDraws(rec, state, imp, cat);
+  sink?.push(...starts);
   const startPicks = startBorderPicks(starts, imp);
   const turn = rec.turn;
-  // each player's start: the replay's draws against the draws between its
-  // witnesses' seeds; a start holding an AI choice that lands on them is
+  // each player's start: the replay's draws against the game's log of the
+  // draws between its witnesses' seeds, label by label; without the log,
+  // against their count, a start holding an AI choice that lands on it
   // consistent, not tested
   for (const s of starts) {
     const subject = `player ${s.player} start t${s.turn}`;
+    const logged = s.pre !== undefined && s.post !== undefined ? imp.randLog?.between(s.pre, s.post) : undefined;
     if (s.game === undefined) out.push({ turn, check: 'start.draws', subject, ok: true, skip: 'no witness seed' });
     else if (s.why) out.push({ turn, check: 'start.draws', subject, ok: true, skip: s.why });
-    else if (s.draws.some((d) => d.choice) && resolveStart(s)) {
+    else if (logged) {
+      const l = logStart(s, logged);
+      const ok = startLogged(s, l);
+      out.push({ turn, check: 'start.draws', subject, ok, game: s.game, ours: l.at.filter((x) => x >= 0).length,
+        ...(ok ? {} : { state: {
+          unexplained: l.extra.map((k) => `${logged[k].label}/${logged[k].range}`),
+          unlogged: s.draws.filter((d, n) => !d.choice && l.at[n] < 0).map((d) => `${d.label} (${d.note ?? ''})`),
+          range: l.range.map((n) => `${s.draws[n].city} ties ${s.draws[n].ties?.length} logged ${logged[l.at[n]].range}`),
+        } }) });
+    } else if (s.draws.some((d) => d.choice) && resolveStart(s)) {
       out.push({ turn, check: 'start.draws', subject, ok: true, skip: 'an AI choice the records do not show' });
     } else {
       const ok = s.game === s.draws.length;
@@ -351,9 +648,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const sp = startPicks.get(`${c.owner}:${c.id}`);
     if (sp === undefined) out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no witness' });
     else if (typeof sp === 'string') out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: sp });
-    else if (sp.game < 0 && imp.nextPlotUnheld.has(cs.centerIndex)) {
+    else if (sp.game < 0 && imp.nextPlotUnheld.has(cs.centerIndex) && !sp.logged) {
       out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no next plot held' });
-    } else out.push({ turn, check: 'city.nextPlotDraw', subject, ok: sp.pick === sp.game, game: sp.game, ours: sp.pick, state: { ties: sp.ties } });
+    } else {
+      out.push({ turn, check: 'city.nextPlotDraw', subject, ok: pickHolds(sp, imp.nextPlotUnheld.has(cs.centerIndex)), game: sp.game, ours: sp.pick,
+        state: { ties: sp.ties, range: sp.range } });
+    }
   }
   // every reader takes the congress the game holds now, but a city's
   // amenities stand as its seat's last turn left them (`congressOf`)
@@ -494,9 +794,9 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const sp = startPicks.get(`${c.owner}:${c.id}`);
     if (sp === undefined) out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no witness' });
     else if (typeof sp === 'string') out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: sp });
-    else if (sp.game < 0 && imp.nextPlotUnheld.has(city.centerIndex)) {
+    else if (sp.game < 0 && imp.nextPlotUnheld.has(city.centerIndex) && !sp.logged) {
       out.push({ turn, check: 'city.nextPlotDraw', subject, ok: true, skip: 'no next plot held' });
-    } else push('city.nextPlotDraw', sp.pick === sp.game, sp.game, sp.pick, { ties: sp.ties });
+    } else push('city.nextPlotDraw', pickHolds(sp, imp.nextPlotUnheld.has(city.centerIndex)), sp.game, sp.pick, { ties: sp.ties, range: sp.range });
     // loyalty
     const gameLpt = num(c.loyaltyPerTurn);
     {

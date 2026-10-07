@@ -780,6 +780,9 @@ export interface Seat {
    *  device "is added to the player's inventory and can then be used by any
    *  unit or improvement capable of deploying it". */
   wmd?: number[];
+  /** The citizen names this seat's civilization has given (`drawCitizenName`):
+   *  its Spies' and the storms named for it. Absent = none. */
+  citizenNames?: number;
   /** Light-years the Exoplanet craft has travelled; -1 = no craft in flight.
    *  The win fires on ARRIVAL (spaceLy >= SPACE_FLIGHT_LY), not on launch. */
   spaceLy?: number;

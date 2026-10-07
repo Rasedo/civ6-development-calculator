@@ -162,23 +162,27 @@ RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights
   dormant named volcano drawn uniformly ("Choose Active Volcano Roll"); at
   or above 70 the same roll puts one ACTIVE volcano to sleep ("Choose
   Inactive Volcano Roll"); the gate below ("C-74: the volcano roll's gate").
-  On the Duel games: 2 sleeps observed where the engines keep a volcano
-  active; the wake count fits an effective N of 500 (expected 15.3 wakes
-  against 15, 2.7 sleeps against 2; logL −93.8) and not 250 (31.1 wakes,
-  logL −100.3), while the event draw measured N 250: a factor 2 left open
-  (the owner-gated reading of field +8 dies: 10 wakes were unowned).
-- The drought start (`dll_drought.py`): ONE weighted draw over EVERY map
-  plot ("Pick Drought Start Plot" 0x287e80): valid when the plot and its
+  **REVERSED by the game's draw log** ("H-1: the draw log's labels"): N is
+  the event draw's N, 250 online — every "Active Volcano Roll" of
+  runs/h1_duelw1117 (243) and 1118 (277) draws over 62 with two volcanoes
+  (250 // 4; 500 // 4 is 125, and with two named volcanoes (70 − pct)·V'
+  never reaches 200, so no divisor brings 500 to 62), and 1118 t152's
+  "Choose Inactive Volcano Roll" over 2 is the sleep branch with both
+  volcanoes active (pct 100 with V = 2). The earlier fit of N 500 to the
+  Duel lab wakes (15.3 expected against 15) is withdrawn; the engines read
+  `TURN_LIMIT` (`volcanoRoll` / `_volcano_roll`). The owner-gated reading of
+  field +8 stays dead (10 wakes were unowned).
+- The drought start (`dll_drought.py`): ONE draw over EVERY candidate plot
+  ("Pick Drought Start Plot" 0x287e80) — **REVERSED: a uniform draw**, see
+  "C-74: the drought's start pick" below; a candidate is a plot that and its
   six neighbours all pass the drought predicate 0x28eb60 — no feature, no
   river (plot byte +0x37), not water and not beside an ocean-sized water
   body (0x82a10), Plains / Grassland (hills too), not under an event —
-  weight 1 + min(hex distance to the nearest live event's current plot,
-  Spacing 15), the live events being the DROUGHTS alone (m_aDroughts
-  +0x948 in 0x28ce90; storms are m_aStorms +0x8b0), each at the last plot
-  of its stored footprint (0x288430 → 0x28aa00). No city anchor. Verified: 13 / 13 placed droughts start on a
-  candidate, 34 / 34 droughts that found no plot had none (without the
-  river clause 16 / 34, without the water clause 23 / 34). `Spacing` is this
-  distance weight, the storm and one-off pickers take the same form.
+  its score 0x28ff20 = 1 + min(hex distance to the nearest live drought's
+  last footprint plot, Spacing 15) (m_aDroughts +0x948 in 0x28ce90) keeps
+  in the list while above 0. No city anchor. Verified: 13 / 13 placed
+  droughts start on a candidate, 34 / 34 droughts that found no plot had
+  none (without the river clause 16 / 34, without the water clause 23 / 34).
 - The fire's draws: "C-74: the fire" below (the strike 0x2867f0, SPREAD).
 
 ## C-93: the great person draw
@@ -1185,8 +1189,8 @@ turns after the origin" (runs/c74s3_fire*), and no Rainforest caught from a
 Forest Fire. The engines' rule that a Jungle Fire spreads into Woods
 (the Climate screen's text) dies with this reading: no recorded case has a
 Jungle Fire beside Woods — a LAB line. The neighbour order 0x6b1b0 walks is
-not read (the engines take DirectionTypes order; it moves only which birth's
-unit rolls come first).
+the ring walk 0x691f0 ("C-74: the fire's spread"): it orders the births and so
+their later ticks and spreads.
 
 ## C-74: the one-off start — READ
 
@@ -1418,9 +1422,8 @@ On 1117 / 1118 the resolved choices are
 the game's logged ones on 630 of 631 starts. Unexplained, 6-10 a duel: a
 civic's antiquity eras and boosts, a Spy's name and shuffle, an agenda, a
 quest, a start goody; and the player 1 starts that draw one or two picks
-more with NO plot changing hands between the records (runs/h1_duelw1117 t28:
-1/2, 0/1, 0/1 for one city that annexed its stored plot; runs/h1_duelw1118
-t33, t66, t148) — a LAB line.
+more with NO plot changing hands between China's cities — the city-states'
+envoy annex ("H-1: the envoy annex").
 
 ## H-1: the random promotion offer (0x4f23a0) — READ
 
@@ -1531,6 +1534,162 @@ it ("Barbarian camp location"), a tribe ("Barb Tribe Roll" 0x152460).
 runs/h1_duelw1117: camps on t1-4 and t8 only. The engines keep their own
 camp and raid rolls (8%, 10%: `BARB_CAMP_SPAWN_PCT`, `BARB_RAID_PCT`) on
 integer draws — a BUILD line.
+
+## H-1: the draw log's labels (RandCalls.csv) — READ
+
+The game's own draw log, every draw with its label, is the harness's to
+read (`cpu/harness/randLog.ts`: a dump's own `<dump>.randcalls.csv`, or a
+shared `h1_randcalls_duelw<a>_<b>.csv` beside it; the game whose chain holds
+the witness seeds). The label map — every label the game draws at, the
+engines' site for it, and who owns it — is `cpu/harness/drawSites.ts`
+(`DRAW_SITES`, `ENGINE_ONLY_SITES`); the harness reads it for its per-turn
+`turn.draws` check (`drawLedger.ts`). runs/h1_duelw1117 (21,322 draws) and
+1118 (23,169), where in the turn each label falls (`start` a player's
+start, `act` its actions, `barb` the barbarians' turn and the congress,
+`step` the random-event step, `after step` the quests' and era's draws):
+
+| label | 1117 / 1118 | where | owner |
+|---|---|---|---|
+| Random Direction | 12,754 / 10,982 | act, barb | AI |
+| Pillage Improvement Chance | 2,313 / 4,896 | step | rule (event damage rows) |
+| GetNextBuyablePlot picker | 2,187 / 2,766 | start, act (foundings, envoys) | rule |
+| Boosted Yield Chance | 1,143 / 975 | step | rule (event yield rows) |
+| Random Diplomatic Value | 896 / 896 | set-up | AI |
+| Unit Combat Damage | 607 / 705 | act, barb | rule |
+| Random Event Roll, Active Volcano Roll | 249 / 277, 243 / 277 | step | rule |
+| Storm Direction (+ Preview, Start Plot) | 89 / 248 (21 / 57, 7 / 19) | step | rule |
+| City Build District Choice | 105 / 171 | act | AI |
+| Random Promotion | 60 / 194 | act, start | rule |
+| BT Research Choice | 108 / 121 | barb (a city-state's research at the turn's end), start | AI |
+| Unknown | 96 / 96 | set-up | set-up |
+| Fertility Gain Chance | 90 / 84 | step | rule (eruption soil) |
+| Barbarian Ranged unit roll | 40 / 48 | barb | rule, lacking |
+| World Congress Resolutions / target | 39 / 43, 18 / 12 | barb | rule / AI |
+| Generating a random new Great Person | 37 / 40 | act, start, set-up | rule |
+| Random Event Unit Damage Roll | 28 / 28 | step | rule |
+| Choosing a Citizen Name | 13 / 34 | step (a storm's name), act and start (a Spy's) | rule |
+| NameManager::GetUnitNamePart | 10 / 24 | act, two a unit (118 then 155; 86 then 81) | rule, lacking |
+| tech / civic boosts, free techs | 24 / 27 | act, start, after step | rule |
+| Selecting a random new quest (+ its type pickers) | 12 / 11 (11 / 8) | after step (every 30 turns), act | rule, lacking |
+| Choosing a City Name | 11 / 10 | act (a major's founding past its capital) | rule |
+| Goody Hut Type / Sub Type | 9 / 11 each | act, start | rule |
+| region names (River, Sea, Desert, Volcano, Mountain Range, Ocean, Lake Range) | 20 / 19 | act, set-up | rule, lacking |
+| Barbarian camp region / location / Barb Tribe Roll | 5 / 6 each | barb | rule, lacking |
+| tech and civic tree set-up | 44 / 41 | set-up | set-up |
+| Random Era for Antiquity Site, Choosing Artifact | 3 / 0, 0 / 3 | start, act | rule, lacking |
+| Choose random agenda, Random Civic Choice | 3 / 3, 1 / 0 | set-up, start | AI |
+
+The engines' sites the game has no label for (`ENGINE_ONLY_SITES`): the
+city-states' and Free Cities' walk (`walkUnit`), their builds and buys
+(`minorPlan`, `minorPurchases`, ...) and the pantheon pick — the AI's, the
+driver's stand-ins. The labels the engines never draw: the barbarians'
+camp step and ranged roll (as the DLL runs them), the unit and region
+names, the quests, the antiquity sites' eras and the artifacts — AUDIT C-74
+BUILD. Every value is ((state' >> 16) · range16) >> 16 (46,082 of 46,082).
+
+What the log settled:
+- The random-event step is the run of step draws holding the gap's last
+  "Random Event Roll" (`loggedStep`): the quests' refresh ("Selecting a
+  random new quest", every 30 turns: t31, t61 ...) and an era's boosts may
+  follow it before the first player's start, so the step is no tail of
+  the gap. On the turn the sea rises the roll is a draw over 1 (1117 t224,
+  t244; 1118 t239, t270): the rise is the turn's event by force.
+- A unit that walked onto a struck plot and died in the event is in no
+  record: the log's "Random Event Unit Damage Roll"s place it (1117 t223,
+  a Warrior on 805 when the fire there was born).
+- The harness replays every start draw for draw where the records tell
+  what the start did: the city-states' research and civics, the recruits'
+  replacements, an agenda (the AI's own labels), a Spy's name and level
+  offer, a wonder's annex and grants (the Dynastic Cycle's boosts, Oxford's
+  techs), the envoy annex, the closing picks (`logStart`). 1117: 1,740 of
+  1,743 witnessed starts, 1118: 1,731 of 1,736.
+
+## C-74: the fire's spread — READ (the order)
+
+The spread's neighbour walk 0x6b1b0 -> 0x691f0 is the ring walk: from the
+plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1),
+(-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's
+SOUTHEAST, WEST, NORTHEAST, NORTHWEST, EAST, SOUTHWEST (`RING_DIRS`). Each
+neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the
+row's Hexes) is born at once with its age-0 strike, in that order, and the
+births tick in it: runs/h1_duelw1118 t22, Rainforest 665's spread lit 664
+(its WEST) before 621 (its NORTHWEST), and at t23 664's tick came first —
+its spread lit 620 alone (621's neighbour 576 is no neighbour of 664). The
+engines walked DirectionTypes; they walk the ring (`fireStrike` /
+`_fire_strike`). The spread's births are no event rows in the records:
+the harness lights them from the step's own spread rolls on the record's
+features (`replayEvents`; 1117 t222-229, 1118 t20-29 replayed draw for
+draw). Units and cities 0x33b580 skips: a city whose established
+governor's +0xc8 holds (unread which) keeps the fire off its plots.
+
+## C-74: the drought's start pick — READ (REVERSED)
+
+0x287e80 builds the list of every plot whose score 0x28ff20 is above 0
+(the area test 0x28aa00 with the row's predicate, times Spacing + 1, less
+Spacing − d where the nearest live drought's last plot is d < Spacing away)
+and draws over the list's COUNT, `rand(n)` through the thunk 0x152eb0,
+indexing the list: the scores are stored and never read. **This reverses
+the weighted pick** shipped before (1 + min(d, 15)): runs/h1_duelw1118 t92
+and t102 draw over 1, t138 and t151 over 3, where the weights summed 16,
+16, 48, 48 (equal weights gave the same plot; a live drought's neighbours
+would not). The engines draw uniformly (`droughtStart` / `_drought_start`);
+`DROUGHT_SPACING` and `droughtEnds` are gone.
+
+## H-1: a city-state sees its suzerain's resources — READ
+
+0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own
+reveal bit (+0xf0), then — where its influence component's suzerain
+(+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition,
+recursively; then the reveal modifiers, then the tech (+0xc8) and civic
+(+0xc0). So a city-state sees every resource its suzerain sees.
+runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95:
+the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts
+from the turn China (their suzerain) holds Military Engineering, before
+the city-state does (logged ties 4 and 1 against the engines' 2 and 5).
+The engines follow (`hiddenResourcesFor` / `_res_hidden`).
+
+## H-1: the envoy annex — READ (settles the extra border picks)
+
+0x1abf40, a city-state's culture reacting to influence received: where its
+civilization level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with
+E the envoys it holds (0x44c4b0, every giver) and A its annexed count past
+its starting tiles (+0xc less 0x1ab460, StartingTilesForCity's), E > A
+annexes E − A plots (AnnexPlots 0x1a8a30, one "GetNextBuyablePlot picker"
+draw each). The AI sends its envoys in its start, before its cities: the
+"one or two border picks more with no plot changing hands" of the major's
+start (LAB) are the city-state's annex — runs/h1_duelw1117 t28 (Caguana's
+two for China's two envoys), t44 (Antananarivo's and Caguana's);
+runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before
+China's seven cities). The harness replays them (`startDraws`, an envoy
+sent in the start or in the actions: the log places it).
+
+## H-1: a city's name, a citizen's name — READ
+
+- "Choosing a City Name" (0x327c30 -> 0x327a70 -> 0x328de0): a city whose
+  founder holds a CapitalName for it (its first) takes it with no draw;
+  else the civilization's CityNames rows less the names used, the first
+  max (10, unless the row 0x28a940 returns sets +0x1c) kept, weighted
+  n, n − 1, ... 1: ONE draw over n(n + 1) / 2. runs/h1_duelw1117 and 1118:
+  21 of 21 foundings past a capital draw over 55, each followed by one
+  picker draw (unread). The engines draw at a major's founding past its
+  capital (`foundCityAt` / `_found_city_at`, `CITY_NAME_DRAW`) and keep
+  their own name list.
+- "Choosing a Citizen Name" (0x486c20): one draw over the civilization's
+  CivilizationCitizenNames rows not yet given, the name given. A Spy takes
+  one at its birth (1117 t102, t118, t199 in China's start; 1118 t218
+  before its level offer); a storm takes one for its naming player
+  (Game_Climate 0x28d4f0): the major owning its plot (0x469db0), else the
+  major whose city stands nearest it (0x36f6c0 per player, the first at
+  the least distance); none, no draw. China's pool falls 40, 39, 38 ... as
+  storms and Spies take names. The engines follow (`drawCitizenName`,
+  `stormNamer` / `_draw_citizen_name`, `_storm_namer`;
+  `Seat.citizenNames` / `civ_citizen_names`).
+- "NameManager::GetUnitNamePart": two draws a unit (118 then 155, or 86
+  then 81) in the majors' actions from t192 — unread which units are named.
+- "Random Era for Antiquity Site" (0x280140, from 0x2805f0): with n the era
+  row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:
+  runs/h1_duelw1117 t217's three draws over 35, 44 and 9 are n = 7, 8 and
+  3 — which era row each site reads (0x2805f0) is unread.
 
 ## H-1: draws with no game site
 

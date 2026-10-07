@@ -3056,17 +3056,17 @@ class SimInit:
         # MAPSIZE_STANDARD's
         self._event_occ_scale = int(_ds["eventOccScale"])
         self._event_turns = int(_ds["eventTurns"])
+        # a major's city past its capital: its name's one draw (`CITY_NAME_DRAW`)
+        self._city_name_draw = int(self.rules.seats["cityNameDraw"])
+        # each roster civilization's citizen names (`citizenNameRows`), by civ
+        self._citizen_name_rows = [int(x) for x in self.rules.seats["citizenNameRows"]]
         self._standard_map_area = int(_ds["standardMapArea"])
         # a per-site pair not yet fired this game carries 100 + this share in
         # hundredths (`FIRST_TIME_OCCURRENCE_BOOST`)
         self._first_boost = int(_ds["firstTimeOccurrenceBoost"])
-        # THE VOLCANO ROLL (`volcanoRoll`): the realism's active percent and
-        # the turns the roll reads the game's span at
+        # THE VOLCANO ROLL (`volcanoRoll`): the realism's active percent (its
+        # turns are the event roll's, `_event_turns`)
         self._pct_volcanoes_active = int(_ds["percentVolcanoesActive"])
-        self._volcano_roll_turns = int(_ds["volcanoRollTurns"])
-        # a drought's start plot weighs 1 + min(its distance to a live event,
-        # this) (`droughtStart`)
-        self._drought_spacing = int(_ds["droughtSpacing"])
         # THE EIGHT ERUPTION ROWS (`ERUPTION_ROWS`: Eyjafjallajokull's two,
         # Kilimanjaro's two, Vesuvius's, then the volcano's three), one entry
         # per row: the per-plot Volcanic Soil chance and the
@@ -3743,6 +3743,9 @@ class SimInit:
         # The Exoplanet flight: LY travelled (-1 = no craft in flight) and the
         # completed laser stations that speed it. Win on ARRIVAL, in step().
         self.space_ly = torch.full((B, self.n_majors), -1, dtype=torch.long, device=device)
+        # the citizen names each major has given (`drawCitizenName`): its Spies
+        # at birth, the storms named for it
+        self.civ_citizen_names = torch.zeros((B, self.n_majors), dtype=torch.long, device=device)
         self.civ_orbital_lasers = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.city_lasers = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # GS: the strategic banks, and the POWERED flag the grid resolves to

@@ -699,6 +699,7 @@ SEAT = {
     "projectsDone": lambda sim, b, rows: [sum(1 for x in sim.project_done[b, c].tolist() if x) for c in rows],
     "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
+    "citizenNames": _civ_scalar("civ_citizen_names"),
     "laserSpeed": lambda sim, b, rows: [int(_batch_rows(sim, "laser", c, sim._laser_speed)[b]) for c in rows],
     "laserStations": lambda sim, b, rows: [
         int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows
