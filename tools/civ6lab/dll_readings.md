@@ -3107,7 +3107,8 @@ its steps landing on the game's log.
   `_seize_civilians` / `_seize_open`; a barbarian's captive holds where it
   stands and guards no camp (`hostileUnitAct`, the GPU's barbarian walk).
 
-## H-1: why a seed does not replay — the AI's worker threads — READ (the off-switch a LAB)
+## H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED
+Measured 2026-10-08: duel seed 1117 recorded twice under `game.py patch apply` + `profile apply`, the second beside a full harness sweep, draws identical over all 22,590 (unpatched recordings parted at t169).
 
 The synchronous generator is never raced. 0x8b6c10 (Random.cpp) takes no
 lock: it reads the state at 0x8b6c98, logs the old state (the RandCalls seed
@@ -3169,6 +3170,29 @@ Where the AI runs off the game-core thread:
   0xe09781a7 = MaxGameCoreTradeRouteThreads, each the game-core count when
   <= 0. MaxJobThreads (the engine's job threads, the main thread included)
   is read at 0x6cb59.
+- What each option reaches. The game-core count (0x7ec3df64) has no reader
+  in either game-core DLL; the exe reads it back only to log "Game Core
+  Thread Count = %d." (0xf86f0) — MaxGameCoreThreads and
+  GameCoreReserveThreads serialize nothing beyond defaulting the two pool
+  counts. The job threads: MaxJobThreads -1 is the logical count (+1 at 4 or
+  fewer, the physical count on AMD family 0x15) less 2; any value is then
+  floored at 2 and capped at 32 (0x6cf0a..0x6cf47, options +0x26c), and the
+  TBB scheduler is initialised with it (Platform_TBBJobManager.cpp,
+  0x9858d0: `task_scheduler_init(min(n, 32))`). The engine always holds a
+  worker beside the main thread, so no option keeps a spawned AI job off
+  the game-core thread's time: EXP_JobManager_SpawnList (0x985bf0) hands
+  the list to TBB and returns.
+- The FinalRelease DLL the game loads: the AI's spawn 0x4a10b0 (flags
+  +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait
+  0x4a16e0 (called from Game::Processor::Update 0x4b72a). Spawned with no
+  wait in the spawning function: City Analysis (0x3e2590), Policy Tree /
+  Civic Tree / Great Work Collection Analysis (0x4136b0), Espionage
+  (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle
+  City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree
+  Analysis (0x4f87e0). Spawned and waited at once: Barbarian Camp
+  Evaluation, Settle City Evaluation (0x4b1540), AI Influence Map, AI Unit
+  Planning, Nearest City Search; Trade Graph Update (0x3883a0) forks over
+  its own list and joins.
 
 No wall-clock budget gates an AI decision: the DLL's only clock reads
 (QueryPerformanceCounter through 0xcc6080) feed the scoped profiler
@@ -3179,15 +3203,23 @@ The reading: an AI job that reads shared state while the game-core thread
 (or another chunk) changes it — City Analysis spawned without a wait, the
 unit-planning chunks sharing the path-finder pool and their reservations —
 decides by thread timing, and a loaded box shifts the timing (the new 1117
-was recorded under load). LAB: the off-switch. `AppOptions.txt`
-[Performance] `MaxGameCoreThreads 1`, `GameCoreReserveThreads 0`,
-`MaxGameCoreUnitMovementThreads 1`, `MaxGameCoreTradeRouteThreads 1`
-(the community's multiplayer-desync setting; read once at the exe's start),
-and `MaxJobThreads 1` as the second arm if the first still parts; then one
-seed recorded twice, once under load, must give identical RandCalls.csv.
-No gameplay mod reaches it: the options are the exe's, read before the mod
-system loads, no GlobalParameters row or Lua binding sets them (the Lua
-`GetWorkerCount` 0x23ce0 only reads), and the jobs are DLL code.
+was recorded under load). No gameplay mod reaches it: the options are the
+exe's, read before the mod system loads, no GlobalParameters row or Lua
+binding sets them (the Lua `GetWorkerCount` 0x23ce0 only reads), and the
+jobs are DLL code.
+
+The off-switch the lab runs (`game.py`): the profile's
+`MaxGameCoreUnitMovementThreads 1` and `MaxGameCoreTradeRouteThreads 1`
+make the path-finder pools one wide (AI Unit Planning plans every unit on
+the calling thread, the influence map is one chunk), and `patch apply`
+patches the FinalRelease DLL so the AI's spawn waits: 0x4a10ed's tail
+jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize
+raised to the raw size) that spawns the list and tail-jumps to the wait
+0x4a16e0. The spawn's flag protocol is unchanged (set before the spawn,
+cleared by the wait); every job list now runs to its end before the
+game-core thread goes on, the only parallel work left is jobs of one list
+beside each other on the scheduler's two threads.
+
 ## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
 
 - A plot's capacity (0x195940) counts a district's specialist slots as its

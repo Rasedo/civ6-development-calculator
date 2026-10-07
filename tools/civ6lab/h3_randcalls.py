@@ -1,7 +1,7 @@
 """H-3: read the game's per-draw random log (Logs/RandCalls.csv) and test the
 known sync LCG against it.
 
-    python tools/civ6lab/h3_randcalls.py [csv] [--head N] [--type sync|async|all]
+    python tools/civ6lab/h3_randcalls.py <RandCalls.csv> [--head N] [--type sync|async|all]
 
 The csv columns are `Game Turn, Range, Value, Seed, Type, Location`. For each
 row it checks whether `Seed` is the state BEFORE or AFTER the draw by stepping
@@ -15,7 +15,6 @@ import collections
 import csv
 import pathlib
 
-LOG = pathlib.Path.home() / "AppData/Local/Firaxis Games/Sid Meier's Civilization VI/Logs/RandCalls.csv"
 M32 = 0xFFFFFFFF
 
 
@@ -41,7 +40,7 @@ def rows(path: pathlib.Path):
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("csv", nargs="?", default=str(LOG))
+    p.add_argument("csv")
     p.add_argument("--head", type=int, default=0)
     p.add_argument("--type", default="all")
     a = p.parse_args()

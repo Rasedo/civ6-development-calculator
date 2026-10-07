@@ -71,7 +71,7 @@ Two box facts it needed:
 
 ## The lab profile, the startup patch, several instances
 
-    python tools/civ6lab/game.py patch apply        # logos off, copyright delay 0, steam_appid.txt
+    python tools/civ6lab/game.py patch apply        # logos off, copyright delay 0, steam_appid.txt, the replay patch
     python tools/civ6lab/game.py profile apply      # the lean options (owner's files backed up)
     python tools/civ6lab/game.py --host 127.0.0.2 launch   # instance 2, tiled into the window grid
     python tools/civ6lab/game.py --host 127.0.0.2 bench --save lab4_t100 --turns 15
@@ -180,11 +180,36 @@ What each finding is:
   tuner listens on `-TunerIP <address>`:4318, so instance N is launched with
   `-TunerIP 127.0.0.N` (`game.py --host 127.0.0.N launch`) and every command
   takes the same `--host`. Without the flag a new instance takes 4318 from
-  the old one. All instances share one user dir (options, logs, saves) —
-  name saves per instance; autosaves collide.
+  the old one.
+* ONE PROFILE PER INSTANCE: `CivilizationVI.exe` builds its user dir from
+  `SHGetKnownFolderPath(FOLDERID_LocalAppData)` (startup RVA 0x6fe6ed, GUID
+  at 0x1127b18, stored at app+0x860) + `\Firaxis Games\Sid Meier's
+  Civilization VI` (wide string 0xfa61f0, joined at 0x6d08d / 0x6d14b), and
+  its Logs folder as that dir + `Logs` (0xfa7718, at 0x6d0ff); Documents
+  (Saves, Mods) comes from `FOLDERID_Documents` (0x6fe76b, GUID 0x1127b38).
+  No switch, AppOptions key or environment variable of its own overrides
+  either (its other env reads are the CRT's and OpenSSL's; the GameCore DLLs
+  import no folder API). The shell resolves both known folders through the
+  process's USERPROFILE, so `game.spawn` starts every instance with
+  USERPROFILE = `C:\civ6lab_profiles\<host>` (LOCALAPPDATA / APPDATA to
+  match). `game.seed_profile` makes that profile at each spawn: the known
+  folders the shell checks for (it fails with 0x80070003 on a missing
+  one), the owner's option files (the lab profile, if applied) and
+  `Mods.sqlite` copied in, `Saves` and `Mods` junctions to the owner's
+  Documents — a named save loads on any instance; autosaves still collide.
+  Cache (the Debug*.sqlite databases), Logs, ModUserData and
+  HallofFame.sqlite are the instance's own. `game.logs_dir(host)` is an
+  instance's Logs folder; `h4.py` reads its Lua.log there and `h1/fleet.py`
+  slices its game logs from there, so parallel recordings never mix rows.
+  Unlink the two junctions (`rmdir`) before deleting a profile tree.
 * The startup patch touches the install (the two logo movies renamed
   `.lab-off`, IntroScreen.lua's ACCEPT_DELAY 0 with a `.lab-backup`) — a
-  Steam file check or a game update undoes it; `patch apply` again.
+  Steam file check or a game update undoes it; `patch apply` again. It
+  also patches `GameCore_XP2_FinalRelease.dll` (a `.lab-backup` beside it)
+  so the AI's job spawn waits for its jobs: with the profile's one path
+  finder, no AI job runs beside the game-core thread and a seed replays (1117 recorded twice, the second beside a full harness sweep: all 22,590 draws identical)
+  (dll_readings.md, "H-1: why a seed does not replay"). Apply it with no
+  instance running (a loaded DLL cannot be written).
 
 ## A session
 

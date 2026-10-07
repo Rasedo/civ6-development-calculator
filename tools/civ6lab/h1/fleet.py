@@ -20,10 +20,10 @@ RandCalls.csv, the war-weariness and combat ledgers, the AI's build,
 policy and research choices, boosts, barbarians, borders) grow across
 games or restart with one; the bytes a game wrote to each are copied to
 `<dump stem>.logs/` (RandCalls.csv also beside the dump as
-`.randcalls.csv`). The instances share one Logs folder, so with several
-hosts a game's slices hold the others' rows too (`logsMixed` in its
-manifest line).
-The instances must already stand at the main menu (`h4.py spawn` / `menu`).
+`.randcalls.csv`). Each instance writes its own Logs folder (its host's
+profile, `game.logs_dir`), so games on several hosts never mix rows.
+The instances must already stand at the main menu (`h4.py spawn` / `menu`),
+spawned through `game.spawn` so each runs in its host's profile.
 """
 from __future__ import annotations
 
@@ -42,20 +42,22 @@ LAB = HERE.parent
 ROOT = LAB.parents[1]
 RUNS = LAB / "runs"
 PY = sys.executable
-LOGS = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI" / "Logs"
+sys.path.insert(0, str(LAB))
+import game  # noqa: E402
 
 
 # the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
 SKIP_LOGS = {"AI_Behavior_Trees.csv"}
 
 
-def log_files() -> list[pathlib.Path]:
-    return sorted([f for f in LOGS.glob("*.csv") if f.name not in SKIP_LOGS] + [LOGS / "CultureBordersLog.txt"])
+def log_files(host: str) -> list[pathlib.Path]:
+    logs = game.logs_dir(host)
+    return sorted([f for f in logs.glob("*.csv") if f.name not in SKIP_LOGS] + [logs / "CultureBordersLog.txt"])
 
 
-def log_sizes() -> dict[str, int]:
+def log_sizes(host: str) -> dict[str, int]:
     out = {}
-    for f in log_files():
+    for f in log_files(host):
         try:
             out[f.name] = f.stat().st_size
         except OSError:
@@ -78,12 +80,13 @@ def save_slice(src: pathlib.Path, start: int, out: pathlib.Path) -> int:
     return body.count(b"\n")
 
 
-def save_logs(starts: dict[str, int], dump: pathlib.Path) -> dict[str, int]:
-    """Every log's slice to `<dump stem>.logs/`; RandCalls.csv also beside the dump."""
+def save_logs(host: str, starts: dict[str, int], dump: pathlib.Path) -> dict[str, int]:
+    """Every log's slice of `host`'s Logs folder to `<dump stem>.logs/`;
+    RandCalls.csv also beside the dump."""
     folder = dump.with_suffix(".logs")
     folder.mkdir(exist_ok=True)
     rows = {}
-    for f in log_files():
+    for f in log_files(host):
         if f.exists():
             rows[f.name] = save_slice(f, starts.get(f.name, 0), folder / f.name)
     if (folder / "RandCalls.csv").exists():
@@ -127,7 +130,7 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     if rc != 0:
         rec.update(end="crash", why=f"no main menu: {tail[-300:]}")
         return rec
-    log_start = log_sizes()  # the new game's set-up rows are its own
+    log_start = log_sizes(host)  # the new game's set-up rows are its own
     rc, tail = bounded([PY, str(LAB / "game.py"), "--host", host, "new", "--config", a.config,
                         "--map-seed", str(seed), "--game-seed", str(seed + 1000), "--wait", str(a.chunk - 10)],
                        a.chunk + 10, log)
@@ -155,8 +158,7 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
     rec["turn"] = last
     bounded([PY, str(LAB / "h4.py"), "--host", host, "--deadline", "30", "lua", "--state", "InGame",
              "Events.ExitToMainMenu()"], 40, log)
-    rec["logs"] = save_logs(log_start, dump)
-    rec["logsMixed"] = a.hosts.count(",") > 0
+    rec["logs"] = save_logs(host, log_start, dump)
     # the game's river and volcano orders beside the dump (`map_orders.py`)
     bounded([PY, str(HERE / "map_orders.py"), str(dump), "--map-seed", str(seed), "--config", a.config], 120, log)
     with lock:  # the report is CPU work; one at a time keeps the box for the games

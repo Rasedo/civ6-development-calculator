@@ -27,9 +27,7 @@ from tuner import Tuner, TunerError  # noqa: E402
 import game  # noqa: E402
 
 HERE = pathlib.Path(__file__).parent
-LUA_LOG = game.USER_DIR / "Logs" / "Lua.log"
-# the Lua.log offset a load starts at (scratch, per checkout)
-LOGPOS = HERE.parents[1] / ".claude" / "scratchpad" / "_h4_logpos.txt"
+SCRATCH = HERE.parents[1] / ".claude" / "scratchpad"
 _OPEN: list[Tuner] = []
 
 
@@ -56,17 +54,26 @@ def connect(host: str, wait: float = 20.0) -> Tuner:
     return t
 
 
-def log_size() -> int:
+def lua_log(host: str) -> pathlib.Path:
+    return game.logs_dir(host) / "Lua.log"
+
+
+def logpos(host: str) -> pathlib.Path:
+    """the Lua.log offset a load on `host` starts at (scratch, per checkout)"""
+    return SCRATCH / f"_h4_logpos_{host}.txt"
+
+
+def log_size(host: str) -> int:
     try:
-        return LUA_LOG.stat().st_size
+        return lua_log(host).stat().st_size
     except OSError:
         return 0
 
 
-def log_errors(since: int) -> list[str]:
+def log_errors(host: str, since: int) -> list[str]:
     """Lua.log lines written after byte `since` that name an error."""
     try:
-        with LUA_LOG.open("rb") as f:
+        with lua_log(host).open("rb") as f:
             f.seek(since)
             text = f.read().decode("utf-8", errors="replace")
     except OSError:
@@ -103,7 +110,7 @@ def load_start(a) -> int:
     t = connect(a.host)
     states = t.refresh_states()
     where = game.IG if game.IG in states else game.FE
-    (LOGPOS).write_text(str(log_size()), encoding="utf-8")
+    logpos(a.host).write_text(str(log_size(a.host)), encoding="utf-8")
     print("   ", t.run(where, game.LUA_LOAD.replace("SAVENAME", a.name), timeout=20)[-1])
     status = "pending"
     end = time.monotonic() + 25
@@ -128,10 +135,10 @@ def load_wait(a) -> int:
     ig = game.IG in t.refresh_states()
     lp = t.run(game.IG, "print(Game.GetLocalPlayer())")[0] if ig else "?"
     try:
-        since = int((LOGPOS).read_text(encoding="utf-8"))
+        since = int(logpos(a.host).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         since = 0
-    errs = log_errors(since)
+    errs = log_errors(a.host, since)
     print(f"loaded: turn {turn} InGame={ig} local={lp} lua-log errors since the load: {len(errs)}")
     for e in errs[:10]:
         print("   LOG", e[:200])

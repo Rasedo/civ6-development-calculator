@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import pathlib
 import subprocess
@@ -79,15 +80,71 @@ CIV6_EXE = pathlib.Path(r"C:\Program Files (x86)\Steam\steamapps\common"
                         r"\Sid Meier's Civilization VI\Base\Binaries\Win64Steam\CivilizationVI.exe")
 
 CIV6_APP = "289070"
+# the owner's user dir: the lab profile edits its option files, and every
+# instance profile is seeded from it
 USER_DIR = pathlib.Path.home() / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI"
+DOCS_DIR = pathlib.Path.home() / "Documents" / "My Games" / "Sid Meier's Civilization VI"
 INSTALL = CIV6_EXE.parents[3]
+
+# THE INSTANCE PROFILES: the binary takes its user dir (options, Logs, Cache,
+# Mods.sqlite) from SHGetKnownFolderPath(FOLDERID_LocalAppData) + "\Firaxis
+# Games\Sid Meier's Civilization VI" and its Documents dir (Saves, Mods) from
+# FOLDERID_Documents (the exe's startup, RVA 0x6fe6ed / 0x6fe76b; Logs is that
+# user dir + "Logs", RVA 0x6d0ff); the shell resolves both through the
+# process's USERPROFILE. Each instance is spawned with USERPROFILE = PROFILES/<host>, so
+# it writes its own Logs. The profile is seeded at every spawn with the
+# owner's option files and mod registry; Saves and Mods are junctions to the
+# owner's, so a named save loads on any instance (autosaves still collide).
+PROFILES = pathlib.Path(r"C:\civ6lab_profiles")
+SEED_FILES = ("AppOptions.txt", "GraphicsOptions.txt", "SoundOpts.txt", "UserOptions.txt", "EOSOptions.txt",
+              "InputSettings.json", "Mods.sqlite")
+SHARED_DOCS = ("Saves", "Mods")
+
+
+def profile_root(host: str) -> pathlib.Path:
+    return PROFILES / host
+
+
+def user_dir(host: str) -> pathlib.Path:
+    """the user dir of the instance on `host`"""
+    return profile_root(host) / "AppData" / "Local" / "Firaxis Games" / "Sid Meier's Civilization VI"
+
+
+def logs_dir(host: str) -> pathlib.Path:
+    """the Logs folder of the instance on `host`"""
+    return user_dir(host) / "Logs"
+
+
+def seed_profile(host: str) -> pathlib.Path:
+    """Make `host`'s profile: the known folders the shell checks exist, the
+    owner's option files and mod registry copied in, Saves and Mods junctioned
+    to the owner's. Returns the profile root."""
+    root = profile_root(host)
+    for sub in ("AppData/Roaming", "AppData/LocalLow", "Documents/My Games/Sid Meier's Civilization VI"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
+    ud = user_dir(host)
+    ud.mkdir(parents=True, exist_ok=True)
+    for name in SEED_FILES:
+        if (USER_DIR / name).exists():
+            (ud / name).write_bytes((USER_DIR / name).read_bytes())
+    docs = root / "Documents" / "My Games" / "Sid Meier's Civilization VI"
+    for name in SHARED_DOCS:
+        link = docs / name
+        if not link.exists():
+            subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(DOCS_DIR / name)],
+                           capture_output=True, check=True)
+    return root
 
 # THE LAB PROFILE: the options a lean autoplay run wants, per file. `profile
 # apply` backs each file up once (<file>.lab-backup) and writes these keys;
 # `profile restore` puts the owner's files back byte for byte.
 LAB_PROFILE: dict[str, dict[str, str]] = {
+    # one path finder: AI Unit Planning plans every unit on the game-core
+    # thread and the influence map is one chunk (the DLL's pool count is
+    # max(1, MaxGameCoreUnitMovementThreads)); one trade-path finder
     "AppOptions.txt": {"RenderWidth": "800", "RenderHeight": "600", "FullScreen": "0",
-                       "PlayIntroVideo": "0"},
+                       "PlayIntroVideo": "0", "MaxGameCoreUnitMovementThreads": "1",
+                       "MaxGameCoreTradeRouteThreads": "1"},
     "GraphicsOptions.txt": {
         "MSAA": "0", "MSAAQuality": "0", "VSync": "1", "ShadowMapResolution": "512",
         "AODepthResolution": "256", "AORenderResolution": "256", "ReducedAssetTextures": "1",
@@ -112,6 +169,62 @@ LOGO_MOVIES = ("Base/Platforms/Windows/Movies/logos.bk2", "Base/Platforms/Window
 INTRO_LUA = "Base/Assets/UI/FrontEnd/IntroScreen.lua"
 INTRO_RE = re.compile(r"local ACCEPT_DELAY\s*:number = UI\.IsFinalRelease\(\) and 5 or 0\.1;")
 INTRO_NEW = "local ACCEPT_DELAY :number = 0;"
+
+# THE REPLAY PATCH: a seed replays exactly only if no AI job runs beside the
+# game-core thread. The DLL's job-list spawn (FinalRelease 0x4a10b0, every
+# AI job goes through it) hands the list to the engine's TBB scheduler and
+# returns; City Analysis, Governor Analyzer, Belief / Tech Tree / Policy Tree
+# Analysis, Espionage and Victory Conditions are never waited for where they
+# are spawned, so they read the game state while the game core changes it.
+# No option reaches it: the engine's job threads are max(2, MaxJobThreads).
+# The patch makes the spawn wait: its tail `mov rcx,[rbx+0x410]; add rsp,0x20;
+# pop rbx; jmp SpawnList` becomes `mov rcx,rbx; add rsp,0x20; pop rbx; jmp
+# CAVE`, and the cave (the .text section's file slack, its VirtualSize raised
+# over it) spawns the list and tail-jumps to the AI's own wait (0x4a16e0:
+# EXP_JobManager_Wait on the job set, then the in-flight flag cleared).
+GAMECORE_DLL = "DLC/Expansion2/Binaries/Win64/GameCore_XP2_FinalRelease.dll"
+_TEXT_DELTA = 0xC00            # .text: RVA 0x1000 at file 0x400
+_CAVE, _SPAWN_LIST, _AI_WAIT = 0x9B6630, 0x992280, 0x4A16E0
+
+
+def _rel32(at: int, size: int, target: int) -> bytes:
+    return ((target - (at + size)) & 0xFFFFFFFF).to_bytes(4, "little")
+
+
+# (file offset, original bytes, patched bytes)
+DLL_PATCHES: tuple[tuple[int, bytes, bytes], ...] = (
+    # .text VirtualSize 0x9b5627 -> 0x9b5800 (its raw size; SizeOfImage unchanged)
+    (0x218, bytes.fromhex("27569b00"), bytes.fromhex("00589b00")),
+    (0x4A10ED - _TEXT_DELTA, bytes.fromhex("488b8b10040000 4883c420 5b e982114f00 cccc"),
+     bytes.fromhex("488bcb 4883c420 5b e9") + _rel32(0x4A10F5, 5, _CAVE) + b"\xcc" * 6),
+    (_CAVE - _TEXT_DELTA, bytes(33),
+     bytes.fromhex("53 4883ec20 488bd9 488b8b10040000 e8") + _rel32(_CAVE + 0xF, 5, _SPAWN_LIST)
+     + bytes.fromhex("488bcb 4883c420 5b e9") + _rel32(_CAVE + 0x1C, 5, _AI_WAIT)),
+)
+
+
+def _patch_dll(action: str) -> None:
+    f, b = INSTALL / GAMECORE_DLL, INSTALL / (GAMECORE_DLL + ".lab-backup")
+    if action == "revert":
+        if b.exists():
+            f.write_bytes(b.read_bytes())
+            b.unlink()
+            print("replay patch reverted:", GAMECORE_DLL)
+        return
+    data = bytearray(f.read_bytes())
+    if all(data[o:o + len(new)] == new for o, _, new in DLL_PATCHES):
+        print("replay patch: already applied")
+        return
+    bad = [hex(o) for o, old, _ in DLL_PATCHES if data[o:o + len(old)] != old]
+    if bad:
+        print("replay patch: NOT applied, the DLL differs at", *bad)
+        return
+    if not b.exists():
+        b.write_bytes(bytes(data))
+    for o, _, new in DLL_PATCHES:
+        data[o:o + len(new)] = new
+    f.write_bytes(bytes(data))
+    print("replay patch: the AI's job spawn waits")
 
 
 def _set_keys(path: pathlib.Path, keys: dict[str, str]) -> list[str]:
@@ -183,6 +296,11 @@ def cmd_patch(a) -> int:
         f.write_bytes(b.read_bytes())
         b.unlink()
         print("copyright delay restored")
+    try:
+        _patch_dll(a.action)
+    except OSError as e:
+        print("replay patch: the DLL is in use, close every instance first -", e)
+        return 1
     return 0
 
 
@@ -461,8 +579,12 @@ def up(host: str, port: int) -> bool:
 def spawn(host: str, exe: pathlib.Path) -> None:
     """start one instance; `-TunerIP` is the address its tuner LISTENS on:
     one instance per loopback address (127.0.0.1, 127.0.0.2, ...), all on
-    port 4318"""
-    subprocess.Popen([str(exe), "-TunerIP", host], cwd=str(exe.parent))
+    port 4318; USERPROFILE (and the two AppData variables a library may read
+    directly) is the host's own profile (`seed_profile`)"""
+    root = seed_profile(host)
+    env = dict(os.environ, USERPROFILE=str(root), LOCALAPPDATA=str(root / "AppData" / "Local"),
+               APPDATA=str(root / "AppData" / "Roaming"))
+    subprocess.Popen([str(exe), "-TunerIP", host], cwd=str(exe.parent), env=env)
 
 
 def retile() -> None:
@@ -677,7 +799,8 @@ def main(argv=None) -> int:
     s = sub.add_parser("profile", help="apply / restore the lean lab profile in the owner's option files")
     s.add_argument("action", choices=("apply", "restore"))
     s.set_defaults(fn=cmd_profile)
-    s = sub.add_parser("patch", help="apply / revert the startup patch (logo movies off, copyright delay 0)")
+    s = sub.add_parser("patch", help="apply / revert the startup patch (logo movies off, copyright delay 0)"
+                                     " and the replay patch (the AI's job spawn waits)")
     s.add_argument("action", choices=("apply", "revert"))
     s.set_defaults(fn=cmd_patch)
     s = sub.add_parser("bench", help="load a save and time N Autoplay turns")
