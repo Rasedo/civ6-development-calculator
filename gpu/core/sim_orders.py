@@ -549,8 +549,8 @@ class SimOrders:
                             continue
                         if _j < 0:
                             continue
-                        if _k == 0:        # FOOD fills the city's own box
-                            self.city_growth[_b, row, _j] += _v
+                        if _k == 0:        # FOOD lands in the city's own box (`lumpFood`)
+                            self._lump_food(_b, row, _j, _v)
                         elif int(self.city_current[_b, row, _j, 0]) >= 0:
                             self.city_progress[_b, row, _j, 0] += _v
                         else:
@@ -1023,7 +1023,8 @@ class SimOrders:
                             self.civ_treasury[b2, row] += f_amt + p_amt
                         if j2 < 0:
                             continue
-                        self.city_growth[b2, row, j2] += f_amt
+                        if f_amt > 0:
+                            self._lump_food(b2, row, j2, f_amt)
                         if int(self.city_current[b2, row, j2, 0]) >= 0:
                             self.city_progress[b2, row, j2, 0] += p_amt
                         else:

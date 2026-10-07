@@ -3188,6 +3188,58 @@ seed recorded twice, once under load, must give identical RandCalls.csv.
 No gameplay mod reaches it: the options are the exe's, read before the mod
 system loads, no GlobalParameters row or Lua binding sets them (the Lua
 `GetWorkerCount` 0x23ce0 only reads), and the jobs are DLL code.
+## H-1: a pillaged building's specialist, the centre's defence, three moments — READ
+
+- A plot's capacity (0x195940) counts a district's specialist slots as its
+  row's base (+0x54 behind +0x50) plus each building of the district not
+  pillaged (0x18fe60 on the city's buildings +0x1c78: the byte array the
+  Lua IsPillaged binding 0x9847b0 -> 0x9ed20 reads; its other callers are
+  the pillaged-building gates, the building upkeep among them). Only a
+  placement reads the capacity: nothing evicts a citizen at the pillage.
+  Recorded: 1128 Xi'an t105, the barbarians' UNITOPERATION_PILLAGE on the
+  Holy Site at t104, the Shrine pillaged, the record's worked plots keep the
+  district's specialist and the city's Faith 5 = 1 + 2 + the specialist's 2;
+  China's turn re-places it (t106: Faith 3). The engines seat a pinned
+  specialist on the slots of every standing building, pillaged or not, and
+  the overflow on the live ones (`citySpecialistSlots(seated)`,
+  `_city_spec_slots(seated=True)`).
+- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed
+  live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's
+  best defender 0x208b80. The record's unit list stands before the in-turn
+  player's start while the plot reads the gamecore's: a military unit that
+  start's production completed already garrisons the centre (1127 Rome t96,
+  1117 t168, 1122 t108, 1123 t101: a Warrior completed in the start window,
+  26 with no unit on the centre in the record; 1119 t112 an Archer, no
+  term). The harness lays it on the centre for the defence read.
+- MITIGATED_RIVER_FLOOD: the flood (0xa2f200) runs the damage pass
+  0xa2a4d0, whose out parameter is the MITIGATING player — the owner
+  (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on
+  the river's plot list, else the Great Bath's (0xa2c280); a mitigating
+  player fires the game signal (+0xbd0) whose handler 0x3060b0 records the
+  moment unless the player's history holds it (hash 0x978039a6 and the
+  player, any river): once a game. 1128 t160 (climate log FLOOD MITIGATED
+  on the Amur): China +1. `riverShield`, `mitigatedFloodMoment` /
+  `_flood_mitigator`, `_moment_mitigated_flood`.
+- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility
+  manager), a player without the flag (+0x8a8) whose team has revealed a
+  plot in every column x of the map (the y loop over the team's revealed
+  bytes +0x2f0) sets it and signals (+0x1728); the handler 0x315980 records
+  FIRST_IN_WORLD (0x17cd04dd) unless another player holds the flag, else the
+  plain row (0x2ada545a). 1127 Rome t157 (5), China t183 (3). A once key,
+  under fog, over the seat's explored plots (`momentKeysHeld` /
+  `_moment_held`; a game with no fog explores nothing).
+- IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST: the improvement handler
+  0x311ed0 compares the improvement with a table of types (0x306640:
+  Beach Resort +8, Mountain Tunnel +0xc, Geothermal Plant +0x10, Solar Farm
+  +0x14, Wind Farm +0x18, Offshore Wind Farm +0x1c, Industry +0x20,
+  Corporation +0x24); the four renewables record the plain row for the
+  player once, FIRST_IN_WORLD where no one holds it. 1127 China t246 (3).
+  One key for the four (`IMPROVEMENT_KEY`).
+- A wonder's annex re-places the city's citizens before the wonder stands:
+  its CityTileOwnershipChanged rows precede its BuildingChanged row, and the
+  re-place scores the plots as they read without it (1128 Xi'an t143: the
+  Great Bath's Floodplains Faith unpaid at the re-place, surplus 9 under
+  every flag set its standing citizens fit; Jiaodong t185 7).
 
 ## DLL rules the engines contradict
 
@@ -3200,7 +3252,9 @@ system loads, no GlobalParameters row or Lua binding sets them (the Lua
   BUILD; the H-1 importer folds the game's rule).
 - The citizen placement (0x197230, "H-1: the citizen manager's placement"):
   the engines' `assignWorkedTiles` / GPU walk score FOCUS_BASE and place
-  every citizen afresh (AUDIT C-94 BUILD).
+  every citizen afresh, and keep a pinned specialist on a pillaged
+  building's slot until the pin changes where the game keeps it until its
+  next full re-place (AUDIT C-94 BUILD).
 - A move onto a religious unit (0x26fe20): the engines' melee order onto
   one only shares its plot (AUDIT C-94 BUILD).
 - An embarking move onto a civilian (0x26fe20 takes it): the engines'

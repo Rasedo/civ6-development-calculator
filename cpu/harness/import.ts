@@ -1466,12 +1466,49 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         gainedInActions.add(`${r[3]}:${r[4]}:${(r[6] as number) * W + (r[5] as number)}`);
       }
     }
+    // A city's culture step draws its next plot when it holds none; a plot
+    // gained after that step — bought (an AI buys in its start, after the
+    // step: runs/h1_duelw1128 Shanghai t91, -1 at t92, 540 drawn at t93), or
+    // taken or founded in the owner's actions — clears it until the owner's
+    // next start. A plot its start brings (a wonder's free tiles, a culture
+    // claim) comes before the step, which draws again (runs/h1_duelw1127
+    // Shanghai t162: two free tiles with its wonder, 756 held at t163).
+    // `clearedSince`: where the record logs its events, does city
+    // `pid:cityId` hold none — its last gain (a plot it holds at the record:
+    // a plot lost logs a row under the city too) or founding with no start
+    // of the owner's after a turn closed since; null where the log names no
+    // gain. A city new since a record before this one with no row in this
+    // log was founded before it, so the log's top counts (runs/h1_duelw1119
+    // Rome, founded t3, the t4 record dropped: its start at t5 holds 650).
+    const clearedSince = (pid: number, cityId: number, plots: number[], founded: boolean): boolean | null => {
+      if (!Array.isArray(rows)) return null;
+      let activeNow = -1;
+      let last = -1;
+      (rows as unknown[][]).forEach((r, i) => {
+        if (r[2] === 'PlayerTurnActivated') activeNow = r[3] as number;
+        else if (r[2] === 'PlayerTurnDeactivated') activeNow = -1;
+        else if (r[3] === pid && r[4] === cityId && (r[2] === 'CityAddedToMap'
+          || (r[2] === 'CityTileOwnershipChanged' && plots.includes((r[6] as number) * W + (r[5] as number)) && (activeNow === pid || (rows as unknown[][]).slice(i + 1, i + 4)
+            .some((x) => x[2] === 'CityMadePurchase' && x[7] === PURCHASE_PLOT_HASH && x[3] === pid && x[4] === cityId
+              && x[5] === r[5] && x[6] === r[6]))))) last = i;
+      });
+      if (last < 0 && !founded) return null;
+      // a start of the owner's after a turn closed since the gain draws again
+      let closed = false;
+      for (const r of (rows as unknown[][]).slice(last + 1)) {
+        if (r[2] === 'PlayerTurnDeactivated') closed = true;
+        else if (r[2] === 'PlayerTurnActivated' && r[3] === pid && closed) return false;
+      }
+      return true;
+    };
     h.nextPlotUnheld.clear();
     for (const c of rec.cities) {
       const k = c.y * W + c.x;
       const b = before.get(k);
+      const cleared = clearedSince(c.owner, c.id, c.plots, !b);
+      if (cleared) h.nextPlotUnheld.add(k);
       if (!b || b.owner !== c.owner) {
-        h.nextPlotUnheld.add(k);
+        if (cleared === null) h.nextPlotUnheld.add(k);
         // a city changing hands starts its border count again, a plot it
         // gained in the same turn counted (runs/h1_duelw1110, Rome taken at
         // t142 with no plot gained: 107 Culture the turn before, 5 on
@@ -1522,8 +1559,8 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const paid = claimedNext || roseShort || (num(c.culture) < num(b.culture) - 0.01
         && (free > 0 ? gainedNow.length > free : c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
       if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
-      // a box pays for one plot; any more came another way
-      if (c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
+      // with no log: a box pays for one plot; any more came another way
+      if (cleared === null && !Array.isArray(rows) && c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
     }
     const fname = (i: number) => cat.features[plotAt(rec, i)[P.feature] as number] ?? '';
     const fwas = (i: number) => cat.features[plotAt(h.last!, i)[P.feature] as number] ?? '';

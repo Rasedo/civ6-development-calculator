@@ -34,6 +34,7 @@ import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, AC
 import { STORM_EVENTS, STORM_ROWS, WIND_ROWS, STORM_UNIT_ROWS, stormFamilyAt, gameLatitude, stormFootprintOffsets, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
 import { floodFertilityHalted, removeFertility, seaRise, stormFertilityHalted, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
+import { mitigatedFloodMoment } from './moments';
 
 function log(state: GameState, text: string): void {
   state.eventLog.push(text);
@@ -539,16 +540,13 @@ export function riverPlots(map: GameMap, tile: Tile): Tile[] {
  * Great Bath along a River will mitigate floods THERE". So the shield is a
  * property of the RIVER, not of the seat: one complete, unpillaged Dam or
  * Great Bath standing anywhere along it covers every tile it floods, whoever
- * owns them.
+ * owns them. The plot of the shield that mitigates (the damage pass
+ * 0xa2a4d0): the first complete, unpillaged Dam in the river's order, else
+ * the Great Bath (0xa2c280); its owner is the flood's MITIGATING player.
  */
-export function riverShielded(reach: Tile[]): boolean {
-  for (const t of reach) {
-    if (t.district && t.districtComplete && !t.districtPillaged
-        && DISTRICTS[t.district].floodShield) return true;
-    if (t.builtWonder && t.builtWonderComplete
-        && BUILT_WONDERS[t.builtWonder]?.effects?.floodMitigation) return true;
-  }
-  return false;
+export function riverShield(reach: Tile[]): Tile | undefined {
+  return reach.find((t) => t.district && t.districtComplete && !t.districtPillaged && DISTRICTS[t.district].floodShield)
+    ?? reach.find((t) => t.builtWonder && t.builtWonderComplete && BUILT_WONDERS[t.builtWonder]?.effects?.floodMitigation);
 }
 
 /** A row's `OccurrencesPerGame` in the draw's tenths, trunc(10·Occ). */
@@ -643,7 +641,7 @@ function riverRevealed(state: GameState, river: FloodRiver): boolean {
  * 0xa2f200: the damage pass 0xa2a4d0, then the yields pass 0xa2ed80) over
  * the river's plots (`riverReach`, in its order). The river counts the
  * episode on the plots it is the home of (`countFlood`). A river carrying its shield
- * (`riverShielded`) skips the damage pass whole; otherwise, for each
+ * (`riverShield`) skips the damage pass whole; otherwise, for each
  * `RandomEvent_Damages` row of the severity in the install's order
  * (`FLOOD_DAMAGE_ROWS`), for each plot: a plot whose owner is immune to the
  * flood (`floodImmune`) takes no draw, any other ONE draw rand(100) <
@@ -657,7 +655,11 @@ function riverRevealed(state: GameState, river: FloodRiver): boolean {
  */
 export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   const reach = riverReach(state.map, start);
-  const mitigated = riverShielded(reach);
+  const shield = riverShield(reach);
+  const mitigated = shield !== undefined;
+  // the mitigating player's moment (the game signal the flood fires with
+  // it, `mitigatedFloodMoment`)
+  if (shield) mitigatedFloodMoment(state, tileSeat(shield));
   countFlood(state.map, floodRiverIndex(state.map, start));
   if (!mitigated) {
     for (const row of FLOOD_DAMAGE_ROWS[sev]) {

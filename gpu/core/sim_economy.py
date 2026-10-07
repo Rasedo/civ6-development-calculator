@@ -2823,6 +2823,7 @@ class SimEconomy:
             on = lists[:, k] >= 0
             reach[bidx[on], lists[on, k]] = True
         shield = self._river_shielded(reach)
+        self._moment_mitigated_flood(hit & shield, self._flood_mitigator(lists))
         home = (self._flood_home == river.unsqueeze(1)) & (river >= 0).unsqueeze(1)
         self.tile_flood_ct += (reach & home).long()
         plots = [(lists[:, k] >= 0, lists[:, k].clamp(min=0)) for k in range(lists.shape[1])]
@@ -2864,13 +2865,51 @@ class SimEconomy:
         that "a Dam or Great Bath along a River will mitigate floods THERE", so
         the shield belongs to the RIVER: one complete, unpillaged Dam or Great
         Bath standing anywhere along it covers every tile it floods, whoever
-        owns them. `riverShielded`'s twin."""
+        owns them. `riverShield`'s twin."""
         sh = (self.district >= 0) & self.district_complete & ~self.district_pillaged \
             & self._d_flood_shield[self.district.clamp(min=0)]
         if self._wond_n:
             sh = sh | ((self.built_wonder >= 0) & self.built_wonder_complete
                        & self._wond_floodmit[self.built_wonder.clamp(min=0)])
         return (reach & sh).any(dim=1)
+
+    def _flood_mitigator(self, lists: torch.Tensor) -> torch.Tensor:
+        """[B] long — the seat owning the shield that mitigates each game's
+        flood over its list `lists` [B, L] (-1 pads), -1 for none
+        (`riverShield`): the first complete, unpillaged Dam in list order,
+        else the first Great Bath."""
+        B, dev = self.B, self.device
+        bidx = torch.arange(B, device=dev)
+        t = lists.clamp(min=0)
+        on = lists >= 0
+        d = self.district.gather(1, t)
+        dam = on & (d >= 0) & self.district_complete.gather(1, t) & ~self.district_pillaged.gather(1, t) \
+            & self._d_flood_shield[d.clamp(min=0)]
+        if self._wond_n:
+            w = self.built_wonder.gather(1, t)
+            bath = on & (w >= 0) & self.built_wonder_complete.gather(1, t) & self._wond_floodmit[w.clamp(min=0)]
+        else:
+            bath = torch.zeros_like(dam)
+        out = torch.full((B,), -1, dtype=torch.long, device=dev)
+        for hit in (bath, dam):  # the Dam's pick stands over the Bath's
+            k = hit.long().argmax(dim=1)
+            any_ = hit.any(dim=1)
+            out = torch.where(any_, self.tile_seat[bidx, t[bidx, k]], out)
+        return out
+
+    def _moment_mitigated_flood(self, hit: torch.Tensor, seat: torch.Tensor) -> None:
+        """`mitigatedFloodMoment` — each major row records the
+        MITIGATED_RIVER_FLOOD key in the games of `hit` [B] whose mitigating
+        seat `seat` [B] it is."""
+        if not bool(hit.count_nonzero()):
+            return
+        for r in range(self.n_majors):
+            mine = hit & (seat == r)
+            if not bool(mine.count_nonzero()):
+                continue
+            keys = torch.zeros(self.B, self._mk_n, dtype=torch.bool, device=self.device)
+            keys[mine, self._mk_mitigated_flood] = True
+            self._moment_record(r, keys)
 
     def _building_cost_in(self, row: int, j: int, bi: torch.Tensor) -> torch.Tensor:
         """[B] — `buildingCostIn`: the catalog price for every row but the
@@ -6892,16 +6931,19 @@ class SimEconomy:
         """[B, RC] — len(workableTiles) per city."""
         return self._work_window(row)[1].sum(dim=2)
 
-    def _city_spec_slots(self, row: int, sl: slice | None = None) -> torch.Tensor:
+    def _city_spec_slots(self, row: int, sl: slice | None = None, seated: bool = False) -> torch.Tensor:
         """[B, n, nD] long — the specialist SLOTS each district offers: its
-        standing buildings, dark while the district is incomplete or pillaged
-        and zero for a district type that seats no specialist
-        (`citySpecialistSlots`)."""
+        standing buildings but the pillaged ones, dark while the district is
+        incomplete or pillaged and zero for a district type that seats no
+        specialist; `seated`: the slots a pinned citizen keeps, a pillaged
+        building's too (`citySpecialistSlots`)."""
         if sl is None:
             sl = slice(0, self.RC)
         B = self.B
         alive = self.city_alive[:, row, sl]
-        bldg = self.city_bldg[:, row, sl] & ~self._building_pillaged(row, sl)  # a pillaged building seats nobody
+        bldg = self.city_bldg[:, row, sl]
+        if not seated:
+            bldg = bldg & ~self._building_pillaged(row, sl)
         dreg = self.city_dist_tile[:, row, sl]
         dflat = dreg.clamp(min=0).reshape(B, -1)
         dlive = (dreg >= 0) & self.district_complete.gather(1, dflat).reshape_as(dreg) & ~self.district_pillaged.gather(1, dflat).reshape_as(dreg)
@@ -6927,7 +6969,8 @@ class SimEconomy:
         if workable is None:
             workable = self._workable_count(row)[:, sl]
         slots = self._city_spec_slots(row, sl)
-        # PINNED citizens first, clamped to the open slots and to population.
+        # PINNED citizens first, clamped to the slots that seat them (a
+        # pillaged building's too) and to population.
         pin = self.city_spec_pin[:, row, sl].clamp(min=0)
         budget = (pop - self.city_idle[:, row, sl]).clamp(min=0) * alive.long()
         # The catalog-order walk `take_i = min(cap_i, budget_i); budget_{i+1} =
@@ -6935,14 +6978,14 @@ class SimEconomy:
         # WATER-FILLING: the running total is min(cumsum(cap), budget_0), so
         # the two per-district loops (2 x nD x 3 dispatches a call, ~100 for
         # thirteen districts) are two prefix-minimums. Same integers.
-        cap = torch.minimum(pin, slots)
+        cap = torch.minimum(pin, self._city_spec_slots(row, sl, seated=True))
         run = torch.minimum(cap.cumsum(dim=2), budget.unsqueeze(2))
         spec = run - torch.cat([torch.zeros_like(run[:, :, :1]), run[:, :, :-1]], dim=2)
         budget = budget - run[:, :, -1]
         # then the OVERFLOW — what population is left over the workable pool —
         # spends itself on whatever slots are still free, in catalog order.
         rem = (budget - workable).clamp(min=0)
-        run2 = torch.minimum((slots - spec).cumsum(dim=2), rem.unsqueeze(2))
+        run2 = torch.minimum((slots - spec).clamp(min=0).cumsum(dim=2), rem.unsqueeze(2))
         spec = spec + run2 - torch.cat([torch.zeros_like(run2[:, :, :1]), run2[:, :, :-1]], dim=2)
         return spec
 

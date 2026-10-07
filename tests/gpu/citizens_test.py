@@ -115,6 +115,28 @@ def main() -> None:
     sim._eff_version += 1
     print("  a pin clamps to the open slots and to the population")
 
+    # --- 3b) A PILLAGED BUILDING keeps its pinned specialist, offers no slot -
+    b0 = int(sim._b_dist_oh[:, di].nonzero().flatten()[0])
+    sim.city_bldg_pillaged[0, row, j, b0] = True
+    sim._eff_version += 1
+    left = int(sim._city_spec_slots(row)[0, j, di])
+    assert left == slots - 1, f"a pillaged building still offers a slot ({left} of {slots})"
+    sim.city_spec_pin[0, row, j, di] = slots
+    sim._eff_version += 1
+    assert int(sim._city_specialists(row)[0, j, di]) == slots, (
+        "a pinned citizen keeps the pillaged building's slot"
+    )
+    sim.city_spec_pin[0, row, j, :] = -1
+    sim.city_pop[0, row, j] = work + slots
+    sim._eff_version += 1
+    assert int(sim._city_specialists(row)[0, j, di]) == slots - 1, (
+        "the overflow fills only the slots that still stand"
+    )
+    sim.city_bldg_pillaged[0, row, j, b0] = False
+    sim.city_pop[0, row, j] = work
+    sim._eff_version += 1
+    print("  a pillaged building keeps its pinned specialist and offers the overflow nothing")
+
     # --- 4) A PILLAGED district darkens the slot, pin or no pin -------------
     dt = int(sim.city_dist_tile[0, row, j, di])
     sim.district_pillaged[0, dt] = True

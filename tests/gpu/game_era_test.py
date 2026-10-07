@@ -202,6 +202,43 @@ def test_disaster_improvement(rules, path) -> None:
     print("  7 disaster improvement OK: an improvement laid on an enriched plot, once, in its game alone")
 
 
+def test_new_once_keys(rules, path) -> None:
+    """8. A mitigated flood records its once key for the mitigating seat
+    alone (`mitigatedFloodMoment`); the world circumnavigated is held once
+    every column holds an explored plot (`momentKeysHeld`), and a renewable
+    energy improvement on the seat's land holds its key."""
+    sim = build(rules, path)
+    row = 0
+    k = sim._mk_mitigated_flood
+    before = sim.era_score[:, row].clone()
+    hit = torch.tensor([True, False], device=sim.device)
+    seat = torch.tensor([row, row], dtype=torch.long, device=sim.device)
+    sim._moment_mitigated_flood(hit, seat)
+    sim._moment_mitigated_flood(hit, seat)
+    assert sim.moment_seen[:, row, k].tolist() == [True, False], "the mitigated flood's key"
+    assert (sim.era_score[:, row] - before).tolist() == [int(sim._mk_world[k]), 0], "the mitigated flood paid"
+    other = 1 if sim.n_majors > 1 else 0
+    assert other == row or not bool(sim.moment_seen[:, other, k].any()), "another seat recorded the flood"
+    c = sim._mk_circumnavigated
+    if sim.fog_of_war:
+        sim.seat_explored[:, row] = False
+        assert not bool(sim._moment_held(row)[:, c].any()), "circumnavigated with nothing explored"
+        cols = torch.arange(sim.W, device=sim.device)
+        sim.seat_explored[0, row, cols] = True  # the first map row: every column
+        sim.seat_explored[1, row, cols[:-1]] = True  # one column short
+        assert sim._moment_held(row)[:, c].tolist() == [True, False], "the circumnavigation key"
+    else:
+        assert not bool(sim._moment_held(row)[:, c].any()), "with no fog nothing circumnavigates"
+    ren = [int(x) for x in sim._mk_imp.tolist()]
+    rk = max(set(ren) - {-1}, key=ren.count)  # the key four improvements share
+    imp = ren.index(rk)
+    t = int((sim.tile_seat[0] < 0).nonzero(as_tuple=True)[0][0])
+    sim.tile_seat[0, t] = row
+    sim.improvement[0, t] = imp
+    assert sim._moment_held(row)[:, rk].tolist() == [True, False], "the renewable energy key"
+    print("  8 new once keys OK: a mitigated flood, the world circumnavigated, a renewable improvement")
+
+
 def main() -> None:
     rules = load_rules()
     paths = fixture_paths()
@@ -215,6 +252,7 @@ def main() -> None:
     test_high_adjacency(rules, p)
     test_formation_and_encampment(rules, p)
     test_disaster_improvement(rules, p)
+    test_new_once_keys(rules, p)
     print("GAME_ERA OK")
 
 

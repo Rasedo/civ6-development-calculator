@@ -193,6 +193,12 @@ def main() -> None:
         assert not bool(sim.pillaged[0, t]), "the Great Bath let a flood pillage an improvement"
         assert not bool(sim.district_pillaged[0, t]), "the Great Bath let a flood take a district"
     assert int(sim.fertility[0, t]) > 0, "a mitigated river stopped silting entirely"
+    # the mitigating player is the Bath's owner (`riverShield`); its seat
+    # records the MITIGATED_RIVER_FLOOD key
+    owner = int(sim.tile_seat[0, up])
+    assert int(sim._flood_mitigator(two)[0]) == owner, "the Bath's owner mitigates its river's flood"
+    if 0 <= owner < sim.n_majors:
+        assert bool(sim.moment_seen[0, owner, sim._mk_mitigated_flood]), "the mitigating seat's moment"
 
     # ...and off that list it protects nothing: the same wonder beside a
     # list of `t` alone leaves every flood on `t` unmitigated.

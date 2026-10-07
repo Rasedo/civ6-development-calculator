@@ -131,6 +131,31 @@ export function seatGrowth(city: City, surplus: number, growthNeeded: number, tu
   }
 }
 
+/** CIV6 (the city's food change, GameCore 0x1b41e0): a lump of Food — a
+ *  harvest's, a cleared feature's — lands in the box at once; a box at the
+ *  size's threshold grows the city one citizen, the threshold paid, and a
+ *  box left above the new size's threshold is cut to one Food below it
+ *  (runs/h1_duelw1128 Taiyuan t151: +49 Food grows it 3 -> 4, the box 21 of
+ *  22). The size and box it leaves. */
+export function lumpGrowth(pop: number, box: number, amount: number): { pop: number; box: number } {
+  let b = box + amount;
+  const need = growthFoodNeeded(pop);
+  if (b < need) return { pop, box: b };
+  b -= need;
+  const next = growthFoodNeeded(pop + 1);
+  return { pop: pop + 1, box: b > next ? next - 1 : b };
+}
+
+/** `lumpGrowth` on the city: a citizen it grows presses as a turn's does. */
+export function lumpFood(city: City, amount: number, turn = 0): void {
+  const r = lumpGrowth(city.population, city.foodBox, amount);
+  city.foodBox = r.box;
+  if (r.pop === city.population) return;
+  gainPopulationPressure(city, 1);
+  city.population = r.pop;
+  logPopWrite(turn, city, 'lp');
+}
+
 export function commitProduction(state: GameState, seat: number, city: City, item: QueueItem): void {
   // CIV6 (Formations): a DIRECT-trained Corps pays double the chassis'
   // strategic resource and an Army triple; a merge pays nothing.

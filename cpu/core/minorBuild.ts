@@ -37,7 +37,7 @@ import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
 import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
-import { seatGrowth } from './seatTurn';
+import { lumpFood, seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
@@ -1025,7 +1025,7 @@ function minorFinish(state: GameState, cityState: CityState, item: Exclude<Minor
 export function minorLump(state: GameState, cityState: CityState, key: 'food' | 'production', amount: number): void {
   if (key === 'food') {
     const city = minorCity(cityState);
-    seatGrowth(city, amount, computeCityStats(state, city).growthNeeded, state.turn);
+    lumpFood(city, amount, state.turn);
     cityState.population = city.population;
     cityState.unconvertedPressure = city.unconvertedPressure;
     cityState.foodBox = city.foodBox;

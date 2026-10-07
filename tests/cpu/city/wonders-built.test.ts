@@ -4,7 +4,8 @@ import { seatOf, tileCity } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords, standBuilding, standDistrict, standWonder } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { canPlaceWonder, wonderExists } from '../../../cpu/core/rules';
-import { computeCityStats, citySpecialistSlots, workableTiles } from '../../../cpu/core/city';
+import { computeCityStats, citySpecialistSlots, effectiveSpecialists, workableTiles } from '../../../cpu/core/city';
+import { PLACEABLE_DISTRICTS } from '../../../cpu/data/districts';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { governmentSlots, seatGovernment } from '../../../cpu/core/effects';
 import { grantCivics, expandBorders } from '../helpers';
@@ -161,6 +162,22 @@ describe('world wonders', () => {
 });
 
 describe('specialists', () => {
+  it('a pinned specialist keeps a pillaged building\'s slot; the overflow fills only the standing ones', () => {
+    const { state, city } = sandboxCity();
+    const campusTile = tileAtCoords(state.map, 9, 8).index;
+    standDistrict(state, city, 'CAMPUS', campusTile);
+    standBuilding(state, city, 'LIBRARY');
+    city.pillagedBuildings = ['LIBRARY'];
+    expect(citySpecialistSlots(state, city).get(campusTile)).toBeUndefined();
+    expect(citySpecialistSlots(state, city, true).get(campusTile)).toBe(1);
+    city.population = 4;
+    city.specialistPref = PLACEABLE_DISTRICTS.map((d) => (d === 'CAMPUS' ? 1 : -1));
+    expect(effectiveSpecialists(state, city).get(campusTile)).toBe(1);
+    city.specialistPref = undefined;
+    city.population = workableTiles(state, city).length + 1;
+    expect(effectiveSpecialists(state, city).get(campusTile)).toBeUndefined();
+  });
+
   it('slots equal buildings in the district; OVERFLOW citizens man them automatically', () => {
     const { state, city } = sandboxCity();
     standDistrict(state, city, 'CAMPUS', tileAtCoords(state.map, 9, 8).index);

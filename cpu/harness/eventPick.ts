@@ -25,7 +25,7 @@
  * another named river, `map:volcanoOrder` while a wake is unnamed), a
  * volcano choice the candidates do not explain (`volcano:activity`).
  * Warming reads the world's carbon the game's climate log holds for the
- * step (`loadCarbonLog`: 1121 t189 / t203 / t241, the flood rows warmed by
+ * step (`loadClimateLog`: 1121 t189 / t203 / t241, the flood rows warmed by
  * 0.57 / 0.92 / 1.24 degrees, pick FLOOD_MAJOR at Tarim and FLOOD_MODERATE at
  * the Arno where the unwarmed table picks the other river; 1127 t225 / t244
  * each on its recorded river), else the imported state's.
@@ -34,13 +34,13 @@ import type { GameState, Tile } from '../core/types';
 import type { CheckResult } from './checks';
 import { P, type Catalog, type TurnRecord } from './record';
 import { engineRowOf, type Imported } from './import';
-import type { RandLog } from './randLog';
-import { droughtStarts, eventAt, eventTable, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
+import type { ClimateLog, LoggedEvent, RandLog } from './randLog';
+import { droughtStarts, eventAt, fireCandidate, eventTable, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
 import type { GameMap } from '../../world/types';
 import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
 import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters';
-import { ERUPTION_ROWS, STORM_EVENTS } from '../data/disasters';
+import { ERUPTION_ROWS, STORM_EVENTS, stormFamilyAt } from '../data/disasters';
 import { canSee, initFog, unitSeesThrough, unitSight } from '../core/fog';
 import { tilesWithin } from '../../world/hex';
 import { isCiv } from '../core/seats';
@@ -130,7 +130,7 @@ export class EventPicks {
   private readonly guessed: number[] = [];
 
   constructor(private readonly cat: Catalog, private readonly log: RandLog | undefined,
-    private readonly carbon?: Map<number, number>) {}
+    private readonly climate?: ClimateLog) {}
 
   /** the check for the step between `rec` and `next` (the step of turn
    *  rec.turn + 1), on `imp`, the import of `rec`; its state is left as it
@@ -145,6 +145,15 @@ export class EventPicks {
     }
     const state = imp.state;
     const T = rec.turn + 1;
+    // past the last record the step is the climate log's: a game that ran no
+    // step for T asks nothing — the turn limit's last turn closes the game
+    // with no step after it (runs/h1_duelw1127: recorded to t250 =
+    // TURN_LIMIT, the log's last row t250), as does a game left before it;
+    // with no log the step is unknown
+    if (!next && (T > TURN_LIMIT || (this.climate && !this.climate.carbon.has(T)))) return [];
+    if (!next && !this.climate) {
+      return this.log ? [{ turn: T, check: 'step.eventPick', subject: `step t${T}`, ok: true, skip: 'no t+1' }] : [];
+    }
     // what the majors have revealed, kept across the records
     const saved = state.seats.map((s) => s.explored);
     const flags = [state.unitsMode, state.fogOfWar] as const;
@@ -182,19 +191,38 @@ export class EventPicks {
     const firedBefore = tiles.map((t) => t.eventFired);
     const activeBefore = tiles.map((t) => t.volcanoActive);
     // the world's carbon at the step, which the records do not carry: the
-    // climate log's where the recording kept it (`loadCarbonLog`), the
+    // climate log's where the recording kept it (`loadClimateLog`), the
     // deforestation factor of the turn-1 map's base laid back off it, all on
     // the first seat
     const co2Before = state.seats.map((s) => s.co2);
-    const carbon = this.carbon?.get(T);
+    const carbon = this.climate?.carbon.get(T);
     if (carbon !== undefined) {
       state.seats.forEach((s, i) => { s.co2 = i === 0 ? carbon / (1 + deforestationModifier(deforestationLevel(state))) : 0; });
     }
     try {
-      // with no next record the step's event is unknown (the dump ends, or
-      // the record after was written mid-turn)
+      // with no next record the step's event is the climate log's row for
+      // the turn (runs/h1_duelw1128, recorded to t282 and logged to t283)
+      let unnamed = false;
+      if (!next && this.climate) {
+        // the event the step began: the turn's rows less a storm going on
+        // (its row followed by its movement: runs/h1_duelw1131 t5, a Haboob
+        // begun t3) and a fire going on (its row again on the centre it held
+        // the turn before: runs/h1_duelw1120 t249, the t248 Forest Fire at
+        // 4,16); an eruption of a natural wonder logs a row per plot of it
+        // (runs/h1_duelw1119 t3, Eyjafjallajökull's two), one event; a fire
+        // spreading logs a row per plot it lights, which leaves more than one
+        // row and no telling which began
+        const rows = this.climate.starts.get(T) ?? [];
+        const before = this.climate.starts.get(T - 1) ?? [];
+        const begun = rows.filter((e, i) => e.kind !== 'STORM MOVEMENT' && !(e.kind === 'STORM' && rows[i + 1]?.kind === 'STORM MOVEMENT')
+          && !(e.kind === 'ONEOFF' && before.some((p) => p.kind === 'ONEOFF' && p.plot === e.plot)));
+        const one = begun.length === 1 || (begun.length > 1 && begun.every((e) => e.kind === 'ERUPTION' && e.severity === begun[0].severity));
+        const names = one ? loggedNames(state, begun[0]) : [];
+        if (begun.length && !names.length) unnamed = true;
+        if (begun.length) this.seen.set(`log:${T}`, { turn: T, name: names.join('|') || 'unnamed', plot: begun[0].plot });
+      }
       const out = this.pick(state, T);
-      return next ? out : out.map((r) => ({ turn: r.turn, check: r.check, subject: r.subject, ok: true, skip: 'no t+1' }));
+      return unnamed ? out.map((r) => (r.ok ? r : { ...r, gaps: [...(r.gaps ?? []), 'event-log:unnamed kind'] })) : out;
     } finally {
       state.seats.forEach((s, i) => { s.explored = saved[i]; });
       [state.unitsMode, state.fogOfWar] = flags;
@@ -235,7 +263,7 @@ export class EventPicks {
     const g = game[0];
     let ok: boolean;
     if (!g) ok = ours === null || !placeable(state, table, p!.row);
-    else ok = ours === g.name && (plots === null || plots.some((t) => t.index === g.plot));
+    else ok = ours !== null && g.name.split('|').includes(ours) && (plots === null || plots.some((t) => t.index === g.plot));
     const gaps: string[] = [];
     if (this.volcanoUnknown) gaps.push('volcano:activity');
     if (this.guessed.length) gaps.push('map:volcanoOrder');
@@ -331,6 +359,32 @@ function placeable(state: GameState, t: EventTable, i: number): boolean {
   if (r.family === 'storm') return stormStarts(state.map, STORM_EVENTS[r.sev]).length > 0;
   if (r.family === 'drought') return droughtStarts(state).length > 0;
   return true;
+}
+
+/** The RandomEvents types a climate log's event row may name, by its kind,
+ *  severity and start plot on the imported map: an eruption's by its
+ *  volcano (a natural wonder's own rows, else VOLCANO_), a flood's
+ *  (mitigated or not), a drought's, a storm's by the family its start
+ *  plot's terrain admits (`stormFamilyAt`), a one-off's — a Meteor Shower
+ *  anywhere, a fire only on its own feature (`fireCandidate`). The row's
+ *  name is the game's language alone. */
+function loggedNames(state: GameState, e: LoggedEvent): string[] {
+  const at = state.map.tiles[e.plot];
+  const sev = ['GENTLE', 'CATASTROPHIC', 'MEGACOLOSSAL'][e.severity];
+  if (e.kind === 'ERUPTION' && sev) {
+    const feature = at?.feature ?? '';
+    const own = ERUPTION_ROWS.find((r) => r === `${feature.replace(/^FEATURE_/, '')}_${sev}`);
+    return [`RANDOM_EVENT_${own ?? `VOLCANO_${sev}`}`];
+  }
+  if ((e.kind === 'FLOOD' || e.kind === 'FLOOD MITIGATED') && FLOODS[e.severity]) return [`RANDOM_EVENT_${FLOODS[e.severity]}`];
+  if (e.kind === 'DROUGHT' && DROUGHTS[e.severity]) return [`RANDOM_EVENT_${DROUGHTS[e.severity]}`];
+  if (e.kind === 'STORM' && at) {
+    return STORM_EVENTS.filter((ev) => ev.severity === e.severity && ev.family === stormFamilyAt(at)).map((ev) => `RANDOM_EVENT_${ev.id}`);
+  }
+  if (e.kind === 'ONEOFF' && at) {
+    return ['RANDOM_EVENT_METEOR_SHOWER', ...FIRES.filter((_f, row) => fireCandidate(at, row)).map((f) => `RANDOM_EVENT_${f}`)];
+  }
+  return [];
 }
 
 /** the roll's band of row i: [first, past the last] */

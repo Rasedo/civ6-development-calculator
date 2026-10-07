@@ -419,6 +419,23 @@ export const MOMENT_DIPLO_VP = moment('PLAYER_EARNED_DIPLOMATIC_VICTORY_POINT', 
 /** CIV6 (DISTRICT_CONSTRUCTED_CANAL): every Canal a major completes (one
  *  row, no first-in-world twin) */
 export const MOMENT_CANAL = moment('DISTRICT_CONSTRUCTED_CANAL', 2);
+/** CIV6 (MITIGATED_RIVER_FLOOD): a flood its Dam or Great Bath mitigated,
+ *  recorded for the mitigating player once a game (GameCore_XP2 0x3060b0:
+ *  no row of its own history holds the moment yet) */
+export const MOMENT_MITIGATED_FLOOD = moment('MITIGATED_RIVER_FLOOD', 1);
+/** CIV6 (WORLD_CIRCUMNAVIGATED): a major whose team has revealed a plot in
+ *  every column of the map (the visibility manager 0x50d390, on a plot
+ *  revealed), as [plain, first in the world] — the first when no other
+ *  player has (0x315980) */
+export const MOMENT_CIRCUMNAVIGATED = [moment('WORLD_CIRCUMNAVIGATED', 3), moment('WORLD_CIRCUMNAVIGATED_FIRST_IN_WORLD', 5)] as const;
+/** CIV6 (IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST): the seat's first
+ *  Geothermal Plant, Solar Farm, Wind Farm or Offshore Wind Farm (the
+ *  improvement handler 0x311ed0 over the types its table 0x306640 names),
+ *  as [plain, first in the world] */
+export const MOMENT_RENEWABLE = [moment('IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST', 2),
+  moment('IMPROVEMENT_CONSTRUCTED_RENEWABLE_ENERGY_FIRST_IN_WORLD', 3)] as const;
+/** the improvements MOMENT_RENEWABLE names */
+export const RENEWABLE_IMPROVEMENTS = ['GEOTHERMAL_PLANT', 'SOLAR_FARM', 'WIND_FARM', 'OFFSHORE_WIND_FARM'] as const;
 /** CIV6 (PLAYER_MET_ALL_MAJORS): a major has met every living major, as
  *  [plain, first in the world] */
 export const MOMENT_MET_ALL = [moment('PLAYER_MET_ALL_MAJORS', 3), moment('PLAYER_MET_ALL_MAJORS_FIRST_IN_WORLD', 5)] as const;

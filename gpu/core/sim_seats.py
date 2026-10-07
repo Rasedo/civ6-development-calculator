@@ -11170,6 +11170,10 @@ class SimSeats:
             seen = seen & self.seat_explored[:, row]
         fk = self._mk_found.take(self.feat_id.clamp(min=0))
         self._moment_scatter(held, torch.where(seen, fk, torch.full_like(fk, -1)))
+        # the world circumnavigated: under fog, every column of the map holds
+        # a plot the row has explored
+        if self.fog_of_war:
+            held[:, self._mk_circumnavigated] |= self.seat_explored[:, row].reshape(B, self.H, self.W).any(dim=1).all(dim=1)
         held[:, self._mk_beliefs] |= (self.civ_religion_done[:, row] & (self.civ_follower[:, row] >= 0)
                                       & (self.civ_founder[:, row] >= 0) & (self.civ_worship[:, row] >= 0)
                                       & (self.civ_enhancer[:, row] >= 0))

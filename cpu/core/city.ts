@@ -181,22 +181,30 @@ export function workableTiles(state: GameState, city: City): Tile[] {
   );
 }
 
-export function citySpecialistSlots(state: GameState, city: City): Map<number, number> {
+/** A city's specialist SLOTS per district plot (the DLL's plot capacity
+ *  0x195940): each building standing in the district, none in a district
+ *  incomplete or pillaged, none of a pillaged building (0x18fe60) — the
+ *  slots a placement fills. `seated`: the slots a citizen already pinned
+ *  keeps, a pillaged building's too — nothing evicts it at the pillage
+ *  (runs/h1_duelw1128 Xi'an t105: barbarians pillage the Shrine, its
+ *  specialist stays and pays its 2 Faith until China's turn re-places it).
+ */
+export function citySpecialistSlots(state: GameState, city: City, seated = false): Map<number, number> {
   const out = new Map<number, number>();
   for (const d of city.districts) {
     if (!SPECIALIST_YIELDS[d.type]) continue;
     const dt = state.map.tiles[d.tileIndex];
-    if (!dt.districtComplete || dt.districtPillaged) continue; // pillaged district has no working specialists
-    // ...and a pillaged building seats nobody
-    const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type && !buildingPillaged(city, b)).length;
+    if (!dt.districtComplete || dt.districtPillaged) continue;
+    const slots = city.buildings.filter((b) => BUILDINGS[b]?.district === d.type && (seated || !buildingPillaged(city, b))).length;
     if (slots > 0) out.set(d.tileIndex, slots);
   }
   return out;
 }
 
 /** WHO MANS THE SLOTS. The citizens the player PINNED (`specialistPref`, a
- * count per PLACEABLE_DISTRICTS index) go in first, clamped to the district's
- * open slots and to the city's population less its idle citizens; then the
+ * count per PLACEABLE_DISTRICTS index) go in first, clamped to the slots the
+ * district seats them (`citySpecialistSlots` seated: a pillaged building's
+ * too) and to the city's population less its idle citizens; then the
  * automatic rule spends the
  * OVERFLOW — population beyond the workable plots — on whatever slots are
  * still free, in PLACEABLE_DISTRICTS order. CIV6 (wiki "Specialists (Civ6)"):
@@ -206,6 +214,7 @@ export function citySpecialistSlots(state: GameState, city: City): Map<number, n
  * unmanaged city gets. Zero-draw on both engines. */
 export function effectiveSpecialists(state: GameState, city: City): Map<number, number> {
   const slots = citySpecialistSlots(state, city);
+  const seats = citySpecialistSlots(state, city, true);
   const out = new Map<number, number>();
   let budget = Math.max(0, city.population - (city.idleCitizens ?? 0));
   PLACEABLE_DISTRICTS.forEach((type, di) => {
@@ -213,7 +222,7 @@ export function effectiveSpecialists(state: GameState, city: City): Map<number, 
     if (pin <= 0 || budget <= 0) return;
     const inst = city.districts.find((d) => d.type === type);
     if (!inst) return;
-    const n = Math.min(pin, slots.get(inst.tileIndex) ?? 0, budget);
+    const n = Math.min(pin, seats.get(inst.tileIndex) ?? 0, budget);
     if (n > 0) {
       out.set(inst.tileIndex, n);
       budget -= n;

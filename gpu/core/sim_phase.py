@@ -882,6 +882,28 @@ class SimPhase:
                 if _w.numel():
                     self._log_pop(_w, row, col[_w], _t)
 
+    def _lump_food(self, b: int, row: int, j: int, amount: float) -> None:
+        """`lumpFood` — CIV6 (the city's food change, GameCore 0x1b41e0): a
+        lump of Food lands in column `j`'s box at once; a box at the size's
+        threshold grows the city one citizen, the threshold paid, and a box
+        left above the new size's threshold is cut to one Food below it."""
+        pop = int(self.city_pop[b, row, j])
+        box = float(self.city_growth[b, row, j]) + amount
+        sizes = self._growth_needed(torch.tensor([pop, pop + 1], device=self.device))
+        need, nxt = float(sizes[0]), float(sizes[1])
+        if box < need:
+            self.city_growth[b, row, j] = box
+            return
+        box -= need
+        self.city_growth[b, row, j] = nxt - 1 if box > nxt else box
+        bt = torch.tensor([b], device=self.device)
+        jt = torch.tensor([j], device=self.device)
+        self._gain_population_pressure(bt, row, jt, torch.ones(1, dtype=torch.long, device=self.device))
+        self.city_pop[b, row, j] = pop + 1
+        self._eff_version += 1
+        if self._log_diff:
+            self._log_pop(bt, row, jt, "lp")
+
     def _culture_after_growth(self, row: int, j: int, pop_before: torch.Tensor,
                               cul: torch.Tensor, lux: torch.Tensor) -> torch.Tensor:
         """`cultureAfterGrowth` — [B] the Culture column `j`'s border box takes:

@@ -127,19 +127,31 @@ function gameOfLog(path: string, seeds: Iterable<number>): { log: RandLog; k: nu
   return best;
 }
 
+/** an event row of the climate log at a turn: its kind (ERUPTION, FLOOD,
+ *  FLOOD MITIGATED, DROUGHT, STORM, ONEOFF; STORM MOVEMENT with no severity
+ *  or plot), severity and start plot */
+export interface LoggedEvent { kind: string; severity: number; plot: number }
+
+/** one game of the climate log: the world's carbon by turn (the turns its
+ *  step ran) and its event rows by turn */
+export interface ClimateLog { carbon: Map<number, number>; starts: Map<number, LoggedEvent[]> }
+
 /**
- * THE WORLD'S CARBON by turn, from the game's own climate log
- * (`Logs/Game_RandomEvents.csv`, a row of sixteen numbers per turn written
- * by the random-event step, 0x33a280: its third column "Total CO2" the
- * climate's world total 0x28db00, in thousands): turn -> carbon. Read from
- * the dump's own logs (`<dump>.logs/`, `tools/civ6lab/h1/fleet.py`), else a
- * shared folder beside it (`h1_logs_duelw<a>_<b>/`) holding several games
- * one after another, the dump's game being the one its draw log there
- * matches by `seeds`. Undefined where neither is kept.
+ * THE WORLD'S CARBON AND THE EVENTS BEGUN by turn, from the game's own
+ * climate log (`Logs/Game_RandomEvents.csv`, written by the random-event
+ * step, 0x33a280): a row of sixteen numbers per turn, its third column
+ * "Total CO2" the climate's world total 0x28db00 in thousands, and a row per
+ * event begun that turn ("52, FLOOD, Severity = 1, <river>, Floodplain at:
+ * (15 - 14), ...": the records' FLOOD_MAJOR at plot 631 that turn,
+ * runs/h1_duelw1128). Read from the dump's own logs (`<dump>.logs/`,
+ * `tools/civ6lab/h1/fleet.py`), else a shared folder beside it
+ * (`h1_logs_duelw<a>_<b>/`) holding several games one after another, the
+ * dump's game being the one its draw log there matches by `seeds`.
+ * Undefined where neither is kept.
  */
-export function loadCarbonLog(dumpPath: string, seeds: Iterable<number>): Map<number, number> | undefined {
+export function loadClimateLog(dumpPath: string, seeds: Iterable<number>, W: number): ClimateLog | undefined {
   const own = join(dumpPath.replace(/\.jsonl$/, '.logs'), 'Game_RandomEvents.csv');
-  if (existsSync(own)) return carbonGames(readFileSync(own, 'utf8')).pop();
+  if (existsSync(own)) return climateGames(readFileSync(own, 'utf8'), W).pop();
   const duel = Number(/h1_duelw(\d+)_/.exec(basename(dumpPath))?.[1]);
   if (!duel) return undefined;
   const dir = dirname(dumpPath);
@@ -152,7 +164,7 @@ export function loadCarbonLog(dumpPath: string, seeds: Iterable<number>): Map<nu
   const draws = join(dir, shared, 'RandCalls.csv');
   if (!existsSync(events) || !existsSync(draws)) return undefined;
   const game = gameOfLog(draws, seeds);
-  return game ? carbonGames(readFileSync(events, 'utf8'))[game.k] : undefined;
+  return game ? climateGames(readFileSync(events, 'utf8'), W)[game.k] : undefined;
 }
 
 /** One battle of the game's combat log (`Logs/CombatLog.csv`): its turn, the
@@ -223,23 +235,36 @@ function combatGames(text: string): CombatRow[][] {
   return games;
 }
 
-/** The climate log's games, each turn -> world carbon; a game starts where
- *  the turn falls back. */
-function carbonGames(text: string): Map<number, number>[] {
-  const games: Map<number, number>[] = [];
-  let cur = new Map<number, number>();
+/** The climate log's games; a game starts where the turn falls back. */
+function climateGames(text: string, W: number): ClimateLog[] {
+  const games: ClimateLog[] = [];
+  let cur: ClimateLog = { carbon: new Map(), starts: new Map() };
   let last = 0;
   for (const line of text.split(/\r?\n/)) {
     const f = line.split(',').map((x) => x.trim());
-    if (f.length !== 16 || !f.every((x) => /^-?\d+$/.test(x))) continue;
-    const turn = Number(f[0]);
-    if (cur.size && turn < last) {
-      games.push(cur);
-      cur = new Map();
+    if (f.length === 16 && f.every((x) => /^-?\d+$/.test(x))) {
+      const turn = Number(f[0]);
+      if (cur.carbon.size && turn < last) {
+        games.push(cur);
+        cur = { carbon: new Map(), starts: new Map() };
+      }
+      last = turn;
+      cur.carbon.set(turn, Number(f[2]) * 1000);
+      continue;
     }
-    last = turn;
-    cur.set(turn, Number(f[2]) * 1000);
+    // an event row: the turn, the kind, its severity and its start plot; a
+    // storm's movement row (no severity, no plot) follows the row of a storm
+    // that began before the turn
+    if (!/^\d+$/.test(f[0] ?? '')) continue;
+    const turn = Number(f[0]);
+    const list = cur.starts.get(turn) ?? [];
+    const sev = /^Severity\s*=\s*(\d+)$/.exec(f[2] ?? '');
+    const at = /\((\d+) - (\d+)\)/.exec(f[4] ?? '');
+    if (f[1] === 'STORM MOVEMENT') list.push({ kind: f[1], severity: -1, plot: -1 });
+    else if (sev && at) list.push({ kind: f[1], severity: Number(sev[1]), plot: Number(at[2]) * W + Number(at[1]) });
+    else continue;
+    cur.starts.set(turn, list);
   }
-  if (cur.size) games.push(cur);
+  if (cur.carbon.size) games.push(cur);
   return games;
 }

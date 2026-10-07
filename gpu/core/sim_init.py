@@ -4800,6 +4800,8 @@ class SimInit:
         self._mk_hood = int(m["neighborhoodKey"])
         self._mk_imp = torch.tensor(m["improvementKey"] or [-1], dtype=torch.long, device=device)
         self._mk_disaster_imp = int(m["disasterImprovementKey"])
+        self._mk_mitigated_flood = int(m["mitigatedFloodKey"])
+        self._mk_circumnavigated = int(m["circumnavigatedKey"])
         self._mk_beliefs = int(m["maxBeliefsKey"])
         self._mk_governors = int(m["governorsAllKey"])
         self._mk_posts = int(m["tradingPostAllKey"])

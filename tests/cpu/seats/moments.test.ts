@@ -3,7 +3,7 @@ import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { deriveContinents } from '../../../world/query';
 import { campMoment, goodyMoment, greatPersonMoment, pantheonMoment, religionMoment, transferMoments, wonderMoment } from '../../../cpu/core/eras';
-import { CITY_SIZE_KEY, DISASTER_IMPROVEMENT_KEY, FORMATION_KEY, FULL_ENCAMPMENT_KEY, HIGH_ADJACENCY_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, improvementMoment, recordMoments } from '../../../cpu/core/moments';
+import { CIRCUMNAVIGATED_KEY, CITY_SIZE_KEY, DISASTER_IMPROVEMENT_KEY, FORMATION_KEY, FULL_ENCAMPMENT_KEY, HIGH_ADJACENCY_KEY, IMPROVEMENT_KEY, MITIGATED_FLOOD_KEY, NEAR_FLOOD_KEY, TECH_ERA_KEY, districtMoment, improvementMoment, mitigatedFloodMoment, momentKeysHeld, recordMoments } from '../../../cpu/core/moments';
 import { districtAdjacency } from '../../../cpu/core/yields';
 import { ERAS, TECHS } from '../../../cpu/data/techs';
 import {
@@ -11,7 +11,7 @@ import {
   MOMENT_CITY_SIZES, MOMENT_NEAR_FLOOD, MOMENT_HIGH_ADJACENCY, MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT,
   MOMENT_FOREIGN_CAPITAL, MOMENT_NEAR_CIV_CITY, MOMENT_NEW_CONTINENT, MOMENT_ON_DESERT, MOMENT_PANTHEON,
   MOMENT_PANTHEON_FIRST, MOMENT_PLAYER_DEFEATED, MOMENT_RELIGION, MOMENT_RELIGION_FIRST, MOMENT_TO_ORIGINAL_OWNER,
-  MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA, MOMENT_DISASTER_IMPROVEMENT,
+  MOMENT_WONDER_GAME_ERA, MOMENT_WONDER_PAST_ERA, MOMENT_DISASTER_IMPROVEMENT, MOMENT_MITIGATED_FLOOD, RENEWABLE_IMPROVEMENTS,
 } from '../../../cpu/data/seats';
 
 const score = (state: ReturnType<typeof makeState>, seat: number) => seatOf(state, seat)!.eraScore ?? 0;
@@ -203,5 +203,37 @@ describe('an improvement laid on a plot a natural disaster enriched', () => {
     improvementMoment(state, 0, rich);
     expect(score(state, 0)).toBe(MOMENT_DISASTER_IMPROVEMENT);
     expect(seatOf(state, 0)!.moments).toContain(DISASTER_IMPROVEMENT_KEY);
+  });
+});
+
+describe('a mitigated flood, the world circumnavigated, a renewable energy improvement', () => {
+  it('the mitigating seat records MITIGATED_RIVER_FLOOD once a game', () => {
+    const state = makeState(makeMap(20, 12));
+    mitigatedFloodMoment(state, 0);
+    mitigatedFloodMoment(state, 0);
+    expect(score(state, 0)).toBe(MOMENT_MITIGATED_FLOOD);
+    expect(seatOf(state, 0)!.moments).toContain(MITIGATED_FLOOD_KEY);
+  });
+
+  it('under fog a seat holds the circumnavigation once every column holds a plot it explored', () => {
+    const state = makeState(makeMap(20, 12));
+    expect(momentKeysHeld(state, 0)).not.toContain(CIRCUMNAVIGATED_KEY); // no fog: nothing explored
+    state.unitsMode = true;
+    state.fogOfWar = true;
+    const s = seatOf(state, 0)!;
+    s.explored = state.map.tiles.map((t) => (t.row === 3 && t.col < 19 ? 1 : 0));
+    expect(momentKeysHeld(state, 0)).not.toContain(CIRCUMNAVIGATED_KEY);
+    s.explored[tileAtCoords(state.map, 19, 8).index] = 1;
+    expect(momentKeysHeld(state, 0)).toContain(CIRCUMNAVIGATED_KEY);
+  });
+
+  it('the four renewable energy improvements share one key, held on the seat\'s land', () => {
+    const keys = new Set(RENEWABLE_IMPROVEMENTS.map((id) => IMPROVEMENT_KEY[id]));
+    expect(keys.size).toBe(1);
+    const state = makeState(makeMap(20, 12));
+    const t = tileAtCoords(state.map, 4, 4);
+    t.ownerSeat = 0;
+    t.improvement = 'WIND_FARM';
+    expect(momentKeysHeld(state, 0)).toContain(IMPROVEMENT_KEY.WIND_FARM);
   });
 });

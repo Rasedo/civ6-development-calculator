@@ -3,7 +3,7 @@ import { seatOf, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { buyWorshipBuilding, purchaseSettler, queueProject, availableProjects, projectCost, buildingPurchaseCost, buildingFaithCost, settlerCost, endTurn, itemCost } from '../../../cpu/core/game';
 import { buySeatBuilding } from '../../../cpu/core/phase';
-import { commitProduction } from '../../../cpu/core/seatTurn';
+import { commitProduction, lumpGrowth } from '../../../cpu/core/seatTurn';
 import { PEACE_GOLD_COST } from '../../../cpu/data/seats';
 import { spawnUnit, builderRemoveFeature, builderHarvest, settlerCount, purchaseSpotBlocked } from '../../../cpu/core/units';
 import { lumpValue, chopGrant, harvestGrant } from '../../../cpu/core/economy';
@@ -231,7 +231,9 @@ describe('chops and harvests', () => {
     const r = builderHarvest(state, builder.id);
     expect(r.ok).toBe(true);
     expect(wheat.resource).toBeNull();
-    expect(city.foodBox).toBe(grant!.amount);
+    // the lump lands in the box at once, growing the city where it fills it
+    const grown = lumpGrowth(1, 0, grant!.amount);
+    expect([city.population, city.foodBox]).toEqual([grown.pop, grown.box]);
     expect(builder.charges).toBe(2);
   });
 

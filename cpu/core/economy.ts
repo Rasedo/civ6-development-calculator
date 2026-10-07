@@ -16,6 +16,7 @@ import { ERAS, TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
 import { minorLump } from './minorBuild';
+import { lumpFood } from './seatTurn';
 
 /**
  * SELECT a tech or civic, keeping the progress on the one being left.
@@ -238,7 +239,7 @@ export function applyLumpYield(
   const city = cityAtTile(state, state.map.tiles[tileIndex]) as City | undefined;
   if (!city) return;
   if (key === 'food') {
-    city.foodBox += amount;
+    lumpFood(city, amount, state.turn);
     return;
   }
   if (city.queue.length > 0) {

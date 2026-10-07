@@ -21,7 +21,7 @@ import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory, readWeariness, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
-import { loadCarbonLog, loadRandLog, randLogPath } from './randLog';
+import { loadClimateLog, loadRandLog, randLogPath } from './randLog';
 import { turnDraws, type DrawLedger } from './drawLedger';
 import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
@@ -117,7 +117,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   history.legs = routeLegs(all);
   all.length = 0;
   const starts: StartReplay[] = [];
-  const picks = new EventPicks(cat, history.randLog, loadCarbonLog(dumpPath, seeds));
+  const picks = new EventPicks(cat, history.randLog, loadClimateLog(dumpPath, seeds, byTurn.get(turns[0])!.head.W));
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);
@@ -147,7 +147,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     const imp = importTurn(rec, cat, history);
     for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
     for (const r of picks.check(rec, byTurn.get(t + 1), imp)) add(r);
-    for (const r of stateChecks(rec, cat, imp, starts)) add(r);
+    for (const r of stateChecks(rec, cat, imp, starts, byTurn.get(t + 1))) add(r);
     const next = byTurn.get(t + 1);
     if (next) for (const r of transitionChecks(rec, next, cat, history, byTurn.get(t - 1))) add(r);
   }

@@ -21,7 +21,7 @@
 import type { City, DistrictId, GameState, Tile } from './types';
 import { addEraScore } from './eras';
 import { isCiv, seatOf } from './seats';
-import { isExplored } from './fog';
+import { fogActive, isExplored } from './fog';
 import { makeYieldCtx } from './effects';
 import { baseAdjacency, buildingVariantAdjacency, cityPower, onOrNextToShallowWater } from './yields';
 import { militaryBuildingRows } from './cityStates';
@@ -44,7 +44,8 @@ import {
   MOMENT_UNIQUE_IMPROVEMENT, MOMENT_NEIGHBORHOOD, MOMENT_SEASIDE_RESORT, MOMENT_MAX_BELIEFS,
   MOMENT_GOVERNORS_ALL, MOMENT_TRADING_POST_ALL, MOMENT_FIND_WONDER, MOMENT_FIRST_SUZERAIN,
   MOMENT_NEAR_WONDER, MOMENT_NEAR_FLOOD, MOMENT_NEAR_VOLCANO, MOMENT_LARGEST, MOMENT_HIGH_ADJACENCY,
-  MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT, MOMENT_POWER_FROM_RESOURCE, MOMENT_DISASTER_IMPROVEMENT,
+  MOMENT_FORMATION, MOMENT_FULL_ENCAMPMENT, MOMENT_POWER_FROM_RESOURCE, MOMENT_DISASTER_IMPROVEMENT, MOMENT_MITIGATED_FLOOD,
+  MOMENT_CIRCUMNAVIGATED, MOMENT_RENEWABLE, RENEWABLE_IMPROVEMENTS,
 } from '../data/seats';
 
 type Pay = readonly [number, number];
@@ -91,11 +92,21 @@ export const NEIGHBORHOOD_KEY = add('NEIGHBORHOOD', MOMENT_NEIGHBORHOOD);
 /** an improvement the seat lays on a plot a natural disaster enriched
  *  (`improvementMoment`) */
 export const DISASTER_IMPROVEMENT_KEY = add('DISASTER_IMPROVEMENT', one(MOMENT_DISASTER_IMPROVEMENT));
-/** an improvement on the seat's land: a unique one, the Seaside Resort */
-export const IMPROVEMENT_KEY: Record<string, number> = Object.fromEntries(Object.values(IMPROVEMENTS)
-  .filter((m) => m.uniqueTo || m.uniqueLeader || m.id === 'SEASIDE_RESORT')
-  .map((m) => [m.id, m.id === 'SEASIDE_RESORT' ? add('SEASIDE_RESORT', MOMENT_SEASIDE_RESORT)
-    : add(`UNIQUE_IMPROVEMENT:${m.id}`, one(MOMENT_UNIQUE_IMPROVEMENT))]));
+/** a flood the seat's Dam or Great Bath mitigated (`mitigatedFloodMoment`) */
+export const MITIGATED_FLOOD_KEY = add('MITIGATED_FLOOD', one(MOMENT_MITIGATED_FLOOD));
+/** a plot the seat has explored in every column of the map */
+export const CIRCUMNAVIGATED_KEY = add('CIRCUMNAVIGATED', MOMENT_CIRCUMNAVIGATED);
+/** a renewable energy improvement, one key for the four types */
+const RENEWABLE_KEY = add('RENEWABLE_ENERGY', MOMENT_RENEWABLE);
+/** an improvement on the seat's land: a unique one, the Seaside Resort, a
+ *  renewable energy one */
+export const IMPROVEMENT_KEY: Record<string, number> = {
+  ...Object.fromEntries(Object.values(IMPROVEMENTS)
+    .filter((m) => m.uniqueTo || m.uniqueLeader || m.id === 'SEASIDE_RESORT')
+    .map((m) => [m.id, m.id === 'SEASIDE_RESORT' ? add('SEASIDE_RESORT', MOMENT_SEASIDE_RESORT)
+      : add(`UNIQUE_IMPROVEMENT:${m.id}`, one(MOMENT_UNIQUE_IMPROVEMENT))])),
+  ...Object.fromEntries(RENEWABLE_IMPROVEMENTS.map((id) => [id, RENEWABLE_KEY])),
+};
 /** a living unit of a formation, [land, naval][formation] (-1 for none) */
 export const FORMATION_KEY: readonly (readonly number[])[] = [
   [-1, add('FORMATION:CORPS', MOMENT_FORMATION.land[0]), add('FORMATION:ARMY', MOMENT_FORMATION.land[1])],
@@ -164,6 +175,14 @@ export function improvementMoment(state: GameState, seat: number, t: Tile): void
   if (t.fertility > 0 || t.fertilityProd > 0 || (t.fertilitySci ?? 0) > 0 || (t.fertilityCul ?? 0) > 0) {
     recordMoment(state, seat, DISASTER_IMPROVEMENT_KEY);
   }
+}
+
+/** CIV6 (MITIGATED_RIVER_FLOOD): `seat` mitigated a flood — its Dam or Great
+ *  Bath shielded the river (`riverShield`); a major records the key once a
+ *  game (runs/h1_duelw1128 t160: China's Dam on the Amur, +1).
+ *  `_moment_mitigated_flood` is the twin. */
+export function mitigatedFloodMoment(state: GameState, seat: number): void {
+  recordMoment(state, seat, MITIGATED_FLOOD_KEY);
 }
 
 /** CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): major `seat` records the
@@ -251,6 +270,18 @@ export function momentKeysHeld(state: GameState, seat: number): number[] {
     }
     const nw = t.feature !== null ? WONDER_FOUND_KEY[t.feature] : undefined;
     if (nw !== undefined && isExplored(state, seat, t.index)) out.add(nw);
+  }
+  // the world circumnavigated: under fog, every column of the map holds a
+  // plot the seat has explored (0x50d390; runs/h1_duelw1127 Rome t157,
+  // China t183)
+  if (fogActive(state)) {
+    const columnSeen = (x: number) => {
+      for (let y = 0; y < map.height; y++) if (isExplored(state, seat, y * map.width + x)) return true;
+      return false;
+    };
+    let round = true;
+    for (let x = 0; x < map.width && round; x++) round = columnSeen(x);
+    if (round) out.add(CIRCUMNAVIGATED_KEY);
   }
   const rel = s.religion;
   if (rel.founded && BELIEF_SLOTS.every((slot) => (rel[slot] ?? null) !== null)) out.add(MAX_BELIEFS_KEY);
