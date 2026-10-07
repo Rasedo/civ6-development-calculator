@@ -720,7 +720,7 @@ describe('what a finished mission does', () => {
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(true);
 
     const g = governorsOf(them)[gi];
-    neutralizeGovernor(g, SPY_GOVERNOR_TURNS);
+    neutralizeGovernor(state, them.seat, gi, SPY_GOVERNOR_TURNS);
     // the clock is the PERSON's: he leaves the city, so the city has none
     expect(governorAt(state, theirs)).toBe(-1);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(false);

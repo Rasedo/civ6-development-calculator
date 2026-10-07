@@ -43,7 +43,7 @@ import { isWater } from '../../world/query';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
-import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
+import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOVERNOR_PROMOTIONS, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { BOOSTS } from '../data/boosts';
 import { boostAmount, boostPoints } from '../core/boosts';
@@ -438,9 +438,9 @@ export interface History {
   govSeated: Map<string, number>;
   /** culture expansions by the city's centre plot (a capture keeps them) */
   cultureTaken: Map<number, number>;
-  /** the residue each city's growth accumulator keeps, in 256ths, by its
-   *  centre plot (`City.growthDrift`, `foldGrowthDrift`) */
-  growthDrift: Map<number, number>;
+  /** the residue each city's growth accumulator keeps, in 256ths, by the
+   *  city's `owner:id` (`City.growthDrift`, `foldGrowthDrift`) */
+  growthDrift: Map<string, number>;
   /** Builders each player has gained: a Builder id new at t+1 */
   builders: Map<number, number>;
   /** Great People each player has spent, by class: a Great Person unit of
@@ -1671,7 +1671,7 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   for (const k of [...h.trail.keys()]) if (!live.has(k)) h.trail.delete(k);
   for (const k of [...h.routeCourse.keys()]) if (!live.has(k)) h.routeCourse.delete(k);
   if (h.last) foldCultureTourism(h, h.last, rec, cat);
-  if (h.last) foldGrowthDrift(h, h.last, rec);
+  if (h.last) foldGrowthDrift(h, h.last, rec, cat);
   foldDominance(h, rec);
   h.beforeThat = h.before;
   h.before = h.last;
@@ -2158,7 +2158,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       foodBox: num(c.food),
       cultureBox: num(c.culture),
       tilesAcquired: history?.cultureTaken.get(center) ?? 0,
-      ...(history?.growthDrift.get(center) ? { growthDrift: history.growthDrift.get(center) } : {}),
+      ...(history?.growthDrift.get(`${c.owner}:${c.id}`) ? { growthDrift: history.growthDrift.get(`${c.owner}:${c.id}`) } : {}),
       nextPlot: num(c.nextPlot),
       focus: 'balanced',
       queue: [],
@@ -3562,11 +3562,42 @@ function spentPersonGaps(ctx: Ctx, rec: TurnRecord, cityByKey: Map<string, City>
  * CIV6 (the city's growth accumulator, DLL 0x1b6180 / 0x1b62d0): a session
  * of the World Congress ends the standing resolutions, and a Migration
  * Treaty's growth percent detaches from every city its target held, each
- * keeping the residue (`growthDetachResidue`), latched by the city's centre
- * plot so a capture keeps it. A session is a table naming a new entry, or
- * one whose entries differ from the record before's.
+ * keeping the residue (`growthDetachResidue`) for as long as the city object
+ * lives (a capture or a flip makes a new city: runs/h1_duelw1110 Antium and
+ * Ravenna, Rome's −2 and −1 gone under China at t205 / t209, both at China's
+ * +38 alone). A session is a table naming a new entry, or one whose entries
+ * differ from the record before's; the cities it detaches
+ * from are the target's in the session's record, a city founded that turn
+ * among them (runs/h1_duelw1115 Chen, founded at the t162 session: 255 at
+ * Displeased beside the older cities' 293). An established governor's growth
+ * title detaches the same way when she leaves the city or stops being
+ * established there (Surplus Logistics' +20%: runs/h1_duelw1105 Shenyang
+ * t190, 344 -> 292 as Magnus moves to Yiyang; 1109 Shenyang t193, 1117
+ * Xiurong t197, 1124 Shenyang t189).
  */
-function foldGrowthDrift(h: History, prev: TurnRecord, rec: TurnRecord): void {
+function foldGrowthDrift(h: History, prev: TurnRecord, rec: TurnRecord, cat: Catalog): void {
+  const add = (k: string, residue: number) => {
+    if (residue !== 0) h.growthDrift.set(k, (h.growthDrift.get(k) ?? 0) + residue);
+  };
+  // the growth titles each record's established governors hold, by city
+  const titles = (r: TurnRecord): Map<string, number> => {
+    const out = new Map<string, number>();
+    for (const p of r.players) {
+      for (const [ti, owner, cityId, established, , , promos] of p.governors ?? []) {
+        if (!bool(established)) continue;
+        const c = r.cities.find((x) => x.owner === owner && x.id === cityId);
+        if (!c) continue;
+        for (const pi of promos) {
+          const pid = engineId('promotion', cat.promotions[pi], 'GOVERNOR_PROMOTION_', GOVERNOR_PROMOTION_INDEX);
+          const g = pid ? GOVERNOR_PROMOTIONS[GOVERNOR_PROMOTION_INDEX[pid]].effects.growthMult : undefined;
+          if (g !== undefined && g !== 1) out.set(`${owner}:${cityId}|${ti}:${pi}`, g);
+        }
+      }
+    }
+    return out;
+  };
+  const kept = titles(rec);
+  for (const [key, g] of titles(prev)) if (!kept.has(key)) add(key.split('|')[0], growthDetachResidue(g));
   const entries = (t: unknown): (DumpResolution & { IsNew?: boolean })[] => (t && typeof t === 'object'
     ? Object.entries(t as Record<string, unknown>).filter(([k, v]) => /^\d+$/.test(k) && !!v && typeof v === 'object')
       .map(([, v]) => v as DumpResolution & { IsNew?: boolean })
@@ -3575,16 +3606,11 @@ function foldGrowthDrift(h: History, prev: TurnRecord, rec: TurnRecord): void {
   const now = entries(rec.congress);
   const sig = (l: DumpResolution[]) => l.map((e) => `${e.Type}:${e.ChosenLabel}:${e.ChosenThing}`).sort().join('|');
   if (!now.some((e) => e.IsNew === true) && sig(was) === sig(now)) return;
-  const W = rec.head.W;
   for (const e of was) {
     if (resolutionByHash().get(e.Type) !== CONGRESS_MIGRATION || typeof e.ChosenThing !== 'string') continue;
     const pid = Number(e.ChosenThing);
     const residue = growthDetachResidue(e.ChosenLabel === 'A' || e.ChosenLabel === 'А' ? CONGRESS_GROWTH_A : CONGRESS_GROWTH_B);
-    for (const c of prev.cities) {
-      if (c.owner !== pid) continue;
-      const k = c.y * W + c.x;
-      h.growthDrift.set(k, (h.growthDrift.get(k) ?? 0) + residue);
-    }
+    for (const c of rec.cities) if (c.owner === pid) add(`${c.owner}:${c.id}`, residue);
   }
 }
 

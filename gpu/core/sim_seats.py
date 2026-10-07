@@ -7775,12 +7775,12 @@ class SimSeats:
     def _unit_buy_base(self) -> torch.Tensor:
         """[B, NU] f64 — `unitBuyBase`'s twin: the cost a unit's purchase
         prices from, a military chassis's under Mercenary Companies on
-        Production its Production cost rounded, the Production half taken
-        back out."""
+        Production its Production cost (`mercenary_cost`), the Production
+        multiplier taken back out."""
         cost = self._type_cost.double().unsqueeze(0).expand(self.B, -1)
         m = self._congress_unit_cost_mult(self._cur_prod).unsqueeze(1)
         merc = ((self._type_combat > 0) | self._type_support).unsqueeze(0)
-        return torch.where(merc & (m != 1), js_round(cost * m) / m, cost)
+        return torch.where(merc & (m != 1), mercenary_cost(cost, m) / m, cost)
 
     def _congress_trade_gold(self, dseat: torch.Tensor) -> torch.Tensor:
         """f64, `dseat`-shaped — TRADE POLICY outcome A (`congressTradeGold`):
@@ -11226,7 +11226,6 @@ class SimSeats:
         old_fol = int(self.city_followed[b, src_row, src_col])
         old_pres = self.city_pressure[b, src_row, src_col, :].clone()
         old_unconv = float(self.city_unconverted[b, src_row, src_col])
-        old_drift = int(self.city_growth_drift[b, src_row, src_col])
         old_hp = int(self.city_hp[b, src_row, src_col])
         old_outer = int(self.city_outer_hp[b, src_row, src_col])
         # a perimeter at its FULL pool is TS's unset `outerHp`, which a flip
@@ -11375,7 +11374,9 @@ class SimSeats:
         self.city_followed[b, dst_row, col] = old_fol
         self.city_pressure[b, dst_row, col, :] = old_pres
         self.city_unconverted[b, dst_row, col] = old_unconv
-        self.city_growth_drift[b, dst_row, col] = old_drift
+        # a transferred city is a new city to the game: its growth
+        # accumulator starts with no residue
+        self.city_growth_drift[b, dst_row, col] = 0
         # The receiver's district registry is DERIVED from the tiles that just
         # re-owned, COMPLETE ones only — never copied from the loser's registry,
         # which is written at QUEUE time and so lists paves that never finished.

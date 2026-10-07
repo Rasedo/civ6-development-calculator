@@ -348,7 +348,17 @@ class SimGovernors:
     def neutralize_governor(self, b: int, row: int, g: int, turns: int) -> None:
         """CIV6 (Neutralize Governor / Governance Doctrine B): the governor
         leaves the city and cannot be assigned again until the clock runs
-        out."""
+        out. Each growth title she was paying there detaches from the
+        city's growth accumulator, which keeps the residue
+        (`growthDetachResidue`)."""
+        col = self._gpromo.get("growthMult")
+        if col is not None and self.n_gov_promos > 0:
+            RC = self.RC
+            at = self._governor_at(row)[b]                                   # [RC]
+            mask = self._governor_mask(row)[b]                               # [RC, NP]
+            resid = torch.floor((col - 1.0) * 256.0) + torch.floor((1.0 - col) * 256.0)
+            res = torch.where(mask, resid.reshape(1, -1), torch.zeros_like(resid).reshape(1, -1)).sum(dim=1)
+            self.city_growth_drift[b, row, :RC] += torch.where(at == g, res.long(), torch.zeros_like(at))
         self.civ_gov_city[b, row, g] = -1
         self.civ_gov_minor[b, row, g] = -1
         self.civ_gov_establish[b, row, g] = 0

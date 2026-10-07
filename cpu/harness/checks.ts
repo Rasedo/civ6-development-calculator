@@ -36,7 +36,7 @@ import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCostMult, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
+import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn, buildingFullCost } from '../core/rules';
 import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
@@ -1246,8 +1246,8 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         // (Flower Power, Mercenary Companies on Production); a Settler is no
         // unit item
         const prod = id === 'SETTLER' ? settlerCost(state, city.seat)
-          : (id === 'BUILDER' ? builderCost(state, city.seat) : id === 'TRADER' ? traderCost(state, city.seat)
-            : unitStepCost(id, unitsAcquired(state, city.seat, id))) * unitProdCostMult(state, city.seat, id);
+          : unitProdCost(state, city.seat, id, id === 'BUILDER' ? builderCost(state, city.seat) : id === 'TRADER' ? traderCost(state, city.seat)
+              : unitStepCost(id, unitsAcquired(state, city.seat, id)));
         buyPush(`buy.unitCost`, near(prod, num(cost), 0.5), num(cost), prod, { unit: id });
         faithPush('buy.unitFaith', unitFaithPrice(state, city.seat, id, city), faith, { unit: id });
         // a chassis bought with Faith alone has no gold purchase to price: the
@@ -1948,10 +1948,15 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       }
       if (growSkip || !next) out.push({ turn, check: 'step.growth', subject, ok: true, skip: growSkip ?? 'no t+1' });
       else {
-        res('step.growth', popAfter + (granted ? grant : 0) === next.pop && near(boxAfter, num(next.food), 0.05),
-          [next.pop, num(next.food)], [popAfter + (granted ? grant : 0), round3(boxAfter)],
-          { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus), needed: st.growthNeeded,
-            housing: st.housing, tier: st.amenities.tier.name });
+        // a record with no congress table holds none of the growth percents a
+        // session attaches and detaches (the Migration Treaty, its residue)
+        const ok = popAfter + (granted ? grant : 0) === next.pop && near(boxAfter, num(next.food), 0.05);
+        const g = gapsFor(gaps, 'step.growth');
+        out.push({ turn, check: 'step.growth', subject, ok, game: [next.pop, num(next.food)],
+          ours: [popAfter + (granted ? grant : 0), round3(boxAfter)],
+          ...(!ok && a.congress === undefined ? { gaps: [...(g.gaps ?? []), 'congress unrecorded'] } : g),
+          ...(ok ? {} : { state: { before, surplus: round3(st.foodSurplus), effective: round3(st.effectiveFoodSurplus),
+            needed: st.growthNeeded, housing: st.housing, tier: st.amenities.tier.name } }) });
       }
       // border growth, the plots bought in the turn landed first: with gold
       // spent, every plot the city gained but the one its box paid for (the

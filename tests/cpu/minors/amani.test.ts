@@ -131,7 +131,7 @@ describe('the governor at a city-state', () => {
     g.promotions = promotionBitValue(P_AFFLUENCE);
     expect(luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before + 1);
     // a neutralized governor leaves, and takes the copy with her
-    neutralizeGovernor(g, 6);
+    neutralizeGovernor(state, 0, AMANI, 6);
     expect(g.minorId).toBe(-1);
     expect(luxuryAmenities(state, 0).get(seatOf(state, 0)!.cities[0].id) ?? 0).toBe(before);
   });

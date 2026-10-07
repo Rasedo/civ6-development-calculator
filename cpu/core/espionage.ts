@@ -37,7 +37,7 @@ import { BARB_SEAT, citiesOf, seatOf, seatsAllied, tileSeat } from './seats';
 import { DED_BODYGUARD } from '../data/seats';
 import { getModifiers } from './effects';
 import { goldenDedication, dedicationEvent, worldEraIndex } from './eras';
-import { cityHasGovernor, governorAt, governorsOf, neutralizeGovernor } from './governors';
+import { cityHasGovernor, governorAt, neutralizeGovernor } from './governors';
 import { seatBuildingSum } from './city';
 import { DISTRICTS } from '../data/districts';
 import { BUILDINGS } from '../data/buildings';
@@ -790,7 +790,7 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       const gi = governorAt(state, city);
       const owner = seatOf(state, city.seat);
       if (gi >= 0 && owner) {
-        neutralizeGovernor(governorsOf(owner)[gi], SPY_GOVERNOR_TURNS);
+        neutralizeGovernor(state, owner.seat, gi, SPY_GOVERNOR_TURNS);
       }
       return;
     }

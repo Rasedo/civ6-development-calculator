@@ -5,7 +5,7 @@ import { type FeatureAppealRow } from '../data/civilizations';
 import { GP_CITY_PERM } from '../data/greatPeople';
 import { FEATURE_ADD_CIVIC } from '../data/appeal';
 import type { GpAppeal } from './appeal';
-import { seatBuildingSum, cityHasPark } from './city';
+import { seatBuildingSum, cityHasPark, growthDetachResidue } from './city';
 import { cityDistrictSum, darkBuildings } from './yields';
 import { congressGovernorFavorType } from './congress';
 import { getModifiers } from './effects';
@@ -544,8 +544,19 @@ export function governorLoyaltyAura(state: GameState, city: City): number {
 }
 
 /** CIV6 (Neutralize Governor / Governance Doctrine B): the governor leaves
- *  the city and cannot be assigned again until the clock runs out. */
-export function neutralizeGovernor(g: Governor, turns: number): void {
+ *  the city and cannot be assigned again until the clock runs out. Each
+ *  growth title she was paying there detaches from the city's growth
+ *  accumulator, which keeps the residue (`growthDetachResidue`). */
+export function neutralizeGovernor(state: GameState, seat: number, i: number, turns: number): void {
+  const s = seatOf(state, seat);
+  const g = s ? governorsOf(s)[i] : undefined;
+  if (!g) return;
+  const city = citiesOf(state, seat).find((c) => c.id === g.cityId);
+  if (city && governorAt(state, city) === i) {
+    for (const e of cityGovernorEffects(state, city)) {
+      if (e.growthMult !== undefined) city.growthDrift = (city.growthDrift ?? 0) + growthDetachResidue(e.growthMult);
+    }
+  }
   g.cityId = -1;
   g.minorId = -1;
   g.establishTurns = 0;

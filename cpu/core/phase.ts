@@ -64,7 +64,7 @@ import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { seatWonders } from './wonders';
 import { cleanFallout, escortUnit, breakEscort, disbandUnit, builderCost, traderCost, builderRemoveFeature, trainableUnits, goldBuyableUnits, purchaseSpotBlocked, archaeologistExcavate, naturalistPark, performConcert, upgradeUnit, unitDomain, formationBanned, garrisonOf } from './units';
 import { killUnit } from './combat';
-import { adoptBeliefs, unitProdCostMult, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
+import { adoptBeliefs, itemCost, unitProdCost, availableProjects, buyTile, buyWorshipBuilding, purchaseBuildingWithFaith, purchaseUnitWithFaith, wallsGoldBlocked, boostProject, wonderChargeBoost, condemnHeretic, formUp, convertHeathens, districtScaledBase, districtDiscounted, refreshDistrictDiscount, engineerFinish, foundCity, goldAffordable, isEncampHarborItem, launchInquisition, evangelizeBelief, purchaseCivilianWithFaith, purchaseNaturalist, purchaseReligiousUnit, purchaseRockBand, purchaseSettler, queueProject, removeHeresy, guruHeal, settlerCost, unitGoldPrice, unitStepCost, unitsAcquired, districtVariantCost, buildingPurchaseCost, spreadReligiousPressure } from './game';
 import { DISTRICTS, PLACEABLE_DISTRICTS, SCAFFOLD_DISTRICTS } from '../data/districts';
 import { IMPROVEMENT_IDS, DEDICATED_IMPROVEMENTS, unitActionIndex, AIR_STRIKE_COLS, AIR_REBASE_COLS, AIR_DEPLOY_COLS, NUKE_COLS, SPY_TRAVEL_COLS, SPY_MISSIONS } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets, rebaseAir, displaceAirFrom, deployAir, deployTargets, priorityTargets, returnToBase } from './air';
@@ -3077,7 +3077,11 @@ export function seatPhase(state: GameState): void {
         // multiplier, which this model pays as a slower fill rather than a
         // moved queue cost.
         if (q.kind === 'unit' && UNITS[q.unit]?.raider) _em *= seatMods.navalRaiderProdMult;
-        if (q.kind === 'unit') _em /= unitProdCostMult(state, civCity.seat, q.unit);
+        if (q.kind === 'unit') {
+          const _uc = itemCost(q);
+          const _ucm = unitProdCost(state, civCity.seat, q.unit, _uc);
+          if (_ucm > 0 && _ucm !== _uc) _em *= _uc / _ucm;
+        }
         // CIV6 (Thunderbolt of the North): "+50% Production toward all naval
         // melee units."
         if (q.kind === 'unit' && leaderOf(state, civCity.seat) === 'HARDRADA' && navalMelee(UNITS[q.unit])) _em *= HARDRADA_NAVAL_MELEE_PROD_MULT;

@@ -681,14 +681,22 @@ export function mercenaryUnit(unitType: string): boolean {
   return (def?.combat ?? 0) > 0 || !!def?.support;
 }
 
-/** What a unit's PRODUCTION cost is multiplied by for this seat now: Flower
- *  Power's land-unit surcharge and Mercenary Companies on Production
+/** CIV6 (Cache_City_BuildQueue 0x17c790): a cost `c` under Mercenary
+ *  Companies' multiplier `m` — c less floor(c · x), x the percent off in 24.8
+ *  fixed point (outcome B's −50% reads 128: 215 -> 108, 325 -> 163). */
+export function mercenaryCost(cost: number, m: number): number {
+  return m === 1 ? cost : cost - Math.floor(cost * Math.round((1 - m) * 256) / 256);
+}
+
+/** A unit's PRODUCTION cost for this seat now, from the item's cost `cost`:
+ *  Flower Power's land-unit surcharge in the seat's integer cost, then
+ *  Mercenary Companies on Production through `mercenaryCost`
  *  (runs/h1_duelw1106 t62-81, outcome B: the Swordsman 45 -> 23 and the
  *  Battering Ram 32 -> 16, the Builder, Settler and Trader unmoved). The
  *  production step pays it as a slower fill. */
-export function unitProdCostMult(state: GameState, seat: number, unitType: string): number {
+export function unitProdCost(state: GameState, seat: number, unitType: string, cost: number): number {
   const merc = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
-  return landUnitPriceMult(state, seat, unitType) * merc;
+  return mercenaryCost(cost * landUnitPriceMult(state, seat, unitType), merc);
 }
 
 /** CIV6 (Flower Power): "The cost of producing and purchasing land units
@@ -711,14 +719,14 @@ function unitIsLandDomain(unitType: string): boolean {
 }
 
 /** The cost a military unit's purchase prices from: under Mercenary
- *  Companies on Production its Production cost as the game rounds it, the
- *  Production half taken back out — a LAB fit (runs/h1_duelw1104 t242, the
- *  Anti-Air Gun 227 -> 114 Production, 905 -> 910 Gold and 450 -> 455
+ *  Companies on Production its Production cost (`mercenaryCost`), the
+ *  Production multiplier taken back out — a LAB fit (runs/h1_duelw1104 t242,
+ *  the Anti-Air Gun 227 -> 114 Production, 905 -> 910 Gold and 450 -> 455
  *  Faith; runs/h1_duelw1111 t222, the Medic 185 -> 93, 625 -> 630 Gold at
  *  15% off), every price off 2 x 114 and 2 x 93. */
 export function unitBuyBase(state: GameState, unitType: string, cost: number): number {
   const m = mercenaryUnit(unitType) ? congressUnitCostMult(state, CONGRESS_CUR_PRODUCTION) : 1;
-  return m === 1 ? cost : Math.round(cost * m) / m;
+  return mercenaryCost(cost, m) / m;
 }
 
 /** The gold price `seat` pays for a unit bought in `city`: its purchase cost

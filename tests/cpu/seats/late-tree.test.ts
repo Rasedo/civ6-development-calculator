@@ -5,7 +5,7 @@ import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
 import { IMPROVEMENTS } from '../../../cpu/data/improvements';
 import { POLICIES } from '../../../cpu/data/policies';
-import { unitProdCostMult } from '../../../cpu/core/game';
+import { unitProdCost } from '../../../cpu/core/game';
 import { CONGRESS_MERCENARY, CONGRESS_GLOBAL_ENERGY } from '../../../cpu/data/seats';
 import { CONGRESS_CUR_PRODUCTION, congressEnergyBlocked, congressEnergyProdMult } from '../../../cpu/core/congress';
 import { POWER_PLANT_IDS } from '../../../cpu/data/buildings';
@@ -37,8 +37,8 @@ describe('Mercenary Companies on Production and the Global Energy Treaty', () =>
   it('B on Production halves a military unit\'s production cost, not a Builder\'s', () => {
     const state = makeState();
     state.congress = [{ res: CONGRESS_MERCENARY, outcome: 1, target: CONGRESS_CUR_PRODUCTION }];
-    expect(unitProdCostMult(state, 0, 'WARRIOR')).toBe(0.5);
-    expect(unitProdCostMult(state, 0, 'BUILDER')).toBe(1);
+    expect(unitProdCost(state, 0, 'WARRIOR', 215)).toBe(108);
+    expect(unitProdCost(state, 0, 'BUILDER', 215)).toBe(215);
   });
 
   it('A bans the named plant, B boosts its production', () => {

@@ -1180,25 +1180,30 @@ class SimPhase:
         _is_unit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
         _ut = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
         _fx = pre["fx"]
-        # CIV6 (Letters of Marque): "Naval Raiders: +100% Production";
-        # (Flower Power): land units other than Rock Bands cost double,
-        # which this model pays as a slower fill rather than a moved cost.
+        # CIV6 (Letters of Marque): "Naval Raiders: +100% Production".
         # A channel standing at its identity 1 is carried as None by the
         # prelude, and a `where` it would have run is a no-op anyway.
         if _fx["raiderprod"] is not None:
             _rp = _fx["raiderprod"].to(_emall.dtype)
             _emall = torch.where(_is_unit & self._type_raider[_ut],
                                  _emall * _rp, _emall)
+        # (Flower Power, Mercenary Companies on Production): the unit's
+        # production cost moves (`unitProdCost`) — land units other than Rock
+        # Bands at double, then every unit of a military formation, the
+        # support chassis with the combat ones, through `mercenary_cost` —
+        # which this model pays as a slower fill: the item's cost over the
+        # moved one.
+        _uc = self.city_cost[bidx, row, col, 0].to(torch.float64)
+        _ucm = _uc
         if _fx["landcost"] is not None:
-            _lc = _fx["landcost"].to(_emall.dtype)
             _land = _is_unit & ~self.unit_naval[_ut] & (self._type_air[_ut] == 0) \
                 & (_ut != self._band_idx)
-            _emall = torch.where(_land, _emall / _lc, _emall)
-        # (Mercenary Companies on Production): every unit of a military
-        # formation, the support chassis with the combat ones
-        _mc = pre["merc"].to(_emall.dtype)
+            _ucm = torch.where(_land, _ucm * _fx["landcost"].to(torch.float64), _ucm)
+        _mc = pre["merc"].to(torch.float64)
         _merc_u = _is_unit & ((self._type_combat[_ut] > 0) | self._type_support[_ut])
-        _emall = torch.where(_merc_u, _emall / _mc, _emall)
+        _ucm = torch.where(_merc_u & (_mc != 1), mercenary_cost(_ucm, _mc), _ucm)
+        _ucf = _uc / torch.where(_ucm > 0, _ucm, torch.ones_like(_ucm))
+        _emall = torch.where(_is_unit & (_ucm > 0) & (_ucm != _uc), _emall * _ucf.to(_emall.dtype), _emall)
         # CIV6 (Automated Workforce): "+20% Production towards city
         # projects."
         if _fx["projprod"] is not None and self._proj_rows:

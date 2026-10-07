@@ -2248,6 +2248,23 @@ FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD).
   player's capital (0x36f460). No record shows it (no Kandy suzerain
   discovered a wonder in the duels). `revealAround` / `_reveal_around`.
 
+## H-1: a unit's Production cost in the queue — READ
+
+Lua `BuildQueue:GetUnitCost` (0x983930) answers an int from the city build
+queue cache's `m_aiUnitCost` (Cache_City_BuildQueue.cpp), which 0x17c790
+fills per unit row: c = the owner's unit manager (+0x12e8) current cost
+array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the
+row's +0x20 class does not read 2 through 0xadd5e0 (unread) and the
+player's +0x1048 equals the global at 0xf2f978 (the currency the
+resolution names; Production fits the records), the quote is c − ((c << 8)
+· x >> 8 >> 8), x the player's +0x10a8 in 24.8 fixed point — Mercenary
+Companies on Production's percent off: c − floor(c · x / 256). Outcome B's
+−50% (x = 128) quotes 215 → 108, 325 → 163, 227 → 114, 45 → 23
+(runs/h1_duelw1104 t242 Biplane, Mechanized Infantry, Anti-Air Gun; 1106
+t62 Swordsman; ~14,700 quotes over the 22 duels at 1/512). Engines:
+`mercenaryCost` / `mercenary_cost`, `unitProdCost` (the production step's
+fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

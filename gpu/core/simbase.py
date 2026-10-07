@@ -910,6 +910,13 @@ def js_round(x: torch.Tensor) -> torch.Tensor:
     return torch.floor(x + 0.5)
 
 
+def mercenary_cost(cost: torch.Tensor, m: torch.Tensor) -> torch.Tensor:
+    """`mercenaryCost`'s twin (Cache_City_BuildQueue 0x17c790): a cost under
+    Mercenary Companies' multiplier `m`, less floor(cost · x), x the percent
+    off in 24.8 fixed point."""
+    return cost - torch.floor(cost * js_round((1 - m) * 256) / 256)
+
+
 def first_argmax(x: torch.Tensor) -> torch.Tensor:
     """argmax along dim 1 with ties -> LOWEST index. torch.argmax's tie pick is
     UNSPECIFIED; the TS scans this mirrors use strict >, so an exact tie must

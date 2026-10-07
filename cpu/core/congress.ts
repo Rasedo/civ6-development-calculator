@@ -393,7 +393,7 @@ function runResolution(state: GameState, res: number, slot: number,
   if (res === CONGRESS_GOVERNANCE && win.outcome === 1) {
     for (const sx of state.seats) {
       const g = (sx.governors ?? [])[win.target];
-      if (g?.appointed) neutralizeGovernor(g, GOVERNOR_NEUTRALIZE_TURNS);
+      if (g?.appointed) neutralizeGovernor(state, sx.seat, win.target, GOVERNOR_NEUTRALIZE_TURNS);
     }
   }
 }
