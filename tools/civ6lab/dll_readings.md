@@ -2116,6 +2116,26 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0;
   an accumulated resource skips it), the copies 0x44eff0 hands a resource's
   recipients, the power ledger 0x4a7cc0.
+- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy
+  setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes
+  the city-state's owned resources off the old suzerain (0x4a91a0) and
+  hands them to the new (0x4a6d90 -> 0x4a7560): a rebuild for the new one.
+  A city-state's own resource change re-hands its copies to its recipients
+  (the signal handler 0x44eff0, Player_Influence.cpp: the luxury and
+  strategic recipient counts +0x8a0 / +0x918 per player). The extra
+  amenities per owned luxury / bonus resource (+0x160 / +0x1c0, the
+  effects' 0x4a7100 / 0x4a70c0) rebuild too.
+- A founding does not rebuild it. Over 1117-1129, 54 foundings tell it
+  apart (the record's luxury amenities fit a full rebuild with the new
+  city, or only the allocation without it): 36 rebuilt before the next
+  record, 18 did not; 1122 t36 (a suzerain's Furs improved), 1124 t82 (a
+  suzerain's Ivory) and 1129 t52 (China's own Tea) show a holdings move
+  after the founding, the rest no logged row. The recorder watches each
+  founding with no allocation and logs LuxAllocArrived [owner, city, the
+  row it follows] or LuxAllocNone at the owner's activation: a probe game
+  (map seed 9131, 140 turns, scratch only) saw two arrivals, at China's
+  PlayerTurnDeactivated (t90) and four rows into a city-state's start
+  (t70), each after a Builder charge.
 - Unread: what rebuilds it at a policy change (the records: 9 of 9 policy
   changes at the processing's start re-rank the cities' luxuries before
   their growth), and which change re-runs it after a founding in the
@@ -2434,7 +2454,7 @@ t35 / t130 and 1124 t120 / t211 (eruptions after each) fit [539, 474] and
 unnamed one (the dumper's per-record `volcanoes`). The engines walk the
 map's vector (`GameMap.volcanoes`, `volcanoOrder` / `_volcano_order`).
 
-## H-1: the citizen manager's placement — READ (the AI's favored yields unrecorded)
+## H-1: the citizen manager's placement and the yield flags — READ
 
 City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the
 population change by City::ChangePopulation 0x1c79b0) adds to
@@ -2482,6 +2502,38 @@ Spices; t231 Shanghai's five specialists back on plots): over the 22
 duels step.growth +11 / step.border +73 passes against reading the next
 record's worked set. AI_CityBuild.csv logs per-city yield values
 ("YIELD_FOOD: -0.1, ..."), not the favored / disfavored flags.
+
+The flags and their setters (read; recorded from runs/h1_duelw1129 on):
+the InGame Lua answers them per city (`GetCitizens():IsFavoredYield(i)` /
+`IsDisfavoredYield(i)`; GameCore_Tuner names them `IsYieldFavored` /
+`IsYieldDisfavored` beside `SetFavoredYield` / `SetDisfavoredYield`), and
+the dumper writes them per city per record (`favored`, `disfavored`) and on
+each CityFocusChanged row (one letter per Yields row). 0x196f90 asserts
+the yield is not favored (+0x38) and writes the disfavored byte (+0x50);
+0x1970e0 the converse; each runs the full reassign 0x196320 whatever the
+value was and fires the event (hash 0xe808a01e) — the city command
+0x975920 (SET_FOCUS) and the Lua setters 0x9c0c80 / 0x9c0ce0 are their only
+callers, so every CityFocusChanged row is a full re-place. Recorded
+(1129-1130): the AI calls a setter on its cities every turn or two, China
+mostly with nothing set ("......", a re-place under no flags), at times
+Food favored (1130); the city-states toggle Food favored on and off a turn
+apart. China's rows fall in its start window (before PlayerTurnActivated)
+or in its actions; a start-window row lands after the city turns:
+re-placing at those rows before the border step costs 112 step.border
+passes on 1129, before the growth 129 step.growth passes — the city turns
+bank on the citizens the growth placement left, and the next record
+carries the re-placed set. The harness places under the record's flags
+(`recordFlags`; `citizens.ts` YieldFlags: a favored flag puts the yield's
+doubled value in the favored score, a disfavored one drops it) and
+re-places on a start's wonder annex where the record holds them (1129:
+step.growth 1484 -> 1487, step.border 1556 -> 1558; with 1130, 2164 ->
+2168 and 2231 -> 2233). Under the recorded flags, re-placing every citizen
+on a grown one (in place of the one placement) costs 60 step.border on
+1129-1130, and re-placing them when a completion adds specialist slots 5
+step.growth and 3 step.border: the DLL's single placement stands, and a
+slot completion re-places nothing. A city-state's start-window rows too
+land after its growth (re-placing at them before it: step.minorGrowth
+1168 -> 1160 on 1129-1130).
 
 ## H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ
 

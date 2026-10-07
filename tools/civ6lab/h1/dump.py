@@ -13,7 +13,9 @@ row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
 raw), `events` (the random events of the turn and the one before),
 `greatPeople` (every recruited person by individual), `parks` (the
 National Parks' plots), `cities` (each with its `plots`: the map plots whose
-owner and owning city are the city's), `units`, `volcanoes` (`h1_dump_gc.lua`:
+owner and owning city are the city's; its `favored` / `disfavored` Yields
+indices, the citizen manager's flags; its `luxAlloc`, the luxury
+allocation's [resource, amount] entries naming it), `units`, `volcanoes` (`h1_dump_gc.lua`:
 the volcano vector's named entries in its order, [plot, NamedVolcanoes
 index], and the vector's size), `revealed` (per major player id its revealed
 plots, a hex string of plot bits, four plots a digit, plot 4k the digit's
@@ -26,7 +28,9 @@ the one before), and from the action log (`h1_actions.lua`, armed by `play`)
 `actions`: every game event logged since the previous record — [seq, turn,
 event, args...] for unit moves, operations and combat, city production,
 purchases and tiles, research, civics, policies, governments, governors,
-beliefs, envoys, routes, wars and deals. The catalogs (index -> type name)
+beliefs, envoys, routes, wars and deals (a CityFocusChanged row ends with
+the city's yield flags as the listener read them, one letter per Yields
+row: F favored, D disfavored, . neither). The catalogs (index -> type name)
 go once to `<out>.cat.json`, with the map's lists read once a game
 (`h1_dump_gc.lua`): `rivers` (the river vector in its own index order, each
 river's index, ID, name, plots, Floodplains list and edges), `continents`

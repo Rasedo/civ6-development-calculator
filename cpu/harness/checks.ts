@@ -54,7 +54,7 @@ import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
 import { Civ6Random, drawsBetween } from './civ6Random';
-import { placeCitizens, replaceAllCitizens } from './citizens';
+import { placeCitizens, replaceAllCitizens, type YieldFlags } from './citizens';
 import type { LoggedDraw } from './randLog';
 import { DRAW_SITES, siteLabel } from './drawSites';
 import {
@@ -189,6 +189,14 @@ const PICKER = 'GetNextBuyablePlot picker';
 /** One row of a record's event log (`actions`, `tools/civ6lab/h1/h1_actions.lua`):
  *  [sequence, turn, the `Events` name, ...the handler's arguments]. */
 type ActionRow = (number | string | boolean | null)[];
+
+/** The city's favored / disfavored yields as the record holds them
+ *  (`YieldFlags`), '' where the record carries none. */
+function recordFlags(c: DumpCity): YieldFlags {
+  if (!c.favored && !c.disfavored) return '';
+  return [0, 1, 2, 3, 4, 5].map((i) => (c.favored?.includes(i) ? 'F' : c.disfavored?.includes(i) ? 'D' : '.')).join('');
+}
+
 
 /** The rows of the record's event log that player `p`'s turn `t` fired
  *  before its PlayerTurnActivated: its start (the city turns in the player's
@@ -2029,7 +2037,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
           // the citizens re-placed on the loss, all of them (the citizen
           // manager, `replaceAllCitizens`: 1121 t21 Xi'an grows back on the
           // Spices, t231 Shanghai's five specialists back on plots)
-          replaceAllCitizens(state, city);
+          replaceAllCitizens(state, city, recordFlags(c));
         }
       }
     }
@@ -2126,11 +2134,11 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // a wonder the processing completes annexes its plots with it, before
     // the city grows (the start's CityTileOwnershipChanged rows before its
     // WonderCompleted, `wondersInStart`); the annex clears the stored next
-    // plot. It also re-places every citizen (0x1a8b70 -> 0x196320), by the
-    // AI's favored yields the records do not hold: the citizens stay where
-    // the record placed them, the closer reading (re-placing them with no
-    // favored yield: step.growth 4 and step.border 3 fewer passes over the
-    // 22 duels)
+    // plot. It also re-places every citizen (0x1a8b70 -> 0x196320) under the
+    // city's yield flags, where the record holds them (runs/h1_duelw1129:
+    // one step.growth more); a record without them leaves the citizens where
+    // it placed them, the closer reading (re-placing them with no favored
+    // yield: step.growth 4 and step.border 3 fewer passes over the 22 duels)
     const startWin = logged ? startRows(b, ownerId, ownerId === seatInTurn ? turn + 1 : turn) : undefined;
     const startWonders = startWin ? wondersInStart(startWin, ownerId, a.head.W, new Set(a.players.filter((x) => bool(x.barb)).map((x) => x.id))) : undefined;
     for (const [i, { city, dump: c }] of list.entries()) {
@@ -2161,6 +2169,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       if (annexed.length > 0) {
         for (const q of annexed) setTileOwner(state.map.tiles[q], seat, city.id);
         city.nextPlot = -1;
+        if (c.favored) replaceAllCitizens(state, city, recordFlags(c));
       }
       if (i === policyFrom) slotCards();
       const k = `${c.owner}:${c.id}`;
@@ -2175,7 +2184,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const evLoss = eventPopLoss.get(k) ?? 0;
       if (evLoss && c.owner === seatInTurn) {
         city.population = Math.max(1, city.population - evLoss);
-        replaceAllCitizens(state, city);
+        replaceAllCitizens(state, city, recordFlags(c));
       }
       // the in-turn player grows at its next start, on the session the next
       // record shows (runs/h1_duelw1128 Rome t121 and t141: a session's growth
@@ -2277,9 +2286,15 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
       // the citizen the growth added is placed beside the rest, and a city
-      // that starved re-places them all (the citizen manager, `citizens.ts`)
-      if (city.population === popLast + 1) placeCitizens(state, city, 1);
-      else if (city.population < popLast) replaceAllCitizens(state, city);
+      // that starved re-places them all (the citizen manager, `citizens.ts`),
+      // under the yield flags the record holds. The flags the AI sets in its
+      // start (the CityFocusChanged rows before its activation, each a full
+      // re-place) come after the city turns: the border banks on the
+      // citizens the growth left (runs/h1_duelw1129: re-placing at those rows
+      // before the border step, 112 step.border passes fewer; before the
+      // growth, 129 step.growth fewer)
+      if (city.population === popLast + 1) placeCitizens(state, city, 1, recordFlags(c));
+      else if (city.population < popLast) replaceAllCitizens(state, city, recordFlags(c));
       // the grown city's culture on the luxuries its resources step ranked
       // before the walk, not re-ranked on its new size (1121 t186: Jiaodong
       // grows to 7 on its 3 luxuries, Displeased at its border turn; the
@@ -2385,7 +2400,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // citizens the record caught idle go to work (1117 Antananarivo t62)
     const annexed = acts.plotsGained.get(k) ?? [];
     for (const q of annexed) setTileOwner(state.map.tiles[q], cs.seat);
-    if (annexed.length > 0) replaceAllCitizens(state, city);
+    if (annexed.length > 0) replaceAllCitizens(state, city, recordFlags(c));
     else placeIdleCitizens([city]);
     const undo = landProduction(state, cat, city, next, a.head.W, false, lateBuilt.get(k), pillagedAfter(c.owner));
     const relaid = relayImprovements(c.owner);

@@ -432,6 +432,24 @@ for _, p in ipairs(players) do
       end
     end
     rec.worked = worked
+    -- the citizen manager's yield flags (the city focus): the Yields indices
+    -- favored and disfavored
+    local fav, dis = {}, {}
+    for _, yi in ipairs(YI) do
+      local okf, f = pcall(function() return cit:IsFavoredYield(yi) end)
+      if okf and f then fav[#fav + 1] = yi end
+      local okd, d = pcall(function() return cit:IsDisfavoredYield(yi) end)
+      if okd and d then dis[#dis + 1] = yi end
+    end
+    rec.favored, rec.disfavored = fav, dis
+    -- the luxury allocation's entries naming this city: [resource, amount]
+    rec.luxAlloc = P(function()
+      local out = {}
+      for _, e in ipairs(pl:GetResources():GetCityResourceAllocations(c:GetID())) do
+        out[#out + 1] = {e.Resource, e.AllocationAmount}
+      end
+      return out
+    end)
     -- purchase prices: every building and unit this city can produce now, and
     -- every plot within 3 it could buy
     local buy = {}

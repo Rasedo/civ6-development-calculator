@@ -18,7 +18,9 @@
  *   it, else favored greater, else other greater, strict — so an earlier entry
  *   keeps a tie; the last row's cell for `n` is placed (0x194d90).
  *
- * The AI's favored and disfavored yields are not recorded: none here.
+ * The favored and disfavored yields (`YieldFlags`) are the city's as the
+ * record carries them: one letter per yield in the Yields order, F favored,
+ * D disfavored, . neither; none where the record holds no flags.
  */
 import type { City, GameState, Tile, Yields } from '../core/types';
 import { citySpecialistSlots, cityPlotBonus, cityYieldCtx, computeCityStats, specialistYields } from '../core/city';
@@ -49,10 +51,20 @@ function hexPlot(state: GameState, centre: Tile, dq: number, dr: number): Tile |
   return state.map.tiles[y * width + x];
 }
 
-function score(y: Partial<Yields>, plot: number): Entry {
+/** a city's favored / disfavored yields: one letter per yield in the Yields
+ *  order (food, production, gold, science, culture, faith) */
+export type YieldFlags = string;
+
+function score(y: Partial<Yields>, plot: number, flags: YieldFlags): Entry {
+  let fav = 0;
   let other = 0;
-  for (const k of KEYS) other += (k === 'gold' ? 1 : 2) * Math.trunc(y[k] ?? 0);
-  return { plot, food: Math.trunc(y.food ?? 0), fav: 0, other };
+  KEYS.forEach((k, i) => {
+    if (flags[i] === 'D') return;
+    const v = (k === 'gold' ? 1 : 2) * Math.trunc(y[k] ?? 0);
+    if (flags[i] === 'F') fav += v;
+    else other += v;
+  });
+  return { plot, food: Math.trunc(y.food ?? 0), fav, other };
 }
 
 function better(cand: Cell, old: Cell, need: number): boolean {
@@ -64,7 +76,7 @@ function better(cand: Cell, old: Cell, need: number): boolean {
 /** Place `n` citizens the city holds unassigned beside the ones working (its
  *  locked plots and its specialist pins); the plots taken are locked and the
  *  slots pinned. */
-export function placeCitizens(state: GameState, city: City, n: number): void {
+export function placeCitizens(state: GameState, city: City, n: number, flags: YieldFlags = ''): void {
   if (n <= 0) return;
   const centre = state.map.tiles[city.centerIndex];
   const pins = PLACEABLE_DISTRICTS.map((_, i) => Math.max(0, city.specialistPref?.[i] ?? 0));
@@ -84,14 +96,14 @@ export function placeCitizens(state: GameState, city: City, n: number): void {
       const y = specialistYields(di.type, city.buildings);
       const free = (slots.get(t.index) ?? 0) - (pi >= 0 ? pins[pi] : 0);
       if (!y || pi < 0) continue;
-      for (let k = 0; k < free; k++) entries.push(score(y, t.index));
+      for (let k = 0; k < free; k++) entries.push(score(y, t.index, flags));
       continue;
     }
     if (t.district || t.builtWonder || t.locked) continue;
     const y = tileYields(ctx, t);
     bonus(t, false, y);
     if (!KEYS.some((k) => y[k] > 0)) continue;
-    entries.push(score(y, t.index));
+    entries.push(score(y, t.index, flags));
   }
   let row: Cell[] = Array.from({ length: n + 1 }, () => ({ food: 0, fav: 0, other: 0, picks: [] }));
   for (const e of entries) {
@@ -116,9 +128,9 @@ export function placeCitizens(state: GameState, city: City, n: number): void {
 
 /** Re-place every citizen of the city (a citizen lost: 0x194fb0 with a
  *  negative count unassigns all, then places them all). */
-export function replaceAllCitizens(state: GameState, city: City): void {
+export function replaceAllCitizens(state: GameState, city: City, flags: YieldFlags = ''): void {
   for (const t of state.map.tiles) if (t.locked && tileBelongsTo(t, city)) t.locked = false;
   city.specialistPref = PLACEABLE_DISTRICTS.map(() => 0);
   city.idleCitizens = undefined;
-  placeCitizens(state, city, city.population);
+  placeCitizens(state, city, city.population, flags);
 }

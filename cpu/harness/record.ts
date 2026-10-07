@@ -161,6 +161,11 @@ export interface DumpCity {
   /** [type, x, y, complete, pillaged, defense, garrisonDamage, garrisonMax, outerDamage, outerMax] */
   districts: Read<number | boolean>[][];
   worked: number[];
+  /** the citizen manager's favored / disfavored yields (Yields indices) */
+  favored?: number[];
+  disfavored?: number[];
+  /** the luxury allocation's [resource, amount] entries naming the city */
+  luxAlloc?: Read<[number, number][]>;
   /** [building, slot, great work index, GreatWorks row] per filled slot */
   greatWorks?: [number, number, number, Read<number>][];
   plots: number[];
