@@ -95,10 +95,9 @@ def main() -> int:
     assert sum(y) > 0, "the route pays nothing"
     if int(code[B0]) <= -2:
         d = -int(code[B0]) - 2
-        mult = float(sim._congress_cs_route_mult()[B0, d])
         # the destination city's own rows (`cityStateRouteYields`), the path
-        # term on top of its Gold
-        cs6 = (sim._cs_route_y6()[B0, d] * mult).tolist()
+        # term on top of its Gold; a minor sender holds no Sovereignty factor
+        cs6 = sim._cs_route_y6()[B0, d].tolist()
         assert all(abs(y[c] - cs6[c]) < 1e-9 for c in (0, 1, 3, 4, 5)), f"{y} vs {cs6}"
         assert y[2] >= cs6[2] - 1e-9, f"gold {y[2]}"
     print(f"  3 income OK — {y}")

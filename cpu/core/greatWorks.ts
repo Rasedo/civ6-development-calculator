@@ -300,9 +300,13 @@ export function greatWorkTourism(state: GameState, city: WorkCity, printing: boo
     // under Heritage Tourism pays its Religious works 3x, not 4x
     // (runs/h1_duelw1112 Beijing and Guangzhou, 3 themed works each, +9
     // over the product from the card's adoption at t216)
+    // The Heritage Organization's +100% is one more percent in that sum
+    // (runs/h1_duelw1117 t222, Writing: each work 4 -> 6 under Printing,
+    // never 8); its outcome B silences the type.
     const scaled = (w.obj === GWO_WRITING && printing ? GW_PRINTING_WRITING_MULT : 1) * scale[w.obj]!;
-    t += own * (w.obj === GWO_ARTIFACT ? artifact : 1) * (omult?.[w.obj] ?? 1)
-      * (scaled + mult[w.slot]! - 1);
+    const k = omult?.[w.obj] ?? 1;
+    if (k === 0) continue;
+    t += own * (w.obj === GWO_ARTIFACT ? artifact : 1) * (scaled + k - 1 + mult[w.slot]! - 1);
   }
   return t;
 }
@@ -314,8 +318,10 @@ export function relicTourism(state: GameState, city: WorkCity, omult?: readonly 
   if (!works.some((w) => w.obj === GWO_RELIC)) return 0;
   const mult = gwSlotMults(state, city);
   let t = 0;
-  for (const w of works) if (w.obj === GWO_RELIC) t += GWO_TOURISM[w.obj]! * mult[w.slot]!;
-  return t * (omult?.[GWO_RELIC] ?? 1);
+  const k = omult?.[GWO_RELIC] ?? 1;
+  if (k === 0) return 0;
+  for (const w of works) if (w.obj === GWO_RELIC) t += GWO_TOURISM[w.obj]! * (mult[w.slot]! + k - 1);
+  return t;
 }
 
 /**

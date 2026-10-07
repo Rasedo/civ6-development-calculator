@@ -1261,9 +1261,11 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   // religion on its own turn, in the turn's order
   const pressBefore = new Map<City, number[]>();
   for (const { city } of citiesOfImport(imp)) pressBefore.set(city, [...(city.religionPressure ?? [])]);
-  // — each player's cities first adding the citizens the record says they
-  // grew on its turn (`gainPopulationPressure`), the majors before their
-  // spread, the city-states and the Free Cities after the last
+  // — each player's cities adding the citizens the record says they grew on
+  // its turn (`gainPopulationPressure`), a major's after its spread (1117
+  // t148: Guangzhou, converted by China's spread, gives its new citizen's
+  // 50 to China's religion, and presses its neighbours +2 that turn), the
+  // city-states and the Free Cities after the last
   const spreadImp = importTurn(a, cat, history);
   const spreadState: GameState = spreadImp.state;
   // a city whose food box emptied while a Settler of its owner came out
@@ -1318,8 +1320,8 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     }
   };
   for (const s of spreadState.seats) {
-    growAt(s.seat);
     spreadReligiousPressure(spreadState, s.seat);
+    growAt(s.seat);
     unitTurn(s.seat);
     routeTurn(s.seat);
   }

@@ -3227,6 +3227,20 @@
           "note": "IDENTITY, in catalog order: feat_id is live (a chop strips, an eruption's `_paint_soil` paints, a fire burns and regrows), so 'which feature' is fully determined on both engines — TS indexes tile.feature through the same catalog order the exporter uses."
         },
         {
+          "name": "terrainId",
+          "compare": "exact",
+          "covers": [
+            "Tile.terrain",
+            "Tile.elevation"
+          ],
+          "planes": [
+            "terrain",
+            "hills",
+            "shallow_water"
+          ],
+          "note": "terrain index in catalog order x 2 + hills: live since a drowned plot becomes flat Coast (submergeTile / _submerge); shallow_water follows the terrain (Coast or Lake)."
+        },
+        {
           "name": "hasResource",
           "compare": "exact",
           "covers": [
@@ -3503,14 +3517,6 @@
         "why": "world geometry, fixed at build."
       },
       {
-        "path": "Tile.terrain",
-        "why": "world geometry. The GPU compiles terrain into yield/passability tables and keeps no terrain id."
-      },
-      {
-        "path": "Tile.elevation",
-        "why": "world geometry (see Tile.terrain)."
-      },
-      {
         "path": "Tile.riverMask",
         "why": "world geometry, fixed at build."
       },
@@ -3525,6 +3531,10 @@
       {
         "path": "CityState.name",
         "why": "presentation."
+      },
+      {
+        "path": "CityState.specialistPref",
+        "why": "the H-1 importer's pins from a recorded game; no engine path writes a minor's."
       },
       {
         "path": "GameState.cityStateMax",

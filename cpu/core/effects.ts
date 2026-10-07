@@ -13,8 +13,8 @@ import { TECHS, type TechDef, type ResearchEffect } from '../data/techs';
 import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressPolicyBlocked, congressWildcardDelta } from './congress';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followersOf, unconvertedOf, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf } from './seats';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followedReligionOf, followersOf, unconvertedOf, type BeliefEffects, type BeliefDef } from '../data/religion';
+import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf, isCityStateSeat } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -2119,7 +2119,14 @@ export function withFollowerBelief(
  */
 export function followerReligionsForCity(base: Modifiers, city: City): readonly number[] {
   if (base.allFollowerBeliefs) return religionsPresent(city);
-  const one = city.followedReligion ?? -1;
+  // a city-state's city follows its pressure row's majority, which neither
+  // engine stores (`majorityReligionOf`); its follower belief pays it as a
+  // major's city (runs/h1_duelw1118 Armagh t61: two of three citizens follow
+  // the religion holding Feed the World, and its Shrine pays +3 Food and
+  // +2 Housing from then on)
+  const one = isCityStateSeat(city.seat)
+    ? followedReligionOf(city.religionPressure ?? [], city.population, unconvertedOf(city))
+    : city.followedReligion ?? -1;
   return one < 0 ? [] : [one];
 }
 

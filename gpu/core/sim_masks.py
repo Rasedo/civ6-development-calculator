@@ -3995,7 +3995,7 @@ class SimMasks:
                     # terrain list is the whole ground rule, on a water plot
                     # with no resource to insist on a different improvement.
                     _ok = (here_ok & _unl & (_rq == -1)
-                           & self.water.gather(1, tc) & ~self.tile_submerged.gather(1, tc)
+                           & self.water.gather(1, tc)
                            & self._imp_ground_ok(_k).gather(1, tc)
                            & self._imp_gov_ok(row, _k).gather(1, tc))
                 elif self._imp_ground[_k]:

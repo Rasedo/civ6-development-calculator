@@ -236,7 +236,7 @@ function eruptionReaches(t: Tile): boolean {
 /** May an eruption's soil row draw on this neighbour? One the eruption
  *  reaches (`eruptionReaches`), above the sea. `_soil_paintable` is the twin. */
 export function soilPaintable(t: Tile): boolean {
-  return eruptionReaches(t) && !isWater(t) && !t.submerged;
+  return eruptionReaches(t) && !isWater(t);
 }
 
 /** The plot becomes Volcanic Soil; a Lumber Mill goes with the Woods or
@@ -649,7 +649,7 @@ export function meteorCandidate(t: Tile): boolean {
 /** May fire row `row` start on this plot — a live plot of its feature above
  *  the sea? The same test is the spread's (`fireTurn`). */
 export function fireCandidate(t: Tile, row: number): boolean {
-  return t.feature === FIRE_START_FEATURE[row] && !t.submerged;
+  return t.feature === FIRE_START_FEATURE[row];
 }
 
 /** The plots under a live event, where no drought may start: every plot a

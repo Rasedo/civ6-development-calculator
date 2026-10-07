@@ -96,6 +96,11 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       rid: t.resource ? RESOURCE_IDS.indexOf(t.resource) : -1,
       terr: TERRAIN_IDS.indexOf(t.terrain),
       wok: BUILT_WONDER_LIST.reduce((m2, w, i) => m2 + (wonderStaticOk(w, t, map) ? wonderBit(i) : 0), 0),
+      // a lowland plot's `wok` once the sea makes it a Coast (`submergeTile`)
+      wks: t.lowland
+        ? BUILT_WONDER_LIST.reduce((m2, w, i) => m2 + (wonderStaticOk(w,
+          { ...t, terrain: 'COAST', elevation: 'FLAT', feature: null, resource: null }, map) ? wonderBit(i) : 0), 0)
+        : 0,
       pass: unitPassable(t) ? 1 : 0,
       wpass: isWater(t) && !isImpassable(t) ? 1 : 0,
       ocean: t.terrain === 'OCEAN' ? 1 : 0,

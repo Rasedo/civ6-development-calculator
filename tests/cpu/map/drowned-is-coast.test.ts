@@ -1,18 +1,16 @@
 /**
  * THE DROWNED GROUND IS COAST.
  *
- * SOURCED (the install's pedia, Sea Level Rise): submerged tiles "become
- * coastal water tiles". Both engines keep the ground's terrain, feature and
- * river edges UNDERNEATH on purpose, so every RING fact masks at the READ —
- * `ringTerrain` and `ringFeature` — and only a rule about what lies beneath
- * reads `tile.terrain` directly.
+ * The recorded game (runs/h1_duelw1122 t229): a submerged plot reads
+ * TERRAIN_COAST, no feature, a Coast's Food 1 Gold 1, and cities work it.
+ * `submergeTile` writes the plot as that Coast, so every rule reads the sea.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
-import {
-  hasFreshWater, isCoastalLand, isCoastalWater, isWater, ringFeature, ringTerrain,
-} from '../../../world/query';
-import { districtAdjacency } from '../../../cpu/core/yields';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
+import { hasFreshWater, isCoastalLand, isCoastalWater, isWater } from '../../../world/query';
+import { districtAdjacency, tileYields } from '../../../cpu/core/yields';
+import { submergeTile } from '../../../cpu/core/climate';
+import { cityYieldCtx } from '../../../cpu/core/city';
 import type { GameState } from '../../../cpu/core/types';
 import type { Tile } from '../../../world/types';
 
@@ -28,20 +26,27 @@ function scene(): GameState {
 
 const at = (s: GameState, c: number, r: number): Tile => tileAtCoords(s.map, c, r);
 
-describe('what a drowned tile presents to its neighbours', () => {
-  it('presents COAST and no feature, while keeping both underneath', () => {
+describe('a drowned plot', () => {
+  it('becomes a flat, featureless Coast', () => {
     const s = scene();
     const t = at(s, 10, 10);
     t.feature = 'WOODS';
-    expect(ringTerrain(t)).toBe('GRASSLAND');
-    expect(ringFeature(t)).toBe('WOODS');
-    t.submerged = true;
-    expect(ringTerrain(t)).toBe('COAST');
-    expect(ringFeature(t)).toBeNull();
-    // ...and the ground is still recorded, which is the point of the mask
-    expect(t.terrain).toBe('GRASSLAND');
-    expect(t.feature).toBe('WOODS');
+    t.elevation = 'HILLS';
+    submergeTile(s, t);
+    expect(t.submerged).toBe(true);
+    expect(t.terrain).toBe('COAST');
+    expect(t.elevation).toBe('FLAT');
+    expect(t.feature).toBeNull();
     expect(isWater(t)).toBe(true);
+  });
+
+  it("yields a Coast's Food and Gold", () => {
+    const s = scene();
+    const city = settleAt(s, at(s, 8, 10).index);
+    const t = at(s, 10, 10);
+    submergeTile(s, t);
+    const y = tileYields(cityYieldCtx(s, city), t);
+    expect([y.food, y.production, y.gold]).toEqual([1, 0, 1]);
   });
 });
 
@@ -51,24 +56,24 @@ describe('the ring facts read the sea', () => {
     const land = at(s, 10, 10);
     const sea = at(s, 11, 10);
     expect(isCoastalLand(s.map, land)).toBe(false);
-    sea.submerged = true;
+    submergeTile(s, sea);
     expect(isCoastalLand(s.map, land)).toBe(true);
   });
 
   it('is itself COASTAL WATER while it still touches land', () => {
     const s = scene();
     const sea = at(s, 10, 10);
-    sea.submerged = true;
+    submergeTile(s, sea);
     expect(isCoastalWater(s.map, sea)).toBe(true);
   });
 
-  it('stops being a LAKE or an OASIS for fresh water', () => {
+  it('stops being an OASIS for fresh water', () => {
     const s = scene();
     const land = at(s, 10, 10);
     const oasis = at(s, 11, 10);
     oasis.feature = 'OASIS';
     expect(hasFreshWater(s.map, land)).toBe(true);
-    oasis.submerged = true;
+    submergeTile(s, oasis);
     expect(hasFreshWater(s.map, land)).toBe(false);
   });
 
@@ -79,7 +84,7 @@ describe('the ring facts read the sea', () => {
     woods.feature = 'WOODS';
     const own = [{ source: 'WOODS' as const, amount: 2 }];
     expect(districtAdjacency(s.map, site, 'HOLY_SITE', [], own)).toBe(2);
-    woods.submerged = true;
+    submergeTile(s, woods);
     expect(districtAdjacency(s.map, site, 'HOLY_SITE', [], own)).toBe(0);
   });
 
@@ -90,7 +95,7 @@ describe('the ring facts read the sea', () => {
     cold.terrain = 'TUNDRA';
     const own = [{ source: 'TUNDRA' as const, amount: 1 }];
     expect(districtAdjacency(s.map, site, 'HOLY_SITE', [], own)).toBe(1);
-    cold.submerged = true;
+    submergeTile(s, cold);
     expect(districtAdjacency(s.map, site, 'HOLY_SITE', [], own)).toBe(0);
   });
 });

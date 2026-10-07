@@ -99,7 +99,8 @@ def main() -> int:
     s3 = fresh(rules, paths[0])
     start = int(s3._removable_at_start[b])
     assert start > 0, "this fixture carries clearable features"
-    assert float(s3._deforestation_level()[b]) == 0.0
+    # a minor founded on a removable feature cleared its centre after the stamp
+    assert float(s3._deforestation_level()[b]) < 0.1
     assert float(s3._defor_modifier()[b]) == -0.2, "0-9% cleared is the -20% band"
     s3._emit_carbon(row, torch.full((s3.B,), 1_000_000.0, dtype=torch.float64))
     assert abs(float(s3._world_carbon()[b]) - 800_000) < 1e-6
@@ -170,16 +171,17 @@ def main() -> int:
     _emit_points(s5b, row, 5)
     s5b._climate_turn()
     assert int(s5b.climate_idx[b]) == 3, "Phase IV is the first that submerges"
-    # CIV6 (Coastal Lowlands): the band is "lost forever" — open water for
-    # every rule that asks, and unusable besides.
+    # CIV6 (Coastal Lowlands): the band is "lost forever" — a flat,
+    # featureless Coast, worked like any Coast (runs/h1_duelw1122 t229).
     assert bool(s5b.tile_submerged[b, t0]) and bool(s5b.water[b, t0])
     assert bool(s5b.wpass[b, t0]) and not bool(s5b.passable[b, t0])
-    assert not bool(s5b.work_ok[b, t0]) and float(s5b.tile_yields[b, t0].sum()) == 0
+    assert int(s5b.terrain[b, t0]) == s5b._terr_coast and int(s5b.feat_id[b, t0]) == -1
+    assert bool(s5b.work_ok[b, t0]) and torch.equal(s5b.tile_yields[b, t0], s5b._coast_y6)
     assert not bool(s5b.settle_ok[b, t0]) and not bool(s5b.d_usable[b, t0])
     assert not bool(s5b.camp_ok[b, t0]) and not bool(s5b.coastal_land[b, t0])
     assert int(s5b.improvement[b, t0]) == -1 and not bool(s5b.road[b, t0])
     assert int(s5b.tile_lowland[b, t0]) == 0, "nothing left to price a barrier against"
-    assert int(s5b.wok[b, t0]) == 0, "and no built wonder may stand in the sea"
+    assert int(s5b.wok[b, t0]) == int(s5b._wok_sea[b, t0]), "its wonders are a Coast's"
     if wh0 != s5b._h_fresh:
         assert float(s5b.tile_wh[b, t0]) == s5b._h_none, (
             "the ground the sea took is no longer coastal LAND")
@@ -188,12 +190,12 @@ def main() -> int:
     assert not bool(s5b.tile_submerged[b, keep].any()), "band 2 goes at Phase VI"
     _emit_points(s5b, row, 2)
     s5b._climate_turn()
-    assert int(s5b.climate_idx[b]) == 5
+    # the drowned band's Woods count as cleared, so the band can move under
+    # the carbon already emitted and carry the world past Phase VI
+    assert int(s5b.climate_idx[b]) >= 5
     assert bool(s5b.tile_submerged[b, keep].all()), "and it does"
     # the drowned ground IS coastal water, and every LAND neighbour of
-    # it has just become coastal land. Both engines keep the terrain and the
-    # feature UNDERNEATH on purpose, so the adjacency sources mask at the READ
-    # rather than the write.
+    # it has just become coastal land.
     _nb = [int(x) for x in s5b.neigh[t0] if int(x) >= 0]
     _land_nb = [x for x in _nb if not bool(s5b.water[b, x])]
     assert _land_nb, "the scene's drowned tile touches no land — nothing to check"
@@ -204,15 +206,6 @@ def main() -> int:
             f"tile {_x} did not become coastal land when {t0} drowned")
         assert float(s5b.tile_wh[b, _x]) != s5b._h_none, (
             f"tile {_x} took no water housing from the new coast")
-    # the ground's own feature is KEPT and lends NOTHING: a source that names
-    # it counts the drowned tile among a neighbour's sources no longer.
-    _fid = int(s5b.feat_id[b, t0])
-    if _fid >= 0 and not bool(s5b.feat_stripped[b, t0]):
-        _src = next((i for i, f in enumerate(s5b._adj_src_feat) if f == _fid), -1)
-        if _src >= 0:
-            _seen = s5b._adj_src_count(_src)[b]
-            assert float(_seen[_land_nb[0]]) == 0.0 or int(s5b.feat_id[b, _land_nb[0]]) == _fid, (
-                f"the drowned tile still lends feature {_fid} to {_land_nb[0]}")
     # the Aqueduct's source is a DERIVED plane over a fact the sea can move.
     # A drowned oasis/lake/mountain stops sourcing its neighbours, and the
     # derivation is rebuilt rather than left as a stale bake.

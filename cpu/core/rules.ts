@@ -1,7 +1,7 @@
 
 import type { City, DistrictId, GameMap, GameState, ImprovementId, Tile } from './types';
 import { hexDistance, neighbors, neighborTile } from '../../world/hex';
-import { isWater, isImpassable, isMountain, isCoastalLand, isCoastalWater, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
+import { isWater, isImpassable, isMountain, isCoastalLand, isCoastalWater, hasRiver, naturalWonderAt } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
 import { riverReach } from './disasters';
@@ -389,7 +389,6 @@ export function validImprovementsIn(
     // resource under it to insist on a different improvement; each row's own
     // `terrains` list is the whole ground rule.
     const out: ImprovementId[] = [];
-    if (tile.submerged) return out;
     for (const def of Object.values(IMPROVEMENTS)) {
       if (!def.waterOnly || !unlocked(def.id)) continue;
       // a WATER row may be a civilization's own (the Polder)
@@ -461,7 +460,7 @@ export function validImprovementsIn(
     flat &&
     bareGround(tile) &&
     (tile.terrain === 'GRASSLAND' || tile.terrain === 'PLAINS' || tile.terrain === 'DESERT') &&
-    neighbors(opts.map, tile).some((n) => ringTerrain(n) === 'COAST') &&
+    neighbors(opts.map, tile).some((n) => n.terrain === 'COAST') &&
     tileAppeal(opts.map, tile, opts.camps, opts.gpAppeal) >= SEASIDE_RESORT_MIN_APPEAL
   ) {
     out.push('SEASIDE_RESORT');
@@ -655,7 +654,7 @@ export function canPlaceDistrictIn(
     const sourced =
       hasRiver(tile) ||
       // a drowned Lake or Oasis is SEA now, and the sea sources nothing
-      around.some((n) => ringTerrain(n) === 'LAKE' || ringFeature(n) === 'OASIS' || isMountain(n));
+      around.some((n) => n.terrain === 'LAKE' || n.feature === 'OASIS' || isMountain(n));
     if (!sourced) return no('Needs an adjacent river, lake, oasis or mountain.');
   }
   if (def.placement.notAdjacentToCityCenter) {

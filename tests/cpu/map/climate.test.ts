@@ -204,18 +204,19 @@ describe('the seven phases', () => {
     emitPoints(state, 5);
     climateTurn(state);
     expect(state.climateIdx).toBe(3);
-    // CIV6 (Coastal Lowlands): the band is "lost forever" — open water for
-    // every rule that asks, and unusable besides.
+    // CIV6 (Coastal Lowlands): the band is "lost forever" — a Coast now
     expect(front.submerged).toBe(true);
+    expect(front.terrain).toBe('COAST');
     expect(isWater(front)).toBe(true);
     expect(front.improvement).toBe(null);
     expect(front.road).toBe(false);
     expect(front.lowland).toBeUndefined();
     expect(unitPassable(front, hull)).toBe(true);
     expect(unitPassable(front, foot)).toBe(false);
-    // it yields nothing and no citizen may work it
+    // it yields a Coast's Food and Gold
     const ctx = bareCtx(state.map);
-    expect(Object.values(tileYields(ctx, front)).some((v) => v !== 0)).toBe(false);
+    const y = tileYields(ctx, front);
+    expect([y.food, y.production, y.gold]).toEqual([1, 0, 1]);
     // ...and the land unit caught on it went down with the ground, while the
     // hull beside it is simply afloat
     expect(state.units.includes(foot)).toBe(false);

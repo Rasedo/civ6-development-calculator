@@ -608,5 +608,6 @@ export function minorCity(cityState: CityState): City {
     powered: cityState.powered,
     religionPressure: cityState.religionPressure,
     unconvertedPressure: cityState.unconvertedPressure,
+    specialistPref: cityState.specialistPref,
   };
 }

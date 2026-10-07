@@ -1043,7 +1043,8 @@ _MUTABLE = [
     "park",  # NATIONAL PARK tiles
     # CIV6 (Coastal Lowlands): the sea takes ground, so every tile fact it
     # moves is state, not map generation (`_submerge`).
-    "tile_submerged", "water", "wpass", "passable", "work_ok", "settle_ok",
+    "tile_submerged", "terrain", "hills", "shallow_water",
+    "water", "wpass", "passable", "work_ok", "settle_ok",
     "d_usable", "d_usable0", "camp_ok", "coastal_land", "coastal_water", "_sr_c", "tile_wh",
     "tile_yields", "wok", "res_id", "res_cat", "res_priority", "lux_id",
     "lux_req", "res_imp", "tile_lowland",

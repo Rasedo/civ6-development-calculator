@@ -1090,6 +1090,13 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const from = handed.find((g) => g.owner !== u.owner && g.type === u.type && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
       // a city-state's unit handed to a major is a levy (`Unit.leviedFrom`)
       if (from && minors.has(from.owner) && !minors.has(u.owner)) h.levied.set(`${u.owner}:${u.id}`, from.owner);
+      // a levied unit upgraded is a new unit of the type it upgrades into,
+      // beside where it stood and as wounded: it stays levied (1118 China's
+      // levied Catapult, a Trebuchet from t87, still costs no upkeep)
+      const was = handed.find((g) => g.owner === u.owner && h.levied.has(`${g.owner}:${g.id}`)
+        && UNITS[engineRowOf(cat, 'unit', g.type) ?? '']?.upgradesTo === engineRowOf(cat, 'unit', u.type)
+        && num(g.damage) === num(u.damage) && hexDistance(shape, g.x, g.y, u.x, u.y) <= 3);
+      if (was) h.levied.set(`${u.owner}:${u.id}`, h.levied.get(`${was.owner}:${was.id}`)!);
       const cs = from || bool(u.embarked) ? 0 : made(u.type, Math.max(0, num(u.formation)));
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
@@ -1685,9 +1692,11 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     const kind = strip(inherits.get(String(p.leader)) ?? '', 'LEADER_MINOR_CIV_').toLowerCase();
     if (!CITY_STATE_TYPES.includes(kind as CityStateType)) gap(ctx, 'city-state-type', String(p.leader));
     // the engine names a city-state as its suzerain-bonus row does
-    // ('Hong Kong' for CIVILIZATION_HONG_KONG), which is what every bonus reads
+    // ('Hong Kong' for CIVILIZATION_HONG_KONG, 'Anshan' for the row naming
+    // CIVILIZATION_BABYLON), which is what every bonus reads
     const civName = strip(String(p.civ), 'CIVILIZATION_');
-    const name = Object.keys(CITY_STATE_SUZERAIN_BONUS).find((n) => n.toUpperCase().replace(/[ -]/g, '_') === civName) ?? civName;
+    const name = Object.entries(CITY_STATE_SUZERAIN_BONUS).find(([n, d]) =>
+      (d.civ ?? `CIVILIZATION_${n.toUpperCase().replace(/[ -]/g, '_')}`) === String(p.civ))?.[0] ?? civName;
     const cs: CityState = {
       ...emptySeat(seat), id: k, name,
       type: (CITY_STATE_TYPES.includes(kind as CityStateType) ? kind : 'trade') as CityStateType,
@@ -1892,6 +1901,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       minor.districts = districts.filter((d) => d.type !== 'CITY_CENTER');
       minor.religionPressure = religionPressure;
       minor.unconvertedPressure = unconvertedPressure;
+      minor.specialistPref = pins;
       // the district project heading the record's queue
       const head = c.queue?.[0];
       const project = head && typeof head === 'object' && head.ProjectType !== undefined

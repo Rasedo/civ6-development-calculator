@@ -3,7 +3,7 @@ import { addYields, emptyYields, type GameState, type City, type Tile, type Yiel
 import { citiesOf, civOf, seatOf, tileBelongsTo, tileSeat, civVariantOf, hiddenResourcesFor } from './seats';
 import { neighbors, hexDistance } from '../../world/hex';
 import type { FeatureId, GameMap } from '../../world/types';
-import { isWater, isMountain, hasRiver, naturalWonderAt, ringFeature, ringTerrain } from '../../world/query';
+import { isWater, isMountain, hasRiver, naturalWonderAt } from '../../world/query';
 import { getModifiers, type YieldCtx, type Modifiers } from './effects';
 import { TERRAINS, HILLS_YIELDS } from '../../world/terrains';
 import { FEATURES } from '../../world/features';
@@ -66,9 +66,7 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
         (!!r.terrains && r.terrains.includes(nb.terrain)) ||
         (!!r.features && nb.feature !== null && r.features.includes(nb.feature)) ||
         // CIV6 (Fishery_SeaResourceAdjacency, AdjacentSeaResource): a
-        // neighbour that is WATER and carries a resource. `ringTerrain`
-        // rather than the ground beneath, so a drowned tile counts as the
-        // sea it now is.
+        // neighbour that is WATER and carries a resource.
         (!!r.seaResource && nb.resource !== null && isWater(nb));
       if (hit) n += 1;
     }
@@ -82,8 +80,6 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
 export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const out = emptyYields();
 
-  // a tile the sea has taken yields nothing, whatever is recorded under it
-  if (tile.submerged) return out;
   const nw = naturalWonderAt(tile);
   if (nw) {
     addYields(out, FEATURES[nw]?.yields ?? {});
@@ -268,12 +264,8 @@ const liveDistrict = (n: Tile): boolean => n.districtComplete && !n.districtPill
 /** does `neighbor` answer `rule` for a district owned by seat `owner`;
  *  `hidden` the resources that seat cannot see */
 function matchesAdjacency(rule: AdjacencyRule, neighbor: Tile, owner: number, hidden?: ReadonlySet<string>): boolean {
-  // CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water tile",
-  // so it lends the SEA's sources and none of the ground's — the same reason
-  // `submergeTile` drops the resource rather than leaving a drowned Iron seam
-  // lending a neighbouring district an adjacency the ground never had.
-  const terrain = ringTerrain(neighbor);
-  const feature = ringFeature(neighbor);
+  const terrain = neighbor.terrain;
+  const feature = neighbor.feature;
   // the resource as the owner sees it (GameCore 0x50a690): an unrevealed
   // strategic is no resource to its rows
   const res = neighbor.resource !== null && !hidden?.has(neighbor.resource) ? neighbor.resource : null;

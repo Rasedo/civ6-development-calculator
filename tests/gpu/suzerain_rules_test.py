@@ -136,8 +136,9 @@ def main() -> None:
     cul_0, gold_0 = float(inc0[0, col, 4]), float(inc0[0, col, 2])
     assert abs((cul_s - cul_0) - sim._suz_route_cul * 1) < 1e-9, (cul_s, cul_0)
     assert abs((gold_s - gold_0) - sim._suz_route_gold * 1) < 1e-9, (gold_s, gold_0)
-    # SOVEREIGNTY outcome A on this minor's TYPE doubles what the MINOR pays
-    # the route, never Kumasi's own term (9170 t240: the GPU paid 12 for 6)
+    # SOVEREIGNTY outcome A on this minor's TYPE pays the minor's own row to
+    # routes sent to it at the resolution's factor (`_cs_route_sov6`), never
+    # scaling its district rows or Kumasi's own term
     sov = sim._congress_at.get("SOVEREIGNTY", -1)
     if sov >= 0:
         saved_ca = sim.congress_active.clone()
@@ -149,7 +150,10 @@ def main() -> None:
         assert inc2 is not None and inc3 is not None
         assert abs((float(inc2[0, col, 4]) - float(inc3[0, col, 4])) - sim._suz_route_cul) < 1e-9, "Sovereignty scaled Kumasi's culture"
         assert abs((float(inc2[0, col, 2]) - float(inc3[0, col, 2])) - sim._suz_route_gold) < 1e-9, "Sovereignty scaled Kumasi's gold"
-        assert float(inc3[0, col, 2]) > gold_0, "the minor's own route gold was not doubled"
+        sov6 = sim._cs_route_sov6()[0, 0]
+        assert float(sov6.sum()) > 0.0, "Sovereignty paid the minor's row nothing"
+        assert all(abs(float(inc3[0, col, c]) - float(inc0[0, col, c]) - float(sov6[c])) < 1e-9 for c in range(6)), \
+            "Sovereignty paid more than the minor's own row"
         sim.congress_active.copy_(saved_ca)
         sim._eff_version += 1
     sim.seat_routes[0, 0, 0, :] = -1

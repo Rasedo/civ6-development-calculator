@@ -229,6 +229,9 @@ class SimPhase:
 
         gov = self._seat_governor_seats(row)
         sci_turn = self._seat_economy(row, active, cact_all, cact_any_l, gov)
+        # its religion, if it founded one, spreads with its faith, before its
+        # cities (`spreadReligiousPressure`'s place in `seatPhase`)
+        self._spread_religious_pressure(row, active)
 
         # THE CITIES, after the economy (`seatPhase`'s walk). CIV6: each city
         # runs its production, then grows or starves on the city as it stands
@@ -264,8 +267,6 @@ class SimPhase:
             self._city_strikes(row, jc, cact)
 
         self._seat_loyalty_flips(row, flip)
-        # its religion, if it founded one, spreads on its own turn
-        self._spread_religious_pressure(row, active)
         self._seat_war_peace_tail(row, active)
         # THE SEAT'S ACTIONS, after its processing and before the next
         # player's turn (tools/civ6lab/turn_order_civ6.md, A11): its diplomacy,

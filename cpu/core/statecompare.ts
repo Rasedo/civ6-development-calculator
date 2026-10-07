@@ -52,6 +52,7 @@ import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
 import { FEATURES } from '../../world/features';
+import { TERRAINS } from '../../world/terrains';
 import { routeOriginCenter } from './trade';
 import { GP_CITY_PERM, GP_PERM, GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { laserSpeed } from './yields';
@@ -60,6 +61,8 @@ import { TRADE_COURSE_MAX, emptyStockpile } from '../data/constants';
 
 // the exported feature index (FEAT_IDS order = the catalog's own)
 const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
+// the exported terrain index (TERRAIN_IDS order = the catalog's own)
+const TERRAIN_IDX_SC = new Map(Object.keys(TERRAINS).map((k, i) => [k, i]));
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
 import { envoysOf } from './cityStates';
@@ -900,6 +903,7 @@ const TILE: Record<string, Extractor> = {
   fireStart: overTiles((t) => t.fireStart ?? -1),
   fireSeq: overTiles((t) => t.fireSeq ?? -1),
   featureId: overTiles((t) => (t.feature === null ? -1 : (FEAT_IDX_SC.get(t.feature) ?? -1))),
+  terrainId: overTiles((t) => (TERRAIN_IDX_SC.get(t.terrain) ?? -1) * 2 + (t.elevation === 'HILLS' ? 1 : 0)),
   lowland: overTiles((t) => t.lowland ?? 0),
   flooded: overTiles((t) => (t.flooded ? 1 : 0)),
   railroad: overTiles((t) => (t.railroad ? 1 : 0)),

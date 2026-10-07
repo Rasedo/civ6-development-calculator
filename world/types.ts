@@ -267,11 +267,8 @@ export interface Tile {
    *  bonus, but is still workable and can be repaired behind a Flood
    *  Barrier. */
   flooded?: boolean;
-  /** CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER. It is open
-   *  water for every rule that asks — a hull sails it, no land unit stands on
-   *  it, the city beside it turns coastal — and it is unusable besides: it
-   *  yields nothing and no citizen may work it. The map's terrain, feature,
-   *  resource and river edges stay recorded underneath, unread. */
+  /** CIV6 (Coastal Lowlands): the sea has taken this tile FOREVER; it is a
+   *  Coast now (`submergeTile`), and no Flood Barrier repairs it. */
   submerged?: boolean;
   /** CIV6 (Nuclear weapons): turns of radioactive fallout still on this tile.
    *  A blast writes the device's own count; a build charge clears it. */

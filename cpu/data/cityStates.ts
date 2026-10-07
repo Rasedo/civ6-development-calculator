@@ -212,6 +212,9 @@ interface SuzerainBonusDef {
   bonus: string;
   /** the modeled RULE — every catalog row names one. */
   suz: SuzEffect;
+  /** the install's CivilizationType where it is not the name's (Anshan's
+   *  LOC_CIVILIZATION_BABYLON_NAME): what a recorded game's minor carries */
+  civ?: string;
   note?: string;
 }
 
@@ -233,7 +236,7 @@ const SUZ_SRC: SrcMap = {
 const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   Geneva: { name: 'Geneva', type: 'scientific', bonus: 'Your cities earn +15% bonus Science output when you are not at war with any civilization.', suz: 'sciencePeace' },
   Bologna: { name: 'Bologna', type: 'scientific', bonus: 'Your districts with a building provide +1 Great Person point of their type (Writer, Artist, and Musician for Theater Square districts with a building).', suz: 'districtGpp' },
-  Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience' },
+  Anshan: { name: 'Anshan', type: 'scientific', bonus: '+2 Science from each Great Work of Writing. +1 Science from each Relic and Artifact.', suz: 'worksScience', civ: 'CIVILIZATION_BABYLON' },
   Nalanda: { name: 'Nalanda', type: 'scientific', bonus: 'Your Builders can now make Mahavihara improvements. When a player constructs their first Mahavihara receive a random technology.', suz: 'suzImprovement' },
   Vilnius: { name: 'Vilnius', type: 'cultural', bonus: 'When you enter a new era, earn 1 random Inspiration from that era.', suz: 'eraInspiration' },
   'Nan Madol': { name: 'Nan Madol', type: 'cultural', bonus: 'Your districts on or next to Coast or Lake tiles provide +2 Culture.', suz: 'waterDistrictCulture' },
@@ -324,6 +327,17 @@ const TRAIT: Record<CityStateType, string> = {
   scientific: 'SCIENTIFIC', cultural: 'CULTURAL', trade: 'TRADE',
   industrial: 'INDUSTRIAL', militaristic: 'MILITARISTIC', religious: 'RELIGIOUS',
 };
+
+/** CIV6 (Leaders.xml, each type's MINOR_CIV_<TYPE>_SEND_TRADE_ROUTE_BONUS,
+ *  MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS): what a minor's
+ *  city adds of its type's yield (`CITY_STATE_TYPE_YIELD`) to a route sent
+ *  to it. The DLL's route yield (Trade_Manager 0x54c6c0) pays a minor
+ *  destination's row only under Sovereignty outcome A naming its type, times
+ *  the resolution's factor (`sovereigntyRouteYields`); otherwise it is
+ *  unpaid. */
+export const CITY_STATE_ROUTE_TO_OTHERS = Object.fromEntries(CITY_STATE_TYPES.map((t) => [t,
+  srcConst(`cityState.routeToOthers.${t}`, t === 'trade' ? 2 : 1,
+    xml('ModifierArguments', `ModifierId=MINOR_CIV_${TRAIT[t]}_SEND_TRADE_ROUTE_BONUS&Name=Amount`, 'Value'))])) as Record<CityStateType, number>;
 
 function rungSrc(type: CityStateType, tier: InfluenceTier, attach: string, mod: string): Record<string, Src> {
   return {

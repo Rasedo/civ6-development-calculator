@@ -242,10 +242,10 @@ def main() -> None:
         stand("TREATY_ORGANIZATION", 1, ct)
         assert float(sim2._congress_suz_favor_weight()[0, 0]) == 0.0
         stand("SOVEREIGNTY", 0, ct)
-        assert float(sim2._congress_cs_route_mult()[0, 0]) == sim2._c_plus100
+        assert float(sim2._cs_route_sov6()[0, 0].sum()) > 0.0
         assert not bool(sim2._congress_suz_bonus_blocked()[0, 0])
         stand("SOVEREIGNTY", 1, ct)
-        assert float(sim2._congress_cs_route_mult()[0, 0]) == 1.0
+        assert float(sim2._cs_route_sov6()[0, 0].sum()) == 0.0
         assert bool(sim2._congress_suz_bonus_blocked()[0, 0])
 
     if sim2._proj_rows:

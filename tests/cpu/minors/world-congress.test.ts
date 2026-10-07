@@ -6,7 +6,7 @@ import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
 import { cityBorderGrowth, seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
 import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION, UDT_DISTRICTS } from '../../../cpu/data/seats';
-import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteMult, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
+import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteFactor, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
 import { cityTradeYields, congressCancelBannedIntl, routeOriginYields } from '../../../cpu/core/trade';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
@@ -358,15 +358,15 @@ describe('world congress: the wider slate', () => {
     ];
     expect(congressSuzFavorMult(state, 2)).toBe(2);
     expect(congressSuzFavorMult(state, 1)).toBe(1);
-    expect(congressCsRouteMult(state, 3)).toBe(2);
-    expect(congressCsRouteMult(state, 2)).toBe(1);
+    expect(congressCsRouteFactor(state, 3)).toBe(2);
+    expect(congressCsRouteFactor(state, 2)).toBe(0);
     expect(congressSuzBonusBlocked(state, 3)).toBe(false);
     state.congress = [
       { res: CONGRESS_TREATY_ORG, outcome: 1, target: 2 },
       { res: CONGRESS_SOVEREIGNTY, outcome: 1, target: 3 },
     ];
     expect(congressSuzFavorMult(state, 2)).toBe(0);
-    expect(congressCsRouteMult(state, 3)).toBe(1);
+    expect(congressCsRouteFactor(state, 3)).toBe(0);
     expect(congressSuzBonusBlocked(state, 3)).toBe(true);
   });
 

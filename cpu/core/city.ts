@@ -167,7 +167,6 @@ export function workableTiles(state: GameState, city: City): Tile[] {
       t.index !== city.centerIndex &&
       !t.district &&
       !t.builtWonder &&
-      !t.submerged &&
       // a CONTAMINATED tile is still worked: measured live (lab 3 part two —
       // every worked tile of a city contaminated by hand, the citizens stayed,
       // the yields and the food surplus were unchanged); fallout hurts the

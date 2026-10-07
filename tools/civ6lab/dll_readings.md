@@ -815,10 +815,16 @@ fraction bits (every amount is written `<< 8`).
   leftover citizens go one at a time to the entry with the largest
   remainder, a tie to the LATER entry (`jl` at 0x1f48aa) — the engines'
   tie order (higher pressure, lower id) is the lab's fit and unread here.
-- Fit: the harness spreads each founder in seat order on the record's
-  state, each major's recorded growth (`gainPopulationPressure`) before
-  its spread and its route changes after: 1108 step.pressure 1,415 / 307
-  → 1,720 / 2; six duels 7,172 / 2,973 → 8,648 / 1,516.
+- The spread runs inside PlayerReligion's turn, after its faith (the
+  turn order's A6), so before the player's cities process (A8): a city the
+  spread converts gives a citizen it grows that turn to the new majority
+  (runs/h1_duelw1117 t148 Guangzhou and t190 Changsha +50 to China's
+  religion, and each then presses its neighbours +2 the same turn). Both
+  engines spread at the seat block's top, before the city walk; the
+  harness spreads each founder in seat order on the record's state, each
+  major's recorded growth (`gainPopulationPressure`) after its spread and
+  its route changes after that: step.pressure over twenty-two duels
+  1,741 → 1,574 gap-free failures, no duel worse.
 
 ## C-94: trade posts and cultural dominance — READ
 
@@ -1718,6 +1724,33 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   when not 100, then the city's percent (+0x1b20) when positive. The flag
   is 0x538a60's fifth argument, unread: which yields it leaves out is the
   open question behind 1117 t222 (docs/AUDIT.md C-94).
+
+## C-94: Sovereignty's route yield — READ
+
+- EFFECT_ADJUST_PLAYER_TRADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (the
+  factory 0xc27d10, the effect's vtable 0xdecb08: apply 0xb468d0 / remove
+  0xb47620) adds its Amount (WC_RES_MODIFY_CITY_STATE_TRADE_YIELD 100) into
+  Player::Congress's int vector +0x4b8 indexed by MinorCivBonusType.
+- Trade_Manager 0x54c6c0, per yield of a route: X = the DESTINATION city's
+  route-to-others row of that yield (city +0x1ee0, its vector +0x28 read
+  by 0x1f9650 — MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS
+  writes it). A major's city adds X as it stands. A minor's city with a
+  bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100 where a is the
+  ORIGIN player's Congress entry for that type (0x37b7a0 -> 0x552d40,
+  shifted to 24.8), and nothing when a <= 0 or X <= 0: a minor's row is paid
+  only under Sovereignty A naming its type, and then doubled. Every minor
+  trait carries one such row on its type's yield (Leaders.xml
+  MINOR_CIV_<TYPE>_SEND_TRADE_ROUTE_BONUS: 1, Trade's Gold 2); the
+  district rows are untouched (`sovereigntyRouteYields` /
+  `_cs_route_sov6`, `CITY_STATE_ROUTE_TO_OTHERS`).
+- Recorded cases: 1117 Xi'an -> Caguana (Harbor, Theater) Culture 1 -> 3
+  under Cultural t62-81 and t102-121, Gold 7 throughout where the
+  doubled rows paid 13; Xi'an -> Antananarivo (centre only) Culture 0 -> 2;
+  1122 Xi'an -> Babylon Science 1 -> 3 t64-81, Gold 5.18 where the doubled
+  rows paid 10.36; 1114 Xi'an -> Vilnius Culture 8 -> 10 t102-104.
+- A route to a minor is international to Reform the Coinage's Golden face
+  (MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_SPECIALTY_DISTRICT_FOR_INTERNATIONAL):
+  1117 Xi'an -> Caguana +6 Gold t108-120 under COMMEMORATION_ECONOMIC.
 
 ## DLL rules the engines contradict
 

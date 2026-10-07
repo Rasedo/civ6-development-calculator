@@ -188,17 +188,14 @@ function floodLowland(tile: Tile): void {
 
 /**
  * CIV6 (Coastal Lowlands): the phases that name a band take it "forever" —
- * the tile becomes open water, unusable besides: it yields nothing and no
- * citizen may work it, while a hull sails over it and the city beside it
- * turns coastal. What stood on the ground goes with it — the improvement, the
- * district and its city's record of it, and any LAND unit caught there (a
- * hull is simply afloat now, and so is a chassis water is ground to). A CITY
- * CENTRE is never taken: no sea destroys a city in this game.
- *
- * MODEL: the map's terrain, feature, resource and river edges stay recorded
- * under the water, unread — the source publishes nothing about what a drowned
- * Woods lends its neighbours, and leaving the record still is the reading both
- * engines can hold identically.
+ * the plot becomes a flat, featureless COAST plot: a Coast's yields, worked
+ * like any Coast, a hull sails over it and the city beside it turns coastal
+ * (runs/h1_duelw1122 t229: 356 drowned plots read TERRAIN_COAST with Food 1
+ * Gold 1, worked plots among them). What stood on the ground goes with it —
+ * the improvement, the district and its city's record of it, the resource,
+ * and any LAND unit caught there (a hull is simply afloat now, and so is a
+ * chassis water is ground to). A CITY CENTRE is never taken: no sea destroys
+ * a city in this game. The river edges stay as recorded.
  */
 export function submergeTile(state: GameState, tile: Tile): void {
   if (isWater(tile)) return;
@@ -214,6 +211,9 @@ export function submergeTile(state: GameState, tile: Tile): void {
     if (city) city.districts = city.districts.filter((d) => d.tileIndex !== tile.index);
   }
   tile.submerged = true;
+  tile.terrain = 'COAST';
+  tile.elevation = 'FLAT';
+  tile.feature = null;
   // the resource goes with the ground: a drowned Iron seam is not a SEA
   // resource, and leaving it would lend a neighbouring district an
   // adjacency the ground never had.

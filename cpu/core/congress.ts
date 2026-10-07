@@ -712,11 +712,14 @@ export function congressSuzFavorMult(state: GameState, csType: number): number {
   return e.outcome === 0 ? CONGRESS_PLUS_100 : 0;
 }
 
-/** Sovereignty outcome A: the multiplier on the CITY-STATE's own yield to a
- *  route sent to a minor of this type. */
-export function congressCsRouteMult(state: GameState, csType: number): number {
+/** Sovereignty outcome A (WC_RES_MODIFY_CITY_STATE_TRADE_YIELD, Amount 100,
+ *  on every major): the factor (100 + Amount) / 100 on what a minor of this
+ *  type pays a route sent to it of its type's yield
+ *  (`sovereigntyRouteYields`); 0 where the resolution does not name the
+ *  type — that row is then unpaid. */
+export function congressCsRouteFactor(state: GameState, csType: number): number {
   const e = congressEffect(state, CONGRESS_SOVEREIGNTY);
-  return e && e.outcome === 0 && e.target === csType ? CONGRESS_PLUS_100 : 1;
+  return e && e.outcome === 0 && e.target === csType ? CONGRESS_PLUS_100 : 0;
 }
 
 /** Sovereignty outcome B: a minor of this type provides no suzerain bonus. */

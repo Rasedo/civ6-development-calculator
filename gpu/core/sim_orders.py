@@ -1114,7 +1114,6 @@ class SimOrders:
                             _valid = (
                                 _unl & (_rq == -1)
                                 & self.water.gather(1, hc.unsqueeze(1)).squeeze(1)
-                                & ~self.tile_submerged.gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & self._imp_ground_ok(_k).gather(1, hc.unsqueeze(1)).squeeze(1)
                                 & self._imp_gov_ok(row, _k).gather(1, hc.unsqueeze(1)).squeeze(1)
                             )

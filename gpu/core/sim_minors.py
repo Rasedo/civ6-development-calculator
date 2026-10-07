@@ -121,7 +121,6 @@ class SimMinors:
         dseat = torch.full((B,), -1, dtype=torch.long, device=dev)
         dcity = torch.full((B,), -1, dtype=torch.long, device=dev)
         dct = torch.full((B,), -1, dtype=torch.long, device=dev)
-        mult = self._congress_cs_route_mult()  # [B, S]
         per_cs = self._cs_route_y6().sum(dim=2) if S > 0 else None  # [B, S]
         for s2 in range(S):
             if s2 == s:
@@ -129,7 +128,7 @@ class SimMinors:
             ctr = self.citystate_center[:, s2].clamp(min=0)
             has = (act & (rr[:, :, 1] == -(2 + s2))).any(dim=1)
             ok = (self.citystate_alive[:, s2] & ~has & reach.gather(1, ctr.unsqueeze(1)).squeeze(1))
-            key = per_cs[:, s2] * mult[:, s2].double()
+            key = per_cs[:, s2]
             take = ok & (~found | (key > best))
             best = torch.where(take, key, best)
             found = found | take
@@ -214,8 +213,8 @@ class SimMinors:
         """[B, K, 6] f64 — what each of minor `s`'s routes pays its city
         (`minorRouteOriginYields`): the international column of
         `District_TradeRouteYields` over the destination city's completed
-        districts plus the centre row (a city-state's under Sovereignty's
-        multiplier, `_cs_route_y6`), the path term, and its own Trading Post
+        districts plus the centre row (`_cs_route_y6`; a minor sender holds
+        no Sovereignty factor), the path term, and its own Trading Post
         at the destination (`_route_post_gold`). A destination gone pays
         nothing. None with no route."""
         row = self._CITY_MINOR0 + s
@@ -233,7 +232,7 @@ class SimMinors:
             raw = -rr[:, :, 1] - 2
             css = raw.clamp(min=0, max=S - 1)
             ok_c = act & (rr[:, :, 1] <= -2) & (raw < S) & self.citystate_alive[:, :S].gather(1, css)
-            m = self._congress_cs_route_mult().gather(1, css).double() * ok_c.double()  # [B, K]
+            m = ok_c.double()  # [B, K]
             cs6 = self._cs_route_y6().gather(1, css.unsqueeze(2).expand(-1, -1, 6)) * m.unsqueeze(2)
             rk = rk + cs6
             # D is every Gold the destination pays the route

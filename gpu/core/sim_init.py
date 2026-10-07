@@ -344,6 +344,12 @@ class SimInit:
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] the type's own district
+        # each type's row to routes sent to it (`CITY_STATE_ROUTE_TO_OTHERS`)
+        # on its type's yield column, [T, 6] -> [B, S, 6]
+        _rto = torch.zeros(len(citystate_yidx), 6, dtype=torch.float64, device=device)
+        for _t, (_yi, _a) in enumerate(zip(citystate_yidx, rules.citystate["routeToOthers"])):
+            _rto[_t, _yi] = float(_a)
+        self._citystate_route_to6 = _rto[self.citystate_type.clamp(min=0)]
         # the queue kinds a production type's ladder pays toward
         # (`CITY_STATE_ITEM_PROD`); every other type pays its own yield
         _cst = self.citystate_type.clamp(min=0)
@@ -856,6 +862,10 @@ class SimInit:
         self._coast_plot_terr = [int(x) for x in _er2["coastPlotTerrains"]]
         # the Lake terrain index (a wonder's per-Lake-tile amenity)
         self._terr_lake = int(_er2["lakeTerrain"])
+        # the Coast a drowned plot becomes (`_submerge`)
+        self._terr_coast = int(_er2["coastTerrain"])
+        self._coast_y6 = torch.tensor([float(x) for x in _er2["coastYields"]], dtype=dtype, device=device)
+        self._coast_appeal = int(_er2["coastAppeal"])
         self._loyalty_max = float(rules.seats["loyaltyMax"])
         self._special_cost = float(_er2["specialSessionCost"])
         self._special_gap = int(_er2["specialSessionGap"])
@@ -1573,6 +1583,8 @@ class SimInit:
         self.res_id = torch.tensor([[t.get("rid", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.terrain =torch.tensor([[t["terr"] for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.wok = torch.tensor([[t.get("wok", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
+        # a lowland plot's `wok` once the sea makes it a Coast (`_submerge`)
+        self._wok_sea = torch.tensor([[t.get("wks", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         if self._wond_n:
             # the install's RegionalRange per wonder, 0 for none: a regional
             # wonder's `cy` and amenities reach every same-seat city centre

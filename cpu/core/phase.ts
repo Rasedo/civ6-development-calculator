@@ -2998,6 +2998,12 @@ export function seatPhase(state: GameState): void {
       }
     }
 
+    // its religion, if it founded one, spreads with its faith, before its
+    // cities (PlayerReligion 0x4967f0: the faith, then the spread 0x498570;
+    // runs/h1_duelw1117 t148: a city China's spread converts gives its new
+    // citizen to China's religion)
+    spreadReligiousPressure(state, actor.seat);
+
     // THE CITIES, after the economy. CIV6: each city runs its production (the
     // completion, a Settler's citizen), then grows or starves on the city as
     // it stands after that completion, then claims its border tile, then
@@ -3201,7 +3207,6 @@ export function seatPhase(state: GameState): void {
     }
 
     for (const civCity of civCityDefectors) flipCity(state, civCity);
-    spreadReligiousPressure(state, actor.seat);
 
     const anyWar = atWarWithAny(state, actor.seat);
     for (const foe of warsOf(state, actor.seat)) {

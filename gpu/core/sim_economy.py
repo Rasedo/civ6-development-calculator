@@ -1284,17 +1284,12 @@ class SimEconomy:
 
     def _submerge(self, take: torch.Tensor) -> None:
         """CIV6 (Coastal Lowlands): the sea takes a band "forever"
-        (`submergeTile`). The tile becomes open water and unusable besides —
-        it yields nothing and no citizen may work it — and what stood on the
+        (`submergeTile`). The plot becomes a flat, featureless COAST plot —
+        a Coast's yields, worked like any Coast — and what stood on the
         ground goes with it: the improvement, the district and its city's
         record of it, the resource, and any LAND unit caught there. A hull is
-        simply afloat now, and so is a chassis water is ground to.
-
-        MODEL: the terrain, the feature and the river edges stay recorded
-        under the water, unread. Every ring fact the exporter derives reads
-        TERRAIN — `isCoastalLand`, the Seaside Resort's coast, fresh water,
-        the Aqueduct's source — so the ONE neighbour answer the sea moves is
-        `isCoastalWater`, which asks `isLand`."""
+        simply afloat now, and so is a chassis water is ground to. The river
+        edges stay as recorded."""
         if not bool(take.count_nonzero()):
             return
         ty = self.unit_type.clamp(min=0, max=self.NU - 1)
@@ -1320,10 +1315,13 @@ class SimEconomy:
         self.wpass |= take & self.passable
         self.water |= take
         self.tile_submerged |= take
-        for _p in ("passable", "work_ok", "settle_ok", "d_usable", "d_usable0", "camp_ok",
-                   "coastal_land", "coastal_water", "_sr_c", "district_complete",
+        self.terrain[take] = self._terr_coast
+        self.shallow_water |= take
+        self.work_ok |= take
+        for _p in ("passable", "settle_ok", "d_usable", "d_usable0", "camp_ok",
+                   "coastal_land", "coastal_water", "_sr_c", "district_complete", "hills",
                    "district_pillaged", "built_wonder_complete", "road", "railroad",
-                   "pillaged", "tile_flooded", "antiquity", "tile_locked"):
+                   "pillaged", "tile_flooded", "antiquity", "tile_locked", "feat_stripped"):
             getattr(self, _p)[take] = False
         for _p, _v in (("improvement", -1), ("district", -1), ("built_wonder", -1),
                        ("res_id", -1), ("res_cat", 0), ("res_priority", 0),
@@ -1331,9 +1329,11 @@ class SimEconomy:
                        ("tile_lowland", 0), ("encamp_hp", 0), ("encamp_outer_hp", 0),
                        ("park", -1), ("tile_air_bonus", 0), ("tile_gp_perm", 0), ("fertility", 0),
                        ("fertility_prod", 0), ("fertility_sci", 0), ("fertility_cul", 0),
-                       ("drought", 0), ("wok", 0)):
+                       ("drought", 0), ("feat_id", -1), ("appeal_feat", 0),
+                       ("appeal_base", self._coast_appeal)):
             getattr(self, _p)[take] = _v
-        self.tile_yields[take] = 0
+        self.tile_yields[take] = self._coast_y6.to(self.tile_yields.dtype)
+        self.wok.copy_(torch.where(take, self._wok_sea, self.wok))
         # water housing is fresh-water first, then coastal — and the ground the
         # sea took is no longer coastal LAND.
         self.tile_wh[take & (self.tile_wh != self._h_fresh)] = self._h_none
@@ -4316,17 +4316,12 @@ class SimEconomy:
         ent = self._adj_src_cache.get(src)
         if ent is not None and ent[1] == (fid, tid) and simbase.stamp_holds(ent[0], planes):
             return ent[2]
-        # CIV6 (Sea Level Rise): a submerged tile "becomes a coastal water
-        # tile", so it lends the SEA's sources and none of the ground's.
-        # Both engines keep the feature and terrain UNDERNEATH on purpose,
-        # so the mask is here at the READ, where `ringTerrain` /
-        # `ringFeature` put it on TS.
         if fid >= 0:
-            on = (self.feat_id == fid) & ~self.feat_stripped & ~self.tile_submerged
+            on = (self.feat_id == fid) & ~self.feat_stripped
         elif tid >= 0:
             # a TERRAIN source is its flat and hills rows: the mountain of
             # that terrain answers neither
-            on = (self.terrain == tid).expand(self.B, self.T) & ~self.tile_mountain & ~self.tile_submerged
+            on = (self.terrain == tid) & ~self.tile_mountain
         else:
             on = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         nb = self.neigh
@@ -5358,10 +5353,13 @@ class SimEconomy:
                 _sc = (_gs * 100).round().long()                                  # [B, 8]
                 _f = _sc.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)
                 scl = scl * _f // 100
+        # the scaling, the Heritage Organization's +100% and a themed holder's
+        # bonus are percents on the base, SUMMED (`greatWorkTourism`); the
+        # resolution's outcome B silences the type
         if km is not None:
-            base = base * km.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)  # by object type
-        # the scaling and a themed holder's bonus are percents on the base,
-        # SUMMED (`greatWorkTourism`)
+            _k = km.gather(1, oc.reshape(self.B, -1)).reshape_as(oc)  # by object type
+            base = base * (_k > 0).long()
+            scl = scl + (_k - 1).clamp(min=0) * 100
         return (base * (scl + (self._gw_slot_mult(row) - 1) * 100) // 100).sum(dim=2)
 
     def _gw_tourism_relic(self, row: int) -> torch.Tensor:
@@ -5372,8 +5370,9 @@ class SimEconomy:
         rel = obj == 7
         if not bool(rel.count_nonzero()):
             return torch.zeros(self.B, self.RC, dtype=torch.long, device=self.device)
-        t = (self._gw_obj_tourism[7] * rel.long() * self._gw_slot_mult(row)).sum(dim=2)
-        return t * self._congress_gw_kmult()[:, 7:8]
+        k = self._congress_gw_kmult()[:, 7:8].unsqueeze(2)  # [B, 1, 1]
+        t = (self._gw_obj_tourism[7] * rel.long() * (self._gw_slot_mult(row) + k - 1)).sum(dim=2)
+        return t * (k[:, :, 0] > 0).long()
 
     def _relig_followed(self) -> torch.Tensor:
         """[B, CITY_ROWS, RC] long — what every city follows as a spread

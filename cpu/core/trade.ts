@@ -23,9 +23,9 @@ import { DISTRICTS, DISTRICT_ROUTE_YIELDS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { cityStateTradeCapacityBonus, hasMet, isSuzerain, minorCity, suzerainEffect, suzerainEffectCount } from './cityStates';
 import { completedDistrictCount } from './yields';
-import { CITY_STATE_TYPES, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, HUNZA_PATH_TILE_GOLD_FX, AMSTERDAM_DEST_LUXURY_GOLD } from '../data/cityStates';
 import { emergencyCsRouteGold } from './emergency';
-import { congressCsRouteMult, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
+import { congressCsRouteFactor, congressIntlBanned, congressRouteCapacity, congressTradeGold } from './congress';
 import { ENHANCER_BELIEFS } from '../data/religion';
 import type { RuleResult } from './rules';
 import { dedicationEvent, goldenDedication } from './eras';
@@ -481,8 +481,9 @@ export function rosterRouteCapacity(state: GameState, seat: number): number {
   return cap;
 }
 
-export function specialtyDistricts(state: GameState, city: City): number {
-  return city.districts.filter(
+/** The completed specialty districts of a city, a city-state's among them. */
+export function specialtyDistricts(state: GameState, city: Pick<City, 'districts'> | CityState): number {
+  return (city.districts ?? []).filter(
     (d) => DISTRICTS[d.type].countsTowardLimit && state.map.tiles[d.tileIndex].districtComplete,
   ).length;
 }
@@ -684,8 +685,9 @@ export function incomingIntlRoutes(state: GameState, city: City): number {
  *  centre's Gold 3 among them — the rows a foreign major's city pays
  *  (runs/h1_duelw1105: Rome's route to Bandar Brunei, centre, Harbor and
  *  Commercial Hub, paid 9 Gold before its path term; Antananarivo's centre,
- *  Harbor and Theater 6 Gold and 1 Culture). `mult` is Sovereignty's. */
-export function cityStateRouteYields(state: GameState, cityState: CityState, mult = 1): Yields {
+ *  Harbor and Theater 6 Gold and 1 Culture). Sovereignty leaves these rows
+ *  alone (`sovereigntyRouteYields`). */
+export function cityStateRouteYields(state: GameState, cityState: CityState): Yields {
   // the centre's row stands for every minor (its plot carries no district
   // mark on a generated map); the rest are the completed districts it built
   const out = emptyYields();
@@ -696,7 +698,20 @@ export function cityStateRouteYields(state: GameState, cityState: CityState, mul
     const row = DISTRICT_ROUTE_YIELDS[d.type]?.international;
     if (row) addYields(out, row);
   }
-  if (mult !== 1) for (const k of Object.keys(out) as YieldKey[]) out[k] *= mult;
+  return out;
+}
+
+/** What a MAJOR's route to a minor gains under Sovereignty outcome A naming
+ *  the minor's type: the minor's own row to routes sent to it
+ *  (`CITY_STATE_ROUTE_TO_OTHERS`, of its type's yield) times the
+ *  resolution's factor, nothing without it (Trade_Manager 0x54c6c0; dll_readings
+ *  "C-94: Sovereignty's route yield": 1117 Xi'an to Caguana Culture 1 -> 3
+ *  and to Antananarivo 0 -> 2, 1122 Xi'an to Babylon Science 1 -> 3,
+ *  1114 Xi'an to Vilnius Culture 8 -> 10, Gold untouched). */
+export function sovereigntyRouteYields(state: GameState, cityState: CityState): Yields {
+  const out = emptyYields();
+  const f = congressCsRouteFactor(state, CITY_STATE_TYPES.indexOf(cityState.type));
+  if (f > 0) out[CITY_STATE_TYPE_YIELD[cityState.type]] += CITY_STATE_ROUTE_TO_OTHERS[cityState.type] * f;
   return out;
 }
 
@@ -728,8 +743,8 @@ export function incomingAllyRouteYields(state: GameState, city: City): Yields {
 /**
  * What ONE city-state route pays its sender: the destination's own rows —
  * the international column of `District_TradeRouteYields` over the
- * destination city's completed districts, a city-state's under Sovereignty's
- * multiplier on its type (`cityStateRouteYields`). Every other route
+ * destination city's completed districts (`cityStateRouteYields`); a
+ * minor sender holds no Sovereignty factor. Every other route
  * adder is a civilization's own (a leader's, a government's, a suzerain's, a
  * Great Person's, a Trading Post's), and a city-state holds none; the rows a
  * destination pays its senders (University of Sankore, a Great Merchant's
@@ -741,7 +756,7 @@ export function incomingAllyRouteYields(state: GameState, city: City): Yields {
 export function minorRouteYields(state: GameState, r: TradeRoute): Yields | null {
   if (r.toCs !== undefined) {
     const dest = state.cityStates.find((c) => c.id === r.toCs);
-    return dest ? cityStateRouteYields(state, dest, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(dest.type))) : null;
+    return dest ? cityStateRouteYields(state, dest) : null;
   }
   const civCity = seatOf(state, r.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === r.toSeatCity);
   return civCity ? districtRouteYields(state, civCity, 'international') : null;
@@ -870,15 +885,20 @@ export function routeOriginYields(state: GameState, city: City, route: TradeRout
   if (route.toCs !== undefined) {
     const cityState = state.cityStates.find((c) => c.id === route.toCs);
     if (cityState) {
-      // SOVEREIGNTY outcome A doubles what a minor of the named TYPE pays
-      // the route sent to it.
-      const csPay = cityStateRouteYields(
-        state, cityState, congressCsRouteMult(state, CITY_STATE_TYPES.indexOf(cityState.type)));
+      const csPay = cityStateRouteYields(state, cityState);
       addYields(out, csPay);
+      addYields(out, sovereigntyRouteYields(state, cityState));
       out.gold += routePathGold(state, seat, route, csPay.gold);
       // a SURVIVED City-State Emergency pays its target +2 gold on every
       // minor leg, forever
       out.gold += emergencyCsRouteGold(state, seat);
+      // CIV6 (Reform the Coinage, Golden face,
+      // MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_SPECIALTY_DISTRICT_FOR_INTERNATIONAL):
+      // a route to a minor is international (1117 Xi'an to Caguana, Harbor
+      // and Theater Square, +6 Gold t108-120)
+      if (goldenDedication(state, seat, DED_COINAGE)) {
+        out.gold += COINAGE_INTL_GOLD_PER_SPEC * specialtyDistricts(state, cityState);
+      }
       out.gold += routePostGold(state, seat, cityState.centerIndex);
       out.gold += routeLengthGold(state, seat, route);
       // CIV6 (Amsterdam): a city-state's city is a foreign city too

@@ -4272,7 +4272,7 @@ class SimSeats:
             if not _wet or self._imp_uniq[_w] >= 0:
                 continue
             _wok = (self._imp_ground_ok(_w) & self._res_bare(row)
-                    & self.wpass & ~self.tile_submerged & ~self.nwonder
+                    & self.wpass & ~self.nwonder
                     & self._imp_gov_ok(row, _w))
             _wu, _wc = int(self._imp_unlock[_w]), int(self._imp_unlock_civic[_w])
             if _wu >= 0:
@@ -4451,7 +4451,7 @@ class SimSeats:
         # a WATER row reaches a water plot with NO resource under it to insist
         # on a different improvement, exactly as the Builder's water arm does
         ground = (self._builder_ground(row) if not self._imp_water[k]
-                  else (self.water & ~self.tile_submerged & self._res_bare(row)))
+                  else (self.water & self._res_bare(row)))
         out = ok.unsqueeze(1) & ground & self._imp_ground_ok(k) & self._imp_gov_ok(row, k)
         # CIV6 (Great Wall, `BuildOnFrontier`): the seat's own BORDER — an
         # owned tile at least one of whose neighbours it does not hold.
@@ -7792,13 +7792,14 @@ class SimSeats:
         fac = torch.where((out == 0).unsqueeze(1), one * self._c_plus100, torch.zeros_like(one))
         return torch.where(hit, fac, one)
 
-    def _congress_cs_route_mult(self) -> torch.Tensor:
-        """[B, S] f64 — SOVEREIGNTY outcome A doubles what a minor of the named
-        TYPE pays the route sent to it."""
+    def _cs_route_sov6(self) -> torch.Tensor:
+        """[B, S, 6] f64 — `sovereigntyRouteYields`: under SOVEREIGNTY
+        outcome A naming a minor's type, the minor's own row to routes sent
+        to it (its type's yield) times the resolution's factor; zero
+        otherwise, the row then unpaid."""
         out, tgt = self._congress_by_id("SOVEREIGNTY")
         hit = (out == 0).unsqueeze(1) & (self.citystate_type[:, : self.S] == tgt.unsqueeze(1))
-        one = torch.ones(self.B, self.S, dtype=torch.float64, device=self.device)
-        return torch.where(hit, one * self._c_plus100, one)
+        return self._citystate_route_to6 * (hit.double() * self._c_plus100).unsqueeze(2)
 
     def _congress_suz_bonus_blocked(self) -> torch.Tensor:
         """[B, S] — SOVEREIGNTY outcome B: a minor of this type provides no
@@ -8248,6 +8249,14 @@ class SimSeats:
         return torch.where(on.reshape((-1,) + (1,) * (one.dim() - 1)), tot, one)
 
     def _city_rel(self, row: int) -> torch.Tensor:
+        """[B, RC] the religion each city of this row follows, for its
+        follower belief: a minor's one city (column 0) composed from its
+        pressure row (`_minor_followed`), as `followerReligionsForCity`."""
+        s = row - self._CITY_MINOR0
+        if 0 <= s < self.S:
+            out = torch.full_like(self.city_followed[:, row], -1)
+            out[:, 0] = self._minor_followed()[:, s]
+            return out
         return self.city_followed[:, row]
 
     def _preserve_plane(self, row: int) -> torch.Tensor | None:
@@ -8775,7 +8784,7 @@ class SimSeats:
         "adjacent unimproved tiles" by APPEAL, and a natural wonder is
         unimproved and Breathtaking by construction, so `tileYields`' wonder
         arm adds the band on top of the roster row."""
-        return ((self.work_ok | self.nwonder) & ~self.tile_submerged).unsqueeze(2).to(self.dtype)
+        return (self.work_ok | self.nwonder).unsqueeze(2).to(self.dtype)
 
     def _incoming_ally_route(self, row: int) -> torch.Tensor | None:
         """[B, RC, 6] double — CIV6 (Democracy): "Your Trade Routes to an Ally
@@ -8832,6 +8841,13 @@ class SimSeats:
         reg = self.city_dist_tile[:, self._CITY_MINOR0:self._CITY_MINOR0 + self.S, 0]  # [B, S, nD]
         comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
         return self._route_centre_intl.reshape(1, 1, 6) + comp.double() @ self._route_intl_y
+
+    def _cs_specialty_n(self) -> torch.Tensor:
+        """[B, S] long — each city-state city's completed specialty districts
+        (`specialtyDistricts`)."""
+        reg = self.city_dist_tile[:, self._CITY_MINOR0:self._CITY_MINOR0 + self.S, 0]  # [B, S, nD]
+        comp = (reg >= 0) & self.district_complete.gather(1, reg.clamp(min=0).reshape(self.B, -1)).reshape_as(reg)
+        return (comp & self._is_specialty.reshape(1, 1, -1)).sum(dim=2)
 
     def _seat_route_income(self, row: int, per_route: bool = False) -> torch.Tensor | None:
         """cityTradeYields for ANY seat row — per-COLUMN ORIGIN income from this
@@ -9030,15 +9046,23 @@ class SimSeats:
             css = citystate_s.clamp(max=S - 1)
             citystate_ok = self.citystate_alive[:, :S].gather(1, css) & (citystate_s < S)
             pays_c = act & is_cs & has_from & citystate_ok
-            # SOVEREIGNTY outcome A doubles the CITY-STATE's own yield to a
-            # route sent to a minor of the named TYPE.
-            pc = pays_c.double() * self._congress_cs_route_mult().gather(1, css)
+            pc = pays_c.double()
+            css6 = css.unsqueeze(2).expand(-1, -1, 6)
             # the city-state city's own rows (`cityStateRouteYields`), [B, K, 6]
-            cs6 = self._cs_route_y6().gather(1, css.unsqueeze(2).expand(-1, -1, 6)) * pc.unsqueeze(2)
-            # D is every Gold the destination pays the route
+            cs6 = self._cs_route_y6().gather(1, css6) * pc.unsqueeze(2)
+            # D is every Gold the destination's rows pay the route
             _p_d = torch.where(pays_c, cs6[:, :, 2], _p_d)
             _p_want = _p_want | pays_c
             rk += cs6
+            # SOVEREIGNTY outcome A on a minor of the named TYPE
+            # (`sovereigntyRouteYields`)
+            rk += self._cs_route_sov6().gather(1, css6) * pc.unsqueeze(2)
+            # CIV6 (Reform the Coinage, Golden face): a route to a minor is
+            # international — +3 Gold per specialty district in its city
+            _gdc = self._golden_ded(row, self._ded_coinage)
+            if bool(_gdc.count_nonzero()):
+                _rk_add(2, pc * self._coinage_spec_gold * self._cs_specialty_n().gather(1, css).double()
+                        * _gdc.double().unsqueeze(1))
             # a SURVIVED City-State Emergency pays its target +2 gold on every
             # minor leg — added AFTER the yield, so Sovereignty does not double it
             _rk_add(2, pays_c.double() * self._emergency_cs_route_gold(row).unsqueeze(1))

@@ -51,9 +51,6 @@ describe('Volcanic Soil', () => {
     const peak = at(7, 2);
     peak.elevation = 'MOUNTAIN';
     expect(soilPaintable(peak)).toBe(false);
-    const drowned = at(8, 2);
-    drowned.submerged = true;
-    expect(soilPaintable(drowned)).toBe(false);
     // a district, a city centre or a wonder takes the draw but no paint
     const campus = at(9, 2);
     campus.district = 'CAMPUS';
