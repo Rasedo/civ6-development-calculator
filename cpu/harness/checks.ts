@@ -2285,7 +2285,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // Stirrups in its start, its Pastures +1 Food in the growth)
     const pa = a.players.find((q) => q.id === c.owner);
     const pb = b.players.find((q) => q.id === c.owner);
-    landResearch(state, cat, cs.seat, pa, pb);
+    landResearch(state, cat, cs.seat, b, history, pa, pb);
     // its Gold and upkeep come before its city, as a major's do (1121 Antioch
     // t170: 1.5 Gold, 13.5 a turn, 28 upkeep, its growth on the bankrupt tier)
     landShortfall(state, cs.seat, pa, pb);
