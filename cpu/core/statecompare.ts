@@ -82,6 +82,7 @@ import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/cityStates';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
+import { GOODY_KINDS } from '../data/goodyHuts';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -421,6 +422,7 @@ const GAME: Record<string, Extractor> = {
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],
   climatePhase: (s) => [s.climateIdx ?? -1],
+  seaRiseFrom: (s) => [s.seaRiseFrom ?? -2],
   removableAtStart: (s) => [s.removableAtStart ?? 0],
   iceAtStart: (s) => [s.iceAtStart ?? 0],
   // the Free Cities seat's treasury: 0 until its first revolt makes the seat
@@ -506,6 +508,7 @@ const SEAT: Record<string, Extractor> = {
   bestMeleeCS: overSeats((s) => s.bestMeleeCS),
   spaceLy: overSeats((s) => s.spaceLy ?? -1),
   citizenNames: overSeats((s) => s.citizenNames ?? 0),
+  goodyKinds: overSeats((s) => GOODY_KINDS.map((_, i) => s.goodyKinds?.[i] ?? 0)),
   // the craft's speed above its base 1 LY/turn, and the terrestrial stations
   // standing behind it (the powered ones are what the speed counts)
   laserSpeed: overSeats((s, st) => laserSpeed(st, s.seat)),

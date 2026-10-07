@@ -1692,15 +1692,134 @@ sent in the start or in the actions: the log places it).
   (Game_Climate 0x28d4f0): the major owning its plot (0x469db0), else the
   major whose city stands nearest it (0x36f6c0 per player, the first at
   the least distance); none, no draw. China's pool falls 40, 39, 38 ... as
-  storms and Spies take names. The engines follow (`drawCitizenName`,
-  `stormNamer` / `_draw_citizen_name`, `_storm_namer`;
-  `Seat.citizenNames` / `civ_citizen_names`).
+  storms and Spies take names. Which units: the unit's creation 0x4eeb70
+  calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or
+  ExtractsArtifacts (+0x1b9 bit 1, `dll_rowmap.py 0xa6f2b0`) is set and the
+  player's +0x1458 is clear — the Spy and the ARCHAEOLOGIST (runs/h1_duelw1118
+  t231 and 1122 t202: an Archaeologist trained in China's start, one name
+  drawn; 1122 t129 and 1124 t248 a Spy, trained and granted by the
+  Intelligence Agency, a name and no level offer). The engines follow
+  (`drawCitizenName`, `CITIZEN_NAMED_UNITS` / `_type_named`, `stormNamer` /
+  `_draw_citizen_name`, `_storm_namer`; `Seat.citizenNames` /
+  `civ_citizen_names`).
 - "NameManager::GetUnitNamePart": two draws a unit (118 then 155, or 86
   then 81) in the majors' actions from t192 — unread which units are named.
 - "Random Era for Antiquity Site" (0x280140, from 0x2805f0): with n the era
   row's +0x1c, era i < n weighs n − i + 1, one draw over n(n + 3) / 2:
   runs/h1_duelw1117 t217's three draws over 35, 44 and 9 are n = 7, 8 and
-  3 — which era row each site reads (0x2805f0) is unread.
+  3. The caller: Game_Archaeology 0x27f640 lays a kind's dig sites once a
+  game (RESOURCE_ANTIQUITY_SITE / RESOURCE_SHIPWRECK, a done flag each at
+  +0x180 / +0x1e0), when a player first completes its revealing civic
+  (Natural History, Cultural Heritage — every logged case is China's
+  Cultural Heritage in its start: 1117 t217, 1119 t215, 1120 t206, 1123
+  t207): candidate plots from the game's history of events (100 each, their
+  neighbours 50), filled out by random plots with no history (index −1);
+  0x2805f0 takes a site's era from its history event, and draws one only
+  for a site with none (the js at 0x280664 → 0x280752; n from the era of a
+  player 0x27fe90 names). 1117 t217: four Shipwrecks laid, three draws. The
+  history is in no record: the harness counts the record's new sites and
+  takes each draw as a choice.
+- An Apostle or a Rock Band (Units.InitialLevel 2, NumRandomChoices 3)
+  draws its level offer at its birth however it comes: runs/h1_duelw1118
+  t224, Mahabodhi's two granted Apostles, 9..1 twice after the annex
+  (1123 t127 alike). The engines follow for a granted Apostle (the grant
+  loop, Stonehenge's fallback: `offerApostlePromotions` /
+  `_offer_apostle_promos`).
+
+## H-1: a start's own event rows, the wonder's annex, the village a claim takes
+
+The record's event log (`actions`) holds every row a player's start fired,
+in order, before its PlayerTurnActivated (`startRows`): the cities' turns in
+the player's city order, then what the AI does before the activation. Read
+with the game's draw log:
+- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its
+  CityTileOwnershipChanged rows BEFORE the WonderCompleted row (a
+  BuildingChanged of the city, a unit pushed off, an improvement's owner, a
+  camp cleared between): each plot one picker draw; the list emptied, no
+  draw (runs/h1_duelw1117 t217: Meenakshi at Xi'an with nothing in reach,
+  none; t224 Machu Picchu at Longxi, none; 1123 t112 two; 1118 t227
+  Kotoku-in two, a Roman unit teleported between). The grants follow the
+  annex (1123 t112: annex 2, annex 1, the Dynastic Cycle's civic boost, then
+  the closing pick over 4), the city's closing pick after them; a camp the
+  annex clears draws a "Barb Tribe Roll" (1121 t190, the Colossus at Longxi
+  over 12,14). Which wonder completes in the start: its WonderCompleted row
+  in the window — the banked-production test missed 1123 t112 (325 + 28 of
+  355).
+- A culture claim the window shows took the stored plot, or another after a
+  fresh pick (1123 t202: Shanghai's 914 taken, lost to a founding in the
+  actions); an envoy annex lands among the closing picks or after them
+  (1118 t66: Caguana's after China's four; t144 Armagh's after, its 916
+  Handan's stored plot, whose reader then answers 919 — the scorer's best
+  plot, no draw).
+- A Tribal Village a claim takes (GoodyHutReward with no unit, the claim's
+  row after it): "Choosing a Goody Hut Type", "Choosing a Sub Type", then the
+  reward's own draws (1118 t189 Military / Resources; 1119 t84 Science / One
+  Tech Boost and its boost; 1123 t104 Faith / Large Faith).
+- A city-state met in the start picks it a quest ("Selecting a random new
+  quest", DiplomacyMeet: 1117 t249, 1122 t226).
+- A city founded after its owner's start holds no next plot (every founding
+  of 1117: -1 until its own start); the camps a player clears after its
+  start stood at its picks (1123 t124: Beijing's pick over 616, 440's camp
+  cleared in China's actions); a fire's woods burnt or grown back by the
+  turn's step stood as the record before left them (1117 t187: Antananarivo
+  over 340, 341 still Burnt Woods).
+
+## H-1: the goody hut's kind — READ
+
+0x42bdd0 (Player_Goody_Hut.cpp): over the GoodyHuts rows whose
+ImprovementType is the popped one (row +0x38 → +0x14), each kind weighs its
+Weight (+0x1c) × the count of ALL GoodyHuts rows (8 with GOODYHUT_DIPLOMACY
+and METEOR_GOODIES: 800) in 24.8, halved once per time the player has had
+that kind (+0x100[kind], the counter bumped after the pick, 0x42c875),
+floored at 1.0 below 2.0, rounded half up; a kind counts only with an
+eligible subtype (0x42c980: MinOneCity, Turn, RequiresUnit, CityState,
+StrategicResources...). ONE "Choosing a Goody Hut Type" draw over the sum,
+then "Choosing a Sub Type" over the kind's eligible subtypes' weights.
+runs/h1_duelw1117: t5 4,000 (five kinds, the first village), t7 3,600,
+t13 4,400, t16 / t27 4,800; sub types 70 (Culture: the relic 15, a boost
+55), 75 (Survivors: 40 + 35), 100. A village a culture claim takes has no
+unit: Military's subtypes needing one drop out (1118 t189: Resources alone,
+over 20). A subtype's Turn is read at the game's speed (0x42c980 through
+0x5254d0: online, Turn 20 is turn 10 — 1117 t13's Gold over 85 holds Medium
+Gold, t16's seven kinds hold Faith). The engines follow (`goodyKindWeight`,
+`drawGoodyReward` / `_goody_kind_weight`, `_draw_goody_reward`;
+`Seat.goodyKinds` / `civ_goody_kinds`; `goodyEligible`'s Turn through
+`scaleByGameSpeed`); the other gates of 0x42c980 (CityState — the Envoy row
+closed until a city-state is met, so 1117's first villages draw over five
+kinds —, RequiresUnit, StrategicResources, the relic's slot) are AUDIT C-74
+BUILD.
+
+## H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)
+
+0xa22150 (a natural wonder) runs 0xa1c760 then 0xa21680, where a volcano's
+0xa22000 runs 0xa1c1a0 then 0xa219e0 ("Fertility Gain Chance"): for each of
+the wonder's plots in turn, for each damage row, the plot itself (r12 = −1,
+impassable: no draw) and its six (the table at 0xeff670 / 0xeff688) — and the
+soil likewise, plot by plot, its draws labelled "Pillage Improvement Chance".
+**This reverses the engines' walk** of every row over the joined ring of all
+the wonder's plots (one plot's eruption reads the same either way):
+runs/h1_duelw1119 t120, Eyjafjallajokull's two plots: the three
+"Random Event Unit Damage Roll"s fall after the 31st draw (the first plot's
+UNIT_DAMAGE_LAND row) and the second plot's 32nd and 34th, and the soil laid
+(11) is the record's only so; the joined walk puts the unit row 60–69 and
+lays other soil. 1119 t17 – t223 (eight eruptions) and 1121's Kilimanjaro
+(t19, t38, t108, t140, t146, t226: one plot, the soil's label alone) land
+draw for draw. The engines follow (`eruptionRings`, `erupt` / `_eruption_ring`,
+`_erupt`).
+
+## H-1: the forced sea rise, the dig sites, the droughts the game leaves out
+
+- The sea's rise (RANDOM_EVENT_SEA_LEVEL_RISE1–7, EffectOperatorType
+  SEA_LEVEL) is the turn's event by force, its "Random Event Roll" over 1
+  (1117 t224, t244, 1118 t239, t270; 1122 t240, t249; 1124 t214, t223,
+  t232): the climate step crossing a phase leaves the sea for the next
+  event step. The engines follow (`seaRiseFrom` / `sea_rise_from`,
+  `seaRise` / `_sea_rise`; a world with no random events rises at once).
+- 1124 t162, t194, t234: the drought's start draws over 1, 3, 3 where every
+  clause of 0x28eb60 passes on 3, 4, 6 plots of the record — the game
+  leaves out 277, 278 (its t28 / t30 droughts' plots) and 319 beside them,
+  while 1118 (780 twice), 1123 (388 three times) and 1124's own 579 draw on
+  a former drought's plot again (AUDIT C-74 LAB).
 
 ## H-1: draws with no game site
 

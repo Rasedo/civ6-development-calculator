@@ -46,9 +46,14 @@ def _bidx(rj, bid: str) -> int:
     return next(i for i, b in enumerate(rj["buildings"]) if b["id"] == bid)
 
 
-def fresh(rules, path, n: int = 1) -> BatchSim:
-    return BatchSim([load_fixture(path) for _ in range(n)], rules, device="cpu",
-                    dtype=torch.float64)
+def fresh(rules, path, n: int = 1, disasters: bool = False) -> BatchSim:
+    """A sim on the fixture; with random events off by default, so a phase
+    crossing raises its sea at once (with them on it waits for the next
+    event step: `seaRise`)."""
+    sim = BatchSim([load_fixture(path) for _ in range(n)], rules, device="cpu",
+                   dtype=torch.float64)
+    sim.disasters = disasters
+    return sim
 
 
 def _emit_points(sim, row: int, points: float) -> None:
@@ -144,7 +149,18 @@ def main() -> int:
     s5._climate_turn()
     assert int(s5.climate_idx[b]) == 2
     assert bool(s5.tile_flooded[b, band2].all())
-    print(f"  5 flooding OK ({len(band1)} band-1 tiles under at Phase II)")
+    # with random events on, the crossing's sea waits for the next event
+    # step, which takes it as its event by force (a roll over one)
+    s5e = fresh(rules, paths[0], disasters=True)
+    _emit_points(s5e, row, 3)
+    s5e._climate_turn()
+    assert int(s5e.climate_idx[b]) == 1 and int(s5e.sea_rise_from[b]) == -1
+    assert not bool(s5e.tile_flooded[b, band1].any()), "the sea waits for the event step"
+    s5e.turn = max(int(s5e.turn), s5e._random_event_start_turn)
+    s5e._disaster_phase()
+    assert int(s5e.sea_rise_from[b]) == -2
+    assert bool(s5e.tile_flooded[b, band1].all()), "the forced rise takes the 1m band"
+    print(f"  5 flooding OK ({len(band1)} band-1 tiles under at Phase II; the forced rise)")
 
     # --- 5b) a phase that SUBMERGES takes its band forever ----------------
     s5b = fresh(rules, paths[0])

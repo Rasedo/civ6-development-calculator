@@ -7,8 +7,8 @@
  *
  * `owner`:
  *  - `rule`: an engine rule both engines draw where the game does;
- *  - `lacking`: an engine rule the engines do not draw (named, quests,
- *    antiquity sites, the barbarians' camp step as the DLL runs it);
+ *  - `lacking`: an engine rule the engines do not draw (unit and region names,
+ *    quests, the dig sites' eras, the barbarians' camp step as the DLL runs it);
  *  - `ai`: a choice of the game's AI — the driver's, not the engines';
  *  - `setup`: the game's set-up, before the first player's first start.
  * `step`: a draw of the turn's random-event step, the last the turn takes
@@ -37,7 +37,7 @@ export function siteLabel(label: string): string {
 
 export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   // the turn's random-event step
-  'Random Event Roll': { owner: 'rule', step: true, cpu: 'randomEvent', gpu: '_random_event', dll: '0x335260', n: [249, 277] },
+  'Random Event Roll': { owner: 'rule', step: true, cpu: 'randomEvent (over 1 on the sea rise: seaRise)', gpu: '_random_event (_sea_rise)', dll: '0x335260', n: [249, 277] },
   'Active Volcano Roll': { owner: 'rule', step: true, cpu: 'volcanoRoll', gpu: '_volcano_roll', dll: '0x335040', n: [243, 277] },
   'Choose Active Volcano Roll': { owner: 'rule', step: true, cpu: 'volcanoRoll', gpu: '_volcano_roll', n: [2, 3] },
   'Choose Inactive Volcano Roll': { owner: 'rule', step: true, cpu: 'volcanoRoll', gpu: '_volcano_roll', n: [0, 1] },
@@ -67,8 +67,8 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Barbarian camp region placement': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x14fcc0', n: [5, 6] },
   'Barbarian camp location': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x14fcc0', n: [5, 6] },
   'Barb Tribe Roll': { owner: 'lacking', cpu: 'barbarianPhase', gpu: '_barbarian_phase', dll: '0x152460', n: [5, 6] },
-  'Choosing a City Name': { owner: 'lacking', n: [11, 10] },
-  'Choosing a Citizen Name': { owner: 'lacking', cpu: 'stormBirth (count only)', gpu: '_storm_birth (count only)', n: [13, 34] },
+  'Choosing a City Name': { owner: 'rule', cpu: 'foundCityAt', gpu: '_found_city_at', dll: '0x327c30', n: [11, 10] },
+  'Choosing a Citizen Name': { owner: 'rule', cpu: 'drawCitizenName (a Spy, an Archaeologist, a storm)', gpu: '_draw_citizen_name', dll: '0x486c20', n: [13, 34] },
   'NameManager::GetUnitNamePart': { owner: 'lacking', n: [10, 24] },
   'Random River': { owner: 'lacking', n: [9, 7] },
   'Random Sea': { owner: 'lacking', n: [2, 4] },

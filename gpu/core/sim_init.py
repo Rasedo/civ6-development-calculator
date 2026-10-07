@@ -1679,6 +1679,9 @@ class SimInit:
             self._wond_occdef = torch.tensor([int(w["occupyDefense"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freeciv = torch.tensor([int(w["freeCivics"]) for w in self._wond_rows], dtype=torch.long, device=device)
             self._wond_freetech = torch.tensor([int(w["freeTechs"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            # Broadway: a random civic boost of its era at completion (era index, -1 none; count)
+            self._wond_cb_era = torch.tensor([int(w["cbEra"]) for w in self._wond_rows], dtype=torch.long, device=device)
+            self._wond_cb_n = torch.tensor([int(w["cbN"]) for w in self._wond_rows], dtype=torch.long, device=device)
             # the Meenakshi Temple: the percent off the seat's Guru purchases
             self._wond_guru_off = torch.tensor([float(w["guruBuyOff"]) for w in self._wond_rows], dtype=torch.float64, device=device)
             self._wond_treasury = torch.tensor([float(w["treasuryMult"]) for w in self._wond_rows], dtype=torch.float64, device=device)
@@ -3970,6 +3973,9 @@ class SimInit:
         self._type_air_slots = torch.tensor([int(u["airSlots"]) for u in ru], dtype=torch.long, device=device)
         self._gdr_idx = next((i for i, u in enumerate(ru) if int(u["gdr"])), -1)
         self._spy_idx = next((i for i, u in enumerate(ru) if int(u["spy"])), -1)
+        # the unit types a major's unit takes a citizen name for at its birth (`CITIZEN_NAMED_UNITS`)
+        self._type_named = torch.tensor([bool(int(u["named"])) for u in ru], dtype=torch.bool, device=device)
+        self._any_named = bool(self._type_named.any())
         self._type_no_gold = torch.tensor([bool(u["noGold"]) for u in ru], dtype=torch.bool, device=device)
         self._any_air = bool((self._type_air > 0).count_nonzero())
         # THE TWO CLASS SENTENCES THE RULES ACTUALLY SPEAK, named here so no
@@ -4346,10 +4352,14 @@ class SimInit:
             tuple(int(x) for x in r) for r in _uq["allianceSharedVis"]]  # type: ignore[misc]
 
         # TRIBAL VILLAGES — the install's own table, straight off the
-        # wire so the GPU draws what TS draws. Kind weights are all equal, so
-        # the kind draw is uniform over the kinds with an eligible subtype.
+        # wire so the GPU draws what TS draws: a kind weighs `_goody_kind_base`
+        # halved per village of it its claimer has had (`goodyKindWeight`),
+        # a subtype's Turn already at the game's speed.
         _gh = rules.goody_huts
         self._goody_kinds: list[str] = list(_gh["kinds"])
+        self._goody_kind_base = int(_gh["kindBase"])
+        # the villages each major has had of each kind (`Seat.goodyKinds`)
+        self.civ_goody_kinds = torch.zeros((B, self.n_majors, max(1, len(self._goody_kinds))), dtype=torch.long, device=device)
         self._goody_payload_kinds: list[str] = list(_gh["payloadKinds"])
         self._goody_sub = [
             (str(r["id"]), int(r["hut"]), int(r["weight"]), int(r["turn"]),
@@ -4698,6 +4708,10 @@ class SimInit:
         self.tile_meteor = torch.zeros(B, T, dtype=torch.bool, device=dev)
         # -1 = no climate change yet; monotone, so it never steps back.
         self.climate_idx = torch.full((B,), -1, dtype=torch.long, device=dev)
+        # the phase the climate step stood at before its crossing, while the
+        # crossing's sea waits for the next random-event step (`seaRiseFrom`);
+        # -2 = none waits
+        self.sea_rise_from = torch.full((B,), -2, dtype=torch.long, device=dev)
 
         self._clear_fids = torch.tensor([int(x) for x in c["clearFids"] if int(x) >= 0],
                                         dtype=torch.long, device=dev)

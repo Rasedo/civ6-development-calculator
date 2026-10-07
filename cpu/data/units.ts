@@ -33,6 +33,25 @@ export const FORMATION_CS: readonly number[] = [
   srcConst('combat.formationCs.2', 17, gp('COMBAT_ARMY_STRENGTH_MODIFIER')),
 ];
 
+/** CIV6 (Units: Spy="true" — the Spy; ExtractsArtifacts="true" — the
+ *  Archaeologist): a major's unit of these types takes a citizen name at its
+ *  birth (the unit's creation 0x4eeb70 reads the two bits, unit info +0x1ba
+ *  bit 2 and +0x1b9 bit 1, and calls 0x486c20, "Choosing a Citizen Name"). */
+export const CITIZEN_NAMED_UNITS: readonly string[] = srcConst('units.citizenNamed', ['SPY', 'ARCHAEOLOGIST'], {
+  derived: 'the Units rows carrying Spy or ExtractsArtifacts, UNIT_ prefix stripped',
+  inputs: [xml('Units', 'UnitType=UNIT_SPY', 'Spy', { expect: true }),
+    xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'ExtractsArtifacts', { expect: true })],
+});
+
+/** CIV6 (Units.NumRandomChoices 3: the Apostle, the Spy, the Rock Band): the
+ *  units whose level draws its offer (0x4f23a0, a shuffle of the class's
+ *  rows) — at its birth, however it came (trained, bought or granted). */
+export const PROMO_OFFER_UNITS: readonly string[] = srcConst('units.promoOffer', ['APOSTLE', 'SPY', 'ROCK_BAND'], {
+  derived: 'the Units rows carrying a NumRandomChoices above 0, UNIT_ prefix stripped',
+  inputs: [xml('Units', 'UnitType=UNIT_APOSTLE', 'NumRandomChoices'), xml('Units', 'UnitType=UNIT_SPY', 'NumRandomChoices'),
+    xml('Units', 'UnitType=UNIT_ROCK_BAND', 'NumRandomChoices')],
+});
+
 /** the civic each tier waits on — index by the tier being FORMED. */
 export const FORMATION_CIVIC: readonly string[] = ['', 'NATIONALISM', 'MOBILIZATION'];
 

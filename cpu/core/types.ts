@@ -487,6 +487,11 @@ export interface GameState {
   /** the CLIMATE PHASE the world has reached, 0 = Phase I; absent or -1 =
    *  no climate change yet. Monotone: it never steps back. */
   climateIdx?: number;
+  /** the climate phase the climate step stood at before it last crossed into
+   *  a higher one, while the crossing's sea (the polar melt, the flooded and
+   *  submerged lowlands) waits for the next random-event step, which takes it
+   *  as its event by force (`seaRise`); absent when none waits. */
+  seaRiseFrom?: number;
   /** how many removable features (Woods, Rainforest, Marsh) the map carried
    *  at creation, and how many Ice tiles — the denominators the deforestation
    *  level and the polar melt are measured against. */
@@ -781,8 +786,12 @@ export interface Seat {
    *  unit or improvement capable of deploying it". */
   wmd?: number[];
   /** The citizen names this seat's civilization has given (`drawCitizenName`):
-   *  its Spies' and the storms named for it. Absent = none. */
+   *  its Spies', its Archaeologists' and the storms named for it. Absent = none. */
   citizenNames?: number;
+  /** The Tribal Villages this seat has had of each kind, dense over
+   *  `GOODY_KINDS`: each halves that kind's weight in its next draw
+   *  (`goodyKindWeight`). Absent = none. */
+  goodyKinds?: number[];
   /** Light-years the Exoplanet craft has travelled; -1 = no craft in flight.
    *  The win fires on ARRIVAL (spaceLy >= SPACE_FLIGHT_LY), not on launch. */
   spaceLy?: number;

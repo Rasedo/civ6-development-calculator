@@ -1619,6 +1619,15 @@ class SimPhase:
                     ft[wr] = self._wond_freetech[wi[wr]]
                     fc[wr] = self._wond_freeciv[wi[wr]]
                     self._grant_free_research(row, ft, fc)
+                # CIV6 (Broadway, MODIFIER_PLAYER_GRANT_RANDOM_CIVIC_BOOST_BY_ERA):
+                # a random civic boost of its era (`civicBoostsByEra`)
+                if int(self._wond_cb_n.sum()) > 0:
+                    cbn = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    cbe = torch.zeros(self.B, dtype=torch.long, device=self.device)
+                    cbn[wr] = self._wond_cb_n[wi[wr]]
+                    cbe[wr] = self._wond_cb_era[wi[wr]].clamp(min=0)
+                    if bool(cbn.count_nonzero()):
+                        self._draw_boosts(row, True, self._boost_pool(row, True, cbe, cbe), cbn)
                 # CIV6 (Great Library): "Receive boosts to all Ancient and
                 # Classical era technologies" — one eureka per technology not
                 # already boosted or researched, each a Free Inquiry event.
@@ -1648,8 +1657,12 @@ class SimPhase:
                         gn[wr] = self._wond_grant[wi[wr], _k, 1]
                         for _c in range(int(gn.max())):
                             for u_i in sorted(set(int(x) for x in gu[(gu >= 0) & (gn > _c)].tolist())):
-                                self._spawn_unit(row, made_w & (gu == u_i) & (gn > _c), ctr_w, u_i)
+                                got = self._spawn_unit(row, made_w & (gu == u_i) & (gn > _c), ctr_w, u_i)
                                 self._gen_ver += 1
+                                # an Apostle (InitialLevel 2) draws its level
+                                # offer at its birth (Mahabodhi's two)
+                                if u_i == self._apostle_idx and row < self.n_majors:
+                                    self._offer_apostle_promos(row, got)
                 # CIV6 (Angkor Wat, MODIFIER_PLAYER_CITIES_ADD_POPULATION):
                 # every city the seat holds grows once.
                 if int(self._wond_popall.sum()) > 0:
@@ -2691,8 +2704,10 @@ class SimPhase:
         self._gp_claim(row, free, cls)
         apo = sto & ~none_m & ~free
         if self._apostle_idx >= 0 and bool(apo.count_nonzero()):
-            self._spawn_unit(row, apo, centre, self._apostle_idx)
+            got = self._spawn_unit(row, apo, centre, self._apostle_idx)
             self._gen_ver += 1
+            # an Apostle (InitialLevel 2) draws its level offer at its birth
+            self._offer_apostle_promos(row, got)
 
     def _gp_claim(self, row: int, hit: torch.Tensor, cls: int, patron: torch.Tensor | None = None,
                   gold: bool = False) -> None:

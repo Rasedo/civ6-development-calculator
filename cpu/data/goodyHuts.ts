@@ -34,7 +34,29 @@ export const GOODY_KINDS: readonly GoodyKind[] = srcConst('goodyHuts.kinds',
 
 export const GOODY_KIND_WEIGHT = srcConst('goodyHuts.kindWeight', 100,
   xml('GoodyHuts', 'GoodyHutType=GOODYHUT_CULTURE', 'Weight',
-    { note: 'every GoodyHuts row carries Weight 100, so the kind draw is uniform' }));
+    { note: 'every GoodyHuts row carries Weight 100' }));
+
+/** the GoodyHuts rows of every layer the game loads — the six base kinds,
+ *  GOODYHUT_DIPLOMACY and the meteor's METEOR_GOODIES: the kind draw 0x42bdd0
+ *  weighs each kind its Weight times their count */
+export const GOODY_KIND_ROWS = srcConst('goodyHuts.kindRows', 8, {
+  derived: 'the count of GoodyHuts rows over Base, Expansion2 and the GranColombia_Maya pack (6 + DIPLOMACY + METEOR_GOODIES)',
+  inputs: [xml('GoodyHuts', 'GoodyHutType=GOODYHUT_SURVIVORS', 'Weight'), xml('GoodyHuts', 'GoodyHutType=GOODYHUT_DIPLOMACY', 'Weight'),
+    xml('GoodyHuts', 'GoodyHutType=METEOR_GOODIES', 'Weight')],
+});
+
+/**
+ * CIV6 (the kind draw 0x42bdd0, dll_readings "H-1: the goody hut's kind"): a
+ * kind weighs `GOODY_KIND_WEIGHT` × `GOODY_KIND_ROWS` in 24.8, halved once for
+ * each time its claimer has had that kind — below 2.0 it stands at 1.0 —
+ * then rounded half up (runs/h1_duelw1117: 4,000 over five kinds, then 3,600
+ * after a Culture, 4,600 and 4,200 for China's later two).
+ */
+export function goodyKindWeight(had: number): number {
+  let w = GOODY_KIND_WEIGHT * GOODY_KIND_ROWS * 256;
+  for (let k = 0; k < had; k++) w = w < 0x200 ? 0x100 : Math.floor(w / 2);
+  return (w >> 8) + ((w & 0x80) ? 1 : 0);
+}
 
 /** what a subtype pays — one channel per row, named for the effect it came from */
 type GoodyPayload =

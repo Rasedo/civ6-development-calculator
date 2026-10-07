@@ -14,7 +14,7 @@
  * engine's WOODS), FEATURE_JUNGLE 1 (RAINFOREST); of the natural wonders this
  * engine fields, ULURU 1, TORRES_DEL_PAINE 2, KILIMANJARO 2, YOSEMITE 2,
  * EVEREST 2, EYJAFJALLAJOKULL 2 (`VikingsLandmarks_Features.xml`), VESUVIUS 2 and
- * GOBUSTAN 1 (`Expansion2_Features.xml`) — Crater Lake, the Dead Sea, Galapagos, the Barrier
+ * GOBUSTAN 1 (`Expansion2_Features.xml`), MATTERHORN 2 (`Expansion1_Features_Major.xml`) — Crater Lake, the Dead Sea, Galapagos, the Barrier
  * Reef, the Pantanal, Dover, the Eye of the Sahara, Paititi and the Bermuda Triangle carry no
  * column at all.
  */
@@ -52,6 +52,7 @@ export const FEATURE_SIGHT_THROUGH: Readonly<Record<string, number>> = {
   DEVILS_TOWER: srcConst('improvements.featSightThrough.DEVILS_TOWER', 2, feat('FEATURE_DEVILSTOWER')),
   PAMUKKALE: srcConst('improvements.featSightThrough.PAMUKKALE', 1, feat('FEATURE_PAMUKKALE')),
   DELICATE_ARCH: srcConst('improvements.featSightThrough.DELICATE_ARCH', 1, feat('FEATURE_DELICATE_ARCH')),
+  MATTERHORN: srcConst('improvements.featSightThrough.MATTERHORN', 2, feat('FEATURE_MATTERHORN')),
 };
 
 /** the farthest any chassis looks — the reach of the static line table both

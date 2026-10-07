@@ -277,6 +277,17 @@
           "note": "the CLIMATE PHASE the world has reached, -1 before Phase I. Monotone on both engines."
         },
         {
+          "name": "seaRiseFrom",
+          "compare": "exact",
+          "covers": [
+            "GameState.seaRiseFrom"
+          ],
+          "planes": [
+            "sea_rise_from"
+          ],
+          "note": "the phase the climate step stood at before a crossing whose sea waits for the next random-event step, -2 when none waits."
+        },
+        {
           "name": "removableAtStart",
           "compare": "exact",
           "covers": [
@@ -1194,6 +1205,16 @@
           ],
           "planes": [
             "civ_citizen_names"
+          ]
+        },
+        {
+          "name": "goodyKinds",
+          "compare": "exact",
+          "covers": [
+            "Seat.goodyKinds"
+          ],
+          "planes": [
+            "civ_goody_kinds"
           ]
         },
         {

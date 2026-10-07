@@ -3,7 +3,7 @@ import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, seatOf } from '../../../cpu/core/seats';
 import { claimGoodyHut, mostAdvancedStrategic } from '../../../cpu/core/units';
 import { drawGoodyReward, goodyEligible, eligibleGoodyKinds } from '../../../cpu/core/goodyHuts';
-import { GOODY_SUBTYPES, GOODY_KINDS, GOODY_KIND_WEIGHT, goodyAmount } from '../../../cpu/data/goodyHuts';
+import { GOODY_SUBTYPES, GOODY_KINDS, GOODY_KIND_WEIGHT, goodyAmount, goodyKindWeight } from '../../../cpu/data/goodyHuts';
 import { CAMP_GOODY_ROWS } from '../../../cpu/data/civilizations';
 import { getModifiers } from '../../../cpu/core/effects';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
@@ -67,10 +67,11 @@ describe('the tribal village table', () => {
     expect(of('RESOURCES').hut).toBe('MILITARY');
   });
 
-  it('gates on the install`s own Turn and MinOneCity', () => {
+  it('gates on the install`s own Turn at the game`s speed and MinOneCity', () => {
     const of = (id: string) => GOODY_SUBTYPES.find((s) => s.id === id)!;
-    expect(goodyEligible(of('LARGE_GOLD'), 39, true)).toBe(false);
-    expect(goodyEligible(of('LARGE_GOLD'), 40, true)).toBe(true);
+    // Turn 40 at the online speed is turn 20
+    expect(goodyEligible(of('LARGE_GOLD'), scaleByGameSpeed(40) - 1, true)).toBe(false);
+    expect(goodyEligible(of('LARGE_GOLD'), scaleByGameSpeed(40), true)).toBe(true);
     expect(goodyEligible(of('LARGE_GOLD'), 40, false)).toBe(false);  // MinOneCity
     expect(goodyEligible(of('ONE_CIVIC_BOOST'), 1, false)).toBe(true);
     // a weight of 0 is OFF, never free
@@ -101,7 +102,7 @@ describe('claiming a village', () => {
     // the draw is kind-then-subtype; only the pooled rewards draw further
     const { state } = scene();
     const rng0 = state.rngState;
-    const sub = drawGoodyReward(state, 1, true);
+    const sub = drawGoodyReward(state, 1, true, seatOf(state, 0)!);
     expect(sub).not.toBeNull();
     expect(state.rngState).not.toBe(rng0);
     // ...and a claimer that can draw NOTHING leaves the stream alone
@@ -111,6 +112,15 @@ describe('claiming a village', () => {
     // property the engine relies on rather than a fabricated empty case
     expect(eligibleGoodyKinds(1, false).length).toBeGreaterThan(0);
     expect(bare.rngState).toBe(r0);
+  });
+
+  it('weighs each kind 800, halved per village of it the claimer has had, and counts the pick', () => {
+    expect([0, 1, 2, 3, 9, 10, 11].map(goodyKindWeight)).toEqual([800, 400, 200, 100, 2, 1, 1]);
+    const { state } = scene();
+    const claimer = seatOf(state, 0)!;
+    const sub = drawGoodyReward(state, 1, true, claimer)!;
+    const k = GOODY_KINDS.indexOf(sub.hut);
+    expect(claimer.goodyKinds).toEqual(GOODY_KINDS.map((_, i) => (i === k ? 1 : 0)));
   });
 
   it('never pays a barbarian or a city-state', () => {

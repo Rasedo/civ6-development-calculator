@@ -15,6 +15,7 @@ import { governorMult } from './governors';
 import { getModifiers } from './effects';
 import { computeCityStats } from './city';
 import { spawnUnit, extraCharges } from './units';
+import { offerApostlePromotions } from './game';
 import { suzerainEffect } from './cityStates';
 import { BOLOGNA_GPP_BUILDING, BOLOGNA_DISTRICT_GPP } from '../data/cityStates';
 import { PROPHET_MAX_PLAYER_INSTANCES } from '../data/religion';
@@ -115,7 +116,9 @@ export function grantFreeProphet(state: GameState, seat: number, centre: number)
     owner.gpp.PROPHET = (owner.gpp.PROPHET ?? 0) + recruit(state, seat, 'PROPHET');
     return;
   }
-  spawnUnit(state, 'APOSTLE', centre, seat);
+  const u = spawnUnit(state, 'APOSTLE', centre, seat);
+  // an Apostle (InitialLevel 2) draws its level offer at its birth
+  if (u) offerApostlePromotions(state, u, seat);
 }
 
 /** CIV6 (Great People page): patronage prices the MISSING points — Faith

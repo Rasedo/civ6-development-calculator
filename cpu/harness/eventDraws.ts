@@ -11,7 +11,7 @@ import type { GameMap, Tile } from '../../world/types';
 import { neighborTile } from '../../world/hex';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
-import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, gameLatitude, stormFamilyAt } from '../data/disasters';
+import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_WONDER, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, gameLatitude, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
 import { droughtCandidate, stormFootprint } from '../core/disasters';
 
@@ -420,28 +420,39 @@ function eruptionReach(t: Tile): boolean {
  * (a landed row's own rolls straight after it) — then the soil pass
  * (0xa219e0): each yield row, each neighbour the eruption reaches above the
  * sea, one "Fertility Gain Chance" rand(100), +1 of the row's yield where it
- * falls under the Percentage (the plot turns Volcanic Soil). `soil` holds the
- * gains by plot: [Food, Production, Science, Culture].
+ * falls under the Percentage (the plot turns Volcanic Soil). A natural
+ * wonder's passes (0xa1c760, 0xa21680) draw the same, the soil's labelled
+ * "Pillage Improvement Chance" too (runs/h1_duelw1121 t19: Kilimanjaro's 54
+ * damage and 18 soil draws, all so labelled). `soil` holds the gains by
+ * plot: [Food, Production, Science, Culture].
  */
 export function eruptionDraws(rng: Civ6Random, map: GameMap, plots: readonly Tile[], row: number,
   ctx: (plot: number) => StruckPlot, out: EventOutcome, soil: Map<number, number[]>): void {
-  const ring: Tile[] = [];
-  for (const p of plots) for (let d = 0; d < 6; d++) { const n = offsetPlot(map, p, DIR_DQ[d], DIR_DR[d]); if (n) ring.push(n); }
-  for (const r of eruptionDamageRows(row)) {
-    for (const n of ring) {
-      if (!eruptionReach(n)) continue;
-      if (rng.get(100, 'Pillage Improvement Chance') >= r.pct) continue;
-      damaged(out, n.index, r.kind);
-      damageRolls(rng, r.kind, r.lo, r.hi, ctx(n.index));
+  const wonder = !!ERUPTION_WONDER[row];
+  const soilLabel = wonder ? 'Pillage Improvement Chance' : 'Fertility Gain Chance';
+  const around = (p: Tile) => [0, 1, 2, 3, 4, 5].map((d) => offsetPlot(map, p, DIR_DQ[d], DIR_DR[d])).filter((n): n is Tile => !!n);
+  // the volcano's passes: each row over its ring; the wonder's: each of its
+  // plots, each row over the plot itself then its ring
+  const passes: Tile[][] = wonder ? [...plots].sort((a, b) => a.index - b.index).map((p) => [p, ...around(p)]) : [plots.flatMap(around)];
+  for (const ring of passes) {
+    for (const r of eruptionDamageRows(row)) {
+      for (const n of ring) {
+        if (!eruptionReach(n)) continue;
+        if (rng.get(100, 'Pillage Improvement Chance') >= r.pct) continue;
+        damaged(out, n.index, r.kind);
+        damageRolls(rng, r.kind, r.lo, r.hi, ctx(n.index));
+      }
     }
   }
-  for (const [c, pct] of eruptionSoilRows(row)) {
-    for (const n of ring) {
-      if (!eruptionReach(n) || isWater(n)) continue;
-      if (rng.get(100, 'Fertility Gain Chance') >= pct) continue;
-      const g = soil.get(n.index) ?? [0, 0, 0, 0];
-      g[c] += 1;
-      soil.set(n.index, g);
+  for (const ring of passes) {
+    for (const [c, pct] of eruptionSoilRows(row)) {
+      for (const n of ring) {
+        if (!eruptionReach(n) || isWater(n)) continue;
+        if (rng.get(100, soilLabel) >= pct) continue;
+        const g = soil.get(n.index) ?? [0, 0, 0, 0];
+        g[c] += 1;
+        soil.set(n.index, g);
+      }
     }
   }
 }

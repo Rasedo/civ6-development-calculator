@@ -1107,7 +1107,7 @@ export function launchInquisition(state: GameState, unit: Unit, actor: Seat): Ru
  * The draw is `drawPromoOffer`'s, taken before Yerevan widens it so the
  * stream reads the same either way.
  */
-function offerApostlePromotions(state: GameState, unit: Unit, seat: number): void {
+export function offerApostlePromotions(state: GameState, unit: Unit, seat: number): void {
   drawPromoOffer(state, unit);
   const rows = unitPromoRows(unit);
   if (suzerainEffect(state, seat, 'apostlePromoChoice')) {

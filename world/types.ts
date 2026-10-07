@@ -78,7 +78,8 @@ export type FeatureId =
   | 'DELICATE_ARCH'
   | 'UBSUNUR_HOLLOW'
   | 'HA_LONG_BAY'
-  | 'WHITE_DESERT';
+  | 'WHITE_DESERT'
+  | 'MATTERHORN';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

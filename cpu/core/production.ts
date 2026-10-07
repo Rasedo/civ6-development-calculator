@@ -1,5 +1,5 @@
 import type { City, GameState, Seat, Unit } from './types';
-import { markBoost } from './boosts';
+import { boostPool, drawBoosts, markBoost } from './boosts';
 import { logPopWrite } from './difflog';
 import { repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
@@ -11,7 +11,7 @@ import { congressCultureBombSeat } from './congress';
 import { hexDistance, neighbors } from '../../world/hex';
 import { availableCivicsIn, availableTechsIn, getModifiers } from './effects';
 import { completedWonders, seatWonderFlag } from './wonders';
-import { grantEraBoosts, refreshDistrictDiscount } from './game';
+import { grantEraBoosts, offerApostlePromotions, refreshDistrictDiscount } from './game';
 import { UNITS, UNIT_TYPE_IDX, ENCAMPMENT_HP, URBAN_DEFENSES_TECH, isLightCavalry } from '../data/units';
 import { isGreatEngineer } from './units';
 import { BUILDINGS } from '../data/buildings';
@@ -351,7 +351,12 @@ export function completeQueueItem(
       // CIV6 (MODIFIER_SINGLE_CITY_GRANT_UNIT_IN_CITY: Pyramids' Builder,
       // Statue of Zeus' army) — at the completing city, row by row.
       for (const g of fx?.grantUnits ?? []) {
-        for (let k = 0; k < g.count; k++) spawnUnit(state, g.unit, city.centerIndex, city.seat);
+        for (let k = 0; k < g.count; k++) {
+          const u = spawnUnit(state, g.unit, city.centerIndex, city.seat);
+          // an Apostle (InitialLevel 2) draws its level offer at its birth
+          // (runs/h1_duelw1118 t224: Mahabodhi's two, 9..1 twice)
+          if (u && u.type === 'APOSTLE') offerApostlePromotions(state, u, city.seat);
+        }
       }
       // CIV6 (Angkor Wat, MODIFIER_PLAYER_CITIES_ADD_POPULATION): every city
       // the owner holds grows once.
@@ -369,6 +374,13 @@ export function completeQueueItem(
       // research chooser uses.
       if (fx?.freeTechs) grantFreeResearch(state, owner, 'tech', fx.freeTechs);
       if (fx?.freeCivics) grantFreeResearch(state, owner, 'civic', fx.freeCivics);
+      // CIV6 (Broadway, MODIFIER_PLAYER_GRANT_RANDOM_CIVIC_BOOST_BY_ERA): a
+      // random civic boost of its era, the era picker's draw (0x39c930;
+      // runs/h1_duelw1124 t189: the Dynastic Cycle's and its own, over 4 and 3)
+      if (fx?.civicBoostsByEra) {
+        const e = ERAS.indexOf(fx.civicBoostsByEra.era as never);
+        drawBoosts(state, city.seat, boostPool(owner.research, 'civic', e, e), fx.civicBoostsByEra.amount);
+      }
       // CIV6 (Great Library): "Receive boosts to all Ancient and Classical era
       // technologies" — one eureka per technology not already boosted or
       // researched, each of which is a Free Inquiry event like any other.

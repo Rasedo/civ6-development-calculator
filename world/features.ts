@@ -283,3 +283,14 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   WHITE_DESERT: { id: 'WHITE_DESERT', name: 'White Desert', yields: { culture: 1, gold: 4, science: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// THE MATTERHORN, appended after the White Desert; the engines' map
+// generator lays none, an imported world carries it. CIV6
+// (Expansion1_Features_Major.xml): one plot, Impassable, Appeal 2,
+// SightThroughModifier 2, no Feature_YieldChanges row; Feature_AdjacentYields
+// Culture 1 to every neighbouring plot (runs/h1_duelw1124: the city beside
+// it reads the Culture). Its MATTERHORN_ADJACENT_UNITS_GRANT_ABILITY (Alpine
+// Training) is not modelled.
+Object.assign(FEATURES, {
+  MATTERHORN: { id: 'MATTERHORN', name: 'Matterhorn', yields: {}, impassable: true, adjacentYields: { culture: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

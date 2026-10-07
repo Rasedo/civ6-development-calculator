@@ -126,16 +126,19 @@ def test_every_payload_channel_has_a_paying_arm(rules, path) -> None:
 def test_the_gates_are_the_installs(rules, path) -> None:
     sim = build(path)
     assert len(sim._goody_sub) == 24
-    sim.turn = 39
+    # LARGE_GOLD's Turn 40 at the online speed is turn 20
+    sim.turn = 19
     early = [sim._goody_sub[i][0] for i in sim._goody_eligible(True)]
-    assert "LARGE_GOLD" not in early, "LARGE_GOLD was drawable before its turn 40"
-    sim.turn = 40
+    assert "LARGE_GOLD" not in early, "LARGE_GOLD was drawable before its turn 40 at the speed"
+    sim.turn = 20
     elig = [sim._goody_sub[i][0] for i in sim._goody_eligible(True)]
-    assert "LARGE_GOLD" in elig, "LARGE_GOLD was not drawable at turn 40"
+    assert "LARGE_GOLD" in elig, "LARGE_GOLD was not drawable at turn 40 at the speed"
     nocity = [sim._goody_sub[i][0] for i in sim._goody_eligible(False)]
     assert "LARGE_GOLD" not in nocity, "a city-less claimer drew a MinOneCity row"
     assert "GRANT_UPGRADE" not in elig, "a weight-0 row was drawable"
-    print("  3 the gates OK — Turn and MinOneCity, and weight 0 stays off")
+    # a kind weighs 800, halved per village of it the claimer has had
+    assert [sim._goody_kind_weight(n) for n in (0, 1, 2, 3, 9, 10)] == [800, 400, 200, 100, 2, 1]
+    print("  3 the gates OK — Turn at the speed and MinOneCity, weight 0 off, the kind weights")
 
 
 def test_a_barbarian_claims_nothing(rules, path) -> None:
@@ -156,10 +159,12 @@ def test_the_draw_moves_one_games_stream(rules, path) -> None:
     one = torch.zeros(wide.B, dtype=torch.bool)
     one[B0] = True
     rng0 = wide.rng_state.clone()
-    sub = wide._draw_goody_reward(one, B0, True)
+    sub = wide._draw_goody_reward(one, B0, True, ROW)
     assert sub is not None, "nothing was drawable at turn 250 with a city"
     assert not bool(torch.equal(wide.rng_state, rng0)), "the draw did not move the stream"
     assert bool(torch.equal(wide.rng_state[1:], rng0[1:])), "another game's stream moved"
+    assert int(wide.civ_goody_kinds[B0, ROW].sum()) == 1, "the kind drawn did not count"
+    assert int(wide.civ_goody_kinds[B0, ROW, wide._goody_sub[sub][1]]) == 1
     print("  5 the draw OK — the stream moves for the claiming game alone")
 
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords, grantTechs } from '../helpers';
 import { setTileOwner } from '../../../cpu/core/seats';
-import { disasterPhase, eventRows, erupt, eruptionRing, meteorCandidate, fireBirth, fireTurn } from '../../../cpu/core/disasters';
+import { disasterPhase, eventRows, erupt, eruptionRings, meteorCandidate, fireBirth, fireTurn } from '../../../cpu/core/disasters';
 import { STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
 import { TURN_LIMIT } from '../../../cpu/core/game';
 import {
@@ -328,18 +328,19 @@ describe('the fires', () => {
 });
 
 describe('the natural wonders\' eruptions', () => {
-  it('a two-plot wonder\'s eruption walks each plot\'s six neighbours, a shared one twice', () => {
+  it('a two-plot wonder\'s eruption walks each plot\'s six neighbours, plot by plot, a shared one twice', () => {
     const state = makeState(makeMap(12, 12));
     const a = tileAtCoords(state.map, 5, 5);
     const b = neighbors(state.map, a)[0];
-    const ring = eruptionRing(state.map, [a, b]);
+    const rings = eruptionRings(state.map, [a, b]);
+    const ring = rings.flat();
     // 6 + 6: the two plots each other's, the two plots they share twice
-    expect(ring.length).toBe(12);
+    expect(rings.map((r) => r.length)).toEqual([6, 6]);
     expect(new Set(ring.map((t) => t.index)).size).toBe(8 + 2);
     expect(ring.filter((t) => t === a || t === b)).toHaveLength(2);
     // the game's NE, E, SE, SW, W, NW (DirectionTypes) from the lower-index plot
     const first = [a, b].sort((x, y) => x.index - y.index)[0];
-    expect(ring.slice(0, 6).map((t) => t.index)).toEqual(
+    expect(rings[0].map((t) => t.index)).toEqual(
       DIRECTION_TYPES.map((d) => neighborTile(state.map, first, d)!.index));
   });
 

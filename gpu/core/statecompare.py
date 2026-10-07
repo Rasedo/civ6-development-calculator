@@ -306,6 +306,7 @@ GAME = {
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],
+    "seaRiseFrom": lambda sim, b, rows: [int(sim.sea_rise_from[b])],
     "removableAtStart": lambda sim, b, rows: [int(sim._removable_at_start[b])],
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
@@ -700,6 +701,7 @@ SEAT = {
     "wmd": lambda sim, b, rows: [int(sim.civ_wmd[b, c].sum()) for c in rows],
     "spaceLy": _civ_scalar("space_ly"),
     "citizenNames": _civ_scalar("civ_citizen_names"),
+    "goodyKinds": lambda sim, b, rows: [[int(x) for x in sim.civ_goody_kinds[b, c].tolist()] for c in rows],
     "laserSpeed": lambda sim, b, rows: [int(_batch_rows(sim, "laser", c, sim._laser_speed)[b]) for c in rows],
     "laserStations": lambda sim, b, rows: [
         int(sim.city_lasers[b, c, : sim.RC][sim.city_alive[b, c, : sim.RC]].sum()) for c in rows

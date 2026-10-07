@@ -3000,10 +3000,10 @@ class SimMasks:
                     f":{int(at_tile[_sb])}:{int(type_idx[_sb])} none #{_why}")
         if not bool(can.count_nonzero()):
             return can
-        # a major's Spy is named at its birth ("Choosing a Citizen Name")
-        if not minor and row < self.n_majors and self._spy_idx >= 0:
+        # a major's Spy or Archaeologist is named at its birth ("Choosing a Citizen Name")
+        if not minor and row < self.n_majors and self._any_named:
             _ti_s = type_idx if torch.is_tensor(type_idx) and type_idx.dim() > 0 else torch.full_like(at_tile, int(type_idx))
-            self._draw_citizen_name(can & (_ti_s == self._spy_idx), torch.full_like(at_tile, row))
+            self._draw_citizen_name(can & self._type_named[_ti_s.clamp(min=0)] & (_ti_s >= 0), torch.full_like(at_tile, row))
         rows = can.nonzero(as_tuple=True)[0]
         if self._log_diff:
             for _sb in rows.tolist():

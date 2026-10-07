@@ -10,8 +10,8 @@ import {
   CLIMATE_PHASES, CO2_PER_POINT, CO2_PER_DEGREE, CARBON_PER_POWER, climatePhase, deforestationModifier,
   pollutionPoints, FLOOD_BARRIER_PER_TILE,
 } from '../../../cpu/data/climate';
-import { FLOOD_WEIGHT, FLOOD_CIPD, DROUGHT_WEIGHT, STORM_EVENTS, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
-import { eventRows, floodWeights, stormWeights } from '../../../cpu/core/disasters';
+import { FLOOD_WEIGHT, FLOOD_CIPD, DROUGHT_WEIGHT, RANDOM_EVENT_START_TURN, STORM_EVENTS, STANDARD_MAP_AREA } from '../../../cpu/data/disasters';
+import { disasterPhase, eventRows, floodWeights, stormWeights } from '../../../cpu/core/disasters';
 import { availableBuildings, buildingCostIn } from '../../../cpu/core/rules';
 import { availableProjects } from '../../../cpu/core/game';
 import { completeQueueItem } from '../../../cpu/core/production';
@@ -172,6 +172,21 @@ describe('the seven phases', () => {
     emitCarbon(state, 0, -seatOf(state, 0)!.co2!);
     climateTurn(state);
     expect(state.climateIdx).toBe(2);
+  });
+
+  it('with random events on, the crossing\'s sea waits for the next event step, the turn\'s event by force', () => {
+    const state = makeState(coast());
+    state.disasters = true;
+    state.turn = RANDOM_EVENT_START_TURN;
+    emitPoints(state, 3);
+    climateTurn(state);
+    const front = tileAtCoords(state.map, 1, 3);
+    expect(state.climateIdx).toBe(1);
+    expect(state.seaRiseFrom).toBe(-1);
+    expect(front.flooded).toBeUndefined();
+    disasterPhase(state);
+    expect(state.seaRiseFrom).toBeUndefined();
+    expect(front.flooded).toBe(true);
   });
 
   it('Phase II floods the shoreline band and leaves the ones behind it dry', () => {

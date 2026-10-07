@@ -1385,22 +1385,46 @@ class SimEconomy:
         self.feat_stripped |= take
 
     def _climate_turn(self) -> None:
-        """The world's climate turn: bank the emissions into points and apply
-        every phase crossed. CIV6: "It is not possible to revert climate change
-        to an earlier phase" (`climateTurn`)."""
+        """The world's climate turn: bank the emissions into points and take
+        the phase crossed. CIV6: "It is not possible to revert climate change
+        to an earlier phase" (`climateTurn`). The sea the crossing raises waits
+        for the next random-event step (`sea_rise_from`, `_sea_rise`); a world
+        with no random events takes it at once."""
         pts = self._climate_points()
         now = torch.full_like(self.climate_idx, -1)
         for p in range(len(self._cl_ice_melt)):
             now = torch.where(pts >= self._cl_points[p], torch.full_like(now, p), now)
-        if not bool((now > self.climate_idx).count_nonzero()):
+        up = now > self.climate_idx
+        if not bool(up.count_nonzero()):
             return
+        was = self.climate_idx.clone()
+        self.climate_idx.copy_(torch.where(up, now, self.climate_idx))
+        if self.disasters:
+            self.sea_rise_from.copy_(torch.where(up & (self.sea_rise_from == -2), was, self.sea_rise_from))
+        else:
+            self._raise_sea(up, was)
+        self._eff_version += 1
+
+    def _sea_rise(self, hit: torch.Tensor) -> None:
+        """`seaRise` — where `hit` [B], the sea level rise the climate step
+        left waiting (`sea_rise_from`), taken: every phase above it up to the
+        one the world stands at (`_raise_sea`)."""
+        go = hit & (self.sea_rise_from != -2)
+        if not bool(go.count_nonzero()):
+            return
+        self._raise_sea(go, self.sea_rise_from.clone())
+        self.sea_rise_from.copy_(torch.where(go, torch.full_like(self.sea_rise_from, -2), self.sea_rise_from))
+        self._eff_version += 1
+
+    def _raise_sea(self, hit: torch.Tensor, frm: torch.Tensor) -> None:
+        """`raiseSea` — where `hit` [B], the sea of every climate phase above
+        `frm` [B] up to `climate_idx`: the polar melt, the flooded lowland
+        band, the submerged one (a Flood Barrier's city spared)."""
         barrier = self._barrier_tiles()
         for p in range(len(self._cl_ice_melt)):
-            at = (self.climate_idx < p) & (now >= p)
+            at = hit & (frm < p) & (self.climate_idx >= p)
             if not bool(at.count_nonzero()):
                 continue
-            self.climate_idx.copy_(torch.where(at, torch.full_like(self.climate_idx, p),
-                                               self.climate_idx))
             self._melt_ice(at, self._cl_ice_melt[p])
             fb = int(self._cl_flood[p])
             if fb > 0:
@@ -1440,6 +1464,8 @@ class SimEconomy:
             self._fire_turn()
             self._volcano_roll()
             self._random_event(strip)
+        else:
+            self._sea_rise(torch.ones(B, dtype=torch.bool, device=dev))
         # CIV6 (EMERGENCY_SEND_AID): the phase's lowest victim asks for aid, once
         self._raise_aid_request(self._aid_hit)
         self._aid_hit = None
@@ -1603,7 +1629,7 @@ class SimEconomy:
     _RING_DIRS = (5, 3, 1, 2, 0, 4)
 
     def _eruption_ring(self, hit: torch.Tensor, plots: torch.Tensor) -> torch.Tensor:
-        """[B, K] `eruptionRing` — each of each game's `plots` [B, T] (where
+        """[B, K] `eruptionRings` — each of each game's `plots` [B, T] (where
         `hit`) in ascending order, its six on-map neighbours in the DLL's
         order: a plot two wonder plots share taken twice, a wonder plot
         beside another taken too; -1 pads."""
@@ -2005,7 +2031,12 @@ class SimEconomy:
         for pw in pairs:
             total = total + pw.sum(dim=1)
         span = total.clamp(min=self._event_occ_scale * self._event_turns)
+        # a sea level rise the climate step left waiting is the turn's event
+        # by force: the roll is a draw over its one row (`_sea_rise`)
+        forced = self.sea_rise_from != -2
+        span = torch.where(forced, torch.ones_like(span), span)
         at = self._rand_range(every, span)
+        self._sea_rise(forced)
         ev = torch.full((B,), -1, dtype=torch.long, device=dev)
         key = torch.full((B,), -1, dtype=torch.long, device=dev)
         done = torch.zeros(B, dtype=torch.bool, device=dev)
@@ -2013,7 +2044,7 @@ class SimEconomy:
         for i, pw in enumerate(pairs):
             run = before.unsqueeze(1) + pw.cumsum(dim=1)
             past = (run > at.unsqueeze(1)) & (pw > 0)
-            take = ~done & past.any(dim=1)
+            take = ~done & ~forced & past.any(dim=1)
             if bool(take.count_nonzero()):
                 col = past.long().argmax(dim=1)
                 kt = keys[i].gather(1, col.unsqueeze(1)).squeeze(1)
@@ -2196,11 +2227,11 @@ class SimEconomy:
     def _erupt(self, hit: torch.Tensor, ring: torch.Tensor, row: torch.Tensor) -> None:
         """`erupt` — an eruption of a volcano or of a natural wonder at each
         game's `ERUPTION_ROWS` row `row` [B], over its neighbours [B, K]
-        (`_eruption_ring`, -1 pads). DAMAGE first: for each damage row in the
+        (`_eruption_ring`, -1 pads), plot by plot. DAMAGE first: for each damage row in the
         install's order, for each neighbour the row reaches
         (`_eruption_reaches`), the plot's BONUS resource is lost — land or
         water, whoever owns it (`_drop_resource`) — and ONE draw at the row's
-        chance applies it (`_event_damage`). Then the SOIL: for each
+        chance applies it (`_event_damage`). Then the SOIL, plot by plot: for each
         `RandomEvent_Yields` row (Food, Production, Science, Culture, where the
         row carries one), for each neighbour on land the row reaches
         (`_soil_paintable`), ONE draw at its chance paints Volcanic Soil and
@@ -2208,42 +2239,45 @@ class SimEconomy:
         a wonder's plot alike."""
         none = torch.full_like(row, -1)
         K = ring.shape[1]
-        for kind in self._ERUPTION_DAMAGE_KINDS:
-            p = self._eruption_damage_p(kind, row)
-            present = hit & (p > 0)
-            if not bool(present.count_nonzero()):
-                continue
-            for d in range(K):
-                nd = torch.where(present, ring[:, d], none)
-                on = self._eruption_reaches(nd)
-                t = nd.clamp(min=0)
-                t1 = t.unsqueeze(1)
-                bonus = (on & (self.res_priority.gather(1, t1).squeeze(1) == 1)
-                         & self._res_live().gather(1, t1).squeeze(1))
-                if bool(bonus.count_nonzero()):
-                    br = bonus.nonzero(as_tuple=True)[0]
-                    self._drop_resource(br, t[br])
-                r = self._rand_range(on, 100)
-                self._event_damage(on & (r < js_round(p * 100).long()), t, kind, self._er_dmg_lo.take(row),
-                                   self._er_dmg_hi.take(row))
-        for py, plane in ((self._er_paint_p, self.fertility), (self._er_prod_p, self.fertility_prod),
-                          (self._er_sci_p, self.fertility_sci), (self._er_cul_p, self.fertility_cul)):
-            p = py[row]
-            present = hit & (p > 0)
-            if not bool(present.count_nonzero()):
-                continue
-            for d in range(K):
-                nd = torch.where(present, ring[:, d], none)
-                elig = self._soil_paintable(nd)
-                r = self._rand_range(elig, 100)
-                land = elig & (r < js_round(p * 100).long())
-                if not bool(land.count_nonzero()):
+        # plot by plot (`eruptionRings`): the ring holds each plot's six in turn
+        for c0 in range(0, K, 6):
+            for kind in self._ERUPTION_DAMAGE_KINDS:
+                p = self._eruption_damage_p(kind, row)
+                present = hit & (p > 0)
+                if not bool(present.count_nonzero()):
                     continue
-                lr = land.nonzero(as_tuple=True)[0]
-                lt = nd[lr]
-                soil = (self.feat_id[lr, lt] == self._soil_fid) & ~self.feat_stripped[lr, lt]
-                self._paint_soil(lr[~soil], lt[~soil])
-                self._silt(plane, lr, lt)
+                for d in range(c0, c0 + 6):
+                    nd = torch.where(present, ring[:, d], none)
+                    on = self._eruption_reaches(nd)
+                    t = nd.clamp(min=0)
+                    t1 = t.unsqueeze(1)
+                    bonus = (on & (self.res_priority.gather(1, t1).squeeze(1) == 1)
+                             & self._res_live().gather(1, t1).squeeze(1))
+                    if bool(bonus.count_nonzero()):
+                        br = bonus.nonzero(as_tuple=True)[0]
+                        self._drop_resource(br, t[br])
+                    r = self._rand_range(on, 100)
+                    self._event_damage(on & (r < js_round(p * 100).long()), t, kind, self._er_dmg_lo.take(row),
+                                       self._er_dmg_hi.take(row))
+        for c0 in range(0, K, 6):
+            for py, plane in ((self._er_paint_p, self.fertility), (self._er_prod_p, self.fertility_prod),
+                              (self._er_sci_p, self.fertility_sci), (self._er_cul_p, self.fertility_cul)):
+                p = py[row]
+                present = hit & (p > 0)
+                if not bool(present.count_nonzero()):
+                    continue
+                for d in range(c0, c0 + 6):
+                    nd = torch.where(present, ring[:, d], none)
+                    elig = self._soil_paintable(nd)
+                    r = self._rand_range(elig, 100)
+                    land = elig & (r < js_round(p * 100).long())
+                    if not bool(land.count_nonzero()):
+                        continue
+                    lr = land.nonzero(as_tuple=True)[0]
+                    lt = nd[lr]
+                    soil = (self.feat_id[lr, lt] == self._soil_fid) & ~self.feat_stripped[lr, lt]
+                    self._paint_soil(lr[~soil], lt[~soil])
+                    self._silt(plane, lr, lt)
 
     def _event_damage(self, land: torch.Tensor, tile: torch.Tensor, kind: str,
                       lo: torch.Tensor, hi: torch.Tensor, ev: torch.Tensor | None = None) -> None:

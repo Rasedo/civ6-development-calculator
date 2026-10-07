@@ -180,6 +180,27 @@ interface Step {
   births?: SpreadFire[];
 }
 
+/** The plots nobody held when turn T's random-event step ran: the record
+ *  after it holds them unowned, or the first player's start of T took them
+ *  after the step (its CityTileOwnershipChanged rows before the turn's
+ *  first PlayerTurnActivated) — the claims of the players after it on the
+ *  turn before stand (runs/h1_duelw1119 t56: the meteor's pick over 262
+ *  plots, four the record before held unowned taken since). */
+function unownedAtStep(after: TurnRecord, T: number): Set<number> {
+  const W = after.head.W;
+  const out = new Set<number>();
+  for (let i = 0; i < W * after.map.length; i++) if ((plotAt(after, i)[P.owner] as number) < 0) out.add(i);
+  const rows = (after as TurnRecord & { actions?: unknown }).actions;
+  if (Array.isArray(rows)) {
+    for (const r of rows as (number | string)[][]) {
+      if (r[1] !== T) continue;
+      if (r[2] === 'PlayerTurnActivated') break;
+      if (r[2] === 'CityTileOwnershipChanged') out.add((r[6] as number) * W + (r[5] as number));
+    }
+  }
+  return out;
+}
+
 export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: RandLog): EventReplay {
   const result: EventReplay = { events: new Map(), gains: new Map(), turns: new Map(), unsure: new Map(), steps: new Map(), gaps: new Map() };
   const names = cat.randomEvents ?? [];
@@ -216,7 +237,10 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
   let volcano: VolcanoDraws = 1;
   const turns = [...byTurn.keys()].sort((a, b) => a - b);
   for (const T of turns) {
-    const before = byTurn.get(T - 1);
+    // the map the step struck: the record before, or the latest earlier one
+    // where that record was not read (runs/h1_duelw1119: record 3 missing,
+    // record 4 read while its counter moved; the step of t5 runs on record 2)
+    const before = byTurn.get(T - 1) ?? byTurn.get(turns.filter((t) => t < T).pop() ?? -1);
     const after = byTurn.get(T)!;
     const news = [...first.values()].filter((e) => e[0] === T);
     live = live.filter((s) => T - s.storm.start <= STORM_WALKS);
@@ -276,12 +300,15 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
           step.bornOk = step.born?.at === at && step.born.added === num(e[4]) && (e[13] === undefined || step.born.dir === num(e[13]));
           return step.bornOk;
         });
-      } else if (eruption >= 0 && name.startsWith('RANDOM_EVENT_VOLCANO')) {
-        const centre = map.tiles[num(e[2])];
-        if (!centre) { unsupported = `${name} t${T}: no volcano plot`; continue; }
+      } else if (eruption >= 0) {
+        // a volcano's row erupts its plot; a natural wonder's row the
+        // wonder's plots (`erupt`: Eyjafjallajokull, Kilimanjaro, Vesuvius)
+        const centres = ERUPTION_WONDER[eruption] ? map.tiles.filter((t) => t.feature === ERUPTION_WONDER[eruption])
+          : [map.tiles[num(e[2])]].filter((t): t is Tile => !!t);
+        if (!centres.length) { unsupported = `${name} t${T}: no volcano plot`; continue; }
         parts.push((rng, step) => {
           const soil = new Map<number, number[]>();
-          eruptionDraws(rng, map, [centre], eruption, ctx, step.out, soil);
+          eruptionDraws(rng, map, centres, eruption, ctx, step.out, soil);
           let n = 0;
           for (const [i, g] of soil) { addGain(step.soil, i, g); n += g[0] + g[1] + g[2] + g[3]; }
           return n === num(e[4]);
@@ -324,7 +351,8 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
         // then its strike's two damage rows (2 of 2 meteors land: 1115 t135,
         // 1116 t243)
         const at = num(e[3]);
-        const cands = map.tiles.filter((t) => meteorGround(t) && (plotAt(before, t.index)[P.owner] as number) < 0);
+        const free = unownedAtStep(after, T);
+        const cands = map.tiles.filter((t) => meteorGround(t) && free.has(t.index));
         if (!cands.length) {
           if (at >= 0) unsupported = `${name} t${T}: the record's plot is no candidate`;
           continue;
@@ -385,7 +413,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
     let slackUsed = 0;
     // draws the records cannot show (a unit that came and went on a struck
     // plot) fall in a flood's or an eruption's damage pass, before its yields
-    const struckEvent = news.some((e) => FLOODS.includes(names[e[1]] ?? '') || (names[e[1]] ?? '').startsWith('RANDOM_EVENT_VOLCANO'));
+    const struckEvent = news.some((e) => FLOODS.includes(names[e[1]] ?? '') || ERUPTION_ROWS.some((r) => `RANDOM_EVENT_${r}` === names[e[1]]));
     const slack = struckEvent ? [0, 1, 2] : [0];
     const variants = tryModes.flatMap((v) => slack.flatMap((extra) => slack.map((tail) => [v, extra, tail] as const)))
       .sort((x, y) => x[1] + x[2] - y[1] - y[2]);

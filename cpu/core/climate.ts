@@ -270,16 +270,38 @@ function meltIce(state: GameState, fraction: number): void {
 
 /**
  * The world's climate turn: bank the emissions into points, and if that moved
- * the phase, apply every phase crossed. CIV6: "It is not possible to revert
- * climate change to an earlier phase."
+ * the phase, take it. CIV6: "It is not possible to revert climate change to
+ * an earlier phase." The sea the crossing raises waits for the next
+ * random-event step (`seaRise`: the game's RANDOM_EVENT_SEA_LEVEL_RISE rows,
+ * EffectOperatorType SEA_LEVEL, whose turn draws its "Random Event Roll" over
+ * the one row — runs/h1_duelw1117 t224, t244, 1118 t239, t270); a world with
+ * no random events takes it at once.
  */
 export function climateTurn(state: GameState): void {
   const now = climatePhase(climatePoints(state));
   const was = state.climateIdx ?? -1;
   if (now <= was) return;
-  for (let p = was + 1; p <= now; p++) {
+  state.climateIdx = now;
+  if (state.disasters) state.seaRiseFrom ??= was;
+  else raiseSea(state, was);
+}
+
+/**
+ * THE SEA LEVEL RISE of every climate phase above `from` up to the one the
+ * world stands at: the polar melt, the flooded lowland band, the submerged
+ * one (a Flood Barrier's city spared).
+ */
+export function seaRise(state: GameState): void {
+  const from = state.seaRiseFrom;
+  if (from === undefined) return;
+  state.seaRiseFrom = undefined;
+  raiseSea(state, from);
+}
+
+function raiseSea(state: GameState, from: number): void {
+  const now = state.climateIdx ?? -1;
+  for (let p = from + 1; p <= now; p++) {
     const ph = CLIMATE_PHASES[p];
-    state.climateIdx = p;
     meltIce(state, ph.iceMelt);
     if (ph.flood > 0) {
       for (const t of state.map.tiles) {

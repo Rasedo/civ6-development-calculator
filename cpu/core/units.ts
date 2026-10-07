@@ -8,7 +8,7 @@ import { ENHANCER_BELIEFS, gainPopulationPressure, unconvertedOf } from '../data
 import type { GameMap, GameState, City, Seat, Tile, Unit } from './types';
 import { seatWonderSum } from './wonders';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP } from '../data/units';
+import { FORMATION_CS, FORMATION_MAX, FORMATION_CIVIC, BUILDER_COST_STEP, CITIZEN_NAMED_UNITS } from '../data/units';
 
 /** what a unit's FORMATION adds to Combat, Ranged and Bombard Strength alike.
  *  ONE reader of the optional field, so no strength site spells its own
@@ -1661,8 +1661,8 @@ export function spawnUnit(
     }
     return null;
   }
-  // a major's Spy is named at its birth ("Choosing a Citizen Name")
-  if (isSpy(unitType) && seat < state.seats.length) drawCitizenName(state, seat);
+  // a major's Spy or Archaeologist is named at its birth ("Choosing a Citizen Name")
+  if (CITIZEN_NAMED_UNITS.includes(unitType) && seat < state.seats.length) drawCitizenName(state, seat);
   const unit: Unit = {
     id: state.nextUnitId++,
     type: unitType,
@@ -2177,7 +2177,7 @@ export function claimMeteorSite(state: GameState, unit: Unit): void {
 export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void {
   const owner = seatOf(state, unit.seat);
   if (!owner) return;
-  const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0);
+  const sub = drawGoodyReward(state, state.turn, owner.cities.length > 0, owner);
   if (!sub) return;
   const p = sub.payload;
   const amount = goodyAmount(sub);

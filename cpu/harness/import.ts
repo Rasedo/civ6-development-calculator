@@ -35,7 +35,7 @@ import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
-import { eruptionRing, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { eruptionRings, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
 import { goldShortfall } from '../data/seats';
@@ -94,7 +94,16 @@ export interface StartTies {
 }
 
 /** the game's `CityMadePurchase` purchase type of a plot: the hash of its kind's name */
-const PURCHASE_PLOT_HASH = gameHash('PLOT');
+export const PURCHASE_PLOT_HASH = gameHash('PLOT');
+
+/** The engine's feature for a record's feature row (none for none, the
+ *  volcano's row, or a row the engine does not field). */
+export function engineFeature(cat: Catalog, fi: number): FeatureId | null {
+  if (fi < 0) return null;
+  const fname = cat.features[fi] ?? '';
+  const id = FEATURE_ID[fname] ?? strip(fname, 'FEATURE_');
+  return id in FEATURES ? id as FeatureId : null;
+}
 
 export interface Imported {
   state: GameState;
@@ -655,7 +664,7 @@ export function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
  * the event, one per row and plot. A flood draws every `FLOOD_YIELD_ROWS`
  * row of its severity on every plot of its river (`riverReach` from the
  * recorded start plot) of the row's Floodplains kind; an eruption every
- * soil row on every neighbour of the volcano or wonder (`eruptionRing`) the
+ * soil row on every neighbour of the volcano or wonder (`eruptionRings`) the
  * soil may paint (`soilPaintable`). A storm's walk is not recorded, only
  * where it began and where it stands: `exact` is false and `slots` holds
  * every land plot a fertile storm row may have reached — within its
@@ -684,7 +693,7 @@ function eventSlots(map: GameMap, name: string, cur: number, start: number, walk
     const wonder = ERUPTION_WONDER[eruption];
     const plots = wonder ? map.tiles.filter((t) => t.feature === wonder) : [at(cur)].filter((t): t is Tile => !!t);
     if (!plots.length) return { slots: [], exact: false };
-    const ring = eruptionRing(map, plots);
+    const ring = eruptionRings(map, plots).flat();
     const slots: [number, EventChannel][] = [];
     const rows = [ERUPTION_PAINT_P[eruption], ERUPTION_PROD_P[eruption], ERUPTION_SCI_P[eruption], ERUPTION_CUL_P[eruption]];
     rows.forEach((p, k) => {

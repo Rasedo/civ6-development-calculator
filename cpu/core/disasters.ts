@@ -33,7 +33,7 @@ import { METEOR_WEIGHT, METEOR_TERRAINS, METEOR_AVOIDS_TERRITORY } from '../data
 import { FIRE_WEIGHT, FIRE_CIPD, FIRE_START_FEATURE, FIRE_BURNING_FEATURE, FIRE_BURNT_FEATURE, FIRE_BURNT_TURN, FIRE_REGROW_TURN, FIRE_SPREAD_P, FIRE_SPREAD_TURNS, FIRE_DAMAGE_TURNS, FIRE_POP_TURN, FIRE_DMG } from '../data/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_WEIGHT, ACCIDENT_MIN_TURN, ACCIDENT_FALLOUT, ACCIDENT_DISTRICT_P, ACCIDENT_BLDG_P, ACCIDENT_POP_P, ACCIDENT_LAND_P, ACCIDENT_DMG_LO, ACCIDENT_DMG_HI, ACCIDENT_CIV_KILL_P } from '../data/disasters';
 import { STORM_EVENTS, STORM_ROWS, WIND_ROWS, STORM_UNIT_ROWS, stormFamilyAt, gameLatitude, stormFootprintOffsets, STORM_MOVEMENT, STORM_STEP_COST_ON, STORM_STEP_COST_OFF, STORM_LAST_TURN_PCT, type StormEvent } from '../data/disasters';
-import { defertilize, desertificationLive, fertilityLive, warmingDegrees } from './climate';
+import { defertilize, desertificationLive, fertilityLive, seaRise, warmingDegrees } from './climate';
 import { governorTileFlag } from './governors';
 
 function log(state: GameState, text: string): void {
@@ -833,6 +833,13 @@ export function sitePairWeight(row: EventRow, pct: number, degrees: number): num
  * plots, the drought's a weighted one over the map (`droughtStart`).
  */
 function randomEvent(state: GameState, strip: boolean): void {
+  // a sea level rise the climate step left waiting is the turn's event by
+  // force: the roll is a draw over its one row (`seaRise`)
+  if (state.seaRiseFrom !== undefined) {
+    randRange(state, 1);
+    seaRise(state);
+    return;
+  }
   const degrees = warmingDegrees(state);
   const rows = eventRows(degrees, state.map.width * state.map.height);
   const sites = eventSites(state);
@@ -1047,21 +1054,16 @@ function droughtTile(state: GameState, t: Tile, sev: number, turns: number, stri
 }
 
 /**
- * The NEIGHBOURS an eruption strikes: each of `plots` (a volcano's one plot,
- * or a natural wonder's) in ascending order, its six on-map neighbours in
- * DirectionTypes order (`DIRECTION_TYPES`) — a plot two wonder plots share taken twice, a
- * wonder plot beside another taken too (the natural-wonder eruption 0xa22150
- * walks each plot's six; the eruption itself skips what it does not reach).
+ * The NEIGHBOURS an eruption strikes, plot by plot: each of `plots` (a
+ * volcano's one plot, or a natural wonder's) in ascending order, its six
+ * on-map neighbours in DirectionTypes order (`DIRECTION_TYPES`) — a plot two
+ * wonder plots share taken twice, a wonder plot beside another taken too (the
+ * natural-wonder eruption 0xa22150 walks each plot's six; the eruption itself
+ * skips what it does not reach).
  */
-export function eruptionRing(map: GameMap, plots: readonly Tile[]): Tile[] {
-  const out: Tile[] = [];
-  for (const p of [...plots].sort((a, b) => a.index - b.index)) {
-    for (const d of DIRECTION_TYPES) {
-      const n = neighborTile(map, p, d);
-      if (n) out.push(n);
-    }
-  }
-  return out;
+export function eruptionRings(map: GameMap, plots: readonly Tile[]): Tile[][] {
+  return [...plots].sort((a, b) => a.index - b.index)
+    .map((p) => DIRECTION_TYPES.map((d) => neighborTile(map, p, d)).filter((n): n is Tile => !!n));
 }
 
 /** An eruption's `RandomEvent_Damages` kinds in the install's row order, each
@@ -1100,12 +1102,16 @@ function silt(state: GameState, tile: Tile, key: 'fertility' | 'fertilityProd' |
  * AN ERUPTION of a volcano or of a natural wonder (`plots`, its plots), at
  * `ERUPTION_ROWS` row `row` (GameCore_XP2 0xa22000 / 0xa22150: the damage pass
  * 0xa1c1a0, then the soil pass 0xa219e0; `tools/civ6lab/dll_eruption.py`).
- * DAMAGE first: for each damage row in the install's order
- * (`ERUPTION_DAMAGE_KINDS`), for each neighbour (`eruptionRing`) the row
+ * DAMAGE first, plot by plot (`eruptionRings`: a natural wonder's passes
+ * 0xa1c760 / 0xa21680 walk each of its plots in turn, every row over the
+ * plot's six before the next plot's — runs/h1_duelw1119 t120,
+ * Eyjafjallajokull's three land-unit rolls after its first plot's 31st and
+ * its second plot's 32nd and 34th draws): for each damage row in the
+ * install's order (`ERUPTION_DAMAGE_KINDS`), for each neighbour the row
  * reaches (`eruptionReaches`), the plot's BONUS resource is lost — land or
  * water, whoever owns it — and ONE draw at the row's chance applies it
- * (`eventDamage`). Then the SOIL: for each `RandomEvent_Yields` row —
- * YIELD_FOOD (`ERUPTION_PAINT_P`), YIELD_PRODUCTION, YIELD_SCIENCE,
+ * (`eventDamage`). Then the SOIL, plot by plot: for each `RandomEvent_Yields`
+ * row — YIELD_FOOD (`ERUPTION_PAINT_P`), YIELD_PRODUCTION, YIELD_SCIENCE,
  * YIELD_CULTURE, where the row carries one — for each neighbour on land the
  * row reaches (`soilPaintable`), ONE draw at its chance paints Volcanic Soil
  * and adds +1 of the row's yield (every row paints) — a district's, a city
@@ -1114,27 +1120,31 @@ function silt(state: GameState, tile: Tile, key: 'fertility' | 'fertilityProd' |
  * district plots all stood on Volcanic Soil, runs/volcano_own_*.jsonl).
  */
 export function erupt(state: GameState, plots: readonly Tile[], row: number): void {
-  const ring = eruptionRing(state.map, plots);
+  const rings = eruptionRings(state.map, plots);
   const volcano = plots[0];
-  for (const kind of ERUPTION_DAMAGE_KINDS) {
-    const p = eruptionDamageP(kind, row);
-    if (p <= 0) continue;
-    for (const n of ring) {
-      if (!eruptionReaches(n)) continue;
-      if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
-      if (randRange(state, 100) < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+  for (const ring of rings) {
+    for (const kind of ERUPTION_DAMAGE_KINDS) {
+      const p = eruptionDamageP(kind, row);
+      if (p <= 0) continue;
+      for (const n of ring) {
+        if (!eruptionReaches(n)) continue;
+        if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
+        if (randRange(state, 100) < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+      }
     }
   }
   const soil: [number, 'fertility' | 'fertilityProd' | 'fertilitySci' | 'fertilityCul'][] = [
     [ERUPTION_PAINT_P[row], 'fertility'], [ERUPTION_PROD_P[row], 'fertilityProd'],
     [ERUPTION_SCI_P[row], 'fertilitySci'], [ERUPTION_CUL_P[row], 'fertilityCul']];
-  for (const [p, key] of soil) {
-    if (p <= 0) continue;
-    for (const n of ring) {
-      if (!soilPaintable(n)) continue;
-      if (randRange(state, 100) >= Math.round(p * 100)) continue;
-      if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
-      silt(state, n, key);
+  for (const ring of rings) {
+    for (const [p, key] of soil) {
+      if (p <= 0) continue;
+      for (const n of ring) {
+        if (!soilPaintable(n)) continue;
+        if (randRange(state, 100) >= Math.round(p * 100)) continue;
+        if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
+        silt(state, n, key);
+      }
     }
   }
   log(state, `Volcanic eruption at (${volcano.col}, ${volcano.row}) — slopes scorched, soil enriched.`);
@@ -1286,7 +1296,7 @@ export function disasterPhase(state: GameState): void {
     fireTurn(state);
     volcanoRoll(state);
     randomEvent(state, strip);
-  }
+  } else seaRise(state);
   // CIV6 (EMERGENCY_SEND_AID, Trigger PLAYER_LOSES_POP_TO_RANDOM_EVENT): the
   // phase's LOWEST victim civilization asks for aid — resolved once at the
   // end, so the order the two engines walk the turn's events cannot pick a

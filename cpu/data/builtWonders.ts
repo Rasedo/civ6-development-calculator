@@ -205,6 +205,9 @@ export interface BuiltWonderDef {
     freeCivics?: number;
     /** Technologies completed outright at completion. */
     freeTechs?: number;
+    /** Random civic boosts of one era granted at completion
+     *  (MODIFIER_PLAYER_GRANT_RANDOM_CIVIC_BOOST_BY_ERA: Broadway's Atomic one). */
+    civicBoostsByEra?: { era: string; amount: number };
     /** The owner's treasury is multiplied by this at completion. */
     treasuryMult?: number;
     /** Era score paid per era-score event worth `ERA_SCORE_MOMENT_MIN` or more. */
@@ -1099,8 +1102,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'BROADWAY', name: 'Broadway', code: 'BW', cost: 1620,
       requiresCivic: 'MASS_MEDIA', placement: { flatOnly: true, adjacentDistrict: 'THEATER_SQUARE' },
-      effects: { gpPoints: { WRITER: 3, MUSICIAN: 3 }, cityYieldMult: { culture: 1.2 } },
-      description: '+3 Writer and +3 Musician points per turn, +20% culture in this city, 1 Writing and 2 Music Great Work slots. Flat land adjacent to a Theater Square.',
+      effects: { gpPoints: { WRITER: 3, MUSICIAN: 3 }, cityYieldMult: { culture: 1.2 }, civicBoostsByEra: { era: 'ATOMIC', amount: 1 } },
+      description: '+3 Writer and +3 Musician points per turn, +20% culture in this city, a random Atomic civic boost, 1 Writing and 2 Music Great Work slots. Flat land adjacent to a Theater Square.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'Cost', { scale: GAME_SPEED }),
@@ -1110,6 +1113,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.flatOnly': { derived: 'true where every Building_ValidTerrains row of the wonder is a FLAT terrain', inputs: [xml('Building_ValidTerrains', 'BuildingType=BUILDING_BROADWAY', 'TerrainType')] },
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_BROADWAY', 'AdjacentDistrict', { expect: 'DISTRICT_THEATER' }),
         'effects.cityYieldMult.culture': { derived: '1 + Amount/100 — the install writes the percentage, this catalog the multiplier', inputs: [xml('ModifierArguments', 'ModifierId=BROADWAY_ADDCULTUREYIELD&Name=Amount', 'Value')] },
+        'effects.civicBoostsByEra.era': xml('ModifierArguments', 'ModifierId=BUILDING_BROADWAY_RANDOMCIVICBOOST&Name=StartEraType', 'Value', { expect: 'ERA_ATOMIC' }),
+        'effects.civicBoostsByEra.amount': xml('ModifierArguments', 'ModifierId=BUILDING_BROADWAY_RANDOMCIVICBOOST&Name=Amount', 'Value'),
       },
     }),
     W({

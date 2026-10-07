@@ -45,10 +45,10 @@ import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } 
 import { governedCityIds, governorFlag } from '../core/governors';
 import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT, WONDER_FREE_TILES } from '../data/constants';
-import { UNITS } from '../data/units';
+import { CITIZEN_NAMED_UNITS, PROMO_OFFER_UNITS, UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
 import { gainPopulationPressure } from '../data/religion';
-import type { DistrictId, YieldKey } from '../../world/types';
+import type { DistrictId, FeatureId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
 import { hexDistance, neighbors, tilesWithin } from '../../world/hex';
 import { P, bool, num, plotAt, type Catalog, type DumpCity, type DumpPlayer, type Read, type TurnRecord } from './record';
@@ -56,7 +56,7 @@ import { Civ6Random, drawsBetween } from './civ6Random';
 import type { LoggedDraw } from './randLog';
 import { DRAW_SITES, siteLabel } from './drawSites';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, ageOf, congressOfRecord, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, routeChanges,
   type History, type Imported,
 } from './import';
 import {
@@ -69,7 +69,8 @@ import { citiesOf, isCiv } from '../core/seats';
 import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
-import { engineId } from './aliases';
+import { engineId, gameHash } from './aliases';
+import { GOODY_SUBTYPES, type GoodySubType } from '../data/goodyHuts';
 import { unitPromoRows } from '../core/promotions';
 import { GOVERNMENTS, POLICIES } from '../data/policies';
 import { TECHS } from '../data/techs';
@@ -170,6 +171,153 @@ function citiesOfImport(imp: Imported): { city: City; dump: DumpCity; minor: boo
 /** the border pick's label in the game's log (0x1ab1c0) */
 const PICKER = 'GetNextBuyablePlot picker';
 
+/** One row of a record's event log (`actions`, `tools/civ6lab/h1/h1_actions.lua`):
+ *  [sequence, turn, the `Events` name, ...the handler's arguments]. */
+type ActionRow = (number | string | boolean | null)[];
+
+/** The rows of the record's event log that player `p`'s turn `t` fired
+ *  before its PlayerTurnActivated: its start (the city turns in the player's
+ *  city order, then what the AI does before the activation fires), from the
+ *  last turn boundary before it. Undefined where the record carries no log
+ *  or the log holds no activation of `p` at `t`. */
+function startRows(rec: TurnRecord, p: number, t: number): ActionRow[] | undefined {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return undefined;
+  const all = rows as ActionRow[];
+  const end = all.findIndex((r) => r[1] === t && r[2] === 'PlayerTurnActivated' && r[3] === p);
+  if (end < 0) return undefined;
+  let from = end;
+  while (from > 0 && all[from - 1][2] !== 'PlayerTurnDeactivated' && all[from - 1][2] !== 'PlayerTurnActivated') from--;
+  return all.slice(from, end);
+}
+
+/** The plots unowned in the record before that the record's event log shows
+ *  changing hands after player `p`'s PlayerTurnActivated of turn `t`. */
+function takenAfterStart(rec: TurnRecord, before: TurnRecord, p: number, t: number): number[] {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return [];
+  const all = rows as ActionRow[];
+  const end = all.findIndex((r) => r[1] === t && r[2] === 'PlayerTurnActivated' && r[3] === p);
+  if (end < 0) return [];
+  const W = rec.head.W;
+  const out: number[] = [];
+  for (const r of all.slice(end + 1)) {
+    if (r[2] !== 'CityTileOwnershipChanged') continue;
+    const i = (r[6] as number) * W + (r[5] as number);
+    if (num(plotAt(before, i)[P.owner] as Read<number>) < 0) out.push(i);
+  }
+  return out;
+}
+
+/** The barbarian camps the record before holds and the record does not that
+ *  still stood at player `p`'s start of turn `t`: the event log removes each
+ *  at or after the start's first row (runs/h1_duelw1123 t124: the camp on
+ *  440 cleared in China's actions — at Beijing's closing pick it still
+ *  priced 440 out, the pick fell on 616). */
+function campsAtStart(rec: TurnRecord, before: TurnRecord, cat: Catalog, p: number, t: number): number[] {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return [];
+  const all = rows as ActionRow[];
+  const end = all.findIndex((r) => r[1] === t && r[2] === 'PlayerTurnActivated' && r[3] === p);
+  if (end < 0) return [];
+  let from = end;
+  while (from > 0 && all[from - 1][2] !== 'PlayerTurnDeactivated' && all[from - 1][2] !== 'PlayerTurnActivated') from--;
+  const W = rec.head.W;
+  const camp = (r: TurnRecord, i: number) => cat.improvements[plotAt(r, i)[P.improvement] as number] === 'IMPROVEMENT_BARBARIAN_CAMP';
+  const out: number[] = [];
+  for (let i = 0; i < W * rec.map.length; i++) {
+    if (!camp(before, i) || camp(rec, i)) continue;
+    const k = all.findIndex((r) => r[2] === 'ImprovementRemovedFromMap' && (r[4] as number) * W + (r[3] as number) === i);
+    if (k >= from) out.push(i);
+  }
+  return out;
+}
+
+/** the civics whose first completion in the game lays the dig sites */
+const DIG_CIVICS = ['CIVIC_NATURAL_HISTORY', 'CIVIC_CULTURAL_HERITAGE'];
+
+/** the fire's features, which the turn's climate step lays and lifts */
+const FIRE_FEATURES = new Set(['BURNING_WOODS', 'BURNT_WOODS', 'BURNING_RAINFOREST', 'BURNT_RAINFOREST']);
+
+/** the plots holding an Antiquity Site or a Shipwreck in the record that
+ *  held none in the record before */
+function newDigSites(rec: TurnRecord, before: TurnRecord, cat: Catalog): number {
+  const dig = (r: TurnRecord, i: number) => /^RESOURCE_(ANTIQUITY_SITE|SHIPWRECK)$/.test(cat.resources[plotAt(r, i)[P.resource] as number] ?? '');
+  let n = 0;
+  for (let i = 0; i < rec.head.W * rec.map.length; i++) if (dig(rec, i) && !dig(before, i)) n++;
+  return n;
+}
+
+/** The Tribal Villages a city's culture claims take in a start's event rows:
+ *  each GoodyHutReward row with no unit (player -1) whose next
+ *  CityTileOwnershipChanged is the city's — the subtype it paid, by its
+ *  type hash. */
+function villageClaims(win: ActionRow[], p: number, city: number): GoodySubType[] {
+  const out: GoodySubType[] = [];
+  win.forEach((r, k) => {
+    if (r[2] !== 'GoodyHutReward' || r[3] !== -1) return;
+    const claim = win.slice(k + 1).find((x) => x[2] === 'CityTileOwnershipChanged');
+    if (!claim || claim[3] !== p || claim[4] !== city) return;
+    const sub = GOODY_SUBTYPES.find((s) => gameHash(`GOODYHUT_${s.id}`) === r[6]);
+    if (sub) out.push(sub);
+  });
+  return out;
+}
+
+/** the draws a village's reward takes after its kind and subtype: a boost
+ *  each (0x4ca470 / 0x39c330), a free technology each (0x4caeb0) */
+function goodyRewardDraws(sub: GoodySubType): string[] {
+  const p = sub.payload;
+  const n = 'amount' in p ? p.amount : 0;
+  if (p.kind === 'techBoost') return Array(n).fill('Choosing random tech boost to grant based on era');
+  if (p.kind === 'civicBoost') return Array(n).fill('Choosing random civic boost to grant based on era');
+  if (p.kind === 'tech') return Array(n).fill('Choosing random tech to grant based on era');
+  return [];
+}
+
+/** the rows an annexed plot's change of hands fires beside its own: a unit
+ *  pushed off it or put out of a camp it clears, its improvement's owner and yields */
+const ANNEX_SIDE_ROWS = new Set(['UnitTeleported', 'UnitAddedToMap', 'ImprovementChanged', 'ImprovementRemovedFromMap', 'ImprovementAddedToMap', 'PlotYieldChanged']);
+
+/** The wonders a start's event rows (`startRows`) complete, by city key, each
+ *  with the plots its annex took: the city's CityTileOwnershipChanged rows
+ *  right before the WonderCompleted row (0x17f870 annexes before it signals
+ *  the wonder; a BuildingChanged of the city, a unit the annex pushed off
+ *  between), each one "GetNextBuyablePlot picker" draw; a list emptied
+ *  draws no more (runs/h1_duelw1117 t217: Meenakshi at Xi'an with no plot
+ *  in reach, no draw; 1123 t112 two; 1118 t227 Kotoku-in two, a Roman unit
+ *  teleported between). */
+function wondersInStart(win: ActionRow[], p: number, W: number, barbs: ReadonlySet<number>): Map<string, StartWonder[]> {
+  const out = new Map<string, StartWonder[]>();
+  win.forEach((r, k) => {
+    if (r[2] !== 'WonderCompleted' || r[6] !== p) return;
+    const city = r[7] as number;
+    const annexed: number[] = [];
+    let camps = 0;
+    for (let j = k - 1; j >= 0; j--) {
+      const q = win[j];
+      if (q[2] === 'ImprovementRemovedFromMap' && barbs.has(q[5] as number)) camps++;
+      if ((q[2] === 'BuildingChanged' && q[7] === city) || ANNEX_SIDE_ROWS.has(q[2] as string)) continue;
+      if (q[2] !== 'CityTileOwnershipChanged' || q[3] !== p || q[4] !== city) break;
+      annexed.push((q[6] as number) * W + (q[5] as number));
+    }
+    const key = `${p}:${city}`;
+    if (!out.has(key)) out.set(key, []);
+    out.get(key)!.push({ building: r[5] as number, annexed, camps });
+  });
+  return out;
+}
+
+/** A wonder a start completes (`wondersInStart`): its building row, the
+ *  plots its annex took, and the barbarian camps among them (a camp's
+ *  plot annexed clears the camp, its unit put out — one "Barb Tribe Roll":
+ *  runs/h1_duelw1121 t190, the Colossus at Longxi annexing 12,14) */
+interface StartWonder {
+  building: number;
+  annexed: number[];
+  camps: number;
+}
+
 /** One draw of a player's start: the DLL's label (the game's log names it
  *  so), what drew it (`note`), and for a city's closing pick its `owner:id`
  *  and the ties it draws over. `choice` marks a draw the player's AI takes
@@ -247,12 +395,67 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
     const r: StartReplay = { player: p, turn: post.turn, pre: a, post: b, game: a !== undefined && b !== undefined ? drawsBetween(a, b, 4096) : undefined,
       cities: post.cities.map((c) => `${p}:${num(c.id)}`), draws: [] };
     out.push(r);
+    // the start's own rows of the record's event log, where it carries one
+    const win = startRows(rec, p, post.turn);
+    // the units a wonder of the start granted, by type
+    const granted = new Map<string, number>();
     // a start of the turn before the record's: the plots gained after it
     // stand unowned at its picks (`lateClaims`)
-    const { late: undo, unsure, claims } = post.turn < rec.turn && before ? lateClaims(rec, before, imp, p, latest)
+    const lc = post.turn < rec.turn && before ? lateClaims(rec, before, imp, p, latest)
       : { late: [], unsure: [], claims: new Map<string, number[]>() };
+    const { claims } = lc;
+    // and every plot the event log shows changing hands after the start —
+    // unowned in the record before — stood unowned at it (runs/h1_duelw1120
+    // t21: Muscat's 826 and 829, annexed for China's envoys in its start of
+    // t22, open at Muscat's pick)
+    const undo = [...new Set([...lc.late, ...(before ? takenAfterStart(rec, before, p, post.turn) : [])])]
+      .filter((i) => state.map.tiles[i].ownerSeat !== NO_SEAT);
+    // a wonder's annex in the start: its plots join the city before its
+    // closing pick, after the picks of the cities before it
+    const wonders = win ? wondersInStart(win, p, W, new Set(rec.players.filter((x) => bool(x.barb)).map((x) => x.id))) : undefined;
+    const annexedAll = new Set<number>();
+    for (const [key, ws] of wonders ?? []) {
+      for (const w of ws) {
+        for (const q of w.annexed) annexedAll.add(q);
+        if (!claims.has(key)) claims.set(key, []);
+        claims.get(key)!.push(...w.annexed);
+      }
+    }
+    // every plot the event log shows a city of the player taking in the start
+    // and no purchase paying for: its culture claim, before its closing pick
+    // (runs/h1_duelw1117 t177: Xi'an's claim of 513 after the Colossus's
+    // annex cleared its stored plot)
+    const bought = new Set((win ?? []).filter((x) => x[2] === 'CityMadePurchase' && x[7] === PURCHASE_PLOT_HASH)
+      .map((x) => (x[6] as number) * W + (x[5] as number)));
+    const startTaken = new Set(annexedAll);
+    for (const x of win ?? []) {
+      if (x[2] !== 'CityTileOwnershipChanged' || x[3] !== p) continue;
+      const q = (x[6] as number) * W + (x[5] as number);
+      if (bought.has(q) || annexedAll.has(q)) continue;
+      const key = `${p}:${x[4]}`;
+      if (!claims.has(key)) claims.set(key, []);
+      if (!claims.get(key)!.includes(q)) claims.get(key)!.push(q);
+      startTaken.add(q);
+    }
+    const unsure = lc.unsure.filter((q) => !startTaken.has(q));
     const kept = undo.map((i) => [state.map.tiles[i].ownerSeat, state.map.tiles[i].ownerCity] as const);
     for (const i of undo) { state.map.tiles[i].ownerSeat = NO_SEAT; state.map.tiles[i].ownerCity = -1; }
+    // the camps cleared after the start stood at its picks
+    const standing = before && state.barbSeat ? campsAtStart(rec, before, cat, p, post.turn) : [];
+    state.barbSeat?.camps.push(...standing);
+    // a start of the turn before stood before the turn's climate step: a
+    // fire's woods burning, burnt or grown back since read as the record
+    // before left them (runs/h1_duelw1117 t187: Antananarivo's pick of 340
+    // over 341, Burnt Woods then, Woods by the record)
+    const refeat: [number, FeatureId | null][] = [];
+    if (before && post.turn < rec.turn) {
+      for (const t of state.map.tiles) {
+        const was = engineFeature(cat, plotAt(before, t.index)[P.feature] as number);
+        if (was === t.feature || !(FIRE_FEATURES.has(was ?? '') || FIRE_FEATURES.has(t.feature ?? ''))) continue;
+        refeat.push([t.index, t.feature]);
+        t.feature = was;
+      }
+    }
     const minor = imp.minorOfPlayer.get(p);
     if (minor && pre) {
       if (num(pre.researching) !== num(post.researching)) r.draws.push({ label: 'BT Research Choice', choice: true });
@@ -261,16 +464,23 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
     for (const g of rec.greatPeople ?? []) {
       if (g[1] === p && g[4] === post.turn) r.draws.push({ label: 'Generating a random new Great Person', choice: true });
     }
-    // a Spy the player gained between the records, trained in its start or
-    // bought in its actions: its name ("Choosing a Citizen Name") and, with
-    // a level offer, the shuffle of its class's rows ("Random Promotion")
-    if (before) {
-      const had = new Set(before.units.filter((u) => u.owner === p).map((u) => u.id));
-      for (const u of rec.units) {
-        if (u.owner !== p || had.has(u.id) || cat.units[u.type] !== 'UNIT_SPY') continue;
-        r.draws.push({ label: 'Choosing a Citizen Name', note: 'spy', choice: true });
-        for (let k = unitPromoRows({ type: 'SPY' }).length; k > 0; k--) r.draws.push({ label: 'Random Promotion', note: 'spy', choice: true });
-      }
+    // a city-state the player meets in its start picks it a quest
+    // ("Selecting a random new quest": runs/h1_duelw1117 t249, China meeting
+    // Valletta as Xi'an's project completed; 1122 t226) — which quest, and
+    // so which type picker follows, the records do not show
+    for (const x of win ?? []) {
+      if (x[2] !== 'DiplomacyMeet' || x[3] !== p || !imp.minorOfPlayer.has(x[4] as number)) continue;
+      r.draws.push({ label: 'Selecting a random new quest', note: 'met', choice: true });
+    }
+    // the dig sites a revealing civic completed in the start lays (Game
+    // Archaeology 0x27f640, once a game per kind: Natural History's
+    // Antiquity Sites, Cultural Heritage's Shipwrecks): a site the game's
+    // history of battles and camps places takes that event's era, any other
+    // draws one ("Random Era for Antiquity Site", 0x2805f0 -> 0x280140) —
+    // which ones the records do not show, so each new site of the record is
+    // a choice (runs/h1_duelw1117 t217: four Shipwrecks, three draws)
+    if (before && win?.some((x) => x[2] === 'CivicCompleted' && x[3] === p && DIG_CIVICS.includes(cat.civics[x[4] as number] ?? ''))) {
+      for (let k = newDigSites(rec, before, cat); k > 0; k--) r.draws.push({ label: 'Random Era for Antiquity Site', note: 'dig site', choice: true });
     }
     // the envoys the player sent between the records — the AI sends them
     // in its start, before its cities, or in its actions (a choice): a
@@ -313,16 +523,31 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
           const gp = plotAt(rec, q);
           const w = gp[P.wonder] as number;
           if (w < 0 || gp[P.wonderComplete] !== 1 || doneBefore.has(q)) continue;
-          // (a wonder no Gold buys carries no price in the record: its
-          // completion at the queue's head is the start's)
-          const price = was.buy.find((x) => x[0] === 'B' && x[1] === w)?.[2];
-          const inStart = head?.BuildingType === w
-            && (price === undefined || num(was.queueProgress?.[0] ?? 0) + num(was.productionYield ?? 0) >= num(price));
-          if (!inStart) continue;
-          for (let k = 0; k < WONDER_FREE_TILES; k++) r.draws.push({ label: PICKER, note: 'wonder', city: key });
-          annexed = true;
+          // the event log names the start's completion and its annex; a
+          // record without one: the wonder at the queue's head with the
+          // banked production and a turn's yield covering its price (a
+          // wonder no Gold buys carries no price in the record: its
+          // completion at the queue's head is the start's), annexing
+          // WONDER_FREE_TILES_UPON_COMPLETION plots
+          let take: number = WONDER_FREE_TILES;
+          if (wonders) {
+            const done = wonders.get(key)?.find((x) => x.building === w);
+            if (!done) continue;
+            take = done.annexed.length;
+            for (let k = 0; k < done.camps; k++) r.draws.push({ label: 'Barb Tribe Roll', note: 'camp annexed', choice: true });
+          } else {
+            const price = was.buy.find((x) => x[0] === 'B' && x[1] === w)?.[2];
+            const inStart = head?.BuildingType === w
+              && (price === undefined || num(was.queueProgress?.[0] ?? 0) + num(was.productionYield ?? 0) >= num(price));
+            if (!inStart) continue;
+          }
+          for (let k = 0; k < take; k++) r.draws.push({ label: PICKER, note: 'wonder', city: key });
+          annexed ||= take > 0;
           // the wonder's grants: the Dynastic Cycle's boosts of its era, a
-          // wonder's free techs and civics (each pool may hold none: a choice)
+          // wonder's free techs and civics (each pool may hold none: a
+          // choice); a granted unit with a level offer shuffles its class's
+          // rows (runs/h1_duelw1118 t224: Mahabodhi's two Apostles, 9..1
+          // twice after the annex)
           const fx = BUILT_WONDERS[(cat.buildings[w] ?? '').replace(/^BUILDING_/, '')]?.effects;
           for (const row of getModifiers(state, city.seat).wonderEraBoost) {
             for (let k = 0; k < row.techs; k++) r.draws.push({ label: 'Choosing random tech boost to grant based on era', note: 'wonder', choice: true });
@@ -330,14 +555,39 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
           }
           for (let k = 0; k < (fx?.freeTechs ?? 0); k++) r.draws.push({ label: 'Choosing random tech to grant based on era', note: 'wonder', choice: true });
           for (let k = 0; k < (fx?.freeCivics ?? 0); k++) r.draws.push({ label: 'Choosing random civic to grant based on era', note: 'wonder', choice: true });
+          for (let k = 0; k < (fx?.civicBoostsByEra?.amount ?? 0); k++) r.draws.push({ label: 'Choosing random civic boost to grant based on era', note: 'wonder', choice: true });
+          for (const g of fx?.grantUnits ?? []) {
+            if (!PROMO_OFFER_UNITS.includes(g.unit)) continue;
+            granted.set(g.unit, (granted.get(g.unit) ?? 0) + g.count);
+            for (let u = 0; u < g.count; u++) {
+              for (let k = unitPromoRows({ type: g.unit }).length; k > 0; k--) r.draws.push({ label: 'Random Promotion', note: 'wonder grant' });
+            }
+          }
         }
         if (num(dump.nextPlotCost) > num(was.nextPlotCost)) {
           const stored = num(was.nextPlot);
           const sp = stored >= 0 ? plotAt(rec, stored) : undefined;
-          const gone = annexed || !sp || num(sp[P.owner] as Read<number>) !== p || num(sp[P.ownerCity] as Read<number>) !== num(wc.id);
+          // the claim the event log names: the stored plot taken, or another
+          // after a fresh pick (the record may hold the plot elsewhere by
+          // then: runs/h1_duelw1123 t202, Shanghai's 914 taken in the start
+          // and lost in the actions)
+          const took = win?.filter((x) => x[2] === 'CityTileOwnershipChanged' && x[3] === p && x[4] === num(wc.id))
+            .map((x) => (x[6] as number) * W + (x[5] as number)).filter((q) => !annexedAll.has(q));
+          const gone = annexed || (took?.length ? !took.includes(stored)
+            : !sp || num(sp[P.owner] as Read<number>) !== p || num(sp[P.ownerCity] as Read<number>) !== num(wc.id));
           if (gone) r.draws.push({ label: PICKER, note: 'stored plot gone', city: key });
           claimed = !gone;
         }
+      }
+      // a Tribal Village the city's culture claim takes pays its owner (the
+      // event log's GoodyHutReward with no unit, the claim's row after it):
+      // the kind and the subtype drawn, then the reward's own draws
+      // (runs/h1_duelw1118 t189 Military / Resources, 1119 t84 Science /
+      // One Tech Boost, 1123 t104 Faith / Large Faith)
+      for (const reward of win ? villageClaims(win, p, num(wc.id)) : []) {
+        r.draws.push({ label: 'Choosing a Goody Hut Type', note: 'village' });
+        r.draws.push({ label: 'Choosing a Sub Type', note: 'village' });
+        for (const label of goodyRewardDraws(reward)) r.draws.push({ label, note: 'village', choice: true });
       }
       const frozen = congressBorderFrozen(state, city.seat);
       const ties = frozen ? [] : borderBestPlots(state, city);
@@ -366,9 +616,53 @@ export function startDraws(rec: TurnRecord, state: GameState, imp: Imported, cat
       const before0 = prior ? [claimed ? prior.claimed : prior.open] : [];
       const lists = (minor ? [ties, ...before0, ...alts] : [seq, ...alts, ties, ...before0]).filter((t) => t.length);
       const uniq = lists.filter((t, k) => lists.findIndex((x) => x.join() === t.join()) === k);
-      if (uniq.length) r.draws.push({ label: PICKER, note: 'next plot', city: key, ties: uniq[0], ...(uniq.length > 1 ? { alts: uniq.slice(1) } : {}) });
+      // a city whose wonder annexed in the start reads its reach after the
+      // annex: nothing left there, it draws nothing (runs/h1_duelw1118 t224:
+      // Mahabodhi's annex took Beijing's 658 and 614, and no pick followed)
+      // A city-state with nothing in reach on the record, the plots gained
+      // after its start given back, drew nothing (runs/h1_duelw1118 t216:
+      // Armagh's last plot, 1003, Handan's by China's turn before)
+      const emptied = (!seq.length && (wonders?.get(key) ?? []).some((x) => x.annexed.length)) || (!!minor && !ties.length);
+      if (uniq.length && !emptied) r.draws.push({ label: PICKER, note: 'next plot', city: key, ties: uniq[0], ...(uniq.length > 1 ? { alts: uniq.slice(1) } : {}) });
     }
     undo.forEach((i, k) => { state.map.tiles[i].ownerSeat = kept[k][0]; state.map.tiles[i].ownerCity = kept[k][1]; });
+    if (standing.length) state.barbSeat!.camps.splice(state.barbSeat!.camps.length - standing.length, standing.length);
+    for (const [i, f] of refeat) state.map.tiles[i].feature = f;
+    // a unit the player gained between the records past a wonder's grants,
+    // trained in its start or bought in its actions: a Spy's or an
+    // Archaeologist's name ("Choosing a Citizen Name", 0x4eeb70: Units.Spy
+    // or ExtractsArtifacts; runs/h1_duelw1118 t231, 1122 t202 an
+    // Archaeologist trained in China's start) and, with a level offer, the
+    // shuffle of its class's rows ("Random Promotion")
+    // — the records' new units, or the start's own trained ones the event
+    // log names (CityProductionCompleted of a unit: a Spy sent off at once
+    // stands in no record, runs/h1_duelw1122 t129), whichever counts more
+    if (before) {
+      const had = new Set(before.units.filter((u) => u.owner === p).map((u) => u.id));
+      const gained = new Map<string, number>();
+      for (const u of rec.units) {
+        const type = (cat.units[u.type] ?? '').replace(/^UNIT_/, '');
+        if (u.owner !== p || had.has(u.id)) continue;
+        if ((granted.get(type) ?? 0) > 0) { granted.set(type, granted.get(type)! - 1); continue; }
+        gained.set(type, (gained.get(type) ?? 0) + 1);
+      }
+      const trained = new Map<string, number>();
+      for (const x of win ?? []) {
+        if (x[2] !== 'CityProductionCompleted' || x[3] !== p) continue;
+        // a unit trained, or the unit a building completed grants
+        // (runs/h1_duelw1124 t248: the Intelligence Agency's Spy)
+        const type = x[5] === 0 ? (cat.units[x[6] as number] ?? '').replace(/^UNIT_/, '')
+          : x[5] === 1 ? BUILDINGS[engineId('building', cat.buildings[x[6] as number] ?? '', 'BUILDING_', BUILDINGS) ?? '']?.grantUnit : undefined;
+        if (type) trained.set(type, (trained.get(type) ?? 0) + 1);
+      }
+      for (const type of new Set([...gained.keys(), ...trained.keys()])) {
+        for (let n = Math.max(gained.get(type) ?? 0, trained.get(type) ?? 0); n > 0; n--) {
+          if (CITIZEN_NAMED_UNITS.includes(type)) r.draws.push({ label: 'Choosing a Citizen Name', note: 'unit', choice: true });
+          if (!PROMO_OFFER_UNITS.includes(type)) continue;
+          for (let k = unitPromoRows({ type }).length; k > 0; k--) r.draws.push({ label: 'Random Promotion', note: 'unit', choice: true });
+        }
+      }
+    }
   }
   // the ties of every city whose start of this turn the next record
   // witnesses (every player but the one whose start this record holds):
@@ -471,15 +765,29 @@ interface StartPick {
   range?: number;
   /** placed on the game's log */
   logged?: boolean;
+  /** the pick's plot another owner holds by the record: the city's best
+   *  plots on the record, the reader's answer */
+  lostTo?: number[];
 }
 
 /** Does the start's pick stand for the record's next plot? The pick is the
  *  record's plot; or the record holds none where a plot the city gained
  *  after the start cleared it (`nextPlotUnheld`), and the log's draw fell
- *  over the city's ties — the pick the record could not keep. */
+ *  over the city's ties — the pick the record could not keep; or the pick
+ *  went to another owner and the record names one of the city's best plots
+ *  now. */
 function pickHolds(sp: StartPick, unheld: boolean): boolean {
   if (sp.pick === sp.game) return true;
-  return unheld && sp.game < 0 && !!sp.logged && sp.range === sp.ties.length;
+  if (unheld && sp.game < 0 && !!sp.logged && sp.range === sp.ties.length) return true;
+  return !!sp.lostTo && sp.range === sp.ties.length && sp.lostTo.includes(sp.game);
+}
+
+/** The best plots of the city `key` (`owner:id`) on the imported record. */
+function recordTies(imp: Imported, key: string): number[] {
+  const city = imp.cityByKey.get(key);
+  if (city) return borderBestPlots(imp.state, city);
+  for (const [m, d] of imp.dumpOfMinor) if (`${d.owner}:${d.id}` === key) return borderBestPlots(imp.state, minorCity(m));
+  return [];
 }
 
 /** A start's draws laid on the game's log of them (`LoggedStart`). */
@@ -508,32 +816,51 @@ export interface LoggedStart {
  * landing and every known range agreeing is the start replayed draw for
  * draw. */
 export function logStart(s: StartReplay, logged: LoggedDraw[]): LoggedStart {
-  // a choice drawn in place (an envoy's annex before the cities) is taken
-  // as a fixed draw or left out, whichever lays the start better on the log
-  const placed = s.draws.some((d) => d.inPlace) ? [true, false] : [false];
+  // a choice drawn in place (an envoy's annex: the AI sends its envoys
+  // before its cities, between them or after them) is taken as a run of
+  // fixed draws at any place among the others, or left out — whichever lays
+  // the start best on the log (runs/h1_duelw1118 t66: Caguana's annex after
+  // China's four closing picks)
+  const base = s.draws.map((_, n) => n).filter((n) => !s.draws[n].choice);
+  const blocks: number[][] = [];
+  s.draws.forEach((d, n) => {
+    if (!d.inPlace) return;
+    const last = blocks[blocks.length - 1];
+    if (last && s.draws[last[0]].city === d.city) last.push(n);
+    else blocks.push([n]);
+  });
   let best: LoggedStart | undefined;
   let bestCost = Infinity;
-  for (const take of placed) {
-    const l = layStart(s, logged, take);
+  const tryOrder = (order: number[]) => {
+    const l = layStart(s, logged, order);
     const cost = l.extra.length + l.range.length + s.draws.filter((d, n) => !d.choice && l.at[n] < 0).length;
     if (cost < bestCost) { best = l; bestCost = cost; }
-  }
+  };
+  const place = (b: number, order: number[]) => {
+    if (b === blocks.length) { tryOrder(order); return; }
+    for (let k = 0; k <= order.length && bestCost > 0; k++) place(b + 1, [...order.slice(0, k), ...blocks[b], ...order.slice(k)]);
+    if (bestCost > 0) place(b + 1, order);
+  };
+  place(0, base);
   for (const [n, t] of best!.swap) s.draws[n].ties = t;
   return best!;
 }
 
-function layStart(s: StartReplay, logged: LoggedDraw[], inPlace: boolean): LoggedStart {
-  const fixed = (d: StartDraw) => !d.choice || (inPlace && d.inPlace);
+/** The start's draws on the log: the draws of `order` (indices in `draws`)
+ *  as fixed draws in that order, then the other choices where their labels
+ *  fall. */
+function layStart(s: StartReplay, logged: LoggedDraw[], order: readonly number[]): LoggedStart {
+  const inOrder = new Set(order);
   const at: number[] = s.draws.map(() => -1);
   const range: number[] = [];
   const swap = new Map<number, number[]>();
   const used = new Set<number>();
   let i = 0;
-  s.draws.forEach((d, n) => {
-    if (!fixed(d)) return;
+  for (const n of order) {
+    const d = s.draws[n];
     let j = i;
     while (j < logged.length && siteLabel(logged[j].label) !== d.label) j++;
-    if (j >= logged.length) return;
+    if (j >= logged.length) continue;
     at[n] = j;
     used.add(j);
     i = j + 1;
@@ -541,9 +868,9 @@ function layStart(s: StartReplay, logged: LoggedDraw[], inPlace: boolean): Logge
     const alt = d.ties && logged[j].range !== d.ties.length ? d.alts?.find((t) => t.length === logged[j].range) : undefined;
     if (alt) swap.set(n, alt);
     if (d.ties && logged[j].range !== (alt ?? d.ties).length) range.push(n);
-  });
+  }
   s.draws.forEach((d, n) => {
-    if (fixed(d) || d.inPlace) return;
+    if (inOrder.has(n) || !d.choice || d.inPlace) return;
     const j = logged.findIndex((x, k) => !used.has(k) && siteLabel(x.label) === d.label);
     if (j < 0) return;
     at[n] = j;
@@ -573,6 +900,13 @@ function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, Sta
     const keys = s.cities;
     const why = (reason: string) => { for (const k of keys) out.set(k, reason); };
     if (s.game === undefined || s.pre === undefined) { why('no witness seed'); continue; }
+    // a city of the player its witnessed start did not hold — founded or
+    // taken after it — drew nothing there and holds no next plot until its
+    // own start (runs/h1_duelw1117: every founding past the start, Longxi
+    // t45 to Yiyang t246, reads -1)
+    for (const k of nextOf.keys()) {
+      if (k.startsWith(`${s.player}:`) && !keys.includes(k)) out.set(k, { pick: -1, game: nextOf.get(k)!, ties: [], range: 0, logged: true });
+    }
     if (s.why) { why(s.why); continue; }
     const logged = s.post !== undefined ? imp.randLog?.between(s.pre, s.post) : undefined;
     if (logged) {
@@ -588,7 +922,13 @@ function startBorderPicks(starts: StartReplay[], imp: Imported): Map<string, Sta
         if (!d.city || !d.ties || d.note !== 'next plot') return;
         const x = l.at[n] >= 0 ? logged[l.at[n]] : undefined;
         if (!x) { out.set(d.city, 'the log holds no pick for it'); return; }
-        out.set(d.city, { pick: x.range === d.ties.length ? d.ties[x.value] : -1, game: nextOf.get(d.city) ?? -1, ties: d.ties, range: x.range, logged: true });
+        const pick = x.range === d.ties.length ? d.ties[x.value] : -1;
+        // a pick another owner took after the start (a city-state's envoy
+        // annex in the actions): the city's reader answers the plot its
+        // scorer names now (runs/h1_duelw1118 t144: Handan's 916, Armagh's
+        // by China's envoys, read 919)
+        const lostTo = pick >= 0 && imp.state.map.tiles[pick]?.ownerSeat !== NO_SEAT ? recordTies(imp, d.city) : undefined;
+        out.set(d.city, { pick, game: nextOf.get(d.city) ?? -1, ties: d.ties, range: x.range, logged: true, ...(lostTo ? { lostTo } : {}) });
       });
       continue;
     }
@@ -633,11 +973,14 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
           unlogged: s.draws.filter((d, n) => !d.choice && l.at[n] < 0).map((d) => `${d.label} (${d.note ?? ''})`),
           range: l.range.map((n) => `${s.draws[n].city} ties ${s.draws[n].ties?.length} logged ${logged[l.at[n]].range}`),
         } }) });
-    } else if (s.draws.some((d) => d.choice) && resolveStart(s)) {
+    } else if (s.draws.some((d) => d.choice) && resolveStart(s) && s.game !== s.draws.filter((d) => !d.choice).length) {
+      // (a start whose count its fixed draws meet alone took none of its
+      // choices: its count is checked below)
       out.push({ turn, check: 'start.draws', subject, ok: true, skip: 'an AI choice the records do not show' });
     } else {
-      const ok = s.game === s.draws.length;
-      out.push({ turn, check: 'start.draws', subject, ok, game: s.game, ours: s.draws.length,
+      const fixedN = s.draws.filter((d) => !d.choice).length;
+      const ok = s.game === fixedN || s.game === s.draws.length;
+      out.push({ turn, check: 'start.draws', subject, ok, game: s.game, ours: s.game === fixedN ? fixedN : s.draws.length,
         ...(ok ? {} : { state: { draws: s.draws.map((d) => d.label + (d.ties ? `/${d.ties.length}` : '') + (d.choice ? '?' : '')) } }) });
     }
   }

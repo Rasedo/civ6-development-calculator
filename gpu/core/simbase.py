@@ -1001,7 +1001,8 @@ _MUTABLE = [
     "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
-    "civ_citizen_names",  # the citizen names each major has given (its Spies, its storms)
+    "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
+    "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)
     "space_ly", "civ_orbital_lasers", "city_lasers",  # the Exoplanet flight: LY travelled, the seat's orbital stations, the terrestrial ones per city
     "civ_stockpile", "civ_fuel_short", "city_powered",  # GS strategic banks, the slots short at the last fuel bill, and the grid they run
     "civ_wmd",  # nuclear devices held, dense over the device catalog
@@ -1096,7 +1097,7 @@ _MUTABLE = [
     "city_alive", "city_center", "city_pop", "city_hp", "city_outer_hp", "city_last_hit", "city_is_cap", "city_orig_cap", "city_founder", "city_former", "city_loyalty", "city_acquired", "city_growth", "city_cbox", "city_next_plot", "city_current", "city_progress", "city_cost", "city_qtile", "city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat", "city_spec_pin", "city_idle", "city_boost_turn", "city_bldg", "city_bldg_pillaged", "city_bldg_era", "city_reactor_age",
     "war_turns", "treaty_turns", "peace_turns", "conquest_turns",
     "civ_gpp_turn",  # Great Person points EARNED this turn, per class (a competition reads it)
-    "civ_co2", "civ_co2_turn", "climate_idx", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
+    "civ_co2", "civ_co2_turn", "climate_idx", "sea_rise_from", "tile_flooded", "tile_flood_ct", "tile_air_bonus", "tile_gp_perm",
     "volcano_active", "tile_event_fired",  # the turn's random event: waking volcanoes, first occurrences
 ]
 

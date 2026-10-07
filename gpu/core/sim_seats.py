@@ -6703,29 +6703,51 @@ class SimSeats:
             out.append(i)
         return out
 
-    def _draw_goody_reward(self, one: torch.Tensor, b: int, has_city: bool) -> int | None:
-        """The subtype game `b` draws, or None if it can draw nothing.
+    def _goody_kind_weight(self, had: int) -> int:
+        """`goodyKindWeight` — a kind's weight in the kind draw (0x42bdd0):
+        `_goody_kind_base` in 24.8, halved per village of it the claimer has
+        had, 1.0 once below 2.0, rounded half up."""
+        w = self._goody_kind_base * 256
+        for _ in range(had):
+            w = 0x100 if w < 0x200 else w // 2
+        return (w >> 8) + (1 if w & 0x80 else 0)
+
+    def _draw_goody_reward(self, one: torch.Tensor, b: int, has_city: bool, row: int) -> int | None:
+        """The subtype game `b` draws for major `row`, or None if it can draw
+        nothing.
 
         `one` is a [B] mask true only at `b`, so the stream moves for that game
         alone. TWO draws when anything is eligible and NONE when nothing is —
-        `drawGoodyReward`'s twin, step for step: a kind uniformly among those
-        with an eligible subtype (every kind carries the same weight), then a
-        subtype within it by its own weight."""
+        `drawGoodyReward`'s twin, step for step: a kind among those with an
+        eligible subtype, each weighing `_goody_kind_weight` of the times the
+        claimer has had it, then a subtype within it by its own weight; the
+        kind drawn counts (`civ_goody_kinds`)."""
         elig = self._goody_eligible(has_city)
         if not elig:
             return None
         kinds = [k for k in range(len(self._goody_kinds))
                  if any(self._goody_sub[i][1] == k for i in elig)]
+        had = self.civ_goody_kinds[b, row].tolist()
+        weights = [self._goody_kind_weight(int(had[k])) for k in kinds]
         # "Choosing a Goody Hut Type", then "Choosing a Sub Type": the game's draws
-        kind = kinds[int(self._rand_range(one, len(kinds))[b])]
+        at = int(self._rand_range(one, sum(weights))[b])
+        kind = kinds[-1]
+        for k, w in zip(kinds, weights):
+            at -= w
+            if at < 0:
+                kind = k
+                break
         subs = [i for i in elig if self._goody_sub[i][1] == kind]
         total = sum(self._goody_sub[i][2] for i in subs)
         acc = int(self._rand_range(one, total)[b])
+        out = subs[-1]
         for i in subs:
             acc -= self._goody_sub[i][2]
             if acc < 0:
-                return i
-        return subs[-1]
+                out = i
+                break
+        self.civ_goody_kinds[b, row, kind] += 1
+        return out
 
     def _goody_pool_draw(self, one: torch.Tensor, b: int, open_: torch.Tensor,
                          n: int) -> list[int]:
@@ -6841,7 +6863,7 @@ class SimSeats:
         cap = int(self.rules.combat["unitHp"])
         tile = torch.full((self.B,), t, dtype=torch.long, device=self.device)
         alive = self.city_alive[b, srow]
-        sub = self._draw_goody_reward(one, b, bool(alive.count_nonzero()))
+        sub = self._draw_goody_reward(one, b, bool(alive.count_nonzero()), srow)
         if sub is None:
             return
         _id, _hut, _w, _turn, _moc, pay, amt, unit_i, pcls = self._goody_sub[sub]
