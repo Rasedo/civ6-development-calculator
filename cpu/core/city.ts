@@ -36,7 +36,7 @@ import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, 
 import { hiddenResourcesFor, onHomeContinent } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
-import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, garrisonOf } from './units';
+import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, cityGarrisons } from './units';
 import { floodBarrierScale } from './climate';
 import { droughtShielded } from '../data/disasters';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
@@ -660,7 +660,7 @@ function nonLuxuryAmenities(
     improvementAmenities(state, city) +
     m.amenitiesAll +
     // CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
-    (m.amenitiesWithGarrison && garrisonOf(state, city) ? m.amenitiesWithGarrison : 0) +
+    (m.amenitiesWithGarrison && cityGarrisons(state, city).length > 0 ? m.amenitiesWithGarrison : 0) +
     // CIV6 (Sports Media): "Stadiums generate +1 Amenity"
     m.amenitiesWithBuilding.reduce((n, r) => n + (city.buildings.includes(r.building) ? r.amenities : 0), 0) +
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +

@@ -174,6 +174,25 @@ def main() -> None:
     assert len(fx["gppb"]) == 1 and fx["gppb"][0][1:] == inv[0], "the row rides the bundle to the Great Person walk"
     print(f"  8 garrison amenity/loyalty 1/2, INVENTION row {inv[0]}")
 
+    # 8b) A garrison stands on the centre or on a complete Encampment
+    # (`_city_garrisoned`, the TS `cityGarrisons`).
+    ctr = int(sim.city_center[0, 0, 0])
+    assert ctr >= 0, "seat 0's first city stands"
+    mine_mil = [s for s in range(sim.unit_seat.shape[1]) if int(sim.unit_seat[0, s]) == 0]
+    assert mine_mil, "seat 0 holds a unit"
+    slot = mine_mil[0]
+    camp = next(t for t in range(sim.military_at.shape[1]) if t != ctr and int(sim.military_at[0, t]) < 0)
+    sim.military_at[0, ctr] = -1
+    sim.city_dist_tile[0, 0, 0, sim._encamp_didx] = camp
+    sim.district_complete[0, camp] = False
+    sim.military_at[0, camp] = slot
+    assert not bool(sim._city_garrisoned(0)[0][0, 0]), "an Encampment still building seats no garrison"
+    sim.district_complete[0, camp] = True
+    assert bool(sim._city_garrisoned(0)[0][0, 0]), "a complete Encampment's military unit garrisons the city"
+    sim.military_at[0, camp] = -1
+    assert not bool(sim._city_garrisoned(0)[0][0, 0]), "no unit, no garrison"
+    print("  8b the Encampment seats a garrison")
+
     print("POLICY CARDS OK")
 
 

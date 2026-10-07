@@ -21,7 +21,7 @@ import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
-import { loadRandLog, randLogPath } from './randLog';
+import { loadCarbonLog, loadRandLog, randLogPath } from './randLog';
 import { turnDraws, type DrawLedger } from './drawLedger';
 import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
@@ -102,16 +102,14 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   // whose chain holds the records' witness seeds
   const all = turns.map((t) => JSON.parse(lines.get(t)!) as TurnRecord);
   const logPath = randLogPath(dumpPath);
-  if (logPath) {
-    const seeds: number[] = [];
-    for (const r of all) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
-    history.randLog = loadRandLog(logPath, seeds);
-  }
+  const seeds: number[] = [];
+  for (const r of all) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
+  if (logPath) history.randLog = loadRandLog(logPath, seeds);
   history.replay = replayEvents(all, cat, history.randLog);
   history.legs = routeLegs(all);
   all.length = 0;
   const starts: StartReplay[] = [];
-  const picks = new EventPicks(cat, history.randLog);
+  const picks = new EventPicks(cat, history.randLog, loadCarbonLog(dumpPath, seeds));
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);

@@ -404,7 +404,7 @@ export interface Modifiers {
   upgradeGoldDiscountPct: number;
   upgradeResourceDiscountPct: number;
   /** amenities and loyalty per turn in a city its seat's own military unit
-   *  garrisons (`garrisonOf`) */
+   *  garrisons (`cityGarrisons`) */
   amenitiesWithGarrison: number;
   loyaltyWithGarrison: number;
   /** amenities in each city holding the named building */
@@ -1141,6 +1141,9 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   const gov = s.government;
   const stored = gov.policies;
   for (let i = 0; i < stored.length; i++) fpPush(m, stored[i]);
+  fpPush(m, FP_MARK);
+  const lapsed = gov.lapsed;
+  for (let i = 0; i < lapsed.length; i++) fpPush(m, lapsed[i]);
   fpPush(m, FP_MARK);
   fpPush(m, gov.held);
   fpPush(m, gov.chosen);

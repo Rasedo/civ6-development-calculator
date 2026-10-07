@@ -6614,10 +6614,9 @@ class SimSeats:
         # and (Limitanei): "+2 Loyalty per turn in cities with a garrisoned unit"
         _gl = self._gov_mods(row)[12]["garloy"].double().take(bidx)
         if self._garrison_loyalty_rows or bool(_gl.count_nonzero()):
-            ctr = self.city_center[bidx, row, col].clamp(min=0)
-            gslot = self.military_at[bidx, ctr]
-            gar = (gslot >= 0) & (self.unit_seat[bidx, gslot.clamp(min=0)] == row)
-            form = self.unit_formation[bidx, gslot.clamp(min=0)] > 0
+            _garr, _gform = self._city_garrisoned(row)
+            gar = _garr[bidx, col]
+            form = _gform[bidx, col]
             for _lc, _ll, _la, _lf in self._live_rows(row, self._garrison_loyalty_rows):
                 _lw = self._row_is(row, _lc, _ll)[bidx]
                 hit = _lw & gar & (form if _lf else torch.ones_like(gar))
@@ -10771,11 +10770,10 @@ class SimSeats:
         _, _cond_amen = self._cond_house_amen(_g_hid, _g_nd, self._live_specialty_counts(row))
         have = have + _g_amen.unsqueeze(1) + _cond_amen
         # CIV6 (Retainers): "+1 Amenity in cities with a garrisoned unit"
+        # (`_city_garrisoned`)
         _ga = _gm[12]["garamen"]
         if bool(_ga.count_nonzero()):
-            _gc = self.city_center[:, row, :cols]
-            _gsl = self.military_at.gather(1, _gc.clamp(min=0))
-            _gar = (_gc >= 0) & (_gsl >= 0) & (self.unit_seat.gather(1, _gsl.clamp(min=0)) == row)
+            _gar = self._city_garrisoned(row)[0][:, :cols]
             have = have + _gar.double() * _ga.double().unsqueeze(1)
         # CIV6 (Sports Media): "Stadiums generate +1 Amenity" — each city
         # holding the row's building (`amenitiesWithBuilding`)
@@ -12832,6 +12830,28 @@ class SimSeats:
         start = torch.where(minor, torch.full_like(best, self._city_start_melee_minor),
                             torch.full_like(best, self._city_start_melee_major))
         return torch.maximum(best, start) - self._city_base_melee_cut
+
+    def _city_garrisoned(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, RC] bool twice — CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT, the
+        requirement 0xbbb1a0): does each of this seat row's cities hold a
+        garrison — the row's own military unit on its centre or on its
+        complete Encampment, the districts with HitPoints — and is one of
+        those garrisons a Corps or an Army (`cityGarrisons`)."""
+        gar = torch.zeros(self.B, self.RC, dtype=torch.bool, device=self.device)
+        form = torch.zeros_like(gar)
+        plots = [(self.city_center[:, row], None)]
+        if self._encamp_didx >= 0:
+            et = self.city_dist_tile[:, row, :, self._encamp_didx]
+            plots.append((et, self.district_complete.gather(1, et.clamp(min=0))))
+        for tiles, live in plots:
+            t0 = tiles.clamp(min=0)
+            slot = self.military_at.gather(1, t0)
+            here = (tiles >= 0) & (slot >= 0) & (self.unit_seat.gather(1, slot.clamp(min=0)) == row)
+            if live is not None:
+                here = here & live
+            gar = gar | here
+            form = form | (here & (self.unit_formation.gather(1, slot.clamp(min=0)) > 0))
+        return gar, form
 
     def _garrison_cs(self, hrow: torch.Tensor, hcol: torch.Tensor,
                      seat: torch.Tensor, base: torch.Tensor) -> torch.Tensor:

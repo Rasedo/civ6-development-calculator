@@ -105,17 +105,73 @@ export function randLogPath(dumpPath: string): string | undefined {
 /** The game of the log at `path` whose chain holds the most of `seeds`;
  *  undefined when none holds any. */
 export function loadRandLog(path: string, seeds: Iterable<number>): RandLog | undefined {
+  return gameOfLog(path, seeds)?.log;
+}
+
+/** The game in the draw log at `path` whose chain holds the most of
+ *  `seeds`, and its place among the log's games; undefined when none holds
+ *  any. */
+function gameOfLog(path: string, seeds: Iterable<number>): { log: RandLog; k: number } | undefined {
   const want = new Set([...seeds].map((s) => s >>> 0));
-  let best: RandLog | undefined;
+  let best: { log: RandLog; k: number } | undefined;
   let bestHits = 0;
-  for (const rows of parse(readFileSync(path, 'utf8'))) {
+  parse(readFileSync(path, 'utf8')).forEach((rows, k) => {
     const log = new RandLog(rows);
     let hits = 0;
     for (const s of want) if (log.index(s) !== undefined) hits++;
     if (hits > bestHits) {
-      best = log;
+      best = { log, k };
       bestHits = hits;
     }
-  }
+  });
   return best;
+}
+
+/**
+ * THE WORLD'S CARBON by turn, from the game's own climate log
+ * (`Logs/Game_RandomEvents.csv`, a row of sixteen numbers per turn written
+ * by the random-event step, 0x33a280: its third column "Total CO2" the
+ * climate's world total 0x28db00, in thousands): turn -> carbon. Read from
+ * the dump's own logs (`<dump>.logs/`, `tools/civ6lab/h1/fleet.py`), else a
+ * shared folder beside it (`h1_logs_duelw<a>_<b>/`) holding several games
+ * one after another, the dump's game being the one its draw log there
+ * matches by `seeds`. Undefined where neither is kept.
+ */
+export function loadCarbonLog(dumpPath: string, seeds: Iterable<number>): Map<number, number> | undefined {
+  const own = join(dumpPath.replace(/\.jsonl$/, '.logs'), 'Game_RandomEvents.csv');
+  if (existsSync(own)) return carbonGames(readFileSync(own, 'utf8')).pop();
+  const duel = Number(/h1_duelw(\d+)_/.exec(basename(dumpPath))?.[1]);
+  if (!duel) return undefined;
+  const dir = dirname(dumpPath);
+  const shared = readdirSync(dir).find((f) => {
+    const m = /^h1_logs_duelw(\d+)_(\d+)$/.exec(f);
+    return !!m && Number(m[1]) <= duel && duel <= Number(m[2]);
+  });
+  if (!shared) return undefined;
+  const events = join(dir, shared, 'Game_RandomEvents.csv');
+  const draws = join(dir, shared, 'RandCalls.csv');
+  if (!existsSync(events) || !existsSync(draws)) return undefined;
+  const game = gameOfLog(draws, seeds);
+  return game ? carbonGames(readFileSync(events, 'utf8'))[game.k] : undefined;
+}
+
+/** The climate log's games, each turn -> world carbon; a game starts where
+ *  the turn falls back. */
+function carbonGames(text: string): Map<number, number>[] {
+  const games: Map<number, number>[] = [];
+  let cur = new Map<number, number>();
+  let last = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const f = line.split(',').map((x) => x.trim());
+    if (f.length !== 16 || !f.every((x) => /^-?\d+$/.test(x))) continue;
+    const turn = Number(f[0]);
+    if (cur.size && turn < last) {
+      games.push(cur);
+      cur = new Map();
+    }
+    last = turn;
+    cur.set(turn, Number(f[2]) * 1000);
+  }
+  if (cur.size) games.push(cur);
+  return games;
 }

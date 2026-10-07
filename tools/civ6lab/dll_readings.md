@@ -2556,10 +2556,8 @@ fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
   (1121 Taiyuan t37, 1124 Shenyang t54, Beijing t60, Shanghai t118, 1118
   Longxi t26, ...) — some rebuild follows the founding in the first group;
   neither the claimed plots' resources, a free building, the holdings, nor
-  the suzerainties tell the groups apart. And the 1121 t222 ranking (China's
-  cards changed at the processing's start, the record holds t221's ranking)
-  is no rule: ranking every non-active major under the record before's cards
-  where they changed loses 26 passes on 1117/1118/1121/1124.
+  the suzerainties tell the groups apart. The 1121 t222 ranking is the
+  slot rebuild's timing ("H-1: the cards the luxury allocation ranks on").
 ## H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ
 
 - AnnexPlot 0x1a8b70 (the border turn 0x1a9bc0's claim, AnnexPlots 0x1a8a30
@@ -2669,6 +2667,83 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
   MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the
   difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps'
   promotions are empty.
+## H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly
+
+- ChangeResourceAmount 0x4a7560 adds the amount and rebuilds the
+  allocation (0x4a6110 at 0x4a77d4) on every call that reaches the update,
+  whatever the amount (an amount of 0 rebuilds too), unless the game's flag
+  +0x45e; an accumulated resource's import or export returns before it.
+  Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the
+  allocation, then the parks 0x32deb0 — so a park stored at a processing
+  pays beside the luxuries ranked on the park amenities before it (1121
+  t243: Chengdu's 3 from its park with its 4 luxuries, Happy at its growth
+  and border; the next rebuild hands it 2).
+- The cards a processing re-slots at its start (the civic step before the
+  resources) reach that processing's allocation; a slot rebuild during the
+  city walk (a completion opening a slot: Big Ben, the Alhambra, a Shipyard's
+  slot) or a card signalled in the actions does not, until the next
+  ChangeResourceAmount: 1121 t222, Xi'an's Shipyard re-slots mid-walk with
+  no card signalled, Liberalism and Civil Prestige laid back, and the record
+  holds the luxuries ranked with their two amenities in Xi'an and Shanghai;
+  1121 t196, Big Ben re-slots Xi'an's cards mid-walk and the Line Infantry
+  (StrategicResource Niter) it buys after re-ranks them on the new cards —
+  the unit's strategic cost (0x1856b3 / 0x185a2a) calls 0x4a7560. A Builder's
+  improvement on a resource rebuilds through 0x4ab4d0 (non-accumulated
+  resources only). The harness ranks each major's record allocation on the
+  record before's cards where its cards moved after its walk began and no
+  such rebuild followed (`luxuryCards`).
+- A processing's re-slot before its walk also reaches the luxury ranking of
+  that walk and the cards the walk's cities read: the government it changed
+  to, its cards, the cards it laid back (1121 t168 Oligarchy -> Monarchy,
+  Xi'an, Taiyuan, Shanghai bank their culture without Liberalism's and Civil
+  Prestige's amenity; 1128 t202 Monarchy, Taiyuan's three luxuries ranked on
+  the new cards). A completion re-slotting mid-walk reaches its own city's
+  growth and border (1121 t206 Xi'an's Alhambra); 1124 t188 Chengdu's
+  Alhambra reads the old ranking's amenity tier at its border (Content, the
+  new cards Displeased) — the tier against the yields the re-slot moves is
+  unread there (C-94 LAB).
+- A grown city's border culture reads the luxuries the processing ranked
+  before it grew (1121 t186: Jiaodong 6 -> 7 on its 3, Displeased; t220
+  Shenyang, t238 Taiyuan).
+- Founding (C-94 LAB, unread): every one of the 48 foundings that read a
+  luxury at once had a city-state its founder is suzerain of take its turn
+  between the founding and the record; 10 of the 16 that read none did too.
+  0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's
+  owned-resource change to its suzerain — an accumulated resource as owned
+  (+n to the suzerain, -n to the city-state), any other as an import —
+  each a 0x4a7560 on the suzerain, so a city-state's strategic accumulation
+  (0x4ab6e0's per-plot amounts) re-ranks its suzerain at the city-state's
+  turn (1121 Hunza's two improved Horses, 1119 Granada's Iron, 1120
+  Yerevan's Horses); 1117's eight (Antananarivo's Sugar, Caguana) and 1127's
+  Hattusa show no such amount in the records.
+
+## H-1: the garrison requirement — READ
+
+GameEffects_Requirements_CityHasGarrisonUnit (REQUIREMENT_CITY_HAS_GARRISON_
+UNIT, 0xbbb1a0) walks the city's districts (+0x1a48); for each that seats a
+garrison (0x24b820, the districts with HitPoints: the centre and the
+Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a
+combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a
+MilitaryFormation argument (+0x90), compares the unit's formation (+0xc90).
+So a unit in the Encampment garrisons the city: 1121 Xi'an t152, a Field
+Cannon in its Encampment and a Guru and a Builder on its centre, Retainers
+pays its amenity (civics part 2); 1124 Xiurong t168; a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content). `cityGarrisons` /
+`_city_garrisoned` (Retainers, Limitanei, the identity rows).
+
+## H-1: the world's carbon in the climate log — READ (the column), the scale a fit
+
+The random-event step writes Game_RandomEvents.csv's sixteen-number row
+(0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2
+("Total CO2"), the categories after. Read as thousands of carbon, the flood
+rows' warming (ChanceIncreasePerDegree 20, CO2For1DegreeTempRise 500,000 on
+Duel) picks the game's event on every step the unwarmed table missed: 1121
+t189 FLOOD_MAJOR at the Tarim (285 -> 0.57 degrees, the boosted weights
+22 / 16), t203 and t241 FLOOD_MODERATE at the Arno (462, 619), t198 the Cat 4
+hurricane, t212 the meteor, t236 the forest fire, t245 the extreme drought;
+step.eventPick 2,784 -> 2,849 passes over the 26 duels (1119-1128, the
+recordings with the log), 1126 three lower where its flood rivers' order
+already fails (t99, t122, t146 ...). The scale (x1000) is a fit; the
+harness reads it per step (`loadCarbonLog`).
 
 ## DLL rules the engines contradict
 

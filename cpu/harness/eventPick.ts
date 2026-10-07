@@ -24,7 +24,11 @@
  * dump without them (`map:riverOrder` where the right flood row fell on
  * another named river, `map:volcanoOrder` while a wake is unnamed), a
  * volcano choice the candidates do not explain (`volcano:activity`).
- * Warming reads the imported state's carbon.
+ * Warming reads the world's carbon the game's climate log holds for the
+ * step (`loadCarbonLog`: 1121 t189 / t203 / t241, the flood rows warmed by
+ * 0.57 / 0.92 / 1.24 degrees, pick FLOOD_MAJOR at Tarim and FLOOD_MODERATE at
+ * the Arno where the unwarmed table picks the other river), else the imported
+ * state's.
  */
 import type { GameState, Tile } from '../core/types';
 import type { CheckResult } from './checks';
@@ -39,6 +43,8 @@ import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters'
 import { ERUPTION_ROWS, STORM_EVENTS } from '../data/disasters';
 import { initFog } from '../core/fog';
 import { isCiv } from '../core/seats';
+import { deforestationLevel } from '../core/climate';
+import { deforestationModifier } from '../data/climate';
 import { siteLabel } from './drawSites';
 
 const FLOODS = ['FLOOD_MODERATE', 'FLOOD_MAJOR', 'FLOOD_1000_YEAR'];
@@ -94,7 +100,8 @@ export class EventPicks {
    *  is the map's own), until an eruption names it */
   private readonly guessed: number[] = [];
 
-  constructor(private readonly cat: Catalog, private readonly log: RandLog | undefined) {}
+  constructor(private readonly cat: Catalog, private readonly log: RandLog | undefined,
+    private readonly carbon?: Map<number, number>) {}
 
   /** the check for the step between `rec` and `next` (the step of turn
    *  rec.turn + 1), on `imp`, the import of `rec`; its state is left as it
@@ -137,9 +144,17 @@ export class EventPicks {
     const tiles = state.map.tiles;
     const firedBefore = tiles.map((t) => t.eventFired);
     const activeBefore = tiles.map((t) => t.volcanoActive);
+    // the world's carbon at the step, the deforestation factor laid back off
+    // it (`worldCarbon`), all on the first seat
+    const co2Before = state.seats.map((s) => s.co2);
+    const carbon = this.carbon?.get(T);
+    if (carbon !== undefined) {
+      state.seats.forEach((s, i) => { s.co2 = i === 0 ? carbon / (1 + deforestationModifier(deforestationLevel(state))) : 0; });
+    }
     try {
       return this.pick(state, T);
     } finally {
+      state.seats.forEach((s, i) => { s.co2 = co2Before[i]; });
       state.seats.forEach((s, i) => { s.explored = saved[i]; });
       [state.unitsMode, state.fogOfWar] = flags;
       tiles.forEach((t, i) => { t.eventFired = firedBefore[i]; t.volcanoActive = activeBefore[i]; });

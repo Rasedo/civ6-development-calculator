@@ -329,10 +329,21 @@ export function unitsAt(state: GameState, tileIndex: number): Unit[] {
   return state.units.filter((u) => u.tileIndex === tileIndex);
 }
 
-/** CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT): the city's own military unit
- *  standing on its centre, if any. */
-export function garrisonOf(state: GameState, city: City): Unit | undefined {
-  return unitsAt(state, city.centerIndex).find((u) => u.seat === city.seat && unitDomain(u.type) === 'military');
+/** CIV6 (REQUIREMENT_CITY_HAS_GARRISON_UNIT, the requirement 0xbbb1a0): the
+ *  units garrisoning the city — on each of its districts that seats a
+ *  garrison (its centre and its Encampment, the districts with HitPoints),
+ *  the city's own combat unit standing there (0x24b170: the plot's best
+ *  defender, a combat unit). 1121 Xi'an t152: a Field Cannon in its
+ *  Encampment pays Retainers' amenity with no unit on the centre. */
+export function cityGarrisons(state: GameState, city: City): Unit[] {
+  const plots = [city.centerIndex, ...city.districts
+    .filter((d) => d.type === 'ENCAMPMENT' && state.map.tiles[d.tileIndex].districtComplete).map((d) => d.tileIndex)];
+  const out: Unit[] = [];
+  for (const p of plots) {
+    const u = unitsAt(state, p).find((v) => v.seat === city.seat && unitDomain(v.type) === 'military');
+    if (u) out.push(u);
+  }
+  return out;
 }
 
 /**

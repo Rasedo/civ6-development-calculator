@@ -10,7 +10,7 @@ import { GOVERNMENTS, POLICIES, POLICY_LIST } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
 import { CITY_MIN_STRIKE_CS } from '../../../cpu/data/constants';
 import { UNIT_ERA_INDEX, unitHasClass, UNITS } from '../../../cpu/data/units';
-import { garrisonOf, spawnUnit } from '../../../cpu/core/units';
+import { cityGarrisons, spawnUnit } from '../../../cpu/core/units';
 import { seatOf, BARB_SEAT } from '../../../cpu/core/seats';
 
 describe('the policy catalog', () => {
@@ -244,18 +244,23 @@ describe('the empire-wide channels', () => {
     }
   });
 
-  it('RETAINERS and LIMITANEI pay on the garrison channels, and a garrison is the city’s own military unit', () => {
+  it('RETAINERS and LIMITANEI pay on the garrison channels, and a garrison is the city’s own military unit on its centre or Encampment', () => {
     const m = defaultModifiers();
     applyPolicyEffects(m, POLICIES.RETAINERS.effects);
     applyPolicyEffects(m, POLICIES.LIMITANEI.effects);
     expect([m.amenitiesWithGarrison, m.loyaltyWithGarrison]).toEqual([1, 2]);
     const state = makeState(makeMap(16, 16));
     const city = foundCity(state, tileAtCoords(state.map, 8, 8).index, 0).city!;
-    expect(garrisonOf(state, city)).toBeUndefined();
+    expect(cityGarrisons(state, city)).toEqual([]);
     spawnUnit(state, 'BUILDER', city.centerIndex, 0);
-    expect(garrisonOf(state, city), 'a civilian garrisons nothing').toBeUndefined();
+    expect(cityGarrisons(state, city), 'a civilian garrisons nothing').toEqual([]);
+    const camp = tileAtCoords(state.map, 9, 8).index;
+    city.districts.push({ type: 'ENCAMPMENT', tileIndex: camp });
+    state.map.tiles[camp].districtComplete = true;
+    spawnUnit(state, 'ARCHER', camp, 0);
+    expect(cityGarrisons(state, city).map((u) => u.type), 'the Encampment seats a garrison').toEqual(['ARCHER']);
     spawnUnit(state, 'WARRIOR', city.centerIndex, 0);
-    expect(garrisonOf(state, city)?.type).toBe('WARRIOR');
+    expect(cityGarrisons(state, city).map((u) => u.type)).toEqual(['WARRIOR', 'ARCHER']);
   });
 
   it('SPORTS_MEDIA pays a Stadium city an amenity; FUTURE_VICTORY_SCIENCE a Spaceport city Power and Aluminum', () => {

@@ -157,6 +157,9 @@ export interface Imported {
   /** the resolutions in force for a seat's cities (`GameState.congress` as
    *  that seat reads it this record) */
   congressOf: (seat: number) => NonNullable<GameState['congress']>;
+  /** the government and cards a major's luxury allocation was ranked on,
+   *  where they are not the record's (`luxuryCards`) */
+  luxCardsOf: (seat: number) => LuxCards | undefined;
   /** does the record carry the queues' banked production (`queueProgress`)?
    *  Where it does not, every imported queue item stands at 0 */
   queueProgressRead: boolean;
@@ -656,6 +659,13 @@ interface PolicySlots {
   kinds: SlotKind[];
   cards: (string | null)[];
   lapsed: Set<string>;
+}
+
+/** A major's government, slotted cards and lapsed cards. */
+export interface LuxCards {
+  chosen: string;
+  policies: string[];
+  lapsed: string[];
 }
 
 /** A record route's identity: its Trader and its two cities. */
@@ -2442,6 +2452,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   state.congress = now.list;
   unrecordedLuxuryGaps(ctx, rec, state, luxUnrecorded, seatOfGame, congressOf);
   if (history) importLapsed(rec, cat, state, seatOfGame, history);
+  const luxCards = history ? luxuryCards(rec, cat, seatOfGame, history) : new Map<number, LuxCards>();
   const congressGaps = [...new Set([...now.gaps, ...before.gaps])];
   // (a queued row the engine lacks is the game's gap, no city's: nothing a
   // check reads comes from the queue)
@@ -2484,7 +2495,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,
-    congressGaps, congressOf, queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
+    congressGaps, congressOf, luxCardsOf: (seat: number) => luxCards.get(seat), queueProgressRead, readBack, lowlandsRead, projectYieldUnread, routes,
     districtLocked: history?.districtLocked ?? new Map(),
     tilesUnknown: new Set(rec.cities.map((c) => c.y * W + c.x).filter((k) => !history || history.unknownSince.has(k))),
     nextPlotUnheld: new Set(history?.nextPlotUnheld ?? []),
@@ -2710,16 +2721,19 @@ function importLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seatOfGam
   for (const p of rec.players) {
     if (!bool(p.major)) continue;
     const seat = seatOfGame(p.id);
-    landLapsed(rec, cat, state, seat, p, history);
+    const s = seatOf(state, seat);
+    if (!s || seat < 0 || seat >= state.seats.length) continue;
+    s.government.lapsed = [...lapsedCards(rec, cat, state, seat, p, history)];
   }
 }
 
-/** One major's lapsed cards as record `rec` slots them (`importLapsed`),
- *  set on its seat: the pair checks land record t+1's cards with it. */
-export function landLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seat: number, p: DumpPlayer,
-  history: History): void {
-  const s = seatOf(state, seat);
-  if (!s || seat < 0 || seat >= state.seats.length) return;
+/**
+ * The cards major `p` holds lapsed at record `rec` (`importLapsed`), with
+ * `state`'s seat `seat` already holding the record's government. Each turn is
+ * read once and kept.
+ */
+export function lapsedCards(rec: TurnRecord, cat: Catalog, state: GameState, seat: number, p: DumpPlayer,
+  history: History, keep = true): Set<string> {
   const byTurn = history.policySlots.get(p.id) ?? new Map<number, PolicySlots>();
   history.policySlots.set(p.id, byTurn);
   let now = byTurn.get(rec.turn);
@@ -2743,9 +2757,75 @@ export function landLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seat
       cards.forEach((c, i) => { if (c && prev!.cards[i] === c && prev!.lapsed.has(c)) lapsed.add(c); });
     }
     now = { gov, kinds, cards, lapsed };
-    byTurn.set(rec.turn, now);
+    if (keep) byTurn.set(rec.turn, now);
   }
-  s.government.lapsed = [...now.lapsed];
+  return now.lapsed;
+}
+
+/**
+ * The cards each major's luxury allocation was ranked on, where they are
+ * not the record's. The allocation is rebuilt at the resources step that
+ * opens the player's processing (Player DoTurn 0x4e4560 -> 0x4a8ed0), after
+ * the cards it re-slots at its start and before its city walk; a slot rebuild
+ * or a card the player signals once its walk began (a completion opening a
+ * slot, its actions) leaves the allocation ranked on the cards before it
+ * (1121 t222: Xi'an's Shipyard opens a slot mid-walk, Liberalism and Civil
+ * Prestige are laid back, and the luxuries stand as ranked with their two
+ * amenities in Xi'an and Shanghai). Read off the record's log: the player's
+ * GovernmentChanged / GovernmentPolicyChanged rows against the first row of
+ * its city walk; with the cards or their standing changed since the record
+ * before and any such row (or none at all) past the walk's start, the
+ * previous record's cards.
+ */
+function luxuryCards(rec: TurnRecord, cat: Catalog, seatOfGame: (pid: number) => number,
+  history: History): Map<number, LuxCards> {
+  const out = new Map<number, LuxCards>();
+  const rows = (rec as TurnRecord & { actions?: unknown[][] }).actions;
+  if (!Array.isArray(rows)) return out;
+  for (const p of rec.players) {
+    if (!bool(p.major)) continue;
+    const byTurn = history.policySlots.get(p.id);
+    const now = byTurn?.get(rec.turn);
+    const before = byTurn ? Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn)) : -1;
+    const prev = byTurn?.get(before);
+    if (!now || !prev) continue;
+    const same = now.gov === prev.gov && JSON.stringify(now.cards) === JSON.stringify(prev.cards)
+      && JSON.stringify([...now.lapsed].sort()) === JSON.stringify([...prev.lapsed].sort());
+    if (same) continue;
+    // the player's processing: from where the player before it closed its
+    // turn to its own turn start; its walk opens at its first city row
+    const start = rows.findIndex((r) => r[2] === 'PlayerTurnActivated' && r[3] === p.id);
+    if (start < 0) continue;
+    const opened = rows.slice(0, start).map((r) => r[2]).lastIndexOf('PlayerTurnDeactivated');
+    let walk = rows.findIndex((r, i) => i > opened && i < start && ((String(r[2]).startsWith('City') && r[3] === p.id)
+      || ((r[2] === 'BuildingChanged' || r[2] === 'WonderCompleted') && r[6] === p.id)));
+    if (walk < 0) walk = start;
+    const signals = rows.map((r, i) => [r, i] as const)
+      .filter(([r]) => (r[2] === 'GovernmentPolicyChanged' || r[2] === 'GovernmentChanged') && r[3] === p.id);
+    if (signals.length > 0 && signals.every(([, i]) => i > opened && i < walk)) continue;
+    // a change of the resources the player holds after the cards moved
+    // rebuilds the allocation on them (ChangeResourceAmount 0x4a7560 ->
+    // 0x4a6110): a unit with a strategic cost trained or bought (1121 t196:
+    // Big Ben re-slots Xi'an's cards mid-walk, the Line Infantry Xi'an buys
+    // after re-ranks the luxuries on them), an improvement on a resource
+    const moved = Math.max(walk, ...signals.map(([, i]) => i));
+    const W = rec.head.W;
+    const strategic = (u: unknown) => {
+      const id = typeof u === 'number' && u >= 0 ? engineId('unit', cat.units[u] ?? '', 'UNIT_', UNITS) : null;
+      return !!id && !!UNITS[id]?.requiresResource;
+    };
+    const rebuilt = rows.some((r, i) => i > moved && (
+      (r[2] === 'CityProductionCompleted' && r[3] === p.id && r[5] === 0 && strategic(r[6]))
+      || (r[2] === 'CityMadePurchase' && r[3] === p.id && r[7] === PURCHASE_UNIT_HASH && strategic(r[8]))
+      || ((r[2] === 'ImprovementAddedToMap' || r[2] === 'ImprovementChanged') && r[6] === p.id
+        && typeof r[3] === 'number' && typeof r[4] === 'number'
+        && (plotAt(rec, (r[4] as number) * W + (r[3] as number))[P.resource] as number) >= 0)));
+    if (rebuilt) continue;
+    const gov = engineId('government', cat.governments[prev.gov] ?? '', 'GOVERNMENT_', GOVERNMENTS);
+    if (!gov) continue;
+    out.set(seatOfGame(p.id), { chosen: gov, policies: prev.cards.filter((c): c is string => c !== null), lapsed: [...prev.lapsed] });
+  }
+  return out;
 }
 
 /**
@@ -2786,7 +2866,14 @@ function importShortfalls(rec: TurnRecord, state: GameState, seatOfGame: (pid: n
     const s = seatOf(state, seatOfGame(p.id));
     const q = prev.players.find((x) => x.id === p.id);
     if (!s || !q) continue;
-    const balance = num(q.gold) + num(q.goldYield) - num(q.maintTotal);
+    // two of the player's turn starts since the record before (the record
+    // written ahead of one) fall short twice before its treasury is read
+    // (1121 Rome t135: -8.4 a turn, part 14 reads 2 where every one-start
+    // record reads 1; a fit, C-94 LAB)
+    const rows = (rec as TurnRecord & { actions?: unknown[][] }).actions;
+    const starts = Array.isArray(rows)
+      ? rows.filter((r) => r[2] === 'PlayerTurnActivated' && r[3] === p.id).length : 1;
+    const balance = num(q.gold) + (num(q.goldYield) - num(q.maintTotal)) * Math.max(1, starts);
     if (Number.isNaN(balance) || Number.isNaN(num(p.gold))) continue;
     s.goldShortfall = num(p.gold) > 0 ? 0 : goldShortfall(balance);
     read.add(p.id);
