@@ -2827,29 +2827,31 @@ class SimMasks:
 
     def _los_disk(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor) -> torch.Tensor:
         """[K, T] bool — the tiles within `radius` of `tiles` an eye standing
-        THERE can see (`canSee` over `tilesWithin`): CIV6 (measured ask 11)
-        OCCLUSION BY ELEVATION — every tile strictly between (`_los_mid`) must
-        put no more in the way than the observer's own height (flat 0, hills
-        1, mountain 2) or the target's own. The range is the caller's; a hill
-        adds height, never reach. `see_through` [K] bool is the Sentry flag
-        per look."""
+        THERE can see (`canSee` over `tilesWithin`): OCCLUSION BY ELEVATION —
+        a tile strictly between (`_los_mid`) blocks when it puts more in the
+        way than the observer's own height (flat 0, hills 1, mountain 2) and
+        no less than the target's own; the look holds when either of the two
+        lines (side 0 / 1, one each side of an edge the line runs along) is
+        clear. The range is the caller's; a hill adds height, never reach.
+        `see_through` [K] bool is the Sentry flag per look."""
         K = rows.numel()
         rad = radius if torch.is_tensor(radius) else torch.full((K,), int(radius), dtype=torch.long, device=self.device)
         rad = rad.reshape(-1).expand(K) if rad.numel() == 1 else rad
         tgt = self._los_tgt[tiles]            # [K, N]
-        mid = self._los_mid[tiles]            # [K, N, M]
+        mid = self._los_mid[tiles]            # [K, N, 2, M]
         th_all = self._sight_through_plane(False)[rows]   # [K, T]
         th_feat0 = self._sight_through_plane(True)[rows]
         th = torch.where(see_through.reshape(K, 1), th_feat0, th_all)
-        N, M = tgt.shape[1], mid.shape[2]
-        mth = th.gather(1, mid.clamp(min=0).reshape(K, -1)).reshape(K, N, M)
+        N, M = tgt.shape[1], mid.shape[3]
+        mth = th.gather(1, mid.clamp(min=0).reshape(K, -1)).reshape(K, N, 2, M)
         mth = torch.where(mid >= 0, mth, torch.zeros_like(mth))
         obs_h = (self.hills[rows, tiles].long() * self._sight_hills
                  + self.tile_mountain[rows, tiles].long() * self._sight_mountain)  # [K]
         # the target's own height (its elevation's plus its feature's, the
-        # Sentry flag aside): a tall plot shows over a lower one
+        # Sentry flag aside): a plot shows over a lower one, never its equal
         tgt_h = th_all.gather(1, tgt.clamp(min=0))  # [K, N]
-        blocked = mth.max(dim=2).values > torch.maximum(obs_h.reshape(K, 1), tgt_h)
+        stops = (mth > obs_h.reshape(K, 1, 1, 1)) & (mth >= tgt_h.reshape(K, N, 1, 1)) & (mid >= 0)
+        blocked = stops.any(dim=3).all(dim=2)
         d = self.pair_dist[tiles].gather(1, tgt.clamp(min=0)).to(torch.long)
         vis = (tgt >= 0) & ~blocked & (d <= rad.reshape(K, 1))
         disk = torch.zeros(K, self.T, dtype=torch.bool, device=self.device)
@@ -2857,6 +2859,13 @@ class SimMasks:
         disk[kk[vis], tgt[vis]] = True
         disk[torch.arange(K, device=self.device), tiles] = True
         return disk
+
+    def _city_look(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor) -> None:
+        """`cityLook`'s twin, a city founded or changing hands: the plots two
+        round its centre whole, then those three round it an eye on the
+        centre sees (`_los_disk`, no Sentry)."""
+        self._reveal_around(rows, seat_row, tiles, 2)
+        self._reveal_around(rows, seat_row, tiles, 3, see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
                        see_through: torch.Tensor | None = None) -> None:
@@ -2869,11 +2878,11 @@ class SimMasks:
         world accrues NO explored state on either engine.
 
         WIRED — the full TS reveal-site set: t0 fixture load (r2/unit), the
-        three major spawn bodies (r2), both founding bodies (r3), every walk
-        hop through _step_verb's one tile write (r2 — all movers route
-        there), tile acquisition r1 at both sites (border growth on every
-        seat row, the driven tile buy), and the captor's r3 at every capture
-        body (`_transfer_city` for city captures and transfers,
+        three major spawn bodies (r2), both founding bodies (`_city_look`),
+        every walk hop through _step_verb's one tile write (r2 — all movers
+        route there), tile acquisition r1 at both sites (border growth on
+        every seat row, the driven tile buy), and the captor's `_city_look`
+        at every capture body (`_transfer_city` for city captures and transfers,
         `_capture_city_state` for both CS conquests). NOT reveals on either
         engine: the melee advance-into-freed-tile and unit capture/transfers
         (TS writes tileIndex directly — no stepUnit, no reveal), and a goody

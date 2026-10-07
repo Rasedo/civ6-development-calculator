@@ -79,7 +79,7 @@ function sitePlots(t: EventTable, i: number, k: number): Tile[] | null {
 const num = (v: unknown): number => (typeof v === 'number' ? v : -1);
 
 /** What a major's own plots, cities and units show at a record's positions
- *  (`initFog`'s look: each plot it owns and its ring, each city 3 plots, each
+ *  (`initFog`'s look: each plot it owns and its ring, each city's look (`cityLook`), each
  *  unit its sight cut by the line of sight), marked into `acc`. */
 function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, seat: number, acc: Uint8Array): void {
   const { map } = state;
@@ -92,7 +92,11 @@ function sightIn(state: GameState, rec: TurnRecord, cat: Catalog, pid: number, s
     }
   };
   rec.map.forEach((row, y) => row.forEach((p, x) => { if (num(p[P.owner]) === pid) look(y * W + x, 1); }));
-  for (const c of rec.cities) if (c.owner === pid) look(c.y * W + c.x, 3);
+  for (const c of rec.cities) {
+    if (c.owner !== pid) continue;
+    look(c.y * W + c.x, 2);
+    look(c.y * W + c.x, 3, false);
+  }
   for (const u of rec.units) {
     if (u.owner !== pid) continue;
     const type = engineRowOf(cat, 'unit', u.type);

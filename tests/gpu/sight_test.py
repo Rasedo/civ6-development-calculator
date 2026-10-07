@@ -3,9 +3,10 @@ LOS scenes are the TS twin).
 
     python tests/gpu/sight_test.py
 
-Measured in the live game (ask 11): a tile on the ray hides
-everything behind it iff its SightThroughModifier sum EXCEEDS the observer's
-SightModifier; a hill adds height, never range; Sentry sees through features.
+A tile on the ray hides what stands behind it when its SightThroughModifier
+sum EXCEEDS the observer's SightModifier and is no less than the target's
+own; either of a ray's two lines past an edge serves; a hill adds height,
+never range; Sentry sees through features.
 """
 
 from __future__ import annotations
@@ -30,22 +31,28 @@ def main() -> None:
     row = {int(tgt[a, k]): k for k in range(tgt.shape[1]) if int(tgt[a, k]) >= 0}
     assert len(row) == 90, f"the disk within 5 of an inner tile holds 90 tiles, got {len(row)}"
     k = row[10 * W + 8]
-    assert mid[a, k].tolist()[:2] == [10 * W + 6, 10 * W + 7] and int(mid[a, k, 2]) == -1, \
-        f"the straight line east from (5,10) to (8,10) passes (6,10),(7,10): {mid[a, k].tolist()}"
+    for s in (0, 1):
+        assert mid[a, k, s].tolist()[:2] == [10 * W + 6, 10 * W + 7] and int(mid[a, k, s, 2]) == -1, \
+            f"the straight line east from (5,10) to (8,10) passes (6,10),(7,10) on side {s}: {mid[a, k, s].tolist()}"
     # every line: distance - 1 mids, each adjacent to the last, the first beside the eye
     from core.simbase import neighbor_table
     nb = neighbor_table(16, 16, False)
+    split = 0
     for k2 in range(tgt.shape[1]):
         b = int(tgt[a, k2])
         if b < 0:
             continue
-        ms = [int(m) for m in mid[a, k2].tolist() if m >= 0]
-        prev = a
-        for m in ms:
-            assert m in nb[prev].tolist(), f"line {a}->{b}: mid {m} is not beside {prev}"
-            prev = m
-        assert b in nb[prev].tolist() or not ms and b in nb[a].tolist(), f"line {a}->{b} does not end beside the target"
-    print("  1 lines OK — 90 targets within 5, the straight row exact, every line a chain of neighbours")
+        for s in (0, 1):
+            ms = [int(m) for m in mid[a, k2, s].tolist() if m >= 0]
+            prev = a
+            for m in ms:
+                assert m in nb[prev].tolist(), f"line {a}->{b} side {s}: mid {m} is not beside {prev}"
+                prev = m
+            assert b in nb[prev].tolist() or not ms and b in nb[a].tolist(), f"line {a}->{b} does not end beside the target"
+        split += mid[a, k2, 0].tolist() != mid[a, k2, 1].tolist()
+    # the six distance-2 targets off the straight lines pass an edge: each side takes its own plot
+    assert split >= 6, f"the lines along an edge take the same plot on both sides ({split} split)"
+    print("  1 lines OK — 90 targets within 5, the straight row exact, every line a chain of neighbours, an edge split")
 
     # -- 2: the look itself, on the fixture map
     rules = load_rules()
@@ -82,6 +89,12 @@ def main() -> None:
     sim.hills[0, e1] = False
     sim.hills[0, o] = False
     assert not bool(look(False)[e2]) and bool(look(True)[e2]), "woods alone hide from a flat eye, not from a Sentry"
+    sim.feat_id[0, e2] = woods[0]
+    assert not bool(look(False)[e2]), "a wooded plot does not show over woods: its equal hides it"
+    sim.hills[0, e2] = True
+    assert bool(look(False)[e2]), "a wooded hill (2) shows over woods (1)"
+    sim.hills[0, e2] = False
+    sim.feat_id[0, e2] = -1
     # a CHOPPED wood keeps its old id behind the strip flag: it hides nothing
     sim.feat_stripped[0, e1] = True
     assert bool(look(False)[e2]), "a felled feature still blocked the look (read the live feature, not feat_id)"

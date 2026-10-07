@@ -14,7 +14,7 @@ import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileF
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
 import { applyTrainingGrants, barbarianPhase, damageRoll, releaseBarbarians, theoStrength, theoFlankCount, theoSupportCount, theoDefenseStrength, FLANKING_CS, SUPPORT_CS } from './combat';
-import { revealAround } from './fog';
+import { cityLook } from './fog';
 import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
@@ -354,7 +354,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
     if (owner) owner.capitalTile = tile.index;  // static once founded
   }
   trajansColumn(state, seat, city);
-  revealAround(state, seat, tile.index, 3);
+  cityLook(state, seat, tile.index);
   foundingMoments(state, seat, tile.index);
   // the road to the capital walks the ground the city just revealed
   allRoadsLeadToRome(state, seat, tile.index);

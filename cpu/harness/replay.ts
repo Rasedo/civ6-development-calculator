@@ -259,7 +259,20 @@ function adoptByTribe(state: GameState, u: Unit): void {
 function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const { state } = ctx;
   const before = new Set(state.units.filter((u) => isBarbSeat(u.seat)));
+  // their rules open their turn, before their units move: each stands where
+  // the pair's first record holds it (runs/h1_duelw1127 t22: the camp step
+  // reads the Scout's sight from (8,19), where it stood before its move to
+  // (9,19), and (7,20) is no candidate)
+  const was = new Map<string, number>(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  const moved = new Map<Unit, number>();
+  for (const [key, u] of ctx.units) {
+    const at = was.get(key);
+    if (!isBarbSeat(u.seat) || at === undefined || at === u.tileIndex || !state.units.includes(u)) continue;
+    moved.set(u, u.tileIndex);
+    u.tileIndex = at;
+  }
   barbarianRules(state, closing);
+  for (const [u, at] of moved) u.tileIndex = at;
   matchNewUnits(ctx, b);
   for (const key of ctx.barbNew) {
     if (unitOf(ctx, key)) continue;
@@ -274,6 +287,21 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
   }
   barbarianOps(state);
+}
+
+/** A battle's unit set on the plot the log's steps had it: another unit of
+ *  its domain the replay left there stood elsewhere in the game, which never
+ *  stacks two — it steps to where record t+1 holds it (runs/h1_duelw1127 t9:
+ *  the barbarians' Slinger and Spearman strike city-state 4's Warrior at
+ *  401, which its other Warrior had walked off; the replay held both there
+ *  and the blows fell on the other) */
+function unstack(ctx: Ctx, b: TurnRecord, u: Unit): void {
+  const dom = unitDomain(u.type);
+  for (const [key, x] of ctx.units) {
+    if (x === u || x.tileIndex !== u.tileIndex || unitDomain(x.type) !== dom || !ctx.state.units.includes(x)) continue;
+    const r = b.units.find((y) => `${y.owner}:${y.id}` === key);
+    if (r && r.y * ctx.W + r.x !== u.tileIndex) x.tileIndex = r.y * ctx.W + r.x;
+  }
 }
 
 /**
@@ -1287,6 +1315,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // for the record's unit, standing outside the engine's game
         const enterer = d.unit ? unitOf(ctx, d.unit) ?? recordedUnit(ctx, b, d.unit, -1) ?? recordedUnit(ctx, ctx.prev, d.unit, -1) : undefined;
         if (enterer) {
+          // it walked onto the plot, and saw from every step and from it
+          // (runs/h1_duelw1127 t6: Rome's Scout enters the village at (31,16)
+          // and the coast two plots west lies revealed in record t7)
+          if (enterer.tileIndex !== d.plot && d.unit && unitOf(ctx, d.unit) === enterer) {
+            for (const p of [...(ctx.paths.get(d.unit) ?? []), d.plot]) {
+              revealAround(state, enterer.seat, p, unitSight(enterer, state), { seeThrough: unitSeesThrough(enterer) });
+            }
+          }
           enterer.tileIndex = d.plot;
           drawAndPayGoody(state, enterer, t);
           matchNewUnits(ctx, b);
@@ -1457,6 +1493,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         dugIn(ctx, d, def);
         atk.tileIndex = d.from;
         def.tileIndex = d.at;
+        unstack(ctx, b, atk);
+        unstack(ctx, b, def);
         // a land unit the log's steps left on water fights embarked
         for (const u of [atk, def]) {
           if (!UNITS[u.type]?.naval && !waterWalks(u.type)) u.embarked = isWater(state.map.tiles[u.tileIndex]) || undefined;

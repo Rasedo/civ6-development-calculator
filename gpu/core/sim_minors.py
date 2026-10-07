@@ -1683,8 +1683,9 @@ class SimMinors:
         the Builder's arms with minor `s`'s own research, arm for arm with the
         majors' builder column (`_seat_unit_mask`): a visible resource offers
         its own improvement alone, bare ground the Farm, the Mine, the Lumber
-        Mill, the Seaside Resort and the ground-only rows. A minor lays no
-        suzerain row (it is no one's suzerain), no unique row (it plays no
+        Mill, the Seaside Resort, the ground-only rows and its own trait's
+        suzerain row (`citystate_suz_imp`: a city-state holds its own trait). A
+        minor lays no other suzerain row, no unique row (it plays no
         civilization), no named unit's or Engineer's row and, standing on
         land, no water row. A drought's own improvements wait for the rain
         (`droughtBars`). Paving, ownership and standing are the caller's."""
@@ -1717,6 +1718,11 @@ class SimMinors:
                     techs[:, self._lumber_unlock_tech] if self._lumber_unlock_tech >= 0 else zeros).unsqueeze(1)
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
                 ok = self._seaside_ok(row) & unl(k)
+            elif self._imp_suz[k] and self._imp_built_by[k] < 0 and not self._imp_water[k]:
+                # the minor's own trait improvement (`suzerainNames` holds a
+                # city-state's own name): its Builders lay it
+                ok = ((self.citystate_suz_imp[:, s] == k).unsqueeze(1) & self._builder_ground(row)
+                      & self._imp_ground_ok(k) & self._imp_gov_ok(row, k))
             elif (self._imp_built_by[k] >= 0 or self._imp_suz[k] or self._imp_uniq[k] >= 0
                   or k == self.TUNNEL or self._imp_eng[k] or self._imp_water[k]):
                 continue

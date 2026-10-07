@@ -162,4 +162,44 @@ describe('a barbarian raid', () => {
     expect(tribe.op!.units.length).toBe(3);
     expect(tribe.every).toBeUndefined();
   });
+
+  it('a scout home hurt by a quarter or more holds its report while an enemy can strike it', () => {
+    const state = land();
+    barbarianTechs(state);
+    const camp = tileAtCoords(state.map, 6, 6);
+    raiseCamp(state, camp.index);
+    state.barbCampsBegun = true;
+    setTileOwner(tileAtCoords(state.map, 8, 6), 0);
+    const tribe = state.barbTribes![0];
+    tribe.boldness = 10;
+    const scout = state.units.find((u) => u.id === tribe.scouts[0])!;
+    scout.hp = 53;
+    // a Warrior (2 moves, reach 1) three plots from the scout
+    const at = state.map.tiles[scout.tileIndex];
+    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, at.col, at.row + 3).index, 0)!;
+    barbarianOps(state);
+    expect(tribe.op).toBeUndefined();
+    expect(tribe.homing).toBeDefined();
+    // the Warrior gone, the report lands
+    state.units = state.units.filter((u) => u !== foe);
+    barbarianOps(state);
+    expect(tribe.op).toMatchObject({ assault: false, target: { seat: 0 } });
+  });
+});
+
+describe('the camp step', () => {
+  it("counts the barbarians' own sight among the players' that bar a camp", () => {
+    const step = (watched: boolean) => {
+      const state = land();
+      spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 0, 0).index, 0);
+      barbarianTechs(state);
+      state.barbCampsBegun = true;
+      // a barbarian Warrior every third plot sees the whole map
+      if (watched) for (const t of state.map.tiles) if (t.col % 3 === 0 && t.row % 3 === 0) spawnUnit(state, 'WARRIOR', t.index, BARB_SEAT);
+      barbarianRules(state, state.turn);
+      return state.barbSeat.camps.length;
+    };
+    expect(step(false)).toBe(1);
+    expect(step(true)).toBe(0);
+  });
 });

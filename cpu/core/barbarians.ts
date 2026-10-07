@@ -23,8 +23,8 @@ import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, isBarbSeat, isTerritorial, majorsAlive, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, unitSight, unitSeesThrough } from './fog';
-import { spawnUnit, tileFreeForUnit } from './units';
-import { UNITS } from '../data/units';
+import { spawnUnit, tileFreeForUnit, unitIsNoncombat } from './units';
+import { UNITS, UNIT_HP } from '../data/units';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import {
@@ -33,7 +33,7 @@ import {
   BARB_NAMES_PER_KIND, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_TAG_UNITS, BARB_FREE_TECHS, barbNameRangedPct,
   BARB_BOLD_TURN, BARB_BOLD_KILL, BARB_BOLD_UNIT_LOST, BARB_BOLD_SCOUT_LOST, BARB_RAID_BOLDNESS, BARB_ASSAULT_BOLDNESS,
   BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL, BARB_HOME_RANGE, BARB_RAID_RECRUIT_TURNS, BARB_ASSAULT_RECRUIT_TURNS,
-  DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness,
+  BARB_PROTECT_DAMAGE, DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness,
   type BarbTag, type BarbTribeDef,
 } from '../data/barbarians';
 
@@ -89,12 +89,16 @@ export function plotsSeenNow(state: GameState, seats: ReadonlySet<number>): Uint
   return seen;
 }
 
-/** every player but the barbarians: the majors, the city-states, the Free
- *  Cities — whose sight bars a camp (0x50b180) */
+/** every living player: the majors, the city-states, the Free Cities and
+ *  the barbarians themselves — whose sight bars a camp (0x50b180 walks the
+ *  players' list at +0x4a0; runs/h1_duelw1127 t22: the game's one candidate
+ *  is (14,13), the engines' best (7,20) and (10,20) lying two plots from the
+ *  barbarians' Scout at (8,19)) */
 function allSeers(state: GameState): Set<number> {
   const out = new Set<number>(state.seats.map((s) => s.seat));
   for (const cs of state.cityStates) out.add(cs.seat);
   if (state.freeSeat) out.add(state.freeSeat.seat);
+  out.add(BARB_SEAT);
   return out;
 }
 
@@ -528,11 +532,33 @@ export function barbScoutLook(state: GameState, unit: Unit): void {
   }
 }
 
+/** can another player's fighting unit strike the plot next turn: one within
+ *  its moves plus its reach (its Range, 1 for melee) — Protect Unit's danger
+ *  (0x7f07c0 reads the AI's influence map, unread: a LAB reading) */
+function threatened(state: GameState, plot: number): boolean {
+  const { map } = state;
+  const t = map.tiles[plot];
+  return state.units.some((x) => {
+    if (isBarbSeat(x.seat) || unitIsNoncombat(x.type)) return false;
+    const def = UNITS[x.type];
+    if (!def) return false;
+    const at = map.tiles[x.tileIndex];
+    return hexDistance(map, at.col, at.row, t.col, t.row) <= def.moves + Math.max(1, def.ranged?.range ?? 0);
+  });
+}
+
 /**
  * A SCOUT HOME WITH ITS REPORT (0x148270): within BARB_HOME_RANGE of its
  * camp the city is its tribe's — a raid at once where the tribe's Boldness
  * reaches its RaidingBoldness and no raid runs, else a city its raid waits
- * for. A scout lost on the way reports nothing.
+ * for. A scout lost on the way reports nothing; one damaged by
+ * BARB_PROTECT_DAMAGE of its health or more where an enemy can strike
+ * (`threatened`) holds its report until it stands home unthreatened or
+ * whole ("Barbarian Found City"'s Protect Unit beside its Move Unit:
+ * runs/h1_duelw1121, the camp at (3,19) — its Scout, struck for 47 by
+ * China's Warrior at t24, is home at t25 three plots from that Warrior and
+ * reports nothing; home again at t33 with no enemy near, the raid recruits
+ * at once, Warriors at t34, t35 and t36).
  */
 function scoutReports(state: GameState, tribe: BarbTribe): void {
   const h = tribe.homing;
@@ -542,6 +568,7 @@ function scoutReports(state: GameState, tribe: BarbTribe): void {
   const a = state.map.tiles[u.tileIndex];
   const c = state.map.tiles[tribe.plot];
   if (hexDistance(state.map, a.col, a.row, c.col, c.row) > BARB_HOME_RANGE) return;
+  if (UNIT_HP - u.hp >= BARB_PROTECT_DAMAGE * UNIT_HP && threatened(state, u.tileIndex)) return;
   delete tribe.homing;
   const can = !(tribe.op && !tribe.op.assault);
   if (can && (tribe.boldness ?? 0) >= raidBoldness(tribe) && startOp(tribe, h.target, false)) return;

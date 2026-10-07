@@ -9,7 +9,9 @@ cavalry tribe an unowned Horses plot within its ResourceRange, a melee tribe
 otherwise inland; a new camp raises its defender on the camp and its scout
 within three plots; a living tribe under its unit cap spawns a melee or ranged
 unit every TurnsToWarriorSpawn turns. The raider AI walks onto a Free City's
-district like any other target.
+district like any other target. A scout home hurt by a quarter of its health
+where another player's fighting unit can strike holds its report; the camp
+step's sight takes the barbarians' own units.
 
 The gate drives barbarians every game, but whether a camp of any seed rises
 near Horses is not something a run can be counted on for, so the lane builds
@@ -26,7 +28,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from core.simbase import FREE_SEAT
+from core.simbase import BARB_SEAT, FREE_SEAT
 from warmup import settle_all
 
 
@@ -215,6 +217,48 @@ def main() -> None:
     assert bool(sim.tribe_op_rec[0, k]) and int(sim.tribe_every[0, k]) == -1, "the force taken, the clock not the tribe's"
     assert int((sim.barb_unit_op[0] & (sim.barb_unit_tribe[0] == k)).sum()) == 3, "the raid took no force of three"
     print("  a scout's report starts a raid, which raises its force one a turn")
+
+    # A HURT SCOUT (`scoutReports`' Protect Unit twin): home with a quarter of
+    # its health gone and another player's fighting unit able to strike it,
+    # it holds its report; the threat gone, the report starts the raid
+    clear_barbs(sim)
+    sim.barb_camps_begun[0] = True
+    k = camp(sim, tile)
+    sc =[s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
+          if int(sim.barb_unit_tribe[0, s]) == k and bool(sim.barb_unit_scout[0, s])][0]
+    st = int(sim.barb_unit_tile[0, sc])
+    seen = [n for n in sim.neigh[st].tolist() if n >= 0 and n != tile and not bool(sim.wpass[0, n])][0]
+    sim.tile_seat[0, seen] = 0
+    sim._tile_owner_ver += 1
+    sim.tribe_bold[0, k] = 10
+    sim.barb_spot_next[0, :] = 0
+    sim.barb_unit_hp[0, sc] = 53
+    ut = sim.unit_type[0].clamp(min=0, max=sim.NU - 1)
+    reach = sim._type_moves[ut] + sim._type_ranged_range[ut].clamp(min=1)
+    fighters = sim.unit_alive[0] & ~sim._type_noncombat[ut] & (sim.unit_seat[0] != BARB_SEAT)
+    for u in (fighters & (sim.pair_dist[sim.unit_tile[0].clamp(min=0), st] <= reach)).nonzero(as_tuple=True)[0].tolist():
+        sim.unit_alive[0, u] = False  # nothing else threatens the scene
+    foe = fighters.nonzero(as_tuple=True)[0].tolist()[0]
+    far = sim.unit_tile[0, foe].item()
+    sim.unit_alive[0, foe] = True
+    sim.unit_tile[0, foe] = [n for n in range(sim.T) if int(sim.pair_dist[st, n]) == 2][0]
+    sim._barbarian_ops()
+    assert int(sim.tribe_op[0, k]) == 0 and int(sim.tribe_home_slot[0, k]) == sc, \
+        "a hurt scout an enemy can strike reported"
+    sim.unit_tile[0, foe] = far if int(sim.pair_dist[far, st]) > int(reach[foe]) else \
+        [n for n in range(sim.T) if int(sim.pair_dist[st, n]) > int(reach[foe])][0]
+    sim._barbarian_ops()
+    assert int(sim.tribe_op[0, k]) == 1 and int(sim.tribe_home_slot[0, k]) == -1, \
+        "the hurt scout, the threat gone, started no raid"
+    print("  a hurt scout holds its report while an enemy can strike it")
+
+    # THE CAMP STEP'S SIGHT counts the barbarians' own units
+    clear_barbs(sim)
+    assert not bool(sim._barb_seen(False)[0, tile]), "the empty camp plot is in some player's sight"
+    camp(sim, tile)
+    assert bool(sim._barb_seen(False)[0, tile]), "the camp's own units do not see their plot"
+    assert not bool(sim._barb_seen(True)[0, tile]), "the majors' sight took the barbarians' units"
+    print("  the camp step's sight takes the barbarians' own units")
 
     print("BARB CAMPS OK — the tribe's kind is its ground, it raises its units on its clock, it raids")
 

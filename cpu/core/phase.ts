@@ -6,7 +6,7 @@ import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch } from './production';
-import { isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
+import { cityLook, isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
@@ -1511,7 +1511,7 @@ export function transferCity(
   // the Free Cities player scores no era and explores nothing
   if (isCiv(to.seat)) {
     transferMoments(state, fromSeat, to.seat, civCity, why === 'loyalty collapsed' || why === 'joined', wasLast);
-    revealAround(state, to.seat, civCity.centerIndex, 3);
+    cityLook(state, to.seat, civCity.centerIndex);
   }
   // the road to the capital walks the city as it now stands: its new holder,
   // its districts, the ground it revealed

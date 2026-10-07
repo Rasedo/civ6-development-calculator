@@ -38,7 +38,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
 import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
-import { isExplored, revealAround } from './fog';
+import { cityLook, isExplored } from './fog';
 import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
@@ -265,7 +265,7 @@ export const MOUNTIE_PARK_RANGE = 2;
 // flanking & support. Real Civ 6: a melee attacker gains +2 CS per
 // OTHER unit adjacent to the defender that is hostile to the defender
 // (flanking); a defender gains +2 CS per friendly MILITARY unit adjacent to it
-// (support), against melee AND ranged. Cities / city-states / civCity-city targets
+// (support), against a melee attack only (0x5228c0 adds it for COMBAT_MELEE). Cities / city-states / civCity-city targets
 // are not units — no flanking against them (recorded simplification). Integer
 // CS adds, so the diff quantization (q = round(Δ·10)) is preserved.
 export const FLANKING_CS = 2;
@@ -2930,7 +2930,7 @@ export function captureCityState(state: GameState, cityState: CityState, seat: n
   });
   const _csList = seatOf(state, seat)!.cities;
   logPopWrite(state, _csList[_csList.length - 1], 'cs');
-  revealAround(state, seat, cityState.centerIndex, 3);
+  cityLook(state, seat, cityState.centerIndex);
   raiseEmergency(state, EMERGENCY_CITY_STATE, seat, id, csPatrons(state, cityState, seat));
   state.eventLog.push(`${cityState.name} conquered — the city-state joins your empire.`);
 }
@@ -2956,7 +2956,7 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
       setTileOwner(t, actor.seat, id); // the claim registers to the new civCity
     }
   }
-  revealAround(state, actor.seat, cityState.centerIndex, 3);
+  cityLook(state, actor.seat, cityState.centerIndex);
   markCityCentre(center); // the captureCityState twin — see the note there
   actor.cities.push({
     id,

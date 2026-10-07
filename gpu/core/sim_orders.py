@@ -1670,8 +1670,8 @@ class SimOrders:
             self.tile_city[b, c_t] = new_id
             self._tile_owner_ver += 1
             self.city_alive[b, row, col] = True
-            self._reveal_around(torch.tensor([b], dtype=torch.long, device=dev), row,
-                                torch.tensor([c_t], dtype=torch.long, device=dev), 3)
+            self._city_look(torch.tensor([b], dtype=torch.long, device=dev), row,
+                            torch.tensor([c_t], dtype=torch.long, device=dev))
             self.city_id[b, row, col] = new_id
             self.city_is_cap[b, row, col] = False  # an annexed minor is never a capital
             self.city_orig_cap[b, row, col] = -1   # ...and never anyone's original one

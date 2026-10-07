@@ -37,16 +37,16 @@ class SimBarb:
 
     def _barb_seen(self, majors_only: bool) -> torch.Tensor:
         """[B, T] bool — `plotsSeenNow`: what the majors (`majors_only`), or
-        every player but the barbarians, see now — each unit's sight across
-        the plots its line reaches, each city centre two plots round, each
-        owned plot with its ring."""
+        every living player, the barbarians included (`allSeers`), see now —
+        each unit's sight across the plots its line reaches, each city centre
+        two plots round, each owned plot with its ring."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
         def seer(seat: torch.Tensor) -> torch.Tensor:
             if majors_only:
                 return (seat >= 0) & (seat < self.n_majors)
-            return (seat >= 0) & (seat != BARB_SEAT)
+            return seat >= 0
 
         live = self.unit_alive & seer(self.unit_seat)
         for u in live.any(dim=0).nonzero(as_tuple=True)[0].tolist():
@@ -491,13 +491,25 @@ class SimBarb:
         """`scoutReports`: tribe `k`'s homing scout within its home range of
         the camp reports its city — a raid at once where the Boldness reaches
         the raid's and no raid runs, else a city the raid waits for; a scout
-        lost reports nothing."""
+        lost reports nothing; one damaged by `protectDamage` of its health or
+        more where another player's fighting unit can strike (within its moves
+        plus its reach) holds its report."""
         hs = self.tribe_home_slot[:, k]
         bidx = torch.arange(self.B, device=self.device)
         live = (hs >= 0) & self.barb_unit_alive[bidx, hs.clamp(min=0)]
         lost = on & (hs != -1) & ~live
-        d = self.pair_dist[self.barb_unit_tile[bidx, hs.clamp(min=0)].clamp(min=0), self.tribe_plot[:, k].clamp(min=0)].to(torch.long)
+        at = self.barb_unit_tile[bidx, hs.clamp(min=0)].clamp(min=0)
+        d = self.pair_dist[at, self.tribe_plot[:, k].clamp(min=0)].to(torch.long)
         rep = on & live & (d <= int(self._bb["homeRange"]))
+        full = int(self.rules.combat["unitHp"])
+        hurt = rep & ((full - self.barb_unit_hp[bidx, hs.clamp(min=0)]).to(torch.float64)
+                      >= float(self._bb["protectDamage"]) * full)
+        if bool(hurt.any()):
+            ut = self.unit_type.clamp(min=0, max=self.NU - 1)
+            reach = self._type_moves[ut] + self._type_ranged_range[ut].clamp(min=1)
+            foe = self.unit_alive & (self.unit_seat != BARB_SEAT) & ~self._type_noncombat[ut]
+            near = self.pair_dist[self.unit_tile.clamp(min=0), at.unsqueeze(1)].to(torch.long) <= reach
+            rep = rep & ~(hurt & (foe & near).any(dim=1))
         seat = self.tribe_home_seat[:, k].clone()
         done = lost | rep
         self.tribe_home_slot[:, k] = torch.where(done, torch.full_like(hs, -1), hs)

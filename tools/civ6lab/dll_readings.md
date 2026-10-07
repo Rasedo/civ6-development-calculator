@@ -1763,9 +1763,49 @@ three only if a unit raised in the turn is not yet recruitable (W at t7
 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is
 unread. The raid operation's own end (its tree's last Notify Owner, which
 opens the city assault) is unread: the engines end an operation once the
-units it took are gone (ASK in docs/AUDIT.md C-94). The visibility event's
-exact trigger (a plot newly in the scout's own sight, the plots in index
-order) is the engines' reading.
+units it took are gone (ASK in docs/AUDIT.md C-94).
+
+- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at
+  signals +0x10c8, which the unit sight update 0x58aa90 raises per plot
+  when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:
+  the plot's visibility count for the unit's OWNER went from 0 to more —
+  newly visible to the barbarian player, not to the scout alone. A move
+  (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the
+  old, so a plot both sights hold raises nothing. The engines take the
+  scout's own sight (LAB). The throttle write follows 0x1485c0 whether or
+  not a tree starts (the engines too).
+- Protect Unit ("Barbarian Found City" node 3, a Concurrent with Move
+  Unit; TreeData Damage Percentage .25): its check 0x7f07c0 counts the
+  node's units whose damage (unit +0xcf0) is at least that share of their
+  health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map
+  (player +0x12d8, 0x716a90 — its builder unread); any such unit and the
+  node answers 2, the concurrent's Move Unit and Notify Owner wait. Case:
+  1121 camp (3,19): its Scout reports at t23, takes 47 from China's
+  Warrior at t24, stands home at t25 three plots from it and raises no
+  raid (none at boldness 10 on t26 either); home again at t33 with no
+  enemy within four, the raid starts at once (Warriors t34, t35, t36, its
+  t28 Archer counted). The engines read the danger as an enemy fighting
+  unit within its moves plus its reach (LAB, `threatened`).
+
+## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)
+
+0x58b1d0 builds a unit's sight list in 24.8 fixed point (constants 0.5
+and 0.05) over a ring walk; unread. Fitted on the records' revealed plots
+(runs/h1_duelw1126–1131, `revealed`, every look a major's land unit took
+from its plots and steps over turns 1-250, cities' surroundings left
+out): a plot between eye and target blocks when its SightThroughModifier
+sum exceeds the eye's height and is no less than the target's own; the
+look holds when either of the line's two nudges is clear. Of the 915
+looks the candidate rules dispute it misreads 9 (1127 t1 Rome's Settler
+(36,13) over a hill to the mountain (34,14) shown, unrevealed); the rule
+letting a plot show over its equal misreads 626, the eye-height-only rule
+271. 1121 t7 (Kilimanjaro past the wooded hill (33,9), through (32,9))
+holds. A city founded or taken looks two plots round its centre whole
+and three by the line: at every major's founding on 1126–1131 no plot two
+from the centre is left dark, and of the 98 left dark three from it the
+line shows 4. A major meeting a city-state sees its centre and ring
+revealed (32 of 32 meetings; plots past the ring dark on 8) — not shipped
+(docs/AUDIT.md C-94: such a reveal names no river).
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 
@@ -2308,10 +2348,18 @@ over 24). The engines draw it (`createRelic` / `_create_relic`,
   territory (0xa36ff0: "Random Desert", "Sea", "Ocean", "Mountain Range",
   "Volcano"; 0xa36400 "Random Lake Range") — one draw over the names left.
   The engines name no region (AUDIT C-74 BUILD).
-- Game_Quests 0x939980 (on a game era's or a player era's change, and
-  0x93ae70) draws "Selecting a random new quest" over the quest types valid
-  for the pair, then the type's picker (0x84d870, a tech boost's). The
-  engines' quest issuer draws nothing (AUDIT C-74 BUILD).
+- Game_Quests 0x939980 (client player edx, minor actor r8d; on a game
+  era's or a player era's change, a meeting, and 0x93ae70) gives the pair
+  1 − (its standing quests, the +0x168 records of state 1) quests: it
+  finds the pair's last quest type in the history (+0x1e0, the record of
+  the highest turn +0x18, its type +0xc), walks the quest logics (+0x200,
+  each 0x8490d0 its type) skipping that type and keeping those whose
+  0x849110 IsValidToStartQuest(client, actor) holds, each weight 1, and
+  draws "Selecting a random new quest" over their count (0x152eb0); the
+  type's own picker follows (0x84d870, a tech boost's). Case: 1117 t17,
+  China meets minor 3: 6 / 1, then the Train Unit picker 4 / 1, the
+  quest's envoy at t24. The logics' validity, pickers and completion are
+  unread; the engines' quest issuer draws nothing (AUDIT C-74 BUILD).
 - A record read before its player's start of the turn (its event log holds
   rows of the turn but no PlayerTurnActivated of the recorder's player:
   1117 t168, 1118 t101, 1119 t4 and t112, 1120 t95, 1121 t134, 1122 t108,
@@ -2743,7 +2791,15 @@ modifiers, the damage each side took; runs/h1_logs_duelw1119_1124 and
   flanks a barbarian Warrior, 32 / 22 where +2 lands and 30 / 24 without;
   1124 t38 CombatLog: a barbarian Warrior at 68 HP beside a second logs +4,
   its +5 less the wound plus one flanker). The engines: `flankSupportLive`
-  / `_flank_support_live` read each player's civics.
+  / `_flank_support_live` read each player's civics. The defender's
+  composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and
+  0x5228c0 for every other; 0x5228c0 adds Support only when the combat
+  type is 0x2ca3edd1, COMBAT_MELEE (`dll_hash.py`) — no Support against a
+  ranged or bombard attack (the engines' `defenderCS`, melee only). So the
+  gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's
+  Warrior at 51 HP on Floodplains beside a friend, 23 logged and the
+  engines' 26, the log's DefenderStrMod −4 where the engines compose −6.9 —
+  is some other term's, unread.
 - Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on
   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's
   Scout, t32, t37, t84; 1126 the Archer 2818053 on every shot t75-88; the

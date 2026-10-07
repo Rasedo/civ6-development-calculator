@@ -106,7 +106,7 @@ def main() -> None:
     def line(a: int, b: int) -> list[int]:
         row = [int(x) for x in tgt[a].tolist()]
         assert b in row, f"{b} is not a target of {a}"
-        return [int(m) for m in mid[a, row.index(b)].tolist() if int(m) >= 0]
+        return [int(m) for m in mid[a, row.index(b), 0].tolist() if int(m) >= 0]
 
     assert line(p12(1, 3), p12(10, 3)) == [36, 47], "TS: the line (1,3) -> (10,3) passes (0,3), (11,3)"
     assert line(p12(11, 2), p12(2, 6)) == [47, 48, 49, 61], "TS: the line (11,2) -> (2,6)"

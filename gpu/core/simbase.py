@@ -137,13 +137,14 @@ def ring_walk_places(ctr: torch.Tensor, k: torch.Tensor, width: int, height: int
 
 def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.Tensor, torch.Tensor]:
     """`hexLineBetween` for every pair within `rmax`, once per map. Returns
-    (targets [T, N], mids [T, N, rmax - 1]): for each tile, the tiles at
-    distance 1..rmax (-1 padded) and, per target, the tiles strictly BETWEEN
-    on the hex line — a cube lerp with the (1e-6, 2e-6, -3e-6) nudge and
-    cube rounding, each coordinate rounded with floor(x + 0.5) exactly as
-    the TS helper does, an off-map hex on the line absent (-1). On a
-    wrapping map a target is each plot once and the line runs the shorter
-    way round (`hex_shift`)."""
+    (targets [T, N], mids [T, N, 2, rmax - 1]): for each tile, the tiles at
+    distance 1..rmax (-1 padded) and, per target and side, the tiles
+    strictly BETWEEN on the hex line — a cube lerp with the (1e-6, 2e-6,
+    -3e-6) nudge (side 0) or its opposite (side 1, the plot across an edge
+    the line runs along) and cube rounding, each coordinate rounded with
+    floor(x + 0.5) exactly as the TS helper does, an off-map hex on the line
+    absent (-1). On a wrapping map a target is each plot once and the line
+    runs the shorter way round (`hex_shift`)."""
     import math
 
     def offset(q, r):
@@ -160,7 +161,7 @@ def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.
     # filled as python lists and handed to torch once: an element write into
     # a tensor costs microseconds, and there are a few hundred thousand here
     tgt = [[-1] * n_t for _ in range(T)]
-    mid = [[[-1] * n_m for _ in range(n_t)] for _ in range(T)]
+    mid = [[[[-1] * n_m, [-1] * n_m] for _ in range(n_t)] for _ in range(T)]
     for a in range(T):
         ac, ar = a % width, a // width
         aq, arr = _axial(ac, ar)
@@ -182,27 +183,29 @@ def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.
                     continue
                 b = br * width + bc % width
                 tgt[a][k] = b
-                mid_ak = mid[a][k]
                 bq, brr = _axial(bc, br)
-                ax, az, ay = aq + 1e-6, arr + 2e-6, -aq - arr - 3e-6
-                bx, bz, by = bq + 1e-6, brr + 2e-6, -bq - brr - 3e-6
-                for i in range(1, n):
-                    t = i / n
-                    x, y, z = ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t
-                    rx, ry, rz = math.floor(x + 0.5), math.floor(y + 0.5), math.floor(z + 0.5)
-                    dx, dy, dz = abs(rx - x), abs(ry - y), abs(rz - z)
-                    if dx > dy and dx > dz:
-                        rx = -ry - rz
-                    elif dy > dz:
-                        ry = -rx - rz
-                    else:
-                        rz = -rx - ry
-                    mc, mr = offset(rx, rz)
-                    if 0 <= mr < height and (wrap_x or 0 <= mc < width):
-                        mid_ak[i - 1] = mr * width + mc % width
+                for side, sgn in ((0, 1), (1, -1)):
+                    mid_ak = mid[a][k][side]
+                    e1, e2, e3 = 1e-6 * sgn, 2e-6 * sgn, -3e-6 * sgn
+                    ax, az, ay = aq + e1, arr + e2, -aq - arr + e3
+                    bx, bz, by = bq + e1, brr + e2, -bq - brr + e3
+                    for i in range(1, n):
+                        t = i / n
+                        x, y, z = ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t
+                        rx, ry, rz = math.floor(x + 0.5), math.floor(y + 0.5), math.floor(z + 0.5)
+                        dx, dy, dz = abs(rx - x), abs(ry - y), abs(rz - z)
+                        if dx > dy and dx > dz:
+                            rx = -ry - rz
+                        elif dy > dz:
+                            ry = -rx - rz
+                        else:
+                            rz = -rx - ry
+                        mc, mr = offset(rx, rz)
+                        if 0 <= mr < height and (wrap_x or 0 <= mc < width):
+                            mid_ak[i - 1] = mr * width + mc % width
                 k += 1
     return (torch.tensor(tgt, dtype=torch.long).reshape(T, n_t),
-            torch.tensor(mid, dtype=torch.long).reshape(T, n_t, n_m))
+            torch.tensor(mid, dtype=torch.long).reshape(T, n_t, 2, n_m))
 
 
 def barb_ring_table(width: int, height: int, wrap_x: bool, radius: int) -> list[list[int]]:

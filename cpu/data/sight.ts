@@ -2,10 +2,12 @@
  * HOW SIGHT IS SPENT — measured in the live game (ask 11;
  * `tools/civ6lab/sight_find.lua` + `sight_read.lua`, 17 geometries): it is
  * OCCLUSION BY ELEVATION, not a budget. A tile on the ray from the observer
- * hides everything behind it iff its SightThroughModifier sum — its
- * elevation's plus its feature's — EXCEEDS the observer's own SightModifier;
- * the range is the unit's BaseSightRange alone (a hill adds height, never
- * range); Sentry's `CanSee` means the FEATURE half of the through-cost is 0.
+ * hides what stands behind it when its SightThroughModifier sum — its
+ * elevation's plus its feature's — EXCEEDS the observer's own SightModifier
+ * and is no less than the target's own (`canSee`: either of a ray's two
+ * lines past an edge serves); the range is the unit's BaseSightRange alone
+ * (a hill adds height, never range); Sentry's `CanSee` means the FEATURE
+ * half of the through-cost is 0.
  *
  * CIV6 (Terrains.xml, every layer): every *_HILLS row carries
  * `SightModifier="1" SightThroughModifier="1"`, every *_MOUNTAIN row 2 and 2 —

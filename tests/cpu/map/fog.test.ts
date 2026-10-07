@@ -105,10 +105,33 @@ describe('sight is occlusion by elevation (ask 11)', () => {
     o.elevation = 'FLAT';
     expect(canSee(state.map, o, e2, false)).toBe(false); // woods alone hide from a flat eye
     expect(canSee(state.map, o, e2, true)).toBe(true); // ...but not from a Sentry
+    e2.feature = 'WOODS';
+    expect(canSee(state.map, o, e2, false)).toBe(false); // a plot never shows over its equal
+    e2.elevation = 'HILLS';
+    expect(canSee(state.map, o, e2, false)).toBe(true); // a wooded hill (2) shows over woods (1)
+    e2.elevation = 'FLAT';
+    e2.feature = null;
     e1.elevation = 'MOUNTAIN';
     e1.feature = null;
     o.elevation = 'HILLS';
     expect(canSee(state.map, o, e2, false)).toBe(false); // a mountain (2) tops a hill eye (1)
+  });
+
+  it('a look along an edge holds while either plot beside the edge is clear', () => {
+    const { state, o } = flatRow();
+    const map = state.map;
+    const b = map.tiles.find((t) => hexDistance(map, o.col, o.row, t.col, t.row) === 2
+      && hexLineBetween(map, o, t, 1)[0].index !== hexLineBetween(map, o, t, -1)[0].index)!;
+    const [m1] = hexLineBetween(map, o, b, 1);
+    const [m2] = hexLineBetween(map, o, b, -1);
+    for (const t of [b, m1, m2]) {
+      t.elevation = 'FLAT';
+      t.feature = null;
+    }
+    m1.elevation = 'HILLS';
+    expect(canSee(map, o, b, false)).toBe(true);
+    m2.elevation = 'HILLS';
+    expect(canSee(map, o, b, false)).toBe(false);
   });
 
   it('a unit reveal is the cut disk and a hill adds no range; a city reveal is whole', () => {

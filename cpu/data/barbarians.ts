@@ -227,6 +227,11 @@ export const BARB_SPOT_THROTTLE_PER_LEVEL = srcConst('barb.spotThrottlePerLevel'
  *  then reports (Move Unit's To Range) */
 export const BARB_HOME_RANGE = srcConst('barb.homeRange', 1,
   xml('TreeData', 'TreeName=Barbarian Found City&NodeId=4&DefnId=4', 'DefaultData'));
+/** "Barbarian Found City" walks its scout home beside Protect Unit (its
+ *  Concurrent node): a scout damaged by at least this share of its health
+ *  that stands where an enemy can strike holds its report (0x7f07c0) */
+export const BARB_PROTECT_DAMAGE = srcConst('barb.protectDamage', 0.25,
+  xml('TreeData', 'TreeName=Barbarian Found City&NodeId=3&DefnId=1', 'DefaultData'));
 /** the turns a raid ("Raid City" node 5) and a city assault ("Barbarian City
  *  Attack" node 7) recruit before their Turn Limiter gives up */
 export const BARB_RAID_RECRUIT_TURNS = srcConst('barb.raidRecruitTurns', 10,

@@ -40,17 +40,19 @@ export function sightThrough(t: Tile, seeThrough: boolean): number {
  * The tiles strictly BETWEEN two tiles on the hex line joining them: a cube
  * lerp with the (1e-6, 2e-6, -3e-6) nudge and cube rounding, rounding each
  * coordinate with floor(x + 0.5) so both engines land on the same hex at
- * every half. An off-map hex on the line is simply absent. On a wrapping map
- * the line runs the shorter way round (`axialDelta`). The GPU builds the same
- * lines once per map (`los_tables`).
+ * every half; `side` -1 turns the nudge round, so a line along an edge
+ * passes the plot on its other side. An off-map hex on the line is simply
+ * absent. On a wrapping map the line runs the shorter way round
+ * (`axialDelta`). The GPU builds the same lines once per map (`los_tables`).
  */
-export function hexLineBetween(map: GameMap, a: Tile, b: Tile): Tile[] {
+export function hexLineBetween(map: GameMap, a: Tile, b: Tile, side: 1 | -1 = 1): Tile[] {
   const [aq, ar] = offsetToAxial(a.col, a.row);
   const [dq, dr] = axialDelta(map, a.col, a.row, b.col, b.row);
   const bq = aq + dq, br = ar + dr;
   const n = hexDistance(map, a.col, a.row, b.col, b.row);
-  const ax = aq + 1e-6, az = ar + 2e-6, ay = -aq - ar - 3e-6;
-  const bx = bq + 1e-6, bz = br + 2e-6, by = -bq - br - 3e-6;
+  const e1 = 1e-6 * side, e2 = 2e-6 * side, e3 = -3e-6 * side;
+  const ax = aq + e1, az = ar + e2, ay = -aq - ar + e3;
+  const bx = bq + e1, bz = br + e2, by = -bq - br + e3;
   const out: Tile[] = [];
   for (let i = 1; i < n; i++) {
     const t = i / n;
@@ -72,19 +74,29 @@ export function hexLineBetween(map: GameMap, a: Tile, b: Tile): Tile[] {
 }
 
 /**
- * CIV6 (measured, ask 11): can an eye standing on `from` see `to`?
- * OCCLUSION BY ELEVATION — every tile strictly between must put no more in
- * the way than the observer's own height (flat 0, hills 1, mountain 2) or
- * the target's own (its elevation's plus its feature's, Sentry or not: a
- * tall plot shows over a lower one — runs/h1_duelw1121 t7: Rome's Scout on
- * flat (33,10) finds Kilimanjaro (2) past the wooded hill at (33,9); 1116
- * China's natural-wonder Astrology boost at t13; LAB, no DLL reading); the range is the
- * caller's, a hill adds height and never reach.
+ * CIV6: can an eye standing on `from` see `to`? OCCLUSION BY ELEVATION — a
+ * tile strictly between blocks when it puts more in the way than the
+ * observer's own height (flat 0, hills 1, mountain 2) and no less than the
+ * target's own (its elevation's plus its feature's, Sentry or not: a plot
+ * shows over a lower one, never over its equal), and the look holds when
+ * either of the two lines (`hexLineBetween`'s two nudges, one each side of
+ * an edge the line runs along) is clear. The range is the caller's; a hill
+ * adds height and never reach. LAB (the DLL's sight walk 0x58b1d0 unread):
+ * the records' revealed plots (runs/h1_duelw1126-1131, every look a unit
+ * took over turns 1-250 that the readings dispute: 915) — this rule
+ * misreads 9 of them, the one-line rule that let a plot show over its
+ * equal 626; runs/h1_duelw1121 t7: Rome's Scout on flat (33,10) finds
+ * Kilimanjaro (2) past the wooded hill at (33,9) along the line through
+ * (32,9).
  */
 export function canSee(map: GameMap, from: Tile, to: Tile, seeThrough: boolean): boolean {
-  const h = Math.max(ELEVATION_SIGHT[from.elevation] ?? 0, sightThrough(to, false));
-  for (const m of hexLineBetween(map, from, to)) if (sightThrough(m, seeThrough) > h) return false;
-  return true;
+  const eye = ELEVATION_SIGHT[from.elevation] ?? 0;
+  const own = sightThrough(to, false);
+  const clear = (side: 1 | -1) => hexLineBetween(map, from, to, side).every((m) => {
+    const h = sightThrough(m, seeThrough);
+    return h <= eye || h < own;
+  });
+  return clear(1) || clear(-1);
 }
 
 /** CIV6 (Sentry, the install's SENTRY_SEE_THROUGH_FEATURES row, CanSee): this unit's look
@@ -212,6 +224,16 @@ export function revealAround(
   }
 }
 
+/** A CITY'S LOOK where it is founded or changes hands: the plots two round
+ *  its centre whole and those three round it that an eye on the centre sees
+ *  (`canSee`). LAB: the records' revealed plots at every major's founding
+ *  (runs/h1_duelw1126-1131): no plot two from the new centre left dark, the
+ *  98 three from it left dark all but 4 hidden from the centre. */
+export function cityLook(state: GameState, seat: number, centre: number): void {
+  revealAround(state, seat, centre, 2);
+  revealAround(state, seat, centre, 3, { seeThrough: false });
+}
+
 /** Does this seat's roster row make its ALLIANCES share map visibility?
  *  Read off the rows directly rather than through `getModifiers`, so the fog
  *  walk — which runs on every unit step — pulls in none of the effect stack. */
@@ -266,7 +288,11 @@ export function initFog(state: GameState): void {
     for (const t of state.map.tiles) {
       if (tileSeat(t) === s.seat) liftFog(state, s.seat, t.index, 1);
     }
-    for (const c of citiesOf(state, s.seat)) liftFog(state, s.seat, c.centerIndex, 3);
+    // each city's look (`cityLook`)
+    for (const c of citiesOf(state, s.seat)) {
+      liftFog(state, s.seat, c.centerIndex, 2);
+      liftFog(state, s.seat, c.centerIndex, 3, { seeThrough: false });
+    }
     for (const u of unitsOf(state, s.seat)) liftFog(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }
 }

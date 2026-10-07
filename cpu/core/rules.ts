@@ -489,7 +489,11 @@ export function validImprovementsIn(
  *  suzerain improvement's row in `validImprovementsIn`. */
 export function suzerainNames(state: GameState, seat: number): ReadonlySet<string> {
   const out = new Set<string>();
-  for (const cs of state.cityStates) if (isSuzerain(state, cs, seat)) out.add(cs.name);
+  for (const cs of state.cityStates) {
+    // a city-state holds its own trait, and its Builders lay its own
+    // improvement (runs/h1_duelw1124 t24: Granada's Builder lays an Alcázar)
+    if (isSuzerain(state, cs, seat) || cs.seat === seat) out.add(cs.name);
+  }
   return out;
 }
 

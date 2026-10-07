@@ -11308,7 +11308,7 @@ class SimSeats:
         # the Free Cities seat scores no era and explores nothing
         if dst_major:
             self._transfer_moments(b, src_row, dst_row, old_orig, old_founder, loyalty, was_last)
-            self._reveal_around(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev), 3)
+            self._city_look(_b1, dst_row, torch.tensor([c_t], dtype=torch.long, device=dev))
         self.city_is_cap[b, dst_row, col] = False  # a received city is never a capital (TS isCapital: false)
         self.city_orig_cap[b, dst_row, col] = old_orig  # ...but it is still whoever founded it
         self.city_founder[b, dst_row, col] = old_founder
@@ -11826,7 +11826,7 @@ class SimSeats:
         slot = (torch.where(alive_row[rows], occ_idx, torch.full_like(occ_idx, -1)).max(dim=1).values + 1)
         assert int(slot.max()) < self.RC, "city slots exhausted — the step-end reclaim must have compacted"
         s_idx = tile[rows]
-        self._reveal_around(rows, seat, s_idx, 3)  # foundCityAt's revealAround(seat, tile, 3)
+        self._city_look(rows, seat, s_idx)  # foundCityAt's cityLook
         # isCapital = seat.cities.length === 0: a total-collapse refound
         # re-crowns and updates capitalTiles[row]; every other settle founds a
         # non-capital.
