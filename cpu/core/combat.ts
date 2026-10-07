@@ -1780,9 +1780,74 @@ export function meleeAttack(state: GameState, attackerId: number, targetIndex: n
   }
   return r;
 }
-/** a melee order that became a MOVE onto a religious unit's tile: no attack
- *  is spent or revealed, and `stepUnit` logs the step itself */
-const MOVED_ONTO: RuleResult = { ok: true, reason: 'Moved onto a religious unit.' };
+/** a melee order that became a MOVE onto a plot holding no fighter (a
+ *  religious unit shares it, a civilian is seized): no attack is spent or
+ *  revealed, and `stepUnit` logs the step itself */
+const MOVED_ONTO: RuleResult = { ok: true, reason: 'Moved onto the plot.' };
+
+/**
+ * A HOSTILE CIVILIAN STEPPED ON (Combat_Manager 0x212500, from the move
+ * 0x26fe20), whoever the mover is — a barbarian too:
+ *   - a chassis with a UnitCaptures row becomes its BecomesUnitType under
+ *     the mover's player, on its plot, with its charges and its damage, no
+ *     moves and no fortification (runs/h1_duelw1117 t33: China's Settler to
+ *     the barbarians, a Settler; 1121 t133 a Builder keeps its 3 charges);
+ *   - one that CanRetreatWhenCaptured withdraws to its own player's nearest
+ *     district plot it may stand on — a city centre alone for a sea-domain
+ *     unit (0x530650) — and is destroyed where none is free;
+ *   - any other is destroyed.
+ */
+export function seizeCivilian(state: GameState, victim: Unit, captor: number): void {
+  const def = UNITS[victim.type];
+  // a seized or withdrawn civilian rides in no formation
+  victim.escorted = false;
+  if (def?.capturedAs) {
+    victim.type = def.capturedAs;
+    reseatUnit(state, victim, captor);
+    return;
+  }
+  const to = def?.retreatsWhenCaptured ? retreatPlot(state, victim) : -1;
+  if (to >= 0) victim.tileIndex = to;
+  else killUnit(state, victim);
+}
+
+/** the hostile civilians a move onto `targetIndex` takes, the plot's last
+ *  first (the move 0x26fe20 walks the plot's units from the back) — never a
+ *  religious unit or an aircraft; null where a hostile fighter still holds
+ *  the plot, or where the mover could not stand on it once they are gone
+ *  (`tileFreeForUnit`, no embarking) */
+function seizable(state: GameState, mover: Unit, targetIndex: number): Unit[] | null {
+  const foes = unitsAt(state, targetIndex).filter(
+    (u) => u.id !== mover.id && unitsHostile(state, mover, u) && !isAirUnit(u.type) && !unitReligious(u.type)
+      && unitVisibleTo(state, u, mover.seat),
+  );
+  if (foes.some((u) => unitDomain(u.type) === 'military')) return null;
+  const at = foes.map((u) => u.tileIndex);
+  for (const u of foes) u.tileIndex = -1;
+  const open = tileFreeForUnit(state, targetIndex, 0, mover);
+  foes.forEach((u, i) => { u.tileIndex = at[i]; });
+  return open ? foes.reverse() : null;
+}
+
+/** the plot a civilian that CanRetreatWhenCaptured withdraws to (0x530650):
+ *  the nearest district plot of its own player other than its own, where it
+ *  may stand — a non-centre district only for a land unit — the lowest plot
+ *  on a tie; -1 none */
+function retreatPlot(state: GameState, u: Unit): number {
+  const at = state.map.tiles[u.tileIndex];
+  const land = !UNITS[u.type]?.naval && !UNITS[u.type]?.seaDomain;
+  let best = -1;
+  let bd = Infinity;
+  for (const t of state.map.tiles) {
+    if (!t.district || t.index === u.tileIndex || tileSeat(t) !== u.seat) continue;
+    if (t.district !== 'CITY_CENTER' && !land) continue;
+    const d = hexDistance(state.map, at.col, at.row, t.col, t.row);
+    if (d >= bd || !tileFreeForUnit(state, t.index, u.seat, u)) continue;
+    bd = d;
+    best = t.index;
+  }
+  return best;
+}
 function meleeAttackInner(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
@@ -1883,13 +1948,13 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
-    if (isBarbSeat(attacker.seat)) {
-      killUnit(state, defender);
-    } else {
-      reseatUnit(state, defender, attacker.seat);
-      spendAttack(attacker, true);
-      return ok;
-    }
+    // no fighter stands there: the order is a MOVE onto the plot, which takes
+    // every hostile civilian on it (`seizable`), and the mover then steps in
+    const taken = seizable(state, attacker, targetIndex);
+    if (!taken) return no('Cannot move there.');
+    for (const u of taken) seizeCivilian(state, u, attacker.seat);
+    stepUnit(state, attacker, target);
+    return MOVED_ONTO;
   } else {
     const atkCSf = atkCS + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
       * (1 + gpPermOf(seatOf(state, attacker.seat),
@@ -1948,7 +2013,12 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     }
   }
   spendAttack(attacker);
-  if (state.units.includes(attacker) && tileFreeForUnit(state, targetIndex, 0, attacker)) {
+  // the victor's ADVANCE is a move onto the plot it emptied, which takes the
+  // hostile civilians the fallen fighter guarded (runs/h1_duelw1117 t54:
+  // China's Warrior killed the barbarians' escort and took the Settler)
+  const taken = state.units.includes(attacker) ? seizable(state, attacker, targetIndex) : null;
+  if (taken) {
+    for (const u of taken) seizeCivilian(state, u, attacker.seat);
     attacker.tileIndex = targetIndex;
     // an amphibious victor comes ashore: `stepUnit`'s own transition rule
     if (!def.naval && !waterWalks(attacker.type)) {
@@ -2922,6 +2992,8 @@ function barbUnits(state: GameState): Unit[] {
 }
 
 export function hostileUnitAct(state: GameState, unit: Unit): void {
+  // a civilian the barbarians took holds where it stands
+  if (unitDomain(unit.type) !== 'military') return;
   const seat = unit.seat;
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
@@ -2940,37 +3012,9 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     return;
   }
 
-  // 2. Pillage the improvement underfoot, paying the target's own plunder
-  // row — a barbarian still HEALS off a heal row, and only a major banks
-  // a yield lump (`pillagePlunder`).
-  // BARBARIANS raid ANY territorial owner — majors, minors and the Free
-  // Cities alike (`isTerritorial`; the GPU's `_owned` is the twin); a
-  // non-barbarian hostile walker still needs its war.
+  // 2. Pillage what stands underfoot (`hostilePillage`)
+  if (hostilePillage(state, unit)) return;
   const here = tile();
-  const hereOwned = isTerritorial(tileSeat(here))
-    && unitsHostile(state, unit, { seat: tileSeat(here) });
-  if (here.improvement && !here.pillaged && hereOwned) {
-    here.pillaged = true;
-    pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
-    unit.movesLeft = 0;
-    return;
-  }
-  // CIV6: the Encampment "cannot be pillaged normally" — it is conquered by a
-  // melee unit instead, which pillages it at the assault site.
-  if (
-    here.district !== null &&
-    here.district !== 'CITY_CENTER' &&
-    here.district !== 'ENCAMPMENT' &&
-    here.districtComplete &&
-    !here.districtPillaged &&
-    hereOwned
-  ) {
-    here.districtPillaged = true;
-    pillagePlunder(state, unit, DISTRICTS[here.district].plunder, true);
-    displaceAirFrom(state, here.index);
-    unit.movesLeft = 0;
-    return;
-  }
 
   let target: Tile | null = null;
   let bestDist = 13;
@@ -3035,6 +3079,46 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   }
   if (!target) return;
   marchOn(state, unit, target, marchOnto);
+}
+
+/**
+ * A HOSTILE WALKER'S PILLAGE of its own plot: the improvement, else the
+ * complete non-centre district, paying the target's own plunder row — a
+ * barbarian still HEALS off a heal row (runs/h1_duelw1117 t39: a barbarian
+ * Warrior on a Farm, 38 -> 88), and only a major banks a yield lump
+ * (`pillagePlunder`) — and the turn's moves. BARBARIANS raid ANY
+ * territorial owner — majors, minors and the Free Cities alike
+ * (`isTerritorial`; the GPU's `_owned` is the twin); a non-barbarian
+ * hostile walker still needs its war. False where nothing there is its to
+ * wreck.
+ */
+export function hostilePillage(state: GameState, unit: Unit): boolean {
+  const here = state.map.tiles[unit.tileIndex];
+  const hereOwned = isTerritorial(tileSeat(here))
+    && unitsHostile(state, unit, { seat: tileSeat(here) });
+  if (here.improvement && !here.pillaged && hereOwned) {
+    here.pillaged = true;
+    pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
+    unit.movesLeft = 0;
+    return true;
+  }
+  // CIV6: the Encampment "cannot be pillaged normally" — it is conquered by a
+  // melee unit instead, which pillages it at the assault site.
+  if (
+    here.district !== null &&
+    here.district !== 'CITY_CENTER' &&
+    here.district !== 'ENCAMPMENT' &&
+    here.districtComplete &&
+    !here.districtPillaged &&
+    hereOwned
+  ) {
+    here.districtPillaged = true;
+    pillagePlunder(state, unit, DISTRICTS[here.district].plunder, true);
+    displaceAirFrom(state, here.index);
+    unit.movesLeft = 0;
+    return true;
+  }
+  return false;
 }
 
 /** a hostile unit's march toward a plot, a step nearer each time while its
@@ -3123,7 +3207,7 @@ export function barbarianPhase(state: GameState): void {
     const camp = map.tiles[campIdx];
     const guard = barbUnits(state).find(
       (u) =>
-        !guards.has(u.id) &&
+        !guards.has(u.id) && unitDomain(u.type) === 'military' &&
         hexDistance(state.map, map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
     );
     if (guard) guards.add(guard.id);

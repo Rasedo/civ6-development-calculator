@@ -601,7 +601,7 @@ describe('civ CS trade routes', () => {
 });
 
 describe('civilian capture', () => {
-  it('a seat-0 melee captures a lone at-war civ civilian (charges kept, no advance)', () => {
+  it('a seat-0 move onto a lone at-war civ civilian seizes it and steps onto its plot (charges kept)', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     settleAt(state, tileAtCoords(state.map, 9, 9).index);
@@ -627,12 +627,13 @@ describe('civilian capture', () => {
     expect(cap!.tileIndex).toBe(defTile.index);
     expect(cap!.charges).toBe(charges);
     expect(cap!.movesLeft).toBe(0);
-    // The attacker spent its attack and did NOT advance (single-occupancy).
-    expect(atk.tileIndex).toBe(atkTile.index);
-    expect(atk.movesLeft).toBe(0);
+    // CIV6 (the move 0x26fe20): the mover steps onto the plot it took,
+    // paying the step and no attack.
+    expect(atk.tileIndex).toBe(defTile.index);
+    expect(atk.attacksLeft ?? 1).toBeGreaterThan(0);
   });
 
-  it('a barbarian still KILLS a lone civilian (no prisoner system)', () => {
+  it('a barbarian seizes a lone civilian too: the captive is theirs', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
     settleAt(state, tileAtCoords(state.map, 9, 9).index);
@@ -645,8 +646,10 @@ describe('civilian capture', () => {
 
     expect(meleeAttack(state, barb.id, defTile.index, 0).ok).toBe(true);
 
-    // Killed, not captured — and the barbarian advances into the emptied tile.
-    expect(state.units.some((u) => u.id === builder.id)).toBe(false);
+    // CIV6 (UnitCaptures, 0x212500): the Builder is the barbarians' Builder,
+    // and the barbarian stands on its plot.
+    expect(builder.seat).toBe(BARB_SEAT);
+    expect(builder.type).toBe('BUILDER');
     expect(barb.tileIndex).toBe(defTile.index);
     expect(isBarbSeat(barb.seat)).toBe(true);
   });

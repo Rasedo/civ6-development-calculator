@@ -3,7 +3,8 @@ of `tests/cpu/units/religious-target.test.ts`, from the lab's records
 (`tools/civ6lab/runs/religious_target_20260926T_{read,pairs,fire}.jsonl`): a
 ranged attack or a city's strike never targets a Missionary, an Apostle or a
 Builder; a melee order onto a religious unit is a MOVE onto its tile, onto a
-Builder a capture; Condemn Heretic is legal on the heretic's own tile only; a
+Builder a seizure that steps onto its plot, whoever moves (a barbarian's
+captive is theirs and holds where it stands); Condemn Heretic is legal on the heretic's own tile only; a
 shot from the ground never takes a lone Support chassis
 (`tools/civ6lab/runs/b89t_fire_20260926.jsonl`).
 
@@ -152,16 +153,55 @@ def main() -> None:
     assert int(sim.unit_mp[0, w]) == 0, "Condemn did not end the condemner's moves"
     print("  3 a melee order onto a religious unit is a move; Condemn on its own tile OK")
 
-    # -- 4: onto a Builder it still captures ------------------------------------
+    # -- 4: onto a Builder it seizes it and steps on ---------------------------
     sim = fresh(rules, path)
     at_war(sim, ROW, FOE)
     a, b, c = trio(sim)
     w = spawn(sim, ROW, sim._warrior_idx, a)
-    spawn(sim, FOE, sim._builder_idx, b)
+    bld = spawn(sim, FOE, sim._builder_idx, b)
+    sim.unit_charges[0, bld] = 2
+    att0 = int(sim.unit_attacks[0, w])
     order(sim, ROW, w, 6 + sim.neigh[a].tolist().index(b))
     got = int(sim.civilian_at[0, b])
     assert got >= 0 and int(sim.unit_seat[0, got]) == ROW, "the Builder was not captured"
-    print("  4 a melee order onto a Builder captures it OK")
+    assert int(sim.unit_type[0, got]) == sim._builder_idx and int(sim.unit_charges[0, got]) == 2, (
+        "the captive is not the Builder with its charges")
+    assert int(sim.unit_tile[0, w]) == b and int(sim.military_at[0, b]) == w, "the mover did not step on"
+    assert int(sim.unit_attacks[0, w]) == att0, "the seizure spent an attack"
+    print("  4 a melee order onto a Builder seizes it and steps onto its plot OK")
+
+    # -- 4b: a barbarian's seizure: the captive is theirs, a Trader dies -------
+    sim = fresh(rules, path)
+    a, b, c = trio(sim)
+    one = torch.ones(sim.B, dtype=torch.bool)
+    was = set(sim.barb_unit_alive[0].nonzero().flatten().tolist())
+    sim._spawn_barb(one, torch.full((sim.B,), a, dtype=torch.long), sim._warrior_idx)
+    bw = (set(sim.barb_unit_alive[0].nonzero().flatten().tolist()) - was).pop()
+    lo = sim.POOL_LO["barb"]
+    if int(sim.unit_tile[0, bw + lo]) != a:
+        r, g = torch.tensor([0]), torch.tensor([bw + lo])
+        sim._occ_clear(r, torch.tensor([int(sim.unit_tile[0, bw + lo])]), g)
+        sim.unit_tile[0, bw + lo] = a
+        sim._occ_set(r, torch.tensor([a]), g)
+    sim.unit_mp[0, bw + lo] = sim.unit_mp_full[0, bw + lo] = 2 * sim._mp_scale
+    bld = spawn(sim, FOE, sim._builder_idx, b)
+    sim.unit_charges[0, bld] = 3
+    sim._hostile_vs_unit(one, torch.full((sim.B,), b, dtype=torch.long), "barb", bw)
+    got = int(sim.civilian_at[0, b])
+    assert got >= lo and int(sim.unit_seat[0, got]) == 200, "the barbarians did not take the Builder"
+    assert int(sim.unit_type[0, got]) == sim._builder_idx and int(sim.unit_charges[0, got]) == 3, (
+        "the barbarians' captive is not the Builder with its charges")
+    assert int(sim.barb_unit_tribe[0, got - lo]) == -1, "the captive joined a tribe"
+    assert int(sim.unit_tile[0, bw + lo]) == b, "the barbarian did not step onto the plot"
+    sim._barbarian_phase()
+    assert bool(sim.unit_alive[0, got]) and int(sim.unit_tile[0, got]) == b, "the barbarians' captive moved"
+    trd = spawn(sim, FOE, type_id(sim, "TRADER"), c)
+    sim.unit_mp[0, bw + lo] = 2 * sim._mp_scale
+    sim.unit_attacks[0, bw + lo] = 1
+    sim._hostile_vs_unit(one, torch.full((sim.B,), c, dtype=torch.long), "barb", bw)
+    assert not bool(sim.unit_alive[0, trd]) and int(sim.unit_tile[0, bw + lo]) == c, (
+        "a Trader stepped on lived, or the barbarian stood off")
+    print("  4b a barbarian's seizure OK — the captive is theirs and holds; a Trader dies to the step")
 
     # -- 5: a shot from the ground never takes a lone Support chassis ----------
     # runs/b89t_fire_20260926.jsonl, runs/b89t_read_20260926.jsonl: a lone

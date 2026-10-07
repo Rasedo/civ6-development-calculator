@@ -2181,6 +2181,9 @@ export function buildRules() {
       raidFreeMoves: u.raidFreeMoves ? 1 : 0,
       captureShips: u.captureShips ? 1 : 0,
       captureConverts: u.captureConverts ? 1 : 0,
+      capturedAs: u.capturedAs ? Object.keys(UNITS).indexOf(u.capturedAs) : -1,
+      retreatsWhenCaptured: u.retreatsWhenCaptured ? 1 : 0,
+      seaDomain: u.seaDomain ? 1 : 0,
     })),
     uniques: {
       civs: CIV_IDS,

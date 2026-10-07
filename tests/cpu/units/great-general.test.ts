@@ -156,7 +156,7 @@ describe('spawn-at-claim & capture', () => {
     expect(g.charges).toBe(1);
   });
 
-  it('an at-war civ melee on a lone seat-0 GENERAL captures it', () => {
+  it('an at-war civ stepping onto a lone GENERAL: it withdraws to its own nearest district (CanRetreatWhenCaptured)', () => {
     const state = newGame();
     setWar(state, (state.seats[(0) + 1] as Seat).seat, 0, true);
     const cap = seatOf(state, 0)!.cities[0].centerIndex;
@@ -167,11 +167,13 @@ describe('spawn-at-claim & capture', () => {
       (n) => tileSeat(n) !== 0 && !state.units.some((u) => u.tileIndex === n.index),
     )!;
     const atk = spawnUnit(state, 'WARRIOR', nb.index, (state.seats[(0) + 1] as Seat).seat)!;
+    // the capital's civilian slot stands free for it
+    state.units = state.units.filter((u) => u.tileIndex !== cap || unitDomain(u.type) !== 'civilian');
     meleeAttack(state, atk.id, gtile, 0);
-    const captured = state.units.find((u) => u.id === gen.id)!;
-    expect(isCiv(captured.seat)).toBe(true);
-    expect(captured.seat).toBe((state.seats[(0) + 1] as Seat).seat);
-    // POOL-END: the captured unit sits at the tail of state.units.
-    expect(state.units[state.units.length - 1].id).toBe(gen.id);
+    const withdrawn = state.units.find((u) => u.id === gen.id)!;
+    expect(isCiv(withdrawn.seat)).toBe(true);
+    expect(withdrawn.seat).toBe(0);
+    expect(withdrawn.tileIndex).toBe(cap);
+    expect(atk.tileIndex).toBe(gtile);
   });
 });

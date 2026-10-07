@@ -120,7 +120,7 @@ describe('combat', () => {
     expect(isWater(state.map.tiles[galley!.tileIndex])).toBe(true);
   });
 
-  it('a barbarian hull kills ashore but never advances onto land', () => {
+  it('a barbarian hull takes no civilian ashore: the move onto it is no move', () => {
     const { state } = battlefield();
     const water = tileAtCoords(state.map, 11, 9);
     water.terrain = 'COAST';
@@ -130,12 +130,12 @@ describe('combat', () => {
     const builder = spawnUnit(state, 'BUILDER', land.index, 0)!;
     builder.tileIndex = land.index;
 
-    expect(meleeAttack(state, galley.id, land.index, 0).ok).toBe(true);
-    expect(state.units.some((u) => u.id === builder.id)).toBe(false); // the kill lands
-    expect(galley.tileIndex).toBe(water.index); // ... the hull stays afloat
+    expect(meleeAttack(state, galley.id, land.index, 0).ok).toBe(false);
+    expect(builder.seat).toBe(0); // the Builder stays its owner's
+    expect(galley.tileIndex).toBe(water.index); // ... and the hull afloat
   });
 
-  it('ranged attacks take no retaliation and civilians die to melee', () => {
+  it('ranged attacks take no retaliation, and a barbarian stepping onto a civilian takes it', () => {
     const { state } = battlefield();
     const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 11, 9).index, 0)!;
     archer.tileIndex = tileAtCoords(state.map, 11, 9).index;
@@ -149,9 +149,34 @@ describe('combat', () => {
 
     const builder = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 12, 9).index, 0)!;
     builder.tileIndex = tileAtCoords(state.map, 12, 9).index;
+    builder.charges = 2;
     barb.movesLeft = 2 * MP_SCALE;
     expect(meleeAttack(state, barb.id, builder.tileIndex, 0).ok).toBe(true);
-    expect(state.units.some((u) => u.id === builder.id)).toBe(false);
+    // CIV6 (UnitCaptures): the Builder is the barbarians' now, a Builder with
+    // its charges, and the mover stands on its plot
+    expect(builder.seat).toBe(BARB_SEAT);
+    expect(builder.type).toBe('BUILDER');
+    expect(builder.charges).toBe(2);
+    expect(builder.movesLeft).toBe(0);
+    expect(barb.tileIndex).toBe(builder.tileIndex);
+    expect(state.units[state.units.length - 1]).toBe(builder);
+  });
+
+  it('a civilian with no UnitCaptures row dies to the step; a barbarian-held one holds and guards no camp', () => {
+    const { state } = battlefield();
+    const barb = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 9).index, BARB_SEAT)!;
+    barb.tileIndex = tileAtCoords(state.map, 13, 9).index;
+    const trader = spawnUnit(state, 'TRADER', tileAtCoords(state.map, 12, 9).index, 0)!;
+    trader.tileIndex = tileAtCoords(state.map, 12, 9).index;
+    barb.movesLeft = 2 * MP_SCALE;
+    expect(meleeAttack(state, barb.id, trader.tileIndex, 0).ok).toBe(true);
+    expect(state.units.includes(trader)).toBe(false);
+    expect(barb.tileIndex).toBe(trader.tileIndex);
+
+    const settler = spawnUnit(state, 'SETTLER', tileAtCoords(state.map, 9, 9).index, BARB_SEAT)!;
+    settler.tileIndex = tileAtCoords(state.map, 9, 9).index;
+    barbarianPhase(state);
+    expect(settler.tileIndex).toBe(tileAtCoords(state.map, 9, 9).index);
   });
 
   it('a Spy is seen by its own side alone, so no hostile fire finds it', () => {

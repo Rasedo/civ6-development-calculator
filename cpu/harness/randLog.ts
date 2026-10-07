@@ -155,6 +155,74 @@ export function loadCarbonLog(dumpPath: string, seeds: Iterable<number>): Map<nu
   return game ? carbonGames(readFileSync(events, 'utf8'))[game.k] : undefined;
 }
 
+/** One battle of the game's combat log (`Logs/CombatLog.csv`): its turn, the
+ *  attacking and defending players, each side's object kind (1 a unit, 3 a
+ *  district), ids and type names, and the damage each side took. */
+export interface CombatRow {
+  turn: number;
+  atkCiv: number;
+  defCiv: number;
+  atkObj: number;
+  defObj: number;
+  atkId: number;
+  defId: number;
+  atkType: string;
+  defType: string;
+  atkDmg: number;
+  defDmg: number;
+}
+
+/**
+ * THE GAME'S COMBAT LOG, in its order: every battle, a unit's shot at a city
+ * included, which the event log names nowhere. Read from the dump's own logs
+ * (`<dump>.logs/CombatLog.csv`), else a shared folder beside it
+ * (`h1_logs_duelw<a>_<b>/`) holding several games one after another, the
+ * dump's game being the one its draw log there matches by `seeds`.
+ * Undefined where neither is kept.
+ */
+export function loadCombatLog(dumpPath: string, seeds: Iterable<number>): CombatRow[] | undefined {
+  const own = join(dumpPath.replace(/\.jsonl$/, '.logs'), 'CombatLog.csv');
+  if (existsSync(own)) return combatGames(readFileSync(own, 'utf8')).pop();
+  const duel = Number(/h1_duelw(\d+)_/.exec(basename(dumpPath))?.[1]);
+  if (!duel) return undefined;
+  const dir = dirname(dumpPath);
+  const shared = readdirSync(dir).find((f) => {
+    const m = /^h1_logs_duelw(\d+)_(\d+)$/.exec(f);
+    return !!m && Number(m[1]) <= duel && duel <= Number(m[2]);
+  });
+  if (!shared) return undefined;
+  const battles = join(dir, shared, 'CombatLog.csv');
+  const draws = join(dir, shared, 'RandCalls.csv');
+  if (!existsSync(battles) || !existsSync(draws)) return undefined;
+  const game = gameOfLog(draws, seeds);
+  return game ? combatGames(readFileSync(battles, 'utf8'))[game.k] : undefined;
+}
+
+/** The combat log's games; a game starts where the turn falls back. A row
+ *  writes each pair of object kinds and of ids as one `a:b` field, so its
+ *  fifteen header columns come as thirteen fields. */
+function combatGames(text: string): CombatRow[][] {
+  const games: CombatRow[][] = [];
+  let cur: CombatRow[] = [];
+  let last = 0;
+  for (const line of text.split(/\r?\n/)) {
+    const f = line.split(',').map((x) => x.trim());
+    if (f.length < 13 || !/^\d+$/.test(f[0])) continue;
+    const turn = Number(f[0]);
+    if (cur.length && turn < last) {
+      games.push(cur);
+      cur = [];
+    }
+    last = turn;
+    const [ao, dob] = f[3].split(':').map(Number);
+    const [ai, di] = f[4].split(':').map(Number);
+    cur.push({ turn, atkCiv: Number(f[1]), defCiv: Number(f[2]), atkObj: ao, defObj: dob, atkId: ai, defId: di,
+      atkType: f[5], defType: f[6], atkDmg: Number(f[11]), defDmg: Number(f[12]) });
+  }
+  if (cur.length) games.push(cur);
+  return games;
+}
+
 /** The climate log's games, each turn -> world carbon; a game starts where
  *  the turn falls back. */
 function carbonGames(text: string): Map<number, number>[] {

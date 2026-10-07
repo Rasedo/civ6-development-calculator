@@ -23,6 +23,7 @@ import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { gameHash } from './aliases';
 import { bool, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
+import type { CombatRow } from './randLog';
 
 export type Phase = 'before' | 'after';
 
@@ -98,6 +99,13 @@ export type Decision = Base & (
       ranged: boolean; seq: number; dmg: [number, number]; strike?: { city: number; origin: number };
       /** the hit's place in the log (its row's sequence number) */
       ord: number }
+  /** a unit's pillage of the plot it stands on (`UnitOperationStarted`,
+   *  UNITOPERATION_PILLAGE), where the log's steps had it */
+  | { kind: 'pillage'; player: number; unit: string; plot: number }
+  /** a hostile civilian stepped on (`UnitCaptured`): the mover the log steps
+   *  onto its plot (`unit`, from the plot it left), the civilian, and the
+   *  unit the game re-added under the mover's player where it took one */
+  | { kind: 'seize'; player: number; unit: string; from: number; plot: number; victim: string; into?: string }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
@@ -108,9 +116,6 @@ export type Decision = Base & (
    *  upgrade under a new id */
   | { kind: 'upgrade'; player: number; unit: string; into: string }
   | { kind: 'camp'; player: number; plot: number; unit: string }
-  /** a unit's pillage (`UnitOperationStarted` UNITOPERATION_PILLAGE): the
-   *  plot it wrecked, the log's next `ImprovementChanged` */
-  | { kind: 'pillage'; player: number; unit: string; plot: number }
   | { kind: 'village'; player: number; plot: number; gold: number; faith: number; techBoosts: number[]; civicBoosts: number[];
       /** the city a citizen the village gave joined, -1 none */
       popCity: number;
@@ -506,16 +511,15 @@ const PURCHASE_UNIT = gameHash('UNIT');
 const ACTIVITY_OPERATION = gameHash('ACTIVITY_OPERATION');
 const OP_REMOVE_FEATURE = gameHash('UNITOPERATION_REMOVE_FEATURE');
 const OP_HARVEST = gameHash('UNITOPERATION_HARVEST_RESOURCE');
+const OP_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
 const OP_FOUND_RELIGION = gameHash('UNITOPERATION_FOUND_RELIGION');
 const PURCHASE_BUILDING = gameHash('BUILDING');
 const PURCHASE_PLOT = gameHash('PLOT');
-/** the game's `UnitOperationStarted` operation: the hash of its row's name */
-const UNITOPERATION_PILLAGE = gameHash('UNITOPERATION_PILLAGE');
 /** the game's `CityProductionChanged` / `CityProductionCompleted` kinds */
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
 const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward']);
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward', 'UnitCaptured']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -605,6 +609,11 @@ export class RecordedActions implements ActionSource {
         }
       }
       if (name === 'UnitOperationStarted') lastOp.set(`${n(r, 0)}:${n(r, 1)}`, n(r, 2));
+      if (name === 'UnitOperationStarted' && n(r, 2) === OP_PILLAGE) {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        const at = stand.get(k);
+        if (at !== undefined) out0.push({ kind: 'pillage', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: k, plot: at });
+      }
       if (name === 'UnitOperationStarted' && (n(r, 2) === OP_REMOVE_FEATURE || n(r, 2) === OP_HARVEST)) {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         const at = stand.get(k);
@@ -707,23 +716,13 @@ export class RecordedActions implements ActionSource {
       if (r[2] !== 'UnitRemovedFromMap' || !nx || nx[2] !== 'UnitAddedToMap' || !majorIds.has(n(r, 0)) || !minors.has(n(nx, 0))) return;
       const from = `${n(r, 0)}:${n(r, 1)}`;
       const to = `${n(nx, 0)}:${n(nx, 1)}`;
-      if (typeOf(from) === undefined || typeOf(from) !== typeOf(to)) return;
+      // (a unit that came home and fell in the same pair is in neither record)
+      if (typeOf(from) === undefined || (typeOf(to) !== undefined && typeOf(from) !== typeOf(to))) return;
       const d = homes.get(n(nx, 0)) ?? { kind: 'levyEnd', phase: phaseOf(n(nx, 0)), player: n(nx, 0), units: [] };
       d.units.push([from, to]);
       homes.set(n(nx, 0), d);
     });
     out0.push(...homes.values());
-    // a pillage: the unit's UNITOPERATION_PILLAGE, on the plot the log's next
-    // `ImprovementChanged` (x, y, ...) or `DistrictPillaged` (owner, district,
-    // city, x, y, ...) names
-    ev.forEach((r, i) => {
-      if (r[2] !== 'UnitOperationStarted' || n(r, 2) !== UNITOPERATION_PILLAGE) return;
-      const at = ev.slice(i + 1, i + 4).find((x) => x[2] === 'ImprovementChanged' || x[2] === 'DistrictPillaged');
-      if (!at) return;
-      const [x, y] = at[2] === 'DistrictPillaged' ? [n(at, 3), n(at, 4)] : [n(at, 0), n(at, 1)];
-      if (!(x >= 0 && x < W && y >= 0 && y < b.head.H)) return;
-      out0.push({ kind: 'pillage', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot: y * W + x });
-    });
     // the melee battles: the defender's damage, then the attacker's, in the
     // attacker's player's turn; every unit where the log's steps had it
     {
@@ -736,7 +735,12 @@ export class RecordedActions implements ActionSource {
       let acting: string | undefined;
       // the actor's units in the order the log set them acting, the last last
       let activated: string[] = [];
-      const hit = (r: ActionRow | undefined) => !!r && r[2] === 'UnitDamageChanged' && n(r, 2) > n(r, 3);
+      // a unit re-added under a new id (a levy's return, a capture) takes its
+      // old damage in a damage event straight after it is added: no blow
+      // (runs/h1_duelw1121 t56: a Warrior home from China's levy at 74)
+      const carried = new Set(ev.filter((r, i) => r[2] === 'UnitDamageChanged' && ev.slice(Math.max(0, i - 2), i)
+        .some((x) => (x[2] === 'UnitAddedToMap' || x[2] === 'UnitTeleported') && n(x, 0) === n(r, 0) && n(x, 1) === n(r, 1))));
+      const hit = (r: ActionRow | undefined) => !!r && r[2] === 'UnitDamageChanged' && n(r, 2) > n(r, 3) && !carried.has(r);
       const chassisOf = (key: string) => {
         const u = units1.get(key) ?? a.units.find((x) => unitKey(x) === key);
         return u ? UNITS[(cat.units[num(u.type)] ?? '').replace(/^UNIT_/, '')] : undefined;
@@ -791,8 +795,71 @@ export class RecordedActions implements ActionSource {
         }
         return undefined;
       };
+      // A UNIT'S SHOT AT A CITY logs no event, yet draws twice, its
+      // district's hit (0x204b10, 0x2074b0: "Unit Combat Damage" each), so
+      // the battles its player fights after it draw past it. The game's
+      // combat log, where the recording kept it, names each in its player's
+      // order among the battles the event log does (runs/h1_duelw1127 t23-36:
+      // a barbarian Slinger's shots at Antananarivo).
+      const combat = b.combatLog ?? [];
+      const used = new Set<number>();
+      const cityShot = (x: CombatRow) => {
+        const def = UNITS[x.atkType.replace(/^UNIT_/, '')];
+        return x.atkObj === 1 && x.defObj === 3 && x.atkDmg === 0 && !!def && (!!def.ranged || def.bombard !== undefined);
+      };
+      // the district a shot struck, which the log names by its district id:
+      // the city of that id's centre where one is (a city-state's first
+      // district and its city share the id), else the owner's nearest centre
+      // or Encampment within the shooter's reach, the lowest plot on a tie
+      // (runs/h1_duelw1124 t115: barbarian Crossbowmen on district 655369,
+      // Beijing's centre, Beijing being city 262147)
+      const shotAt = (owner: number, id: number, unit: string, from: number) => {
+        const cities = b.cities.length ? b.cities : a.cities;
+        const c = cities.find((x) => x.owner === owner && x.id === id);
+        if (c) return centreOf(c, W);
+        const reach = (chassisOf(unit)?.ranged?.range ?? 0) + 1;
+        const sites = cities.filter((x) => x.owner === owner).map((x) => centreOf(x, W));
+        for (let p = 0; p < W * b.head.H; p++) {
+          const row = plotAt(b, p);
+          if (row[P.owner] === owner && cat.districts[row[P.district] as number] === 'DISTRICT_ENCAMPMENT') sites.push(p);
+        }
+        let best: number | undefined;
+        let bd = reach + 1;
+        for (const p of sites.sort((x, y) => x - y)) {
+          const d = dist(p, from);
+          if (d >= 1 && d < bd) { bd = d; best = p; }
+        }
+        return best;
+      };
+      // the turn the actor acts in (its activation's), and its row of the
+      // combat log a battle is: the actor's first unused row naming it
+      let turn = a.turn;
+      const rowOf = (pred: (x: CombatRow) => boolean): number | undefined => {
+        const j = combat.findIndex((x, k) => !used.has(k) && x.turn === turn && x.atkCiv === actor && pred(x));
+        if (j < 0) return undefined;
+        used.add(j);
+        return j;
+      };
+      // the actor's shots at cities the combat log holds before its row
+      // `upto` (every one left, where none is given), each on the draws it took
+      const shoot = (ord: number, upto?: number) => {
+        combat.forEach((x, j) => {
+          if (used.has(j) || x.turn !== turn || x.atkCiv !== actor || (upto !== undefined && j >= upto) || !cityShot(x)) return;
+          used.add(j);
+          const unit = `${actor}:${x.atkId}`;
+          const from = pos.get(unit);
+          const at = from === undefined ? undefined : shotAt(x.defCiv, x.defId, unit, from);
+          if (from !== undefined && at !== undefined) {
+            out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker: unit, defender: '', from, at, ranged: true, seq: hits, ord,
+              dmg: [x.defDmg, 0] });
+          }
+          hits += 2;
+        });
+      };
       ev.forEach((r, i) => {
         if (r[2] === 'PlayerTurnActivated' && n(r, 0) !== actor) {
+          shoot(r[0] as number);
+          turn = r[1] as number;
           actor = n(r, 0);
           hits = 0;
           acting = undefined;
@@ -804,13 +871,21 @@ export class RecordedActions implements ActionSource {
           activated = [...activated.filter((x) => x !== k), k];
         }
         if (!hit(r)) return;
+        const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
+        const counter = n(r, 0) === actor && !!pv && hit(pv) && n(pv, 0) !== actor;
+        if (!counter) {
+          // the shots at cities before this battle drew first
+          const j = n(r, 0) === actor
+            ? rowOf((x) => x.atkObj === 1 && x.defObj === 3 && x.atkId === n(r, 1) && !cityShot(x))
+            : rowOf((x) => x.defObj === 1 && x.defCiv === n(r, 0) && x.defId === n(r, 1));
+          if (j !== undefined) shoot(r[0] as number, j);
+        }
         const k = hits;
         hits += 1;
         if (n(r, 0) === actor) {
           // the actor's own unit struck with no foe's hit before it: a blow
           // it took on its own attack on a city, which no battle holds
-          const pv = ev.slice(Math.max(0, i - 3), i).reverse().find((x) => x[2] === 'UnitDamageChanged');
-          if (!pv || !hit(pv) || n(pv, 0) === actor) {
+          if (!counter) {
             // the attack drew the attacker's damage, then the city's hit
             // points' and its walls' (GameCore_XP2_Release.dll 0x206080:
             // 0x519370, then 0x519440 twice) — three draws, one event; the
@@ -863,6 +938,38 @@ export class RecordedActions implements ActionSource {
         }
         out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k, ord: r[0] as number,
           dmg: [n(r, 2) - n(r, 3), countered ? n(nx!, 2) - n(nx!, 3) : 0] });
+      });
+      shoot(Number.MAX_SAFE_INTEGER);
+    }
+    // the seizures: `UnitCaptured` (the victim's owner and id, its owner
+    // again, the mover's player), the captive re-added under the mover just
+    // before it (`UnitAddedToMap`), and the mover's step onto the plot — after
+    // the capture, or just before it where the step ended on water
+    // (runs/h1_duelw1117 t33: a barbarian Warrior onto China's Settler;
+    // 1121 t141: a barbarian Galley onto China's embarked Builder)
+    {
+      const at = new Map(a.units.map((u) => [unitKey(u), u.y * W + u.x]));
+      // per row: a step's mover's plot before it, a capture's victim's plot
+      const before: number[] = [];
+      ev.forEach((r, i) => {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        if (r[2] === 'UnitMoved' || r[2] === 'UnitTeleported') {
+          before[i] = at.get(k) ?? -1;
+          at.set(k, n(r, 3) * W + n(r, 2));
+        } else if (r[2] === 'UnitCaptured') before[i] = at.get(k) ?? -1;
+      });
+      ev.forEach((r, i) => {
+        if (r[2] !== 'UnitCaptured') return;
+        const by = n(r, 3);
+        const added = ev.slice(Math.max(0, i - 8), i).reverse().find((x) => x[2] === 'UnitAddedToMap' && n(x, 0) === by);
+        const plot = added ? n(added, 3) * W + n(added, 2) : before[i];
+        if (plot < 0) return;
+        const onto = (x: ActionRow) => x[2] === 'UnitMoved' && n(x, 0) === by && n(x, 3) * W + n(x, 2) === plot;
+        let j = ev.findIndex((x, k) => k > i && k <= i + 4 && onto(x));
+        for (let k = i - 1; j < 0 && k >= Math.max(0, i - 12); k--) if (onto(ev[k])) j = k;
+        if (j < 0 || before[j] < 0) return;
+        out0.push({ kind: 'seize', phase: phaseOf(by), player: by, unit: `${by}:${n(ev[j], 1)}`, from: before[j], plot,
+          victim: `${n(r, 0)}:${n(r, 1)}`, ...(added ? { into: `${by}:${n(added, 1)}` } : {}) });
       });
     }
     // the unit each village rewarded: `GoodyHutReward` (player, unit, type,

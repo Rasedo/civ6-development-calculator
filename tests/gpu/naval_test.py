@@ -543,9 +543,12 @@ def poke_walls_civ(rules, path, GALLEY, WARRIOR):
 
 
 def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
-    """8. Capturing an EMBARKED civ-seat civilian: the captured unit appends at
-    the seat-0 POOL END (unit_next) and KEEPS embarked under its new seat (civk).
+    """8. An EMBARKED civ-seat civilian: the seizure is a move, so a land
+    unit takes none it cannot stand beside on water (`_seize_open`); a seat-0
+    hull seizes it — the captive appends at the seat-0 POOL END (unit_next),
+    KEEPS embarked under its new seat, and the hull steps onto its plot.
     """
+    GALLEY = [u["id"] for u in rules.units].index("GALLEY")
     sim = build(rules, path, 25)
     r = 0
     sim.war[0, 0, 1 + r] = sim.war[0, 1 + r, 0] = True
@@ -561,19 +564,30 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     assert bt >= 0 and bt != land
     force_water(sim, bt)
     bslot = place_civilian(sim, r + 1, bt, BUILDER, emb=True)
+    d = dir_to(sim, land, bt)
+    assert d >= 0
+    sim._apply_seat_unit_actions(0, order(sim, wslot, 6 + d))
+    assert bool(sim.major_unit_alive[0, bslot]) and int(sim.major_unit_seat[0, bslot]) == r + 1, (
+        "a land unit seized a civilian on water it cannot step onto")
+    # a seat-0 hull on another water plot beside the builder
+    gt = -1
+    for n in sim.neigh[bt].tolist():
+        if n >= 0 and n != land and not is_center(sim, n) and int(sim.military_at[0, n]) < 0 \
+                and int(sim.civilian_at[0, n]) < 0 and int(sim.embarked_at[0, n]) < 0:
+            gt = n
+            break
+    assert gt >= 0, "no plot beside the builder for the hull"
+    force_water(sim, gt)
+    gslot = place_mil(sim, 0, gt, GALLEY)
     # a TAIL seat-0 unit AFTER the builder so pool-end is observable
-    tail = empty_neighbor(sim, land)
-    tail = tail if (tail >= 0 and tail != bt) else land  # any valid tile; reuse if scarce
-    # find a genuinely different free tile for the tail
+    tail = -1
     for cand in range(sim.T):
-        if int(sim.military_at[0, cand]) < 0 and int(sim.civilian_at[0, cand]) < 0 and bool(sim.passable[0, cand]) and cand not in (land, bt):
+        if int(sim.military_at[0, cand]) < 0 and int(sim.civilian_at[0, cand]) < 0 and bool(sim.passable[0, cand]) and cand not in (land, bt, gt):
             tail = cand
             break
     tail_slot = place_mil(sim, 0, tail, WARRIOR)
     old_next = int(sim.unit_next[0])
-    d = dir_to(sim, land, bt)
-    assert d >= 0
-    sim._apply_seat_unit_actions(0, order(sim, wslot, 6 + d))
+    sim._apply_seat_unit_actions(0, order(sim, gslot, 6 + dir_to(sim, gt, bt)))
     cap = old_next  # captured unit appends at the pool end
     assert bool(sim.major_unit_alive[0, cap]), "captured builder not appended to the seat-0 pool"
     assert int(sim.major_unit_type[0, cap]) == BUILDER, "captured unit is the builder"
@@ -581,7 +595,8 @@ def poke_embarked_capture(rules, path, WARRIOR, BUILDER):
     assert cap > tail_slot, "capture must append at POOL END (after the pre-existing tail)"
     assert not bool(sim.major_unit_alive[0, bslot]), "the civ builder must despawn on capture"
     assert int(sim.embarked_at[0, bt]) == cap, "an embarked captive holds the PASSENGER plane as a seat-0 unit"
-    print(f"  8 embarked-civilian capture OK (pool-end slot {cap} > tail {tail_slot}, keeps embarked)")
+    assert int(sim.major_unit_tile[0, gslot]) == bt, "the hull did not step onto the plot it took"
+    print(f"  8 embarked-civilian seizure OK (a land unit refused; the hull's captive at pool-end slot {cap} > tail {tail_slot}, keeps embarked)")
 
 
 def poke_flank_support(rules, path, GALLEY):
@@ -1047,16 +1062,21 @@ def poke_passenger_death(rules, path, WARRIOR, BUILDER):
     land = empty_neighbor(sim2, ctr2)
     assert land >= 0
     clear_tile(sim2, land)
-    w = place_mil(sim2, 0, land, WARRIOR)
+    place_mil(sim2, 0, land, WARRIOR)
     bt = free_neighbor(sim2, land, ctr2)
     assert bt >= 0
     force_water(sim2, bt)
     clear_tile(sim2, bt)
     cap0 = place_civilian(sim2, 1, bt, BUILDER, emb=True)
+    # the seizure is a move, which the hull beside it may make on water
+    gt = next(n for n in sim2.neigh[bt].tolist() if n >= 0 and n not in (land, ctr2) and not is_center(sim2, n))
+    force_water(sim2, gt)
+    clear_tile(sim2, gt)
+    hull = place_mil(sim2, 0, gt, [u["id"] for u in rules.units].index("GALLEY"))
     old_next = int(sim2.unit_next[0])
-    d = dir_to(sim2, land, bt)
+    d = dir_to(sim2, gt, bt)
     assert d >= 0
-    sim2._apply_seat_unit_actions(0, order(sim2, w, 6 + d))
+    sim2._apply_seat_unit_actions(0, order(sim2, hull, 6 + d))
     assert not bool(sim2.major_unit_alive[0, cap0]), "the captured builder must despawn"
     assert bool(sim2.major_unit_emb[0, old_next]), "the captive keeps embarked"
     assert int(sim2.embarked_at[0, bt]) == old_next + sim2.POOL_LO["major"], \

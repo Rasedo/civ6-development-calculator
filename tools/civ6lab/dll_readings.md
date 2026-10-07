@@ -2976,6 +2976,40 @@ read record before it and lands what it laid at the next read record
 missing; the t3 dust storm's last walk at t5 lays 229 and 272 +1 Production
 (plot.yields 377 -> 39, city.centreYields 122 -> 0 on Handan's centre 272),
 its steps landing on the game's log.
+## H-1: a civilian stepped on — READ
+
+- The move 0x26fe20 walks the destination plot's units from the last to the
+  first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose
+  unit info lacks the +0x1ba bit 2, and whose player the mover's player is
+  at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0
+  back destroys the victim (the religion swing 0x493f80 with the capture
+  flag 1), a 1 or a 2 leaves it be. The mover then completes its step.
+- 0x212500: a unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the
+  Great People, the Archaeologist, the Naturalist, the Rock Band) retreats
+  to 0x530650's plot and returns 2, or returns 0 where none is valid;
+  otherwise the type the unit info's UnitCaptures collection names first
+  (+0x208, BecomesUnitType: Settler -> Settler, Builder -> Builder, the
+  install's only rows) — or, where the mover may capture combat units, its
+  own type after the "Unit Capture Chance" draw — is created under the
+  mover's player on the victim's plot with the victim's build charges
+  (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked
+  state, the victim removed (1); no type: 0. Nothing in it reads the
+  barbarians: their captive is theirs.
+- 0x530650: the nearest of the victim's player's districts (the list at the
+  player's +0x1308 -> +0xd8) other than its own plot where it may be placed
+  (0x586360), a city centre only for a unit of a domain other than land; the
+  first strictly nearest in the list's order.
+- Recorded (the log's UnitCaptured, then the re-added captive, then the
+  mover's UnitMoved onto the plot — before the capture where the step
+  ended on water): 1117 t33 China's Settler to a barbarian Warrior, a
+  Settler; t54 China's Warrior kills the barbarian escort and its advance
+  takes the Settler back; 1121 t133 a Builder keeps its 3 charges; 1121
+  t141 / t142 a barbarian Galley takes China's embarked Builders, embarked;
+  every capture the recordings of 1117-1131 hold takes a Settler or a Builder. The
+  engines: `seizeCivilian` / `seizable` (the order onto a plot holding no
+  fighter is a move that seizes, and so is a victor's advance),
+  `_seize_civilians` / `_seize_open`; a barbarian's captive holds where it
+  stands and guards no camp (`hostileUnitAct`, the GPU's barbarian walk).
 
 ## DLL rules the engines contradict
 
@@ -2991,6 +3025,9 @@ its steps landing on the game's log.
   every citizen afresh (AUDIT C-94 BUILD).
 - A move onto a religious unit (0x26fe20): the engines' melee order onto
   one only shares its plot (AUDIT C-94 BUILD).
+- An embarking move onto a civilian (0x26fe20 takes it): the engines'
+  seizure takes no plot the mover cannot stand on without embarking (AUDIT
+  C-94 BUILD).
 - The high-adjacency moment reads District::GetYield's flat bucket (+0x2f0)
   and appeal rows (+0x458) only as Nan Madol's Culture (docs/AUDIT.md, the
   Harness section's Moments BUILD line).

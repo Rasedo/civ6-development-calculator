@@ -44,17 +44,17 @@ import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builde
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
-import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, pillagePlunder } from '../core/economy';
+import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra } from '../core/economy';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
 import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '../core/governors';
 import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
-import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, holdBarbarians, meleeAttack, rangedAttack, terrainDefense } from '../core/combat';
+import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, holdBarbarians, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
-import { MINOR_UPGRADE_GOLD } from '../data/cityStates';
+import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
@@ -71,16 +71,13 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, holdMinorResearch, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem } from '../core/minorBuild';
-import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS } from '../core/unitActions';
-import { IMPROVEMENTS } from '../data/improvements';
-import { DISTRICTS } from '../data/districts';
-import type { ImprovementId } from '../../world/types';
+import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, holdMinorResearch, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
+import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
-import { loadRandLog, randLogPath, type RandLog } from './randLog';
+import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
@@ -531,7 +528,7 @@ function strike(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision, s: 
   const city = major?.city ?? (minor && minor.centerIndex === s.city ? minorCity(minor) : undefined);
   if (!def || !city) { count(ctx, 'battle', 'refused', d.player, def ? 'a city the replay does not hold' : 'a unit the replay does not hold'); return; }
   const s0 = battleDraw(ctx, wit, b, d);
-  if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); return; }
+  if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); return; }
   if (def.tileIndex !== d.at) def.fortifyTurns = 0;
   dugIn(ctx, d, def);
   def.tileIndex = d.at;
@@ -580,15 +577,16 @@ function dugIn(ctx: Ctx, d: BattleDecision, def: Unit): void {
   if (f && d.ord > f.ord && f.turns > (def.fortifyTurns ?? 0)) def.fortifyTurns = f.turns;
 }
 
-/** A UNIT'S ATTACK ON A CITY the log names (its own damage, `battle` with no
- *  defender): the engine's melee attack from where the log's steps had the
- *  unit, on the city's centre or Encampment, on the game's own draws. */
+/** A UNIT'S ATTACK ON A CITY the log names (`battle` with no defender: a
+ *  melee attack by its own damage, a shot by the combat log): the engine's
+ *  melee or ranged attack from where the log's steps had the unit, on the
+ *  city's centre or Encampment, on the game's own draws. */
 function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): void {
   const { state } = ctx;
   const atk = unitOf(ctx, d.attacker);
   if (!atk) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); return; }
   const s0 = battleDraw(ctx, wit, b, d);
-  if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); return; }
+  if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); return; }
   if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
   atk.tileIndex = d.from;
   if (!UNITS[atk.type]?.naval && !waterWalks(atk.type)) atk.embarked = isWater(state.map.tiles[atk.tileIndex]) || undefined;
@@ -598,9 +596,9 @@ function assault(ctx: Ctx, wit: TurnRecord, b: TurnRecord, d: BattleDecision): v
   const hp0 = atk.hp;
   if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [];
   ctx.stream.placed(true);
-  const r = meleeAttack(state, atk.id, d.at, atk.seat);
+  const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
   ctx.stream.placed(false);
-  if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0}->${atk.hp} vs city@${d.at} melee seq${d.seq} game[${d.dmg}] ours[-,${hp0 - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
+  if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0}->${atk.hp} vs city@${d.at} ${d.ranged ? 'ranged' : 'melee'} seq${d.seq} game[${d.dmg}] ours[-,${hp0 - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
   if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); return; }
   ctx.battled.add(d.attacker);
   if (!state.units.includes(atk)) ctx.engineKilled.add(d.attacker);
@@ -801,6 +799,9 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
     d.currency === 'gold' && id !== 'SETTLER' ? `${id} price ${unitGoldPrice(state, id, seat, city)} treasury ${Math.round(actor.treasury ?? 0)}` : id);
 }
 
+/** the seat order's pillage column */
+const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
+
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
  *  the units, a Trader's route once its unit stands (runs/h1_duelw1117 t44:
@@ -809,7 +810,7 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
  *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
  *  Slinger kill completed Archery, then Horseback Riding was picked) */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'levyEnd', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'pillage', 'gpActivate', 'unitNew', 'routes', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
+  'envoy', 'levy', 'levyEnd', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'gpActivate', 'unitNew', 'pillage', 'battle', 'seize', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
   const { state, next } = ctx;
@@ -818,7 +819,14 @@ function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnR
   // after their battles (runs/h1_duelw1121 t12: Rome's Warrior killed in the
   // barbarians' turn)
   const phaseOf = (d: Decision) => (d.kind === 'unitGone' && d.why === 'lost' ? 'after' : d.phase);
-  const mine = ds.filter((d) => phaseOf(d) === phase).sort((x, y) => ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind));
+  // the players act in the game's turn order, each its own decisions in the
+  // fixed order (a levied army fights its levier's battles before its minor
+  // calls it home: runs/h1_duelw1117 t42); what record t+1 shows of a unit
+  // lands after every player's (its loss, its health)
+  const late = (d: Decision) => (d.kind === 'unitGone' && d.why !== 'founded') || d.kind === 'combat' || d.kind === 'hit';
+  const rank = (d: Decision) => (late(d) ? 1 << 20 : 'player' in d ? d.player : -1);
+  const mine = ds.filter((d) => phaseOf(d) === phase)
+    .sort((x, y) => (rank(x) - rank(y)) || (ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind)));
   // EACH PLAYER'S ACTIONS draw on the stream its start completed with (its
   // `PlayerTurnStartComplete` witness in `wit`: record t for the active
   // player's, record t + 1 for the others'), each player's draws its own
@@ -913,9 +921,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!cs || !s) { count(ctx, 'levy', 'refused', d.player); break; }
         const price = levyGoldCost(state, seat, cs);
         const res = levyUnits(state, cs.id, seat);
+        // the old id still names the unit through the pair: a battle it
+        // fought before the levy is the log's under it (`unitGone`)
         for (const [from, to] of d.units) {
           const u = unitOf(ctx, from);
-          ctx.units.delete(from);
           if (!u) continue;
           ctx.units.set(to, u);
           if (!res.ok) {
@@ -924,8 +933,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           }
         }
         if (!res.ok) {
+          // the record's levy, on the verb's own term (`levyUnits`)
           s.treasury -= price;
           cs.levySeat = seat;
+          cs.levyEnds = state.turn + LEVY_TURNS - 1;
         }
         count(ctx, 'levy', res.ok ? 'applied' : 'fallback', d.player, res.reason);
         break;
@@ -958,11 +969,16 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'levyEnd': {
         // the engine's own levy clock sends the units home
-        // (`minorLevyReturn`); the game's new ids name the same units
+        // (`minorLevyReturn`), held to the minor's own place in the turn
+        // (`holdLevies`); the game's new ids name the same units, the old
+        // ones still through the pair: a battle a unit fought before it came
+        // home is the log's under its levied id (runs/h1_duelw1117 t42:
+        // China's levied Warrior killed a barbarian, then went home with its
+        // 23 damage)
         const seat = seatOfP(ctx, d.player);
+        if (isCityStateSeat(seat)) releaseLevies(state, cityStateOfSeat(seat));
         for (const [from, to] of d.units) {
           const u = unitOf(ctx, from);
-          ctx.units.delete(from);
           if (!u) continue;
           ctx.units.set(to, u);
           if (u.seat === seat) { count(ctx, 'levyEnd', 'applied'); continue; }
@@ -1198,7 +1214,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'unitGone': {
-        const u = unitOf(ctx, d.unit);
+        // a levied or returned unit leaves its old id alone
+        const rekeyed = ds.some((x) => (x.kind === 'levy' || x.kind === 'levyEnd') && x.units.some(([f]) => f === d.unit));
+        const u = rekeyed ? undefined : unitOf(ctx, d.unit);
         ctx.units.delete(d.unit);
         if (!u) { count(ctx, `unitGone:${d.why}`, 'applied'); break; }
         disbandUnit(state, u.id);
@@ -1221,6 +1239,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // item) is the record's
         matchNewUnits(ctx, b);
         if ((d.why === 'trained' && major) || unitOf(ctx, d.unit)) break;
+        // a captive is the seizure's (`seize`)
+        if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) break;
         spawnRecorded(ctx, b, d.unit);
         count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player, `${d.unit} ${ctx.cat.units[d.type]} ${d.why}: the engine made none`);
         break;
@@ -1299,26 +1319,6 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         count(ctx, 'village', 'fallback', d.player, d.unit ? `${d.unit} not in record t+1` : 'no unit the log names');
         break;
       }
-      case 'pillage': {
-        // the order is the unit's, from the plot the log names: the wrecked
-        // improvement or district pays its plunder row (`pillagePlunder`)
-        const u = unitOf(ctx, d.unit);
-        const t = state.map.tiles[d.plot];
-        if (!u || !t) { count(ctx, 'pillage', 'refused', d.player, 'a unit the replay does not hold'); break; }
-        u.tileIndex = d.plot;
-        if (t.improvement && !t.pillaged) {
-          t.pillaged = true;
-          pillagePlunder(state, u, IMPROVEMENTS[t.improvement as ImprovementId]?.plunder, false, t.improvement, tileSeat(t));
-          u.movesLeft = 0;
-          count(ctx, 'pillage', 'applied');
-        } else if (t.district && t.district !== 'CITY_CENTER' && t.districtComplete && !t.districtPillaged) {
-          t.districtPillaged = true;
-          pillagePlunder(state, u, DISTRICTS[t.district].plunder, true);
-          u.movesLeft = 0;
-          count(ctx, 'pillage', 'applied');
-        } else count(ctx, 'pillage', 'refused', d.player, 'nothing standing to pillage');
-        break;
-      }
       case 'upgrade': {
         // the order is the player's, through the engine's verb; the game's
         // new id names the same unit from here on
@@ -1366,6 +1366,66 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         count(ctx, 'promote', 'fallback', d.player, k < 0 ? `no ${name} in the unit's class` : 'the engine offered no such pick');
         break;
       }
+      case 'pillage': {
+        // the order is the player's, through the engine's verb from the plot
+        // the log's steps had the unit on: a major's its seat's own order
+        // (the plunder, the moves), any other's the hostile walker's
+        // (`hostilePillage`: a barbarian heals off a Farm)
+        const u = unitOf(ctx, d.unit);
+        const t = state.map.tiles[d.plot];
+        if (!u) { count(ctx, 'pillage', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        const was = [!!t.pillaged, !!t.districtPillaged];
+        u.tileIndex = d.plot;
+        const actor = u.seat < state.seats.length ? seatOf(state, u.seat) as Seat | undefined : undefined;
+        if (actor) {
+          u.movesLeft = Math.max(u.movesLeft, grantedMoves(state, u));
+          applySeatUnitOrders(state, actor, [unitsOf(state, u.seat).map((x) => (x === u ? A_PILLAGE : -1))]);
+        } else hostilePillage(state, u);
+        const done = (!!t.pillaged && !was[0]) || (!!t.districtPillaged && !was[1]);
+        count(ctx, 'pillage', done ? 'applied' : 'refused', d.player, done ? undefined : 'the engine wrecked nothing');
+        break;
+      }
+      case 'seize': {
+        // the move is the player's, through the engine's own: its mover from
+        // the plot the log's steps had it on, onto the civilian's plot, which
+        // seizes it (`seizeCivilian`); the game's new id names the captive
+        const vic = unitOf(ctx, d.victim);
+        // a victor's advance took it already, in the battle the log names
+        // (runs/h1_duelw1117 t54: China's Warrior killed the escort)
+        if (vic && vic.seat === seatOfP(ctx, d.player)) {
+          ctx.units.delete(d.victim);
+          if (d.into) ctx.units.set(d.into, vic);
+          count(ctx, 'seize', 'applied');
+          break;
+        }
+        if (!vic) { count(ctx, 'seize', 'refused', d.player, 'a civilian the replay does not hold'); break; }
+        const by = unitOf(ctx, d.unit);
+        if (!by) {
+          // the record's seizure, on the engine's own rule for the civilian,
+          // where the engine's battles left no mover
+          vic.tileIndex = d.plot;
+          seizeCivilian(state, vic, seatOfP(ctx, d.player));
+          ctx.units.delete(d.victim);
+          if (d.into && state.units.includes(vic)) ctx.units.set(d.into, vic);
+          count(ctx, 'seize', 'fallback', d.player, 'a mover the replay does not hold');
+          break;
+        }
+        by.tileIndex = d.from;
+        vic.tileIndex = d.plot;
+        by.movesLeft = Math.max(by.movesLeft, grantedMoves(state, by));
+        by.attacksLeft = Math.max(1, by.attacksLeft ?? 1);
+        const r = meleeAttack(state, by.id, d.plot, by.seat);
+        const took = d.into ? vic.seat === by.seat && state.units.includes(vic) : !state.units.includes(vic);
+        if (!took) {
+          // the record's seizure, on the engine's own rule for the civilian
+          if (state.units.includes(vic) && vic.seat !== by.seat) seizeCivilian(state, vic, by.seat);
+          by.tileIndex = d.plot;
+        }
+        ctx.units.delete(d.victim);
+        if (d.into && state.units.includes(vic)) ctx.units.set(d.into, vic);
+        count(ctx, 'seize', took ? 'applied' : 'fallback', d.player, r.ok ? 'the civilian was not taken' : r.reason);
+        break;
+      }
       case 'kill': {
         // the battle is the record's (`combat`); the kill is the engine's
         // event, paid through its own verb: the killer's eurekas and
@@ -1390,7 +1450,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const def = unitOf(ctx, d.defender);
         if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
         const s0 = battleDraw(ctx, wit, b, d);
-        if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); break; }
+        if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); break; }
         // a unit the log's steps moved holds no fortification
         if (atk.tileIndex !== d.from) atk.fortifyTurns = 0;
         if (def.tileIndex !== d.at) def.fortifyTurns = 0;
@@ -1902,7 +1962,7 @@ const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read
  *  first `:`, else the whole kind): a kind not named reaches every one —
  *  a seat's purse, research, government, or a city's state flows into all */
 const IMPOSES_ON: Record<string, readonly string[]> = {
-  combat: UNITS_SUBS, hit: UNITS_SUBS, levyEnd: UNITS_SUBS, gpActivate: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
+  combat: UNITS_SUBS, hit: UNITS_SUBS, seize: UNITS_SUBS, levyEnd: UNITS_SUBS, gpActivate: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
   promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:buy': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
@@ -2002,6 +2062,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     history.randLog = loadRandLog(logPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   }
   history.replay = replayEvents(recs, cat, history.randLog);
+  // the game's combat log, where the recording kept it: each record carries
+  // the battles of the turns its event log covers (`RecordedActions`)
+  const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
+  if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {} };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
@@ -2017,6 +2081,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // the engine's stand-ins for those are its AI's
   holdMinorOrders(true);
   holdCityStrikes(true);
+  holdLevies(true);
   const state = first.state;
   // each seat starts on the plots the record says it revealed
   // (`TurnRecord.revealed`), else on what its own plots, cities and units
@@ -2232,6 +2297,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
     fortifyOrders(ctx, a, b);
     applyPhase(ctx, ds, 'after', b, b);
+    // an army due home the record shows no return of comes home at its
+    // minor's start all the same
+    releaseLevies(state);
     for (const u of struckHp.keys()) {
       if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
       const rest = { ...u };
@@ -2328,6 +2396,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdResearchEra(null);
   holdMinorOrders(false);
   holdCityStrikes(false);
+  holdLevies(false);
   holdBarbarians(null);
   return report;
 }

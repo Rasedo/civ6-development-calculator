@@ -4189,6 +4189,12 @@ class SimInit:
         self._type_raid_free = _uc("raidFreeMoves", bool, torch.bool)
         self._type_capture_ships = _uc("captureShips", bool, torch.bool)
         self._type_capture_converts = _uc("captureConverts", bool, torch.bool)
+        # the chassis a civilian becomes under whoever steps onto it
+        # (UnitCaptures), -1 none; and the civilians that withdraw instead
+        self._type_captured_as = _uc("capturedAs")
+        self._type_retreats = _uc("retreatsWhenCaptured", bool, torch.bool)
+        # a sea-domain chassis with no hull (the Great Admiral)
+        self._type_sea_domain = _uc("seaDomain", bool, torch.bool)
         _uq = rules.uniques
         self._civ_ids: list[str] = list(_uq["civs"])
         self._open_terr = torch.tensor([int(t) for t in _uq["openTerrains"]], dtype=torch.long, device=device)

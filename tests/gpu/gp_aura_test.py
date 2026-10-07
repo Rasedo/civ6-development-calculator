@@ -288,8 +288,10 @@ def poke_aura_in_combat(rules, rj, path):
 
 
 def poke_capture(rules, rj, path):
-    """6. Type-agnostic capture: an at-war civ melee on a lone seat-0 GENERAL
-    CAPTURES it — POOL-END transfer to the v_ pool, type/charges carried."""
+    """6. CIV6 (Units.CanRetreatWhenCaptured): an at-war civ stepping onto a
+    lone seat-0 GENERAL does not take it — it withdraws to its own nearest
+    district plot (the capital's centre), still seat 0's, and the mover
+    stands where it stood (`seizeCivilian`, `_retreat_plot`)."""
     WARRIOR = [u["id"] for u in rules.units].index("WARRIOR")
     sim = build(rules, path)
     gi = sim._general_unit_idx
@@ -302,15 +304,18 @@ def poke_capture(rules, rj, path):
     assert gtile >= 0 and atile >= 0
     pgen = place_civilian(sim, 0, gtile, gi)  # a lone seat-0 general
     ratk = place_mil(sim, 1, atile, WARRIOR)
-    v_before = int(sim.unit_next[0])
+    sim.major_unit_mp[0, ratk] = sim.major_unit_mp_full[0, ratk] = 2 * sim._mp_scale
     sim._hostile_vs_unit(torch.tensor([True]), torch.tensor([gtile]), "major", ratk)
-    assert not bool(sim.major_unit_alive[0, pgen]), "captured seat-0 general must leave the seat-0 pool"
-    # POOL-END: appended at the old unit_next slot, type carried, owned by civ 0
-    cap = v_before
-    assert bool(sim.major_unit_alive[0, cap]) and int(sim.major_unit_type[0, cap]) == gi, "captured general not appended to the civ pool tail as a GENERAL"
-    assert int((sim.major_unit_seat[0, cap] - 1)) == 0, "captured general not keyed to the captor's civ"
-    assert int(sim.civilian_at[0, gtile]) == cap, "captured general not registered on the civilian plane"
-    print("  6 GENERAL capture OK — POOL-END transfer, type carried")
+    assert bool(sim.major_unit_alive[0, pgen]) and int(sim.major_unit_seat[0, pgen]) == 0, (
+        "the General was taken — it withdraws")
+    near = [t for t in range(sim.T) if (int(sim.centre_slot_at[0, t]) >= 0 or int(sim.district[0, t]) >= 0)
+            and int(sim.tile_seat[0, t]) == 0]
+    best = min(near, key=lambda t: (int(sim.pair_dist[gtile, t]), t))
+    assert int(sim.major_unit_tile[0, pgen]) == best, (
+        f"the General withdrew to {int(sim.major_unit_tile[0, pgen])}, not its nearest district plot {best}")
+    assert int(sim.civilian_at[0, best]) == pgen + sim.POOL_LO["major"], "the General is not on its civilian plane"
+    assert int(sim.major_unit_tile[0, ratk]) == gtile, "the mover did not step onto the plot"
+    print("  6 GENERAL withdraws OK — to its nearest district plot, the mover on its plot")
 
 
 sim0 = None  # module-level handle for poke_seat0_spawn's roster indices

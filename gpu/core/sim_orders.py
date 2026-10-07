@@ -1965,6 +1965,9 @@ class SimOrders:
         # pool also holds the Free Cities', which no camp guards or sends
         # raiding.
         _barbs = lambda: self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)  # noqa: E731
+        # a civilian the barbarians took holds where it stands and guards no
+        # camp (`hostileUnitAct`, `barbarianPhase`)
+        _fighter = lambda: self._type_dom_mil[self.barb_unit_type.clamp(min=0, max=self.NU - 1)]  # noqa: E731
         any_camp = bool((self.camp_tile >= 0).count_nonzero())
         _k_live: list[int] = []
         if any_camp:
@@ -1980,7 +1983,7 @@ class SimOrders:
         for k in _k_live:
             camp = self.camp_tile[:, k]
             active = camp >= 0
-            near = _barbs() & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
+            near = _barbs() & _fighter() & (du_g[:, k] <= 1) & ~guard & active.unsqueeze(1)
             any_near = near.any(dim=1)
             first = near.long().argmax(dim=1)
             rows = any_near.nonzero(as_tuple=True)[0]
@@ -2020,7 +2023,8 @@ class SimOrders:
             _homing[_hb, _hs[_hb, _hk]] = True
             _home_camp[_hb, _hs[_hb, _hk]] = self.tribe_plot[_hb, _hk]
         for u in u_live:
-            act = self.barb_unit_alive[:, u] & (self.barb_unit_seat[:, u] == BARB_SEAT) & ~guard[:, u]
+            act = (self.barb_unit_alive[:, u] & (self.barb_unit_seat[:, u] == BARB_SEAT) & ~guard[:, u]
+                   & _fighter()[:, u])
             if not bool(act.count_nonzero()):
                 continue
             hm = act & _homing[:, u]
@@ -2043,14 +2047,13 @@ class SimOrders:
             _ctr_nb = _cplane.gather(1, nbc)
             cs_nb = (_ctr_nb >= 100) & (_ctr_nb < BARB_SEAT)
             # A NON-BARBARIAN unit is adjacent (a barbarian is not a target for
-            # a barbarian). Civilians are never barbarian, so only the military
-            # plane needs the seat test.
+            # a barbarian, nor is a civilian the barbarians took).
             _mn = self._visible_military_at(BARB_SEAT).gather(1, nbc)
             _mn_seat = torch.where(_mn >= 0, self.unit_seat.gather(1, _mn.clamp(min=0)), torch.full_like(_mn, -1))
-            has_unit = (((_mn >= 0) & (_mn_seat != BARB_SEAT))
-                        | (self.civilian_at.gather(1, nbc) >= 0)
-                        | (self.support_at.gather(1, nbc) >= 0)
-                        | (self.embarked_at.gather(1, nbc) >= 0))
+            has_unit = (_mn >= 0) & (_mn_seat != BARB_SEAT)
+            for _pl in (self.civilian_at, self.support_at, self.embarked_at):
+                _o = _pl.gather(1, nbc)
+                has_unit = has_unit | ((_o >= 0) & (self.unit_seat.gather(1, _o.clamp(min=0)) != BARB_SEAT))
             enc_nb = self._encamp_block(nb, BARB_SEAT) if self._encamp_didx >= 0 else None
             valid = (nb >= 0) & (ctr | cs_nb | has_unit | (enc_nb if enc_nb is not None else False))
             tkey = torch.where(valid, nb, T + 1)

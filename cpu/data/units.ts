@@ -417,6 +417,14 @@ export interface UnitDef {
    *  city when it's captured, the city will automatically convert to the
    *  Conquistador player's majority Religion." */
   captureConverts?: boolean;
+  /** CIV6 (UnitCaptures, BecomesUnitType): the chassis this civilian becomes
+   *  under the player whose unit steps onto it. A civilian with no row is
+   *  destroyed by the step, unless it `retreatsWhenCaptured`. */
+  capturedAs?: string;
+  /** CIV6 (Units.CanRetreatWhenCaptured): stepped on by a hostile unit, this
+   *  civilian withdraws to its own player's nearest plot it may stand on
+   *  instead of being taken (`seizeCivilian`). */
+  retreatsWhenCaptured?: boolean;
   description: string;
 }
 
@@ -448,8 +456,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 3,
       builder: true,
+      capturedAs: 'BUILDER',
       description: 'Builds improvements, removes features and repairs pillaging (3 charges).',
       src: {
+        capturedAs: xml('UnitCaptures', 'CapturedUnitType=UNIT_BUILDER', 'BecomesUnitType', { expect: 'UNIT_BUILDER' }),
         cost: xml('Units', 'UnitType=UNIT_BUILDER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_BUILDER', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_BUILDER', 'BaseMoves'),
@@ -794,8 +804,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0,
       charges: 1,
       spawnOnly: true,
+      retreatsWhenCaptured: true,
       description: 'Great General — +5 CS to own land military within 2 tiles (spawned on claim).',
       src: {
+        retreatsWhenCaptured: xml('Units', 'UnitType=UNIT_GREAT_GENERAL', 'CanRetreatWhenCaptured', { expect: true }),
         cost: { stylized: 'great people arrive by points, never production — this model prices the chassis at 0 (units.ts header)' },
         maintenance: xml('Units', 'UnitType=UNIT_GREAT_GENERAL', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_GREAT_GENERAL', 'BaseMoves'),
@@ -814,8 +826,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 1,
       spawnOnly: true,
       seaDomain: true,
+      retreatsWhenCaptured: true,
       description: 'Great Admiral — +5 CS to own naval/embarked units within 2 tiles (spawned on claim).',
       src: {
+        retreatsWhenCaptured: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'CanRetreatWhenCaptured', { expect: true }),
         cost: { stylized: 'great people arrive by points, never production — this model prices the chassis at 0 (units.ts header)' },
         maintenance: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_GREAT_ADMIRAL', 'BaseMoves'),
@@ -903,8 +917,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0, // civilian
       charges: 3,
       requiresCivic: 'NATURAL_HISTORY',
+      retreatsWhenCaptured: true,
       description: 'Excavates Antiquity Sites into Artifacts (3 charges).',
       src: {
+        retreatsWhenCaptured: xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'CanRetreatWhenCaptured', { expect: true }),
         cost: xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'Maintenance'),
         moves: xml('Units', 'UnitType=UNIT_ARCHAEOLOGIST', 'BaseMoves'),
@@ -928,9 +944,11 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       combat: 0, // civilian: captured/killed rather than fighting
       charges: 0,
       settler: true,
+      capturedAs: 'SETTLER',
       description: 'Founds a new city (consumed on founding).',
       sight: 3,
       src: {
+        capturedAs: xml('UnitCaptures', 'CapturedUnitType=UNIT_SETTLER', 'BecomesUnitType', { expect: 'UNIT_SETTLER' }),
         sight: xml('Units', 'UnitType=UNIT_SETTLER', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_SETTLER', 'Cost', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_SETTLER', 'Maintenance'),
@@ -987,9 +1005,11 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 1,  // Units.xml ParkCharges
       naturalist: true,
       requiresCivic: 'CONSERVATION',
+      retreatsWhenCaptured: true,
       description: 'Designates a National Park over four contiguous tiles (consumed).',
       sight: 3,
       src: {
+        retreatsWhenCaptured: xml('Units', 'UnitType=UNIT_NATURALIST', 'CanRetreatWhenCaptured', { expect: true }),
         sight: xml('Units', 'UnitType=UNIT_NATURALIST', 'BaseSightRange'),
         cost: xml('Units', 'UnitType=UNIT_NATURALIST', 'Cost', { scale: GAME_SPEED }),
         costStep: xml('Units', 'UnitType=UNIT_NATURALIST', 'CostProgressionParam1', { scale: GAME_SPEED }),
@@ -2426,8 +2446,10 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       charges: 1,
       faithOnly: true,
       requiresCivic: 'COLD_WAR',
+      retreatsWhenCaptured: true,
       description: 'Performs a concert at a foreign venue for a tourism burst (faith purchase only).',
       src: {
+        retreatsWhenCaptured: xml('Units', 'UnitType=UNIT_ROCK_BAND', 'CanRetreatWhenCaptured', { expect: true }),
         cost: xml('Units', 'UnitType=UNIT_ROCK_BAND', 'Cost', { scale: GAME_SPEED }),
         costStep: xml('Units', 'UnitType=UNIT_ROCK_BAND', 'CostProgressionParam1', { scale: GAME_SPEED }),
         maintenance: xml('Units', 'UnitType=UNIT_ROCK_BAND', 'Maintenance'),

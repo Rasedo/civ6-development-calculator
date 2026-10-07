@@ -12151,6 +12151,7 @@ class SimSeats:
         def_is_barb = ok_m & (m_seat == BARB_SEAT)
         mil_att = att & ok_m
         civ_att = att & ~ok_m & ok_c
+        civ_all = civ_att
         if bool(mil_att.count_nonzero()):
             ds0 = d_slot.clamp(min=0)
             d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
@@ -12283,6 +12284,12 @@ class SimSeats:
                 a_alive[:, u] = a_alive[:, u] & ~atk_dead
                 self._dig_at(ar, here[ar], a_seat[ar, u])
                 self._occ_clear(ar, here[ar], torch.full_like(ar, u + a_lo))
+            # the victor's ADVANCE is a move onto the plot it emptied, which
+            # takes the hostile civilians the fallen fighter guarded
+            # (`seizable`)
+            _won = def_dead & ~atk_dead
+            if bool(_won.count_nonzero()):
+                self._seize_civilians(self._seize_open(_won, ttc, a_type[:, u], a_seat[:, u]), ttc, a_seat[:, u], atk_kind)
             adv_terr = self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
             _anav = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
             adv = (def_dead & ~atk_dead & adv_terr
@@ -12303,41 +12310,23 @@ class SimSeats:
                 if major:
                     self._clear_camp_at(adv, ttc, a_seat[:, u], self._row_of(a_seat[:, u]))
         if bool(civ_att.count_nonzero()):
+            # no fighter stands there: the order is a MOVE onto the plot
+            # (`meleeAttackInner`'s seizure arm). A plot the mover could not
+            # stand on once emptied is no move; else every hostile civilian
+            # on it is seized (`_seize_civilians`) and the mover steps in,
+            # paying the step and no attack.
+            civ_att = self._seize_open(civ_att, ttc, a_type[:, u], a_seat[:, u])
             rows = civ_att.nonzero(as_tuple=True)[0]
-            if major:
-                self._capture_unit(rows, cslot_raw[rows], atk_kind, a_seat[rows, u], ttc[rows])
-            else:
-                self._dig_at(rows, ttc[rows], self.unit_seat[rows, cslot_raw[rows]])
-                self._occ_clear(rows, ttc[rows], cslot_raw[rows])
-                self.unit_alive[rows, cslot_raw[rows]] = False
-                self._gen_ver += 1
-        kill_adv = civ_att if not major else torch.zeros_like(civ_att)
-        if bool(kill_adv.count_nonzero()):
-            # the SAME naval-plane gate as the melee advance above — a roll-free
-            # civilian kill by a barb GALLEY must not walk the hull onto the
-            # (land) tile it just cleared.
-            adv = (
-                kill_adv
-                & self._advance_terrain(a_type[:, u], a_seat[:, u], tgt)
-                & self._advance_open(a_type[:, u], a_seat[:, u], tgt)
-                & ~self._blocked_for(
-                    tgt.unsqueeze(1), a_seat[:, u].unsqueeze(1),
-                    is_naval=self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]).squeeze(1)
-            )
-            if bool(adv.count_nonzero()):
-                vr = adv.nonzero(as_tuple=True)[0]
-                _gs = torch.full_like(vr, u + a_lo)
-                self._occ_clear(vr, here[vr], _gs)
-                a_tile[vr, u] = ttc[vr]
-                a_emb[vr, u] = self.water[vr, ttc[vr]] & ~self.unit_naval[
-                    a_type[vr, u].clamp(min=0, max=self.NU - 1)]
-                self._occ_set(vr, ttc[vr], _gs)
+            if rows.numel():
+                self._seize_civilians(civ_att, ttc, a_seat[:, u], atk_kind)
+                for s in torch.unique(a_seat[rows, u]).tolist():
+                    self._melee_coloc(civ_att & (a_seat[:, u] == s), ttc, atk_kind, u, int(s))
         # A FALLEN attacker's turn ends outright; a surviving one pays through
         # `spendAttack`, which one promotion waives.
         _mp = getattr(self, f"{atk_kind}_unit_mp")
         _live = a_alive[:, u]
         _mp[:, u] = torch.where(att & ~_live, torch.zeros_like(_mp[:, u]), _mp[:, u])
-        self._spend_attack(atk_kind, u, att & _live)
+        self._spend_attack(atk_kind, u, att & ~civ_all & _live)
 
     def _convert_heathens(self, row: int, act: torch.Tensor, here: torch.Tensor,
                           slot: torch.Tensor) -> None:
@@ -12512,13 +12501,18 @@ class SimSeats:
                 | (self._shot_embarked_plane(False) >= 0))
 
     def _nonbarb_unit_at(self, tiles: torch.Tensor) -> torch.Tensor:
-        """[B, N] — `_nonbarb_unit_plane` evaluated AT `tiles`. A prober asking
-        about one tile per game has no business building the whole map."""
+        """[B, N] — a unit a barbarian's melee may take stands AT `tiles`: a
+        non-barbarian military unit, civilian or passenger (a civilian the
+        barbarians hold is theirs). A prober asking about one tile per game
+        has no business building the whole map."""
         t = tiles.clamp(min=0)
         mil = self._visible_military_at(BARB_SEAT).gather(1, t)
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
-        return (((mil >= 0) & (mseat != BARB_SEAT))
-                | (self.civilian_at.gather(1, t) >= 0) | (self.embarked_at.gather(1, t) >= 0))
+        foe = (mil >= 0) & (mseat != BARB_SEAT)
+        for plane in (self.civilian_at, self.embarked_at):
+            o = plane.gather(1, t)
+            foe = foe | ((o >= 0) & (self.unit_seat.gather(1, o.clamp(min=0)) != BARB_SEAT))
+        return foe
 
     def _pool_at(self, plane: torch.Tensor, pool: str) -> torch.Tensor:
         lo, hi = self.POOL_LO[pool], self.POOL_HI[pool]
@@ -13711,15 +13705,15 @@ class SimSeats:
 
     def _capture_unit(self, rows: torch.Tensor, src: torch.Tensor, pool: str,
                       dst_seat: torch.Tensor, tile: torch.Tensor) -> None:
-        """`meleeAttack`'s roll-free civilian CAPTURE — ONE body, whichever
-        major seat takes whichever major seat's civilian.
+        """`reseatUnit` for a seized civilian — ONE body, whoever takes
+        whoever's civilian, into the captor's pool `pool`.
 
-        TS re-seats the defender and then splices it to the END of
-        `state.units`; the pooled twin despawns MERGED slot `src` and respawns
-        at `pool`'s append head, so both engines iterate the captured unit LAST
-        in every array-order walk. hp / charges / xp / embark ride along
-        (`_CAPTURE_CARRY`); movesLeft is 0, so the heal skips it this turn. The
-        captor does NOT advance — single occupancy, and the tile is still held.
+        TS re-seats the unit and then splices it to the END of `state.units`;
+        the pooled twin despawns MERGED slot `src` and respawns at `pool`'s
+        append head, so both engines iterate the captured unit LAST in every
+        array-order walk. hp / charges / xp / embark ride along
+        (`_CAPTURE_CARRY`); movesLeft is 0, so the heal skips it this turn. A
+        barbarian captive belongs to no tribe and no operation.
         """
         lo = self.POOL_LO[pool]
         cur = getattr(self, self.POOL_NEXT[pool])
@@ -13733,12 +13727,114 @@ class SimSeats:
         self.unit_seat[rows, dst] = dst_seat
         self.unit_tile[rows, dst] = tile
         self._carry_capture(rows, src, dst)
+        if pool == "barb":
+            self.barb_unit_tribe[rows, nslot] = -1
+            self.barb_unit_scout[rows, nslot] = False
+            self.barb_unit_op[rows, nslot] = False
+            self.barb_unit_fresh[rows, nslot] = False
         # `_carry_capture` brings `unit_emb` across, so the class the captive
         # files under is known by the time `_occ_set` asks.
         self._occ_clear(rows, tile, src)
         self._occ_set(rows, tile, dst)
         cur[rows] += 1
         self._gen_ver += 1
+
+    def _seize_victim(self, slot: torch.Tensor, captor: torch.Tensor) -> torch.Tensor:
+        """[B] — the unit at MERGED `slot` [B] (-1 none) is one a move of
+        `captor` [B] seizes: hostile, no fighter, no religious unit."""
+        s0 = slot.clamp(min=0).unsqueeze(1)
+        ut = self.unit_type.gather(1, s0).squeeze(1).clamp(min=0, max=self.NU - 1)
+        return ((slot >= 0) & ~self._type_dom_mil[ut] & ~(self._rel_strength[ut] > 0)
+                & self._seats_hostile(captor, self.unit_seat.gather(1, s0)).squeeze(1))
+
+    def _seize_open(self, mask: torch.Tensor, tile: torch.Tensor, u_type: torch.Tensor,
+                    captor: torch.Tensor) -> torch.Tensor:
+        """`seizable`'s verdict, [B]: a move of a `u_type` of `captor` onto
+        `tile` (clamped) may take the plot — no unit but the ones it seizes is
+        foreign there (a hostile fighter, a religious unit), and once they are
+        gone the mover may stand on it (`tileFreeForUnit`, no embarking)."""
+        ok = (mask & self._advance_terrain(u_type, captor, tile) & self._advance_open(u_type, captor, tile)
+              & ~self._encamp_block(tile.unsqueeze(1), captor.unsqueeze(1)).squeeze(1))
+        for plane in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            o = plane.gather(1, tile.unsqueeze(1)).squeeze(1)
+            o_seat = torch.where(o >= 0, self.unit_seat.gather(1, o.clamp(min=0).unsqueeze(1)).squeeze(1), torch.full_like(o, -1))
+            ok = ok & ~((o >= 0) & (o_seat != captor) & ~self._seize_victim(o, captor))
+        return ok
+
+    def _seize_civilians(self, mask: torch.Tensor, tile: torch.Tensor, captor: torch.Tensor, pool: str) -> None:
+        """`seizeCivilian` over every hostile civilian on `tile` [B] (clamped)
+        of the games in `mask`, `captor` [B] the mover's seat, `pool` its
+        pool: a chassis with a UnitCaptures row becomes it under the captor
+        (`_capture_unit`), one that CanRetreatWhenCaptured withdraws to its
+        own nearest district plot (`_retreat_plot`), destroyed where none is
+        free, and any other is destroyed. A religious unit is never seized
+        (onto its plot the order is a move, `_melee_coloc`). A plot holds
+        at most one civilian a UnitCaptures row names, so the planes' order
+        appends no two captives against each other."""
+        for plane in (self.embarked_at, self.support_at, self.civilian_at):
+            slot = plane.gather(1, tile.unsqueeze(1)).squeeze(1)
+            hit = mask & self._seize_victim(slot, captor)
+            if not bool(hit.count_nonzero()):
+                continue
+            hr = hit.nonzero(as_tuple=True)[0]
+            hs, ht, hc = slot[hr], tile[hr], captor[hr]
+            hu = self.unit_type[hr, hs].clamp(min=0, max=self.NU - 1)
+            # a seized or withdrawn civilian rides in no formation
+            self.unit_escorted[hr, hs] = False
+            cap = self._type_captured_as[hu]
+            take = cap >= 0
+            if bool(take.count_nonzero()):
+                self.unit_type[hr[take], hs[take]] = cap[take]
+                self._capture_unit(hr[take], hs[take], pool, hc[take], ht[take])
+            back = ~take & self._type_retreats[hu]
+            to = torch.full_like(hs, -1)
+            if bool(back.count_nonzero()):
+                to[back] = self._retreat_plot(hr[back], hs[back])
+            moved = back & (to >= 0)
+            if bool(moved.count_nonzero()):
+                mr, ms, mt = hr[moved], hs[moved], to[moved]
+                self._occ_clear(mr, ht[moved], ms)
+                self.unit_tile[mr, ms] = mt
+                self._occ_set(mr, mt, ms)
+                self._gen_ver += 1
+            die = ~take & ~moved
+            if bool(die.count_nonzero()):
+                dr, ds = hr[die], hs[die]
+                self._dig_at(dr, ht[die], self.unit_seat[dr, ds])
+                self._occ_clear(dr, ht[die], ds)
+                self.unit_alive[dr, ds] = False
+                self._gen_ver += 1
+
+    def _retreat_plot(self, rows: torch.Tensor, slots: torch.Tensor) -> torch.Tensor:
+        """`retreatPlot`: [n] the plot each unit (merged `slots` of games
+        `rows`) withdraws to — the nearest district plot of its own seat other
+        than its own where it may stand, a non-centre district only for a
+        land unit, the lowest plot on a tie; -1 none."""
+        T = self.T
+        here = self.unit_tile[rows, slots]
+        seat = self.unit_seat[rows, slots]
+        ut = self.unit_type[rows, slots].clamp(min=0, max=self.NU - 1)
+        land = ~self.unit_naval[ut] & ~self._type_sea_domain[ut]
+        centre = self.centre_slot_at[rows] >= 0
+        cand = ((centre | ((self.district[rows] >= 0) & land.unsqueeze(1)))
+                & (self.tile_seat[rows] == seat.unsqueeze(1))
+                & self.passable[rows] & ~self.water[rows])
+        n = rows.numel()
+        cand[torch.arange(n, device=self.device), here.clamp(min=0)] = False
+        # `tileFreeForUnit` on dry ground: a foreign unit blocks, and an own
+        # unit of the class the withdrawer stands in
+        sup = self._type_support[ut].unsqueeze(1)
+        own_class = torch.where(sup, self.support_at[rows], self.civilian_at[rows])
+        for plane in (self.military_at, self.civilian_at, self.support_at):
+            occ = plane[rows]
+            o_seat = torch.where(occ >= 0, self.unit_seat[rows.unsqueeze(1), occ.clamp(min=0)], torch.full_like(occ, -1))
+            cand = cand & ~((occ >= 0) & (o_seat != seat.unsqueeze(1)))
+        cand = cand & ~(own_class >= 0)
+        allt = torch.arange(T, device=self.device).unsqueeze(0).expand(n, T)
+        d = self.pair_dist[here.clamp(min=0)].to(torch.long)
+        key = torch.where(cand, d * T + allt, torch.full_like(d, 1 << 40))
+        best = key.min(dim=1).values
+        return torch.where(best < (1 << 40), best % T, torch.full_like(best, -1))
 
     def _log_stock(self, rows, row: int, slot, tag: str) -> None:
         """`logStockWrite`'s twin — WHICH writer moved this seat's strategic

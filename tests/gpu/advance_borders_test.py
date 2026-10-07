@@ -20,9 +20,9 @@ scenario proves nothing:
     and on the owner's own ground: the victor ADVANCES;
   * a religious unit ignores borders and an INQUISITOR does not, on the same
     list the ordinary move reads;
-  * the roll-free CIVILIAN advance is barbarian-only (a major captures and
-    stays) and a barbarian is never border-bound, so that arm's gate is inert
-    by construction — written alike so the two cannot drift.
+  * the move onto a lone CIVILIAN is an entry too: on closed ground it is
+    refused and the civilian stays its owner's; with the border opened the
+    mover seizes it and stands on its plot.
 """
 
 from __future__ import annotations
@@ -173,30 +173,30 @@ def test_the_religious_exception(rules, path) -> None:
     print("  3 religious OK — the exception list is the move's, and the advance shares it")
 
 
-def test_the_civilian_arm_is_barbarian_only(rules, path) -> None:
-    """The roll-free civilian arm advances for a NON-major only: a major
-    CAPTURES the civilian and stays on its own tile, so `kill_adv` is empty for
-    it. The pool that DOES advance there is the barbarian one, and a barbarian
-    is never border-bound — `borderClosedTo` answers only for a civ. The gate
-    on that arm is therefore inert, written the same way as the military one so
-    the two cannot drift rather than because it can refuse anything."""
+def test_the_civilian_arm_is_a_move(rules, path) -> None:
+    """The move onto a lone hostile civilian takes it only where the mover
+    may step (`seizable`, `_seize_open`): on ground closed to it the order is
+    refused and the civilian stays its owner's; once the border opens the
+    mover seizes it — a Builder stays a Builder, now the mover's — and steps
+    onto its plot."""
     sim, here, there, atk = scene(rules, path, civilian=True)
+    gs = atk + sim.POOL_LO["major"]
+    sim.unit_mp[B0, gs] = sim.unit_mp_full[B0, gs] = 2 * sim._mp_scale
     att = torch.zeros(sim.B, dtype=torch.bool)
     att[B0] = True
-    sim._hostile_vs_unit(att, torch.full((sim.B,), there, dtype=torch.long), "major", atk)
-    cap = int(sim.civilian_at[B0, there])
-    assert cap >= 0 and int(sim.unit_seat[B0, cap]) == ATT, \
-        "the civilian was neither captured nor cleared — the scenario proves nothing"
-    assert int(sim.major_unit_tile[B0, atk]) == here, \
-        "the captor advanced — a major must stay on the tile it took the civilian from"
-    # ...and the border never binds the pool that DOES advance on this arm
-    barb = sim.n_majors     # any row past the majors answers as a barbarian does
-    assert bool(sim._advance_open(
-        torch.full((sim.B,), 2, dtype=torch.long),
-        torch.full((sim.B,), barb, dtype=torch.long),
-        torch.full((sim.B,), there, dtype=torch.long))[B0]), \
-        "a non-major was refused ground — borderClosedTo answers only for a civ"
-    print("  4 civilian arm OK — a major captures and stays; the barbarian that advances walks free")
+    tgt = torch.full((sim.B,), there, dtype=torch.long)
+    sim._hostile_vs_unit(att, tgt, "major", atk)
+    civ = int(sim.civilian_at[B0, there])
+    assert civ >= 0 and int(sim.unit_seat[B0, civ]) != ATT, "the civilian was taken on ground closed to the mover"
+    assert int(sim.major_unit_tile[B0, atk]) == here, "the mover entered ground closed to it"
+    sim.war[B0, ATT, OWNER] = sim.war[B0, OWNER, ATT] = True
+    bump(sim)
+    sim._hostile_vs_unit(att, tgt, "major", atk)
+    civ = int(sim.civilian_at[B0, there])
+    assert civ >= 0 and int(sim.unit_seat[B0, civ]) == ATT, "the open ground's civilian was not seized"
+    assert int(sim.unit_type[B0, civ]) == int(sim._builder_idx), "the seized Builder changed chassis"
+    assert int(sim.major_unit_tile[B0, atk]) == there, "the mover did not step onto the plot it took"
+    print("  4 civilian arm OK — refused on closed ground; seized, and the mover stands on it, once open")
 
 
 def main() -> int:
@@ -205,7 +205,7 @@ def main() -> int:
     test_closed_ground_holds_the_victor(rules, path)
     test_every_opening_lets_it_in(rules, path)
     test_the_religious_exception(rules, path)
-    test_the_civilian_arm_is_barbarian_only(rules, path)
+    test_the_civilian_arm_is_a_move(rules, path)
     print("BATTERY OK advance_borders")
     return 0
 

@@ -6,6 +6,7 @@
  * check reads it as a value.
  */
 import { existsSync, readFileSync } from 'node:fs';
+import type { CombatRow } from './randLog';
 
 /** A value a Lua reader may have failed on. */
 export type Read<T> = T | string;
@@ -270,6 +271,9 @@ export interface TurnRecord {
    *  fired: what the start banks from) and as it completed (`post`), for
    *  the record's turn and the one before */
   witness?: StartWitness[];
+  /** the game's combat log rows of the turns the record's event log covers,
+   *  where the recording kept the log (`loadCombatLog`, set by the replay) */
+  combatLog?: CombatRow[];
 }
 
 /** One player's state at a point of its start of turn (`TurnRecord.witness`). */

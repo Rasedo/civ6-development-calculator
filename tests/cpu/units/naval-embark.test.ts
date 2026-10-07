@@ -304,7 +304,7 @@ describe('N2 naval spawn + combat', () => {
     expect(defenderCS(state, embarked, water.index)).toBe(20 + 6);
   });
 
-  it('capturing an embarked civilian KEEPS it embarked and appends it pool-end', () => {
+  it('a hull seizing an embarked civilian KEEPS it embarked and appends it pool-end; a land unit takes none', () => {
     const state = makeState(makeMap(12, 12, 'GRASSLAND'));
     state.unitsMode = true;
     const civ = bareCiv(state);
@@ -316,12 +316,20 @@ describe('N2 naval spawn + combat', () => {
     const builder = spawnUnit(state, 'BUILDER', warriorTile.index, civ.seat)!;
     builder.tileIndex = builderTile.index; // embarked civilian on the water tile
     builder.embarked = true;
+    // the seizure is a move, and a land unit's takes no plot it cannot stand on
+    expect(meleeAttack(state, warrior.id, builderTile.index, 0).ok).toBe(false);
+    expect(builder.seat).toBe(civ.seat);
+    const seaTile = neighbors(state.map, builderTile).find((t) => t.index !== warriorTile.index && !neighbors(state.map, warriorTile).includes(t))!;
+    seaTile.terrain = 'COAST';
+    const galley = spawnUnit(state, 'GALLEY', seaTile.index, 0)!;
+    galley.tileIndex = seaTile.index;
     // add another seat-0 unit AFTER the builder so pool-end is observable
     const tail = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 9).index, 0)!;
-    const res = meleeAttack(state, warrior.id, builderTile.index, 0);
+    const res = meleeAttack(state, galley.id, builderTile.index, 0);
     expect(res.ok).toBe(true);
     expect((builder.seat) === 0).toBe(true);
     expect(builder.embarked).toBe(true); // KEEPS embarked under the new owner
+    expect(galley.tileIndex).toBe(builderTile.index);
     // pool-end: the captured unit is the LAST entry in state.units
     expect(state.units[state.units.length - 1].id).toBe(builder.id);
     expect(state.units.indexOf(builder)).toBeGreaterThan(state.units.indexOf(tail));
