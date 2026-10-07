@@ -35,8 +35,7 @@ re-adds them.
 
 | Open item | Weight | What is left |
 |---|---|---|
-| A-1 parity of the H-1 merges | 1 | a 24-seed battery over the engine merges since 41011436 (BLOCKER: the owner's mode) |
-| **A. Engine vs engine** | **1** | |
+| **A. Engine vs engine** | **0** | |
 | B-24r governor tails | 1 | Foreign Investor and Affluence wait on C-38; Renewable Subsidizer, the plant line's pick (LAB) |
 | B-31r trade-route tails | 1 | the destination term (LAB); the destination's free choice (P8) |
 | B-D unsourced data values | 1 | the unread and unscaled durations, "Standard Speed" amounts, the per-opponent reader (LAB) |
@@ -56,7 +55,7 @@ re-adds them.
 | C-93 the turn's order | 1 | tourism's banking, the victory and turn-limit checks, the turn-opening Great Person draw (LAB) |
 | C-94 the harness's first findings | 3 | the uncatalogued policy cards and two governments, the game era's readers and the other moments, the dominance identity term, lifetime culture's boosts, the Fortify order, the boosts' unmodelled triggers (BUILD); the district discount's refresh residue, the luxury allocation's residue, Huey Teocalli's lake count, the religious 2's source, the founding turn's luxury, Pamukkale's second Amenity, the border count's two-plot turn, the World Games' tie, the dark-age slot rebuild, 1116's Democracy-turn Production, the route path and loyalty residuals, the garrison pick, the map script's continents, China's fourth Tobacco, the boost triggers' readings, the action replay's sight, governor-clock and city-state build fits (LAB); a flood's river order, Celestial Navigation's +5, the fortification jump, a city attack's draws (ASK) |
 | **C. Absent systems** | **12** | |
-| **OPEN, TOTAL** | **20** | |
+| **OPEN, TOTAL** | **19** | |
 
 ## The question ledger — owner asks
 
@@ -69,8 +68,6 @@ scenes cite them), so the gaps are closed asks.
 |---|---|---|---|
 
 ## A. Engine vs engine
-
-- **A-1. PARITY OF THE H-1 MERGES.** Weight 1. The 24-seed battery passed at 41011436; every engine merge after it (the draw structure, the boosts, the fixed point, the step order, the city-state builds, the H-1 rules) passed its touched GPU test scripts only. BLOCKER: a battery, which the owner's BUILD mode holds; then each red's wrong twin.
 
 ## B. Fidelity vs real Civ 6 — shipped mechanics with open tails
 
