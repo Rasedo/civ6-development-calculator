@@ -85,11 +85,6 @@ export interface StreamHold extends RngHooks {
   ledger(): StreamLedger;
 }
 
-/** the label's key: the volcano roll's choice by either branch is one site */
-function keyOf(label: string): string {
-  const k = siteLabel(label);
-  return k === 'Choose Inactive Volcano Roll' ? 'Choose Active Volcano Roll' : k;
-}
 
 /**
  * The hold for a replay of `recs`. The engine's seat phase of turn t is the
@@ -124,7 +119,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
   const byKey = new Map<string, Map<number, number[]>>();
   if (log) {
     log.draws.forEach((d, i) => {
-      const k = keyOf(d.label);
+      const k = siteLabel(d.label);
       let m = byKey.get(k);
       if (!m) byKey.set(k, (m = new Map()));
       let a = m.get(d.turn);
@@ -236,7 +231,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
     },
     draw(state: GameState, max: number, label: DrawLabel): void {
       if (state !== game) return;
-      const k = keyOf(label);
+      const k = siteLabel(label);
       const t = tallyOf(k);
       t.engine++;
       engineDraws++;
@@ -282,7 +277,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
       for (let i = 0; i < n; i++) {
         const d = log!.draws[i];
         if (!covered.has(d.turn)) continue;
-        const k = keyOf(d.label);
+        const k = siteLabel(d.label);
         out.loggedDraws++;
         const t = tallyOf(k);
         t.logged++;
@@ -294,7 +289,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
       for (const w of windows) {
         let ok = !w.spoiled;
         for (let i = w.from; ok && i < w.to; i++) {
-          if (drawn.has(keyOf(log!.draws[i].label)) && !taken[i]) ok = false;
+          if (drawn.has(siteLabel(log!.draws[i].label)) && !taken[i]) ok = false;
         }
         out.stretches++;
         if (ok) out.exact++;
@@ -304,7 +299,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
         if (ok || w.kind !== 'step') continue;
         // the step's first difference, the game's labels the engine draws
         // against the engine's, in order
-        const game = log!.draws.slice(w.from, w.to).map((d) => keyOf(d.label)).filter((k) => drawn.has(k));
+        const game = log!.draws.slice(w.from, w.to).map((d) => siteLabel(d.label)).filter((k) => drawn.has(k));
         let p = 0;
         while (p < game.length && p < w.seq.length && game[p] === w.seq[p]) p++;
         const afterRoll = p > 0 && game[p - 1] === 'Random Event Roll';

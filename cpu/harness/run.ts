@@ -25,6 +25,7 @@ import { loadRandLog, randLogPath } from './randLog';
 import { turnDraws, type DrawLedger } from './drawLedger';
 import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
+import { EventPicks } from './eventPick';
 
 interface Tally {
   pass: number;
@@ -112,6 +113,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   history.legs = routeLegs(all);
   all.length = 0;
   const starts: StartReplay[] = [];
+  const picks = new EventPicks(cat, history.randLog);
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };
     tallies.set(r.check, t);
@@ -140,6 +142,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     advanceHistory(history, rec, cat);
     const imp = importTurn(rec, cat, history);
     for (const [g, n] of imp.gaps) gaps.set(g, Math.max(gaps.get(g) ?? 0, n));
+    for (const r of picks.check(rec, byTurn.get(t + 1), imp)) add(r);
     for (const r of stateChecks(rec, cat, imp, starts)) add(r);
     const next = byTurn.get(t + 1);
     if (next) for (const r of transitionChecks(rec, next, cat, history, byTurn.get(t - 1))) add(r);

@@ -185,13 +185,17 @@ export function unexploredByAll(state: GameState, tileIndex: number): boolean {
   return state.seats.every((s) => s.explored.length === 0 || s.explored[tileIndex] !== 1);
 }
 
+/** The fog over a standing position: what each major's own plots, cities and
+ *  units show. Nothing is discovered: no era score, no Kandy Relic, no ally's
+ *  share — the position already holds what its discoveries paid. */
 export function initFog(state: GameState): void {
   for (const s of state.seats) {
     s.explored = new Array(state.map.tiles.length).fill(0);
+    if (!state.fogOfWar || !isCiv(s.seat)) continue;
     for (const t of state.map.tiles) {
-      if (tileSeat(t) === s.seat) revealAround(state, s.seat, t.index, 1);
+      if (tileSeat(t) === s.seat) liftFog(state, s.seat, t.index, 1);
     }
-    for (const c of citiesOf(state, s.seat)) revealAround(state, s.seat, c.centerIndex, 3);
-    for (const u of unitsOf(state, s.seat)) revealAround(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+    for (const c of citiesOf(state, s.seat)) liftFog(state, s.seat, c.centerIndex, 3);
+    for (const u of unitsOf(state, s.seat)) liftFog(state, s.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
   }
 }

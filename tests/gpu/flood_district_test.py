@@ -60,7 +60,7 @@ def main() -> None:
     # is 0), so the floods are driven onto the tile at the top severity.
     hit = torch.zeros(sim.B, dtype=torch.bool)
     hit[0] = True
-    at = torch.full((sim.B,), t, dtype=torch.long)
+    at = torch.full((sim.B, 1), t, dtype=torch.long)  # a Floodplains list of `t` alone
     top = torch.full((sim.B,), len(sim._flood_damage) - 1, dtype=torch.long)
     n = 0
     while not bool(sim.district_pillaged[0, t]) and n < 200:
@@ -76,7 +76,7 @@ def main() -> None:
     sim.district_complete[0, t] = False
     hit = torch.zeros(sim.B, dtype=torch.bool)
     hit[0] = True
-    at = torch.full((sim.B,), t, dtype=torch.long)
+    at = torch.full((sim.B, 1), t, dtype=torch.long)  # a Floodplains list of `t` alone
     before = int(sim.tile_flood_ct[0, t])
     for _ in range(200):
         sim._flood_river(hit, at, sim._flood_severity_draw(hit))

@@ -752,12 +752,15 @@ function eventSlots(map: GameMap, name: string, cur: number, start: number, walk
   if (flood >= 0) {
     const s = at(start);
     if (!s) return { slots: [], exact: false };
-    const reach = riverReach(map, s);
+    // the record's own Floodplains lists from the start (`floodplainList`):
+    // two rivers meeting above a shared mouth leave every candidate a slot
+    const lists = floodplainList(map, s);
+    const reach = lists.length === 1 ? lists[0] : lists.length ? [...new Set(lists.flat())] : riverReach(map, s);
     const slots: [number, EventChannel][] = [];
     for (const row of FLOOD_YIELD_ROWS[flood]) {
       for (const t of reach) if (t.feature === row.feature) slots.push([t.index, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd']);
     }
-    return { slots, exact: true };
+    return { slots, exact: lists.length <= 1 };
   }
   const eruption = (ERUPTION_ROWS as readonly string[]).indexOf(ev);
   if (eruption >= 0) {

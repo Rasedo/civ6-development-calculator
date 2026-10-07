@@ -1585,8 +1585,7 @@ class SimEconomy:
     def _flood_open(self) -> torch.Tensor:
         """[B, n_sites] `riverRevealed` over the flood sites: a river floods
         once any major has revealed a plot of it — its component's plots
-        (`river_comp`), a lone Floodplains plot its own. With no fog every
-        river is revealed."""
+        (`river_comp` of its start). With no fog every river is revealed."""
         idx, _n = self._flood_sites
         ok = idx >= 0
         if not self.fog_of_war:
@@ -2059,6 +2058,7 @@ class SimEconomy:
         self._sea_rise(forced)
         ev = torch.full((B,), -1, dtype=torch.long, device=dev)
         key = torch.full((B,), -1, dtype=torch.long, device=dev)
+        site = torch.zeros(B, dtype=torch.long, device=dev)
         done = torch.zeros(B, dtype=torch.bool, device=dev)
         before = torch.zeros(B, dtype=torch.long, device=dev)
         for i, pw in enumerate(pairs):
@@ -2070,6 +2070,7 @@ class SimEconomy:
                 kt = keys[i].gather(1, col.unsqueeze(1)).squeeze(1)
                 ev = torch.where(take, torch.full_like(ev, i), ev)
                 key = torch.where(take, kt, key)
+                site = torch.where(take, col, site)
             done = done | take
             before = run[:, -1]
         if not bool(done.count_nonzero()):
@@ -2088,7 +2089,8 @@ class SimEconomy:
         if bool(hit.count_nonzero()):
             # the flood tables are read for every game of the batch, so a game
             # whose row is another family's reads a clamped (unused) index
-            self._flood_river(hit, key.clamp(min=0), sev.clamp(min=0, max=len(self._flood_damage) - 1))
+            self._flood_river(hit, self._flood_lists[torch.arange(B, device=dev), site.clamp(max=self._flood_lists.shape[1] - 1)],
+                              sev.clamp(min=0, max=len(self._flood_damage) - 1))
 
         for r in range(len(self._eruption_weight)):
             hit = (fam == self._EV_ERUPTION) & (sev == r)
@@ -2767,11 +2769,11 @@ class SimEconomy:
                     alive[gone_u, us[gone_u]] = False
                     self._vacate(pool, gone_u, us[gone_u])
 
-    def _flood_river(self, hit: torch.Tensor, tile: torch.Tensor, sev: torch.Tensor) -> None:
-        """`floodRiver` — a FLOOD of each game's severity `sev` [B] on the
-        river through `tile` where `hit` (0xa2f200: the damage pass 0xa2a4d0,
-        then the yields pass 0xa2ed80). Every Floodplains plot of the river
-        (a lone one floods alone), in its flood order (`flood_rank`), remembers the episode
+    def _flood_river(self, hit: torch.Tensor, lists: torch.Tensor, sev: torch.Tensor) -> None:
+        """`floodRiver` — a FLOOD of each game's severity `sev` [B] where
+        `hit`, over each game's Floodplains list `lists` [B, L] (plots in
+        flood order, -1 pads; 0xa2f200: the damage pass 0xa2a4d0, then the
+        yields pass 0xa2ed80). Every plot of the list remembers the episode
         (`tile_flood_ct`). A shielded river (`_river_shielded`) skips the
         damage pass whole; otherwise, for each damage row of the severity in
         the install's order (`_flood_damage`), for each plot: a plot whose
@@ -2786,28 +2788,15 @@ class SimEconomy:
         B, dev = self.B, self.device
         if not bool(hit.count_nonzero()):
             return
-        tc = tile.clamp(min=0)
-        comp0 = self.river_comp.gather(1, tc.unsqueeze(1))  # [B, 1]
-        reach = (
-            (self.river_comp == comp0) & (comp0 >= 0)
-            & self.floodplain & hit.unsqueeze(1)
-        )
-        # a Floodplains tile carrying no river at all floods alone
-        reach[torch.arange(B, device=dev), tc] |= hit
+        bidx = torch.arange(B, device=dev)
+        lists = torch.where(hit.unsqueeze(1), lists, torch.full_like(lists, -1))
+        reach = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
+        for k in range(lists.shape[1]):
+            on = lists[:, k] >= 0
+            reach[bidx[on], lists[on, k]] = True
         shield = self._river_shielded(reach)
         self.tile_flood_ct += reach.long()
-        # the river's plots in its flood order (`flood_rank`, `riverReach`):
-        # each step k's plot per game and whether the game's river has a k-th
-        ranked = reach & (self.flood_rank >= 0)
-        order = torch.where(ranked, self.flood_rank + 1, torch.zeros_like(self.flood_rank))  # 1-based, 0 off-reach
-        # a plot no flood list ranks goes last, in index order (`riverReach`)
-        loose = reach & ~ranked
-        order = torch.where(loose, order.max(dim=1, keepdim=True).values + loose.long().cumsum(dim=1), order)
-        plots: list[tuple[torch.Tensor, torch.Tensor]] = []
-        for k in range(1, int(order.max()) + 1):
-            at = order == k
-            plots.append((at.any(dim=1), at.long().argmax(dim=1)))
-        bidx = torch.arange(B, device=dev)
+        plots = [(lists[:, k] >= 0, lists[:, k].clamp(min=0)) for k in range(lists.shape[1])]
         for s, rows in enumerate(self._flood_damage):
             hs = hit & (sev == s) & ~shield
             if not bool(hs.count_nonzero()):

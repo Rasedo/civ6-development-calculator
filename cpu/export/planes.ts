@@ -23,7 +23,7 @@ import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, i
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
-import { floodRanks, floodRivers } from '../core/disasters';
+import { floodRivers } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
@@ -70,8 +70,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
   // behind a zero-yield district). So each resource tile also ships `nr`:
   // the keys whose value would DIFFER if the tile carried no resource, which
   // is exactly what the twin copies in when the resource is harvested.
-  // each plot's place in its river's flood order (`floodRanks`), -1 off
-  const floodRank = floodRanks(map);
   const tileRec = (t: (typeof map.tiles)[number]) => {
     // the static plane ships UNPAVED yields — what the tile would
     // yield without its district — because paving is a runtime mask in every
@@ -301,7 +299,6 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // belongs to, -1 off a mountain. Static, so it bakes.
       mrange: t.mountainRange ?? -1,
       fp: isFloodplains(t.feature) ? 1 : 0,
-      fo: floodRank[t.index],
       dc: droughtTerrain(t) ? 1 : 0,
       // the storm FAMILY that may start here (`STORM_FAMILIES` index), -1 none
       sf: (() => { const f = stormFamilyAt(t); return f ? STORM_FAMILIES.indexOf(f) : -1; })(),
@@ -337,9 +334,10 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     fogOfWar: 1, // fog is LIVE in units mode — both engines derive t0 explored from the start units
     disasters: 1,
     volcanoes,
-    // the flood sites, each the plot its river's flood starts on, in draw
-    // order — static, so the TS rule's own answer ships (`floodRivers`)
-    floodStarts: floodRivers(map).map((r) => r.start.index),
+    // the flood sites in draw order, each its Floodplains list in flood
+    // order (the start first) — static, so the TS rule's own answer ships
+    // (`floodRivers`)
+    floodLists: floodRivers(map).map((r) => r.list.map((t) => t.index)),
     maxCamps,
     // the deforestation denominator, stamped off the map as it was loaded
     // (`createGameFromMap`), before a founding clears a centre's feature

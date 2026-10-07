@@ -4,7 +4,7 @@ import { hexDistance, neighbors, neighborTile } from '../../world/hex';
 import { isWater, isImpassable, isMountain, isCoastalLand, isCoastalWater, hasRiver, naturalWonderAt } from '../../world/query';
 import { computeUnlocks, isTechComplete, isCivicComplete, type Unlocks } from './effects';
 import { isExplored } from './fog';
-import { riverReach } from './disasters';
+import { riverPlots } from './disasters';
 import { congressChopBanned, congressEnergyBlocked, congressUdtBlockedDistrict } from './congress';
 import { tileAppeal, type GpAppeal } from './appeal'; // SEASIDE_RESORT gates on appeal
 import { cityAppealResolver, cityGovernorPromos } from './governors';
@@ -592,7 +592,7 @@ export function canPlaceDistrictIn(
   if (def.placement.floodplainRiver) {
     if (!isFloodplains(tile.feature)) return no('Must be on a floodplain.');
     if (riverSideCount(tile) < 2) return no('The river must run along two of its sides.');
-    for (const t of riverReach(map, tile)) {
+    for (const t of riverPlots(map, tile)) {
       if (t.index !== tile.index && t.district === type) return no(`This river already has a ${def.name}.`);
     }
   }

@@ -8,102 +8,29 @@
  */
 
 import type { GameMap, Tile } from '../../world/types';
-import { neighborTile } from '../../world/hex';
-import { FEATURES, isFloodplains } from '../../world/features';
+import { FEATURES } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
 import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_WONDER, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, gameLatitude, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
-import { droughtCandidate, stormFootprint } from '../core/disasters';
-
-/** GlobalParameters MAP_MAX_FLOODPLAIN_SIZE / MAP_MIN_FLOODPLAIN_SIZE as the
- *  map scripts pass them to TerrainBuilder.GenerateFloodplains
- *  (`Maps/Utility/FeatureGenerator.lua`: 4 and 10) */
-export const FLOODPLAIN_MIN = 4;
-export const FLOODPLAIN_MAX = 10;
-
-interface RiverEdge {
-  plots: [number, number];
-  ends: [string, string];
-  /** the plot the edge is set on (the game's IsNEOfRiver / IsNWOfRiver /
-   *  IsWOfRiver plot: its E, SE or SW side in the game's terms) */
-  owner: number;
-}
-
-/** a hex corner, by the plots that meet there (an off-map one by the plot
- *  and direction that would reach it) */
-function corner(map: GameMap, t: Tile, d1: number, d2: number): string {
-  const a = neighborTile(map, t, d1);
-  const b = neighborTile(map, t, d2);
-  const ids = [t.index, a ? a.index : -1 - (t.index * 6 + d1), b ? b.index : -1 - (t.index * 6 + d2)];
-  return ids.sort((x, y) => x - y).join(':');
-}
-
-/** every river edge of the map, and the edges meeting at each corner */
-function riverGraph(map: GameMap): { edges: RiverEdge[]; at: Map<string, RiverEdge[]> } {
-  const edges: RiverEdge[] = [];
-  const at = new Map<string, RiverEdge[]>();
-  for (const t of map.tiles) {
-    for (let d = 0; d < 6; d++) {
-      if (!(t.riverMask & (1 << d))) continue;
-      const n = neighborTile(map, t, d);
-      if (!n || n.index < t.index) continue;
-      const e: RiverEdge = { plots: [t.index, n.index], ends: [corner(map, t, d, (d + 1) % 6), corner(map, t, d, (d + 5) % 6)],
-        owner: d <= 2 ? t.index : n.index };
-      edges.push(e);
-      for (const c of e.ends) {
-        if (!at.has(c)) at.set(c, []);
-        at.get(c)!.push(e);
-      }
-    }
-  }
-  return { edges, at };
-}
-
-const other = (e: RiverEdge, p: number) => (e.plots[0] === p ? e.plots[1] : e.plots[0]);
+import { droughtCandidate, floodplainRun, riverGraph, stormFootprint, type RiverEdge } from '../core/disasters';
 
 /**
  * A FLOOD'S PLOTS, in the order its draws walk them: the river's Floodplains
- * list (`GenerateFloodplains` 0xa2aa30 → 0xa2aca0). The river keeps its
- * plots as its edges were laid from the source down, each edge adding the
- * plot it is set on and the plot across it, each plot once; the map scripts
- * pass rivers that start inland (FeatureGenerator.lua), so the list is read from the mouth up, and its
- * Floodplains are the first unbroken run of 4 to 10 plots that take them.
- * The record keeps no flow and no river identity, only the river edges and
- * the plot the list begins on (`start`, the flood's start plot): every walk
- * up the river edges from an edge `start` borders gives the plots after it
- * — each edge adds the plot the next edge up does not border, the source
- * edge the plot across it and then the plot it is set on — and its run
- * is those carrying Floodplains. The candidates: every distinct run of 4 or
- * more (two rivers meeting above a shared mouth give two).
+ * list (`floodplainRun`, 0xa2aa30 → 0xa2aca0). The record keeps no flow and
+ * no river identity, only the river edges and the plot the list begins on
+ * (`start`, the flood's start plot): every walk up the river edges from an
+ * edge `start` borders, laid from its top down, whose run begins on `start`.
+ * The candidates: every distinct run (two rivers meeting above a shared
+ * mouth give two).
  */
 export function floodplainList(map: GameMap, start: Tile): Tile[][] {
   const { edges, at } = riverGraph(map);
-  const fp = (i: number) => isFloodplains(map.tiles[i].feature);
-  const runs = new Set<string>();
-  // the river's plots from the source edge down to `path[0]`, each edge its
-  // own plot then the plot across, each plot once; read from the mouth up,
-  // the first run of FLOODPLAIN_MIN or more plots taking Floodplains (a plot
-  // that takes none ends a run long enough, else clears it), FLOODPLAIN_MAX
-  // at most (0xa2aca0)
-  const finish = (path: RiverEdge[]) => {
-    const fromSource: number[] = [];
-    for (let k = path.length - 1; k >= 0; k--) {
-      for (const p of [path[k].owner, other(path[k], path[k].owner)]) if (!fromSource.includes(p)) fromSource.push(p);
-    }
-    const run: number[] = [];
-    for (const p of fromSource.reverse()) {
-      if (fp(p)) {
-        run.push(p);
-        if (run.length >= FLOODPLAIN_MAX) break;
-      } else if (run.length >= FLOODPLAIN_MIN) break;
-      else run.length = 0;
-    }
-    if (run.length >= FLOODPLAIN_MIN && run[0] === start.index) runs.add(run.join(','));
-  };
+  const runs = new Map<string, Tile[]>();
   const walk = (path: RiverEdge[], top: string) => {
     const next = (at.get(top) ?? []).filter((g) => !path.includes(g));
     if (!next.length) {
-      finish(path);
+      const run = floodplainRun(map, [...path].reverse());
+      if (run[0] === start) runs.set(run.map((t) => t.index).join(','), run);
       return;
     }
     for (const g of next) walk([...path, g], g.ends[0] === top ? g.ends[1] : g.ends[0]);
@@ -112,7 +39,7 @@ export function floodplainList(map: GameMap, start: Tile): Tile[][] {
     if (!e.plots.includes(start.index)) continue;
     for (const up of e.ends) walk([e], up);
   }
-  return [...runs].map((r) => r.split(',').map((i) => map.tiles[Number(i)]));
+  return [...runs.values()];
 }
 
 /** What a struck plot holds that spends draws of its own, as the record

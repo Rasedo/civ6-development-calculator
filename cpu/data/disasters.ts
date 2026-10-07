@@ -84,6 +84,12 @@ export const FIRST_TIME_OCCURRENCE_BOOST = srcConst('disasters.firstTimeOccurren
 export const PERCENT_VOLCANOES_ACTIVE = srcConst('disasters.percentVolcanoesActive', 70,
   xml('RealismSettings', 'RealismSettingType=REALISM_SETTING_MODERATE', 'PercentVolcanoesActive'));
 
+/** CIV6 (Expansion2 Maps/Utility/FeatureGenerator.lua): the minimum and the
+ *  maximum Floodplains run the map scripts pass TerrainBuilder.
+ *  GenerateFloodplains, 4 and 10 — a river's flood list (0xa2aca0). */
+export const FLOODPLAIN_MIN = 4;
+export const FLOODPLAIN_MAX = 10;
+
 /** CIV6 (`RANDOM_EVENT_START_TURN`, Expansion2_GlobalParameters): the first
  *  turn a random event may fire. */
 export const RANDOM_EVENT_START_TURN = srcConst('disasters.randomEventStartTurn', 2,

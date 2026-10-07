@@ -6,7 +6,6 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { neighborTile, neighbors, tilesAtOffsets, hexDistance, DIRECTION_TYPES, RING_DIRS } from '../../world/hex';
 import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { isFloodplains } from '../../world/features';
-import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
 import { atRngPoint, randRange, randWeighted, type DrawLabel } from './rand';
 import { fogActive, isExplored } from './fog';
@@ -24,7 +23,7 @@ import { centerBuildingIds } from './prodLayout';
 import { unitsAt } from './units';
 import { disbandUnit } from './units';
 import { unitDomain } from './units';
-import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN } from '../data/disasters';
+import { FLOOD_WEIGHT, FLOOD_CIPD, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, type FloodDamageRow, warmedWeight, RANDOM_EVENT_START_TURN, FLOODPLAIN_MIN, FLOODPLAIN_MAX } from '../data/disasters';
 import { ERUPTION_WEIGHT, DROUGHT_WEIGHT, DROUGHT_CIPD, DROUGHT_TURNS, DROUGHT_HEXES, DROUGHT_IMPROVEMENTS, DROUGHT_DESTROY_P, droughtGround, SOIL_REPLACES } from '../data/disasters';
 import { ERUPTION_PAINT_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_BLDG_P, ERUPTION_POP_P, ERUPTION_CIV_KILL_P, ERUPTION_DMG_LO, ERUPTION_DMG_HI, ERUPTION_ROWS, ERUPTION_WONDER, ERUPTION_PROD_P, ERUPTION_SCI_P, ERUPTION_CUL_P } from '../data/disasters';
 import { FIRST_TIME_OCCURRENCE_BOOST, EVENT_OCC_SCALE, STANDARD_MAP_AREA, PERCENT_VOLCANOES_ACTIVE } from '../data/disasters';
@@ -308,67 +307,180 @@ export function riverOfPlots(map: GameMap): Int32Array {
   return out;
 }
 
+/** One river edge: the two plots it parts, its two corners, and the plot it
+ *  is set on (the game's IsNEOfRiver / IsNWOfRiver / IsWOfRiver plot). */
+export interface RiverEdge {
+  plots: [number, number];
+  ends: [string, string];
+  owner: number;
+}
+
+/** a hex corner, by the plots that meet there (an off-map one by the plot
+ *  and direction that would reach it) */
+function corner(map: GameMap, t: Tile, d1: number, d2: number): string {
+  const a = neighborTile(map, t, d1);
+  const b = neighborTile(map, t, d2);
+  const ids = [t.index, a ? a.index : -1 - (t.index * 6 + d1), b ? b.index : -1 - (t.index * 6 + d2)];
+  return ids.sort((x, y) => x - y).join(':');
+}
+
+/** Every river edge of the map, and the edges meeting at each corner. */
+export function riverGraph(map: GameMap): { edges: RiverEdge[]; at: Map<string, RiverEdge[]> } {
+  const edges: RiverEdge[] = [];
+  const at = new Map<string, RiverEdge[]>();
+  for (const t of map.tiles) {
+    for (let d = 0; d < 6; d++) {
+      if (!(t.riverMask & (1 << d))) continue;
+      const n = neighborTile(map, t, d);
+      if (!n || n.index < t.index) continue;
+      const e: RiverEdge = { plots: [t.index, n.index], ends: [corner(map, t, d, (d + 1) % 6), corner(map, t, d, (d + 5) % 6)],
+        owner: d <= 2 ? t.index : n.index };
+      edges.push(e);
+      for (const c of e.ends) {
+        if (!at.has(c)) at.set(c, []);
+        at.get(c)!.push(e);
+      }
+    }
+  }
+  return { edges, at };
+}
+
 /**
- * Every Floodplains tile ALONG one river — the river `start` belongs to
- * (`riverOfPlots`) — in the order a flood from `start` walks them: the
- * river's Floodplains list (0xa2aa30 → 0xa2aca0) is read from the river's
- * mouth up, its first plot the flood's start (`tools/civ6lab/dll_readings.md`
- * "H-1: the random events' draws": 39 of 39 floods on runs/h1_duelw1116, 25
- * of 25 on 1115); this map's rivers keep no laying order, so the plots go
- * in the river's flood order (`floodRanks`).
+ * A river's FLOODPLAINS LIST from its edges in laying order, source first
+ * (GenerateFloodplains' per-river pass 0xa2aca0, `tools/civ6lab/
+ * dll_readings.md` "H-1: the Floodplains list"): the river's plot list —
+ * each edge adds the plot it is set on, then the plot across, each plot once
+ * — read from the mouth, its first unbroken run of `FLOODPLAIN_MIN` to
+ * `FLOODPLAIN_MAX` plots carrying Floodplains (a plot without ends a run
+ * long enough, else clears it). Empty when no run is long enough.
+ */
+export function floodplainRun(map: GameMap, laid: readonly RiverEdge[]): Tile[] {
+  const fromSource: number[] = [];
+  for (const e of laid) {
+    for (const p of [e.owner, e.plots[0] === e.owner ? e.plots[1] : e.plots[0]]) if (!fromSource.includes(p)) fromSource.push(p);
+  }
+  const run: number[] = [];
+  for (const p of fromSource.reverse()) {
+    if (isFloodplains(map.tiles[p].feature)) {
+      run.push(p);
+      if (run.length >= FLOODPLAIN_MAX) break;
+    } else if (run.length >= FLOODPLAIN_MIN) break;
+    else run.length = 0;
+  }
+  return run.length >= FLOODPLAIN_MIN ? run.map((p) => map.tiles[p]) : [];
+}
+
+/**
+ * THE MAP'S RIVERS as the map generator laid them (RiversLakes.lua DoRiver,
+ * the record keeping only their edges): per network of connected edges, its
+ * MOUTH is the end corner it ran out on — beside the sea, else beside a lake
+ * (the lakes come after the rivers), else the end whose plots stand lowest
+ * (a river runs to the lowest neighbour, GetRiverValueAtPlot), ties to the
+ * lower corner; every other end is a SOURCE. The map script lays its rivers
+ * from their sources in ascending plot order (RiversLakes.lua AddRivers), so
+ * the source by the lowest plot laid its river all the way down; each later
+ * one laid its own until it met an edge already laid (DoRiver stops beside
+ * an existing river: runs/h1_duelw1115 rivers 151 and 250, the lower source
+ * reaching the mouth at 794, the higher one ending at the junction by 839).
+ * Each river's edges in laying order, source first; ascending by source
+ * corner within a network, networks by their lowest edge.
+ */
+const laidCache = new WeakMap<readonly Tile[], RiverEdge[][]>();
+export function laidRivers(map: GameMap): RiverEdge[][] {
+  const hit = laidCache.get(map.tiles);
+  if (hit) return hit;
+  const { edges, at } = riverGraph(map);
+  const out: RiverEdge[][] = [];
+  const seen = new Set<RiverEdge>();
+  const plotsOf = (c: string) => c.split(':').map(Number);
+  const wet = (c: string) => {
+    let sea = false;
+    let lake = false;
+    for (const i of plotsOf(c)) {
+      if (i < 0) sea = true;
+      else if (map.tiles[i].terrain === 'LAKE') lake = true;
+      else if (isWater(map.tiles[i])) sea = true;
+    }
+    return sea ? 2 : lake ? 1 : 0;
+  };
+  const height = (c: string) => plotsOf(c).reduce((s, i) => s + (i < 0 ? 1 : riverHeight(map.tiles[i])), 0);
+  for (const e0 of edges) {
+    if (seen.has(e0)) continue;
+    const net: RiverEdge[] = [];
+    const stack = [e0];
+    seen.add(e0);
+    while (stack.length) {
+      const e = stack.pop()!;
+      net.push(e);
+      for (const c of e.ends) for (const f of at.get(c)!) if (!seen.has(f)) { seen.add(f); stack.push(f); }
+    }
+    const ends = [...new Set(net.flatMap((e) => e.ends))].filter((c) => at.get(c)!.length === 1);
+    if (!ends.length) continue;
+    const mouth = [...ends].sort((a, b) => wet(b) - wet(a) || height(a) - height(b) || (a < b ? -1 : 1))[0];
+    // every corner's way down: the edge toward the mouth, by steps from it
+    const down = new Map<string, RiverEdge>();
+    const steps = new Map<string, number>([[mouth, 0]]);
+    const queue = [mouth];
+    for (let i = 0; i < queue.length; i++) {
+      const c = queue[i];
+      for (const e of at.get(c)!) {
+        const o = e.ends[0] === c ? e.ends[1] : e.ends[0];
+        if (steps.has(o)) continue;
+        steps.set(o, steps.get(c)! + 1);
+        down.set(o, e);
+        queue.push(o);
+      }
+    }
+    const low = (c: string) => Math.min(...plotsOf(c).filter((i) => i >= 0));
+    const sources = ends.filter((c) => c !== mouth).sort((a, b) => low(a) - low(b) || (a < b ? -1 : 1));
+    const laid = new Set<RiverEdge>();
+    const rivers: [string, RiverEdge[]][] = [];
+    for (const s of sources) {
+      const river: RiverEdge[] = [];
+      for (let c = s; c !== mouth;) {
+        const e = down.get(c)!;
+        if (laid.has(e)) break;
+        laid.add(e);
+        river.push(e);
+        c = e.ends[0] === c ? e.ends[1] : e.ends[0];
+      }
+      if (river.length) rivers.push([s, river]);
+    }
+    rivers.sort((a, b) => (a[0] < b[0] ? -1 : 1));
+    for (const [, r] of rivers) out.push(r);
+  }
+  laidCache.set(map.tiles, out);
+  return out;
+}
+
+/** a plot's height as the river generator weighs it (GetPlotElevation):
+ *  mountain 4, hills 3, other land 2, water 1 */
+function riverHeight(t: Tile): number {
+  if (isWater(t)) return 1;
+  return t.elevation === 'MOUNTAIN' ? 4 : t.elevation === 'HILLS' ? 3 : 2;
+}
+
+/**
+ * The plots a flood starting on `start` strikes, in the order its draws walk
+ * them: the Floodplains list of the flood river it starts (`floodRivers`),
+ * else of the first that holds it, else the plot alone.
  *
  * CIV6 (Flood): "The level of the water rises, flooding all Floodplains tiles
  * found along the River, and then recedes on the next turn." One severity for
  * the whole flood, then each reached tile takes the effects at that severity.
  */
 export function riverReach(map: GameMap, start: Tile): Tile[] {
-  const river = riverOfPlots(map);
-  const r = river[start.index];
-  if (r < 0) return [start];
-  const rank = floodRanks(map);
-  const far = map.tiles.length;
-  const at = (t: Tile) => (rank[t.index] >= 0 ? rank[t.index] : far);
-  const out = map.tiles.filter((t: Tile) => river[t.index] === r && isFloodplains(t.feature))
-    .sort((a, b) => at(a) - at(b) || a.index - b.index);
-  return out.length ? out : [start];
+  const rivers = floodRivers(map);
+  const r = rivers.find((x) => x.start === start) ?? rivers.find((x) => x.list.includes(start));
+  return r ? r.list : [start];
 }
 
-/**
- * Each plot's place in its river's flood order, -1 on a plot no flood list
- * holds: from the river's flood start (`floodRivers`) outward over the
- * river's own plots (`riverOfPlots`), step by step, its Floodplains plots
- * ranked by steps, ties to the lower index, any the walk misses last; a lone
- * Floodplains plot 0.
- * Static; the exporter ships it as the `fo` plane.
- */
-const rankCache = new WeakMap<readonly Tile[], number[]>();
-export function floodRanks(map: GameMap): number[] {
-  const hit = rankCache.get(map.tiles);
-  if (hit) return hit;
+/** Every plot of the river network beside `tile` (`riverOfPlots`), the plot
+ *  alone beside none: the river a Dam's "one per River" counts. */
+export function riverPlots(map: GameMap, tile: Tile): Tile[] {
   const river = riverOfPlots(map);
-  const out = new Array<number>(map.tiles.length).fill(-1);
-  for (const fr of floodRivers(map)) {
-    const r = river[fr.start.index];
-    if (r < 0) {
-      out[fr.start.index] = 0;
-      continue;
-    }
-    const dist = new Map<number, number>([[fr.start.index, 0]]);
-    const queue = [fr.start];
-    for (let i = 0; i < queue.length; i++) {
-      for (const n of neighbors(map, queue[i])) {
-        if (river[n.index] !== r || dist.has(n.index)) continue;
-        dist.set(n.index, dist.get(queue[i].index)! + 1);
-        queue.push(n);
-      }
-    }
-    const far = map.tiles.length;
-    map.tiles.filter((t) => river[t.index] === r && isFloodplains(t.feature))
-      .sort((a, b) => (dist.get(a.index) ?? far) - (dist.get(b.index) ?? far) || a.index - b.index)
-      .forEach((t, i) => { out[t.index] = i; });
-  }
-  rankCache.set(map.tiles, out);
-  return out;
+  const r = river[tile.index];
+  return r < 0 ? [tile] : map.tiles.filter((t) => river[t.index] === r);
 }
 
 /**
@@ -414,38 +526,38 @@ export function floodSeverity(state: GameState): number {
   return randWeighted(state, floodWeights(warmingDegrees(state)), 'Engine: breached dam');
 }
 
-/** A river a flood may strike: the plot its flood STARTS on and every plot
- *  of the river (a lone Floodplains plot is its own). */
+/** A river a flood may strike: the plot its flood STARTS on, its Floodplains
+ *  list in flood order (`floodplainRun`, `start` first) and every plot of its
+ *  network (`riverOfPlots` of the start), which a major's sight names. */
 export interface FloodRiver {
   start: Tile;
+  list: Tile[];
   plots: Tile[];
 }
 
 /**
- * The FLOOD RIVERS: one per river carrying Floodplains and one per
- * Floodplains plot no river touches, in the order of each one's lowest-index
- * Floodplains plot; a river's plots are the plots that belong to it
- * (`riverOfPlots`), and its site is the
- * plot its flood starts on (`floodStart`). Static: rivers, Floodplains and
- * the map's water as made never move, so the exporter ships the starts
- * (`floodStarts`).
+ * The FLOOD RIVERS: every laid river (`laidRivers`) whose Floodplains list
+ * is not empty (0xa2cfc0 skips a river with none), in the order of each
+ * list's lowest-index plot — the game walks its river vector in the map
+ * generator's laying order, which no record carries (docs/AUDIT.md C-74).
+ * Static: rivers and the map's Floodplains as made never move, so the
+ * exporter ships the lists (`floodLists`).
  */
+const floodCache = new WeakMap<readonly Tile[], FloodRiver[]>();
 export function floodRivers(map: GameMap): FloodRiver[] {
+  const hit = floodCache.get(map.tiles);
+  if (hit) return hit;
   const riverOf = riverOfPlots(map);
-  const seen = new Set<number>();
   const out: FloodRiver[] = [];
-  for (const t of map.tiles) {
-    if (!isFloodplains(t.feature)) continue;
-    const r = riverOf[t.index];
-    if (r < 0) {
-      out.push({ start: t, plots: [t] });
-      continue;
-    }
-    if (seen.has(r)) continue;
-    seen.add(r);
-    const river = map.tiles.filter((u) => riverOf[u.index] === r);
-    out.push({ start: floodStart(map, river), plots: river });
+  for (const laid of laidRivers(map)) {
+    const list = floodplainRun(map, laid);
+    if (!list.length) continue;
+    const r = riverOf[list[0].index];
+    out.push({ start: list[0], list, plots: r < 0 ? [list[0]] : map.tiles.filter((t) => riverOf[t.index] === r) });
   }
+  const low = (r: FloodRiver) => Math.min(...r.list.map((t) => t.index));
+  out.sort((a, b) => low(a) - low(b));
+  floodCache.set(map.tiles, out);
   return out;
 }
 
@@ -453,52 +565,14 @@ export function floodRivers(map: GameMap): FloodRiver[] {
  * May this river flood yet? MEASURED (`runs/c74s2_turn_c74s2_duel*`: 1,806
  * of 1,806 river-turns one state per river, never falling back; 11 of 13
  * rivers turned floodable on the first turn a major revealed one of their
- * plots): a river floods once any major has revealed a plot of it. With no
- * fog every river is revealed.
+ * plots), and READ: 0xa2cfc0 skips a river whose name is unset, and a
+ * river takes its name when a major first reveals a plot beside it (0x534950
+ * -> 0xa29730 -> "Random River" 0xa292a0). With no fog every river is
+ * revealed.
  */
 function riverRevealed(state: GameState, river: FloodRiver): boolean {
   if (!fogActive(state)) return true;
   return state.seats.some((s) => isCiv(s.seat) && river.plots.some((t) => isExplored(state, s.seat, t.index)));
-}
-
-/**
- * The plot a river's flood starts on — the FIRST plot of the river's
- * Floodplains list (MEASURED, `runs/event_history_*`, 447 of 447 floods),
- * which the game reads from the river's mouth up (0xa2aa30 → 0xa2aca0;
- * `tools/civ6lab/dll_readings.md` "H-1: the random events' draws"): this
- * map's river model keeps no flow, so the first plot is the river's
- * MOUTH-MOST Floodplains plot — the one nearest, in steps across river edges,
- * to the river's plots that touch the map's water as made, ties to the
- * lowest index. A river touching no water, and a lone Floodplains plot, start
- * on their lowest-index Floodplains plot.
- */
-function floodStart(map: GameMap, river: readonly Tile[]): Tile {
-  const dist = new Map<number, number>();
-  const queue = river.filter((u) => neighbors(map, u).some((n) => TERRAINS[n.terrain].water))
-    .sort((a, b) => a.index - b.index);
-  for (const u of queue) dist.set(u.index, 0);
-  const on = new Set(river.map((u) => u.index));
-  for (let i = 0; i < queue.length; i++) {
-    const u = queue[i];
-    for (let d = 0; d < 6; d++) {
-      if (!(u.riverMask & (1 << d))) continue;
-      const n = neighborTile(map, u, d);
-      if (!n || !on.has(n.index) || dist.has(n.index)) continue;
-      dist.set(n.index, dist.get(u.index)! + 1);
-      queue.push(n);
-    }
-  }
-  let best: Tile | null = null;
-  let near = Infinity;
-  for (const u of [...river].sort((a, b) => a.index - b.index)) {
-    if (!isFloodplains(u.feature)) continue;
-    const du = dist.get(u.index) ?? Infinity;
-    if (best === null || du < near) {
-      best = u;
-      near = du;
-    }
-  }
-  return best!;
 }
 
 /**
@@ -608,17 +682,21 @@ export function stormStartRadius(ev: StormEvent): number {
  * never reaches the draw. No candidate, no draw. `_storm_start` is the twin.
  */
 export function stormStart(state: GameState, ev: StormEvent): Tile | undefined {
-  const map = state.map;
+  const cands = stormStarts(state.map, ev);
+  if (!cands.length) return undefined;
+  return cands[randRange(state, cands.length, 'Pick Storm Start Plot')];
+}
+
+/** The plots a storm row may start on (`stormStart`), ascending. */
+export function stormStarts(map: GameMap, ev: StormEvent): Tile[] {
   const need = ev.hexes >= 19 ? 2 : ev.hexes >= 3 ? 1 : 0;
-  if (need === 0) return undefined;
-  const cands = map.tiles.filter((t) => {
+  if (need === 0) return [];
+  return map.tiles.filter((t) => {
     if (stormFamilyAt(t) !== ev.family) return false;
     if (need === 1) return true;
     const ring = neighbors(map, t);
     return ring.length === 6 && ring.some((n) => stormFamilyAt(n) === ev.family);
   });
-  if (!cands.length) return undefined;
-  return cands[randRange(state, cands.length, 'Pick Storm Start Plot')];
 }
 
 /** A city whose reactor can melt down, and its seat. */
@@ -689,13 +767,18 @@ export function droughtCandidate(map: GameMap, t: Tile, centres: ReadonlySet<num
  * twin.
  */
 export function droughtStart(state: GameState): Tile | undefined {
+  const cands = droughtStarts(state);
+  if (!cands.length) return undefined;
+  return cands[randRange(state, cands.length, 'Pick Drought Start Plot')];
+}
+
+/** The plots a drought may start on now (`droughtCandidate`), ascending. */
+export function droughtStarts(state: GameState): Tile[] {
   const map = state.map;
   const centres = new Set<number>();
   for (const s of cityHolders(state)) for (const c of s.cities) centres.add(c.centerIndex);
   for (const cs of state.cityStates) centres.add(cs.centerIndex);
-  const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, (u) => !!u.stormStruck));
-  if (!cands.length) return undefined;
-  return cands[randRange(state, cands.length, 'Pick Drought Start Plot')];
+  return map.tiles.filter((t) => droughtCandidate(map, t, centres, (u) => !!u.stormStruck));
 }
 
 /**
@@ -710,8 +793,9 @@ export function droughtStart(state: GameState): Tile | undefined {
  * volcano, no draw. Below `PERCENT_VOLCANOES_ACTIVE`, while a named volcano
  * sleeps: D //= (70 − pct)·N // 100 when that product reaches 200, and
  * rand(D) = 0 wakes ONE sleeping named volcano, drawn uniformly in ascending
- * tile order ("Choose Active Volcano Roll"); at or above it, with an active
- * volcano, rand(D) = 0 puts ONE active volcano to sleep, drawn the same way.
+ * tile order ("Choose Active Volcano Roll", the label 1118 t53 drew); at or above
+ * it, with an active volcano, rand(D) = 0 puts ONE active volcano to sleep,
+ * drawn the same way ("Choose Inactive Volcano Roll", 1118 t152).
  * `_volcano_roll` is the twin.
  */
 export function volcanoRoll(state: GameState): void {
@@ -733,7 +817,7 @@ export function volcanoRoll(state: GameState): void {
   }
   if (randRange(state, d, 'Active Volcano Roll') !== 0) return;
   const from = wake ? named.filter((t) => !t.volcanoActive) : active;
-  const t = from[randRange(state, from.length, wake ? 'Choose Inactive Volcano Roll' : 'Choose Active Volcano Roll')];
+  const t = from[randRange(state, from.length, wake ? 'Choose Active Volcano Roll' : 'Choose Inactive Volcano Roll')];
   t.volcanoActive = wake;
 }
 
@@ -754,7 +838,7 @@ function volcanoNamed(state: GameState, t: Tile): boolean {
  *  wonder's one while the wonder stands (its plots together), an accident one
  *  per city whose reactor has reached the row's `MinTurnAtRisk` — whoever
  *  holds it, the Free Cities seat included — in ascending centre order. */
-interface EventSites {
+export interface EventSites {
   flood: FloodRiver[];
   eruption: Tile[][][];  // per ERUPTION_ROWS row, its sites, each a site's plots
   accident: ReactorSite[][];  // per severity
@@ -836,6 +920,29 @@ function randomEvent(state: GameState): void {
     seaRise(state);
     return;
   }
+  const table = eventTable(state);
+  const p = eventAt(table, randRange(state, table.range, 'Random Event Roll'));
+  if (!p) return;
+  const row = table.rows[p.row];
+  const site = row.family === 'flood' ? heldFloodSite(state, table.sites, row.sev, p.site) : p.site;
+  const key = table.keys[p.row]?.[site];
+  if (key) key.eventFired = (key.eventFired ?? 0) | (1 << p.row);
+  fireEvent(state, row, table.sites, site);
+}
+
+/** The turn's draw as the weights 0x335260 lay it out: the rows, their sites,
+ *  each per-site row's key plots, every (row, site) pair's integer weight and
+ *  the roll's range, max(10·N, Σ). */
+export interface EventTable {
+  rows: EventRow[];
+  sites: EventSites;
+  keys: (Tile[] | null)[];
+  pairs: number[][];
+  range: number;
+}
+
+/** The step's draw table on `state` (`randomEvent`): pure, no draw. */
+export function eventTable(state: GameState): EventTable {
   const degrees = warmingDegrees(state);
   const rows = eventRows(degrees, state.map.width * state.map.height);
   const sites = eventSites(state);
@@ -845,19 +952,20 @@ function randomEvent(state: GameState): void {
     : k.map((t) => sitePairWeight(rows[i], ((t.eventFired ?? 0) >> i) & 1 ? 100 : 100 + FIRST_TIME_OCCURRENCE_BOOST, degrees))));
   let total = 0;
   for (const p of pairs) for (const x of p) total += x;
-  const at = randRange(state, Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total), 'Random Event Roll');
+  return { rows, sites, keys, pairs, range: Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total) };
+}
+
+/** The (row, site) pair a roll of `at` lands on — the first whose running
+ *  sum exceeds it (0x287c00) — or null past them all: the empty slot. */
+export function eventAt(table: EventTable, at: number): { row: number; site: number } | null {
   let cum = 0;
-  for (let i = 0; i < rows.length; i++) {
-    for (let k = 0; k < pairs[i].length; k++) {
-      cum += pairs[i][k];
-      if (at >= cum) continue;
-      const site = rows[i].family === 'flood' ? heldFloodSite(state, sites, rows[i].sev, k) : k;
-      const key = keys[i]?.[site];
-      if (key) key.eventFired = (key.eventFired ?? 0) | (1 << i);
-      fireEvent(state, rows[i], sites, site);
-      return;
+  for (let i = 0; i < table.rows.length; i++) {
+    for (let k = 0; k < table.pairs[i].length; k++) {
+      cum += table.pairs[i][k];
+      if (at < cum) return { row: i, site: k };
     }
   }
+  return null;
 }
 
 let floodHold: ((state: GameState, sev: number) => number | undefined) | null = null;

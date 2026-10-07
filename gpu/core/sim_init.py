@@ -2033,21 +2033,23 @@ class SimInit:
 
         self.disasters = bool(f0.get("disasters", 0))
         self.floodplain = torch.tensor([[t.get("fp", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # each plot's place in its river's flood order (`floodRanks`), -1 off
-        self.flood_rank = torch.tensor([[t.get("fo", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # the GROUND a drought may start on (`droughtTerrain`); the live start
         # plots are this, featureless and above water (`_drought_cands`)
         self.drought_cand = torch.tensor([[t.get("dc", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         # the storm FAMILY that may start on each tile (`stormFamilyAt`), -1 none
         self.storm_fam = torch.tensor([[t.get("sf", -1) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.fertilizable = torch.tensor([[t.get("fz", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
-        # the flood sites (`floodRivers`), each the plot its flood starts on, in
-        # draw order, -1 pads
-        n_fl = max(max((len(f["floodStarts"]) for f in fixtures), default=0), 1)
-        _fl_idx = torch.full((B, n_fl), -1, dtype=torch.long, device=device)
+        # the flood sites (`floodRivers`) in draw order: each its Floodplains
+        # list in flood order, the start first (`_flood_lists`, -1 pads), and
+        # the start plot its event memory is keyed on (`_flood_sites`)
+        n_fl = max(max((len(f["floodLists"]) for f in fixtures), default=0), 1)
+        n_len = max(max((len(lst) for f in fixtures for lst in f["floodLists"]), default=0), 1)
+        _fl = torch.full((B, n_fl, n_len), -1, dtype=torch.long, device=device)
         for b, f in enumerate(fixtures):
-            for i, v in enumerate(f["floodStarts"]):
-                _fl_idx[b, i] = v
+            for i, lst in enumerate(f["floodLists"]):
+                _fl[b, i, :len(lst)] = torch.tensor(lst, dtype=torch.long, device=device)
+        self._flood_lists = _fl
+        _fl_idx = _fl[:, :, 0]
         self._flood_sites = (_fl_idx, (_fl_idx >= 0).sum(dim=1))
         # CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its
         # plot's feature, and no Improvement_ValidFeatures row lists it

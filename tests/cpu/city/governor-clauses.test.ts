@@ -10,7 +10,7 @@ import { RANDOM_EVENT_START_TURN } from '../../../cpu/data/disasters';
 import { cityPlotBonus, computeCityStats } from '../../../cpu/core/city';
 import { emptyYields } from '../../../cpu/core/types';
 import { tileAppeal } from '../../../cpu/core/appeal';
-import { neighbors } from '../../../world/hex';
+import { neighborTile, neighbors } from '../../../world/hex';
 import { purchaseReligiousUnit } from '../../../cpu/core/game';
 import { takePromotion, promoReady, promoAvailable, unitPromoRows, xpToNextLevel } from '../../../cpu/core/promotions';
 import type { City, GameState, Unit } from '../../../cpu/core/types';
@@ -155,8 +155,17 @@ describe('Reinforced Materials', () => {
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
     const city = settleAt(state, tileAtCoords(state.map, 4, 4).index, 0);
+    // a river under four tiles of row 6, both banks Floodplains: one flood list
     const plain = tileAtCoords(state.map, 6, 6);
-    plain.feature = 'FLOODPLAINS';
+    for (let k = 0, t = plain; k < 4; k++, t = neighborTile(state.map, t, 0)!) {
+      t.feature = 'FLOODPLAINS';
+      for (const d of [4, 5]) {
+        t.riverMask |= 1 << d;
+        const nb = neighborTile(state.map, t, d)!;
+        nb.riverMask |= 1 << ((d + 3) % 6);
+        nb.feature = 'FLOODPLAINS';
+      }
+    }
     plain.district = 'CAMPUS';
     plain.districtComplete = true;
     setTileOwner(plain, 0, city.id);

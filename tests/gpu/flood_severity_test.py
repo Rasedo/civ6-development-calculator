@@ -62,7 +62,16 @@ def solo(sim, t: int) -> None:
     idx, cnt = sim._flood_sites
     idx[0, :] = t
     cnt[0] = 1
+    sim._flood_lists[0] = -1
+    sim._flood_lists[0, :, 0] = t
     sim.river_comp[0, :] = -1
+
+
+def alone(sim, t: int) -> torch.Tensor:
+    """[B, L] a Floodplains list of `t` alone, for every game"""
+    lst = torch.full((sim.B, sim._flood_lists.shape[2]), -1, dtype=torch.long, device=sim.device)
+    lst[:, 0] = t
+    return lst
 
 
 def flood(sim, t: int) -> None:
@@ -71,7 +80,7 @@ def flood(sim, t: int) -> None:
     work. The severity is one draw by the flood rows' weights
     (`_flood_severity_draw`, the breached Dam's)."""
     one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-    sim._flood_river(one, torch.full((sim.B,), t, dtype=torch.long, device=sim.device),
+    sim._flood_river(one, alone(sim, t),
                      sim._flood_severity_draw(one))
 
 
@@ -163,11 +172,11 @@ def main() -> None:
     up = next(int(x) for x in sim.neigh[t].tolist()
               if x >= 0 and int(sim.centre_slot_at[0, x]) < 0
               and int(sim.built_wonder[0, x]) < 0 and int(sim.district[0, x]) < 0)
-    # a two-tile river: `t` and `up` share one component, so a shield on either
-    # covers both. `solo` cleared every component, so these two are the river.
+    # a two-plot Floodplains list, `t` then `up`: a shield on either covers
+    # both (0xa2a4d0 reads the river's list)
     sim.floodplain[0, up] = True
-    sim.river_comp[0, t] = 0
-    sim.river_comp[0, up] = 0
+    two = alone(sim, t)
+    two[:, 1] = up
     sim.built_wonder[0, up] = widx
     sim.built_wonder_complete[0, up] = True
     sim._eff_version += 1
@@ -178,15 +187,15 @@ def main() -> None:
     for _ in range(N):
         sim.improvement[0, t] = 0
         sim.pillaged[0, t] = False
-        flood(sim, t)
+        one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
+        sim._flood_river(one, two, sim._flood_severity_draw(one))
         assert int(sim.improvement[0, t]) >= 0, "the Great Bath let a flood destroy an improvement"
         assert not bool(sim.pillaged[0, t]), "the Great Bath let a flood pillage an improvement"
         assert not bool(sim.district_pillaged[0, t]), "the Great Bath let a flood take a district"
     assert int(sim.fertility[0, t]) > 0, "a mitigated river stopped silting entirely"
 
-    # ...and off that river it protects nothing: the same wonder, one river
-    # component away, leaves every flood on `t` unmitigated.
-    sim.river_comp[0, up] = 1
+    # ...and off that list it protects nothing: the same wonder beside a
+    # list of `t` alone leaves every flood on `t` unmitigated.
     struck = 0
     for _ in range(N):
         sim.improvement[0, t] = 0
@@ -196,7 +205,6 @@ def main() -> None:
         if bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0:
             struck += 1
     assert struck > 0, "a shield off the river spared a flood it has no business reaching"
-    sim.river_comp[0, up] = 0
     print("  the Bath shields its own river, and only its own")
 
     poke_river_reach()
@@ -245,7 +253,7 @@ def poke_row_walk() -> None:
     t = floodplain(sim)
     solo(sim, t)
     one = torch.ones(1, dtype=torch.bool, device=sim.device)
-    at = torch.tensor([t], dtype=torch.long, device=sim.device)
+    at = alone(sim, t)
     owner = int(sim.tile_seat[0, t])
     civ0, lead0 = int(sim.row_civ[0, owner]), int(sim.row_leader[0, owner])
     ci = sim._civ_ids.index("EGYPT")
@@ -292,35 +300,35 @@ def poke_row_walk() -> None:
 
 def poke_river_reach() -> None:
     """f. CIV6 (Flood): "The level of the water rises, flooding all Floodplains
-    tiles found along the River". One severity for the whole flood; every
-    Floodplains tile of the struck river takes it, nothing off that river
-    does, and the draw stream is the row walk's (`spent_by_walk`)."""
+    tiles found along the River" — the river's Floodplains list (0xa2aca0,
+    shipped per site by the exporter, `floodRivers`). One severity for the
+    whole flood; every plot of the list takes it, in its order, no plot off
+    it does, and the draw stream is the row walk's (`spent_by_walk`)."""
     rules = load_rules()
     best = None
     for p in fixture_paths():
         sim = BatchSim([load_fixture(p)], rules, device="cpu", dtype=torch.float64)
-        rc, fp = sim.river_comp[0], sim.floodplain[0]
-        total = int(fp.sum())
-        for c in set(int(x) for x in rc[fp].tolist()):
-            n = int(((rc == c) & fp).sum())
-            # a river with SEVERAL floodplains, and floodplains OFF it to spare
-            if c >= 0 and n > 1 and n < total and (best is None or n > best[2]):
-                best = (sim, c, n)
-        if best is not None and best[2] >= 4:
+        fp = sim.floodplain[0]
+        for lst in sim._flood_lists[0].tolist():
+            reach = [t for t in lst if t >= 0]
+            # a list of SEVERAL plots, and floodplains off it to spare
+            if len(reach) > 1 and len(reach) < int(fp.sum()) and (best is None or len(reach) > len(best[1])):
+                best = (sim, reach)
+        if best is not None and len(best[1]) >= 4:
             break
-    assert best is not None, "no fixture holds a multi-tile river beside another floodplain"
-    sim, comp, n = best
-    rc, fp = sim.river_comp[0], sim.floodplain[0]
-    reach = ((rc == comp) & fp).nonzero(as_tuple=True)[0].tolist()
-    off = [t for t in ((rc != comp) & fp).nonzero(as_tuple=True)[0].tolist()]
-    assert len(reach) == n
+    assert best is not None, "no fixture holds a multi-plot flood list beside another floodplain"
+    sim, reach = best
+    n = len(reach)
+    fp = sim.floodplain[0]
+    off = [t for t in fp.nonzero(as_tuple=True)[0].tolist() if t not in reach]
 
     for t in reach + off:
         sim.improvement[0, t] = 0
         sim.pillaged[0, t] = False
     seed = int(sim.rng_state[0])
-    sim._flood_river(torch.ones(1, dtype=torch.bool, device=sim.device),
-                     torch.tensor([reach[0]], dtype=torch.long, device=sim.device),
+    lst = torch.full((1, sim._flood_lists.shape[2]), -1, dtype=torch.long, device=sim.device)
+    lst[0, :n] = torch.tensor(reach, dtype=torch.long, device=sim.device)
+    sim._flood_river(torch.ones(1, dtype=torch.bool, device=sim.device), lst,
                      torch.tensor([2], dtype=torch.long, device=sim.device))
     spent = 0
     st = torch.tensor([seed], dtype=sim.rng_state.dtype, device=sim.device)
@@ -331,42 +339,31 @@ def poke_river_reach() -> None:
         spent += 1
     egypt = [s for s in range(sim.n_majors) if bool(sim._seat_plays(torch.tensor([s]), "EGYPT")[0])]
     want = spent_by_walk(sim, reach, 2, egypt)
-    assert spent == want, f"a {n}-tile flood spent {spent} draws, not the row walk's {want}"
+    assert spent == want, f"a {n}-plot flood spent {spent} draws, not the row walk's {want}"
     for t in reach:
         owner = int(sim.tile_seat[0, t])
         if owner >= 0 and owner not in egypt:
             assert bool(sim.pillaged[0, t]) or int(sim.improvement[0, t]) < 0, \
-                f"tile {t} is on the flooded river and kept its improvement whole"
+                f"tile {t} is on the flooded list and kept its improvement whole"
         elif owner < 0:
             # the improvement rows refuse an unowned plot (the applier 0x336a50)
             assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
                 f"tile {t} is unowned and the flood pillaged it"
     for t in off:
         assert not bool(sim.pillaged[0, t]) and int(sim.improvement[0, t]) >= 0, \
-            f"tile {t} is on ANOTHER river and the flood reached it"
-    print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off-river spared")
+            f"tile {t} is off the flooded list and the flood reached it"
+    print(f"  f river reach OK — {n} floodplains flooded together, {len(off)} off the list spared")
 
-    # THE FLOOD SITES (`floodRivers`, shipped by the exporter): the turn's draw
-    # weighs each flood row once per RIVER carrying Floodplains and once per
-    # Floodplains plot no river touches, in the order of each one's lowest
-    # Floodplains plot; a river's site is the Floodplains plot its flood
-    # starts on (its upstream-most), one of its own.
-    rivers = {int(c) for c in rc[fp].tolist() if int(c) >= 0}
-    alone = [t for t in (fp & (rc < 0)).nonzero(as_tuple=True)[0].tolist()]
-    lead = [int(((rc == c) & fp).nonzero(as_tuple=True)[0].min()) for c in rivers]
+    # THE FLOOD SITES: one per river whose list is not empty, each keyed on
+    # its list's first plot, in the order of each list's lowest plot; every
+    # listed plot carries Floodplains
     idx, cnt = sim._flood_sites
     got = idx[0, : int(cnt[0])].tolist()
-    assert all(bool(fp[s]) for s in got), f"a flood site off the Floodplains: {got}"
-
-    def lead_of(s: int) -> int:
-        c = int(rc[s])
-        return s if c < 0 else int(((rc == c) & fp).nonzero(as_tuple=True)[0].min())
-    assert [lead_of(s) for s in got] == sorted(lead + alone), \
-        f"flood sites {got} name {[lead_of(s) for s in got]}, not {sorted(lead + alone)}"
-    moved = sum(1 for s in got if lead_of(s) != s)
-    print(f"  g flood sites OK — {len(rivers)} rivers and {len(alone)} lone floodplains, one site each, "
-          f"{moved} rivers starting upstream of their lowest plot")
-
-
+    lists = [[t for t in lst if t >= 0] for lst in sim._flood_lists[0].tolist()][: int(cnt[0])]
+    assert all(lst and lst[0] == s for lst, s in zip(lists, got)), f"a flood site is not its list's start: {got}"
+    assert all(bool(fp[t]) for lst in lists for t in lst), "a listed plot carries no Floodplains"
+    lows = [min(lst) for lst in lists]
+    assert lows == sorted(lows), f"flood sites out of their lowest-plot order: {lows}"
+    print(f"  g flood sites OK — {len(got)} rivers, each its list's start")
 if __name__ == "__main__":
     main()

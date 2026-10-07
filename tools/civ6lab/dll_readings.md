@@ -2134,10 +2134,52 @@ both twins.
 
 ## H-1: the flood's river walk — READ
 
-0xa2cfc0 walks the map's river vector in its stored order, weighting each
-river's flood site with no reveal check in the function itself. The order
-is map-generation state no record carries (docs/AUDIT.md C-94, ASK); the
-action replay holds the record's site (`holdFloodRiver`).
+0xa2cfc0 walks the river manager's vector (+0xb8) in its stored order. The
+vector is filled by 0xa28900, which the SetNEOfRiver / SetWOfRiver /
+SetNWOfRiver bindings (0x2be20 / 0x2c220 / 0x2bff0) call per edge: it finds
+the river of the edge's ID or creates it at the back ("Incorrect River ID,
+going non-sequentially" asserts the IDs come in order) — the map script's
+laying order (RiversLakes.lua DoRiver). A river object: +0 its NAME (-1
+unnamed; the id the event history carries as River), +4 its ID, +0x28..+0x30
+its Floodplains list, +0x48 the player who named it, +0x78 its event history
+(16-byte entries, +8 the event row). The weight loop skips a river whose name
+is -1 or whose list is empty, and boosts a river's pair while its own history
+holds no entry of the row; it tests no reveal itself. The reveal gate is the
+NAME: a plot first revealed (0x534950) names its rivers (0xa29730 ->
+"Random River" 0xa292a0, an unused name of the namer's civilization; runs/
+h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ; a
+river whose namer field is 0 — player 0's — is named again). The order is no
+record's: 1117's floods fall in the order 181, 8, 207, 251 (sources by plots
+~386, ~523, ~540, ~164), 1118's 152, 243, 251, 250, 12 — no source-order or
+edge-order law fits both (docs/AUDIT.md C-74, ASK); the engines walk their
+lists by each one's lowest plot, `step.eventPick` counts it as a gap and the
+action replay holds the record's river (`holdFloodRiver`).
+
+The damage pass 0xa2a4d0 decides the shield: mitigated when the river is
+unnamed or its list empty, or when the Great Bath (0xa2b280: the first
+building flagged +0x28 & 8) stands on a plot of the LIST (0x810d0), or when
+0xa2c280 finds a Dam (0xa2b200: the district flagged +0x48 & 0x40) on a plot
+of the list whose city holds it (0x81330) — the list, not the river's whole
+network (`riverShielded` over `riverReach`). The engines' rivers are laid back
+from the record's edges (`laidRivers`): the mouth by the sea, else a lake,
+else the lowest end; the source by the lowest plot lays to the mouth, each
+later one to the first laid edge (runs/h1_duelw1115 rivers 151 at 794 and 250
+at 839; 1111 296; 1123 480 and 612; 1112 two of three; 1116's two lists at 480
+stay unmatched).
+
+## H-1: the volcano roll's branches and order — READ
+
+0x335040: the wake branch (active share under 70) draws "Choose Active
+Volcano Roll" (0xa20f20: the entries of the volcano vector +0x160, stride
+0xa0, not active and named; the chosen one's +0x14 takes the turn), the sleep
+branch "Choose Inactive Volcano Roll" (0xa212d0: active and named; +0x14 =
+-1) — runs/h1_duelw1118 t53 woke over 2, t152 slept over 2 with both active;
+the engines had the two labels crossed (`volcanoRoll` now draws Active for a
+wake). The wake's gate is the named count less the active: 1121 t70–99 (two
+volcanoes, one named and active: share 50, named − active 0) draws nothing
+until the second is named (its "Random Volcano", t99). The candidates walk the
+vector's own order, no record's: 1118 t53 woke 803 at index 0 of {534, 803},
+1117 t154 827 at index 1 of {206, 827} (docs/AUDIT.md C-74, ASK).
 
 ## H-1: the citizen manager's placement — READ (the AI's favored yields unrecorded)
 

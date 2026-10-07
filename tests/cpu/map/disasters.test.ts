@@ -80,8 +80,7 @@ describe('disasters', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const plain = tileAtCoords(state.map, 4, 4);
-    plain.feature = 'FLOODPLAINS';
+    const [plain] = floodRun(state.map, 4, 4);
     plain.district = 'CAMPUS';
     plain.districtComplete = true;
     setTileOwner(plain, 0);
@@ -96,11 +95,8 @@ describe('disasters', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const site = tileAtCoords(state.map, 4, 4);
-    site.feature = 'FLOODPLAINS';
+    const [site, , centre] = floodRun(state.map, 4, 4);
     site.district = 'CAMPUS'; // queued, not complete
-    const centre = tileAtCoords(state.map, 6, 6);
-    centre.feature = 'FLOODPLAINS';
     centre.district = 'CITY_CENTER';
     centre.districtComplete = true;
 
@@ -163,11 +159,10 @@ describe('disasters', () => {
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
     state.unitsMode = true;
-    const plain = tileAtCoords(state.map, 4, 4);
-    plain.feature = 'FLOODPLAINS';
-    plain.terrain = 'DESERT';
+    const run = floodRun(state.map, 4, 4);
+    const plain = run[0];
     setTileOwner(plain, 0);
-    return { state, plain };
+    return { state, plain, run };
   };
 
   it('a flood pillages the improvement every time and sometimes takes it away', () => {
@@ -190,8 +185,8 @@ describe('disasters', () => {
   });
 
   it('a flood damages a unit and a city centre, and can cost a citizen', () => {
-    const { state, plain } = floodBoard();
-    const city = settleAt(state, tileAtCoords(state.map, 9, 9).index);
+    const { state, plain, run } = floodBoard();
+    const city = settleAt(state, run[2].index);
     setTileOwner(plain, 0);
     plain.ownerCity = city.id;
     city.population = 6;
@@ -201,8 +196,7 @@ describe('disasters', () => {
     for (let i = 0; i < 6000; i++) {
       const u = spawnUnit(state, 'WARRIOR', plain.index, 0)!;
       const pop = city.population;
-      const centre = state.map.tiles[city.centerIndex];
-      centre.feature = 'FLOODPLAINS';
+      state.map.tiles[city.centerIndex].feature = 'FLOODPLAINS';
       // a storm's damage would stack on the flood's: read calm phases only
       const calm = stormFree(state, []);
       if (calm && city.population < pop) popLost++;
@@ -243,15 +237,8 @@ describe('disasters', () => {
     const state = makeState(makeMap(18, 18));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const plain = tileAtCoords(state.map, 4, 4);
-    const up = neighborTile(state.map, plain, 0)!;
-    plain.riverMask |= 1 << 0;
-    up.riverMask |= 1 << 3;
-    for (const t of [plain, up]) {
-      t.feature = 'FLOODPLAINS';
-      t.terrain = 'DESERT';
-      setTileOwner(t, 0);
-    }
+    const [plain, up] = floodRun(state.map, 4, 4);
+    for (const t of [plain, up]) setTileOwner(t, 0);
     plain.improvement = 'FARM';
     plain.district = 'CAMPUS';
     plain.districtComplete = true;
@@ -331,78 +318,89 @@ function riverUnder(map: ReturnType<typeof makeMap>, start: Tile, n: number): Ti
   return out;
 }
 
+/** A river under `n` (default 4) tiles of row `row` from column `col`
+ *  eastward (`riverUnder`), every plot on either side of it a flat
+ *  Floodplains of `terrain`: one flood list (a list runs both banks, each
+ *  edge its own plot then the plot across). Returns the row's tiles, then the
+ *  bank across. */
+function floodRun(map: ReturnType<typeof makeMap>, col: number, row: number,
+  terrain: 'DESERT' | 'GRASSLAND' = 'DESERT', n = 4): Tile[] {
+  const top = riverUnder(map, tileAtCoords(map, col, row), n);
+  const across: Tile[] = [];
+  for (const t of top) {
+    for (const d of [4, 5]) {
+      const nb = neighborTile(map, t, d);
+      if (nb && !across.includes(nb)) across.push(nb);
+    }
+  }
+  const run = [...top, ...across];
+  for (const t of run) {
+    t.terrain = terrain;
+    t.elevation = 'FLAT';
+    t.feature = 'FLOODPLAINS';
+  }
+  return run;
+}
+
 describe('the flood reaches the whole river', () => {
-  it('walks the river and stops where the river does', () => {
+  it('floods the river\'s Floodplains list, and nothing off it', () => {
     const state = makeState(makeMap(16, 16));
-    const [a, b, c, dry] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 4);
-    for (const t of [a, b, c]) t.feature = 'FLOODPLAINS';
-    // a floodplain OFF the river; `dry` a river tile that is not floodplain
+    const run = floodRun(state.map, 4, 4);
+    // a floodplain OFF the river
     const off = tileAtCoords(state.map, 10, 10);
     off.feature = 'FLOODPLAINS';
 
-    const reach = riverReach(state.map, a).map((t) => t.index);
-    expect(reach).toEqual([a, b, c].map((t) => t.index).sort((x, y) => x - y));
+    const reach = riverReach(state.map, run[0]).map((t) => t.index);
+    expect([...reach].sort((x, y) => x - y)).toEqual(run.map((t) => t.index).sort((x, y) => x - y));
     expect(reach).not.toContain(off.index);
-    expect(reach).not.toContain(dry.index);
-
-    // ...and from the far end it is the same river
-    expect(riverReach(state.map, c).map((t) => t.index)).toEqual(reach);
-    // a floodplain with no river at all floods alone
+    // ...and from any plot of it it is the same list
+    expect(riverReach(state.map, run[2]).map((t) => t.index)).toEqual(reach);
+    // a floodplain on no river is no flood site, and alone in its reach
+    expect(floodRivers(state.map)).toHaveLength(1);
     expect(riverReach(state.map, off).map((t) => t.index)).toEqual([off.index]);
   });
 
-  it('a flood starts on its river\'s mouth-most floodplain and walks the river from there', () => {
-    const board = (mouthEast: boolean | null) => {
+  it('a list is read from the river\'s mouth: its first plot by the sea', () => {
+    const board = (mouthEast: boolean) => {
       const state = makeState(makeMap(16, 16));
-      const [a, b, c, d, e] = riverUnder(state.map, tileAtCoords(state.map, 3, 4), 5);
-      for (const t of [b, c, d]) t.feature = 'FLOODPLAINS';
-      if (mouthEast !== null) (mouthEast ? neighborTile(state.map, e, 0)! : neighborTile(state.map, a, 3)!).terrain = 'COAST';
-      return { state, b, d };
+      const run = floodRun(state.map, 3, 4, 'DESERT', 5);
+      const ends = run.slice(0, 5);
+      (mouthEast ? neighborTile(state.map, ends[4], 0)! : neighborTile(state.map, ends[0], 3)!).terrain = 'COAST';
+      return floodRivers(state.map)[0].start;
     };
-    // the sea beside the east end: the east floodplain is mouth-most, and the
-    // flood walks the river from it
-    const east = board(true);
-    expect(floodRivers(east.state.map).map((r) => r.start.index)).toEqual([east.d.index]);
-    expect(riverReach(east.state.map, east.b).map((t) => t.index)[0]).toBe(east.d.index);
-    // the sea beside the west end: the west one
-    const west = board(false);
-    expect(floodRivers(west.state.map).map((r) => r.start.index)).toEqual([west.b.index]);
-    // no water anywhere: the lowest-index floodplain
-    const inland = board(null);
-    expect(floodRivers(inland.state.map).map((r) => r.start.index)).toEqual([inland.b.index]);
-    // the whole river floods in one order from any of its plots
-    expect(riverReach(west.state.map, west.d).map((t) => t.index))
-      .toEqual(riverReach(west.state.map, west.b).map((t) => t.index));
-    expect(riverReach(west.state.map, west.d)[0]).toBe(west.b);
+    expect(board(true).col).toBeGreaterThanOrEqual(7);
+    expect(board(false).col).toBeLessThanOrEqual(3);
   });
 
-  it('one flood takes every floodplain along its river together', () => {
+  it('fewer than four Floodplains in a run make no list', () => {
+    const state = makeState(makeMap(16, 16));
+    floodRun(state.map, 4, 4, 'DESERT', 1);
+    expect(floodRivers(state.map)).toHaveLength(0);
+  });
+
+  it('one flood takes every plot of its list together; a floodplain off any river never floods', () => {
     const state = makeState(makeMap(16, 16));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const [a, b, c] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 3);
+    const run = floodRun(state.map, 4, 4);
     const off = tileAtCoords(state.map, 10, 10);
-    for (const t of [a, b, c, off]) {
-      t.feature = 'FLOODPLAINS';
-      t.terrain = 'DESERT';
-      setTileOwner(t, 0);
-    }
+    off.feature = 'FLOODPLAINS';
+    off.terrain = 'DESERT';
+    for (const t of [...run, off]) setTileOwner(t, 0);
     const struck = (t: Tile) => t.pillaged || t.improvement === null;
     let rivers = 0;
     let alone = 0;
-    for (let i = 0; i < 6000 && (rivers < 3 || alone < 1); i++) {
-      for (const t of [a, b, c, off]) { t.improvement = 'FARM'; t.pillaged = false; }
-      if (!stormFree(state, [a, b, c, off])) continue;
-      if (struck(a) || struck(b) || struck(c)) {
-        // one river, one flood: no tile of it is spared
-        expect([struck(a), struck(b), struck(c)]).toEqual([true, true, true]);
+    for (let i = 0; i < 6000 && rivers < 3; i++) {
+      for (const t of [...run, off]) { t.improvement = 'FARM'; t.pillaged = false; }
+      if (!stormFree(state, [...run, off])) continue;
+      if (run.some(struck)) {
+        expect(run.map(struck)).toEqual(run.map(() => true));
         rivers += 1;
-      } else if (struck(off)) {
-        alone += 1; // the riverless floodplain floods by itself
       }
+      if (struck(off)) alone += 1;
     }
     expect(rivers).toBeGreaterThanOrEqual(3);
-    expect(alone).toBeGreaterThanOrEqual(1);
+    expect(alone).toBe(0);
   });
 });
 
@@ -419,18 +417,19 @@ describe('the flood\'s row walk', () => {
     }
     return n;
   };
-  /** a river of three Floodplains plots, one of each kind, unowned */
+  /** one river's Floodplains list, unowned, its plots each of the three
+   *  kinds in turn */
   const river = () => {
     const state = makeState(makeMap(16, 16));
     state.unitsMode = true;
-    const [a, b, c] = riverUnder(state.map, tileAtCoords(state.map, 4, 4), 3);
-    a.terrain = 'DESERT';
-    a.feature = 'FLOODPLAINS';
-    b.terrain = 'GRASSLAND';
-    b.feature = 'FLOODPLAINS_GRASSLAND';
-    c.terrain = 'PLAINS';
-    c.feature = 'FLOODPLAINS_PLAINS';
-    return { state, plots: [a, b, c] };
+    floodRun(state.map, 4, 4);
+    const plots = floodRivers(state.map)[0].list;
+    const kinds = [['DESERT', 'FLOODPLAINS'], ['GRASSLAND', 'FLOODPLAINS_GRASSLAND'], ['PLAINS', 'FLOODPLAINS_PLAINS']] as const;
+    plots.forEach((t, k) => {
+      t.terrain = kinds[k % 3][0];
+      t.feature = kinds[k % 3][1];
+    });
+    return { state, plots };
   };
 
   it('draws once per damage row per plot, then once per yield row per plot', () => {
@@ -461,7 +460,7 @@ describe('the flood\'s row walk', () => {
     dam.plots[2].districtComplete = true;
     dam.plots[0].improvement = 'FARM';
     setTileOwner(dam.plots[0], 0);
-    expect(draws(dam.state, () => floodRiver(dam.state, dam.plots[0], 2))).toBe(FLOOD_YIELD_ROWS[2].length * 3);
+    expect(draws(dam.state, () => floodRiver(dam.state, dam.plots[0], 2))).toBe(FLOOD_YIELD_ROWS[2].length * dam.plots.length);
     expect(dam.plots[0].pillaged).toBeFalsy();
   });
 
@@ -475,7 +474,7 @@ describe('the flood\'s row walk', () => {
   it('a yield row lands on its own Floodplains kind alone, at its Percentage, halved on a shielded river', () => {
     // MODERATE carries Food rows alone: no plot ever gains Production
     const rate = (shield: boolean) => {
-      const gained = [0, 0, 0];
+      const gained = new Array(9).fill(0);
       let n = 0;
       for (let i = 0; i < 4000; i++) {
         const { state, plots } = river();
@@ -492,10 +491,10 @@ describe('the flood\'s row walk', () => {
       return gained.map((g) => g / n);
     };
     const pct = (f: string) => FLOOD_YIELD_ROWS[0].find((r) => r.feature === f)!.pct / 100;
-    const kinds = ['FLOODPLAINS', 'FLOODPLAINS_GRASSLAND', 'FLOODPLAINS_PLAINS'];
-    const open = rate(false);
+    const kinds = river().plots.map((t) => t.feature as string);
+    const open = rate(false).slice(0, kinds.length);
     open.forEach((r, k) => expect(Math.abs(r - pct(kinds[k]))).toBeLessThan(0.03));
-    const shut = rate(true);
+    const shut = rate(true).slice(0, kinds.length);
     shut.forEach((r, k) => {
       const want = Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * pct(kinds[k]) * 100) / 100) / 100;
       expect(Math.abs(r - want)).toBeLessThan(0.03);
@@ -523,16 +522,11 @@ describe('the turn\'s one random event', () => {
       v.volcano = true;
       v.volcanoActive = true;
     }
-    const a = tileAtCoords(state.map, 8, 4);
-    const b = neighborTile(state.map, a, 0)!;
-    a.riverMask |= 1 << 0;
-    b.riverMask |= 1 << 3;
+    const run = floodRun(state.map, 6, 4, 'GRASSLAND');
     const lone = tileAtCoords(state.map, 8, 12);
-    for (const t of [a, b, lone]) {
-      t.terrain = 'GRASSLAND';
-      t.feature = 'FLOODPLAINS';
-    }
-    return { state, a, b, lone, city };
+    lone.terrain = 'GRASSLAND';
+    lone.feature = 'FLOODPLAINS';
+    return { state, run, lone, city };
   };
 
   /** one phase with no storm left standing, so a drawn storm always lands
@@ -550,16 +544,16 @@ describe('the turn\'s one random event', () => {
   /** the board's area: an 18 x 18 map */
   const AREA = 18 * 18;
 
-  it('a river is one flood site, a riverless floodplain another', () => {
-    const { state, a, b, lone } = eventBoard();
+  it('a river\'s Floodplains list is one flood site; a riverless floodplain is none', () => {
+    const { state, run, lone } = eventBoard();
     const rivers = floodRivers(state.map);
-    expect(rivers.map((r) => r.start.index)).toEqual([a.index, lone.index].sort((x, y) => x - y));
-    expect(rivers.find((r) => r.start === a)!.plots.map((t) => t.index).sort((x, y) => x - y))
-      .toEqual([a.index, b.index].sort((x, y) => x - y));
+    expect(rivers).toHaveLength(1);
+    expect(rivers[0].list.map((t) => t.index).sort((x, y) => x - y)).toEqual(run.map((t) => t.index).sort((x, y) => x - y));
+    expect(rivers[0].list).not.toContain(lone);
   });
 
   it('each (row, site) pair fires at its integer weight over 10 x N; the rest of the turn is empty', () => {
-    // per-site rows in tenths: 2 flood sites x 45, 2 volcanoes x 80; per-map
+    // per-site rows in tenths: 1 flood site x 45, 2 volcanoes x 80; per-map
     // rows scaled by the map's area over Standard's, each counted whether or
     // not it finds a plot: of the storms only the Grassland's tornado pair
     // (150 and 30 tenths: 10 + 2) lands; the droughts find no plot (the only
@@ -582,7 +576,7 @@ describe('the turn\'s one random event', () => {
     }
     const tornado = Math.floor(150 * AREA / STANDARD_MAP_AREA) + Math.floor(30 * AREA / STANDARD_MAP_AREA);
     expect(tornado).toBe(12);
-    const want = { flood: 90 / SPAN, eruption: 160 / SPAN, storm: tornado / SPAN, drought: 0 };
+    const want = { flood: 45 / SPAN, eruption: 160 / SPAN, storm: tornado / SPAN, drought: 0 };
     for (const [k, p] of Object.entries(want)) {
       expect(Math.abs(seen[k as keyof typeof seen] / N - p)).toBeLessThan(0.008);
     }
@@ -591,21 +585,19 @@ describe('the turn\'s one random event', () => {
   });
 
   it('weights summing past 10 x N are the draw\'s span', () => {
-    // sixty lone Desert floodplains, every one already flooded on all three
-    // rows (no boost): 60 x 45 = 2700 past the 2500, and every per-map row
-    // counted once — the floods take their share of the whole
-    const state = makeState(makeMap(18, 18, 'COAST'));
+    // sixty rivers of Desert floodplains, every one already flooded on all
+    // three rows (no boost): 60 x 45 = 2700 past the 2500, and every per-map
+    // row counted once — the floods take their share of the whole
+    const state = makeState(makeMap(60, 40, 'COAST'));
     state.disasters = true;
     state.turn = RANDOM_EVENT_START_TURN;
-    const flood = eventRows(0, AREA).flatMap((r, i) => (r.family === 'flood' ? [i] : []));
-    for (const t of state.map.tiles.filter((u) => u.row % 2 === 0 && u.col % 2 === 0).slice(0, 60)) {
-      t.terrain = 'DESERT';
-      t.feature = 'FLOODPLAINS';
-      t.eventFired = flood.reduce((m, i) => m | (1 << i), 0);
-    }
+    const area = 60 * 40;
+    const flood = eventRows(0, area).flatMap((r, i) => (r.family === 'flood' ? [i] : []));
+    for (let k = 0; k < 60; k++) floodRun(state.map, 2 + 7 * (k % 8), 2 + 4 * Math.floor(k / 8));
+    for (const r of floodRivers(state.map)) r.start.eventFired = flood.reduce((m, i) => m | (1 << i), 0);
     expect(floodRivers(state.map)).toHaveLength(60);
     const floodMass = 60 * FLOOD_WEIGHT.reduce((x, y) => x + y * 10, 0);
-    const mapMass = eventRows(0, AREA).filter((r) => ['storm', 'drought', 'meteor', 'fire'].includes(r.family))
+    const mapMass = eventRows(0, area).filter((r) => ['storm', 'drought', 'meteor', 'fire'].includes(r.family))
       .reduce((x, r) => x + r.weight, 0);
     expect(floodMass).toBeGreaterThan(SPAN);
     const N = 3000;
@@ -619,16 +611,15 @@ describe('the turn\'s one random event', () => {
   });
 
   it('a (row, site) pair not yet fired this game carries the first-occurrence boost; the firing ends it', () => {
-    // one lone Grassland floodplain in a sea: its three flood rows' tenths
-    // 20 / 15 / 10, x (100 + 30) // 100 while the pair has not fired
+    // one river of Grassland floodplains in a sea: its three flood rows'
+    // tenths 20 / 15 / 10, x (100 + 30) // 100 while the pair has not fired
     expect(FIRST_TIME_OCCURRENCE_BOOST).toBe(30);
     const rate = (fresh: boolean) => {
       const state = makeState(makeMap(18, 18, 'COAST'));
       state.disasters = true;
       state.turn = RANDOM_EVENT_START_TURN;
-      const t = tileAtCoords(state.map, 9, 9);
-      t.terrain = 'GRASSLAND';
-      t.feature = 'FLOODPLAINS';
+      floodRun(state.map, 7, 9, 'GRASSLAND');
+      const t = floodRivers(state.map)[0].start;
       const N = 20000;
       let floods = 0;
       for (let i = 0; i < N; i++) {
@@ -660,7 +651,9 @@ describe('the turn\'s one random event', () => {
   });
 
   it('a river floods only once a major has revealed a plot of it', () => {
-    const { state, a, b } = eventBoard();
+    const { state, run } = eventBoard();
+    const a = floodRivers(state.map)[0].start;
+    const b = run.find((t) => t !== a)!;
     state.unitsMode = true;
     state.fogOfWar = true;
     const seat = state.seats[0];
