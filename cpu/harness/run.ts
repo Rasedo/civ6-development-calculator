@@ -59,27 +59,44 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   const catPath = dumpPath.replace(/\.jsonl$/, '.cat.json');
   if (!existsSync(catPath)) throw new Error(`no catalog beside the dump: ${catPath}`);
   const cat = JSON.parse(readFileSync(catPath, 'utf8')) as Catalog;
-  const byTurn = new Map<number, TurnRecord>();
+  // each record kept as its line and parsed when read: the walk below holds
+  // three records at a time, not the whole game
+  const lines = new Map<number, string>();
   for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     const rec = JSON.parse(line) as TurnRecord;
     if (rec.moved || rec.turn < from || rec.turn > to) continue;
-    byTurn.set(rec.turn, rec);
+    lines.set(rec.turn, line);
   }
-  const turns = [...byTurn.keys()].sort((a, b) => a - b);
+  const turns = [...lines.keys()].sort((a, b) => a - b);
+  const window = new Map<number, TurnRecord>();
+  const byTurn = {
+    get(t: number): TurnRecord | undefined {
+      let rec = window.get(t);
+      if (rec) return rec;
+      const line = lines.get(t);
+      if (line === undefined) return undefined;
+      rec = JSON.parse(line) as TurnRecord;
+      window.set(t, rec);
+      for (const k of window.keys()) if (k < t - 1 || k > t + 1) window.delete(k);
+      return rec;
+    },
+  };
   const tallies = new Map<string, Tally>();
   const failures = new Map<string, Failure>();
   const gaps = new Map<string, number>();
   const history = newHistory();
   // the game's own draw log, where the recording kept it: its game is the one
   // whose chain holds the records' witness seeds
+  const all = turns.map((t) => JSON.parse(lines.get(t)!) as TurnRecord);
   const logPath = randLogPath(dumpPath);
   if (logPath) {
     const seeds: number[] = [];
-    for (const r of byTurn.values()) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
+    for (const r of all) for (const w of r.witness ?? []) if (typeof w.seed === 'number') seeds.push(w.seed);
     history.randLog = loadRandLog(logPath, seeds);
   }
-  history.replay = replayEvents(turns.map((t) => byTurn.get(t)!), cat, history.randLog);
+  history.replay = replayEvents(all, cat, history.randLog);
+  all.length = 0;
   const starts: StartReplay[] = [];
   const add = (r: CheckResult) => {
     const t = tallies.get(r.check) ?? { pass: 0, fail: 0, failGapped: 0, skip: {} };

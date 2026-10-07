@@ -20,3 +20,4 @@ __pycache__/
 # H-1 per-turn dumps and full reports (tens of MB; the .report.md and manifests are kept)
 tools/civ6lab/runs/h1_duel*.jsonl
 tools/civ6lab/runs/h1_*.report.json
+cpu/core/.h1run.mjs
