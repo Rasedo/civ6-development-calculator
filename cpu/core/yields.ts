@@ -15,7 +15,7 @@ import { seatWonderFlag } from './wonders';
 import { DISTRICTS, type AdjacencyRule } from '../data/districts';
 import { BUILDINGS, POWER_PLANT_IDS, buildingVariantFor, effectiveBuilding } from '../data/buildings';
 import { regionalReach, suzerainEffect } from './cityStates';
-import { gpTilePermOf } from '../data/greatPeople';
+import { GP_BUILDING_YIELDS, gpPermOf, gpTilePermOf } from '../data/greatPeople';
 import { CARDIFF_HARBOR_POWER } from '../data/cityStates';
 import { LASER_POWER_LOAD } from '../data/projects';
 import { cityGovernorEffects, cityGovernorPromos, governorSum } from './governors';
@@ -562,7 +562,7 @@ export function poweredExtra(mods: Modifiers, poweredYields: Partial<Yields>): P
   return out;
 }
 
-export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): Yields {
+export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false, gpSeat?: { gpPerm?: number[] }): Yields {
   const out = emptyYields();
   const pillaged = pillagedDistrictTypes(ctx.map, city.districts);
   const dark = darkBuildings(ctx.map, city);
@@ -629,6 +629,15 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
       // (runs/h1_duelw1117 Longxi t242: Rationalism's 50% on a powered
       // Research Lab, Science 42 where the unpowered rows read 39.5)
       if (powered) base += def.poweredYields?.[b.yield] ?? 0;
+      // and a spent Great Person's add to it (`GP_BUILDING_YIELDS`), not a
+      // city-state's, a belief's or a card's (runs/h1_duelw1128 Shanghai
+      // t157-168: Rationalism's 50% on a Library's 2 and Hypatia's +1, 1.5,
+      // and Xi'an's with Newton's +2 on its University; runs/h1_duelw1113
+      // Beijing t237-245 and runs/h1_duelw1118 Xi'an t214-216: the
+      // Scientific city-states' +1 / +2 on the same buildings outside it)
+      for (const r of GP_BUILDING_YIELDS) {
+        if (r.building === id && r.yield === b.yield) base += gpPermOf(gpSeat, r.perm);
+      }
     }
     out[b.yield] += base * pct;
   }

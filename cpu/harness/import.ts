@@ -48,7 +48,7 @@ import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, 
 import { BOOSTS } from '../data/boosts';
 import { boostAmount, boostPoints } from '../core/boosts';
 import { updateCulturalDominance } from '../core/seatTurn';
-import { addSeatPerm } from '../core/gpAbility';
+import { addCityPerm, addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
@@ -487,6 +487,9 @@ export interface History {
   revealed: Map<number, Set<string>>;
   /** centre plots of cities already standing at the first record past turn 1 */
   unknownSince: Set<number>;
+  /** the first record each city stood in under its owner, by
+   *  `${owner}:${centre plot}` */
+  cityFirstSeen: Map<string, number>;
   /** centre plots of the last record's cities that the record before did not
    *  hold or that gained a plot without their culture box paying for it (a
    *  founding, a purchase): the game holds no next plot for them until its
@@ -727,7 +730,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 
 export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
-    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+    unknownSince: new Set(), cityFirstSeen: new Map(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
@@ -943,6 +946,32 @@ interface DrawReading {
  */
 function placeEventDraws(h: History, rec: TurnRecord, readings: DrawReading[]): void {
   const order = [...h.openEvents.filter((o) => !o.storm), ...h.openEvents.filter((o) => o.storm)];
+  // the draws the event replay landed this record (`EventReplay.gains`) are
+  // laid already: an event whose step it placed this turn counts them off
+  // its own, and no reading takes them again (runs/h1_duelw1126, the t6
+  // dust storm: its t6 and t7 steps replayed, its t8 step not, the plots
+  // 318, 364 and 404 each +1 as the game's log enhances them, not +2)
+  const landed = h.replay?.gains.get(rec.turn);
+  if (landed) {
+    for (const r of readings) {
+      if (r.bare) continue;
+      const g = landed.get(r.plot);
+      if (g) r.gain = r.gain.map((v, c) => v - Math.max(0, g[c] ?? 0));
+    }
+    for (const ev of order) {
+      if (!h.replay!.placedTurns.get(ev.key)?.has(rec.turn)) continue;
+      for (const [i, g] of landed) {
+        g.forEach((n, c) => {
+          const k = `${i}:${c}`;
+          const room = ev.slots.get(k) ?? 0;
+          const take = Math.min(Math.max(0, n), room, ev.remaining);
+          if (take <= 0) return;
+          ev.slots.set(k, room - take);
+          ev.remaining -= take;
+        });
+      }
+    }
+  }
   for (const ev of order) {
     const take: [DrawReading, number, number][] = [];
     let total = 0;
@@ -1220,6 +1249,10 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       newlyRevealed.get(pid)!.add(resource);
     }
   }
+  for (const c of rec.cities) {
+    const k = `${c.owner}:${c.y * W + c.x}`;
+    if (!h.cityFirstSeen.has(k)) h.cityFirstSeen.set(k, rec.turn);
+  }
   if (h.last === null) {
     h.firstTurn = rec.turn;
     if (rec.turn > 1) for (const c of rec.cities) h.unknownSince.add(c.y * W + c.x);
@@ -1333,15 +1366,17 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       // named next joined the city alone and the event log bought none of it.
       // Several plots at once came another way (a culture bomb, a wonder's
       // free tiles: Handan t145 took 434 and 438 with its price standing).
-      const gainedNow = c.plots.filter((q) => !b.plots.includes(q));
-      const claimedNext = boughtPlots !== null && num(b.nextPlot) >= 0
-        && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
-        && !boughtPlots.has(num(b.nextPlot)) && !gainedInActions.has(`${c.owner}:${c.id}:${num(b.nextPlot)}`);
       // a wonder the log completes in the city takes its free tiles
       // (WONDER_FREE_TILES_UPON_COMPLETION) before the box can: a box that
       // fell with no more than those gained bought nothing (1118 Beijing t224:
-      // two plots with its wonder, the price standing at 193)
+      // two plots with its wonder, the price standing at 193; 1127 Jiaodong
+      // t208: its next plot taken with the Oracle, the box rising, the price
+      // standing at 149)
       const free = wonderFreeTiles(rec, c.owner, c.id);
+      const gainedNow = c.plots.filter((q) => !b.plots.includes(q));
+      const claimedNext = boughtPlots !== null && free === 0 && num(b.nextPlot) >= 0
+        && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
+        && !boughtPlots.has(num(b.nextPlot)) && !gainedInActions.has(`${c.owner}:${c.id}:${num(b.nextPlot)}`);
       // a plot taken alone while the box rose, but by less than the turn's
       // culture at the largest border percent (+25%) less the city's price:
       // the culture claimed it with no plot stored (runs/h1_duelw1105 Ostia,
@@ -2343,7 +2378,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   const luxUnrecorded = importLuxuryDeals(ctx, state, players, cat, seatOfGame, history);
-  if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame, cityByKey);
+  if (history?.people) importPeople(ctx, rec, state, history.people, seatOfGame, cityByKey, history.cityFirstSeen);
   else spentPersonGaps(ctx, rec, cityByKey, history);
   const routes = importTradeRoutes(rec, state, cityByKey, minorOfPlayer, seatOfGame, history);
 
@@ -2661,35 +2696,42 @@ function importLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seatOfGam
   for (const p of rec.players) {
     if (!bool(p.major)) continue;
     const seat = seatOfGame(p.id);
-    const s = seatOf(state, seat);
-    if (!s || seat < 0 || seat >= state.seats.length) continue;
-    const byTurn = history.policySlots.get(p.id) ?? new Map<number, PolicySlots>();
-    history.policySlots.set(p.id, byTurn);
-    let now = byTurn.get(rec.turn);
-    if (!now) {
-      const cards = (p.policies ?? []).map((pi) => {
-        const i = num(pi);
-        return i >= 0 ? engineId('policy', cat.policies[i], 'POLICY_', POLICIES) : null;
-      });
-      const kinds = governmentSlots(state, seat);
-      const gov = num(p.government);
-      const before = Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn));
-      const prev = byTurn.get(before);
-      const lapsed = new Set<string>();
-      const slotted = prev && (prev.gov !== gov || prev.cards.length !== cards.length)
-        ? slottedAfterRebuild(rec, cat, p.id, prev.cards, Math.min(cards.filter((c) => c).length, prev.cards.filter((c) => c).length)) : null;
-      if (slotted) cards.forEach((c) => { if (c && !slotted.has(c)) lapsed.add(c); });
-      else if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
-        const laid = carryLayout(prev.kinds.map((k, i) => [k, prev!.cards[i] ?? null] as const), kinds, () => true);
-        cards.forEach((c, i) => { if (c && laid[i] === c) lapsed.add(c); });
-      } else if (prev) {
-        cards.forEach((c, i) => { if (c && prev!.cards[i] === c && prev!.lapsed.has(c)) lapsed.add(c); });
-      }
-      now = { gov, kinds, cards, lapsed };
-      byTurn.set(rec.turn, now);
-    }
-    s.government.lapsed = [...now.lapsed];
+    landLapsed(rec, cat, state, seat, p, history);
   }
+}
+
+/** One major's lapsed cards as record `rec` slots them (`importLapsed`),
+ *  set on its seat: the pair checks land record t+1's cards with it. */
+export function landLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seat: number, p: DumpPlayer,
+  history: History): void {
+  const s = seatOf(state, seat);
+  if (!s || seat < 0 || seat >= state.seats.length) return;
+  const byTurn = history.policySlots.get(p.id) ?? new Map<number, PolicySlots>();
+  history.policySlots.set(p.id, byTurn);
+  let now = byTurn.get(rec.turn);
+  if (!now) {
+    const cards = (p.policies ?? []).map((pi) => {
+      const i = num(pi);
+      return i >= 0 ? engineId('policy', cat.policies[i], 'POLICY_', POLICIES) : null;
+    });
+    const kinds = governmentSlots(state, seat);
+    const gov = num(p.government);
+    const before = Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn));
+    const prev = byTurn.get(before);
+    const lapsed = new Set<string>();
+    const slotted = prev && (prev.gov !== gov || prev.cards.length !== cards.length)
+      ? slottedAfterRebuild(rec, cat, p.id, prev.cards, Math.min(cards.filter((c) => c).length, prev.cards.filter((c) => c).length)) : null;
+    if (slotted) cards.forEach((c) => { if (c && !slotted.has(c)) lapsed.add(c); });
+    else if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
+      const laid = carryLayout(prev.kinds.map((k, i) => [k, prev!.cards[i] ?? null] as const), kinds, () => true);
+      cards.forEach((c, i) => { if (c && laid[i] === c) lapsed.add(c); });
+    } else if (prev) {
+      cards.forEach((c, i) => { if (c && prev!.cards[i] === c && prev!.lapsed.has(c)) lapsed.add(c); });
+    }
+    now = { gov, kinds, cards, lapsed };
+    byTurn.set(rec.turn, now);
+  }
+  s.government.lapsed = [...now.lapsed];
 }
 
 /**
@@ -3539,7 +3581,7 @@ function importCongress(table: unknown, rec: TurnRecord, cat: Catalog, state: Ga
  * roster is the seat's `gp-person` gap.
  */
 function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<number, RecruitedPerson>,
-  seatOfGame: (pid: number) => number, cityByKey: Map<string, City>): void {
+  seatOfGame: (pid: number) => number, cityByKey: Map<string, City>, firstSeen: Map<string, number>): void {
   for (const [ind, p] of people) {
     if (p.spent === null || p.spent > rec.turn) continue;
     const seat = seatOfGame(p.player);
@@ -3558,6 +3600,13 @@ function importPeople(ctx: Ctx, rec: TurnRecord, state: GameState, people: Map<n
       addSeatPerm(s, fx.perm ?? {});
       (s.gpActivated ??= []).push(person.id);
       if (fx.luxuryCopies) (s.gpLuxuries ??= []).push(fx.luxuryAmenities ?? 1);
+      // a RunOnce row: the cities the player held when it spent the charge
+      if (fx.cityPermAll && 'cities' in s) {
+        for (const c of s.cities) {
+          const first = firstSeen.get(`${p.player}:${c.centerIndex}`);
+          if (first !== undefined && first <= p.spent) addCityPerm(c, fx.cityPermAll);
+        }
+      }
     }
     const cityPerm = Object.entries(fx.cityPerm ?? {}).filter(([, n]) => n);
     const tilePerm = Object.entries(fx.tilePerm ?? {}).filter(([, n]) => n);

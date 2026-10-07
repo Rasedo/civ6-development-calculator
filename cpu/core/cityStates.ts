@@ -351,6 +351,15 @@ interface CsBonuses {
   buildingAdd: Partial<Record<string, Partial<Yields>>>;
 }
 
+/** The envoys whose 1/3/6 rows pay `seat`: CIV6 (Leaders.xml,
+ *  PLAYER_HAS_SMALL / MEDIUM / LARGE_INFLUENCE) each tier's requirement set
+ *  holds REQUIRES_PLAYER_AT_PEACE beside the envoy count, so a seat at war
+ *  with the minor draws none of its rows (runs/h1_duelw1128 Rome t197: war
+ *  on two city-states, the capital's +1 Science and +1 Faith gone). */
+function envoysPaying(state: GameState, cityState: CityState, seat: number): number {
+  return civsAtWar(state, seat, cityState.seat) ? 0 : envoysHere(state, cityState, seat);
+}
+
 /** The city-state YIELD ladder (`CITY_STATE_ENVOY_ROWS` of the yield types);
  *  the production types pay through `cityStateItemProduction` instead. */
 export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses {
@@ -358,7 +367,7 @@ export function cityStateEnvoyBonuses(state: GameState, seat: number): CsBonuses
   const buildingAdd: CsBonuses['buildingAdd'] = {};
   for (const cityState of state.cityStates) {
     if (CITY_STATE_ITEM_PROD[cityState.type]) continue;
-    const mine = envoysHere(state, cityState, seat);
+    const mine = envoysPaying(state, cityState, seat);
     if (mine < 1) continue;
     const key = CITY_STATE_TYPE_YIELD[cityState.type];
     for (const row of CITY_STATE_ENVOY_ROWS) {
@@ -382,7 +391,7 @@ export function cityStateItemProduction(state: GameState, city: City, kind: Queu
   let dark: Set<string> | undefined;
   for (const cityState of state.cityStates) {
     if (!CITY_STATE_ITEM_PROD[cityState.type]?.includes(kind)) continue;
-    const mine = envoysHere(state, cityState, city.seat);
+    const mine = envoysPaying(state, cityState, city.seat);
     if (mine < 1) continue;
     for (const row of CITY_STATE_ENVOY_ROWS) {
       if (row.type !== cityState.type || mine < row.envoys) continue;

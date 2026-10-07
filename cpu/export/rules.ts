@@ -520,6 +520,7 @@ function gpFxRow(p: GreatPersonDef): number[] {
     ...GP_PERM.map((k) => fx.perm?.[k] ?? 0),
     ...GP_CITY_PERM.map((k) => fx.cityPerm?.[k] ?? 0),
     ...GP_TILE_PERM.map((k) => fx.tilePerm?.[k] ?? 0),
+    ...GP_CITY_PERM.map((k) => fx.cityPermAll?.[k] ?? 0),
   ];
 }
 
@@ -1480,6 +1481,8 @@ export function buildRules() {
         cityHousing: w.effects?.cityHousing ?? 0,
         empireHousing: w.effects?.empireHousing ?? 0,
         empireMult: YIELD_KEYS.map((k) => w.effects?.empireYieldMult?.[k] ?? 1),
+        // the percent a governed city off the capital continent gains (Casa)
+        foreignGov: YIELD_KEYS.map((k) => w.effects?.foreignGovernorYieldPct?.[k] ?? 0),
         popAllCities: w.effects?.popAllCities ?? 0,
         grantEnvoys: w.effects?.grantEnvoys ?? 0,
         governorTitles: w.effects?.governorTitles ?? 0,

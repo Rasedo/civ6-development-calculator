@@ -986,7 +986,7 @@ class SimPhase:
         capital, a building row in a city holding any of its buildings
         standing (not dark)."""
         bidx = self._bidx
-        env = self._envoys_here(row)
+        env = self._envoys_paying(row)
         B = cur.shape[0]
         nw = self._wonder_era.shape[0]
         kinds = (

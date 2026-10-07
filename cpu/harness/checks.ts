@@ -59,7 +59,7 @@ import type { LoggedDraw } from './randLog';
 import { DRAW_SITES, siteLabel } from './drawSites';
 import {
   AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, leviesAcross, majorEras, notStarted, citiesNotStarted, recordMap, recordRoutes, routeChanges, routeKey,
-  type History, type Imported,
+  type History, type Imported, landLapsed,
 } from './import';
 import {
   ERA_BEGINS, buildingDedications, campMoment, canalMoment, diploVictoryMoment, levyMoment, metAllMajorsMoment, newContinent, enterEra, eraCountdownStep, foundingKeys,
@@ -122,6 +122,16 @@ function cityGaps(imp: Imported, c: DumpCity): string[] {
     for (const x of imp.tileGaps.get(q) ?? []) if (worked.has(q) || !x.startsWith('event-draw:')) out.push(`plot ${q} ${x}`);
   }
   return [...new Set(out)];
+}
+
+/** whether a Border Control Treaty froze the seat's borders on the session
+ *  its last turn read (`Imported.congressOf`) */
+function frozenAtLastTurn(state: GameState, imp: Imported, seat: number): boolean {
+  const now = state.congress;
+  state.congress = imp.congressOf(seat);
+  const frozen = congressBorderFrozen(state, seat);
+  state.congress = now;
+  return frozen;
 }
 
 /** the checks a worked plot's yields feed — its Food the loyalty a starving
@@ -1146,9 +1156,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     // (bought) until that step; else -1 is no plot left to claim
     if (num(c.nextPlot) < 0 && imp.nextPlotUnheld.has(city.centerIndex)) {
       out.push({ turn, check: 'city.nextPlot', subject, ok: true, skip: 'no next plot held' });
-    } else if (congressBorderFrozen(state, city.seat)) {
+    } else if (frozenAtLastTurn(state, imp, city.seat)) {
       // a Border Control Treaty's target draws no plot: it holds what it
-      // held the turn before, or nothing once a plot was gained since
+      // held the turn before, or nothing once a plot was gained since — on
+      // the session its seat's last turn read (runs/h1_duelw1128 t182:
+      // China's treaty ended by the session shown that turn, Xi'an and
+      // Jiaodong still holding none until their next turn)
       const was = imp.cityBefore.get(`${c.owner}:${c.id}`);
       if (!was) out.push({ turn, check: 'city.nextPlot', subject, ok: true, skip: 'no record before' });
       else {
@@ -1156,14 +1169,12 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
         push('city.nextPlot', num(c.nextPlot) === held, num(c.nextPlot), held);
       }
     } else {
-      // the stored plot stands until the city's next border turn: one another
-      // city took since the pick (unowned at the record before) is judged on
-      // the plots as they stood at it (1121 t120: Taiyuan's 495, Shanghai's
-      // from China's actions, until Taiyuan's start redraws; t159: Xi'an's
-      // 358, Taiyuan's claim later in the same start)
+      // the stored plot stands until the city's next border turn though
+      // another city has taken it since: the draw read it unowned (1121
+      // t120: Taiyuan's 495, Shanghai's from China's actions; t159: Xi'an's
+      // 358; runs/h1_duelw1127 t69: Xi'an holds 279, Changsha's since)
       const np = num(c.nextPlot);
-      const stale = np >= 0 && state.map.tiles[np].ownerSeat !== NO_SEAT
-        && !!imp.recordBefore && num(plotAt(imp.recordBefore, np)[P.owner] as Read<number>) < 0;
+      const stale = np >= 0 && state.map.tiles[np].ownerSeat !== NO_SEAT && !tileBelongsTo(state.map.tiles[np], city);
       const ties = stale ? withoutOwners(state, [np], () => borderBestPlots(state, city)) : borderBestPlots(state, city);
       // the pick was drawn at the city's start, on the plots as they stood
       // there: the start's replayed ties read it where the record's plots
@@ -1595,6 +1606,8 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     // Taiyuan t71: its Granary completes and the city banks +7 on the plot
     // an Industrial Zone was placed on afterwards)
     if (!actedFirst && (!complete || late.districts.has(ti)) && !city.districts.some((x) => x.tileIndex === t.index)) continue;
+    // one placed before and finished after the walk stands unfinished for it
+    if (!actedFirst && late.districts.has(ti) && !t.districtComplete) continue;
     t.district = id;
     t.districtComplete = complete === true;
     // a district pillaged or repaired after its owner's walk stands as the
@@ -1636,7 +1649,8 @@ function landShortfall(state: GameState, seat: number, pa?: DumpPlayer, pb?: Dum
  *  swapped with no civic completed came after the cities (1112 t201). A
  *  city-state's research lands the same way, its civics' improvement bonuses
  *  with it (1121 Antioch t93: Mercantilism's Camp Food). */
-function landResearch(state: GameState, cat: Catalog, seat: number, pa?: DumpPlayer, pb?: DumpPlayer): void {
+function landResearch(state: GameState, cat: Catalog, seat: number, b: TurnRecord, history: History | undefined,
+  pa?: DumpPlayer, pb?: DumpPlayer): void {
   const s = seatOf(state, seat);
   if (!s || !pa || !pb) return;
   const ids = (bits: string, names: string[], kind: 'tech' | 'civic', prefix: string, known: object) =>
@@ -1649,9 +1663,26 @@ function landResearch(state: GameState, cat: Catalog, seat: number, pa?: DumpPla
   const gov = num(pb.government);
   const gid = gov >= 0 ? engineId('government', cat.governments[gov], 'GOVERNMENT_', GOVERNMENTS) : null;
   if (gid) s.government.chosen = gid as typeof s.government.chosen;
+  landPolicies(state, cat, seat, b, history, pb);
+}
+
+/** The cards record t+1 slots, landed on the seat with the cards it holds
+ *  lapsed by the import's rule (`landLapsed`: a rebuild lays the old cards
+ *  back unattached, a card re-slotted attaches; runs/h1_duelw1127 t225: Civil
+ *  Prestige re-slotted before China's cities, its +2 Housing reaching
+ *  Changsha's and Chengdu's growth; runs/h1_duelw1128 t99: a new
+ *  government lays it back lapsed before Xi'an grows) — read for the step
+ *  alone, record t+1's own import reading it afresh. */
+function landPolicies(state: GameState, cat: Catalog, seat: number, b: TurnRecord, history: History | undefined,
+  pb: DumpPlayer): void {
+  const s = seatOf(state, seat)!;
   s.government.policies = (pb.policies ?? []).map((x) => num(x)).filter((i) => i >= 0)
     .map((i) => engineId('policy', cat.policies[i], 'POLICY_', POLICIES))
     .filter((x): x is string => !!x) as typeof s.government.policies;
+  if (!history) return;
+  const had = history.policySlots.get(pb.id)?.has(b.turn) ?? false;
+  landLapsed(b, cat, state, seat, pb, history);
+  if (!had) history.policySlots.get(pb.id)?.delete(b.turn);
 }
 
 /** how far a Settler the city trained can stand from it at the next record:
@@ -1705,6 +1736,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         && (walked.has(r[3]) || acting.has(r[3]))) lateSettlers.add(`${r[3]}:${r[4]}`);
       else if (r[2] === 'CityProductionCompleted' && (r[5] === 1 || r[5] === 2) && r[8] === PURCHASED && walked.has(r[3]) && !acting.has(r[3])) {
         late(`${r[3]}:${r[4]}`, r[5] === 1 ? 'buildings' : 'districts', r[6] as number);
+      } else if (r[2] === 'CityProductionCompleted' && r[5] === 2 && acting.has(r[3])) {
+        // a district completed in its owner's actions (bought: runs/h1_duelw1127
+        // Longxi t223, an Aqueduct, the city growing at its old housing)
+        late(`${r[3]}:${r[4]}`, 'districts', r[6] as number);
       }
     }
   }
@@ -1893,6 +1928,24 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   // PlayerTurnActivated rows; 1118 Rome t100 -> t101 banks nothing, t101 ->
   // t102 twice, one such pair in each of 1117-1124)
   const inTurnStarts = logged ? logged.filter((r) => r[2] === 'PlayerTurnActivated' && r[3] === seatInTurn).length : 1;
+  // the citizens the turn's random events took (a fire's POPULATION_LOSS, a
+  // flood's, a storm's): a CityPopulationChanged row, one citizen each, in
+  // the event step after the last player closed turn t — after every other
+  // player's turn start, before the in-turn player's next (runs/h1_duelw1128
+  // Xi'an t47: a Settler, the growth to 5, a fire's loss to 4; runs/h1_duelw1127
+  // Rome t47: the fire's loss to 4, then the growth back to 5 at its start)
+  const eventPopLoss = new Map<string, number>();
+  if (logged) {
+    let closed = -1;
+    logged.forEach((r, i) => {
+      if (r[1] === a.turn && r[2] === 'PlayerTurnDeactivated') closed = i;
+    });
+    logged.forEach((r, i) => {
+      if (closed < 0 || i <= closed || r[1] !== a.turn || r[2] !== 'CityPopulationChanged') return;
+      const k = `${r[3]}:${r[4]}`;
+      eventPopLoss.set(k, (eventPopLoss.get(k) ?? 0) + 1);
+    });
+  }
   // the per-city turn step, city by city in the game's order, stats first
   const perSeat = new Map<number, { city: City; dump: DumpCity }[]>();
   for (const { city, dump } of citiesOfImport(imp)) {
@@ -1964,7 +2017,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     }, 0);
     const pa = a.players.find((q) => q.id === imp.playerOfSeat.get(seat));
     const pb = b.players.find((q) => q.id === imp.playerOfSeat.get(seat));
-    landResearch(state, cat, seat, pa, pb);
+    landResearch(state, cat, seat, b, history, pa, pb);
     // the envoys the player sent in its actions before its turn start stand
     // at its city turns (the InfluenceGiven rows of the actions opening the
     // pair's log; 1121 t33: Rome's first envoy to Ayutthaya on meeting it, +1
@@ -2038,12 +2091,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         for (const q of annexed) setTileOwner(state.map.tiles[q], seat, city.id);
         city.nextPlot = -1;
       }
-      if (i === policyFrom && pb) {
-        const sp = seatOf(state, seat)!;
-        sp.government.policies = (pb.policies ?? []).map((x) => num(x)).filter((q) => q >= 0)
-          .map((q) => engineId('policy', cat.policies[q], 'POLICY_', POLICIES))
-          .filter((x): x is string => !!x) as typeof sp.government.policies;
-      }
+      if (i === policyFrom && pb) landPolicies(state, cat, seat, b, history, pb);
       const k = `${c.owner}:${c.id}`;
       const next = after.get(k);
       const subject = subjectOf(c);
@@ -2053,13 +2101,23 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // the boxes of a city whose own turn start the pair missed
       const boxSkip = skipAll ?? (lateCities.has(k) ? 'a turn start missing from a record' : null);
       const granted = grant > 0 && !!next && !acts.cityChanged.has(k);
+      const evLoss = eventPopLoss.get(k) ?? 0;
+      if (evLoss && c.owner === seatInTurn) {
+        city.population = Math.max(1, city.population - evLoss);
+        replaceAllCitizens(state, city);
+      }
+      // the in-turn player grows at its next start, on the session the next
+      // record shows (runs/h1_duelw1128 Rome t121 and t141: a session's growth
+      // percent attached and detached the turn it is shown)
+      const congressAtGrowth = state.congress;
+      if (c.owner === seatInTurn) state.congress = congressNext;
       const st = computeCityStats(state, city, lux, getModifiers(state, seat));
       const res = (check: string, ok: boolean, game: unknown, ours: unknown, s?: Record<string, unknown>) =>
         out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !s ? {} : { state: s }) });
 
       // growth
       const before = { pop: city.population, food: city.foodBox };
-      const outside = acts.popOutsideBox.has(k) && !settled.has(city) && !granted ? 'a citizen came or went outside the food box' : null;
+      const outside = acts.popOutsideBox.has(k) && !settled.has(city) && !granted && !evLoss ? 'a citizen came or went outside the food box' : null;
       const growSkip = boxSkip ?? outside;
       // a feature cleared or a resource harvested off the city's plots across
       // the pair pays its Food into the box in the owner's actions: before
@@ -2075,10 +2133,12 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
         const sk = k === 0 ? st : computeCityStats(state, city, lux, getModifiers(state, seat));
         seatGrowth(city, sk.effectiveFoodSurplus, sk.growthNeeded, state.turn);
       }
+      state.congress = congressAtGrowth;
       // the actions after the turn start: the turn's border step stands on
       // the city its start left
       let popAfter = city.population;
       if (leftLate.has(city) && !governorFlag(state, city, (e) => e.settlerFreePop)) popAfter = Math.max(1, popAfter - 1);
+      if (evLoss && c.owner !== seatInTurn) popAfter = Math.max(1, popAfter - evLoss);
       let boxAfter = city.foodBox;
       if (c.owner !== seatInTurn && lump > 0) {
         boxAfter += lump;
@@ -2485,12 +2545,24 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
     for (const [pid, n] of done) of(pid).events.push([`routes done ${n}`, (st, seat) => dedicationEvent(st, seat, DED_COINAGE, n)]);
   }
   // a barbarian camp gone from its plot: the major whose unit stands there
-  // at t+1 destroyed it
+  // at t+1 destroyed it, or the one the log moves onto it as it goes
+  // (runs/h1_duelw1127 t50: Rome's unit clears 33,22 and walks on)
   const campIdx = cat.improvements.indexOf('IMPROVEMENT_BARBARIAN_CAMP');
+  const rowsB = ((b as TurnRecord & { actions?: unknown[][] }).actions ?? []) as unknown[][];
+  const isMajor = (pid: unknown) => b.players.some((p) => p.id === pid && bool(p.major));
   for (let i = 0; campIdx >= 0 && i < W * b.head.H; i++) {
     if (plotAt(a, i)[P.improvement] !== campIdx || plotAt(b, i)[P.improvement] === campIdx) continue;
-    const by = b.units.find((u) => u.y * W + u.x === i && b.players.some((p) => p.id === u.owner && bool(p.major)));
-    if (by) of(by.owner).events.push([`camp ${i}`, (st, seat) => campMoment(st, seat, i)]);
+    let owner = b.units.find((u) => u.y * W + u.x === i && isMajor(u.owner))?.owner;
+    if (owner === undefined) {
+      const gone = rowsB.findIndex((r) => r[2] === 'ImprovementRemovedFromMap' && (r[4] as number) * W + (r[3] as number) === i);
+      for (let j = gone - 1; gone > 0 && j >= 0; j--) {
+        const r = rowsB[j];
+        if (r[2] !== 'UnitMoved' || (r[6] as number) * W + (r[5] as number) !== i) continue;
+        if (isMajor(r[3])) owner = r[3] as number;
+        break;
+      }
+    }
+    if (owner !== undefined) of(owner).events.push([`camp ${i}`, (st, seat) => campMoment(st, seat, i)]);
   }
   for (const [i, by] of villagesEntered(a, b, cat)) of(by).events.push([`village ${i}`, goodyMoment]);
   // each Eureka and Inspiration the player newly holds
@@ -2535,7 +2607,7 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
  * near-a-feature founding keys of each city it founded; the city-states'
  * research eras join the world's (`recordMoments`).
  */
-export function seedMoments(state: GameState, imp: Imported, history?: History): void {
+export function seedMoments(state: GameState, imp: Imported, history?: History, rec?: TurnRecord, cat?: Catalog): void {
   const world = new Set<number>(history?.momentsWorld ?? []);
   for (const [pid, seat] of imp.seatOfPlayer) {
     const s = seatOf(state, seat);
@@ -2549,6 +2621,16 @@ export function seedMoments(state: GameState, imp: Imported, history?: History):
     for (const k of ks) world.add(k);
   }
   for (const c of state.cityStates) researchKeys(c.research.techs, c.research.civics, world);
+  // the barbarians' research is the world's too (runs/h1_duelw1128 t31:
+  // Rome's Iron Working pays TECH_RESEARCHED_IN_ERA_FIRST, 1, the barbarians
+  // holding Shipbuilding)
+  for (const p of rec && cat ? rec.players : []) {
+    if (!bool(p.barb)) continue;
+    const ids = (bits: string, names: string[], kind: 'tech' | 'civic', prefix: string, known: object) =>
+      [...(bits ?? '')].flatMap((ch, k) => (ch === '1' ? [engineId(kind, names[k], prefix, known)] : []))
+        .filter((x): x is string => !!x);
+    researchKeys(ids(p.techs, cat!.techs, 'tech', 'TECH_', TECHS), ids(p.civics, cat!.civics, 'civic', 'CIVIC_', CIVICS), world);
+  }
   state.momentsWorld = [...world].sort((x, y) => x - y);
 }
 
@@ -2592,7 +2674,7 @@ function eraChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, late: Set<number>
   const events = eraEvents(a, b, cat, prev);
   // t+1 read with the pair's own levies held as levies (`leviesAcross`)
   const ib = importTurn(b, cat, history && { ...history, levied: new Map([...history.levied, ...leviesAcross(a, b)]) });
-  seedMoments(state, imp, history);
+  seedMoments(state, imp, history, a, cat);
   for (const p0 of a.players) {
     if (!bool(p0.major)) continue;
     const p1 = b.players.find((q) => q.id === p0.id);

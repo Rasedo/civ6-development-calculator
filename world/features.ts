@@ -294,3 +294,12 @@ Object.assign(FEATURES, {
 Object.assign(FEATURES, {
   MATTERHORN: { id: 'MATTERHORN', name: 'Matterhorn', yields: {}, impassable: true, adjacentYields: { culture: 1 }, ...NW },
 } satisfies Record<string, FeatureDef>);
+
+// MOUNT RORAIMA, appended after the Matterhorn; the engines' map generator
+// lays none, an imported world carries it. CIV6 (Expansion1_Features_Major.xml):
+// four plots, Impassable, Appeal 2, SightThroughModifier 2, no
+// Feature_YieldChanges row; Feature_AdjacentYields Faith 1 Science 1 to
+// every neighbouring plot (runs/h1_duelw1128).
+Object.assign(FEATURES, {
+  RORAIMA: { id: 'RORAIMA', name: 'Mount Roraima', yields: {}, impassable: true, adjacentYields: { faith: 1, science: 1 }, ...NW },
+} satisfies Record<string, FeatureDef>);

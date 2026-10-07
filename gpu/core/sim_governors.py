@@ -201,6 +201,14 @@ class SimGovernors:
             return self._envoys_here_all()[:, row]
         return self._envoys_here_one(row)
 
+    def _envoys_paying(self, row: int) -> torch.Tensor:
+        """[B, S] long — `envoysPaying`'s twin: the envoys whose 1/3/6 rows
+        pay major row `row`, none at a city-state it is at war with (each
+        tier's requirement set holds REQUIRES_PLAYER_AT_PEACE)."""
+        env = self._envoys_here(row)
+        war = self.war[:, row, self.n_majors:self.n_majors + self.S]
+        return torch.where(war, torch.zeros_like(env), env)
+
     def _envoys_here_one(self, row: int) -> torch.Tensor:
         """[B, S] long — one row's effective count, derived."""
         return self._envoys_with(row, self.seat_citystate_envoys[:, row].to(torch.long))

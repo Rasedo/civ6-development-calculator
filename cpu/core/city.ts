@@ -33,7 +33,7 @@ import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TO
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { CITY_WORK_RADIUS, BORDER_MAX_RADIUS, PLOT_INFLUENCE, borderGrowthCost, FOOD_PER_CITIZEN, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, LUXURY_AMENITY_CITIES, growthFoodNeeded, housingGrowthFactor, amenitiesNeeded, amenityTier, amenityTierIndex, type AmenityTier } from '../data/constants';
-import { hiddenResourcesFor } from './seats';
+import { hiddenResourcesFor, onHomeContinent } from './seats';
 import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf, citiesOf, civOf, civVariantOf, tileClaimed, campTiles, borderTurnsFrom, isCityStateSeat } from './seats';
 import { warWearinessLosses } from './weariness';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, garrisonOf } from './units';
@@ -499,7 +499,10 @@ export function housingParts(state: GameState, city: City, mods?: Modifiers): nu
   const map = state.map;
   const center = map.tiles[city.centerIndex];
 
-  const fresh = hasFreshWater(map, center);
+  // CIV6 (Mohenjo-Daro, EFFECT_ADJUST_CITIES_FRESHWATER_HOUSING_BONUS): its
+  // suzerain's cities house as fresh-water cities (runs/h1_duelw1125, China
+  // suzerain from t123: every city's water part 3 -> 5)
+  const fresh = hasFreshWater(map, center) || suzerainEffect(state, city.seat, 'freshWaterHousing');
   let water = fresh
     ? HOUSING_FRESH_WATER
     : isCoastalLand(map, center)
@@ -862,8 +865,14 @@ export function borderPlotCost(state: GameState, city: City, t: Tile, yctx: Yiel
  *  Yiyang t216-222: the Shipwreck at 529 drawn over 528). */
 export function seenResourceAt(state: GameState, seat: number): (t: Tile) => boolean {
   const hidden = hiddenResourcesFor(state, seat);
-  const antiquity = isCivicComplete(state, ANTIQUITY_CIVIC, seat);
-  const shipwreck = isCivicComplete(state, SHIPWRECK_CIVIC, seat);
+  // a city-state sees what its suzerain sees, the dig sites too
+  // (`hiddenResourcesFor`; runs/h1_duelw1128 Hong Kong t177-188: the
+  // Antiquity Site at 228 drawn alone once China, its suzerain, holds
+  // Natural History)
+  const suz = isCityStateSeat(seat) ? (seatOf(state, seat) as CityState | undefined)?.suzerain ?? -1 : -1;
+  const knows = (civic: string) => isCivicComplete(state, civic, seat) || (suz >= 0 && isCivicComplete(state, civic, suz));
+  const antiquity = knows(ANTIQUITY_CIVIC);
+  const shipwreck = knows(SHIPWRECK_CIVIC);
   return (t) => (t.resource !== null && !hidden.has(t.resource))
     || (antiquity && !!t.antiquity) || (shipwreck && !!t.shipwreck);
 }
@@ -1608,7 +1617,7 @@ export function computeCityStats(
     const y = inst ? specialistYields(inst.type, city.buildings) : undefined;
     if (y) addYields(districts, y, n);
   }
-  const buildings = cityBuildingYields(ctx, city, city.powered ?? false);
+  const buildings = cityBuildingYields(ctx, city, city.powered ?? false, seatOf(state, city.seat));
   addYields(buildings, buildingEraYields(state, city));
   const regional = regionalEffects(
     state, city, governorFlag(state, city, (e) => e.industryAllSources));
@@ -1795,9 +1804,10 @@ export function computeCityStats(
   addYields(total, bonuses);
   addYields(total, trade);
   // CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB): the
-  // seat's percent on every non-Food yield at the Happy / Ecstatic tier
-  const gpHappy = tier.name === 'Happy' ? gpPermOf(seatOf(state, city.seat), 'happyYieldPct')
-    : tier.name === 'Ecstatic' ? gpPermOf(seatOf(state, city.seat), 'ecstaticYieldPct') : 0;
+  // percent this city was laid at the spend on every non-Food yield at the
+  // Happy / Ecstatic tier
+  const gpHappy = tier.name === 'Happy' ? gpCityPermOf(city, 'happyYieldPct')
+    : tier.name === 'Ecstatic' ? gpCityPermOf(city, 'ecstaticYieldPct') : 0;
   // CIV6 (GameAttribute::Value 0xaa740, the city yield's attribute): ONE
   // modifier per yield, value = base + base x modifier / 100 — every percent
   // on a city's yield (its amenity tier's, the cards', the governor's, the
@@ -1851,6 +1861,13 @@ export function computeCityStats(
     for (const mult of [mine ? w.def.effects?.cityYieldMult : undefined, w.def.effects?.empireYieldMult]) {
       if (!mult) continue;
       for (const k of Object.keys(mult) as YieldKey[]) pct[k] += (mult[k] ?? 1) - 1;
+    }
+    // CIV6 (Casa de Contratación): a city with an established governor off
+    // the owner's capital continent (runs/h1_duelw1125 Handan t197: Magnus
+    // established, +15% Production, Gold and Faith)
+    const fg = w.def.effects?.foreignGovernorYieldPct;
+    if (fg && cityGovernorEffects(state, city).length > 0 && !onHomeContinent(state, city.seat, city.centerIndex)) {
+      for (const k of Object.keys(fg) as YieldKey[]) pct[k] += (fg[k] ?? 0) / 100;
     }
   }
   // CIV6 (MINOR_CIV_PRODUCTION_PENALTY, MODIFIER_PLAYER_CITIES_ADJUST_CITY_

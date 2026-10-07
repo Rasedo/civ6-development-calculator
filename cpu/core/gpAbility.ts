@@ -237,6 +237,12 @@ export function addSeatPerm(seat: { gpPerm?: number[] }, perm: Partial<Record<st
   for (const [k, n] of Object.entries(perm)) if (n) permAdd(seat, GP_PERM.length, k, GP_PERM, n);
 }
 
+/** a PERMANENT per-city run added from outside a spend — the H-1 importer's
+ *  replay of a spent person's channels. */
+export function addCityPerm(city: { gpPerm?: number[] }, perm: Partial<Record<string, number>>): void {
+  for (const [k, n] of Object.entries(perm)) if (n) permAdd(city, GP_CITY_PERM.length, k, GP_CITY_PERM, n);
+}
+
 /** the tiles a `perAdjacent` clause counts around (and, when `here`, on) the
  *  activation tile. */
 function perAdjacentCount(state: GameState, tile: Tile, fx: NonNullable<GpEffect['perAdjacent']>): number {
@@ -488,6 +494,10 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   // PERMANENT CHANNELS.
   for (const [k, n] of Object.entries(fx.perm ?? {})) permAdd(owner, GP_PERM.length, k, GP_PERM, n);
   if (city) for (const [k, n] of Object.entries(fx.cityPerm ?? {})) permAdd(city, GP_CITY_PERM.length, k, GP_CITY_PERM, n);
+  // a RunOnce row: every city the seat holds now, none it gains after
+  for (const c of 'cities' in owner ? owner.cities : []) {
+    for (const [k, n] of Object.entries(fx.cityPermAll ?? {})) permAdd(c, GP_CITY_PERM.length, k, GP_CITY_PERM, n);
+  }
   // the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
   for (const [k, n] of Object.entries(fx.tilePerm ?? {})) permAdd(tile, GP_TILE_PERM.length, k, GP_TILE_PERM, n);
 

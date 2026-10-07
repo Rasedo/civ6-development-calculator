@@ -88,6 +88,10 @@ export interface BuiltWonderDef {
     empireHousing?: number;
     /** Multiplies every yield named in every city the owner holds. */
     empireYieldMult?: Partial<Yields>;
+    /** CIV6 (Casa de Contratación, GOVERNOR_CITY_NOT_OWNER_CAPITAL_CONTINENT_
+     *  REQUIREMENTS): the percent each yield named gains in every city of the
+     *  owner with an established governor off its capital's continent. */
+    foreignGovernorYieldPct?: Partial<Yields>;
     /** Population added once, at completion, to every city the owner holds. */
     popAllCities?: number;
     /** Envoys paid once, at completion. */
@@ -1040,8 +1044,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
     W({
       id: 'CASA_DE_CONTRATACION', name: 'Casa de Contratación', code: 'CC', cost: 920,
       requiresTech: 'CARTOGRAPHY', placement: { adjacentDistrict: 'GOVERNMENT_PLAZA' },
-      effects: { gpPoints: { MERCHANT: 3 }, governorTitles: 3 },
-      description: '+3 Merchant points per turn and 3 Governor titles at completion. Adjacent to a Government Plaza.',
+      effects: { gpPoints: { MERCHANT: 3 }, governorTitles: 3, foreignGovernorYieldPct: { faith: 15, gold: 15, production: 15 } },
+      description: '+3 Merchant points per turn and 3 Governor titles at completion; +15% Faith, Gold and Production in cities with a Governor off the capital\'s continent. Adjacent to a Government Plaza.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_CASA_DE_CONTRATACION', 'Cost', { scale: GAME_SPEED }),
@@ -1049,6 +1053,9 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'effects.gpPoints.MERCHANT': xml('Building_GreatPersonPoints', 'BuildingType=BUILDING_CASA_DE_CONTRATACION&GreatPersonClassType=GREAT_PERSON_CLASS_MERCHANT', 'PointsPerTurn'),
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_CASA_DE_CONTRATACION', 'AdjacentDistrict', { expect: 'DISTRICT_GOVERNMENT' }),
         'effects.governorTitles': xml('ModifierArguments', 'ModifierId=CONTRATACION_GOVERNOR_POINTS&Name=Delta', 'Value'),
+        'effects.foreignGovernorYieldPct.faith': xml('ModifierArguments', 'ModifierId=CONTRATACION_FOREIGNFAITH&Name=Amount', 'Value'),
+        'effects.foreignGovernorYieldPct.gold': xml('ModifierArguments', 'ModifierId=CONTRATACION_FOREIGNGOLD&Name=Amount', 'Value'),
+        'effects.foreignGovernorYieldPct.production': xml('ModifierArguments', 'ModifierId=CONTRATACION_FOREIGNPRODUCTION&Name=Amount', 'Value'),
       },
     }),
     W({

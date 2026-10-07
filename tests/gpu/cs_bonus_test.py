@@ -193,6 +193,31 @@ def test_building_pillage(rules, path) -> None:
           "(the remainder is the capital row)")
 
 
+def test_at_war(rules, path) -> None:
+    """CIV6 (PLAYER_HAS_*_INFLUENCE hold REQUIRES_PLAYER_AT_PEACE): a seat at
+    war with the minor draws none of its envoy rows (`envoysPaying`)."""
+    sim = opened(rules, path, 6)
+    _force_scientific_cs0(sim)
+    if sim.S > 1:
+        sim.citystate_alive[0, 1:] = False
+    sim.city_bldg[0, 0, 0, bidx("LIBRARY")] = True
+
+    def sci0(envoys: int) -> float:
+        sim.seat_citystate_envoys[0, 0, 0] = envoys
+        sim._eff_version += 1
+        total, _, _, _ = city_totals(sim, 0)
+        return float(total[0, 0, SCIENCE])
+
+    s0, s6 = sci0(0), sci0(6)
+    assert s6 > s0 + 1e-9, "the rows pay at peace"
+    cs_row = sim.n_majors
+    sim.war[0, 0, cs_row] = True
+    sim.war[0, cs_row, 0] = True
+    s6w = sci0(6)
+    assert abs(s6w - s0) < 1e-9, f"at war the envoys still pay ({s0} -> {s6w})"
+    print(f"  at-war OK: science {s0:.2f} -> {s6:.2f} at peace, {s6w:.2f} at war")
+
+
 def test_militaristic_item_prod(rules, path) -> None:
     """CIV6 (Ethiopia_Buildings.xml, the MINOR_CIV_MILITARISTIC_* rows): the
     militaristic ladder is Production toward UNITS — a Settler among them —
@@ -431,6 +456,7 @@ def main() -> None:
     test_catalog(rules, p)
     test_building_bonus(rules, p)
     test_building_pillage(rules, p)
+    test_at_war(rules, p)
     test_militaristic_item_prod(rules, p)
     test_suzerain(rules, p)
     test_faith_class(rules, p)

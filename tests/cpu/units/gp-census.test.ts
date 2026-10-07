@@ -6,7 +6,7 @@ import {
   GREAT_PEOPLE, GP_ABILITY, GP_CLASSES, GP_SITES, GP_SITE_CITY_CENTER,
   gpChargesOf, gpCityPermOf, gpNoMilitaryOf, gpPermOf, gpSiteArg, gpSiteOf, gpTilePermOf,
 } from '../../../cpu/data/greatPeople';
-import { activateGreatPerson, addSeatPerm, gpActivateOk } from '../../../cpu/core/gpAbility';
+import { activateGreatPerson, addCityPerm, addSeatPerm, gpActivateOk } from '../../../cpu/core/gpAbility';
 import { gpSiteKey, gpSiteTiles } from '../../../cpu/core/targetSites';
 import { computeCityStats, luxuryHoldings } from '../../../cpu/core/city';
 import { regionalEffects } from '../../../cpu/core/yields';
@@ -374,7 +374,7 @@ describe('the standing channels', () => {
     expect(computeCityStats(state, city).breakdown.districts.science).toBe(before.science);
   });
 
-  it('Ibn Khaldun: +2% at Happy and +4% at Ecstatic on every non-Food yield', () => {
+  it('Ibn Khaldun: +2% at Happy and +4% at Ecstatic on every non-Food yield of each city it was laid on', () => {
     const state = newGame();
     const seat = state.seats[0];
     const city = seat.cities[0];
@@ -382,15 +382,15 @@ describe('the standing channels', () => {
     let n = 0;
     while (computeCityStats(state, city).amenities.tier.name !== 'Happy' && n < 20) raise(++n);
     const base = computeCityStats(state, city).total;
-    addSeatPerm(seat, GP_ABILITY.GP_IBN_KHALDUN.perm!);
+    addCityPerm(city, GP_ABILITY.GP_IBN_KHALDUN.cityPermAll!);
     const happy = computeCityStats(state, city).total;
     // summed with the Happy tier's own +10%
     expect(happy.science).toBeCloseTo(base.science * 1.12 / 1.1, 2); // to 1/256: the percent in 24.8 fixed point
     expect(happy.food).toBe(base.food);
     while (computeCityStats(state, city).amenities.tier.name !== 'Ecstatic' && n < 20) raise(++n);
-    addSeatPerm(seat, { happyYieldPct: -2, ecstaticYieldPct: -4 });
+    addCityPerm(city, { happyYieldPct: -2, ecstaticYieldPct: -4 });
     const e0 = computeCityStats(state, city).total;
-    addSeatPerm(seat, { happyYieldPct: 2, ecstaticYieldPct: 4 });
+    addCityPerm(city, { happyYieldPct: 2, ecstaticYieldPct: 4 });
     expect(computeCityStats(state, city).total.culture).toBeCloseTo(e0.culture * 1.24 / 1.2, 2);
   });
 

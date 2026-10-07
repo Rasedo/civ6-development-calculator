@@ -336,8 +336,8 @@ def test_channels(rules, path, R) -> None:
     tier = int(sim._seat_amenity(ROW)[0][B0, 0])
     assert tier == sim._gp_ecstatic_tier, f"20 amenities make the capital Ecstatic: tier {tier}"
     e0 = p.walk()[B0, 0].clone()
-    sim.civ_gp_perm[:, ROW, sim._gp_perm_names.index("happyYieldPct")] = 2.0
-    sim.civ_gp_perm[:, ROW, sim._gp_perm_names.index("ecstaticYieldPct")] = 4.0
+    sim.city_gp_perm[:, ROW, 0, sim._gp_city_perm_names.index("happyYieldPct")] = 2.0
+    sim.city_gp_perm[:, ROW, 0, sim._gp_city_perm_names.index("ecstaticYieldPct")] = 4.0
     e1 = p.walk()[B0, 0]
     assert float(e1[0]) == float(e0[0]), "Food takes none of it"
     # summed with the Ecstatic tier's own +20%

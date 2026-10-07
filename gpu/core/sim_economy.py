@@ -7478,7 +7478,7 @@ class SimEconomy:
                 # `cityStateEnvoyBonuses`' building rows: per envoy bar, the
                 # yield-type city-states reached, counted by type, times each
                 # type's building amounts, on the type's yield
-                env, nB = self._envoys_here(row), lit.shape[2]
+                env, nB = self._envoys_paying(row), lit.shape[2]
                 ylad = self.citystate_alive & ~self._citystate_item_type
                 csf = torch.zeros(B, nB, 6, dtype=F64, device=dev)
                 for _e in self._cs_env_bars:
@@ -7566,6 +7566,14 @@ class SimEconomy:
                 _base = _base + torch.einsum(
                     "bjn,bn->bj", _mine * self.city_powered[:, row, sl].double().unsqueeze(2),
                     bcol["powY"][:, :, _yi])
+                # and a spent Great Person's add to its row, not a
+                # city-state's, a belief's or a card's (`cityBuildingYields`)
+                for _gk, _gb, _gy in self._gp_building_yields:
+                    if _gk < 0 or _gb < 0 or _gy != _yi:
+                        continue
+                    _gw = self._gp_perm(row, self._gp_perm_names[_gk]).double()
+                    if bool(_gw.count_nonzero()):
+                        _base = _base + _mine[:, :, _gb] * _gw.unsqueeze(1)
                 bld_y[:, :, _yi] = bld_y[:, :, _yi] + torch.where(
                     _live, _base * _pct, torch.zeros_like(_base))
         # CIV6 (`Building_YieldsPerEra`, the Dar-e Mehr): per game era since
@@ -7649,7 +7657,7 @@ class SimEconomy:
         b_cap = b_cap + _gcap.double()
         if self.S > 0 and row < self.n_majors:  # only a major sends envoys or holds a suzerain
             # `cityStateEnvoyBonuses`' capital rows
-            _env = self._envoys_here(row)
+            _env = self._envoys_paying(row)
             _ylad = self.citystate_alive & ~self._citystate_item_type
             for _e in self._cs_env_bars:
                 _cnt = torch.einsum("bs,bst->bt", ((_env >= _e) & _ylad).double(), self._cs_type_onehot)
@@ -7740,17 +7748,16 @@ class SimEconomy:
                 _at = (_tier == _ht) & self._row_is(row, _hc, _hl).unsqueeze(1)
                 pct[:, :, _hy] = pct[:, :, _hy] + _at.double() * (_hp / 100.0)
         # CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB):
-        # the seat's percent on every non-Food yield at the Happy / Ecstatic
-        # tier
-        _khh = self._gp_perm(row, "happyYieldPct").double()
-        _khe = self._gp_perm(row, "ecstaticYieldPct").double()
+        # the percent each city was laid at the spend on every non-Food yield
+        # at the Happy / Ecstatic tier
+        _khh = self._gp_city_perm(row, "happyYieldPct")[:, sl].double()     # [B, n]
+        _khe = self._gp_city_perm(row, "ecstaticYieldPct")[:, sl].double()
         if bool(_khh.count_nonzero()) or bool(_khe.count_nonzero()):
             _ktier = amen_tier if amen_tier is not None else self._seat_amenity(row)[0]
             if j is not None:
                 _ktier = _ktier[:, j:j + 1]
-            _kp = torch.where(_ktier == self._gp_happy_tier, _khh.unsqueeze(1),
-                              torch.where(_ktier == self._gp_ecstatic_tier, _khe.unsqueeze(1),
-                                          torch.zeros_like(_khh).unsqueeze(1)))
+            _kp = torch.where(_ktier == self._gp_happy_tier, _khh,
+                              torch.where(_ktier == self._gp_ecstatic_tier, _khe, torch.zeros_like(_khh)))
             for _ky in range(1, 6):
                 pct[:, :, _ky] = pct[:, :, _ky] + _kp / 100.0
         # CIV6 (Toqui, EFFECT_ADJUST_CITY_YIELD_MODIFIER): the roster's rows for
@@ -7811,12 +7818,21 @@ class SimEconomy:
             _held = _seatw.any(dim=1)  # [B, nW]
             zeros6 = torch.zeros(1, 1, 6, dtype=F64, device=dev)
             _held_any = _held.any(dim=0).tolist()
+            _fgov = None
             for wi in range(_seatw.shape[2]):
                 if not _held_any[wi]:
                     continue
                 if compw is not None:
                     pct = pct + torch.where(compw[:, :, wi:wi + 1], self._wond_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
                 pct = pct + torch.where(_held[:, wi].reshape(B, 1, 1), self._wond_emp_mult[wi].reshape(1, 1, 6) - 1.0, zeros6)
+                # CIV6 (Casa de Contratación): a city with an established
+                # governor off the owner's capital continent
+                if bool(self._wond_foreign_gov[wi].count_nonzero()):
+                    if _fgov is None:
+                        _fgov = self._governor_established(row)[:, sl] & ~self._on_home_continent(
+                            row, self.city_center[:, row, sl])
+                    pct = pct + torch.where((_held[:, wi].unsqueeze(1) & _fgov).unsqueeze(2),
+                                            self._wond_foreign_gov[wi].reshape(1, 1, 6) / 100.0, zeros6)
         # CIV6 (MINOR_CIV_PRODUCTION_PENALTY, a city yield percent): a
         # city-state's city takes the minor's -50% in the same sum
         if self._CITY_MINOR0 <= row < self.FREE_ROW:

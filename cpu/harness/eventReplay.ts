@@ -52,6 +52,10 @@ export interface ReplayedEvent {
 export interface EventReplay {
   /** the events whose every draw the replay placed, by key */
   events: Map<string, ReplayedEvent>;
+  /** by key, the turns whose step the replay placed for each event, one not
+   *  in `events` included (a storm whose last step was not placed): their
+   *  draws are in `gains` */
+  placedTurns: Map<string, Set<number>>;
   /** the fertility the replayed events laid between record T-1 and record
    *  T, by T: plot -> [Food, Production, Science, Culture] */
   gains: Map<number, Map<number, number[]>>;
@@ -206,7 +210,7 @@ function unownedAtStep(after: TurnRecord, T: number): Set<number> {
 }
 
 export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: RandLog): EventReplay {
-  const result: EventReplay = { events: new Map(), gains: new Map(), turns: new Map(), unsure: new Map(), steps: new Map(), gaps: new Map() };
+  const result: EventReplay = { events: new Map(), placedTurns: new Map(), gains: new Map(), turns: new Map(), unsure: new Map(), steps: new Map(), gaps: new Map() };
   const names = cat.randomEvents ?? [];
   const byTurn = new Map(recs.map((r) => [r.turn, r]));
   const seeds = new Map<string, number>();
@@ -559,6 +563,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
   }
   // an event is replayed when every turn its draws fell on was placed
   for (const [key, p] of placed) {
+    result.placedTurns.set(key, new Set([...p.turns].filter(([, g]) => g !== null).map(([t]) => t)));
     if ([...p.turns.values()].some((g) => g === null)) continue;
     const e = first.get(key);
     if (!e) continue;

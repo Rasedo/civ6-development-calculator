@@ -10537,6 +10537,11 @@ class SimSeats:
         # aqFreshBonus, a dry one is raised to aqNoFreshTotal. A pillaged
         # Aqueduct gives nothing.
         wh = self.tile_wh.gather(1, ctr)  # [B, cols] f64
+        # CIV6 (Mohenjo-Daro): its suzerain's cities house as fresh-water ones
+        if self._suz_c_fresh_house >= 0:
+            _mo = self._suz_effect(row, self._suz_c_fresh_house)
+            if bool(_mo.count_nonzero()):
+                wh = torch.where(_mo.unsqueeze(1), torch.full_like(wh, float(self._h_fresh)), wh)
         if self._aqueduct_idx >= 0:
             aq_t = dreg[:, :, self._aqueduct_idx]
             aq_c = aq_t.clamp(min=0)
@@ -11579,11 +11584,20 @@ class SimSeats:
     def _seen_resource(self, row: int) -> torch.Tensor:
         """[B, T] bool — `seenResourceAt`'s twin: a resource this row's
         research reveals, and a dig site its civics reveal (an Antiquity Site
-        past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`)."""
+        past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`; a
+        city-state's dig sites past its suzerain's civics)."""
         seen = self._res_live() & ~self._res_hidden(row)
+        s = row - self._CITY_MINOR0
         for plane, civic in ((self.antiquity, self._antiquity_civic), (self.shipwreck, self._shipwreck_civic)):
             if civic >= 0 and row < self.n_majors:
                 seen = seen | (plane & self.civ_civics[:, row, civic].unsqueeze(1))
+            elif civic >= 0 and 0 <= s < self.S:
+                # a city-state sees the dig sites its suzerain's civics reveal
+                suz = self.citystate_suzerain[:, s]                               # [B]
+                for x in range(self.n_majors):
+                    on = (suz == x) & self.civ_civics[:, x, civic]
+                    if bool(on.count_nonzero()):
+                        seen = seen | (plane & on.unsqueeze(1))
         return seen
 
     def _seat_border_key(self, row: int, center: torch.Tensor):

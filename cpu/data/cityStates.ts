@@ -71,7 +71,8 @@ export type SuzEffect =
   | 'hubAmenities'       // Muscat
   | 'relicFaith'         // Kandy
   | 'partnerProduction' // Singapore
-  | 'wonderProduction';  // Brussels
+  | 'wonderProduction'   // Brussels
+  | 'freshWaterHousing'; // Mohenjo-Daro
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -85,7 +86,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
-  'partnerProduction', 'wonderProduction',
+  'partnerProduction', 'wonderProduction', 'freshWaterHousing',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -319,6 +320,9 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'La Venta': { name: 'La Venta', type: 'religious', bonus: 'Your Builders can build Colossal Heads improvements.', suz: 'suzImprovement' },
   Yerevan: { name: 'Yerevan', type: 'religious', bonus: 'Your Apostle units can choose from any possible promotion instead of receiving a random promotion.', suz: 'apostlePromoChoice' },
   Armagh: { name: 'Armagh', type: 'religious', bonus: 'Your Builders can build Monastery improvements.', suz: 'suzImprovement' },
+  // CIV6 (Leaders.xml, MINOR_CIV_MOHENJO_DARO_CITIES_FRESHWATER_HOUSING_BONUS:
+  // MODIFIER_PLAYER_GRANT_CITIES_FRESHWATER_HOUSING_BONUS, HasBonus true)
+  'Mohenjo-Daro': { name: 'Mohenjo-Daro', type: 'cultural', bonus: 'Your cities have full Housing from water, as if they were adjacent to a River.', suz: 'freshWaterHousing' },
 };
 
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(

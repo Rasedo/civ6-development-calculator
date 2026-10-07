@@ -489,6 +489,8 @@ class SimInit:
         # Brussels: percent toward wonders (`suzerainWonderPct`)
         self._suz_c_wonder_prod = _sfx.index("wonderProduction") if "wonderProduction" in _sfx else -1
         self._suz_wonder_pct = float(_suz["wonderPct"])
+        # Mohenjo-Daro: every city houses as a fresh-water one
+        self._suz_c_fresh_house = _sfx.index("freshWaterHousing") if "freshWaterHousing" in _sfx else -1
         self._suz_hub_amen = (float(_suz["hubAmenities"]), int(_suz["hubDistrict"]))
         self._suz_c_relic_faith = _sfx.index("relicFaith") if "relicFaith" in _sfx else -1
         self._suz_relic_faith_pct = float(_suz["relicFaithPct"])
@@ -1620,6 +1622,8 @@ class SimInit:
             self._wond_cy = self._wond_cy_all * _local.unsqueeze(1)  # [nW, 6] the HOLDING city's share
             self._wond_mult = torch.tensor([w["mult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_emp_mult = torch.tensor([w["empireMult"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6] every city of the seat
+            # the percent a governed city off the capital continent gains (Casa)
+            self._wond_foreign_gov = torch.tensor([w["foreignGov"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW, 6]
             self._wond_grow = torch.tensor([w["growAll"] for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             _amen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             # wonderRegionalAmenities — a regional wonder's amenities.
@@ -1809,7 +1813,9 @@ class SimInit:
         self._GP_PERM0 = len(self._gp_fx_names)
         self._GP_CPERM0 = self._GP_PERM0 + len(self._gp_perm_names)
         self._GP_TPERM0 = self._GP_CPERM0 + len(self._gp_city_perm_names)
-        _fxw = self._GP_TPERM0 + len(self._gp_tile_perm_names)
+        # the RunOnce run (`cityPermAll`): every city the seat holds at the spend
+        self._GP_APERM0 = self._GP_TPERM0 + len(self._gp_tile_perm_names)
+        _fxw = self._GP_APERM0 + len(self._gp_city_perm_names)
         gp_fx = rr["gpEffects"] or [[[0] * max(1, _fxw)] * 4] * n_gp
         gp_ea = rr["gpEra"] or [[0] * len(c) for c in gp_fx]
         _maxN = max(1, max(len(c) for c in gp_fx))

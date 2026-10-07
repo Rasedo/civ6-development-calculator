@@ -79,7 +79,8 @@ export type FeatureId =
   | 'UBSUNUR_HOLLOW'
   | 'HA_LONG_BAY'
   | 'WHITE_DESERT'
-  | 'MATTERHORN';
+  | 'MATTERHORN'
+  | 'RORAIMA';
 
 export type ResourceCategory = 'bonus' | 'luxury' | 'strategic';
 

@@ -673,10 +673,6 @@ export const GP_PERM = [
   'universityScience',
   'researchLabScience',
   'factoryProduction',
-  // CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB): the
-  // percent a Happy / Ecstatic city adds to its five non-Food yields.
-  'happyYieldPct',
-  'ecstaticYieldPct',
   // CIV6 (Raja Todar Mal): Gold on a domestic route per specialty district
   // at its destination.
   'domesticRouteGoldPerSpecialty',
@@ -714,6 +710,10 @@ export const GP_CITY_PERM = [
   // CIV6 (Giovanni de' Medici, MODIFIER_SINGLE_CITY_ADJUST_EXTRA_GREAT_WORK_SLOTS):
   // the Bank's GREATWORKSLOT_PALACE slots (`GW_GP_EXTRA_SLOTS`).
   'bankGwSlots',
+  // CIV6 (Ibn Khaldun, MODIFIER_PLAYER_CITIES_ADJUST_HAPPINESS_YIELD_BAB): the
+  // percent a Happy / Ecstatic city adds to its five non-Food yields.
+  'happyYieldPct',
+  'ecstaticYieldPct',
 ] as const;
 type GpCityPermKey = (typeof GP_CITY_PERM)[number];
 
@@ -913,6 +913,11 @@ export interface GpEffect {
   grantRelic?: boolean;
   perm?: Partial<Record<GpPermKey, number>>;
   cityPerm?: Partial<Record<GpCityPermKey, number>>;
+  /** a RunOnce MODIFIER_PLAYER_CITIES_* row: the per-city channels laid on
+   *  every city the seat holds at the spend, none on a city it gains after
+   *  (runs/h1_duelw1125: Ibn Khaldun spent t121, Taiyuan, Longxi and Beijing
+   *  founded after it read no Happy percent) */
+  cityPermAll?: Partial<Record<GpCityPermKey, number>>;
   /** on the DISTRICT tile the charge is spent on. */
   tilePerm?: Partial<Record<GpTilePermKey, number>>;
 }
@@ -920,8 +925,9 @@ export interface GpEffect {
 /**
  * THE DENSE EFFECT ROW both engines read, by name. The exporter emits this
  * list beside the table, so the GPU never writes a column number down and a
- * new channel appends here and nowhere else. `perm` and `cityPerm` ride the
- * tail as their own runs, in `GP_PERM` / `GP_CITY_PERM` order.
+ * new channel appends here and nowhere else. `perm`, `cityPerm`, `tilePerm` and
+ * `cityPermAll` ride the tail as their own runs, in `GP_PERM` / `GP_CITY_PERM` /
+ * `GP_TILE_PERM` / `GP_CITY_PERM` order.
  */
 export const GP_FX = [
   'science', 'culture', 'gold', 'prodCapital', 'faith',
@@ -1056,7 +1062,7 @@ export const GP_ABILITY: Record<string, GpAbility> = {
   // your empire by 40%" — +2% at Happy, +4% at Ecstatic, per non-Food yield
   GP_IBN_KHALDUN: {
     cityPerm: { housing: 2, amenities: 1 },
-    perm: {
+    cityPermAll: {
       happyYieldPct: gpArg('GP_KHALDUN_HAPPY', 'GREAT_PERSON_INDIVIDUAL_IBN_KHALDUN_EMPIRE_HAPPY_SCIENCE', 2),
       ecstaticYieldPct: gpArg('GP_KHALDUN_ECSTATIC', 'GREAT_PERSON_INDIVIDUAL_IBN_KHALDUN_EMPIRE_ECSTATIC_SCIENCE', 4),
     },

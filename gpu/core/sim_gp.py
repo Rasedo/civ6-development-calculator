@@ -493,6 +493,13 @@ class SimGp:
             if self._gp_appeal_col >= 0 and bool(
                     (_rowfx[_r, self._GP_CPERM0 + self._gp_appeal_col] != 0).count_nonzero()):
                 self._eff_version += 1
+        # a RunOnce row (`cityPermAll`): every city the seat holds now, none it
+        # gains after
+        if _nc and bool(m.count_nonzero()):
+            _all = _rowfx[:, self._GP_APERM0:self._GP_APERM0 + _nc]
+            if bool(_all.count_nonzero()):
+                _live = (self.city_alive[:, row] & m.unsqueeze(1)).to(self.city_gp_perm.dtype)   # [B, RC]
+                self.city_gp_perm[:, row] += _live.unsqueeze(2) * _all.to(self.city_gp_perm.dtype).unsqueeze(1)
         # the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
         _ntp = len(self._gp_tile_perm_names)
         if _ntp and bool(m.count_nonzero()):
