@@ -52,7 +52,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { CIVICS } from '../data/civics';
 import { TECHS } from '../data/techs';
 import { UNITS, CITY_MAX_HP, UNIT_HP, BUILDER_COST_STEP, SETTLER_COST_STEP, FORMATION_CS } from '../data/units';
-import { MP_SCALE, emptyStockpile, scaleByGameSpeed } from '../data/constants';
+import { MP_SCALE, WONDER_FREE_TILES, emptyStockpile, scaleByGameSpeed } from '../data/constants';
 import { accrueStockpiles, chargeUnitResource, chargeUnitUpkeep, resolveSeatPower } from '../core/stockpile';
 import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -104,6 +104,7 @@ export function engineFeature(cat: Catalog, fi: number): FeatureId | null {
   const id = FEATURE_ID[fname] ?? strip(fname, 'FEATURE_');
   return id in FEATURES ? id as FeatureId : null;
 }
+const PURCHASE_UNIT_HASH = gameHash('UNIT');
 
 export interface Imported {
   state: GameState;
@@ -405,6 +406,9 @@ export interface History {
    *  city-state's player id: a city-state's unit gone at t+1 beside a new
    *  one of its type under the major */
   levied: Map<string, number>;
+  /** the turn each player last seated each governor (`GovernorAssigned` in
+   *  the records' action log), by `player:governor` catalog index */
+  govSeated: Map<string, number>;
   /** culture expansions by the city's centre plot (a capture keeps them) */
   cultureTaken: Map<number, number>;
   /** the residue each city's growth accumulator keeps, in 256ths, by its
@@ -466,6 +470,9 @@ export interface History {
    *  district of it completed since the record before, the count after
    *  that turn's productions */
   discountDistricts: Map<number, Map<DistrictId, number>>;
+  /** the count a type's district placed at the latest record took before its
+   *  placement moved the type's count, by `player:type` */
+  discountPlaced: Map<string, number>;
   /** the age each era transition gave each player, in order (`AGE_DARK`,
    *  `AGE_NORMAL`, `AGE_GOLDEN_ONLY`, `AGE_HEROIC`) */
   ages: Map<number, number[]>;
@@ -621,8 +628,8 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 }
 
 export function newHistory(): History {
-  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
-    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
+  return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
+    unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
     eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
@@ -1025,6 +1032,12 @@ function copiesQuoted(rec: TurnRecord, cat: Catalog, pid: number, unitName: stri
 export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void {
   const W = rec.head.W;
   const uReplace = new Map(cat.unitReplaces);
+  // a governor seated in a city: [.., turn, kind, city owner, city id,
+  // player, governor]
+  const logged = (rec as TurnRecord & { actions?: unknown }).actions;
+  for (const r of Array.isArray(logged) ? logged : []) {
+    if (Array.isArray(r) && r[2] === 'GovernorAssigned') h.govSeated.set(`${r[5]}:${r[6]}`, r[1] as number);
+  }
   // what a unit new at this record raises its owner's base to
   // (`raiseBestMelee`): a land or naval fighting unit's Combat with its
   // formation's strength
@@ -1110,6 +1123,27 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
       if (u.type === builder) h.builders.set(u.owner, (h.builders.get(u.owner) ?? 0) + 1);
     }
+    // a unit the log shows trained, bought or upgraded raises it too, gone
+    // by the record or not (1121 t43: Xi'an's Heavy Chariot, made and
+    // removed in China's processing, holds every centre at 28 - 10 until
+    // t77; 1118 t207: a Cuirassier made a Tank, merged into a Corps before
+    // the record, 85 - 10)
+    // An upgrade made at sea stands embarked and raises nothing (1122 t131:
+    // a Line Infantry made embarked).
+    const logged = (rec as TurnRecord & { actions?: unknown }).actions;
+    const afloat = new Set<unknown>();
+    for (const r of Array.isArray(logged) ? logged as unknown[][] : []) {
+      if (r[2] === 'UnitEmbarkedStateChanged') {
+        if (r[5] === true) afloat.add(r[4]);
+        else afloat.delete(r[4]);
+      }
+      const idx = r[2] === 'CityProductionCompleted' && r[5] === 0 ? r[6]
+        : r[2] === 'CityMadePurchase' && r[7] === PURCHASE_UNIT_HASH ? r[8]
+          : r[2] === 'UnitUpgraded' && !afloat.has(r[4]) ? r[5] : undefined;
+      if (typeof idx !== 'number' || minors.has(r[3] as number)) continue;
+      const cs = made(idx, 0);
+      if (cs > (h.bestMelee.get(r[3] as number) ?? 0)) h.bestMelee.set(r[3] as number, cs);
+    }
     const now = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     for (const u of h.last.units) {
       const cls = strip(cat.units[u.type] ?? '', 'UNIT_GREAT_') as GreatPersonClass;
@@ -1155,8 +1189,13 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       const claimedNext = boughtPlots !== null && num(b.nextPlot) >= 0
         && gainedNow.length === 1 && gainedNow[0] === num(b.nextPlot)
         && !boughtPlots.has(num(b.nextPlot));
+      // a wonder the log completes in the city takes its free tiles
+      // (WONDER_FREE_TILES_UPON_COMPLETION) before the box can: a box that
+      // fell with no more than those gained bought nothing (1118 Beijing t224:
+      // two plots with its wonder, the price standing at 193)
+      const free = wonderFreeTiles(rec, c.owner, c.id);
       const paid = claimedNext || (num(c.culture) < num(b.culture) - 0.01
-        && (c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
+        && (free > 0 ? gainedNow.length > free : c.plots.length > b.plots.length || num(b.nextPlot) >= 0));
       if (paid) h.cultureTaken.set(k, (h.cultureTaken.get(k) ?? 0) + 1);
       // a box pays for one plot; any more came another way
       if (c.plots.length - b.plots.length > (paid ? 1 : 0)) h.nextPlotUnheld.add(k);
@@ -1399,6 +1438,14 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         for (const t of PLACEABLE_DISTRICTS) counts.set(t, D);
       }
       for (const t of completedSince(h.last, rec, cat, p.id)) counts.set(t, completedSpecialty(rec, cat, p.id));
+      // a district placed: its own price took the count standing, the type's
+      // later prices take the count at its placement (1117 t175: China's
+      // Aerodrome placed, the other cities quote it at 95, not 160)
+      for (const t of completedSince(h.last, rec, cat, p.id, true)) {
+        const was = counts.get(t);
+        if (was !== undefined) h.discountPlaced.set(`${p.id}:${t}`, was);
+        counts.set(t, completedSpecialty(rec, cat, p.id));
+      }
     }
     // a route gone with its Trader alive ran to its end: its owner holds a
     // Trading Post at both of its cities
@@ -1554,22 +1601,28 @@ function bitCount(bits: string | undefined): number {
   return n;
 }
 
-/** the types of the districts a player completed between two records: one
- *  complete in `b` that `a` showed in the same city incomplete or not at all */
-function completedSince(a: TurnRecord, b: TurnRecord, cat: Catalog, pid: number): Set<DistrictId> {
+/** the types of the districts a player completed (or, `placed`, placed)
+ *  between two records: one complete in `b` that `a` showed in the same city
+ *  incomplete or not at all (one `b` shows that `a` did not show at all) */
+function completedSince(a: TurnRecord, b: TurnRecord, cat: Catalog, pid: number, placed = false): Set<DistrictId> {
   const was = new Set<string>();
+  const stood = new Set<string>();
   const held = new Set<number>();
   for (const c of a.cities) {
     if (c.owner !== pid) continue;
     held.add(c.id);
-    for (const d of c.districts) if (d[3] === true) was.add(`${d[1]},${d[2]}`);
+    for (const d of c.districts) {
+      stood.add(`${d[1]},${d[2]}`);
+      if (d[3] === true) was.add(`${d[1]},${d[2]}`);
+    }
   }
   const out = new Set<DistrictId>();
   for (const c of b.cities) {
     if (c.owner !== pid || !held.has(c.id)) continue;
     for (const d of c.districts) {
       const id = engineRowOf(cat, 'district', d[0] as number) as DistrictId | null;
-      if (id && id !== 'CITY_CENTER' && d[3] === true && !was.has(`${d[1]},${d[2]}`)) out.add(id);
+      const at = `${d[1]},${d[2]}`;
+      if (id && id !== 'CITY_CENTER' && (placed ? !stood.has(at) : d[3] === true && !was.has(at))) out.add(id);
     }
   }
   return out;
@@ -1993,7 +2046,13 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   }
 
   // the governors: each appointed one in its catalog slot, seated in the
-  // engine city (or, Amani, the city-state) the game names
+  // engine city (or, Amani, the city-state) the game names. The record's
+  // count is the governor's whole establishment time: one seated on turn A
+  // establishes in its owner's turn processing A + that count (1117 Handan:
+  // seated t94, established at t99's, the border banking +20% that turn), so
+  // the engine's clock is the processings still to run, the next one
+  // included — the active player's own for this turn ran before the record.
+  const activeId = rec.players.find((q) => bool(q.turnActive))?.id ?? num(rec.head.localPlayer);
   for (const p of players) {
     const seat = seatOfGame(p.id);
     const s = seatOf(state, seat);
@@ -2024,11 +2083,14 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
       }
       const minor = minorOfPlayer.get(owner);
       const city = cityByKey.get(`${owner}:${cityId}`);
+      const seated = history?.govSeated.get(`${p.id}:${ti}`);
+      const next = p.id === activeId ? rec.turn + 1 : rec.turn;
       roster[gi] = {
         appointed: true,
         cityId: city && city.seat === seat ? city.id : -1,
         minorId: minor ? minor.id : -1,
-        establishTurns: bool(established) ? 0 : Math.max(0, num(toEstablish)),
+        establishTurns: bool(established) ? 0
+          : seated === undefined ? Math.max(0, num(toEstablish)) : Math.max(1, seated + num(toEstablish) - next + 1),
         outTurns: Math.max(0, num(neutralized) || 0),
         promotions,
       };
@@ -2141,7 +2203,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const readBack = history?.floods ? importFloods(state, history.floods) : importFloodCounts(rec, state, cityByKey.values());
   // the columns this record's readings placed an event's draws from
   for (const [i, cols] of history?.eventRead ?? []) readBack.set(i, new Set([...(readBack.get(i) ?? []), ...cols]));
-  if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
+  // the prices lock as the history reaches the record: a look ahead at the
+  // next record (the era checks' t+1 read) locks nothing
+  if (history && history.last === rec) lockDistrictPrices(rec, cat, state, cityByKey, history);
   if (history) importPower(ctx, rec, state, seatOfGame, history);
   // a boosted item neither held nor current holds its boost as parked
   // progress (`markBoost`); the record shows no item's progress but the
@@ -2210,6 +2274,34 @@ function importPower(ctx: Ctx, rec: TurnRecord, state: GameState, seatOfGame: (p
   }
 }
 
+/** the plots the wonders a record's log completes in a city grant it
+ *  (WONDER_FREE_TILES_UPON_COMPLETION each); 0 where the record carries no log */
+function wonderFreeTiles(rec: TurnRecord, pid: number, cityId: number): number {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const r of rows as unknown[][]) if (r[2] === 'WonderCompleted' && r[6] === pid && r[7] === cityId) n += WONDER_FREE_TILES;
+  return n;
+}
+
+/** the technologies and civics (engine ids) a player's log completes after
+ *  it places a district of row `idx` in its city `cityId`; none where the
+ *  record carries no log or the placement is not in it */
+function researchAfterPlacement(rec: TurnRecord, cat: Catalog, pid: number, cityId: number, idx: number): Set<string> {
+  const out = new Set<string>();
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return out;
+  let on = false;
+  for (const r of rows as unknown[][]) {
+    if (r[2] === 'DistrictAddedToMap' && r[3] === pid && r[5] === cityId && r[8] === idx) on = true;
+    if (!on || r[3] !== pid) continue;
+    const id = r[2] === 'ResearchCompleted' ? engineId('tech', cat.techs[r[4] as number] ?? '', 'TECH_', TECHS)
+      : r[2] === 'CivicCompleted' ? engineId('civic', cat.civics[r[4] as number] ?? '', 'CIVIC_', CIVICS) : null;
+    if (id) out.add(id);
+  }
+  return out;
+}
+
 /** The prices the record's standing districts locked at placement
  *  (`History.districtLocked`): a district the city quoted before it stood
  *  locks the engine's price at the first record it stands, itself left out
@@ -2256,10 +2348,75 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
       }
       unlocks ??= computeUnlocks(state, city.seat);
       const [placed] = city.districts.splice(at, 1);
+      // the price climbs with the research as it stood at the placement: a
+      // technology or civic the log completes after it is not yet in it
+      // (1117 Changsha's Aqueduct, placed in China's t227 processing at 139,
+      // before a Great Scientist's technologies took the quote to 142)
+      const later = researchAfterPlacement(rec, cat, c.owner, c.id, idx);
+      const { techs, civics } = s.research;
+      s.research.techs = techs.filter((x) => !later.has(x));
+      s.research.civics = civics.filter((x) => !later.has(x));
+      const slot = PLACEABLE_DISTRICTS.indexOf(id);
+      const counts = s.discountDistricts;
+      const pre = h.discountPlaced.get(`${c.owner}:${id}`);
+      if (counts && slot >= 0 && pre !== undefined) s.discountDistricts = counts.map((n, i) => (i === slot ? pre : n));
       h.districtLocked.set(key, districtSiteCost(state, s, id, unlocks));
+      s.discountDistricts = counts;
+      s.research.techs = techs;
+      s.research.civics = civics;
       city.districts.splice(at, 0, placed);
     }
   }
+}
+
+/**
+ * The cards a rebuild's player slotted after it, read off the record's log.
+ * `GovernmentPolicyChanged` signals a card entering a slot and each card a
+ * rebuild clears; the cards it lays back are written silently. Where the
+ * government changed, the cards signalled after the last `GovernmentChanged`
+ * were slotted anew (its clear stands before it). Where the slot count moved
+ * alone, the clear is a run of the player's signals, unbroken by its other
+ * events, one per card slotted then (the record before's cards and those
+ * slotted since), at least as many as the fewer of the two records' cards,
+ * and the cards signalled after the last such run were slotted anew. Null
+ * where the record carries no log or no rebuild shows in it (1118 China
+ * t202: the action phase clears its seven cards and slots Expropriation
+ * alone, Liberalism laid back paying nothing to t208; 1117 China t162: six
+ * cleared, four slotted).
+ */
+function slottedAfterRebuild(rec: TurnRecord, cat: Catalog, pid: number, before: (string | null)[], n: number): Set<string> | null {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  if (!Array.isArray(rows)) return null;
+  // the player's signals, a null between two runs where another of its
+  // events stands
+  const events: (string | null)[] = [];
+  let govAt = -1;
+  for (const r of rows as unknown[][]) {
+    if (r[3] !== pid || typeof r[2] !== 'string' || r[2].startsWith('Unit') || r[2].startsWith('City')) continue;
+    if (r[2] === 'GovernmentPolicyChanged') {
+      const i = r[4] as number;
+      events.push(i >= 0 ? engineId('policy', cat.policies[i] ?? '', 'POLICY_', POLICIES) : null);
+      continue;
+    }
+    if (r[2] === 'GovernmentChanged') govAt = events.length;
+    events.push(null);
+  }
+  const held = new Set(before.filter((c): c is string => c !== null));
+  let from = govAt;
+  for (let i = 0; i < events.length && govAt < 0;) {
+    let j = i;
+    const run = new Set<string>();
+    while (j < events.length && events[j] !== null && held.has(events[j]!) && !run.has(events[j]!)) run.add(events[j++]!);
+    if (run.size >= Math.max(1, n) && (i === 0 || events[i - 1] === null)) {
+      from = j;
+      i = j;
+      continue;
+    }
+    if (events[i] !== null) held.add(events[i]!);
+    i += 1;
+  }
+  if (from < 0) return null;
+  return new Set(events.slice(from).filter((c): c is string => c !== null));
 }
 
 /**
@@ -2296,7 +2453,10 @@ function importLapsed(rec: TurnRecord, cat: Catalog, state: GameState, seatOfGam
       const before = Math.max(-1, ...[...byTurn.keys()].filter((t) => t < rec.turn));
       const prev = byTurn.get(before);
       const lapsed = new Set<string>();
-      if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
+      const slotted = prev && (prev.gov !== gov || prev.cards.length !== cards.length)
+        ? slottedAfterRebuild(rec, cat, p.id, prev.cards, Math.min(cards.filter((c) => c).length, prev.cards.filter((c) => c).length)) : null;
+      if (slotted) cards.forEach((c) => { if (c && !slotted.has(c)) lapsed.add(c); });
+      else if (prev && (prev.gov !== gov || prev.cards.length !== cards.length)) {
         const laid = carryLayout(prev.kinds.map((k, i) => [k, prev!.cards[i] ?? null] as const), kinds, () => true);
         cards.forEach((c, i) => { if (c && laid[i] === c) lapsed.add(c); });
       } else if (prev) {

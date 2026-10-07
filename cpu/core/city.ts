@@ -2,7 +2,7 @@
 import { addYields, emptyYields, type City, type CityState, type DistrictId, type GameState, type Seat, type Tile, type Yields, type YieldKey, type FocusId, type ImprovementId } from './types';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isMountain } from '../../world/query';
-import { tileYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, liveSpecialtyCount } from './yields';
+import { tileYields, wonderAdjacentYields, improvementAdjacency, cityDistrictYields, cityBuildingYields, buildingEraYields, regionalEffects, localAmenities, darkBuildings, cityHasFeature, buildingPillaged, effectiveAdjacency, buildingVariantAdjacency, liveSpecialtyCount } from './yields';
 import { isCivicComplete, seatGovernment, getModifiers, notFoundedSum, religionsPresent, makeYieldCtx, withFollowerBelief, withGovernor, followerReligionsForCity, type Modifiers, type YieldCtx } from './effects';
 import { tileAppeal, appealTier, appealBand, PRESERVE_APPEAL_HOUSING } from './appeal';
 import { TECHS, ERAS } from '../data/techs'; // wonder/civ era scale
@@ -326,11 +326,17 @@ export function assignWorkedTiles(
   return worked;
 }
 
-/** City-center tile yields, floored per Civ 6. */
+/** City-center tile yields, floored per Civ 6: the plot's own Food and
+ *  Production raised to YIELD_FOOD_CITY_TERRAIN_REPLACE /
+ *  YIELD_PRODUCTION_CITY_TERRAIN_REPLACE, and what the natural wonders beside
+ *  it pay added after the floor (the DLL's plot yield 0x538a60: the city's
+ *  cmovl at 0x53916e, the neighbours' rows after it; runs/h1_duelw1121
+ *  Chengdu, Plains beside Yosemite: Food 3). */
 export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
   const y = tileYields(ctx, { ...center, district: null });
-  y.food = Math.max(y.food, CITY_CENTER_MIN_FOOD);
-  y.production = Math.max(y.production, CITY_CENTER_MIN_PRODUCTION);
+  const adj = wonderAdjacentYields(ctx.map, center);
+  y.food = Math.max(y.food - adj.food, CITY_CENTER_MIN_FOOD) + adj.food;
+  y.production = Math.max(y.production - adj.production, CITY_CENTER_MIN_PRODUCTION) + adj.production;
   return y;
 }
 

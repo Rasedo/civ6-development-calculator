@@ -143,6 +143,9 @@ class SimInit:
         # chop or a Volcanic Soil paint leaves it, exactly as TS reads
         # `tile.feature` live.
         self.tile_mountain = torch.tensor([[t.get("mtn", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
+        # the Food and Production the natural wonders beside a plot pay it, a
+        # city centre adding them after its floors (`tileYieldsForCenter`)
+        self.tile_nw_adj = torch.tensor([[t.get("nwa", [0, 0]) for t in f["tiles"]] for f in fixtures], dtype=dtype, device=device)
         self.coastal_land = torch.tensor([[t.get("cl", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.passable = torch.tensor([[t["pass"] for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)
         self.wpass = torch.tensor([[t.get("wpass", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.bool, device=device)

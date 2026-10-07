@@ -7051,8 +7051,13 @@ class SimEconomy:
             ctr6 = ctr6 + featP.gather(1, _c6).double()
         if hidY is not None:
             ctr6 = ctr6 - hidY.gather(1, _c6).double()   # the centre too (tileYieldsForCenter)
-        ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev))
-        ctr6[:, :, 1] = torch.maximum(p_plane.gather(1, ctr).double(), torch.tensor(float(self.rules.center_min_production), dtype=F64, device=dev))
+        # the floors take the plot's own Food and Production; what the natural
+        # wonders beside it pay rides on top (`tileYieldsForCenter`)
+        _nwa = self.tile_nw_adj.gather(1, ctr.unsqueeze(2).expand(-1, -1, 2)).double()
+        ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double() - _nwa[:, :, 0],
+                                      torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev)) + _nwa[:, :, 0]
+        ctr6[:, :, 1] = torch.maximum(p_plane.gather(1, ctr).double() - _nwa[:, :, 1],
+                                      torch.tensor(float(self.rules.center_min_production), dtype=F64, device=dev)) + _nwa[:, :, 1]
         # CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
         # tile of the named terrain (`CENTER_ADJ_ROWS`) — after the floors, as
         # TS adds them beside `tileYieldsForCenter`

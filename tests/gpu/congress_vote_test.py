@@ -591,10 +591,13 @@ def main() -> None:
             f"rank {rank} took {int(simC.civ_diplo_favor[0, row])} favor, wanted {want_f}"
         )
 
-    # ...and a tie takes the LOWER row, one total order both engines share
+    # ...and a tie on the best score pays the gold to every tied member, while
+    # the favor tiers go by rank, the LOWER row first (one total order both
+    # engines share)
     run_window(lambda row: 4.0 if row == 0 else 0.0)
-    assert int(simC.civ_diplo_points[0, 1]) == int(defn["gold"]), "a tie skipped the lower row"
-    assert int(simC.civ_diplo_points[0, 2]) == 0, "the tie paid gold twice"
+    for row in range(1, nrow):
+        assert int(simC.civ_diplo_points[0, row]) == int(defn["gold"]), f"tied row {row} missed the gold"
+    assert int(simC.civ_diplo_points[0, 0]) == 0, "the dirtiest row took the gold"
     assert int(simC.civ_diplo_favor[0, 2]) == int(defn["bronze"]), "the tied runner-up missed bronze"
     print("  the competition runs its 30 turns, scores the CO2 gap and pays all three tiers")
 

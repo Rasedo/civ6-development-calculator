@@ -16,7 +16,7 @@ import { YIELD_KEYS } from '../core/types';
 import type { WorldFile } from '../../world/file';
 import { tileCity, tileSeat } from '../core/seats';
 import { baseYieldCtx } from '../core/effects';
-import { tileYields, districtAdjacency } from '../core/yields';
+import { tileYields, districtAdjacency, wonderAdjacentYields } from '../core/yields';
 import { terrainDefense } from '../core/combat';
 import { terrainMp, unitPassable } from '../core/units';
 import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, isMountain, isWater, naturalWonderAt } from '../../world/query';
@@ -85,6 +85,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
       // static, the natural wonder rides `nw` and RAINFOREST `fid` +
       // feat_stripped.
       mtn: t.elevation === 'MOUNTAIN' ? 1 : 0,
+      // the Food and Production the natural wonders beside it pay, which a
+      // city centre adds after its floors (`tileYieldsForCenter`)
+      ...((nwa) => (nwa.food || nwa.production ? { nwa: [nwa.food, nwa.production] } : {}))(wonderAdjacentYields(map, t)),
       cl: isCoastalLand(map, t) ? 1 : 0,
       fid: t.feature ? featIdx.get(t.feature) ?? -1 : -1,
       // off-script gate catch (rng 2026006108 t81): foundCity strips

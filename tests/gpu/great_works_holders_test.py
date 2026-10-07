@@ -211,10 +211,15 @@ def main() -> None:
     d = (kongo - plain).tolist()
     # +2 Food, +2 Production, +1 Faith, +4 Gold per sculpture x3 — the
     # amenity factor scales the non-food columns, so the RATIOS are pinned —
-    # and the museum's theming leaves the roster's adders alone (culture equal)
+    # and the museum's theming leaves the roster's adders alone (culture equal
+    # to the 256th: the factor cuts each city's whole column to 1/256, and
+    # the two civilizations' columns stand on different bases)
     assert abs(d[0] - 6.0) < 1e-9, f"+2 Food per sculpture x3, got {d[0]}"
-    assert d[1] > 0 and d[2] > 0 and d[5] > 0 and abs(d[4]) < 1e-9, d
-    assert abs(d[2] / d[1] - 2.0) < 1e-9 and abs(d[1] / d[5] - 2.0) < 1e-9, "gold 4 : production 2 : faith 1"
+    assert d[1] > 0 and d[2] > 0 and d[5] > 0 and abs(d[4]) <= 1 / 256 + 1e-12, d
+    # gold 4 : production 2 : faith 1, each column cut to the 256th after the
+    # factor, so the differences of two cuts hold within two 256ths
+    assert abs(d[2] - 2 * d[1]) <= 2 / 256 + 1e-12 and abs(d[1] - 2 * d[5]) <= 2 / 256 + 1e-12, (
+        f"gold 4 : production 2 : faith 1, got {d}")
     print("  Nkisi's sculpture rows OK")
 
     # --- Kristina: a two-slot wonder themes itself once full, culture AND tourism

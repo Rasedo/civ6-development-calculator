@@ -1876,6 +1876,49 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   (MODIFIER_PLAYER_ADJUST_TRADE_ROUTE_YIELD_PER_SPECIALTY_DISTRICT_FOR_INTERNATIONAL):
   1117 Xi'an -> Caguana +6 Gold t108-120 under COMMEMORATION_ECONOMIC.
 
+## H-1: a city centre's floors — READ
+
+- The plot yield 0x538a60 sums the plot's own rows, then, on a plot holding
+  a city (0x81120), raises Food to YIELD_FOOD_CITY_TERRAIN_REPLACE 2 and
+  Production to YIELD_PRODUCTION_CITY_TERRAIN_REPLACE 1 (GlobalParameters
+  +0x7d4 / +0x7dc, the cmovl at 0x53916e), and only then adds the game
+  effects' rows (0xc7e9b0) and the neighbours' (the walk over the plot's x,
+  y from 0x5391c0) — Feature_AdjacentYields among them.
+- Recorded: 1121 Chengdu on Plains beside Yosemite (Food 1 adjacent) reads
+  Food 3 t221-250, the engines' floor-after 2. `tileYieldsForCenter` takes
+  its floors on the plot less `wonderAdjacentYields`; the GPU walk on its
+  planes less the exported `nwa` plane (`tile_nw_adj`).
+
+## H-1: the luxury allocation's rebuilds — PARTLY READ
+
+- Player DoTurn 0x4e4560 runs its cities (Player_Cities +0x12f0, 0x36f420 at
+  0x4e4665) before its resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the
+  holdings recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation).
+  So a city's growth and border read the allocation the previous rebuild
+  left. Recorded: 1122 t200, Reyna established in Changsha (Civil Prestige's
+  amenity) leaves the ranking standing to t201.
+- ChangeResourceAmount 0x4a7560 (resource, ownership, amount) rebuilds the
+  allocation at once (0x4a77d4, unless the game's flag +0x45e) for any
+  ownership-0 change and any non-accumulated import / export. Its callers:
+  a production completion's strategic costs (0x18433d building, 0x184d95
+  project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing
+  (0x4ab4d0 from the city, district and plot handlers 0x4ac2e0..0x4ad0d0;
+  an accumulated resource skips it), the copies 0x44eff0 hands a resource's
+  recipients, the power ledger 0x4a7cc0.
+- Unread: what rebuilds it at a policy change (the records: 9 of 9 policy
+  changes at the processing's start re-rank the cities' luxuries before
+  their growth), and which change re-runs it after a founding in the
+  action phase (AUDIT C-94 LAB).
+
+## H-1: the best melee from the log — READ (as above)
+
+- 0x4c1a30 raises the base as a unit is made, an upgrade included; a unit
+  made and removed before the record still raised it (1121 t43: Xi'an's
+  Heavy Chariot, 28, holds every centre at 18 until t77), and an upgrade
+  made embarked raises nothing (1122 t131's Line Infantry). The importer
+  reads CityProductionCompleted (order 0), CityMadePurchase of a unit and
+  UnitUpgraded off the action log (`advanceHistory`).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

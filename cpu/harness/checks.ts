@@ -42,7 +42,7 @@ import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
-import { governedCityIds, governorFlag } from '../core/governors';
+import { governedCityIds, governorClocks, governorFlag } from '../core/governors';
 import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT, WONDER_FREE_TILES } from '../data/constants';
 import { CITIZEN_NAMED_UNITS, PROMO_OFFER_UNITS, UNITS } from '../data/units';
@@ -1053,12 +1053,15 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     const gaps = cityGaps(imp, c);
     const push = (check: string, ok: boolean, game: unknown, ours: unknown, st?: Record<string, unknown>) =>
       out.push({ turn, check, subject, ok, game, ours, ...gapsFor(gaps, check), ...(ok || !st ? {} : { state: st }) });
-    // the city's yields and boxes stand as its seat's last turn left them,
-    // the congress then standing with them (1112 China t182: the session
-    // shown that turn reaches its cities' amenity tier at t183)
+    // the city reads the congress the game holds now, but its luxury
+    // allocation stands as its seat's last rebuild left it, on the session
+    // its last turn read (1112 China t182: the session shown that turn
+    // reaches its cities' amenity tier at t183; 1117 Xi'an t62: Sovereignty
+    // shown that turn already pays its route to Caguana)
     state.congress = imp.congressOf(city.seat);
-    const stats = computeCityStats(state, city);
+    const luxStanding = luxuryAmenities(state, city.seat);
     state.congress = congressNow;
+    const stats = computeCityStats(state, city, luxStanding);
     const gy = c.yields.map(num);
     // the game's city Gold is before its buildings' and districts' upkeep
     const oy = YIELD_KEYS.map((k: YieldKey) => round3(k === 'gold' ? stats.total.gold + stats.maintenance : stats.total[k]));
@@ -1089,10 +1092,8 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     }
     push('city.housing', near(stats.housing, num(c.housing)), num(c.housing), stats.housing,
       { parts: c.housingParts, ourParts: stats.housingParts, pop: city.population });
-    state.congress = imp.congressOf(city.seat);
-    const standing = computeCityStats(state, city).amenities;
-    const standingLux = luxuryAmenities(state, city.seat).get(city.id) ?? 0;
-    state.congress = congressNow;
+    const standing = stats.amenities;
+    const standingLux = luxStanding.get(city.id) ?? 0;
     push('city.amenities', standing.have === num(c.amenities) && standing.needed === num(c.amenitiesNeeded),
       [num(c.amenities), num(c.amenitiesNeeded)], [standing.have, standing.needed], { parts: c.amenityParts, ourLux: standingLux });
     const tierGame = 6 - num(c.happiness);
@@ -1470,7 +1471,12 @@ function actionFood(state: GameState, cat: Catalog, a: TurnRecord, b: TurnRecord
   return food;
 }
 
-function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCity, W: number, actedFirst: boolean): (landed: boolean) => void {
+/** the buildings and districts (catalog rows) a city's owner completed after
+ *  its city walk across a pair */
+interface LateItems { buildings: Set<number>; districts: Set<number>; pillage: Set<number> }
+
+function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCity, W: number, actedFirst: boolean,
+  late: LateItems = { buildings: new Set(), districts: new Set(), pillage: new Set() }): (landed: boolean) => void {
   type Side = { buildings: string[]; pillaged: string[] | undefined; wonders: City['wonders']; districts: City['districts'];
     tiles: [number, Tile['district'], boolean, boolean, boolean][] };
   const touched = new Set<number>();
@@ -1502,6 +1508,10 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     if (cat.wonders.includes(name)) {
       const id = engineId('wonder', name, 'BUILDING_', BUILT_WONDERS);
       if (!id || city.wonders.some((w) => w.id === id)) continue;
+      // a wonder or building its owner completed in its actions lands after
+      // its turn start (1118 t60: Longxi's Hanging Gardens, 98% in China's
+      // processing, finished in its actions; no city grows on its +15% then)
+      if (!actedFirst && late.buildings.has(bi)) continue;
       // a wonder granting every city a citizen lands after the cities have
       // grown, its Housing with it (runs/h1_duelw1108 t183, Angkor Wat:
       // Chengdu grows at its old quarter-growth housing band)
@@ -1514,6 +1524,7 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     }
     const id = engineRowOf(cat, 'building', bi);
     if (!id) continue;
+    if (!actedFirst && late.buildings.has(bi) && !start.buildings.includes(id)) continue;
     buildings.push(id);
     if (pil) pillaged.push(id);
   }
@@ -1529,10 +1540,12 @@ function landProduction(state: GameState, cat: Catalog, city: City, next: DumpCi
     // player the records were read in (`actedFirst`; runs/h1_duelw1112
     // Taiyuan t71: its Granary completes and the city banks +7 on the plot
     // an Industrial Zone was placed on afterwards)
-    if (!actedFirst && !complete && !city.districts.some((x) => x.tileIndex === t.index)) continue;
+    if (!actedFirst && (!complete || late.districts.has(ti)) && !city.districts.some((x) => x.tileIndex === t.index)) continue;
     t.district = id;
     t.districtComplete = complete === true;
-    t.districtPillaged = dpil === true;
+    // a district pillaged or repaired after its owner's walk stands as the
+    // walk read it (1118 t95: Xi'an's Theater Square pillaged by Preslav)
+    if (actedFirst || !late.pillage.has(t.index)) t.districtPillaged = dpil === true;
     if (!city.districts.some((x) => x.tileIndex === t.index)) city.districts.push({ type: id, tileIndex: t.index });
   }
   const landed = read();
@@ -1577,6 +1590,10 @@ function landResearch(state: GameState, cat: Catalog, seat: number, pa?: DumpPla
 /** how far a Settler the city trained can stand from it at the next record:
  *  its moves on the turn it appears */
 const SETTLER_WALK = UNITS.SETTLER.moves;
+/** a purchase's kind in the game's log: a unit */
+const PURCHASE_UNIT_HASH = gameHash('UNIT');
+/** a production the log completes by a purchase: `CityProductionCompleted`'s last cell */
+const PURCHASED = 65535;
 
 /** pin the city's citizens to the plots the later record works — the step
  *  after a citizen left with a Settler grows the city the game kept */
@@ -1599,6 +1616,39 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
   const state = imp.state;
   const after = new Map(b.cities.map((c) => [`${c.owner}:${c.id}`, c]));
   const settlerIdx = cat.units.indexOf('UNIT_SETTLER');
+  // the wonders, buildings and districts each city's owner completed after
+  // its city walk, by `owner:city`: in its actions (the log's WonderCompleted and
+  // finished BuildingChanged between its PlayerTurnActivated and
+  // PlayerTurnDeactivated), and a building or district bought in its processing after
+  // the walk closed (its `ResearchChanged` to none: 1118 t171 Chengdu's and
+  // t199 Taiyuan's Monuments, banked on the old Culture; 1117 t13 Xi'an's,
+  // bought before it, on the new)
+  const lateBuilt = new Map<string, LateItems>();
+  // the cities that bought a Settler after their walk: its citizen leaves
+  // after the turn's growth
+  const lateSettlers = new Set<string>();
+  {
+    const acting = new Set<unknown>();
+    const walked = new Set<unknown>();
+    const late = (k: string, kind: keyof LateItems, i: number) => {
+      const v = lateBuilt.get(k) ?? { buildings: new Set<number>(), districts: new Set<number>(), pillage: new Set<number>() };
+      v[kind].add(i);
+      lateBuilt.set(k, v);
+    };
+    for (const r of (b as TurnRecord & { actions?: unknown[][] }).actions ?? []) {
+      if (r[2] === 'PlayerTurnActivated') acting.add(r[3]);
+      else if (r[2] === 'PlayerTurnDeactivated') acting.delete(r[3]);
+      else if (r[2] === 'ResearchChanged' && r[4] === -1) walked.add(r[3]);
+      else if ((r[2] === 'WonderCompleted' || (r[2] === 'BuildingChanged' && r[8] === 100)) && acting.has(r[6])) late(`${r[6]}:${r[7]}`, 'buildings', r[5] as number);
+      else if (r[2] === 'DistrictPillaged' && walked.has(r[3])) late(`${r[3]}:${r[5]}`, 'pillage', (r[7] as number) * b.head.W + (r[6] as number));
+      else if (r[2] === 'CityMadePurchase' && r[7] === PURCHASE_UNIT_HASH && r[8] === settlerIdx
+        && (walked.has(r[3]) || acting.has(r[3]))) lateSettlers.add(`${r[3]}:${r[4]}`);
+      else if (r[2] === 'CityProductionCompleted' && (r[5] === 1 || r[5] === 2) && r[8] === PURCHASED && walked.has(r[3]) && !acting.has(r[3])) {
+        late(`${r[3]}:${r[4]}`, r[5] === 1 ? 'buildings' : 'districts', r[6] as number);
+      }
+    }
+  }
+  const logged = (b as TurnRecord & { actions?: unknown[][] }).actions;
 
   // the religious spread first, on the untouched turn-t state: each founder's
   // religion on its own turn, in the turn's order
@@ -1685,6 +1735,18 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     perSeat.set(city.seat, list);
   }
   for (const [seat, list] of perSeat) {
+    // the cities read the luxury allocation the last rebuild left: the
+    // player's resources rebuild it after the cities in its turn (Player
+    // DoTurn 0x4e4560: the cities 0x4e4665, then the resources 0x4e46c0 ->
+    // 0x4a6110), so a governor established in this processing moves no
+    // luxury before the next record (1122 t200: Reyna seated in Changsha,
+    // Civil Prestige's amenity re-ranks the luxuries only at t201); a
+    // policy change at the processing's start rebuilds it before the cities
+    // (the 9 recorded policy-change turns of 1117, 1118, 1121, 1122 read the
+    // new ranking, the 6 others the standing one)
+    const standing = luxuryAmenities(state, seat);
+    // the governors' clocks run first in the seat's processing
+    governorClocks(state, seat);
     // the turn's processing places the citizens the record caught idle
     // (`seatPhase`)
     placeIdleCitizens(list.map(({ city }) => city));
@@ -1696,20 +1758,37 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // (tools/civ6lab/turn_order_civ6.md, armS: pop 6 -> 5, then the pop-5
     // surplus), unless the city's governor spares it (Provision)
     const settled = new Set<City>();
+    const leftLate = new Set<City>();
     for (const { city, dump: c } of list) {
       const next = after.get(`${c.owner}:${c.id}`);
       if (!next || acts.cityChanged.has(`${c.owner}:${c.id}`)) continue;
-      sides.push(landProduction(state, cat, city, next, a.head.W, c.owner === seatInTurn));
+      sides.push(landProduction(state, cat, city, next, a.head.W, c.owner === seatInTurn, lateBuilt.get(`${c.owner}:${c.id}`)));
       // the Settler stands beside the city, or the city trained it (its
       // queue's head) and it walked off within its first moves
       const trained = (c.queue?.[0] as { UnitType?: number } | undefined)?.UnitType === settlerIdx && next.pop === c.pop - 1;
-      if (acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
+      // where the record logs its events, the Settler is this city's: it
+      // completed the Settler or bought one, seen at the next record or
+      // settled before it (1117 Xi'an t34: a Settler the game handed China
+      // beside it takes no citizen; Longxi t63: its Settler founded at once)
+      const made = !logged || logged.some((x) => x[3] === c.owner && x[4] === c.id
+        && ((x[2] === 'CityProductionCompleted' && x[5] === 0 && x[6] === settlerIdx)
+          || (x[2] === 'CityMadePurchase' && x[7] === PURCHASE_UNIT_HASH && x[8] === settlerIdx)));
+      if (logged ? made : acts.unitsNew.some((u) => u.owner === c.owner && u.type === settlerIdx
         && tileDistance(state, u.plot, city.centerIndex) <= (trained ? SETTLER_WALK : 1))) {
         settled.add(city);
-        if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
+        if (c.owner !== seatInTurn && lateSettlers.has(`${c.owner}:${c.id}`)) leftLate.add(city);
+        else if (!governorFlag(state, city, (e) => e.settlerFreePop)) {
           city.population = Math.max(1, city.population - 1);
-          // the citizen that left is the one the later record no longer works
+          // the citizen that left is the one the later record no longer works,
+          // also where the city grew one back (1117 Xi'an t21: 562 left, the
+          // pop-5 surplus 5, the regrown citizen on 563)
           if (next.pop === city.population) relockWorked(state, city, c, next);
+          else if (next.pop === city.population + 1) {
+            for (const q of c.worked) state.map.tiles[q].locked = false;
+            for (const q of c.worked) {
+              if (next.worked.includes(q) && q !== city.centerIndex && !state.map.tiles[q].district) state.map.tiles[q].locked = true;
+            }
+          }
         }
       }
     }
@@ -1722,9 +1801,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       const next = after.get(`${c.owner}:${c.id}`);
       return n + (next ? popGrant(cat, c, next) : 0);
     }, 0);
-    landResearch(state, cat, seat, a.players.find((q) => q.id === imp.playerOfSeat.get(seat)),
-      b.players.find((q) => q.id === imp.playerOfSeat.get(seat)));
-    const lux = luxuryAmenities(state, seat);
+    const pa = a.players.find((q) => q.id === imp.playerOfSeat.get(seat));
+    const pb = b.players.find((q) => q.id === imp.playerOfSeat.get(seat));
+    landResearch(state, cat, seat, pa, pb);
+    const lux = JSON.stringify(pa?.policies) !== JSON.stringify(pb?.policies) ? luxuryAmenities(state, seat) : standing;
     const mods = getModifiers(state, seat);
     const stats = new Map(list.map(({ city }) => [city, computeCityStats(state, city, lux, mods)]));
     for (const { city, dump: c } of list) {
@@ -1757,6 +1837,7 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       // the actions after the turn start: the turn's border step stands on
       // the city its start left
       let popAfter = city.population;
+      if (leftLate.has(city) && !governorFlag(state, city, (e) => e.settlerFreePop)) popAfter = Math.max(1, popAfter - 1);
       let boxAfter = city.foodBox;
       if (c.owner !== seatInTurn && lump > 0) {
         boxAfter += lump;
@@ -1785,6 +1866,13 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       for (const q of boughtPlots) setTileOwner(state.map.tiles[q], seat, city.id);
       const plotsBefore = new Set(state.map.tiles.filter((t) => t.ownerSeat === city.seat && t.ownerCity === city.id).map((t) => t.index));
       const boxBefore = city.cultureBox;
+      // the citizen the growth added works the one plot the later record
+      // shows: the city's own placement is the player's choice
+      if (next && city.population > before.pop && next.pop === city.population) {
+        const added = next.worked.filter((q) => !c.worked.includes(q));
+        const t = added.length === 1 && c.worked.every((q) => next.worked.includes(q)) ? state.map.tiles[added[0]] : undefined;
+        if (t && !t.district && t.index !== city.centerIndex) t.locked = true;
+      }
       const culture = cultureAfterGrowth(state, city, before.pop, st);
       // the culture turn reads the session the next record shows: a Border
       // Control Treaty holds the target's boxes from the pair it opens on
@@ -1861,11 +1949,27 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
       continue;
     }
     const city = minorCity(cs);
+    // the plots its processing claims stand before its growth, and the
+    // citizens the record caught idle go to work (1117 Antananarivo t62:
+    // 250 and 164 claimed, its two idle citizens work them, surplus 4 -> 8)
+    for (const q of acts.plotsGained.get(k) ?? []) setTileOwner(state.map.tiles[q], cs.seat);
+    placeIdleCitizens([city]);
     const undo = landProduction(state, cat, city, next, a.head.W, false);
     const st = computeCityStats(state, city);
     const before = { pop: city.population, food: city.foodBox };
     seatGrowth(city, st.effectiveFoodSurplus, st.growthNeeded, state.turn);
     undo(false);
+    // a feature cleared or a resource harvested in its actions, after its
+    // turn start, pays its Food into the box (1117 Caguana t49: +12)
+    const lump = actionFood(state, cat, a, b, city, c);
+    if (lump > 0) {
+      city.foodBox += lump;
+      const need = growthFoodNeeded(city.population);
+      if (city.foodBox >= need) {
+        city.foodBox -= need;
+        city.population += 1;
+      }
+    }
     const ok = city.population === next.pop && near(city.foodBox, num(next.food), 0.05);
     out.push({ turn, check: 'step.minorGrowth', subject, ok, game: [next.pop, num(next.food)], ours: [city.population, round3(city.foodBox)],
       ...gapsFor(cityGaps(imp, c), 'step.minorGrowth'),

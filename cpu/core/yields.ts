@@ -77,6 +77,17 @@ export function improvementAdjacency(ctx: YieldCtx, tile: Tile, imp: Improvement
   return out;
 }
 
+/** CIV6 (Feature_AdjacentYields): what the natural wonders beside `tile` pay
+ *  it, one row per neighbouring wonder plot. */
+export function wonderAdjacentYields(map: GameMap, tile: Tile): Yields {
+  const out = emptyYields();
+  for (const n of neighbors(map, tile)) {
+    const adj = FEATURES[naturalWonderAt(n) ?? '']?.adjacentYields;
+    if (adj) addYields(out, adj);
+  }
+  return out;
+}
+
 export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
   const out = emptyYields();
 
@@ -228,19 +239,14 @@ export function tileYields(ctx: YieldCtx, tile: Tile): Yields {
     }
   }
 
+  // CIV6 (Feature_AdjacentYields): what the natural wonders beside it pay.
   // CIV6 (Torres del Paine): the terrain yields double ONCE, however many of
   // the wonder's plots the tile touches (runs/h1_duelw1116 Beijing, plots 721
   // and 809 beside both of its plots: plains 2/2, forest 2/3)
-  let doubled = false;
-  for (const n of neighbors(ctx.map, tile)) {
-    const wf = naturalWonderAt(n);
-    if (!wf) continue;
-    const w = FEATURES[wf];
-    if (!w) continue;
-    if (w.adjacentYields) addYields(out, w.adjacentYields);
-    if (w.doublesAdjacentTerrain) doubled = true;
+  addYields(out, wonderAdjacentYields(ctx.map, tile));
+  if (neighbors(ctx.map, tile).some((n) => FEATURES[naturalWonderAt(n) ?? '']?.doublesAdjacentTerrain)) {
+    addYields(out, terrainYields(tile));
   }
-  if (doubled) addYields(out, terrainYields(tile));
 
   if (tile.fertility > 0) out.food += tile.fertility;
   if (tile.fertilityProd > 0) out.production += tile.fertilityProd;

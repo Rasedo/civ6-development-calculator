@@ -242,6 +242,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Civics', 'CivicType=CIVIC_MASS_MEDIA', 'EraType', { expect: 'ERA_MODERN' }),
     cost: xml('Civics', 'CivicType=CIVIC_MASS_MEDIA', 'Cost', { scale: GAME_SPEED }),
     prereqs: { derived: 'the CivicPrereqs rows of CIVIC_MASS_MEDIA, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_MASS_MEDIA&PrereqCivic=CIVIC_NATURAL_HISTORY', 'PrereqCivic', { expect: 'CIVIC_NATURAL_HISTORY' }), xml('CivicPrereqs', 'Civic=CIVIC_MASS_MEDIA&PrereqCivic=CIVIC_URBANIZATION', 'PrereqCivic', { expect: 'CIVIC_URBANIZATION' })] },
+    'effects.0.policy': xml('Policies', 'PolicyType=POLICY_PROPAGANDA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' }),
   },
   PROFESSIONAL_SPORTS: {
     era: xml('Civics', 'CivicType=CIVIC_PROFESSIONAL_SPORTS', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -645,7 +646,9 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'FORCE_MODERNIZATION' },
     ]),
 
-    C('MASS_MEDIA', 'Mass Media', 'Modern', 1540, ['NATURAL_HISTORY', 'URBANIZATION']),
+    C('MASS_MEDIA', 'Mass Media', 'Modern', 1540, ['NATURAL_HISTORY', 'URBANIZATION'], [
+      { kind: 'unlockPolicy', policy: 'PROPAGANDA' },
+    ]),
     C('PROFESSIONAL_SPORTS', 'Professional Sports', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockBuilding', building: 'STADIUM' },
       { kind: 'unlockBuilding', building: 'AQUATICS_CENTER' },

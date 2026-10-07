@@ -322,7 +322,18 @@ export function governorPhase(state: GameState, seat: number): void {
     taken.add(g.cityId);
     at += 1;
   }
+  governorClocks(state, seat);
+}
 
+/** The seat's governor clocks, in its turn processing before its cities: the
+ *  neutralize clock, a governor whose city or minor is gone back to the
+ *  Palace, and the establishment clock (the processing that brings it to 0
+ *  already reads the governor established). */
+export function governorClocks(state: GameState, seat: number): void {
+  const s = seatOf(state, seat);
+  if (!s) return;
+  const roster = governorsOf(s);
+  const cities = citiesOf(state, seat);
   for (const g of roster) {
     if (!g.appointed) continue;
     if (g.outTurns > 0) g.outTurns -= 1;

@@ -788,6 +788,10 @@ const POLICY_SRC: Record<string, SrcMap> = {
     'effects.prodBoost.eraMax': { derived: '-1: every era - the modifier names one unit type and no era', inputs: [xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_SPYPRODUCTION&Name=UnitType', 'Value')] },
     'effects.spyOffenseTimeCutPct': xml('ModifierArguments', 'ModifierId=MACHIAVELLIANISM_OFFENSIVESPYTIME&Name=ReductionPercent', 'Value'),
   },
+  PROPAGANDA: {
+    kind: xml('Policies', 'PolicyType=POLICY_PROPAGANDA', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.wwCutPct': { derived: '-Amount - the install writes the cut negative (Overall), this catalog positive', inputs: [xml('ModifierArguments', 'ModifierId=PROPAGANDA_OVERALLWARWEARINESS&Name=Amount', 'Value')] },
+  },
   RETAINERS: {
     kind: xml('Policies', 'PolicyType=POLICY_RETAINERS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
     obsoleteCivic: { derived: 'the PrereqCivic of the policy the install names in ObsoletePolicies', inputs: [xml('ObsoletePolicies', 'PolicyType=POLICY_RETAINERS', 'ObsoletePolicy', { expect: 'POLICY_PROPAGANDA' }), xml('Policies', 'PolicyType=POLICY_PROPAGANDA', 'PrereqCivic', { expect: 'CIVIC_MASS_MEDIA' })] },
@@ -1250,6 +1254,9 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     P('INTERNATIONAL_SPACE_AGENCY', 'International Space Agency', 'diplomatic',
       '+5% Science per city-state you are the Suzerain of.', undefined, {
       yieldPctPerSuzerain: { science: 0.05 },
+    }),
+    P('PROPAGANDA', 'Propaganda', 'military', 'War Weariness reduced by 25%.', undefined, {
+      wwCutPct: 25,
     }),
     P('RETAINERS', 'Retainers', 'military', '+1 Amenity in cities with a garrisoned unit.', 'MASS_MEDIA', {
       amenitiesWithGarrison: 1,
