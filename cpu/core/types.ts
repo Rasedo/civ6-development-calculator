@@ -792,6 +792,9 @@ export interface Seat {
    *  could not meet at this seat's last upkeep pass. */
   fuelShort?: number;
   camps: number[];
+  /** CIV6 (BOOST_TRIGGER_NUM_BARBS_KILLED): the barbarian units this seat
+   *  has destroyed (`boostOnKill`) */
+  barbKills?: number;
   gpEarned: string[];
   /** the era score this seat has earned over the whole game */
   eraScore?: number;

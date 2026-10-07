@@ -21,6 +21,7 @@
  * The GPU twin is `tests/gpu/geopolitics_test.py`'s pokes i, i2 and i3.
  */
 import { describe, it, expect } from 'vitest';
+import { BOOSTS } from '../../../cpu/data/boosts';
 import { makeMap, makeState, tileAtCoords, holdWorks } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { CIV_LEADERS } from '../../../cpu/data/seats';
@@ -467,7 +468,7 @@ describe('the alliance levels pay their dividends', () => {
   };
 
   it('Research 2 hands each side, every 30 turns, the first tech its ally holds and it does not', () => {
-    const [ta, tb, tc] = Object.keys(TECHS);
+    const [ta, tb, tc] = Object.keys(TECHS).filter((id) => BOOSTS[id]);
     const run = (turn: number): [string[], string[]] => {
       const state = table();
       state.turn = turn;

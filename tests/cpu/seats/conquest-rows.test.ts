@@ -4,7 +4,7 @@ import { emptySeat, setWar, tileCity } from '../../../cpu/core/seats';
 import { computeCityStats } from '../../../cpu/core/city';
 import { advanceGreatPeople } from '../../../cpu/core/greatPeople';
 import { computeUnlocks, getModifiers } from '../../../cpu/core/effects';
-import { effectiveResearchCostIn, rosterBoostPoints } from '../../../cpu/core/boosts';
+import { boostAmount, boostPoints } from '../../../cpu/core/boosts';
 import { standingLoyalty } from '../../../cpu/core/phase';
 import { governorTitlesEarned } from '../../../cpu/core/governors';
 import { spawnUnit, extraCharges } from '../../../cpu/core/units';
@@ -129,17 +129,12 @@ describe('Dynastic Cycle', () => {
   it('deepens a boost by ten points, on techs and on civics alike', () => {
     const state = sceneAs(seatRow('CHINA'));
     const plain = sceneAs(PLAIN);
-    expect(rosterBoostPoints(state, 0, false)).toBe(10);
-    expect(rosterBoostPoints(state, 0, true)).toBe(10);
-    expect(rosterBoostPoints(plain, 0, false)).toBe(0);
-    const id = Object.keys(TECHS)[0];
-    const rs = state.seats[0].research;
-    rs.boosted.push(id);
-    const base = TECHS[id].cost;
-    const chinese = effectiveResearchCostIn(rs, id, base, 0, 10);
-    const other = effectiveResearchCostIn(rs, id, base, 0, 0);
-    expect(chinese).toBe(Math.round(base * 0.5));
-    expect(other).toBe(Math.round(base * 0.6));
+    expect(boostPoints(state, 0, false)).toBe(10);
+    expect(boostPoints(state, 0, true)).toBe(10);
+    expect(boostPoints(plain, 0, false)).toBe(0);
+    // runs/h1_duelw1115: China's Writing (40) lands 19, Rome's 15
+    expect(boostAmount(40, 40, 10)).toBe(19);
+    expect(boostAmount(40, 40, 0)).toBe(15);
   });
 });
 

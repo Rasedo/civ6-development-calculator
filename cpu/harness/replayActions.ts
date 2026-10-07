@@ -55,12 +55,22 @@ export type Decision = Base & (
   | { kind: 'governors'; player: number }
   | { kind: 'war'; player: number; other: number; war: boolean }
   | { kind: 'routes'; player: number }
-  | { kind: 'move'; player: number; unit: string; plot: number }
+  /** `path`: the plots the log's `UnitMoved` steps entered, in order */
+  | { kind: 'move'; player: number; unit: string; plot: number; path?: number[] }
   | { kind: 'unitNew'; player: number; unit: string; type: number; plot: number; why: 'trained' | 'other' }
   | { kind: 'unitGone'; player: number; unit: string; why: 'founded' | 'consumed' | 'lost' }
   | { kind: 'capture'; player: number; city: number }
   | { kind: 'congress' }
   | { kind: 'combat'; player: number; unit: string; hp: number }
+  /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
+   *  type (-1 a city's shot or unknown), the victim's player and type */
+  | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
+  /** a promotion the player picked (`UnitPromoted`): the unit, the catalog's
+   *  `unitPromotions` index, the experience the unit held at record t */
+  | { kind: 'promote'; player: number; unit: string; promotion: number; xp: number }
+  /** a unit upgraded (`UnitUpgraded`): the game removes the unit and adds its
+   *  upgrade under a new id */
+  | { kind: 'upgrade'; player: number; unit: string; into: string }
   | { kind: 'camp'; player: number; plot: number; unit: string }
   | { kind: 'village'; player: number; plot: number; gold: number; faith: number; techBoosts: number[]; civicBoosts: number[];
       /** the city a citizen the village gave joined, -1 none */
@@ -325,6 +335,9 @@ export class InferredActions implements ActionSource {
         if (num(u.damage) > num(was.damage)) out.push({ kind: 'combat', phase: 'after', player: u.owner, unit: k, hp: 100 - num(u.damage) });
         continue;
       }
+      // a new unit already wounded fought the turn it came (runs/h1_duelw1118
+      // China's Scout, 31 damage in the record that first lists it)
+      if (num(u.damage) > 0) out.push({ kind: 'combat', phase: 'after', player: u.owner, unit: k, hp: 100 - num(u.damage) });
       const near1 = cityCentres(u.owner).filter((cc) => near(b, plot, cc, 3));
       if (heads0.get(u.owner)?.has(u.type) && near1.length) {
         out.push({ kind: 'unitNew', phase: 'after', player: u.owner, unit: k, type: u.type, plot, why: 'trained' });
@@ -439,7 +452,7 @@ const PURCHASE_PLOT = gameHash('PLOT');
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
 const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap']);
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -455,6 +468,8 @@ type Keyed = Map<string, Decision>;
  *   - `buyBuilding` and `buyPlot`: `CityMadePurchase` of a building or a plot;
  *   - `improve`: `ImprovementAddedToMap` (x, y, type, owner);
  *   - `pantheon`: `PantheonFounded` (player, belief);
+ *   - `kill`: `UnitKilledInCombat` (victim player, victim id, killer player,
+ *     killer id), the types off the records' units;
  *   - the active player's `research` and `civic` where the record holds no pick:
  *     its last `ResearchChanged` / `CivicChanged`; its queues' head: its last
  *     `CityProductionChanged` of the turn per city (a pick its start of turn
@@ -470,7 +485,7 @@ export class RecordedActions implements ActionSource {
 
   decisions(a: TurnRecord, b: TurnRecord, cat: Catalog): Decision[] {
     const rows = (b as TurnRecord & { actions?: unknown }).actions;
-    const inferred = this.inference.decisions(a, b, cat);
+    let inferred = this.inference.decisions(a, b, cat);
     if (!Array.isArray(rows)) return inferred;
     const W = b.head.W;
     const act = activePlayer(a);
@@ -496,6 +511,9 @@ export class RecordedActions implements ActionSource {
     };
 
     const log = new Map<string, Keyed>();
+    const out0: Decision[] = [];
+    const paths = new Map<string, number[]>();
+    let removed: string | null = null;
     const put = (kind: string, key: string, d: Decision) => {
       if (!log.has(kind)) log.set(kind, new Map());
       log.get(kind)!.set(key, d);
@@ -530,6 +548,28 @@ export class RecordedActions implements ActionSource {
         // across the pair leaves nothing to land
         if (/GOODY|BARBARIAN/.test(cat.improvements[imp] ?? '') || owner < 0 || plotAt(b, plot)[P.improvement] !== imp) continue;
         put('improve', `${plot}:${imp}`, { kind: 'improve', phase: phaseOf(owner), player: owner, plot, improvement: imp });
+      } else if (name === 'UnitRemovedFromMap') {
+        removed = `${n(r, 0)}:${n(r, 1)}`;
+      } else if (name === 'UnitUpgraded') {
+        // the unit the game removed just before it added the upgrade
+        if (removed && removed.startsWith(`${n(r, 0)}:`)) {
+          out0.push({ kind: 'upgrade', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: removed, into: `${n(r, 0)}:${n(r, 1)}` });
+        }
+      } else if (name === 'UnitPromoted') {
+        const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
+        out0.push({ kind: 'promote', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, promotion: n(r, 2),
+          xp: u0 ? num(u0.xp) : 0 });
+      } else if (name === 'UnitMoved') {
+        const k = `${n(r, 0)}:${n(r, 1)}`;
+        paths.set(k, [...(paths.get(k) ?? []), n(r, 3) * W + n(r, 2)]);
+      } else if (name === 'UnitKilledInCombat') {
+        const typeOf = (owner: number, id: number) => {
+          const u = a.units.find((x) => x.owner === owner && x.id === id) ?? b.units.find((x) => x.owner === owner && x.id === id);
+          return u ? num(u.type) : -1;
+        };
+        // after the engine's turn, which may have fought the same battle
+        out0.push({ kind: 'kill', phase: 'after', player: n(r, 2), killerType: typeOf(n(r, 2), n(r, 3)),
+          victim: n(r, 0), victimType: typeOf(n(r, 0), n(r, 1)), victimUnit: `${n(r, 0)}:${n(r, 1)}` });
       } else if (name === 'PantheonFounded') {
         put('pantheon', `${n(r, 0)}:${n(r, 1)}`, { kind: 'pantheon', phase: phaseOf(n(r, 0)), player: n(r, 0), belief: n(r, 1) });
       } else if ((name === 'ResearchChanged' || name === 'CivicChanged') && n(r, 0) === act && n(r, 1) >= 0) {
@@ -545,9 +585,11 @@ export class RecordedActions implements ActionSource {
         put('queueHead', `${centre}`, { kind: 'queue', phase: 'before', player: act, city: centre, items: [{ kind: pk, row: n(r, 3), plot: -1 }] });
       }
     }
+    const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     for (const r of ev) {
       if (r[2] !== 'UnitAddedToMap') continue;
       const k = `${n(r, 0)}:${n(r, 1)}`;
+      if (upgradedInto.has(k)) continue;
       const u = units1.get(k);
       if (!u || a.units.some((x) => unitKey(x) === k)) continue;
       const plot = u.y * W + u.x;
@@ -580,7 +622,13 @@ export class RecordedActions implements ActionSource {
       if (x.kind === 'queue' && y.kind === 'queue') return !!x.items[0] && !!y.items[0] && x.items[0].kind === y.items[0].kind && x.items[0].row === y.items[0].row;
       return JSON.stringify({ ...x, phase: 0 }) === JSON.stringify({ ...y, phase: 0 });
     };
-    const out: Decision[] = [];
+    // an upgrade is neither the old unit's loss nor the new one's arrival
+    const upgraded = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.unit, d.into] : [])));
+    const inferredAll = inferred;
+    inferred = inferredAll.filter((d) => !((d.kind === 'unitGone' || d.kind === 'unitNew') && upgraded.has(d.unit)));
+    const out: Decision[] = [...out0];
+    // the steps each moved unit took, on the inference's move
+    for (const d of inferred) if (d.kind === 'move' && paths.has(d.unit)) d.path = paths.get(d.unit);
     const settledKinds = new Set(['found', 'buyBuilding', 'buyPlot', 'improve', 'pantheon', 'unitOrigin', 'research', 'civic', 'queueHead']);
     const inferredBy = new Map<string, Keyed>();
     for (const d of inferred) {
@@ -624,7 +672,18 @@ export class RecordedActions implements ActionSource {
         // the record shows the pick the turn's changes settled on; the log's
         // last one stands where the record holds none (its picks churn
         // through transient rows: runs/h1_duelw1117 Rome t6-7, 2 then 5 then 2)
-        out.push(...(theirs.size ? theirs.values() : mine.values()));
+        // where the record shows that pick COMPLETED across the pair; a log
+        // pick the record shows neither held nor complete did not take
+        // (runs/h1_duelw1118: Rome names Military Tradition each turn and
+        // holds no civic and no progress through t100)
+        const bits = kind === 'research' ? 'techs' : 'civics';
+        const p0 = players0.get(act);
+        const p1 = b.players.find((p) => p.id === act);
+        const done = (d: Decision) => {
+          const k = d.kind === 'research' ? d.tech : d.kind === 'civic' ? d.civic : -1;
+          return k >= 0 && String(p1?.[bits] ?? '')[k] === '1' && String(p0?.[bits] ?? '')[k] !== '1';
+        };
+        out.push(...(theirs.size ? theirs.values() : [...mine.values()].filter(done)));
       } else {
         // what the log names, and what the records show that it does not
         out.push(...mine.values(), ...[...theirs].filter(([k]) => !mine.has(k)).map(([, d]) => d));

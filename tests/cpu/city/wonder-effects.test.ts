@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { BOOSTS } from '../../../cpu/data/boosts';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { makeMap, makeState, tileAtCoords, expandBorders, holdWorks } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
@@ -295,7 +296,11 @@ describe('wonder effects, sourced', () => {
     const wt = stand(state, city, 'GREAT_LIBRARY', 9, 8);
     completeQueueItem(state, city,
       { kind: 'wonder', wonder: 'GREAT_LIBRARY', tileIndex: wt, progress: 0 }, 0);
-    for (const id of early.slice(1)) expect(seat.research.boosted).toContain(id);
+    // a technology with no Boosts row (Animal Husbandry, Mining, Pottery) takes none
+    for (const id of early.slice(1)) {
+      if (BOOSTS[id]) expect(seat.research.boosted).toContain(id);
+      else expect(seat.research.boosted).not.toContain(id);
+    }
     expect(seat.research.boosted).not.toContain(early[0]);
     for (const id of later) expect(seat.research.boosted).not.toContain(id);
   });

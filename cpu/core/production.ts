@@ -1,4 +1,5 @@
 import type { City, GameState, Seat, Unit } from './types';
+import { markBoost } from './boosts';
 import { logPopWrite } from './difflog';
 import { repairBuilding, stampBuildingEra } from './yields';
 import { scoreProject } from './competition';
@@ -373,13 +374,10 @@ export function completeQueueItem(
       // researched, each of which is a Free Inquiry event like any other.
       const boostEra = fx?.boostTechsThroughEra ?? -1;
       if (boostEra >= 0) {
-        const rsr = owner.research;
         let fired = 0;
         for (const [id, def] of Object.entries(TECHS)) {
           if (ERAS.indexOf(def.era) > boostEra) continue;
-          if (rsr.techs.includes(id) || rsr.boosted.includes(id)) continue;
-          rsr.boosted.push(id);
-          fired += 1;
+          if (markBoost(state, city.seat, id)) fired += 1;
         }
         dedicationEvent(state, city.seat, DED_FREE_INQUIRY, fired);
       }

@@ -93,7 +93,7 @@ def main() -> None:
     print("  d envoy verb OK (neediest met, lowest-index ties, mask-gated)")
 
     # --- the RESEARCH verb ---------------------------------------------------
-    # Sort the available items by `effectiveResearchCostIn` and take the first;
+    # Sort the available items by `researchOwed` and take the first;
     # the sort is STABLE, so equal costs keep catalog order = lowest index wins.
     mm = torch.tensor([[True, True, True]])
     assert int(ladder.pick_research(torch.tensor([[80, 30, 100]]), mm)[0]) == 1, "cheapest EFFECTIVE cost wins"

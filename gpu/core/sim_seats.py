@@ -643,6 +643,13 @@ class SimSeats:
                 self.seat_delegation[:, _g, _h])
         self._stamp_war_kind(row, tgt, want, declare)
         self._grievance_war_declared(row, tgt, declare, want)
+        # CIV6 (BOOST_TRIGGER_RECEIVE_DOW, _DOW_CASUS_BELLI): the target's
+        # Defensive Tactics; a war a casus belli opens (a kind with a
+        # condition), the declarer's Nationalism (`boostOnWarDeclared`)
+        self._grant_boost_rows(tgt, declare, lambda r: r["cls"] == "RECEIVE_DOW")
+        _cond = torch.tensor([k[2] for k in self._war_kinds] or [0], dtype=torch.long, device=self.device)
+        _cb = declare & (_cond[want.clamp(min=0, max=_cond.numel() - 1)] != 0)
+        self._grant_boost_rows(row, _cb, lambda r: r["cls"] == "DOW_CASUS_BELLI")
         self._defensive_pact(row, tgt, declare)
 
     def _declare_war_minor(self, row: int, s: int, declare: torch.Tensor) -> None:
@@ -1368,9 +1375,10 @@ class SimSeats:
             if techs:
                 sky = self._golden_ded(row, self._ded_sky) & games
                 if bool(sky.count_nonzero()):
+                    want = torch.zeros_like(self.civ_techs[:, row])
                     for t in techs:
-                        self.civ_tech_boosted[:, row, t] = self.civ_tech_boosted[:, row, t] | (
-                            sky & ~self.civ_techs[:, row, t])
+                        want[:, t] = sky
+                    self._land_boosts(row, want, False)
             if self._gdr_idx >= 0:
                 auto = self._golden_ded(row, self._ded_automaton) & games
                 if bool(auto.count_nonzero()):
@@ -1704,8 +1712,9 @@ class SimSeats:
             if _bt < 0:
                 continue
             for _row in range(self.n_majors):
-                _w = self._row_is(_row, _bc, _bl)
-                self.civ_tech_boosted[:, _row, _bt] = self.civ_tech_boosted[:, _row, _bt] | _w
+                want = torch.zeros_like(self.civ_techs[:, _row])
+                want[:, _bt] = self._row_is(_row, _bc, _bl)
+                self._land_boosts(_row, want, False)
 
     def _religions_present(self, row: int, min_pressure: int = 1) -> torch.Tensor:
         """[B, RC] long — how many religions have at least `min_pressure` in
@@ -4039,37 +4048,41 @@ class SimSeats:
         return torch.where(air & (at >= 0), at, ctr)
 
     def _upgrade_gold_cost(self, row: int, utp: torch.Tensor, nc: torch.Tensor,
-                           levied: torch.Tensor) -> torch.Tensor:
-        """[B, ...] f64 — `upgradeGoldCost`: the gap between the two chassis'
-        own gold purchase prices (`unitPurchaseCost` — Mercenary Companies on a
-        combat or support chassis, Flower Power on a land one), never below 0. CIV6
-        (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
-        PERCENT): a LEVIED unit upgrades at the row's discount. `utp` and `nc`
-        are the old and new chassis, shaped [B] or [B, N]."""
+                           levied: torch.Tensor, formation: torch.Tensor) -> torch.Tensor:
+        """[B, ...] f64 — `upgradeGoldCost` (Unit_Upgrade_Manager 0x5376d0, in
+        24.8 fixed point): the base at the speed plus the two chassis'
+        production costs apart (never below none, at the net percent) times the
+        Gold a point costs; a Corps twice, an Army three times; Force
+        Modernization's percent off; the floor; a levied unit's percent off
+        (The Raven King) and its floor; down to a multiple of PURCHASE_DIVISOR.
+        `utp` and `nc` are the old and new chassis, `formation` the unit's,
+        shaped [B] or [B, N]."""
         B = self.B
         shp = utp.shape
         old = utp.clamp(min=0).reshape(B, -1)
         new = nc.clamp(min=0).reshape(B, -1)
-        merc = self._congress_unit_cost_mult(self._cur_gold).unsqueeze(1)
-        land = self._land_unit_price_mult(row)
+        base, lo, lo_s, lo_lv, lo_lv_s, net_pct, gold_eq = self.rules.upgrade_cost
+        cost = self._type_cost.long()
+        net = torch.div((cost.take(new) - cost.take(old)) * net_pct, 100, rounding_mode="trunc").clamp(min=0)
+        c = (base + net * gold_eq) * 256
+        form = formation.reshape(B, -1).long()
+        c = torch.where(form == 1, c * 2, torch.where(form == 2, c * 3, c))
 
-        buy_base = self._unit_buy_base()
+        def off(c: torch.Tensor, pct: torch.Tensor) -> torch.Tensor:
+            p = pct.clamp(max=100.0) / 100.0
+            fx = torch.trunc(p).long() * 256 + torch.trunc((p % 1.0) * 256).long()
+            return c - torch.div(c * fx.unsqueeze(1), 256, rounding_mode="trunc")
 
-        def price(t: torch.Tensor) -> torch.Tensor:
-            p = buy_base.gather(1, t) * self.rules.gold_purchase_mult
-            p = torch.where((self._type_combat.take(t) > 0) | self._type_support.take(t), p * merc, p)
-            return p * land.gather(1, t)
-
-        raw = (price(new) - price(old)).clamp(min=0)
-        # CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT)
-        off = self._gov_mods(row)[12]["upgold"].clamp(max=100.0).unsqueeze(1)
-        if bool((off > 0).count_nonzero()):
-            raw = torch.where(off > 0, js_round(raw * (100.0 - off) / 100.0), raw)
+        c = off(c, self._gov_mods(row)[12]["upgold"].double())
+        c = torch.where(c < lo * 256, torch.full_like(c, lo_s * 256), c)
         pct = torch.zeros(B, dtype=torch.float64, device=self.device)
         for _lc, _ll, _ld, _le, _lm, _lcs in self._live_rows(row, self._levy_rows):
             pct = torch.where(self._row_is(row, _lc, _ll), pct.clamp(min=float(_ld)), pct)
-        disc = js_round(raw * (1.0 - pct.clamp(max=100.0).unsqueeze(1) / 100.0))
-        return torch.where(levied.reshape(B, -1), disc, raw).reshape(shp)
+        cl = off(c, pct)
+        cl = torch.where(cl < lo_lv * 256, torch.full_like(cl, lo_lv_s * 256), cl)
+        g = torch.where(levied.reshape(B, -1), cl, c) // 256
+        d = int(self.rules.purchase_divisor)
+        return (g - g % d).double().reshape(shp)
 
     def _upgrade_res_cost(self, row: int, cost: torch.Tensor) -> torch.Tensor:
         """the new chassis' resource charge an UPGRADE draws, [B] or [B, N] —
@@ -4102,7 +4115,8 @@ class SimSeats:
                               torch.ones_like(ok))
         ok = ok & torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0).unsqueeze(1)).squeeze(1),
                               torch.ones_like(ok))
-        price = self._upgrade_gold_cost(row, utp, nc, self.unit_levied.gather(1, sc.unsqueeze(1)).squeeze(1))
+        price = self._upgrade_gold_cost(row, utp, nc, self.unit_levied.gather(1, sc.unsqueeze(1)).squeeze(1),
+                                        self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
         ok = ok & self._afford(self.civ_treasury[:, row], price)
         slot, cost = self._type_res_slot[nc], self._upgrade_res_cost(row, self._type_res_cost[nc])
         want = (slot >= 0) & (cost > 0) & (self._type_res_slot[utp.clamp(min=0)] != slot)
@@ -5888,6 +5902,8 @@ class SimSeats:
                         _m = _pay & (killer == g) & _who
                     if bool(_m.count_nonzero()):
                         _purse[:, g] += (_m.long() * _lump).to(_purse.dtype)
+        # the kill's eurekas and inspirations (`boostOnKill`)
+        self._boost_on_kill(killer, killer_type, vict_type, vict_barb, killed)
         alive = killed & ~vict_barb
         if killer_type is not None and self._gdr_idx >= 0:
             gdr = alive & (killer_type == self._gdr_idx)
@@ -5902,6 +5918,40 @@ class SimSeats:
         if not bool(ev.count_nonzero()):
             return
         self._ded_by_killer(killer, self._ded_dracones, ev)
+
+    def _boost_on_kill(self, killer, killer_type, vict_type: torch.Tensor, vict_barb: torch.Tensor,
+                       killed: torch.Tensor) -> None:
+        """`boostOnKill`'s twin — CIV6 (BOOST_TRIGGER_KILL_WITH /
+        _KILL_SPECIFIC_UNIT / _NUM_BARBS_KILLED): a major's unit of
+        `killer_type` (None for a city's shot) destroyed a unit of
+        `vict_type`; a barbarian victim counts toward the seat's barbarian
+        kills. `killer` is a row int or a [B] seat tensor."""
+        tab = self._boost_tables()
+        repl = tab["repl"]
+        nu = repl.numel()
+
+        def is_of(t: torch.Tensor, u: int) -> torch.Tensor:
+            tc = t.clamp(min=0, max=nu - 1)
+            return (t >= 0) & ((tc == u) | (repl[tc] == u))
+
+        for g in range(self.n_majors):
+            m = killed & ((killer == g) if not isinstance(killer, int) else torch.full_like(killed, killer == g))
+            if not bool(m.count_nonzero()):
+                continue
+            self.civ_barb_kills[:, g] += (m & vict_barb).long()
+            for target, ded in (("tech", self._ded_free_inquiry), ("civic", self._ded_pen_brush)):
+                w = torch.zeros_like((self.civ_civics if target == "civic" else self.civ_techs)[:, g])
+                for i, idx in tab["to_" + target]:
+                    r = tab["rows"][i]
+                    if r["cls"] == "KILL_WITH" and killer_type is not None:
+                        w[:, idx] |= m & is_of(killer_type, int(r["unit"]))
+                    elif r["cls"] == "KILL_SPECIFIC_UNIT":
+                        w[:, idx] |= m & is_of(vict_type, int(r["unit"]))
+                    elif r["cls"] == "NUM_BARBS_KILLED":
+                        w[:, idx] |= m & (self.civ_barb_kills[:, g] >= int(r["n"]))
+                if bool(w.count_nonzero()):
+                    newly = self._land_boosts(g, w, target == "civic")
+                    self._dedication_event(g, ded, newly.sum(dim=1))
 
     def _disciples_spread(self, killer, k_type: torch.Tensor, k_promos: torch.Tensor,
                           vict_barb: torch.Tensor, tile: torch.Tensor,
@@ -6954,7 +7004,6 @@ class SimSeats:
         era_of = (self._civic_era if is_civic else self._tech_era)[:k]
         perm = torch.argsort(era_of * k + torch.arange(k, device=self.device), stable=True)
         live = pool[:, perm].clone()
-        boosted = self.civ_civic_boosted if is_civic else self.civ_tech_boosted
         for i in range(int(n.max())):
             want = (n > i) & live.any(dim=1)
             if not bool(want.count_nonzero()):
@@ -6963,8 +7012,10 @@ class SimSeats:
             hit = live & ((live.long().cumsum(dim=1) - 1) == pick.unsqueeze(1)) & want.unsqueeze(1)
             live = live & ~hit
             col = perm[hit.long().argmax(dim=1)]
+            land = torch.zeros_like((self.civ_civics if is_civic else self.civ_techs)[:, row])
             r = want.nonzero(as_tuple=True)[0]
-            boosted[r, row, col[r]] = True
+            land[r, col[r]] = True
+            self._land_boosts(row, land, is_civic)
             drawn = drawn + want.long()
         return drawn
 
@@ -12366,6 +12417,7 @@ class SimSeats:
         # CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
         # extracted."
         self._dedication_event(row, self._ded_wish, go)
+        self._grant_boost_rows(row, go, lambda r: r["cls"] == "ARTIFACT_EXTRACTED")
         # CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_DIG_ARTIFACTS): a dig worked on
         # another major's ground is the digging the promise forbids
         owner = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
@@ -12524,6 +12576,7 @@ class SimSeats:
         anchor = chosen[:, 0]                               # the cluster's name
         for k in range(chosen.shape[1]):
             self.park[rows, chosen[:, k]] = anchor
+        self._grant_boost_rows(row, go, lambda r: r["cls"] == "CREATED_NATIONAL_PARK")
         # CIV6 (Units.ParkCharges — Naturalist 1, Mountie 2): ONE path for
         # every park chassis, `naturalistPark`'s: the designation spends a
         # charge and ends the turn; at 0 charges the unit is consumed.

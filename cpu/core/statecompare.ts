@@ -604,6 +604,7 @@ const SEAT: Record<string, Extractor> = {
   tradingPosts: overSeats((s) => [...(s.tradingPosts ?? [])]),
   prophets: overSeats((s) => prophetsOf(s)),
   gpUsed: overSeats((s) => (s.gpActivated ?? []).length),
+  barbKills: overSeats((s) => s.barbKills ?? 0),
   gpEarnedByClass: overSeats((s) => GP_CLASSES.map((cls) =>
     (s.gpEarned ?? []).filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length)),
   gpPerm: overSeats((s) => GP_PERM.map((_k: string, i: number) => s.gpPerm?.[i] ?? 0)),

@@ -56,7 +56,7 @@ import {
   STRATEGIC_IDS, emptyStockpile, progressCost, gameProgressK, gameProgressPct,
 } from '../data/constants';
 import { TECHS } from '../data/techs';
-import { boostPool, drawBoosts, earliestBoostEra } from './boosts';
+import { boostOnEvent, boostPool, drawBoosts, earliestBoostEra } from './boosts';
 import { tradeCapacity } from './trade';
 import { revealAround, unitSight, unitSeesThrough } from './fog';
 import { drawGoodyReward } from './goodyHuts';
@@ -1225,7 +1225,7 @@ export function canUpgradeUnit(state: GameState, unit: Unit, seat: number): bool
   if (def.requiresCivic && !isCivicComplete(state, def.requiresCivic, seat)) return false;
   const tile = state.map.tiles[unit.tileIndex];
   if (tileSeat(tile) !== seat) return false;
-  if (!canPayUpgradeGold(state, seat, unit.type, unit.leviedFrom !== undefined)) return false;
+  if (!canPayUpgradeGold(state, seat, unit.type, unit.leviedFrom !== undefined, unit.formation ?? 0)) return false;
   const c = upgradeResourceCost(state, seat, unit.type);
   return !c || canPayStockpile(state, seat, c.id, c.n);
 }
@@ -1234,7 +1234,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   if (!canUpgradeUnit(state, unit, seat)) return { ok: false, reason: 'Cannot upgrade here.' };
   const next = civUpgradeTarget(civOf(state, seat), unit.type, leaderOf(state, seat))!;
   const s = seatOf(state, seat)!;
-  s.treasury -= upgradeGoldCost(state, seat, unit.type, unit.leviedFrom !== undefined);
+  s.treasury -= upgradeGoldCost(state, seat, unit.type, unit.leviedFrom !== undefined, unit.formation ?? 0);
   const c = upgradeResourceCost(state, seat, unit.type);
   if (c) spendStockpile(state, seat, c.id, c.n, 'ug');
   unit.type = next;
@@ -1303,6 +1303,7 @@ export function archaeologistExcavate(state: GameState, unitId: number, seat: nu
   // CIV6 (Wish You Were Here, dark face): "+1 Era Score for each Artifact
   // extracted."
   dedicationEvent(state, unit.seat, DED_WISH);
+  boostOnEvent(state, unit.seat, 'ARTIFACT_EXTRACTED');
   // CIV6 (DIPLOACTION_KEEP_PROMISE_DONT_DIG_ARTIFACTS): a dig worked on
   // another major's ground is the digging the promise forbids
   promiseIncursion(state, tile.ownerSeat, unit.seat, PROMISE_DIG, 1);
@@ -1389,6 +1390,7 @@ export function naturalistPark(state: GameState, unitId: number, seat: number): 
     // the cluster comes back SORTED, so its first tile is the anchor both
     // engines name the park by.
     for (const i of cluster) state.map.tiles[i].park = cluster[0];
+    boostOnEvent(state, seat, 'CREATED_NATIONAL_PARK');
     // ONE path for every park chassis: the designation spends a charge and
     // ends the turn; at 0 charges the unit is consumed (the Naturalist's
     // single ParkCharge is what "consumed on designation" IS).
@@ -2187,7 +2189,7 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       // pick (runs/h1_duelw1117 t6: 8 Ancient techs, t30: 6 then 5 civics)
       const kind = p.kind === 'techBoost' ? 'tech' : 'civic';
       const era = earliestBoostEra(owner.research, kind);
-      if (era >= 0) drawBoosts(state, owner.research, boostPool(owner.research, kind, era, era), amount);
+      if (era >= 0) drawBoosts(state, unit.seat, boostPool(owner.research, kind, era, era), amount);
       break;
     }
     case 'tech': {

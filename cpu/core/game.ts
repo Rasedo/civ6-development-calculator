@@ -10,7 +10,7 @@ import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from '
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
 import { computeUnlocks, getModifiers, isCivicComplete, goldPrice, faithPrice } from './effects';
 import type { Modifiers, Unlocks } from './effects';
-import { boostPool, drawBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
+import { boostPool, drawBoosts } from './boosts';
 import { spawnUnit, refreshUnits, trainableUnits, disbandUnit, reseatUnit, tileFreeForUnit, builderCost, traderCost, unitsAt, unitDomain, bestTrainableOfClass, purchaseSpotBlocked, raiseBestMelee } from './units';
 import { drawPromoOffer, promoFlag, unitPromoRows } from './promotions';
 import { logXpWrite, logPopWrite } from './difflog';
@@ -30,7 +30,7 @@ import { scoreLeader } from './score';
 import { gpPermOf } from '../data/greatPeople';
 import { ALLIANCE_RELIGIOUS, ALLIANCE_REL3_PRESSURE_PCT, DIPLO_VICTORY_POINTS, DED_EXODUS, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, COMPETITIONS } from '../data/seats';
 import { recordMoments } from './moments';
-import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenBoostBonus, goldenDedication, monumentalityBuyMult } from './eras';
+import { foundingMoments, religionMoment, gameEraTurn, buildingDedications, dedicationEvent, goldenDedication, monumentalityBuyMult } from './eras';
 import { UNITS, CITY_MAX_HP, UNIT_HP, REPAIR_QUIET_TURNS, FORMATION_CIVIC, FORMATION_MAX, SETTLER_COST_STEP } from '../data/units';
 import { buildingCostIn, outerPool, wallsMax, fitEncampOuter, encampOuterMissing } from './rules';
 import { darkBuildings, laserSpeed, stampBuildingEra } from './yields';
@@ -42,7 +42,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
-import { TECHS, ERAS } from '../data/techs';
+import { ERAS } from '../data/techs';
 import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
@@ -62,14 +62,6 @@ export const TURN_LIMIT = srcConst('scenario.turnLimit', 250, {
   inputs: [960, 600, 480, 240, 120, 48, 24, 12].map((m) => xml('GameSpeed_Turns',
     `GameSpeedType=GAMESPEED_ONLINE&MonthIncrement=${m}`, 'TurnsPerIncrement')),
 });
-
-export function effectiveResearchCost(state: GameState, seat: number, id: string, baseCost: number): number {
-  // A GOLDEN Free Inquiry / Pen-Brush-and-Voice deepens the boost — the
-  // RESEARCHING seat's dedication, which is the `seat` this function already
-  // takes; the GPU passes the row.
-  return effectiveResearchCostIn(seatOf(state, seat)!.research, id, baseCost,
-    goldenBoostBonus(state, seat, !TECHS[id]), rosterBoostPoints(state, seat, !TECHS[id]));
-}
 
 /** The SPECIALTY base: the price of a Campus and its kin, and the figure the
  *  observation renders where no district is named. */
@@ -1684,8 +1676,8 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
   let civics = 0;
   for (const r of rows) { techs += r.techs; civics += r.civics; }
   const e = ERAS.indexOf(era as never);
-  drawBoosts(state, rsr, boostPool(rsr, 'tech', e, e), techs);
-  drawBoosts(state, rsr, boostPool(rsr, 'civic', e, e), civics);
+  drawBoosts(state, seat, boostPool(rsr, 'tech', e, e), techs);
+  drawBoosts(state, seat, boostPool(rsr, 'civic', e, e), civics);
 }
 
 /**
@@ -1702,7 +1694,7 @@ function eraInspirations(state: GameState): void {
   for (let seat = 0; seat < state.seats.length; seat++) {
     const sx = seatOf(state, seat);
     if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
-    if (drawBoosts(state, sx.research, boostPool(sx.research, 'civic', era, era), 1)) {
+    if (drawBoosts(state, seat, boostPool(sx.research, 'civic', era, era), 1)) {
       dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
     }
   }

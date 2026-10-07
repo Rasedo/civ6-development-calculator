@@ -1,4 +1,5 @@
 import type { GameState } from './types';
+import { boostOnKill, markBoost } from './boosts';
 import { civEraIndex } from './city';
 import { onHomeContinent, seatOf, citiesOf, isBarbSeat, isCiv, civOf } from './seats';
 import { getModifiers } from './effects';
@@ -363,6 +364,9 @@ export function unitKillEvent(
       }
     }
   }
+  // the kill's eurekas and inspirations (BOOST_TRIGGER_KILL_WITH,
+  // _KILL_SPECIFIC_UNIT, _NUM_BARBS_KILLED)
+  boostOnKill(state, killerSeat, killer?.type, victim.type, isBarbSeat(victim.seat));
   if (isBarbSeat(victim.seat)) return;
   // CIV6 (To Arms!): "+1 Era Score each time you kill a non-Barbarian Corps in
   // combat and +2 Era Score each time you kill a non-Barbarian Army in
@@ -389,8 +393,7 @@ function commitGoldenGrants(state: GameState, seat: number, era: number): void {
   if (goldenDedication(state, seat, DED_SKY)) {
     for (const id of SKY_EUREKAS[era] ?? []) {
       if (!TECHS[id]) continue;
-      if (owner.research.techs.includes(id) || owner.research.boosted.includes(id)) continue;
-      owner.research.boosted.push(id);
+      markBoost(state, seat, id);
     }
   }
   if (goldenDedication(state, seat, DED_AUTOMATON)) {

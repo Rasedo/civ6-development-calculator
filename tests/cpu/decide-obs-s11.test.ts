@@ -11,7 +11,7 @@ import { researchObs, policyObs, warObs, SEAT_GROUPS } from '../../cpu/core/deci
 import { TECHS } from '../../cpu/data/techs';
 import { CIVICS } from '../../cpu/data/civics';
 import { GOVERNMENT_LIST, POLICY_LIST } from '../../cpu/data/policies';
-import { BOOST_FRACTION } from '../../cpu/data/boosts';
+import { boostAmount } from '../../cpu/core/boosts';
 import { WAR_MIN_TURNS, PEACE_GOLD_COST } from '../../cpu/data/seats';
 import { WAR_KIND_SURPRISE } from '../../cpu/data/warKinds';
 import { addEnvoys, placeCityStateAt } from '../../cpu/core/cityStates';
@@ -22,16 +22,16 @@ describe('decision mask groups', () => {
     expect(Object.keys(SEAT_GROUPS)).toEqual(['research', 'policy', 'war']);
   });
 
-  it('research: the open items at their effective cost, -1 elsewhere', () => {
+  it('research: the open items at the points still owed, -1 elsewhere', () => {
     const state = makeState(makeMap(12, 12));
     const techs = Object.values(TECHS);
     const root = techs.find((t) => t.prereqs.length === 0)!;
     const locked = techs.find((t) => t.prereqs.length > 0)!;
-    seatOf(state, 0)!.research.boosted.push(root.id);
+    seatOf(state, 0)!.research.techRetained[root.id] = boostAmount(root.cost, 40, 0);
     const obs = researchObs(state, 0);
     expect(obs.tech_cost).toHaveLength(techs.length);
     expect(obs.civic_cost).toHaveLength(Object.keys(CIVICS).length);
-    expect(obs.tech_cost[techs.indexOf(root)]).toBe(Math.round(root.cost * (1 - BOOST_FRACTION)));
+    expect(obs.tech_cost[techs.indexOf(root)]).toBe(root.cost - boostAmount(root.cost, 40, 0));
     expect(obs.tech_cost[techs.indexOf(locked)]).toBe(-1);
     const code = Object.keys(CIVICS).indexOf('CODE_OF_LAWS');
     expect(obs.civic_cost[code]).toBe(CIVICS.CODE_OF_LAWS.cost);

@@ -492,16 +492,16 @@ def main() -> None:
     rep = [i for i, d in enumerate(rj["districts"]) if d["allowMultiple"]]
     assert dam in rep and canal in rep, "the Dam and Canal are repeatable"
     brow = next((x for x in rj["boosts"]
-                 if x["kind"] == "district" and x["dtype"] in rep and x["count"] >= 2), None)
+                 if x["cls"] == "HAVE_X_DISTRICTS" and x["district"] in rep and x["n"] >= 2), None)
     if brow is None:
         print("repeatable boost SKIPPED (no boost row names a repeatable district)")
     else:
         s16 = settle_all(BatchSim([load_fixture(paths[0])], rules, device="cpu", dtype=torch.float64))
-        di = int(brow["dtype"])
+        di = int(brow["district"])
         ctr16 = int(s16.city_center[b, row, col])
         spots = [int(t) for t in (s16.pair_dist[ctr16] <= 3).nonzero().reshape(-1).tolist()
-                 if int(s16.centre_slot_at[b, t]) < 0 and int(s16.district[b, t]) < 0][:int(brow["count"])]
-        assert len(spots) == int(brow["count"]), "not enough free tiles for the lane"
+                 if int(s16.centre_slot_at[b, t]) < 0 and int(s16.district[b, t]) < 0][:int(brow["n"])]
+        assert len(spots) == int(brow["n"]), "not enough free tiles for the lane"
         for t_i in spots:
             # every instance stands in the SAME city, which is what the
             # registry cannot represent
@@ -510,9 +510,9 @@ def main() -> None:
         assert not bool(tgt[b, row, int(brow["idx"])]), "the lane must start unboosted"
         s16._detect_seat_boosts(row, torch.ones(s16.B, dtype=torch.bool, device=s16.device))
         assert bool(tgt[b, row, int(brow["idx"])]), (
-            f"{brow['count']} of district {di} in ONE city must fire the boost — "
+            f"{brow['n']} of district {di} in ONE city must fire the boost — "
             "the registry holds one tile per type, so this counts off the tile plane")
-        print(f"repeatable boost ok ({brow['count']}x district {di} in one city)")
+        print(f"repeatable boost ok ({brow['n']}x district {di} in one city)")
 
     print("BATTERY OK districts_new")
 

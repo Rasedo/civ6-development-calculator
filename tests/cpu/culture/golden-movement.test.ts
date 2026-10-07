@@ -7,8 +7,7 @@ import { seededGame } from '../helpers';
 import { spawnUnit, refreshUnits, unitFullMoves } from '../../../cpu/core/units';
 import { GOLDEN_MOVE_BONUS, DED_MONUMENTALITY, DED_EXODUS, DED_FREE_INQUIRY } from '../../../cpu/data/seats';
 import { goldenBoostBonus } from '../../../cpu/core/eras';
-import { effectiveResearchCostIn } from '../../../cpu/core/boosts';
-import { TECHS } from '../../../cpu/data/techs';
+import { boostPoints } from '../../../cpu/core/boosts';
 import { UNITS } from '../../../cpu/data/units';
 import type { GameState, Unit } from '../../../cpu/core/types';
 
@@ -156,18 +155,13 @@ describe('golden dedications reach the civ that committed them', () => {
     expect(a - b).toBe(4 * T);
   });
 
-  it('FREE_INQUIRY discounts a CIV SEAT boosted tech by an extra 10%', () => {
+  it('FREE_INQUIRY deepens a CIV SEAT eureka by 10 points', () => {
     const state = newGame();
-    const civ = state.seats.slice(1)[0];
-    const id = civ.research.techs.length ? null : Object.keys(TECHS)[0];
-    expect(id).toBeTruthy();
-    civ.research.boosted.push(id!);
-    const base = TECHS[id!].cost;
-    const plain = effectiveResearchCostIn(civ.research, id!, base, 0, 0);
+    const plain = boostPoints(state, 1, false);
     golden(state, 1, DED_FREE_INQUIRY);
     const g = goldenBoostBonus(state, 1, false);
     expect(g).toBeGreaterThan(0);
-    expect(effectiveResearchCostIn(civ.research, id!, base, g, 0)).toBeLessThan(plain);
+    expect(boostPoints(state, 1, false)).toBe(plain + 10);
     // ...and SEAT 0's Golden age does not pay for the civ
     const other = newGame();
     golden(other, 0, DED_FREE_INQUIRY);

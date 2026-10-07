@@ -1543,6 +1543,17 @@
           "note": "how many recruited Great People this seat has actually SPENT."
         },
         {
+          "name": "barbKills",
+          "compare": "exact",
+          "covers": [
+            "Seat.barbKills"
+          ],
+          "planes": [
+            "civ_barb_kills"
+          ],
+          "note": "the barbarian units this seat has destroyed — BOOST_TRIGGER_NUM_BARBS_KILLED reads it."
+        },
+        {
           "name": "gpEarnedByClass",
           "compare": "exact",
           "covers": [

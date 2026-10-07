@@ -1826,6 +1826,8 @@ class SimInit:
         # how many of each CLASS this seat has been awarded — `Seat.gpEarned`
         # counted per class, which the roster's guarantee rows ask for
         self.civ_gp_earned = torch.zeros(B, self.n_majors, n_gp, dtype=torch.long, device=device)
+        # the barbarian units each seat has destroyed (`Seat.barbKills`)
+        self.civ_barb_kills = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.civ_gp_perm = torch.zeros(
             B, self.n_majors, max(1, len(self._gp_perm_names)), dtype=dtype, device=device)
         self.civ_gp_lux = torch.zeros(B, self.n_majors, simbase.GP_LUX_MAX, dtype=torch.long, device=device)
@@ -1926,6 +1928,9 @@ class SimInit:
         self._civic_era = torch.tensor(rr["civicEra"] or [0], dtype=torch.long, device=device)
         self._tech_boostable = torch.tensor(rr["techBoostable"] or [False], dtype=torch.bool, device=device)
         self._civic_boostable = torch.tensor(rr["civicBoostable"] or [False], dtype=torch.bool, device=device)
+        # each row's `Boosts.Boost` percent, 0 with no row (`_land_boosts`)
+        self._tech_boost_pct = torch.tensor(rr["techBoostPct"] or [0], dtype=torch.long, device=device)
+        self._civic_boost_pct = torch.tensor(rr["civicBoostPct"] or [0], dtype=torch.long, device=device)
         # the wonder CATALOG cost — `itemCost` reads a wonder off the catalog
         # and never its queued price, which is what "the ORIGINAL wonder
         # cost" means for the Builder's charge

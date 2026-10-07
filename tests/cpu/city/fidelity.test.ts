@@ -2,17 +2,22 @@ import { describe, it, expect } from 'vitest';
 import type { DistrictId } from '../../../cpu/core/types';
 import { seatOf } from '../../../cpu/core/seats';
 import { canPlaceDistrict, makeMap, makeState, tileAtCoords, grantTechs, expandBorders, standBuilding, standDistrict } from '../helpers';
-import { foundCity, endTurn, districtCost, districtDiscounted, districtScaledBase, refreshDistrictDiscount, effectiveResearchCost, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
+import { foundCity, endTurn, districtCost, districtDiscounted, districtScaledBase, refreshDistrictDiscount, itemCost, DISTRICT_SPECIALTY_COST } from '../../../cpu/core/game';
 import { placeSeatDistrict } from '../../../cpu/core/phase';
 import { computeUnlocks } from '../../../cpu/core/effects';
 import { validImprovements } from '../../../cpu/core/rules';
 import { scaleByGameSpeed } from '../../../cpu/data/constants';
-import { detectBoosts, toggleBoost, isBoosted } from '../../../cpu/core/boosts';
+import { boostAmount, detectBoosts, isBoosted, markBoost, progressOn } from '../../../cpu/core/boosts';
+import { TECHS } from '../../../cpu/data/techs';
+import { CIVICS } from '../../../cpu/data/civics';
+import { BUILDINGS } from '../../../cpu/data/buildings';
+import { UNITS } from '../../../cpu/data/units';
+import { BOOSTS } from '../../../cpu/data/boosts';
 import { buildingMaintenance, computeCityStats, computeHousing, cityMaintenance } from '../../../cpu/core/city';
 import { tileAppeal, appealTier } from '../../../cpu/core/appeal';
 
 describe('eurekas & inspirations', () => {
-  it('auto-detects observable conditions and discounts the cost', () => {
+  it('auto-detects observable conditions and lands the boost as progress', () => {
     const state = makeState(makeMap(16, 16));
     foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
     grantTechs(state, 'MINING');
@@ -25,7 +30,38 @@ describe('eurekas & inspirations', () => {
     expect(isBoosted(state, 'MASONRY', 0)).toBe(false);
     detectBoosts(state, 0);
     expect(isBoosted(state, 'MASONRY', 0)).toBe(true);
-    expect(effectiveResearchCost(state, 0, 'MASONRY', 80)).toBe(48); // -40%
+    const cost = TECHS.MASONRY.cost;
+    expect(progressOn(seatOf(state, 0)!.research, 'MASONRY')).toBe(boostAmount(cost, 40, 0));
+  });
+
+  it('every Boosts row names ids the engine carries', () => {
+    for (const [id, b] of Object.entries(BOOSTS)) {
+      expect(TECHS[id] ?? CIVICS[id], id).toBeTruthy();
+      if (b.building) expect(BUILDINGS[b.building], `${id} ${b.building}`).toBeTruthy();
+      if (b.unit && !b.unit.startsWith('GREAT_')) expect(UNITS[b.unit], `${id} ${b.unit}`).toBeTruthy();
+      if (b.tech) expect(TECHS[b.tech], `${id} ${b.tech}`).toBeTruthy();
+      if (b.civic) expect(CIVICS[b.civic], `${id} ${b.civic}`).toBeTruthy();
+    }
+  });
+
+  it('the DLL amount: 40% of 25 lands 9, of 40 lands 15; ten points more land 12 and 19', () => {
+    expect(boostAmount(25, 40, 0)).toBe(9);
+    expect(boostAmount(40, 40, 0)).toBe(15);
+    expect(boostAmount(25, 40, 10)).toBe(12);
+    expect(boostAmount(40, 40, 10)).toBe(19);
+    expect(boostAmount(20, 40, 10)).toBe(9);
+  });
+
+  it('a boost that fills the current item completes it at once', () => {
+    const state = makeState(makeMap(16, 16));
+    foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
+    const rs = seatOf(state, 0)!.research;
+    rs.tech = 'ASTROLOGY';
+    rs.techProgress = TECHS.ASTROLOGY.cost - 2;
+    expect(markBoost(state, 0, 'ASTROLOGY')).toBe(true);
+    expect(rs.techs).toContain('ASTROLOGY');
+    expect(rs.tech).toBe(null);
+    expect(rs.techProgress).toBe(0);
   });
 
   it('boosts fire during normal turns and never re-fire', () => {
@@ -37,12 +73,13 @@ describe('eurekas & inspirations', () => {
     expect(seatOf(state, 0)!.research.boosted.length).toBe(count); // idempotent
   });
 
-  it('manual boosts toggle', () => {
+  it('a boost on a parked item lands on its parked progress', () => {
     const state = makeState(makeMap(16, 16));
-    toggleBoost(state, 'WRITING', 0);
-    expect(isBoosted(state, 'WRITING', 0)).toBe(true);
-    toggleBoost(state, 'WRITING', 0);
-    expect(isBoosted(state, 'WRITING', 0)).toBe(false);
+    foundCity(state, tileAtCoords(state.map, 8, 8).index, 0);
+    const rs = seatOf(state, 0)!.research;
+    rs.techRetained.WRITING = 3;
+    markBoost(state, 0, 'WRITING');
+    expect(rs.techRetained.WRITING).toBe(3 + boostAmount(TECHS.WRITING.cost, 40, 0));
   });
 });
 

@@ -73,164 +73,205 @@ class SimMasks:
 
 
     def _boost_tables(self) -> dict:
-        """`rules.boosts` grouped for `_detect_seat_boosts`: the kinds one
-        gather answers for every row at once (building, improvement, cityPop,
-        tech) as index/threshold tensors with their catalog positions, and
-        the TARGET index of every row split by tech / civic."""
+        """`rules.boosts` (the install's Boosts rows) as the detector reads
+        them: each row's dict, its target split by tech / civic, and each
+        unit type's base chassis (`UnitReplaces`)."""
         tab = self._boost_tab_cache
         if tab is not None:
             return tab
         dev = self.device
         boosts = self.rules.boosts
-        T = lambda xs: torch.tensor(xs, dtype=torch.long, device=dev)  # noqa: E731
-        grp: dict = {}
-        for i, b in enumerate(boosts):
-            grp.setdefault(b["kind"], []).append(i)
-        tab = {"K": len(boosts), "single": [i for i, b in enumerate(boosts)
-                                            if b["kind"] not in ("building", "improvement", "cityPop", "tech")]}
-        for kind, field in (("building", "b"), ("improvement", "imp"), ("cityPop", "pop"), ("tech", "t")):
-            ix = grp.get(kind, [])
-            tab[kind] = (T(ix), T([boosts[i][field] for i in ix]),
-                         T([boosts[i].get("count", 0) for i in ix])) if ix else None
-        imp = grp.get("improvement", [])
-        tab["imp_res"] = torch.tensor([bool(boosts[i]["onResource"]) for i in imp], dtype=torch.bool, device=dev)
+        ru = self.rules.units or []
+        tab = {"rows": boosts,
+               "repl": torch.tensor([int(u.get("repl", -1)) for u in ru] or [-1], dtype=torch.long, device=dev)}
         for target in ("tech", "civic"):
-            ix = [i for i, b in enumerate(boosts) if (b["target"] == "tech") == (target == "tech")]
-            tab["to_" + target] = (T(ix), T([boosts[i]["idx"] for i in ix])) if ix else None
+            tab["to_" + target] = [(i, int(b["idx"])) for i, b in enumerate(boosts) if b["target"] == target]
         self._boost_tab_cache = tab
         return tab
 
-    def _detect_seat_boosts(self, row: int, active: torch.Tensor) -> None:
-        """detectBoosts for seat row `row` — ONE
-        body, because `checkSatisfied` is seat-generic in TS: every condition
-        reads either THIS seat's cities/research/territory or a map-global
-        fact, and no arm asks which seat is asking.
+    def _boost_units(self, row: int, keep: torch.Tensor) -> torch.Tensor:
+        """[B] long — seat row `row`'s living units whose type `keep` [NU]
+        accepts (`ownUnits`)."""
+        alive = self.major_unit_alive & (self.major_unit_seat == int(self._ROW_SEAT[row]))
+        t = self.major_unit_type.clamp(min=0, max=keep.numel() - 1)
+        return (alive & keep[t]).sum(dim=1)
 
-        Runs at the row's own block top in the seatPhase loop. `active` is the
-        TS loop's eliminated-actor continue — a cityless seat detects nothing.
-
-        Every condition is read first, off state no boost writes; then each
-        target research row is marked boosted where ANY of its conditions
-        holds and the research is not done, and Free Inquiry's era score pays
-        once per row that NEWLY lands — the count TS's per-boost `newly`
-        walk reaches, since a second boost on a row already marked this turn
-        lands nothing."""
+    def _boost_triggers(self, row: int) -> torch.Tensor:
+        """[B, K] bool — `stateTrigger` for every Boosts row, seat row `row`:
+        each BoostClass the seat's standing state answers. An event class (a
+        kill, a camp, a declaration of war, a park, an artifact) lands where
+        its event happens; a class neither engine models never triggers."""
         tab = self._boost_tables()
-        B = self.B
+        B, dev = self.B, self.device
         alive = self.city_alive[:, row]
         pop = self.city_pop[:, row]
-        pred = torch.zeros(B, tab["K"], dtype=torch.bool, device=self.device)
-        if tab["building"] is not None:
-            pos, bi, cnt = tab["building"]
-            pred[:, pos] = (self.city_bldg[:, row][:, :, bi] & alive.unsqueeze(2)).sum(dim=1) >= cnt
-        if tab["improvement"] is not None:
-            # the improvements on the row's OWN plots (pillaged still counts):
-            # of the row's kind, or of any kind where it names none (-1)
-            pos, ii, cnt = tab["improvement"]
-            imp = self.improvement.unsqueeze(2)
-            mine = (self.tile_seat == int(self._ROW_SEAT[row])).unsqueeze(2)
-            on = mine & (imp >= 0) & ((ii < 0) | (imp == ii)) \
-                & (~tab["imp_res"] | (self.res_priority > 0).unsqueeze(2))
-            pred[:, pos] = on.sum(dim=1) >= cnt
-        if tab["cityPop"] is not None:
-            pos, need, _ = tab["cityPop"]
-            pred[:, pos] = ((pop.unsqueeze(2) >= need) & alive.unsqueeze(2)).any(dim=1)
-        if tab["tech"] is not None:
-            pos, ti, _ = tab["tech"]
-            pred[:, pos] = self.civ_techs[:, row][:, ti]
-        pop_sum = None
-        on_d = None
-        for i in tab["single"]:
-            brow = self.rules.boosts[i]
-            kind = brow["kind"]
-            if kind == "totalPop":
-                if pop_sum is None:
-                    pop_sum = (pop * alive.to(pop.dtype)).sum(dim=1)
-                p = pop_sum >= brow["pop"]
-            elif kind == "coastalCity":
-                # isCoastalLand at each live centre, read off the static tile
-                # plane (a dead slot's centre is masked out by `alive`).
-                p = (alive & self.coastal_land.gather(1, self.city_center[:, row].clamp(min=0))).any(dim=1)
-            elif kind == "cities":
-                p = alive.sum(dim=1) >= brow["count"]
-            elif kind == "greatPeople":
-                p = (self.gp_earned.sum(dim=1) if brow["cls"] < 0 else self.gp_earned[:, brow["cls"]]) >= brow["count"]
-            elif kind == "anyWonderBuilt":
-                p = self.built_wonder_complete.any(dim=1)
-            elif kind == "naturalWonderFound":
-                # BOOST_TRIGGER_FIND_NATURAL_WONDER: a natural wonder plot revealed
-                seen = self.seat_explored[:, row] if self.fog_of_war else torch.ones_like(self.nwonder)
-                p = (self.nwonder & seen).any(dim=1)
-            elif kind == "district":
-                # The CITY REGISTRY is the list TS walks (`c.districts` of
-                # citiesOf(seat)), gated on the TILE's districtComplete. A
-                # captured district leaves the registry with its city, so the
-                # registry needs no liveness term of its own.
-                dtype = brow["dtype"]
-                if on_d is None:
-                    dt = self.city_dist_tile[:, row]
-                    comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
-                    on_d = (dt >= 0) & comp & alive.unsqueeze(2)
+        seat = int(self._ROW_SEAT[row])
+        mine = (self.tile_seat == seat) & (self.improvement >= 0) & ~self.pillaged
+        has_res = (self.res_id >= 0) & ~self.res_stripped
+        repl = tab["repl"]
+        nu = repl.numel()
+        ar = torch.arange(nu, device=dev)
+        unit_of = lambda u: (ar == u) | (repl == u)  # noqa: E731
+        cache: dict = {}
+
+        def on_d():
+            if "on_d" not in cache:
+                dt = self.city_dist_tile[:, row]
+                comp = self.district_complete.gather(1, dt.clamp(min=0).reshape(B, -1)).reshape_as(dt)
+                cache["on_d"] = (dt >= 0) & comp & alive.unsqueeze(2)
+            return cache["on_d"]
+
+        def own_wonders():
+            if "w" not in cache:
+                cache["w"] = (self.tile_seat == seat) & (self.built_wonder >= 0) & self.built_wonder_complete
+            return cache["w"]
+
+        out = torch.zeros(B, len(tab["rows"]), dtype=torch.bool, device=dev)
+        # a row whose item every game holds or has boosted lands nothing: it
+        # is not read
+        open_ = {"tech": (~self.civ_techs[:, row] & ~self.civ_tech_boosted[:, row]).any(dim=0).tolist(),
+                 "civic": (~self.civ_civics[:, row] & ~self.civ_civic_boosted[:, row]).any(dim=0).tolist()}
+        for i, b in enumerate(tab["rows"]):
+            if not open_[b["target"]][int(b["idx"])]:
+                continue
+            cls, n = b["cls"], int(b["n"])
+            if cls == "NUM_IMPROVED_TILES":
+                p = mine.sum(dim=1) >= n
+            elif cls == "HAVE_X_IMPROVEMENTS":
+                hit = mine & (self.improvement == int(b["improvement"]))
+                if b["requiresResource"]:
+                    hit = hit & has_res
+                p = hit.sum(dim=1) >= n
+            elif cls in ("IMPROVE_SPECIFIC_RESOURCE", "HAVE_UNIT_AND_IMPROVEMENT"):
+                p = (mine & (self.improvement == int(b["improvement"])) & has_res
+                     & (self.res_id == int(b["resource"]))).any(dim=1)
+                if cls == "HAVE_UNIT_AND_IMPROVEMENT":
+                    p = p & (self._boost_units(row, unit_of(int(b["unit"]))) >= 1)
+            elif cls == "HAVE_X_UNIQUE_SPECIALTY_DISTRICTS":
+                p = (on_d().any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= n
+            elif cls == "HAVE_X_DISTRICTS":
+                dtype = int(b["district"])
                 if dtype < 0:
-                    # boosts.ts: with no check.type, only districts that COUNT
-                    # TOWARD THE LIMIT qualify (specialty) — aqueducts and the
-                    # other support districts are excluded.
-                    if brow["distinct"]:
-                        p = (on_d.any(dim=1) & self._is_specialty.reshape(1, -1)).sum(dim=1) >= brow["count"]
-                    else:
-                        p = (on_d & self._is_specialty.reshape(1, 1, -1)).sum(dim=(1, 2)) >= brow["count"]
-                elif bool(self._is_repeatable[dtype]):
-                    # A city may hold SEVERAL of a repeatable district and the
-                    # registry keeps ONE tile per type, so the registry cannot
-                    # count them. TS walks every `c.districts` entry, which is
-                    # the tile plane here — complete, in a live city of this
-                    # row. Pillaged still counts, exactly as TS has it.
-                    ids = self.city_id[:, row]  # [B, RC]
-                    okd = ((self.district == dtype) & self.district_complete
-                           & (self.tile_seat == row))
-                    per = (okd.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1))
-                           & alive.unsqueeze(1))
-                    p = per.sum(dim=(1, 2)) >= brow["count"]
-                else:
-                    p = on_d[:, :, dtype].sum(dim=1) >= brow["count"]
-            elif kind == "alliance":
-                # BOOST_TRIGGER_HAVE_ALLIANCE_LEVEL_X: any major at the level
-                p = (self._alliance_levels_of(row) >= brow["level"]).any(dim=1)
-            elif kind == "policies":
-                if not self._npol:
                     continue
-                p = self._gov_mods(row)[4].sum(dim=1) >= brow["count"]
-            elif kind == "pantheon":
-                # BOOST_TRIGGER_CREATE_PANTHEON / _FOUND_RELIGION
+                if bool(self._is_repeatable[dtype]):
+                    # a city may hold SEVERAL of a repeatable district and the
+                    # registry keeps ONE tile per type: the tile plane counts
+                    ids = self.city_id[:, row]
+                    okd = (self.district == dtype) & self.district_complete & (self.tile_seat == row)
+                    per = okd.unsqueeze(2) & (self.tile_city.unsqueeze(2) == ids.unsqueeze(1)) & alive.unsqueeze(1)
+                    p = per.sum(dim=(1, 2)) >= n
+                else:
+                    p = on_d()[:, :, dtype].sum(dim=1) >= n
+            elif cls == "EMPIRE_POPULATION":
+                p = (pop * alive.to(pop.dtype)).sum(dim=1) >= n
+            elif cls == "CITY_POPULATION":
+                p = ((pop >= n) & alive).any(dim=1)
+            elif cls == "CREATE_PANTHEON":
                 p = self.civ_pantheon_done[:, row].clone()
-            elif kind == "religion":
+            elif cls == "FOUND_RELIGION":
                 p = self.civ_religion_done[:, row].clone()
-            elif kind == "metCityStates":
-                # BOOST_TRIGGER_MEET_X_CITY_STATES: the living minors met
+            elif cls == "RESEARCH_TECH":
+                p = self.civ_techs[:, row, int(b["tech"])].clone()
+            elif cls == "CULTURVATE_CIVIC":
+                p = self.civ_civics[:, row, int(b["civic"])].clone()
+            elif cls == "MEET_X_CITY_STATES":
                 if not self.S:
                     continue
-                p = (self.seat_citystate_met[:, row, :self.S] & self.citystate_alive[:, :self.S]).sum(dim=1) >= brow["count"]
-            elif kind == "tradeRoutes":
-                # BOOST_TRIGGER_MAINTAIN_X_TRADE_ROUTES
-                p = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1) >= brow["count"]
+                p = (self.seat_citystate_met[:, row, :self.S] & self.citystate_alive[:, :self.S]).sum(dim=1) >= n
+            elif cls == "HAVE_X_WONDERS":
+                p = own_wonders().sum(dim=1) >= n
+            elif cls == "HAVE_WONDER_PAST_X_ERA":
+                era = self._wonder_era[self.built_wonder.clamp(min=0, max=self._wond_n - 1)]
+                p = (own_wonders() & (era + 1 >= n)).any(dim=1)
+            elif cls in ("HAVE_X_BUILDINGS", "CONSTRUCT_BUILDING"):
+                bi = int(b["building"])
+                if bi < 0:
+                    continue
+                p = (self.city_bldg[:, row][:, :, bi] & alive).sum(dim=1) >= n
+            elif cls == "HAVE_BUILDING_MOUNTAIN":
+                bi, dt = int(b["building"]), int(b["buildingDistrict"])
+                if bi < 0 or dt < 0:
+                    continue
+                tile = self.city_dist_tile[:, row, :, dt]                              # [B, RC]
+                nb = self.neigh[tile.clamp(min=0)]                                     # [B, RC, 6]
+                mtn = self.tile_mountain.gather(1, nb.clamp(min=0).reshape(B, -1)).reshape(nb.shape) & (nb >= 0)
+                p = (self.city_bldg[:, row][:, :, bi] & alive & (tile >= 0) & mtn.any(dim=2)).any(dim=1)
+            elif cls == "MAINTAIN_X_TRADE_ROUTES":
+                p = (self.seat_routes[:, row, :, 0] >= 0).sum(dim=1) >= n
+            elif cls == "SETTLE_COAST":
+                p = (alive & self.coastal_land.gather(1, self.city_center[:, row].clamp(min=0))).any(dim=1)
+            elif cls == "FIND_NATURAL_WONDER":
+                seen = self.seat_explored[:, row] if self.fog_of_war else torch.ones_like(self.nwonder)
+                p = (self.nwonder & seen).any(dim=1)
+            elif cls == "OWN_X_UNITS_OF_TYPE":
+                p = self._boost_units(row, unit_of(int(b["unit"]))) >= n
+            elif cls == "HAVE_X_LAND_UNITS":
+                land = (~self.unit_naval[:nu] & (self._type_air[:nu] == 0)
+                        & ((self._type_combat[:nu] > 0) | (self._type_ranged_strength[:nu] > 0)))
+                p = self._boost_units(row, land) >= n
+            elif cls in ("HAVE_X_CORPS", "HAVE_X_ARMIES"):
+                form = 1 if cls == "HAVE_X_CORPS" else 2
+                al = self.major_unit_alive & (self.major_unit_seat == seat) & (self.major_unit_formation == form)
+                p = al.sum(dim=1) >= n
+            elif cls == "TRAIN_UNIT":
+                if int(b["gpClass"]) >= 0:
+                    p = self.civ_gp_earned[:, row, int(b["gpClass"])] >= 1
+                elif int(b["unit"]) >= 0:
+                    p = self._boost_units(row, unit_of(int(b["unit"]))) >= 1
+                else:
+                    continue
+            elif cls == "HAVE_X_GREAT_PEOPLE":
+                p = self.civ_gp_earned[:, row].sum(dim=1) >= n
+            elif cls == "HAVE_AN_ALLIANCE":
+                p = (self._alliance_levels_of(row) >= 1).any(dim=1)
+            elif cls == "HAVE_ALLIANCE_LEVEL_X":
+                p = (self._alliance_levels_of(row) >= n).any(dim=1)
+            elif cls == "HAVE_X_CITIES_FOLLOWING_YOUR_RELIGION":
+                p = self.civ_religion_done[:, row] & ((self.city_alive & (self.city_followed == row)).sum(dim=(1, 2)) >= n)
+            elif cls == "HAVE_GOVERNMENT_TIER":
+                p = self._adopted_gov_tier(row) >= int(b["govTier"])
             else:
                 continue
-            pred[:, i] = p
-        hit = pred & active.unsqueeze(1)
-        for target, done_pl, boosted_pl, ded in (("tech", self.civ_techs, self.civ_tech_boosted, 1),
-                                                  ("civic", self.civ_civics, self.civ_civic_boosted, 2)):
-            if tab["to_" + target] is None:
+            out[:, i] = p
+        return out
+
+    def _detect_seat_boosts(self, row: int, active: torch.Tensor) -> None:
+        """detectBoosts for seat row `row`: every trigger read off the state
+        as it stands (`_boost_triggers`), then each target landed
+        (`_land_boosts`, techs first as TS's catalog walk lands them), Free
+        Inquiry's / Pen, Brush and Voice's era score paid once per row that
+        NEWLY lands. `active` is the TS loop's eliminated-actor continue — a
+        cityless seat detects nothing."""
+        tab = self._boost_tables()
+        hit = self._boost_triggers(row) & active.unsqueeze(1)
+        want = {}
+        for target, held in (("tech", self.civ_techs), ("civic", self.civ_civics)):
+            w = torch.zeros_like(held[:, row])
+            for i, idx in tab["to_" + target]:
+                w[:, idx] |= hit[:, i]
+            want[target] = w
+        for target, ded in (("tech", self._ded_free_inquiry), ("civic", self._ded_pen_brush)):
+            if not bool(want[target].count_nonzero()):
                 continue
-            pos, idx = tab["to_" + target]
-            done = done_pl[:, row]
-            cand = hit[:, pos] & ~done[:, idx]
-            agg = torch.zeros(B, done.shape[1], dtype=torch.long, device=self.device).index_add_(
-                1, idx, cand.long()) > 0
-            # FREE INQUIRY pays era score per EUREKA — once per row that
-            # NEWLY lands (the TS `newly` twin), counted before the mark
-            newly = (agg & ~boosted_pl[:, row]).sum(dim=1)
-            boosted_pl[:, row] |= agg
-            self._dedication_event(row, ded, newly)
+            newly = self._land_boosts(row, want[target], target == "civic")
+            self._dedication_event(row, ded, newly.sum(dim=1))
+
+    def _grant_boost_rows(self, row: int, m: torch.Tensor, keep) -> None:
+        """`grantEvent`'s twin: in the games of `m` [B], every Boosts row
+        `keep(row_dict)` accepts lands on seat row `row`, its dedication paid
+        (`grantBoost`)."""
+        if not bool(m.count_nonzero()):
+            return
+        tab = self._boost_tables()
+        for target, ded in (("tech", self._ded_free_inquiry), ("civic", self._ded_pen_brush)):
+            held = self.civ_civics if target == "civic" else self.civ_techs
+            w = torch.zeros_like(held[:, row])
+            for i, idx in tab["to_" + target]:
+                if keep(tab["rows"][i]):
+                    w[:, idx] |= m
+            if bool(w.count_nonzero()):
+                newly = self._land_boosts(row, w, target == "civic")
+                self._dedication_event(row, ded, newly.sum(dim=1))
 
 
     def _lcg_step(self, mask: torch.Tensor) -> torch.Tensor:
@@ -3503,14 +3544,11 @@ class SimMasks:
                     _one[b] = 1
                     self._add_era_score(_s, int(self._mom["campNear" if _near else "camp"]), _one)
                 self.civ_treasury[b, _s] += float(reward)
-                # CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's
-                # inspiration at the clear (`grantBoost`)
-                _mt = int(self.rules.combat["campBoostCivic"])
-                if _mt >= 0 and not bool(self.civ_civics[b, _s, _mt]) and not bool(self.civ_civic_boosted[b, _s, _mt]):
-                    self.civ_civic_boosted[b, _s, _mt] = True
-                    _one = torch.zeros(self.B, dtype=torch.long, device=self.device)
-                    _one[b] = 1
-                    self._dedication_event(_s, 2, _one)
+                # CIV6 (BOOST_TRIGGER_CLEAR_CAMP): the clear's boosts
+                # (`boostOnEvent`)
+                _onb = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                _onb[b] = True
+                self._grant_boost_rows(_s, _onb, lambda r: r["cls"] == "CLEAR_CAMP")
                 # CIV6 (Epic Quest): "Receive a Tribal Village reward each time
                 # you capture a barbarian outpost" — a civilization's trait,
                 # so a major's clear alone; the install maps the camp to a
@@ -4716,7 +4754,7 @@ class SimMasks:
         ok = ok & (self.tile_seat.gather(1, tc) == row)
         ok = ok & (self.unit_mp.gather(1, sc) > 0)
         # the GOLD (`upgradeGoldCost`, the applier's own price)
-        price = self._upgrade_gold_cost(row, utype, nc, self.unit_levied.gather(1, sc))
+        price = self._upgrade_gold_cost(row, utype, nc, self.unit_levied.gather(1, sc), self.unit_formation.gather(1, sc))
         ok = ok & self._afford(self.civ_treasury[:, row].unsqueeze(1), price)
         # the BANK: the new chassis' charge, and nothing when both rungs ask
         # for the same resource

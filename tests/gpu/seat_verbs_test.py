@@ -361,8 +361,13 @@ def main() -> None:
     rc9 = int(sim9._type_civic[up_dst])
     if rc9 >= 0:
         sim9.civ_civics[0, row, rc9] = True
-    price9 = max(0.0, float(sim9._type_cost[up_dst] - sim9._type_cost[up_src])) \
-        * sim9.rules.gold_purchase_mult
+    _full = lambda v: torch.full((sim9.B,), v, dtype=torch.long, device=sim9.device)  # noqa: E731
+    price9 = float(sim9._upgrade_gold_cost(row, _full(up_src), _full(up_dst),
+                                           torch.zeros(sim9.B, dtype=torch.bool, device=sim9.device), _full(0))[0])
+    # `upgradeGoldCost`: the base at the speed plus twice the production apart
+    base9, _, _, _, _, net9, eq9 = sim9.rules.upgrade_cost
+    want9 = base9 + int(int(sim9._type_cost[up_dst]) - int(sim9._type_cost[up_src])) * net9 // 100 * eq9
+    assert price9 == float(want9 - want9 % sim9.rules.purchase_divisor), f"the upgrade reads {price9}, not {want9}"
 
     def offered(s) -> bool:
         smap = s._seat_slot_map(row)[0]

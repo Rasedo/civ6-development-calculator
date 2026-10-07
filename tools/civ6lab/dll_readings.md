@@ -1473,6 +1473,49 @@ researchable before the grants (0x4c8c40), each draw erasing its pick — a
 row the first grant opens is not offered (1117 t226: two draws); the engines
 follow (`grantFreeResearch` / `_grant_free_research`).
 
+## H-1: a boost lands as progress — READ
+
+The trigger 0x4cd900 (techs, "LOC_NOTIFICATION_TECH_BOOST_MESSAGE"; civics
+0x3a3c00, "Cannot trigger a boost for a civic that is not in this game"),
+past its "already held / already boosted" gates (0x39d190 / 0x39d1f0), marks
+m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8
+fixed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18 times
+the item's cost 0x29a010 / 0x353a70, sar 8); the share q = (B<<16) / (cost<<8)
+(0x16e940, a truncating divide), times 100 (0x16e7d0); plus the player's
+m_iModifiedBoost (+0xf8, `<< 8`: Dynastic Cycle's 10, a golden Free
+Inquiry's / Pen, Brush and Voice's 10); the amount (cost<<8) x that / 25600,
+its fraction dropped (`and 0xffffff00`); min(cost - progress, amount) is
+added to THAT item's progress (0x393670 -> 0x3a1fb0), current or not. The
+setter completes the item the moment its progress reaches the cost
+(0x3a22c5 -> 0x3a1ac0). The cost is never cut. Check: `dll_boost.py`, the recorded
+current-item boosts of the sixteen duels: 29 of 32 land exactly amount
++ the turn's yield
+(Rome Astrology 25 -> 9 where floor(0.4 x 25) = 10; Writing 40 -> 15 where
+16; China, ten points more, Writing 40 -> 19, Craftsmanship 20 -> 9); the
+other three carry a second grant the same turn. The engines follow
+(`boostAmount`, `markBoost`, `completeResearchNow` / `_boost_amount`,
+`_land_boosts`, `_complete_research_now`); this REVERSES their earlier
+cost cut (cost x (1 - 0.4 - points)), which no recorded case fits (Rome's
+Astrology read 14 where the cut model shows 5, every duel's t9-t12).
+
+## H-1: the upgrade's gold — READ
+
+Unit_Upgrade_Manager's cost 0x5376d0 (via 0x590520; "Upgraded unit is
+cheaper than current unit", "iNetProduction >= 0"), in 24.8: UPGRADE_BASE_COST
+(GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis'
+production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST
+(+0x74c, 100) / 100, never below 0; cost = base + net x
+GOLD_EQUIVALENT_OTHER_YIELDS (+0x380, 2), less an argument the engines pass
+as 0; a Corps x2, an Army x3; less the player's discount percent (+0x398,
+Force Modernization); below UPGRADE_MINIMUM_COST (+0x744, 15, compared
+unscaled) it is that at the speed (0x5254d0); a levied unit then less its
+percent (+0x458) and the levy floor (+0x748); then down to a multiple of
+PURCHASE_DIVISOR (+0x5b0). Check: runs/h1_duelw1117 China t25, Slinger
+(17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30. The engines follow
+(`upgradeGoldCost` / `_upgrade_gold_cost`); the production cost they read is
+the chassis' catalog cost (a LAB line: whether 0x4f2b20 carries the player's
+own unit-cost percents).
+
 ## H-1: the barbarians' turn (0x1514a0) — PARTLY READ
 
 The barbarian manager's turn: 0x14f530, the camp step 0x14fcc0, each tribe's

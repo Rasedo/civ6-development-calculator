@@ -351,7 +351,7 @@ def pick_research(cost: torch.Tensor, mask: torch.Tensor,
     """[B] long — the RESEARCH verb (tech or civic), over `cost` [B, n] the
     effective price of every item and `mask` [B, n] the open ones.
 
-    Lowest `effectiveResearchCostIn` wins, except on a DEEP row, which takes
+    Lowest `researchOwed` wins, except on a DEEP row, which takes
     the most advanced legal item instead (the catalogs are era-ordered, so the
     highest legal index is the deepest reachable rung). Ties keep CATALOG
     order — the lowest index, the same convention as every other scripted

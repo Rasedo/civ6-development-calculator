@@ -7,7 +7,8 @@
  * The index space is `STRATEGIC_IDS`; a seat's `stockpile` is dense over it.
  */
 import { logStockWrite } from './difflog';
-import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile } from '../data/constants';
+import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, RAILROAD_COST, emptyStockpile,
+  PURCHASE_DIVISOR, UPGRADE_BASE_COST, UPGRADE_MINIMUM_COST, UPGRADE_MINIMUM_COST_LEVY, UPGRADE_NET_PRODUCTION_PERCENT_COST, scaleByGameSpeed } from '../data/constants';
 import { UNITS, civUpgradeTarget, FORMATION_RESOURCE_MULT } from '../data/units';
 import { PROJECTS } from '../data/projects';
 import { DED_AUTOMATON, DED_SKY, SKY_ALUMINUM_PER_TURN, AUTOMATON_URANIUM_PER_TURN, AUTOMATON_URANIUM_PER_MINE } from '../data/seats';
@@ -19,7 +20,8 @@ import { citiesOf, civOf, leaderOf, seatOf, tileOwnedByCiv, tileSeat, hiddenReso
 import { suzerainMinorSeats } from './cityStates';
 import { getModifiers } from './effects';
 import { goldenDedication } from './eras';
-import { goldAffordable, unitPurchaseCost } from './game';
+import { goldAffordable } from './game';
+import { GOLD_EQUIVALENT_OTHER_YIELDS } from './trade';
 import { cityHasLiveDistrict, cityImprovedResourceKinds, cityPower, darkBuildings } from './yields';
 import { CARBON_PER_RESOURCE, emitCarbon, plantCarbon, powerCells, unitCarbon } from './climate';
 import { ageReactors } from './disasters';
@@ -254,29 +256,44 @@ export function fuelShortCS(state: GameState, u: Unit): number {
  * next-level unit (unless the unit you're upgrading also requires the same
  * resource, in which case you don't need any)".
  *
- * MODEL: no source publishes the gold FORMULA, only that it "usually reflects
- * how much its strength will increase". This charges the difference between
- * the two chassis' own published purchase prices, floored at zero — built from
- * numbers the pages do give, with no free constant.
+ * The gold, as the DLL reckons it (Unit_Upgrade_Manager 0x5376d0, in 24.8
+ * fixed point): UPGRADE_BASE_COST at the game's speed plus the two chassis'
+ * production costs apart (never below none, at UPGRADE_NET_PRODUCTION_PERCENT_COST)
+ * times GOLD_EQUIVALENT_OTHER_YIELDS; a Corps pays it twice, an Army three
+ * times; CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_
+ * PERCENT) takes its percent off; never below UPGRADE_MINIMUM_COST at the
+ * speed; a levied unit's percent off (The Raven King) and its own floor after;
+ * then down to a multiple of PURCHASE_DIVISOR (runs/h1_duelw1117 China t25: a
+ * Slinger's upgrade to an Archer, 5 + 2 x (30 - 17) = 31, paid 30).
  */
 export function upgradeGoldCost(
   state: GameState,
   seat: number,
   unitType: string,
   levied = false,
+  formation = 0,
 ): number {
   const next = civUpgradeTarget(civOf(state, seat), unitType, leaderOf(state, seat));
   if (!next) return 0;
-  // CIV6 (Force Modernization, EFFECT_ADJUST_PLAYER_UNIT_UPGRADE_DISCOUNT_PERCENT)
-  const off = Math.min(100, getModifiers(state, seat).upgradeGoldDiscountPct);
-  const full = Math.max(0, unitPurchaseCost(state, next, seat) - unitPurchaseCost(state, unitType, seat));
-  const raw = off ? Math.round(full * (100 - off) / 100) : full;
-  if (!levied) return raw;
-  // CIV6 (The Raven King, EFFECT_ADJUST_PLAYER_LEVIED_UNIT_UPGRADE_DISCOUNT_
-  // PERCENT): levied units upgrade at a 75% discount.
-  let pct = 0;
-  for (const r of getModifiers(state, seat).levy) pct = Math.max(pct, r.upgradeDiscountPct);
-  return Math.round(raw * (1 - Math.min(100, pct) / 100));
+  const net = Math.max(0, Math.trunc(((UNITS[next]?.cost ?? 0) - (UNITS[unitType]?.cost ?? 0)) * UPGRADE_NET_PRODUCTION_PERCENT_COST / 100));
+  let c = (scaleByGameSpeed(UPGRADE_BASE_COST) + net * GOLD_EQUIVALENT_OTHER_YIELDS) * 256;
+  if (formation === 1) c *= 2;
+  else if (formation === 2) c *= 3;
+  const off = (pct: number) => {
+    const p = Math.min(100, pct);
+    const fx = Math.trunc(p / 100) * 256 + Math.trunc(((p / 100) % 1) * 256);
+    c -= Math.trunc((c * fx) / 256);
+  };
+  off(getModifiers(state, seat).upgradeGoldDiscountPct);
+  if (c < UPGRADE_MINIMUM_COST * 256) c = scaleByGameSpeed(UPGRADE_MINIMUM_COST) * 256;
+  if (levied) {
+    let pct = 0;
+    for (const r of getModifiers(state, seat).levy) pct = Math.max(pct, r.upgradeDiscountPct);
+    off(pct);
+    if (c < UPGRADE_MINIMUM_COST_LEVY * 256) c = scaleByGameSpeed(UPGRADE_MINIMUM_COST_LEVY) * 256;
+  }
+  const g = c >> 8;
+  return g - (g % PURCHASE_DIVISOR);
 }
 
 /** can this seat's treasury cover the upgrade? */
@@ -285,9 +302,10 @@ export function canPayUpgradeGold(
   seat: number,
   unitType: string,
   levied = false,
+  formation = 0,
 ): boolean {
   const s = seatOf(state, seat);
-  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType, levied));
+  return !!s && goldAffordable(s.treasury, upgradeGoldCost(state, seat, unitType, levied, formation));
 }
 
 /** what the UPGRADE draws out of the bank: the new chassis' own charge, or

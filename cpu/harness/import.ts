@@ -43,7 +43,8 @@ import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
 import { GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBit, promotionBitValue } from '../data/governors';
 import { CIV_LEADERS, COMPETITIONS, COMPETITION_TURNS, DEAL_ITEMS, DEAL_LUXURY, DEAL_TURNS, DEDICATION_COMMEMORATIONS, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_ROUTE_PCT } from '../data/seats';
-import { BOOST_FRACTION } from '../data/boosts';
+import { BOOSTS } from '../data/boosts';
+import { boostAmount, boostPoints } from '../core/boosts';
 import { updateCulturalDominance } from '../core/seatTurn';
 import { addSeatPerm } from '../core/gpAbility';
 import { BUILDINGS, POWER_PLANT_IDS } from '../data/buildings';
@@ -954,7 +955,7 @@ function foldCultureTourism(h: History, prev: TurnRecord, rec: TurnRecord, cat: 
     for (let k = 0; k < now.length; k++) {
       if (now[k] !== '1' || was[k] === '1' || (q?.civics ?? '')[k] === '1') continue;
       const cost = CIVICS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.cost ?? 0;
-      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + Math.round(cost * BOOST_FRACTION));
+      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + boostAmount(cost, BOOSTS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.pct ?? 0, 0));
     }
     const met = new Set((p.met ?? []).map(num));
     for (const o of majors) {
@@ -2102,6 +2103,18 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   for (const [i, cols] of history?.eventRead ?? []) readBack.set(i, new Set([...(readBack.get(i) ?? []), ...cols]));
   if (history) lockDistrictPrices(rec, cat, state, cityByKey, history);
   if (history) importPower(ctx, rec, state, seatOfGame, history);
+  // a boosted item neither held nor current holds its boost as parked
+  // progress (`markBoost`); the record shows no item's progress but the
+  // current one's, so any research parked on it before is unread
+  for (const s of state.seats) {
+    const r = s.research;
+    for (const id of r.boosted) {
+      if (r.techs.includes(id) || r.civics.includes(id) || r.tech === id || r.civic === id || !BOOSTS[id]) continue;
+      const civic = !TECHS[id];
+      const cost = civic ? CIVICS[id].cost : TECHS[id].cost;
+      (civic ? r.civicRetained : r.techRetained)[id] = Math.min(cost, boostAmount(cost, BOOSTS[id].pct, boostPoints(state, s.seat, civic)));
+    }
+  }
   return {
     state, seatOfPlayer, playerOfSeat, cityByKey, dumpOfCity, minorOfPlayer, dumpOfMinor,
     gaps: ctx.gaps, seatGaps: ctx.seatGaps!, tileGaps: ctx.tileGaps!, cityGaps: ctx.cityGaps!, religionSeat,

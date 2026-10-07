@@ -14,40 +14,45 @@ class SimPhase:
             # struck: the per-turn payments, the clock, and the stale offer.
             self._deal_phase()
         for row in range(self.n_majors):
-            self._seat_turn(row)
-
-            # THE UNIT WALK IS NOT THE ECONOMY TURN. `_seat_turn` answers for a
-            # seat that owns a CITY; this walk answers for a seat that owns a
-            # UNIT, and a settler start owns nothing else. Gating it on the
-            # economy's mask locks a city-less seat out of the FOUND verb —
-            # the one verb that would give it a city — for the whole game.
-            # CIV6: a civ is eliminated when it holds neither a city nor a
-            # settler, and until then it takes its turn.
-            _dsq = getattr(self, "_driven_useq", None)
-            if _dsq is None or row not in _dsq:
-                continue
-            walk = self.civ_alive[:, row] & self.seat_ext[:, row]
-            if not bool(walk.count_nonzero()):
-                continue
-            # Replayed unit acts fire HERE, at the walkers' own position in the
-            # phase, never before step(): battles DRAW, so they must consume
-            # their combat draws at the same position in the stream as the TS
-            # in-phase replay. Draw-free actions (production/tech/civic) stay
-            # pre-step. The walk branches on the war state at entry (a peace
-            # made this turn still runs the war branch, like the TS if/else):
-            # a seat at war with ANYONE takes the WAR branch, whose act scans
-            # every at-war seat's units and cities.
-            atw = walk & self.war[:, row, :self.n_majors].any(dim=1)
-            for _rows in (atw, walk & ~atw):
-                if bool(_rows.count_nonzero()):
-                    self.apply_seat_unit_sequence(row, torch.where(
-                        _rows.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1)))
+            active = self._seat_turn(row)
+            self._seat_unit_walk(row)
+            # the eurekas and inspirations the seat's processing and actions
+            # earned land within its turn (`detectBoosts` at the block's end)
+            self._detect_seat_boosts(row, active)
 
         # a promise's keep answers every asker's settlement this phase, and is
         # for THIS turn alone
         self._driven_geo["keep_promise"].clear()
         self._seat_route_cache = None
 
+    def _seat_unit_walk(self, row: int) -> None:
+        """The seat's unit orders, replayed at its own position in the phase."""
+        # THE UNIT WALK IS NOT THE ECONOMY TURN. `_seat_turn` answers for a
+        # seat that owns a CITY; this walk answers for a seat that owns a
+        # UNIT, and a settler start owns nothing else. Gating it on the
+        # economy's mask locks a city-less seat out of the FOUND verb —
+        # the one verb that would give it a city — for the whole game.
+        # CIV6: a civ is eliminated when it holds neither a city nor a
+        # settler, and until then it takes its turn.
+        _dsq = getattr(self, "_driven_useq", None)
+        if _dsq is None or row not in _dsq:
+            return
+        walk = self.civ_alive[:, row] & self.seat_ext[:, row]
+        if not bool(walk.count_nonzero()):
+            return
+        # Replayed unit acts fire HERE, at the walkers' own position in the
+        # phase, never before step(): battles DRAW, so they must consume
+        # their combat draws at the same position in the stream as the TS
+        # in-phase replay. Draw-free actions (production/tech/civic) stay
+        # pre-step. The walk branches on the war state at entry (a peace
+        # made this turn still runs the war branch, like the TS if/else):
+        # a seat at war with ANYONE takes the WAR branch, whose act scans
+        # every at-war seat's units and cities.
+        atw = walk & self.war[:, row, :self.n_majors].any(dim=1)
+        for _rows in (atw, walk & ~atw):
+            if bool(_rows.count_nonzero()):
+                self.apply_seat_unit_sequence(row, torch.where(
+                    _rows.view(-1, 1, 1), _dsq[row], torch.full_like(_dsq[row], -1)))
 
     def _seat_city_strike(self, row: int, col: torch.Tensor, fire: torch.Tensor, key: str,
                           origin: torch.Tensor | None = None) -> None:
@@ -362,12 +367,15 @@ class SimPhase:
                               & (self.seat_alliance_pts[:, row, :NM] >= self._al_l2_qp))
                         for _o in r2.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                             for _me, _al in ((row, _o), (_o, row)):
-                                cand = ((self.civ_techs[:, _al] | self.civ_tech_boosted[:, _al])
-                                        & ~self.civ_techs[:, _me] & ~self.civ_tech_boosted[:, _me])
+                                nb = min(self.civ_techs.shape[2], self._tech_boost_pct.numel())
+                                cand = torch.zeros_like(self.civ_techs[:, _me])
+                                cand[:, :nb] = ((self.civ_techs[:, _al, :nb] | self.civ_tech_boosted[:, _al, :nb])
+                                                & ~self.civ_techs[:, _me, :nb] & ~self.civ_tech_boosted[:, _me, :nb]
+                                                & (self._tech_boost_pct[:nb] > 0).unsqueeze(0))
                                 has = cand.any(dim=1) & r2[:, _o]
                                 pick = cand.long().argmax(dim=1, keepdim=True)
-                                cur = self.civ_tech_boosted[:, _me].gather(1, pick)
-                                self.civ_tech_boosted[:, _me].scatter_(1, pick, cur | has.unsqueeze(1))
+                                want = torch.zeros_like(cand).scatter_(1, pick, has.unsqueeze(1))
+                                self._land_boosts(_me, want, False)
                 plane[:, row] -= run.long()
                 plane[:, :, row] -= run.long()
                 if plane is self.seat_ally_turns:
@@ -1587,8 +1595,7 @@ class SimPhase:
                     if bool((be >= 0).count_nonzero()):
                         nt = min(self.civ_tech_boosted.shape[2], self._tech_era.numel())
                         want = (self._tech_era[:nt].reshape(1, -1) <= be.reshape(-1, 1)) & (be >= 0).reshape(-1, 1)
-                        newly = want & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
-                        self.civ_tech_boosted[:, row, :nt] |= newly
+                        newly = self._land_boosts(row, want, False)
                         self._dedication_event(row, 1, newly.sum(dim=1))
                 # CIV6 (Kilwa Kisiwani): envoys paid once, at completion.
                 if int(self._wond_grant_env.sum()) > 0:
@@ -2201,11 +2208,7 @@ class SimPhase:
         grants: list[tuple[torch.Tensor, int]] = []
         for _ in range(RESEARCH_LOOPS):
             curt = self.civ_cur_tech[:, row]
-            cost_t = self._eff_cost(
-                rdv.t_cost.gather(0, curt.clamp(min=0)),
-                self.civ_tech_boosted[:, row].gather(1, curt.clamp(min=0).unsqueeze(1)).squeeze(1),
-                row,
-            )
+            cost_t = rdv.t_cost.gather(0, curt.clamp(min=0))
             fin = active & (curt >= 0) & (self.civ_tech_prog[:, row] >= cost_t)
             if not bool(fin.count_nonzero()):
                 break
@@ -2322,11 +2325,7 @@ class SimPhase:
         civic_done = torch.zeros(B, dtype=torch.bool, device=dev)
         for _ in range(RESEARCH_LOOPS):
             curc = self.civ_cur_civic[:, row]
-            cost_c = self._eff_cost(
-                rdv.c_cost.gather(0, curc.clamp(min=0)),
-                self.civ_civic_boosted[:, row].gather(1, curc.clamp(min=0).unsqueeze(1)).squeeze(1),
-                row, is_civic=True,
-            )
+            cost_c = rdv.c_cost.gather(0, curc.clamp(min=0))
             fin = active & (curc >= 0) & (self.civ_civic_prog[:, row] >= cost_c)
             if not bool(fin.count_nonzero()):
                 break
@@ -2728,7 +2727,9 @@ class SimPhase:
                     if pool.numel() == 0:
                         continue
                     k = int(self._rand_range(one, pool.numel())[b])
-                    self.civ_tech_boosted[b, o, int(pool[k])] = True
+                    want = torch.zeros_like(self.civ_techs[:, o])
+                    want[b, int(pool[k])] = True
+                    self._land_boosts(o, want, False)
         guidx = int(self._gp_class_unit[cls]) if cls < int(self._gp_class_unit.numel()) else -1
         if guidx < 0:
             return

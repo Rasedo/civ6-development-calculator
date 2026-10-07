@@ -147,28 +147,26 @@ def main() -> None:
           f"{sim4._mp_scale * sim4._embark_moves} (the flat pool, bonus dropped)")
 
     # ---- 7. the OTHER three faces are keyed on the seat too --------------
-    # The research discount / prophet points / culture answer for the civ that
-    # committed the dedication, never a hardcoded civ 0.
+    # The eureka's extra points / prophet points / culture answer for the civ
+    # that committed the dedication, never a hardcoded civ 0.
     sim5 = build()
     if sim5.n_majors > 1:
         fi, pb = sim5._ded_free_inquiry, sim5._ded_pen_brush
-        cost = torch.full((sim5.B,), 200.0, dtype=sim5.dtype)
-        boosted = torch.ones(sim5.B, dtype=torch.bool)
-        plain = sim5._eff_cost(cost, boosted, 1)  # row 1, before its golden age
+        plain = int(sim5._boost_points(1, False)[0])  # row 1, before its golden age
         golden(sim5, 1, fi)  # civ 0 = unified civ 1
-        civ_g = sim5._eff_cost(cost, boosted, 1)
-        assert float(civ_g[0]) < float(plain[0]), (
-            "a CIV in a golden FREE_INQUIRY got no extra discount — the call "
-            "site is still asking about civ 0"
+        civ_g = int(sim5._boost_points(1, False)[0])
+        assert civ_g == plain + 10, (
+            "a CIV in a golden FREE_INQUIRY got no extra eureka points — the "
+            "call site is still asking about civ 0"
         )
         # ...and seat 0's Golden age must not pay for the civ. `sim5` is read
         # again below, so this one takes a base of its own.
         sim6 = build(slot=1)
         golden(sim6, 0, fi)
-        assert float(sim6._eff_cost(cost, boosted, 1)[0]) == float(plain[0]), (
-            "seat 0's dedication discounted a CIV's research"
+        assert int(sim6._boost_points(1, False)[0]) == plain, (
+            "seat 0's dedication deepened a CIV's eureka"
         )
-        print(f"  7 FREE_INQUIRY: civ cost {float(plain[0]):.0f} -> {float(civ_g[0]):.0f}; seat 0's own age does not pay for it")
+        print(f"  7 FREE_INQUIRY: civ eureka points {plain} -> {civ_g}; seat 0's own age does not pay for it")
 
         # EXODUS's +4 prophet points and PEN_BRUSH's culture read the same table
         assert bool(sim5._golden_ded(1, fi)[0]) and not bool(sim5._golden_ded(0, fi)[0])

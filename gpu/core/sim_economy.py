@@ -672,20 +672,114 @@ class SimEconomy:
         fresh = ~done if repeat is None else (~done | repeat.unsqueeze(0))
         return fresh & ~missing
 
-    def _eff_cost(self, cost: torch.Tensor, boosted: torch.Tensor, row: int, is_civic: bool = False) -> torch.Tensor:
-        """The BOOSTED cost of every item, for seat row `row`. The row is
-        required: a golden Free Inquiry / Pen-Brush-and-Voice and CIV6
-        (Dynastic Cycle)'s "Eurekas and Inspirations provide 50% ... instead
-        of 40%" are both the RESEARCHING seat's (`BOOST_PCT_ROWS`)."""
-        frac = self.rules.boost_fraction
+    def _boost_points(self, row: int, is_civic: bool) -> torch.Tensor:
+        """[B] long — `boostPoints`'s twin: the PERCENTAGE POINTS seat row
+        `row` adds to a boost of the kind — CIV6 (Dynastic Cycle)'s
+        `BOOST_PCT_ROWS` and a golden Free Inquiry's / Pen, Brush and Voice's
+        10."""
+        pts = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for _bc, _bl, _bt, _bp in self._live_rows(row, self._boost_pct_rows):
             if bool(_bt) != (not is_civic):
                 continue
-            frac = frac + self._row_is(row, _bc, _bl).to(cost.dtype).reshape(
-                -1, *((1,) * (cost.dim() - 1))) * (_bp / 100.0)
+            pts = pts + self._row_is(row, _bc, _bl).long() * int(_bp)
         g = self._golden_ded(row, self._ded_pen_brush if is_civic else self._ded_free_inquiry)
-        extra = g.to(cost.dtype).reshape(-1, *((1,) * (cost.dim() - 1))) * 0.1
-        return torch.where(boosted, js_round(cost * (1 - frac - extra)), cost)
+        return pts + g.long() * 10
+
+    @staticmethod
+    def _boost_amount(cost: torch.Tensor, pct: torch.Tensor, points: torch.Tensor) -> torch.Tensor:
+        """`boostAmount`'s twin (the DLL's 0x4cd900 / 0x3a3c00 in 24.8 fixed
+        point), broadcast over long tensors: B = floor(pct x cost / 100), the
+        share q = floor(B·256 / cost) re-read as q·100, plus `points`·256;
+        floor(cost x that / 100) / 256, floored."""
+        b = torch.div(pct * cost, 100, rounding_mode="floor")
+        q = torch.div(b * 256, cost.clamp(min=1), rounding_mode="floor")
+        amt = torch.div(torch.div(cost * (q * 100 + points * 256), 100, rounding_mode="floor"),
+                        256, rounding_mode="floor")
+        return torch.where(cost > 0, amt, torch.zeros_like(amt))
+
+    def _land_boosts(self, row: int, want: torch.Tensor, is_civic: bool) -> torch.Tensor:
+        """`markBoost`'s twin over every item at once: the items of `want`
+        [B, N] neither held nor boosted that carry a `Boosts` row are marked
+        boosted and their percent (`_boost_amount`) lands as progress — the
+        current item's pool or its parked progress —, never past the cost; an
+        item that reaches its cost completes at once
+        (`_complete_research_now`). Returns the items newly boosted [B, N]."""
+        held = (self.civ_civics if is_civic else self.civ_techs)[:, row]
+        boosted = self.civ_civic_boosted if is_civic else self.civ_tech_boosted
+        pct = self._civic_boost_pct if is_civic else self._tech_boost_pct
+        n = min(want.shape[1], held.shape[1], pct.numel())
+        newly = torch.zeros_like(held)
+        newly[:, :n] = want[:, :n] & ~held[:, :n] & ~boosted[:, row, :n] & (pct[:n] > 0).unsqueeze(0)
+        if not bool(newly.count_nonzero()):
+            return newly
+        boosted[:, row] |= newly
+        rdv = self.rules_dev
+        cost_n = (rdv.c_cost if is_civic else rdv.t_cost)[:n].long()
+        prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
+        retain = self.civ_civic_retain if is_civic else self.civ_tech_retain
+        cur = (self.civ_cur_civic if is_civic else self.civ_cur_tech)[:, row]
+        is_cur = torch.arange(n, device=self.device).unsqueeze(0) == cur.unsqueeze(1)
+        have = torch.where(is_cur, prog[:, row].unsqueeze(1), retain[:, row, :n])
+        amt = self._boost_amount(cost_n.unsqueeze(0), pct[:n].long().unsqueeze(0),
+                                 self._boost_points(row, is_civic).unsqueeze(1)).to(have.dtype)
+        add = torch.minimum(cost_n.unsqueeze(0).to(have.dtype) - have, amt)
+        go = newly[:, :n] & (add > 0)
+        add = torch.where(go, add, torch.zeros_like(add))
+        prog[:, row] += (add * is_cur.to(add.dtype)).sum(dim=1)
+        retain[:, row, :n] += torch.where(is_cur, torch.zeros_like(add), add)
+        full = torch.zeros_like(held)
+        full[:, :n] = go & (have + add >= cost_n.unsqueeze(0).to(have.dtype))
+        if bool(full.count_nonzero()):
+            self._complete_research_now(row, full, is_civic)
+        return newly
+
+    def _complete_research_now(self, row: int, full: torch.Tensor, is_civic: bool) -> None:
+        """`completeResearchNow`'s twin: the items of `full` [B, N] COMPLETED
+        at once outside the research step (a boost that filled them) — the
+        loop's completion effects, the banked progress spent, the current pick
+        cleared, a technology's free unit in the capital at once."""
+        any_b = full.any(dim=1)
+        cur_pl = self.civ_cur_civic if is_civic else self.civ_cur_tech
+        prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
+        retain = self.civ_civic_retain if is_civic else self.civ_tech_retain
+        if is_civic and self._ngov:
+            gov_before = self._adopted_gov(row)[0].clone()
+            slots_before = self._seat_policy_slots(row).clone()
+        cols = full.any(dim=0).nonzero(as_tuple=True)[0].tolist()
+        for col in cols:
+            fin = full[:, col]
+            idx = torch.full((self.B,), col, dtype=torch.long, device=self.device)
+            if is_civic:
+                self.civ_civics[:, row, col] |= fin
+                self.civ_civic_turn[:, row] = torch.where(fin, torch.full_like(self.civ_civic_turn[:, row], self.turn),
+                                                          self.civ_civic_turn[:, row])
+            else:
+                if col == self._urban_def_tech:
+                    self._urban_defenses_fit(row, fin)
+                self.civ_techs[:, row, col] |= fin
+            self._eff_version += 1
+            self._research_award(row, fin, idx, is_civic)
+            if not is_civic:
+                for _gc, _gl, _gu, _gt, _gf, _gp, _gx in self._live_rows(row, self._grant_unit_rows):
+                    if _gt != col or _gu < 0:
+                        continue
+                    _gm = fin & self._row_is(row, _gc, _gl) & (self.civ_cap_tile[:, row] >= 0)
+                    if bool(_gm.count_nonzero()):
+                        self._spawn_unit(row, _gm, self.civ_cap_tile[:, row].clamp(min=0),
+                                         torch.full((self.B,), _gu, dtype=torch.long, device=self.device))
+        retain[:, row] = torch.where(full, torch.zeros_like(retain[:, row]), retain[:, row])
+        cur = cur_pl[:, row]
+        on_cur = (cur >= 0) & full.gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
+        prog[:, row] = torch.where(on_cur, torch.zeros_like(prog[:, row]), prog[:, row])
+        cur_pl[:, row] = torch.where(on_cur, torch.full_like(cur, -1), cur)
+        if is_civic and self._ngov:
+            _adopted, _has = self._adopted_gov(row)
+            _gov_on = _has & any_b
+            self.civ_gov_held[:, row] |= torch.where(
+                _gov_on, torch.ones_like(_adopted) << _adopted, torch.zeros_like(_adopted))
+            self._carry_policies(row, _gov_on & (_adopted != gov_before), slots_before)
+        self.civ_discount_districts[:, row] = torch.where(
+            any_b.unsqueeze(1), self._completed_specialty(row).unsqueeze(1), self.civ_discount_districts[:, row])
 
     def _feat_gone(self) -> torch.Tensor:
         """[B, T] bool — the BAKED (t0) feature's yields no longer apply: it

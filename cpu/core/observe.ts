@@ -16,8 +16,7 @@ import { seatStrength, seatProximity } from './phase';
 import { AGREEMENT_TURNS, COMPETITION_TURNS, CONGRESS_DV_MIN_ERA, CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DIPLO_VICTORY_POINTS, GRIEVANCE_GANG, VISIBILITY_MAX } from '../data/seats';
 import { grievancesAgainst } from './grievance';
 import { envoysOf, hasMet } from './cityStates';
-import { effectiveResearchCostIn, rosterBoostPoints } from './boosts';
-import { goldenBoostBonus, worldEraIndex } from './eras';
+import { worldEraIndex } from './eras';
 import { itemCost, districtCostIn, settlerCost, DISTRICT_SPECIALTY_COST } from './game';
 import { builderCost, settlerCount } from './units';
 import { growthFoodNeeded, borderGrowthCost } from '../data/constants';
@@ -143,14 +142,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     builderCost(state, seat) / 1000,
   ];
   const rs = s?.research;
-  const gT = goldenBoostBonus(state, seat, false);
-  const gC = goldenBoostBonus(state, seat, true);
-  const bT = rosterBoostPoints(state, seat, false);
-  const bC = rosterBoostPoints(state, seat, true);
-  const costT = Object.values(TECHS).map((t) =>
-    (rs ? effectiveResearchCostIn(rs, t.id, t.cost, gT, bT) : t.cost) / 1000);
-  const costC = Object.values(CIVICS).map((c) =>
-    (rs ? effectiveResearchCostIn(rs, c.id, c.cost, gC, bC) : c.cost) / 1000);
+  const costT = Object.values(TECHS).map((t) => t.cost / 1000);
+  const costC = Object.values(CIVICS).map((c) => c.cost / 1000);
   // PARKED progress per option, on the cost blocks' scale so the two read as a
   // ratio. Switching research is a legal move and cannot be decided from the
   // cost alone: the science already sunk into an abandoned item is the other

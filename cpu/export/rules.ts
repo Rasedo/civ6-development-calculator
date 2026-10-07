@@ -296,10 +296,10 @@ const effectRow = (fx: PolicyEffects) => ({
   concertShare: fx.concertShare ?? 0,
   militaryMaintenanceAdd: fx.militaryMaintenanceAdd ?? 0,
 });
-import { BOOSTLESS, BOOSTS, BOOST_FRACTION } from '../data/boosts';
+import { BOOSTLESS, BOOSTS } from '../data/boosts';
 import { STRATEGIC_IDS, STRATEGIC_PER_TURN, STOCKPILE_CAP_BASE, STOCKPILE_CAP_PER_ENCAMPMENT_BUILDING, UNIT_RESOURCE_COST, FUEL_SHORT_CS, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, COMBAT_BASE_DAMAGE, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_MINIMUM_DAMAGE, COMBAT_MAX_HIT_POINTS, COMBAT_POWER_SCALING_256, DAMAGE_EXPONENT_REACH, damageFactor } from '../data/constants';
 import { GOODY_KINDS, GOODY_PAYLOAD_KINDS, GOODY_SUBTYPES, goodyAmount } from '../data/goodyHuts';
-import { COST_MULTIPLIER_PCT, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, PROGRESS_TECH_COUNT, PROGRESS_CIVIC_COUNT, PLOT_BUY_BASE_COST, PLOT_BUY_RING_STEP, PLOT_BUY_K, gameProgressK, CITY_GROWTH_THRESHOLD, CITY_GROWTH_MULTIPLIER, CITY_GROWTH_EXPONENT, CULTURE_COST_FIRST_PLOT, CULTURE_COST_LATER_PLOT_MULTIPLIER, CULTURE_COST_LATER_PLOT_EXPONENT, WONDER_FREE_TILES, PLOT_INFLUENCE, CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, FOOD_PER_CITIZEN, HOUSING_LEFT_HALF_GROWTH, HOUSING_LEFT_QUARTER_GROWTH, HOUSING_LEFT_ZERO_GROWTH, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, PURCHASE_DIVISOR, LUXURY_AMENITY_CITIES, GAME_SPEED, scaleByGameSpeed, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
+import { COST_MULTIPLIER_PCT, HARVEST_IMPROVED_DEGRADATION, HARVEST_PILLAGED_DEGRADATION, PROGRESS_TECH_COUNT, PROGRESS_CIVIC_COUNT, PLOT_BUY_BASE_COST, PLOT_BUY_RING_STEP, PLOT_BUY_K, gameProgressK, CITY_GROWTH_THRESHOLD, CITY_GROWTH_MULTIPLIER, CITY_GROWTH_EXPONENT, CULTURE_COST_FIRST_PLOT, CULTURE_COST_LATER_PLOT_MULTIPLIER, CULTURE_COST_LATER_PLOT_EXPONENT, WONDER_FREE_TILES, PLOT_INFLUENCE, CITY_WORK_RADIUS, CITIZEN_SCIENCE, CITIZEN_CULTURE, UNASSIGNED_CITIZEN_GOLD, FOOD_PER_CITIZEN, HOUSING_LEFT_HALF_GROWTH, HOUSING_LEFT_QUARTER_GROWTH, HOUSING_LEFT_ZERO_GROWTH, CITY_CENTER_MIN_FOOD, CITY_CENTER_MIN_PRODUCTION, PILLAGE_BUILDING_REPAIR_PERCENT, HOUSING_FRESH_WATER, HOUSING_COASTAL, HOUSING_NO_WATER, AQUEDUCT_FRESH_BONUS, AQUEDUCT_NO_FRESH_TOTAL, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, PURCHASE_DIVISOR, UPGRADE_BASE_COST, UPGRADE_MINIMUM_COST, UPGRADE_MINIMUM_COST_LEVY, UPGRADE_NET_PRODUCTION_PERCENT_COST, LUXURY_AMENITY_CITIES, GAME_SPEED, scaleByGameSpeed, REGIONAL_RANGE, EMBARK_MOVES, EMBARK_MOVE_TECHS, SEA_MOVE_TECH, SEA_MOVE_TECH_BONUS, EMBARKED_DEFENSE_CS_BY_ERA, MP_SCALE, ROAD_TIER_MP, ROAD_TIER_BRIDGES, ROAD_TIER_ERA, RAILROAD_MP, RAILROAD_TECH, RAILROAD_COST, EMBARK_TRANSITION_MP } from '../data/constants';
 
 // The GPU improvement index space (tile.improvement values): this array's
 // order IS the GPU's improvement index, so anything but an append renumbers
@@ -386,62 +386,34 @@ const beliefRow = (def: { effects: BeliefEffects }) => ({
   })(),
 });
 
+/** THE INSTALL'S `Boosts` ROWS (cpu/data/boosts.ts), each column as an
+ *  index into the catalog it names (-1 where the row names none): the GPU's
+ *  `_boost_triggers` evaluates the same BoostClass arms `stateTrigger`
+ *  does, and `_land_boosts` lands `pct`. */
 const boostRows: object[] = [];
 for (const [id, def] of Object.entries(BOOSTS)) {
-  if (!def.check) continue;
   const target = techIdx.has(id) ? 'tech' : civicIdx.has(id) ? 'civic' : null;
   if (!target) continue;
-  const idx = target === 'tech' ? techIdx.get(id)! : civicIdx.get(id)!;
-  const c = def.check;
-  let row: object | null = null;
-  if (c.kind === 'building') {
-    const b = buildingIdx.get(c.id);
-    if (b !== undefined) row = { kind: 'building', b, count: c.count };
-  } else if (c.kind === 'cityPop') row = { kind: 'cityPop', pop: c.pop };
-  else if (c.kind === 'totalPop') row = { kind: 'totalPop', pop: c.pop };
-  else if (c.kind === 'coastalCity') row = { kind: 'coastalCity' };
-  else if (c.kind === 'cities') row = { kind: 'cities', count: c.count };
-  else if (c.kind === 'pantheon') row = { kind: 'pantheon' };
-  else if (c.kind === 'religion') row = { kind: 'religion' };
-  else if (c.kind === 'metCityStates') row = { kind: 'metCityStates', count: c.count };
-  else if (c.kind === 'tradeRoutes') row = { kind: 'tradeRoutes', count: c.count };
-  else if (c.kind === 'tech') {
-    const t = techIdx.get(c.id);
-    if (t !== undefined) row = { kind: 'tech', t };
-  } else if (c.kind === 'naturalWonderFound') row = { kind: 'naturalWonderFound' };
-  else if (c.kind === 'improvement') {
-    // Improvement eurekas for every improvement in the roster: an
-    // unexported row fires in TS only and forks the GPU's research stream
-    // on the boosted cost (seed 9066 t57, MASONRY's quarry eureka).
-    const imp = c.id ? IMPROVEMENT_IDS.indexOf(c.id) : -1;
-    // imp -1: an improvement of any kind
-    if (imp >= 0 || !c.id) row = { kind: 'improvement', imp, count: c.count, onResource: c.onResource ? 1 : 0 };
-  } else if (c.kind === 'anyWonderBuilt') {
-    row = { kind: 'anyWonderBuilt' };
-  } else if (c.kind === 'district') {
-    // District eurekas/inspirations (STATE_WORKFORCE: any specialty district;
-    // MATHEMATICS: 3; per-type ones). distinctTypes conditions
-    // (CIVIL_ENGINEERING: 7 different specialty districts) export too: the
-    // full specialty catalog is placeable, so every seat can satisfy them
-    // (rng 2026006131 t248).
-    const dtype = c.type ? PLACEABLE_DISTRICTS.indexOf(c.type) : -1;
-    row = { kind: 'district', dtype, count: c.count, distinct: c.distinctTypes ? 1 : 0 };
-  } else if (c.kind === 'greatPeople') {
-    // Great-person eurekas (EDUCATION: a Scientist; HUMANISM: an Artist;
-    // ENLIGHTENMENT: any 3). cls -1 = any class (sum); else the GP_CLASSES
-    // index, which is the GPU's gp_earned column (tracks the first 5 classes).
-    const cls = c.class ? GP_CLASSES.indexOf(c.class) : -1;
-    if (!c.class) row = { kind: 'greatPeople', cls: -1, count: c.count };
-    else if (cls >= 0 && cls < 5) row = { kind: 'greatPeople', cls, count: c.count };
-  } else if (c.kind === 'policies') {
-    // the "run N policy cards" inspiration (MEDIEVAL_FAIRES, count 4): every
-    // seat's slotted cards count, in the boost detector and on the GPU
-    // (`_seat_slotted`).
-    row = { kind: 'policies', count: c.count };
-  } else if (c.kind === 'alliance') {
-    row = { kind: 'alliance', level: c.level };
-  }
-  if (row) boostRows.push({ target, idx, ...row });
+  const unitIds = Object.keys(UNITS);
+  boostRows.push({
+    target,
+    idx: target === 'tech' ? techIdx.get(id)! : civicIdx.get(id)!,
+    cls: def.cls,
+    pct: def.pct,
+    n: def.n ?? 1,
+    unit: def.unit ? unitIds.indexOf(def.unit) : -1,
+    // a Great Person's class (`GP_CLASSES`) where Unit1Type names one
+    gpClass: def.unit?.startsWith('GREAT_') ? GP_CLASSES.indexOf(def.unit.slice(6) as (typeof GP_CLASSES)[number]) : -1,
+    building: def.building ? buildingIdx.get(def.building) ?? -1 : -1,
+    buildingDistrict: def.building ? PLACEABLE_DISTRICTS.indexOf(BUILDINGS[def.building].district) : -1,
+    district: def.district ? PLACEABLE_DISTRICTS.indexOf(def.district) : -1,
+    improvement: def.improvement ? IMPROVEMENT_IDS.indexOf(def.improvement) : -1,
+    resource: def.resource ? RESOURCE_IDS.indexOf(def.resource as never) : -1,
+    requiresResource: def.requiresResource ? 1 : 0,
+    tech: def.tech ? techIdx.get(def.tech) ?? -1 : -1,
+    civic: def.civic ? civicIdx.get(def.civic) ?? -1 : -1,
+    govTier: def.govTier ?? 0,
+  });
 }
 
 /** [research index, per, food] — the one row of a research list carrying a
@@ -624,7 +596,6 @@ export function buildRules() {
     cardiffHarborPower: CARDIFF_HARBOR_POWER,
     laserPowerLoad: LASER_POWER_LOAD,
     biospherePowerMult: BIOSPHERE_POWER_MULT,
-    boostFraction: BOOST_FRACTION,
     // THE INSTALL'S `CivilizationLevels` TABLE, in `CIV_LEVEL_ORDER` (append
     // only — the GPU indexes its per-row capability vectors by position).
     // Ten permissions per class of player; the GPU reads the one that forks a
@@ -642,7 +613,7 @@ export function buildRules() {
     wonderFreeTiles: WONDER_FREE_TILES,
     // `borderPlotCost`'s PLOT_INFLUENCE_* terms
     plotInfluence: { ...PLOT_INFLUENCE },
-    scenario: { settlerBase: UNITS.SETTLER.cost, settlerPerCity: scaleByGameSpeed(SETTLER_COST_STEP), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, turnLimit: TURN_LIMIT, builderBase: UNITS.BUILDER.cost, builderPer: scaleByGameSpeed(BUILDER_COST_STEP), gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY, civicUnlockMaxCost: CIVIC_UNLOCK_MAX_COST, civicUnlockPerTurnDrop: CIVIC_UNLOCK_PER_TURN_DROP, civicUnlockMinCost: CIVIC_UNLOCK_MIN_COST, gameCostEscalation: GAME_COST_ESCALATION, anarchyTurns: ANARCHY_TURNS },
+    scenario: { settlerBase: UNITS.SETTLER.cost, settlerPerCity: scaleByGameSpeed(SETTLER_COST_STEP), settlerPopGate: SETTLER_POP_GATE, goldPurchaseMult: GOLD_PURCHASE_MULT, faithPurchaseMult: FAITH_PURCHASE_MULT, purchaseDivisor: PURCHASE_DIVISOR, upgradeCost: [scaleByGameSpeed(UPGRADE_BASE_COST), UPGRADE_MINIMUM_COST, scaleByGameSpeed(UPGRADE_MINIMUM_COST), UPGRADE_MINIMUM_COST_LEVY, scaleByGameSpeed(UPGRADE_MINIMUM_COST_LEVY), UPGRADE_NET_PRODUCTION_PERCENT_COST, GOLD_EQUIVALENT_OTHER_YIELDS], turnLimit: TURN_LIMIT, builderBase: UNITS.BUILDER.cost, builderPer: scaleByGameSpeed(BUILDER_COST_STEP), gameSpeed: GAME_SPEED, spaceLyTarget: SPACE_FLIGHT_LY, civicUnlockMaxCost: CIVIC_UNLOCK_MAX_COST, civicUnlockPerTurnDrop: CIVIC_UNLOCK_PER_TURN_DROP, civicUnlockMinCost: CIVIC_UNLOCK_MIN_COST, gameCostEscalation: GAME_COST_ESCALATION, anarchyTurns: ANARCHY_TURNS },
     actions: { unit: unitActionNames(IMPROVEMENT_IDS) },
     // THE GAME'S PROGRESS as the prices read it (`gameProgressPct`,
     // `progressCost`): the two trees' install row counts and the speed's
@@ -1179,6 +1150,9 @@ export function buildRules() {
       // the rows a random boost picker may offer (a `Boosts` row, `BOOSTLESS`)
       techBoostable: techList.map((t) => !BOOSTLESS.has(t.id)),
       civicBoostable: civicList.map((c) => !BOOSTLESS.has(c.id)),
+      // each technology's / civic's `Boosts.Boost` percent, 0 with no row
+      techBoostPct: techList.map((t) => BOOSTS[t.id]?.pct ?? 0),
+      civicBoostPct: civicList.map((c) => BOOSTS[c.id]?.pct ?? 0),
       warMinTurns: WAR_MIN_TURNS,
       peaceTreatyTurns: PEACE_TREATY_TURNS,
       dowProximity: DOW_PROXIMITY,
@@ -1909,7 +1883,6 @@ export function buildRules() {
       barbHorseRange: BARB_HORSE_RANGE,
       campClearReward: CAMP_DISPERSAL_GOLD,
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
-      campBoostCivic: civicIdx.get('MILITARY_TRADITION') ?? -1,
       // COMBAT: the single-precision factor e^(x/256) per exponent x in
       // 1/256ths over ±DAMAGE_EXPONENT_REACH (`damageFactor`, the function
       // damageRoll's `damageOf` calls), the exponent's k, and the roll's

@@ -350,7 +350,10 @@ def main() -> None:
         torch.ones(s15.B, dtype=torch.bool, device=s15.device),
         torch.zeros(s15.B, dtype=torch.float64, device=s15.device))
     got = s15.civ_tech_boosted[0, 0, :nt15]
-    assert bool((got[early] | s15.civ_techs[0, 0, :nt15][early]).all()), \
+    # a technology with no Boosts row (Pottery, Mining, Animal Husbandry) takes none
+    able = s15._tech_boost_pct[:nt15] > 0
+    assert not bool(got[~able].any()), "a technology with no Boosts row took a eureka"
+    assert bool((got[early & able] | s15.civ_techs[0, 0, :nt15][early & able]).all()), \
         "an Ancient or Classical technology was left unboosted"
     assert not bool(got[~early].any()), "a later technology was boosted"
     assert not bool(got[int(early.nonzero()[0])]), "a researched technology took a eureka"

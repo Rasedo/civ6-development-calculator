@@ -6,7 +6,8 @@ import { GOVERNMENT_LIST, POLICY_LIST, SLOT_KINDS } from '../data/policies';
 import { PEACE_GOLD_COST, WAR_MIN_TURNS } from '../data/seats';
 import { warKindCode } from '../data/warKinds';
 import { availableCivicsIn, availableTechsIn, governmentsOpen, governmentSlots, inDarkAge, seatGovernment, unlockedPolicyIds } from './effects';
-import { effectiveResearchCost, goldAffordable } from './game';
+import { goldAffordable } from './game';
+import { researchOwed } from './boosts';
 import { congressPolicyBlocked } from './congress';
 import { cityStateById, hasMet, isSuzerain } from './cityStates';
 import { civsAtWar, atWarWithAny, isCityStateSeat, cityStateOfSeat, seatOf, treatyTurnsWith, warTurnsWith } from './seats';
@@ -23,13 +24,15 @@ import { defaultWarKind, warBuffRowsOf, warKindAllowed } from './casusBelli';
  * the decide. A name the GPU does not emit is a red.
  */
 
-/** Per table index the effective cost of every open item, -1 where it is
- *  not open: the record's research arms accept exactly the open ones. */
+/** Per table index the Science or Culture still owed on every open item
+ *  (`researchOwed`: its cost less the whole points banked on it, a boost's
+ *  among them), -1 where it is not open: the record's research arms accept
+ *  exactly the open ones. */
 function openCosts(state: GameState, seat: number, civic: boolean): number[] {
   const research = seatOf(state, seat)!.research;
   const table = civic ? CIVICS : TECHS;
   const open = new Set((civic ? availableCivicsIn(research) : availableTechsIn(research)).map((d) => d.id));
-  return Object.values(table).map((d) => (open.has(d.id) ? effectiveResearchCost(state, seat, d.id, d.cost) : -1));
+  return Object.values(table).map((d) => (open.has(d.id) ? researchOwed(research, d.id, d.cost) : -1));
 }
 
 /** The `research` group: `tech_cost` and `civic_cost` per table index. */

@@ -585,9 +585,10 @@ class SimGp:
         w = want[:, :nt]
         held = self.civ_techs[:, row, :nt]
         boosted = self.civ_tech_boosted[:, row, :nt]
-        newly = w & ~held & ~boosted
         done = w & ~held & boosted
-        self.civ_tech_boosted[:, row, :nt] |= newly
+        land = torch.zeros_like(self.civ_techs[:, row])
+        land[:, :nt] = w & ~held & ~boosted
+        newly = self._land_boosts(row, land, False)
         if bool(done.count_nonzero()):
             self.civ_techs[:, row, :nt] |= done
             self.civ_tech_retain[:, row, :nt] = torch.where(
@@ -608,8 +609,9 @@ class SimGp:
             return
         nt = min(self.civ_tech_boosted.shape[2], self._tech_era.numel())
         band = (self._tech_era[:nt].reshape(1, -1) == era.reshape(-1, 1)) & want.reshape(-1, 1)
-        newly = band & ~self.civ_techs[:, row, :nt] & ~self.civ_tech_boosted[:, row, :nt]
-        self.civ_tech_boosted[:, row, :nt] |= newly
+        land = torch.zeros_like(self.civ_techs[:, row])
+        land[:, :nt] = band
+        newly = self._land_boosts(row, land, False)
         self._dedication_event(row, self._ded_free_inquiry, newly.sum(dim=1))
 
     def _gp_boost_draw(self, row: int, m: torch.Tensor, cls: torch.Tensor, at: torch.Tensor,

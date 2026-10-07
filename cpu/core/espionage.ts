@@ -7,6 +7,7 @@
  * enemy cities and your own, and what exactly they will do depends on the city
  * you send them to."
  */
+import { markBoost } from './boosts';
 import { gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { GW_KIND_ART, GW_KIND_MUSIC, GW_KIND_WRITING, type GreatWork } from '../data/greatWorks';
 import { hexDistance } from '../../world/hex';
@@ -777,7 +778,7 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
     }
     case SPY_M_STEAL_TECH_BOOST: {
       const id = stealableTech(state, unit.seat, holder);
-      if (id) owner.research.boosted.push(id);
+      if (id) markBoost(state, owner.seat, id);
       return;
     }
     case SPY_M_FOMENT_UNREST:

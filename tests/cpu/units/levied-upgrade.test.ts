@@ -43,7 +43,8 @@ describe('a levied unit upgrades cheaply', () => {
     const full = upgradeGoldCost(s, 0, 'WARRIOR', false);
     const cut = upgradeGoldCost(s, 0, 'WARRIOR', true);
     expect(full).toBeGreaterThan(0);              // or this lane proves nothing
-    expect(cut).toBe(Math.round(full * 0.25));
+    // a quarter of the full price, down to a multiple of PURCHASE_DIVISOR
+    expect(cut).toBe(Math.floor((full * 0.25) / 5) * 5);
     expect(cut).toBeLessThan(full);
   });
 

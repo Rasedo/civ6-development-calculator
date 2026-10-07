@@ -196,39 +196,36 @@ def main() -> None:
             assert p["unlockCivic"] >= 0, f"{p['id']} is adoptable but no civic grants it"
             assert p["obsoleteCivic"] == -1 or 0 <= p["obsoleteCivic"] < len(rj["civics"]), f"{p['id']} retires to nothing"
 
-    # 8) The MEDIEVAL_FAIRES "run 4 policy cards" inspiration: drive
-    #    _detect_seat_boosts and assert it fires at >=4 slotted policies, not
-    #    below. ONE detector serves every row, so the lane also proves a CIV
-    #    row reads its OWN slotted-policy count.
-    mf_idx = civ_idx["MEDIEVAL_FAIRES"]
+    # 8) The CASTLES eureka (BOOST_TRIGGER_HAVE_GOVERNMENT_TIER, Tier2): drive
+    #    _detect_seat_boosts and assert it fires in a tier-2 government
+    #    (Monarchy), not in the Chiefdom. ONE detector serves every row, so
+    #    the lane also proves a CIV row reads its OWN government.
+    tech_idx = {t["id"]: i for i, t in enumerate(rj["techs"])}
+    ca_idx = tech_idx["CASTLES"]
+    monarchy = ["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]
     simp = build(rules, paths[0], slot=1)
-    simp.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
-    simp._slot_greedily(0)  # the store is the truth now; a hand-set scene fills it with the greedy reference
-    _, _, _, _, slp, *_ = simp._gov_policy_mods(simp.civ_civics[:, 0])
-    assert int(slp[0].sum()) >= 4, "MONARCHY config must slot >=4 policies to arm the inspiration"
-    simp.civ_civic_boosted[:, 0] = False
+    simp.civ_civics[:, 0].copy_(civics_with(monarchy))
+    assert int(simp._adopted_gov_tier(0)[0]) >= 2, "the Divine Right scene must stand in a tier-2 government"
+    simp.civ_tech_boosted[:, 0] = False
     simp._detect_seat_boosts(0, torch.ones(simp.B, dtype=torch.bool))
-    assert bool(simp.civ_civic_boosted[0, 0, mf_idx]), "MEDIEVAL_FAIRES inspiration fires at 4+ slotted policies"
+    assert bool(simp.civ_tech_boosted[0, 0, ca_idx]), "the CASTLES eureka fires in a tier-2 government"
     simn = build(rules, paths[0], slot=1)
     simn.civ_civics[:, 0].copy_(civics_with(["CODE_OF_LAWS"]))
-    _, _, _, _, sln, *_ = simn._gov_policy_mods(simn.civ_civics[:, 0])
-    assert int(sln[0].sum()) < 4, "CHIEFDOM+CODE_OF_LAWS slots <4 policies"
-    simn.civ_civic_boosted[:, 0] = False
+    simn.civ_tech_boosted[:, 0] = False
     simn._detect_seat_boosts(0, torch.ones(simn.B, dtype=torch.bool))
-    assert not bool(simn.civ_civic_boosted[0, 0, mf_idx]), "MEDIEVAL_FAIRES does NOT fire below 4 slotted policies"
-    # ...and the same row on a CIV seat: the policies condition is keyed on
-    # that seat's own civics, not on seat 0's.
+    assert not bool(simn.civ_tech_boosted[0, 0, ca_idx]), "the CASTLES eureka does NOT fire in the Chiefdom"
+    # ...and the same row on a CIV seat: the condition is keyed on that
+    # seat's own government, not on seat 0's.
     if simp.n_majors > 1:
         simr = build(rules, paths[0], slot=1)
-        simr.civ_civics[:, 1].copy_(civics_with(["CODE_OF_LAWS", "CRAFTSMANSHIP", "MILITARY_TRADITION", "POLITICAL_PHILOSOPHY", "STATE_WORKFORCE", "EARLY_EMPIRE", "CIVIL_SERVICE", "DIVINE_RIGHT"]))
-        simr._slot_greedily(1)
-        simr.civ_civic_boosted[:, 1:] = False
+        simr.civ_civics[:, 1].copy_(civics_with(monarchy))
+        simr.civ_tech_boosted[:, 1:] = False
         simr._detect_seat_boosts(1, torch.ones(simr.B, dtype=torch.bool))
-        assert bool(simr.civ_civic_boosted[0, 1, mf_idx]), (
-            "MEDIEVAL_FAIRES never fires for a CIV seat — the policies condition "
-            "is still seat-0-only"
+        assert bool(simr.civ_tech_boosted[0, 1, ca_idx]), (
+            "the CASTLES eureka never fires for a CIV seat — the government "
+            "condition is still seat-0-only"
         )
-        assert not bool(simr.civ_civic_boosted[0, 0, mf_idx]), "a civ's inspiration landed on seat 0's row"
+        assert not bool(simr.civ_tech_boosted[0, 0, ca_idx]), "a civ's eureka landed on seat 0's row"
 
     # 9) The sourced government rows, channel by channel — what each ships,
     #    and the DELETED unsourced magnitudes staying deleted.
@@ -317,7 +314,7 @@ def main() -> None:
     # the tier INDEX ranks best-first, so more amenities is a SMALLER index
     assert int(t_hi[0, 0]) < int(t_lo[0, 0]), "the amenity grant reaches the tier balance of the districted city"
 
-    print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + MEDIEVAL_FAIRES inspiration + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the specialty-district grant)")
+    print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + the CASTLES eureka + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the specialty-district grant)")
 
 
 if __name__ == "__main__":

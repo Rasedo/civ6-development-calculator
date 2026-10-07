@@ -194,6 +194,14 @@ export const FAITH_PURCHASE_MULT = srcConst('scenario.faithPurchaseMult', 2, {
 });
 export const PURCHASE_DIVISOR = srcConst('scenario.purchaseDivisor', 5, gp('PURCHASE_DIVISOR'));
 
+/** THE UPGRADE'S GOLD (Unit_Upgrade_Manager 0x5376d0, dll_readings "H-1: the
+ *  upgrade's gold"): the base, the floor and a levied unit's floor at the
+ *  game's speed; the net production's percent. The Gold a point of it costs is GOLD_EQUIVALENT_OTHER_YIELDS (`core/trade.ts`). */
+export const UPGRADE_BASE_COST = srcConst('scenario.upgradeBaseCost', 10, gp('UPGRADE_BASE_COST'));
+export const UPGRADE_MINIMUM_COST = srcConst('scenario.upgradeMinimumCost', 15, gp('UPGRADE_MINIMUM_COST'));
+export const UPGRADE_MINIMUM_COST_LEVY = srcConst('scenario.upgradeMinimumCostLevy', 0, gp('UPGRADE_MINIMUM_COST_LEVY'));
+export const UPGRADE_NET_PRODUCTION_PERCENT_COST = srcConst('scenario.upgradeNetProductionPct', 100, gp('UPGRADE_NET_PRODUCTION_PERCENT_COST'));
+
 /** THE POLICY UNLOCK. CIV6 (the Governments pedia): "Any time a new
  *  government or policy is unlocked from the Civics Tree, you will have the
  *  opportunity to reselect policies or change your government for free.

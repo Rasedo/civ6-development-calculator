@@ -245,7 +245,6 @@ class Rules:
     unassigned_citizen_gold: float
     food_per_citizen: float
     housing_left_growth: tuple  # (half, quarter, zero): growth falls to half / a quarter at, halts below
-    boost_fraction: float
     housing_fresh: float
     housing_coastal: float
     housing_none: float
@@ -276,6 +275,7 @@ class Rules:
     gold_purchase_mult: float  # gold price = production cost × this (GOLD_PURCHASE_MULT)
     faith_purchase_mult: float  # faith price = production cost × this (FAITH_PURCHASE_MULT)
     purchase_divisor: int  # every gold / faith price is floored to a multiple of this (PURCHASE_DIVISOR 5, measured)
+    upgrade_cost: tuple  # (base at speed, floor, floor at speed, levy floor, levy floor at speed, net %, gold per point) — `upgradeGoldCost`
     civic_unlock: tuple  # (CivicUnlockMaxCost, CivicUnlockPerTurnDrop, CivicUnlockMinCost) — `policyUnlockCost`
     cost_escalation: int  # GAME_COST_ESCALATION 1000, the policy unlock's escalation end point — `policyEscalated`
     anarchy_turns: int  # the turns a return to a held government leaves the seat in none (ANARCHY_TURNS)
@@ -491,7 +491,6 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         unassigned_citizen_gold=r["unassignedCitizenGold"],
         food_per_citizen=r["foodPerCitizen"],
         housing_left_growth=tuple(int(x) for x in r["housingLeftGrowth"]),
-        boost_fraction=r["boostFraction"],
         housing_fresh=r["housing"]["fresh"],
         housing_coastal=r["housing"]["coastal"],
         housing_none=r["housing"]["none"],
@@ -519,6 +518,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         gold_purchase_mult=r["scenario"]["goldPurchaseMult"],
         faith_purchase_mult=r["scenario"]["faithPurchaseMult"],
         purchase_divisor=int(r["scenario"]["purchaseDivisor"]),
+        upgrade_cost=tuple(int(x) for x in r["scenario"]["upgradeCost"]),
         civic_unlock=(int(r["scenario"]["civicUnlockMaxCost"]), int(r["scenario"]["civicUnlockPerTurnDrop"]),
                       int(r["scenario"]["civicUnlockMinCost"])),
         cost_escalation=int(r["scenario"]["gameCostEscalation"]),
@@ -1022,7 +1022,7 @@ _MUTABLE = [
     "trading_post",  # Trading Posts by (seat row, centre tile)
     "city_id",
     "unit_next",
-    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "civ_gp_lux_copies", "city_gp_perm", "pantheon_claimed_n",
+    "gp_earned", "gp_offer", "gp_price", "gp_passed_by", "gp_claimed", "civ_gp_used", "civ_gp_earned", "civ_barb_kills", "civ_gp_perm", "civ_gp_lux", "civ_gp_lux_n", "civ_gp_lux_copies", "city_gp_perm", "pantheon_claimed_n",
     "pan_claimed", "fol_claimed", "wor_claimed", "fou_claimed", "enh_claimed",  # belief-claim masks, one per class
     "holy_tile", "city_pressure", "city_followed",  # ONE seat-indexed pressure+followed plane pair
     "city_unconverted",  # each city's unconverted pressure

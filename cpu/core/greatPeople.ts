@@ -1,4 +1,5 @@
 
+import { markBoost } from './boosts';
 import type { GameState, GreatPersonClass, Seat } from './types';
 import { alliedAtLevel, citiesOf, seatOf, unitSeat } from './seats';
 import { GP_CLASSES, GP_CLASS_DISTRICT, GREAT_PEOPLE, gpChargesOf, gpCost } from '../data/greatPeople';
@@ -314,7 +315,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
       );
       if (pool.length === 0) continue;
       const pick = pool[randRange(state, pool.length)];
-      if (pick) o.research.boosted.push(pick);
+      if (pick) markBoost(state, o.seat, pick);
     }
   }
   return refund;

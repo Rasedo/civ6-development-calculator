@@ -674,7 +674,9 @@ class SimSpy:
         elif m == self._spy_m_steal:
             t = int(self._steal_first(row)[b, hr])
             if t >= 0:
-                self.civ_tech_boosted[b, row, t] = True
+                want = torch.zeros_like(self.civ_techs[:, row])
+                want[b, t] = True
+                self._land_boosts(row, want, False)
         elif m == self._spy_m_unrest:
             drop = self._spy_unrest + self._spy_unrest_per_level * lvl
             self.city_loyalty[b, hr, hc] = max(

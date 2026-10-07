@@ -265,8 +265,8 @@ class BatchEnv:
                           torch.stack(self._escalators(s.civ_techs[:, row], s.civ_civics[:, row],
                                                        s.civ_builders_trained[:, row],
                                                        s._seat_settler_cost(row).to(d)), dim=1),
-                          s._eff_cost(s.rules_dev.t_cost.unsqueeze(0).expand(B, -1), s.civ_tech_boosted[:, row], row).to(d) / 1000.0,
-                          s._eff_cost(s.rules_dev.c_cost.unsqueeze(0).expand(B, -1), s.civ_civic_boosted[:, row], row, is_civic=True).to(d) / 1000.0,
+                          s.rules_dev.t_cost.unsqueeze(0).expand(B, -1).to(d) / 1000.0,
+                          s.rules_dev.c_cost.unsqueeze(0).expand(B, -1).to(d) / 1000.0,
                           # PARKED progress per option, on the cost blocks'
                           # scale so the two read as a ratio. Switching is a
                           # legal move, and it cannot be decided from the

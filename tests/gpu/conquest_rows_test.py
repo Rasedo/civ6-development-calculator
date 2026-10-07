@@ -23,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
 from warmup import settle_all, warm_base
-from core.simbase import js_round
 
 B0 = 0
 RULES = json.loads((Path(__file__).resolve().parent.parent.parent
@@ -153,26 +152,19 @@ def test_mother_russia(rules, path) -> None:
 
 def test_dynastic_cycle(rules, path) -> None:
     """A boost worth ten points more, on techs and on civics alike."""
-    def cost(name, is_civic: bool) -> float:
+    def points(name, is_civic: bool) -> int:
         s2 = fresh(rules, path)
         seat(s2, 0, name)
-        base = (s2.rules_dev.c_cost if is_civic else s2.rules_dev.t_cost)[:1]
-        boosted = torch.ones(1, dtype=torch.bool)
-        return float(s2._eff_cost(base.reshape(1), boosted, 0, is_civic=is_civic)[0])
+        return int(s2._boost_points(0, is_civic)[0])
 
     sim = fresh(rules, path)
-    frac = float(sim.rules.boost_fraction)
-    assert abs(frac - 0.4) < 1e-9, f"the base boost fraction moved to {frac}"
     for is_civic in (False, True):
-        base = float((sim.rules_dev.c_cost if is_civic else sim.rules_dev.t_cost)[0])
-        # js_round's own rounding, not a ratio: a small base cost rounds and a
-        # ratio assertion would read the rounding, not the fraction
-        want_p = float(js_round(torch.tensor([base * (1 - frac)], dtype=torch.float64))[0])
-        want_c = float(js_round(torch.tensor([base * (1 - frac - 0.1)], dtype=torch.float64))[0])
-        assert cost(None, is_civic) == want_p, f"the baseline paid {cost(None, is_civic)}, not {want_p}"
-        assert cost("CHINA", is_civic) == want_c, f"China paid {cost('CHINA', is_civic)}, not {want_c}"
-        assert want_c < want_p, "the scene's base cost is too small to tell the two apart"
-    print("  4 Dynastic Cycle OK — the boost takes half the cost, not two fifths")
+        assert points(None, is_civic) == 0, f"the baseline adds {points(None, is_civic)} points"
+        assert points("CHINA", is_civic) == 10, f"China adds {points('CHINA', is_civic)} points, not 10"
+    # the DLL's amount (runs/h1_duelw1115: Writing 40 lands Rome 15, China 19)
+    amt = lambda c, p: int(sim._boost_amount(torch.tensor([c]), torch.tensor([40]), torch.tensor([p]))[0])  # noqa: E731
+    assert (amt(40, 0), amt(40, 10), amt(25, 0), amt(25, 10)) == (15, 19, 9, 12)
+    print("  4 Dynastic Cycle OK — ten points more on every eureka and inspiration")
 
 
 def test_first_emperor(rules, path) -> None:

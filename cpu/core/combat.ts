@@ -64,7 +64,7 @@ import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the s
 import { gdrHas, unitFullMoves, waterWalks, grantedMoves } from './units';
 import { warWearinessBattle, warWearinessLaunch } from './weariness';
 import { unitKillEvent, campMoment } from './eras';
-import { grantBoost } from './boosts';
+import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
 const ok: RuleResult = { ok: true };
@@ -92,7 +92,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   // CIV6 (BOOST_TRIGGER_CLEAR_CAMP): Military Tradition's inspiration, a
   // major's at the clear (runs/h1_duelw1116 China: the camp cleared at t6,
   // the inspiration read at t7)
-  if (clearer && isCiv(unit.seat)) grantBoost(state, unit.seat, 'MILITARY_TRADITION');
+  if (clearer && isCiv(unit.seat)) boostOnEvent(state, unit.seat, 'CLEAR_CAMP');
   // CIV6 (Epic Quest): "Receive a Tribal Village reward each time you capture
   // a barbarian outpost" — the install maps the camp to a goody hut outright,
   // so it is the SAME draw off the SAME table (`CAMP_GOODY_ROWS`).

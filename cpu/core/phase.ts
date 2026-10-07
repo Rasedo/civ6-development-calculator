@@ -21,7 +21,8 @@ import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, da
 import { promoClassOf, promoValue, takePromotion } from './promotions';
 import { PROMO_COLS, UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
-import { detectBoosts, effectiveResearchCostIn, rosterBoostPoints } from './boosts';
+import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
+import { BOOSTS } from '../data/boosts';
 import { selectResearch, pillagePlunder } from './economy';
 import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
@@ -112,7 +113,7 @@ import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
-import { levyMoment, pantheonMoment, transferMoments, agePressure, goldenBoostBonus, worldEraIndex } from './eras';
+import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
 import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
@@ -244,6 +245,10 @@ export function declareWar(state: GameState, declarer: number, target: number, k
   clearDelegations(state, declarer, target);
   setWarKind(state, declarer, target, k);
   grievanceWarDeclared(state, declarer, target, k);
+  // CIV6 (BOOST_TRIGGER_RECEIVE_DOW, _DOW_CASUS_BELLI): the target's
+  // Defensive Tactics; a war a casus belli opens (a kind with a condition),
+  // the declarer's Nationalism
+  boostOnWarDeclared(state, declarer, target, WAR_KINDS[k].condition !== 'none');
   state.eventLog.push(`${actor.name} declares a ${WAR_KINDS[k].id} war on ${foe.name}!`);
   defensivePact(state, declarer, target);
   return ok;
@@ -2516,6 +2521,52 @@ function researchAward(actor: Seat, effects: readonly ResearchEffect[]): void {
   }
 }
 
+/**
+ * A technology or civic COMPLETED AT ONCE outside the turn's research step —
+ * a boost that fills it (the DLL's progress setter 0x3a1fb0 completes the
+ * item the moment its progress reaches the cost, 0x3a1ac0): the completion's
+ * own effects as the research loop pays them, the item's banked progress
+ * spent, the current pick cleared. The free unit a technology grants
+ * (EFFECT_GRANT_UNIT_IN_CITY) arrives in the capital at once.
+ */
+export function completeResearchNow(state: GameState, seat: number, id: string): void {
+  const actor = seatOf(state, seat) as Seat | undefined;
+  if (!actor) return;
+  const rsr = actor.research;
+  if (TECHS[id]) {
+    if (rsr.techs.includes(id)) return;
+    if (id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
+    researchAward(actor, TECHS[id].effects);
+    rsr.techs.push(id);
+    delete rsr.techRetained[id];
+    if (rsr.tech === id) {
+      rsr.tech = null;
+      rsr.techProgress = 0;
+    }
+    for (const g of getModifiers(state, seat).grantUnits) {
+      if (g.tech !== id || !g.unit) continue;
+      const cap = actor.cities.find((c) => c.centerIndex === actor.capitalTile) ?? actor.cities[0];
+      if (cap) spawnUnit(state, g.unit, cap.centerIndex, seat);
+    }
+  } else {
+    if (rsr.civics.includes(id)) return;
+    const govBefore = seatGovernment(state, seat);
+    const slotsBefore = governmentSlots(state, seat);
+    researchAward(actor, CIVICS[id].effects);
+    rsr.civics.push(id);
+    delete rsr.civicRetained[id];
+    actor.government.civicTurn = state.turn;
+    if (rsr.civic === id) {
+      rsr.civic = null;
+      rsr.civicProgress = 0;
+    }
+    const govNow = seatGovernment(state, seat);
+    actor.government.held |= governmentBit(govNow);
+    if (govNow && govNow !== govBefore) carryPolicies(state, seat, slotsBefore);
+  }
+  refreshDistrictDiscount(state, seat);
+}
+
 export function seatPhase(state: GameState): void {
 
   // Seat units get their movement in this phase (like barbarians).
@@ -2792,8 +2843,6 @@ export function seatPhase(state: GameState): void {
         sciSum += ALLIANCE_R3_SCI_PCT * (o.sciRate ?? 0);
       }
     }
-    const gTech = goldenBoostBonus(state, actor.seat, false);
-    const gCivic = goldenBoostBonus(state, actor.seat, true);
     // The RESEARCH PICK arrives on the wire (applySeatActionRecord). A seat
     // with no pick banks progress with no current tech — the same wait the
     // GPU's `cur_tech == -1` already models.
@@ -2804,10 +2853,9 @@ export function seatPhase(state: GameState): void {
     // Every seat accrues (the GPU twin is seat_science_total rows 0..R);
     // lump grants (applyLumpGrant, goody maps) add to the same field.
     actor.scienceTotal = (actor.scienceTotal ?? 0) + sciSum;
-    const bTech = rosterBoostPoints(state, actor.seat, false);
     let techDone = false;
-    while (rsr.tech && rsr.techProgress >= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech)) {
-      rsr.techProgress -= effectiveResearchCostIn(rsr, rsr.tech, TECHS[rsr.tech].cost, gTech, bTech);
+    while (rsr.tech && rsr.techProgress >= TECHS[rsr.tech].cost) {
+      rsr.techProgress -= TECHS[rsr.tech].cost;
       if (rsr.tech === URBAN_DEFENSES_TECH) urbanDefensesFit(state, actor.seat);
       researchAward(actor, TECHS[rsr.tech].effects);
       if (!rsr.techs.includes(rsr.tech)) rsr.techs.push(rsr.tech);
@@ -2879,12 +2927,11 @@ export function seatPhase(state: GameState): void {
     // scores DOMESTIC TOURISTS off lifetime culture, so this is the substrate
     // the Culture victory reads. Zero-draw; the GPU mirrors at this position.
     actor.cultureTotal = (actor.cultureTotal ?? 0) + culSum;
-    const bCivic = rosterBoostPoints(state, actor.seat, true);
     const _govBefore = seatGovernment(state, actor.seat);
     const _slotsBefore = governmentSlots(state, actor.seat);
     let civicDone = false;
-    while (rsr.civic && rsr.civicProgress >= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic)) {
-      rsr.civicProgress -= effectiveResearchCostIn(rsr, rsr.civic, CIVICS[rsr.civic].cost, gCivic, bCivic);
+    while (rsr.civic && rsr.civicProgress >= CIVICS[rsr.civic].cost) {
+      rsr.civicProgress -= CIVICS[rsr.civic].cost;
       researchAward(actor, CIVICS[rsr.civic].effects);
       if (!rsr.civics.includes(rsr.civic)) rsr.civics.push(rsr.civic);
       delete rsr.civicRetained[rsr.civic];
@@ -3215,10 +3262,10 @@ export function seatPhase(state: GameState): void {
           && alliedAtLevel(state, actor.seat, other, ALLIANCE_RESEARCH, 2)) {
           const ra = actor.research;
           const rb = seatOf(state, other)!.research;
-          for (const [me, al] of [[ra, rb], [rb, ra]] as const) {
-            const pick = Object.keys(TECHS).find((tid) => (al.techs.includes(tid) || al.boosted.includes(tid))
+          for (const [me, al, mine] of [[ra, rb, actor.seat], [rb, ra, other]] as const) {
+            const pick = Object.keys(TECHS).find((tid) => BOOSTS[tid] && (al.techs.includes(tid) || al.boosted.includes(tid))
               && !me.techs.includes(tid) && !me.boosted.includes(tid));
-            if (pick) me.boosted.push(pick);
+            if (pick) markBoost(state, mine, pick);
           }
         }
         setAllyTurnsWith(state, actor.seat, other, al - 1);
@@ -3441,6 +3488,12 @@ export function seatPhase(state: GameState): void {
       tradeRouteExpiry(state, actor);
     }
     if (recU) applySeatUnitOrders(state, actor, recU.units);
+    // the eurekas and inspirations the seat's processing and actions earned
+    // land within its turn, as the game's events land them (a city founded on
+    // the coast shows Sailing's boost in the record of the turn it was
+    // founded: runs/h1_duelw1115 China t2); the block top's detection takes
+    // what other seats' turns gave it
+    detectBoosts(state, actor.seat);
   }
 
   // Env-gated registry coherence check at the phase tail (after every

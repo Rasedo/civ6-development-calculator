@@ -312,13 +312,19 @@ def _floored(v: torch.Tensor) -> torch.Tensor:
 
 
 def _open_cost(sim, row: int, civic: bool) -> torch.Tensor:
-    """[B, n] long — every item's effective research cost, -1 where the item
-    is not open. The cost is `_eff_cost`'s: a base cost, boosted and
-    js-rounded, so a whole number and exact as an integer."""
+    """[B, n] long — the Science or Culture still owed on every item
+    (`researchOwed`: its cost less the whole points banked on it — the
+    current item's pool, else its parked progress), -1 where the item is not
+    open."""
     base = sim.rules_dev.c_cost if civic else sim.rules_dev.t_cost
     B = sim.B
-    boosted = sim.civ_civic_boosted[:, row] if civic else sim.civ_tech_boosted[:, row]
-    cost = _as_long(sim._eff_cost(base.unsqueeze(0).expand(B, -1), boosted, row, is_civic=civic))
+    n = base.numel()
+    cur = (sim.civ_cur_civic if civic else sim.civ_cur_tech)[:, row]
+    pool = (sim.civ_civic_prog if civic else sim.civ_tech_prog)[:, row]
+    parked = (sim.civ_civic_retain if civic else sim.civ_tech_retain)[:, row, :n]
+    is_cur = torch.arange(n, device=sim.device).unsqueeze(0) == cur.unsqueeze(1)
+    banked = torch.where(is_cur, pool.unsqueeze(1).expand(B, n), parked)
+    cost = _as_long(base.unsqueeze(0).expand(B, -1)) - _floored(banked)
     open_ = sim._seat_civic_mask(row) if civic else sim._seat_tech_mask(row)
     return torch.where(open_, cost, torch.full_like(cost, -1))
 

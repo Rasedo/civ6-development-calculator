@@ -14,7 +14,7 @@ import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import { captureCityStateFor } from './combat';
 import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
-import { boostPool, drawBoosts } from './boosts';
+import { boostPool, drawBoosts, markBoost } from './boosts';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
   gpEffectOf, gpNoMilitaryOf, gpSiteOf, personWorkObjects,
@@ -192,7 +192,7 @@ export function boostRandom(
 ): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
-  const k = drawBoosts(state, owner.research, boostPool(owner.research, kind, lo, hi), n);
+  const k = drawBoosts(state, seat, boostPool(owner.research, kind, lo, hi), n);
   for (let i = 0; i < k; i++) dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
 }
 
@@ -303,21 +303,17 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
         rsr.techs.push(id);
         delete rsr.techRetained[id];
         if (rsr.tech === id) rsr.tech = null;
-      } else {
-        rsr.boosted.push(id);
+      } else if (markBoost(state, unit.seat, id)) {
         fired += 1;
       }
     }
     if (fired) dedicationEvent(state, unit.seat, DED_FREE_INQUIRY, fired);
   }
   if (fx.eurekaEra) {
-    const rsr = owner.research;
     let fired = 0;
     for (const [id, def] of Object.entries(TECHS)) {
       if (ERAS.indexOf(def.era) !== era) continue;
-      if (rsr.techs.includes(id) || rsr.boosted.includes(id)) continue;
-      rsr.boosted.push(id);
-      fired += 1;
+      if (markBoost(state, unit.seat, id)) fired += 1;
     }
     if (fired) dedicationEvent(state, unit.seat, DED_FREE_INQUIRY, fired);
   }

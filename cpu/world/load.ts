@@ -1,4 +1,5 @@
 import type { WorldFile } from '../../world/file';
+import { markBoost } from '../core/boosts';
 import type { CityStateType, Elevation, FeatureId, GameMap, GameState, TerrainId, Tile } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
@@ -91,7 +92,7 @@ export function loadWorld(world: WorldFile): GameState {
     // technology Eureka" — the BOOST, not the tech (`START_BOOST_ROWS`)
     for (const r of START_BOOST_ROWS) {
       if (!rowIsFor(r, civOf(state, i), leaderOf(state, i))) continue;
-      if (!seat.research.boosted.includes(r.tech)) seat.research.boosted.push(r.tech);
+      markBoost(state, i, r.tech);
     }
     for (const u of civ.units) {
       if (!UNITS[u.type]) throw new Error(`world file names unit type '${u.type}' the engine does not know`);
