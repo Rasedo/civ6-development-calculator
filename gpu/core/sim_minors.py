@@ -1589,7 +1589,7 @@ class SimMinors:
                 cost = self._type_cost[ui.clamp(min=0)].double()
                 pay = want & (self.city_free_pot[:, row, j] >= cost)
                 if bool(pay.count_nonzero()):
-                    landed = self._spawn_barb(pay, ctr, ui.clamp(min=0), ladder=False, seat=FREE_SEAT,
+                    landed = self._spawn_barb(pay, ctr, ui.clamp(min=0), seat=FREE_SEAT,
                                               home=torch.full((B,), -1, dtype=torch.long, device=dev))
                     self.city_free_pot[:, row, j] -= torch.where(landed, cost, torch.zeros_like(cost))
                 halt = halt | want

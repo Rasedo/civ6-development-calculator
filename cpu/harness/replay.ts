@@ -29,16 +29,17 @@
  * from the game's draw log where the recording kept it.
  */
 import { readFileSync } from 'node:fs';
-import type { City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
+import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
+import { hexDistance } from '../../world/hex';
 import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost } from '../core/game';
-import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
+import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, sueForPeace, transferCity } from '../core/phase';
 import { addEnvoys, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements } from '../core/rules';
-import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, grantedMoves, restUnit, upgradeUnit } from '../core/units';
+import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
@@ -49,10 +50,12 @@ import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '.
 import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
-import { applyTrainingGrants, clearCampFor, meleeAttack, rangedAttack } from '../core/combat';
+import { applyTrainingGrants, clearCampFor, holdBarbarians, meleeAttack, rangedAttack } from '../core/combat';
+import { barbarianRules, foundTribe, tribeKindAt } from '../core/barbarians';
+import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, seatOf, setTileOwner, setWar, BARB_SEAT } from '../core/seats';
+import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, seatOf, setTileOwner, setWar, unitsOf, BARB_SEAT } from '../core/seats';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { PROJECTS } from '../data/projects';
@@ -65,7 +68,8 @@ import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constan
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { holdFloodRiver } from '../core/disasters';
-import { holdMinorItem, type MinorItem } from '../core/minorBuild';
+import { holdMinorItem, holdMinorWalk, minorBuilderLays, type MinorItem } from '../core/minorBuild';
+import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS } from '../core/unitActions';
 import type { Catalog, DumpCity, TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
@@ -75,7 +79,7 @@ import { streamHold } from './streamHold';
 import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId } from './aliases';
-import { InferredActions, RecordedActions, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
+import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
 /** what became of one decision */
 type Outcome = 'applied' | 'fallback' | 'refused';
@@ -124,6 +128,11 @@ interface Ctx {
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
   battled: Set<string>;
+  /** the record's new barbarian units of this pair, which the barbarians'
+   *  rules close it with (`barbarianTurn`) */
+  barbNew: string[];
+  /** the players' envoys of this pair that land after its moves (`settleEnvoys`) */
+  lateEnvoys: EnvoyDecision[];
   /** the game's draw log, where the recording kept it */
   log?: RandLog;
 }
@@ -185,6 +194,84 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   ctx.state.units.push(unit);
   ctx.units.set(key, unit);
   return unit;
+}
+
+/** a barbarian scout the record raised, to the scouts of the nearest living
+ *  camp's tribe within three plots, where no tribe counts it yet (a raid's
+ *  units are the barbarians' AI operation's, no tribe's) */
+function adoptByTribe(state: GameState, u: Unit): void {
+  const def = UNITS[u.type];
+  const tribes = state.barbTribes ?? [];
+  if (!def?.recon && !(def?.naval && !def.ranged)) return;
+  if (tribes.some((tr) => tr.alive && (tr.scouts.includes(u.id) || tr.units.includes(u.id)))) return;
+  const at = state.map.tiles[u.tileIndex];
+  let best: BarbTribe | undefined;
+  let bd = 4;
+  for (const tr of tribes) {
+    if (!tr.alive || (!def.recon && tr.kind !== 'NAVAL')) continue;
+    const ct = state.map.tiles[tr.plot];
+    const d = hexDistance(state.map, at.col, at.row, ct.col, ct.row);
+    if (d < bd) [bd, best] = [d, tr];
+  }
+  best?.scouts.push(u.id);
+}
+
+/**
+ * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
+ * (the record's, landed), their rules run (`barbarianRules`: their techs,
+ * the camp step, each tribe's turn, on the barbarian player's own stream);
+ * the units their tribes raise are the record's new barbarian units where
+ * they match by type, nearest first. A record unit no tribe raised is the
+ * record's (a raid's force is the barbarians' AI operation), and a unit a
+ * tribe raised that the game did not is unmade.
+ */
+function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
+  const { state } = ctx;
+  const before = new Set(state.units.filter((u) => isBarbSeat(u.seat)));
+  barbarianRules(state, closing);
+  matchNewUnits(ctx, b);
+  for (const key of ctx.barbNew) {
+    if (unitOf(ctx, key)) continue;
+    const made = spawnRecorded(ctx, b, key);
+    if (made) adoptByTribe(state, made);
+    count(ctx, 'barb:unitNew', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
+  }
+  const mapped = new Set(ctx.units.values());
+  for (const u of [...state.units]) {
+    if (!isBarbSeat(u.seat) || before.has(u) || mapped.has(u)) continue;
+    disbandUnit(state, u.id);
+    count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
+  }
+}
+
+/**
+ * THE PLAYERS' ENVOYS of the pair (the ones not sent in a start,
+ * `stageEnvoys`), once its moves have landed: a major meets a city-state in
+ * the move that reveals it, the first major to meet one sending it its free
+ * envoy (`meetCityState`). Each minor's count from the player is brought to
+ * record t+1's — through the engine's own verb, its purse's tokens, where
+ * the engine's meeting has not; what the purse cannot send is the record's.
+ */
+function settleEnvoys(ctx: Ctx, b: TurnRecord): void {
+  const { state } = ctx;
+  for (const d of ctx.lateEnvoys) {
+    const seat = seatOfP(ctx, d.player);
+    const s = seatOf(state, seat) as Seat | undefined;
+    const ms = seatOfP(ctx, d.minor);
+    const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
+    if (!s || !cs || seat >= state.seats.length) { count(ctx, 'envoy', 'refused', d.player); continue; }
+    const want = (b.players.find((p) => p.id === d.minor)?.envoysReceived ?? []).find(([g]) => g === d.player)?.[1] ?? 0;
+    const short = want - (cs.envoys[seat] ?? 0);
+    if (short <= 0) { count(ctx, 'envoy', 'applied'); continue; }
+    const was = cs.envoys[seat] ?? 0;
+    applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(short).fill(cs.id) });
+    const got = (cs.envoys[seat] ?? 0) - was;
+    // the envoys the engine's purse could not send land as the engine
+    // receives any (`addEnvoys`): the stored contest, and the ground the
+    // minor annexes for them
+    if (got < short) addEnvoys(state, cs, seat, short - got);
+    count(ctx, 'envoy', got >= short ? 'applied' : 'fallback', d.player, got >= short ? undefined : 'no token in the engine purse');
+  }
 }
 
 /** a queued item as the engine holds it */
@@ -311,7 +398,10 @@ function applyResearch(ctx: Ctx, player: number, row: number, civic: boolean): v
   }
   const open = (civic ? availableCivicsIn(r) : availableTechsIn(r)).some((x) => x.id === id);
   selectResearch(r, id, civic);
-  count(ctx, kind, open ? 'applied' : 'fallback', player);
+  const def = civic ? CIVICS[id] : TECHS[id];
+  const missing = (def?.prereqs ?? []).filter((p) => !(civic ? r.civics : r.techs).includes(p));
+  count(ctx, kind, open ? 'applied' : 'fallback', player, open ? undefined : `${id} lacks ${missing.join(',') || '(no prereq missing)'}`);
+  if (!open && TRACE.has(kind)) console.error(`   ${kind} engine holds [${(civic ? r.civics : r.techs).join(',')}] at ${civic ? r.civic : r.tech} ${civic ? r.civicProgress : r.techProgress}`);
 }
 
 type PolicyDecision = Extract<Decision, { kind: 'policies' }>;
@@ -563,13 +653,20 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
 
 /** the decisions of one phase, in a fixed order: cities first (a founding
  *  gives the queue its city), then the seats, the cities' orders, the plots,
- *  the units */
-const ORDER: Decision['kind'][] = ['found', 'capture', 'research', 'civic', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'battle', 'unitGone', 'unitNew', 'move', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'village'];
+ *  the units; the research and civic picks last, after the blows whose
+ *  boosts may complete what was in hand (runs/h1_duelw1117 t23: China's
+ *  Slinger kill completed Archery, then Horseback Riding was picked) */
+const ORDER: Decision['kind'][] = ['found', 'capture', 'policies', 'pantheon', 'religion', 'governors', 'war',
+  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'move', 'village', 'unitNew', 'battle', 'unitGone', 'combat', 'hit', 'kill', 'promote', 'upgrade', 'camp', 'research', 'civic'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord, wit: TurnRecord): void {
   const { state, next } = ctx;
-  const mine = ds.filter((d) => d.phase === phase).sort((x, y) => ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind));
+  // a unit lost in the pair was lost to a blow of whoever struck it, which
+  // may be a later player's: its loss lands with the other players' actions,
+  // after their battles (runs/h1_duelw1121 t12: Rome's Warrior killed in the
+  // barbarians' turn)
+  const phaseOf = (d: Decision) => (d.kind === 'unitGone' && d.why === 'lost' ? 'after' : d.phase);
+  const mine = ds.filter((d) => phaseOf(d) === phase).sort((x, y) => ORDER.indexOf(x.kind) - ORDER.indexOf(y.kind));
   // EACH PLAYER'S ACTIONS draw on the stream its start completed with (its
   // `PlayerTurnStartComplete` witness in `wit`: record t for the active
   // player's, record t + 1 for the others'), each player's draws its own
@@ -628,10 +725,30 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const t = state.map.tiles[d.plot];
         const want = next.state.map.tiles[d.plot].improvement;
         if (!want) { count(ctx, 'improve', 'refused', d.player); break; }
-        const ok = seat >= 0 && seat < state.seats.length && validImprovements(state, t, seat).includes(want as never);
+        const valid = seat >= 0 ? validImprovements(state, t, seat) : [];
+        // the order is the player's, through the engine's verb with the unit
+        // the log names: a major's Builder takes its improvement order (the
+        // charge, the turn, the culture bomb, the last charge's end), a
+        // minor's lays it as a minor's does
+        const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
+        const actor = seatOf(state, seat) as Seat | undefined;
+        if (builder && actor && valid.includes(want as never) && (builder.charges ?? 0) > 0) {
+          builder.tileIndex = d.plot;
+          if (isCityStateSeat(seat)) minorBuilderLays(state, builder, d.plot, want);
+          else if (seat < state.seats.length) {
+            const ii = IMPROVEMENT_IDS.indexOf(want);
+            const code = ii < 0 ? -1 : ii < DEDICATED_IMPROVEMENTS ? 13 + ii : 18 + ii - DEDICATED_IMPROVEMENTS;
+            const row = unitsOf(state, seat).map((u) => (u === builder ? code : -1));
+            builder.movesLeft = Math.max(builder.movesLeft, grantedMoves(state, builder));
+            if (code >= 0) applySeatUnitOrders(state, actor, [row]);
+          }
+          if (t.improvement === want) { count(ctx, 'improve', 'applied'); break; }
+        }
+        const ok = valid.includes(want as never);
         t.improvement = want;
         t.pillaged = false;
-        count(ctx, 'improve', ok ? 'applied' : 'fallback', d.player);
+        count(ctx, 'improve', 'fallback', d.player, ok ? (builder ? 'the builder\'s order refused' : 'no builder the log names')
+          : `${want} on ${t.terrain}/${t.elevation}/${t.feature}/${t.resource} seat ${seat}: the engine offers [${valid.join(',')}]`);
         break;
       }
       case 'levy': {
@@ -686,19 +803,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       case 'envoy': {
         // the other players' envoys went to the engine's turn (`stageEnvoys`)
         if (ctx.envoys.includes(d)) break;
-        const seat = seatOfP(ctx, d.player);
-        const s = seatOf(state, seat) as Seat | undefined;
-        const ms = seatOfP(ctx, d.minor);
-        const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
-        if (!s || !cs || seat >= state.seats.length) { count(ctx, 'envoy', 'refused', d.player); break; }
-        const was = cs.envoys[seat] ?? 0;
-        applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(d.n).fill(cs.id) });
-        const got = (cs.envoys[seat] ?? 0) - was;
-        // the envoys the engine's purse could not send land as the engine
-        // receives any (`addEnvoys`): the stored contest, and the ground the
-        // minor annexes for them
-        if (got < d.n) addEnvoys(state, cs, seat, d.n - got);
-        count(ctx, 'envoy', got >= d.n ? 'applied' : 'fallback', d.player);
+        // the rest land once the pair's moves have met what they met
+        // (`settleEnvoys`)
+        ctx.lateEnvoys.push(d);
         break;
       }
       case 'pantheon': {
@@ -781,15 +888,40 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const s = seatOf(state, seat);
         const theirs = seatOf(next.state, seat)?.tradeRoutes;
         if (!s || !theirs) { count(ctx, 'routes', 'refused', d.player); break; }
-        const remap = (owner: number, id: number | undefined) => {
-          if (id === undefined) return undefined;
-          const c = seatOf(next.state, owner)?.cities.find((x) => x.id === id);
-          return c ? cityAt(state, c.centerIndex)?.id : undefined;
-        };
-        s.tradeRoutes = theirs.map((r) => ({ ...structuredClone(r), from: remap(seat, r.from) ?? -1,
-          ...(r.to !== undefined ? { to: remap(seat, r.to) } : {}),
-          ...(r.toSeatCity !== undefined && r.toSeat !== undefined ? { toSeatCity: remap(r.toSeat, r.toSeatCity) } : {}) }));
-        count(ctx, 'routes', 'fallback', d.player);
+        // each route record t+1 runs that the engine does not is the
+        // player's order, through the engine's own verb for its kind (a
+        // Trader spent, the course laid); a route the engine refuses is the
+        // record's. Routes that ended are the engine's to end.
+        const nextOwner = seatOf(next.state, seat)!;
+        const key = (o: number, dst: number) => `${o}>${dst}`;
+        const have = new Set((s.tradeRoutes ?? []).map((r) => key(routeOriginCenter(state, s, r), routeDestCenter(state, s, r))));
+        for (const r of theirs) {
+          const o = routeOriginCenter(next.state, nextOwner, r);
+          const dst = routeDestCenter(next.state, nextOwner, r);
+          if (o < 0 || dst < 0 || have.has(key(o, dst))) continue;
+          const from = cityAt(state, o);
+          let res: { ok: boolean; reason?: string } = { ok: false, reason: 'no engine city at the origin' };
+          if (from && from.seat === seat) {
+            if (r.toCs !== undefined) res = addCsTradeRoute(state, from.id, r.toCs, seat);
+            else if (r.toSeat !== undefined && r.toSeat !== seat) {
+              const to = cityAt(state, dst);
+              res = to ? addIntlTradeRoute(state, from.id, to.seat, to.id, seat) : { ok: false, reason: 'no engine city at the destination' };
+            } else {
+              const to = cityAt(state, dst);
+              res = to ? addTradeRoute(state, from.id, to.id, seat) : { ok: false, reason: 'no engine city at the destination' };
+            }
+          }
+          if (res.ok) { count(ctx, 'routes', 'applied'); continue; }
+          const remap = (owner: number, id: number | undefined) => {
+            if (id === undefined) return undefined;
+            const c = seatOf(next.state, owner)?.cities.find((x) => x.id === id);
+            return c ? cityAt(state, c.centerIndex)?.id : undefined;
+          };
+          (s.tradeRoutes ??= []).push({ ...structuredClone(r), from: remap(seat, r.from) ?? -1,
+            ...(r.to !== undefined ? { to: remap(seat, r.to) } : {}),
+            ...(r.toSeatCity !== undefined && r.toSeat !== undefined ? { toSeatCity: remap(r.toSeat, r.toSeatCity) } : {}) });
+          count(ctx, 'routes', 'fallback', d.player, res.reason);
+        }
         break;
       }
       case 'war': {
@@ -832,9 +964,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'unitNew': {
         // a major's trained unit is its city's production, the engine's to
-        // make; a city-state's, a Free City's or the barbarians' is their
-        // scripts' decision, which the engine does not replay
+        // make; a city-state's or a Free City's is their scripts' decision,
+        // which the engine does not replay; the barbarians' are their rules',
+        // which close the pair (`barbarianTurn`)
         const major = seatOfP(ctx, d.player) >= 0 && seatOfP(ctx, d.player) < state.seats.length;
+        if (isBarbSeat(seatOfP(ctx, d.player))) {
+          ctx.barbNew.push(d.unit);
+          break;
+        }
         // a unit an engine verb of this phase made (a wonder a charge
         // completed grants its Great Person) is the record's
         if (major) matchNewUnits(ctx, b);
@@ -861,13 +998,24 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'village': {
-        // entering is the decision; the reward is a draw the engine's table
-        // does not follow, so the record's is paid: its Gold, Faith and boosts
+        // entering is the decision; the reward is the engine's own village
+        // (`drawAndPayGoody`) on the game's draws ("Choosing a Goody Hut
+        // Type", "Choosing a Sub Type"), paid to the unit the log names
+        // (`GoodyHutReward`), standing on the plot
         const s = seatOf(state, seatOfP(ctx, d.player));
         const t = state.map.tiles[d.plot];
         if (!s || !t.goodyHut) { count(ctx, 'village', 'refused', d.player); break; }
         t.goodyHut = false;
         goodyMoment(state, s.seat);
+        const enterer = d.unit ? unitOf(ctx, d.unit) : undefined;
+        if (enterer) {
+          enterer.tileIndex = d.plot;
+          drawAndPayGoody(state, enterer, t);
+          matchNewUnits(ctx, b);
+          count(ctx, 'village', 'applied');
+          break;
+        }
+        // no unit the log names: the record's reward, its Gold, Faith and boosts
         if (d.gold >= VILLAGE_MIN) s.treasury += d.gold;
         if (d.faith >= VILLAGE_MIN) s.faith += d.faith;
         // the unit it gave arrives as the record's (`unitNew`); a Builder or a
@@ -955,7 +1103,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // damage draws
         const atk = unitOf(ctx, d.attacker);
         const def = unitOf(ctx, d.defender);
-        if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); break; }
+        if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
         const s0 = battleDraw(ctx, wit, b, d);
         if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); break; }
         atk.tileIndex = d.from;
@@ -1075,9 +1223,10 @@ function fortifyOrders(ctx: Ctx, b: TurnRecord): void {
 
 /** every unit the replay knows stands where record t+1 shows it, with the
  *  moves it has left and its charges; the record's units the engine never
- *  made stay missing (a production difference) */
-function syncUnits(ctx: Ctx, b: TurnRecord): void {
+ *  made stay missing (a production difference); `only` a player's alone */
+function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
   for (const r of b.units) {
+    if (only !== undefined && r.owner !== only) continue;
     const u = unitOf(ctx, `${r.owner}:${r.id}`);
     if (!u) continue;
     const at = r.y * ctx.W + r.x;
@@ -1101,11 +1250,9 @@ function syncUnits(ctx: Ctx, b: TurnRecord): void {
 }
 
 /** THE DRAWS the engine does not take on the game's sites, re-synced to the
- *  record's results: each city's stored next plot (the border step's tie
- *  pick among the lowest-cost plots, `drawBorderPlot`), where the record's
- *  plot is still unowned in the engine — else left, and counted —, the
- *  random events' soil and the barbarians' camps */
-function syncDraws(ctx: Ctx, b: TurnRecord): void {
+ *  record's results — the random events' soil — and the barbarians' camps
+ *  against the record's: whether they held, before the record's stand */
+function syncDraws(ctx: Ctx, b: TurnRecord, tribesBefore: number): boolean {
   const { state } = ctx;
   // the random events' soil: which plots a flood, an eruption, a fire or a
   // drought struck and what each laid (the importer's reading of the
@@ -1130,22 +1277,42 @@ function syncDraws(ctx: Ctx, b: TurnRecord): void {
     soil++;
   }
   if (soil) count(ctx, 'draw:eventSoil', 'fallback');
-  // the barbarians' camps: where a new one rises is the barbarians' draw
+  // the barbarians' camps: the engine's camp step against the record's
+  // camps; where they differ the record's stand, each with its tribe (a
+  // camp the engine raised that the game did not is unmade, its tribe with
+  // it; a camp the game raised that the engine did not takes a tribe of the
+  // engine's kind for its plot, named by the first name free)
   const camps = ctx.next.state.barbSeat.camps;
-  if ([...state.barbSeat.camps].sort().join() !== [...camps].sort().join()) {
-    state.barbSeat.camps = [...camps];
+  const campsHeld = [...state.barbSeat.camps].sort().join() === [...camps].sort().join();
+  if (TRACE.has('barb')) {
+    console.error(`t${traceTurn} camps engine [${state.barbSeat.camps}] game [${camps}] tribes ${JSON.stringify(state.barbTribes ?? [])}`);
+    const W = ctx.W;
+    const mine = state.units.filter((u) => isBarbSeat(u.seat)).map((u) => `${u.id}:${u.type}@${u.tileIndex}`);
+    const game = b.units.filter((u) => seatOfP(ctx, u.owner) === BARB_SEAT).map((u) => `${u.id}:${engineRowOf(ctx.cat, 'unit', u.type)}@${u.y * W + u.x}`);
+    console.error(`   units engine ${mine.join(' ')}\n   units game   ${game.join(' ')}`);
+  }
+  if (!campsHeld) {
+    const tribes = state.barbTribes ?? [];
+    for (const c of [...state.barbSeat.camps]) {
+      if (camps.includes(c)) continue;
+      state.barbSeat.camps.splice(state.barbSeat.camps.indexOf(c), 1);
+      const k = tribes.findIndex((tr) => tr.plot === c && tr.alive);
+      if (k >= tribesBefore) tribes.splice(k, 1);
+      else if (k >= 0) tribes[k].alive = false;
+    }
+    for (const c of camps) {
+      if (state.barbSeat.camps.includes(c)) continue;
+      const kind = tribeKindAt(state, c).kind;
+      const taken = new Set(tribes.filter((tr) => tr.kind === kind).map((tr) => tr.name));
+      let name = 0;
+      while (taken.has(name)) name++;
+      // the game's tribe took its turn the turn it rose
+      foundTribe(state, c, name).spawnTurns = 1;
+    }
+    for (const u of state.units) if (isBarbSeat(u.seat)) adoptByTribe(state, u);
     count(ctx, 'draw:camps', 'fallback');
   }
-  for (const c of b.cities) {
-    const at = c.y * ctx.W + c.x;
-    const want = num(c.nextPlot);
-    const city = cityAt(state, at) ?? state.cityStates.find((x) => x.centerIndex === at);
-    if (!city || want < 0 || city.nextPlot === want) continue;
-    const t = state.map.tiles[want];
-    const free = t.ownerSeat === NO_SEAT;
-    if (free) city.nextPlot = want;
-    count(ctx, 'draw:nextPlot', free ? 'fallback' : 'refused');
-  }
+  return campsHeld;
 }
 
 /** the plots whose improvement the engine's own city-state, Free City or
@@ -1211,7 +1378,11 @@ function note(t: Tallies, sub: string, ok: boolean, subject: string, game: unkno
   if (!x.worst || gap > x.worst.gap) x.worst = { subject, game, ours, gap };
 }
 
-const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+/** a value holds only where it IS the game's: within half the game's 1/256 step
+ *  (its 24.8 fixed point), never a looser tolerance — sub-step drift
+ *  compounds in a free-running replay */
+const EXACT = 1 / 512;
+const near = (a: number, b: number) => Math.abs(a - b) <= EXACT;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const setOf = (xs: readonly (string | null)[]) => xs.filter((x) => x !== null).sort().join(',');
 
@@ -1226,12 +1397,12 @@ export function compareState(state: GameState, read: Imported): Tallies {
     note(t, 'city.exists', !!ec && ec.seat === rc.seat, name, rc.seat, ec?.seat ?? null);
     if (!ec || ec.seat !== rc.seat) continue;
     note(t, 'city.pop', ec.population === rc.population, name, rc.population, ec.population, Math.abs(ec.population - rc.population));
-    note(t, 'city.food', near(ec.foodBox, rc.foodBox, 0.05), name, r3(rc.foodBox), r3(ec.foodBox), Math.abs(ec.foodBox - rc.foodBox));
-    note(t, 'city.culture', near(ec.cultureBox, rc.cultureBox, 0.05), name, r3(rc.cultureBox), r3(ec.cultureBox), Math.abs(ec.cultureBox - rc.cultureBox));
+    note(t, 'city.food', near(ec.foodBox, rc.foodBox), name, r3(rc.foodBox), r3(ec.foodBox), Math.abs(ec.foodBox - rc.foodBox));
+    note(t, 'city.culture', near(ec.cultureBox, rc.cultureBox), name, r3(rc.cultureBox), r3(ec.cultureBox), Math.abs(ec.cultureBox - rc.cultureBox));
     const ep = plotsOf(state, ec);
     const rp = plotsOf(rs, rc);
     note(t, 'city.plots', ep.join() === rp.join(), name, rp.length, ep.length, Math.abs(ep.length - rp.length) + (ep.join() === rp.join() ? 0 : 0.5));
-    note(t, 'city.loyalty', near(ec.loyalty ?? 100, rc.loyalty ?? 100, 0.05), name, r3(rc.loyalty ?? 100), r3(ec.loyalty ?? 100),
+    note(t, 'city.loyalty', near(ec.loyalty ?? 100, rc.loyalty ?? 100), name, r3(rc.loyalty ?? 100), r3(ec.loyalty ?? 100),
       Math.abs((ec.loyalty ?? 100) - (rc.loyalty ?? 100)));
     note(t, 'city.buildings', setOf(ec.buildings) === setOf(rc.buildings), name,
       rc.buildings.filter((b) => !ec.buildings.includes(b)), ec.buildings.filter((b) => !rc.buildings.includes(b)));
@@ -1251,7 +1422,7 @@ export function compareState(state: GameState, read: Imported): Tallies {
     const ep2 = ec.religionPressure ?? [];
     const rp2 = rc.religionPressure ?? [];
     const gap = Math.max(0, ...rp2.map((v, i) => Math.abs((ep2[i] ?? 0) - v)), ...ep2.map((v, i) => Math.abs((rp2[i] ?? 0) - v)));
-    if (rp2.some((v) => v > 0) || ep2.some((v) => v > 0)) note(t, 'city.pressure', gap <= 0.5, name, rp2.map(r3), ep2.map(r3), gap);
+    if (rp2.some((v) => v > 0) || ep2.some((v) => v > 0)) note(t, 'city.pressure', gap <= EXACT, name, rp2.map(r3), ep2.map(r3), gap);
   }
   for (const [rcs, dump] of read.dumpOfMinor) {
     const name = `minor ${dump.owner} ${dump.name.replace('LOC_CITY_NAME_', '')}`;
@@ -1259,17 +1430,17 @@ export function compareState(state: GameState, read: Imported): Tallies {
     note(t, 'minor.exists', !!ecs, name, rcs.centerIndex, ecs?.centerIndex ?? null);
     if (!ecs) continue;
     note(t, 'minor.pop', ecs.population === rcs.population, name, rcs.population, ecs.population, Math.abs(ecs.population - rcs.population));
-    note(t, 'minor.food', near(ecs.foodBox ?? 0, rcs.foodBox ?? 0, 0.05), name, r3(rcs.foodBox ?? 0), r3(ecs.foodBox ?? 0),
+    note(t, 'minor.food', near(ecs.foodBox ?? 0, rcs.foodBox ?? 0), name, r3(rcs.foodBox ?? 0), r3(ecs.foodBox ?? 0),
       Math.abs((ecs.foodBox ?? 0) - (rcs.foodBox ?? 0)));
-    note(t, 'minor.culture', near(ecs.cultureBox ?? 0, rcs.cultureBox ?? 0, 0.05), name, r3(rcs.cultureBox ?? 0), r3(ecs.cultureBox ?? 0),
+    note(t, 'minor.culture', near(ecs.cultureBox ?? 0, rcs.cultureBox ?? 0), name, r3(rcs.cultureBox ?? 0), r3(ecs.cultureBox ?? 0),
       Math.abs((ecs.cultureBox ?? 0) - (rcs.cultureBox ?? 0)));
   }
   rs.seats.forEach((rsx, seat) => {
     const es = state.seats[seat];
     const name = `seat ${read.playerOfSeat.get(seat)} ${rsx.name}`;
-    note(t, 'seat.gold', near(es.treasury ?? 0, rsx.treasury ?? 0, 0.5), name, r3(rsx.treasury ?? 0), r3(es.treasury ?? 0),
+    note(t, 'seat.gold', near(es.treasury ?? 0, rsx.treasury ?? 0), name, r3(rsx.treasury ?? 0), r3(es.treasury ?? 0),
       Math.abs((es.treasury ?? 0) - (rsx.treasury ?? 0)));
-    note(t, 'seat.faith', near(es.faith ?? 0, rsx.faith ?? 0, 0.5), name, r3(rsx.faith ?? 0), r3(es.faith ?? 0), Math.abs((es.faith ?? 0) - (rsx.faith ?? 0)));
+    note(t, 'seat.faith', near(es.faith ?? 0, rsx.faith ?? 0), name, r3(rsx.faith ?? 0), r3(es.faith ?? 0), Math.abs((es.faith ?? 0) - (rsx.faith ?? 0)));
     note(t, 'seat.techs', setOf(es.research.techs) === setOf(rsx.research.techs), name,
       rsx.research.techs.filter((x) => !es.research.techs.includes(x)), es.research.techs.filter((x) => !rsx.research.techs.includes(x)));
     note(t, 'seat.civics', setOf(es.research.civics) === setOf(rsx.research.civics), name,
@@ -1278,19 +1449,19 @@ export function compareState(state: GameState, read: Imported): Tallies {
       rsx.research.boosted.filter((x) => !es.research.boosted.includes(x)), es.research.boosted.filter((x) => !rsx.research.boosted.includes(x)));
     if (rsx.research.tech) {
       const same = es.research.tech === rsx.research.tech;
-      note(t, 'seat.science', same && near(es.research.techProgress, rsx.research.techProgress, 0.5), name,
+      note(t, 'seat.science', same && near(es.research.techProgress, rsx.research.techProgress), name,
         `${rsx.research.tech} ${r3(rsx.research.techProgress)}`, `${es.research.tech} ${r3(es.research.techProgress)}`,
         same ? Math.abs(es.research.techProgress - rsx.research.techProgress) : 1000);
     }
     if (rsx.research.civic) {
       const same = es.research.civic === rsx.research.civic;
-      note(t, 'seat.culture', same && near(es.research.civicProgress, rsx.research.civicProgress, 0.5), name,
+      note(t, 'seat.culture', same && near(es.research.civicProgress, rsx.research.civicProgress), name,
         `${rsx.research.civic} ${r3(rsx.research.civicProgress)}`, `${es.research.civic} ${r3(es.research.civicProgress)}`,
         same ? Math.abs(es.research.civicProgress - rsx.research.civicProgress) : 1000);
     }
     note(t, 'seat.eraScore', (es.eraScore ?? 0) === (rsx.eraScore ?? 0), name, rsx.eraScore ?? 0, es.eraScore ?? 0,
       Math.abs((es.eraScore ?? 0) - (rsx.eraScore ?? 0)));
-    note(t, 'seat.favor', near(es.diplomaticFavor ?? 0, rsx.diplomaticFavor ?? 0, 0.5), name, rsx.diplomaticFavor ?? 0, r3(es.diplomaticFavor ?? 0),
+    note(t, 'seat.favor', near(es.diplomaticFavor ?? 0, rsx.diplomaticFavor ?? 0), name, rsx.diplomaticFavor ?? 0, r3(es.diplomaticFavor ?? 0),
       Math.abs((es.diplomaticFavor ?? 0) - (rsx.diplomaticFavor ?? 0)));
     note(t, 'seat.government', es.government.chosen === rsx.government.chosen
       && setOf(es.government.policies) === setOf(rsx.government.policies), name,
@@ -1386,11 +1557,11 @@ const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read
  *  a seat's purse, research, government, or a city's state flows into all */
 const IMPOSES_ON: Record<string, readonly string[]> = {
   combat: UNITS_SUBS, hit: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
-  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:walk': UNITS_SUBS,
+  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
-  'draw:nextPlot': ['read.city.nextPlot', 'read.city.nextPlotDraw', 'city.plots', 'plots.owner'],
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
-  'draw:camps': ['plots.improvement'],
+  'draw:camps': ['plots.improvement', 'barb.camps'],
+  'barb:unit': UNITS_SUBS, 'barb:unitNew': UNITS_SUBS,
   'draw:floodRiver': [...UNITS_SUBS, 'plots.feature', 'read.plot.yields'],
   // a village paid as the record paid it: its Gold, Faith, boosts, citizen,
   // the unit's price climb, its moment and the hut's plot
@@ -1492,6 +1663,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
   holdMinorItem(minorItems(recs, cat));
+  // a city-state's army moves and fights as the record's moves and battles
+  // say (`syncUnits`, `battle`): the engine's walk for it is its AI's
+  holdMinorWalk(true);
   const state = first.state;
   // the record holds no plot's revealed state: each seat starts on what its
   // own plots, cities and units reveal (`initFog`), which its moments read
@@ -1500,7 +1674,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), log: history.randLog,
+    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog,
   };
   holdFloodRiver(floodRivers(recs, cat), () => count(ctx, 'draw:floodRiver', 'fallback'));
   // the record's units in the importer's order
@@ -1537,10 +1711,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.imposed = new Map();
     ctx.battled = new Set();
     ctx.paths = new Map();
+    ctx.barbNew = [];
+    ctx.lateEnvoys = [];
     traceTurn = b.turn;
     const ds = source.decisions(a, b, cat);
     stream.actions(a.turn);
     applyPhase(ctx, ds, 'before', b, a);
+    // the active player's units stand where its actions left them before its
+    // next start (`endTurn`'s seat phase): its moves reveal, and meet, there
+    syncUnits(ctx, b, activePlayer(a));
     const envoysWere = stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
@@ -1569,10 +1748,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const logged = Array.isArray((b as { actions?: unknown }).actions);
     const walked = new Set(ds.flatMap((d) => (d.kind === 'move' && d.path ? [d.unit] : [])));
     const spent = new Map<Unit, number>();
-    // a city-state's unit the record rested, as it stood before the turn: the
-    // engine's own walk for it (`minorWalk`) is its script's decision, which
-    // the record's moves stand in for
-    const restedMinor = new Map<Unit, { at: number; from: number; hp: number; fortifyTurns?: number }>();
     const struckHp = new Map<Unit, number>();
     // a barbarian unit's rest: whether it stood the turn through and struck
     // no blow
@@ -1587,20 +1762,23 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       u.movesLeft = rested ? grantedMoves(state, u) : 0;
       if (!rested) spent.set(u, u.hp);
       else if (struckOnly.has(key)) struckHp.set(u, u.hp);
-      else if (isCityStateSeat(u.seat)) restedMinor.set(u, { at: r.y * ctx.W + r.x, from: u.tileIndex, hp: u.hp, fortifyTurns: u.fortifyTurns });
       if (isBarbSeat(u.seat)) barbRest.set(u, stood && !struck.has(key) && num(r.fortify) > 0);
     }
-    // THE BARBARIANS' TURN IS THE RECORD'S: their units are its units
-    // (`syncUnits`), their battles its battles (`combat`, `kill`) and their
-    // camps its draws (`syncDraws`), so the engine's barbarian script takes no
-    // unit of theirs into the turn — it would fight battles the record never
-    // fought (runs/h1_duelw1117 t11: a Warrior China's engine killed that the
-    // game's lived to t12). A unit the script raises is undone below. The
-    // city-states' units stay: their script's draws are on the turn's stream
-    // before the random events (runs/h1_duelw1118 t7: without them a flood's
-    // draw took a citizen of Rome the game's spared)
-    const barbs = state.units.filter((u) => isBarbSeat(u.seat));
-    state.units = state.units.filter((u) => !isBarbSeat(u.seat));
+    // THE BARBARIANS' TURN closes the pair (`barbarianTurn`), after the
+    // other players' actions; their units' moves and battles are the
+    // record's (`syncUnits`, `battle`), so they sit the engine's turn out
+    // (`holdBarbarians`): the engine's AI would fight battles the record
+    // never fought (runs/h1_duelw1117 t11: a Warrior China's engine killed that
+    // the game's lived to t12). The city-states' units stay: their script's
+    // draws are on the turn's stream before the random events
+    // (runs/h1_duelw1118 t7: without them a flood's draw took a citizen of
+    // Rome the game's spared)
+    const barbs: Unit[] = [];
+    holdBarbarians((st) => {
+      barbs.push(...st.units.filter((u) => isBarbSeat(u.seat)));
+      st.units = st.units.filter((u) => !isBarbSeat(u.seat));
+    });
+    const tribesBefore = state.barbTribes?.length ?? 0;
     // A CITY-STATE'S BUILDERS lay what its AI picks, which the record's
     // improvements carry (`improve`): the engine's own pick sits the turn out,
     // its charges kept (runs/h1_duelw1115 Yerevan's Builder: the engine's
@@ -1647,27 +1825,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const u of [...state.units]) {
       if (standing.has(u) || mapped.has(u) || u.seat < state.seats.length) continue;
       disbandUnit(state, u.id);
-      count(ctx, 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat));
+      count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat));
     }
     undoMinorPlots(ctx, improvements);
     // the record's units the engine's own turn destroyed: a kill the log
     // names on one of them was the engine's to pay, and it paid it
     const live = new Set(state.units);
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
-    // the rested city-state units the engine's walk moved spent their moves
-    // there and missed the turn's rest: they rest where the record holds them
-    for (const [u, w] of restedMinor) {
-      if (!live.has(u) || u.tileIndex === w.from) continue;
-      u.tileIndex = w.at;
-      u.hp = w.hp;
-      u.fortifyTurns = w.fortifyTurns;
-      restUnit(state, u, true);
-      count(ctx, 'minorAi:walk', 'fallback', ctx.playerOfSeat.get(u.seat));
-    }
     fortifyOrders(ctx, b);
     applyPhase(ctx, ds, 'after', b, b);
     for (const [u, heal] of heals) if (state.units.includes(u)) u.hp = Math.min(UNIT_HP, u.hp + heal);
     syncUnits(ctx, b);
+    barbarianTurn(ctx, b, a.turn);
+    // the units the barbarians raised stand where the record holds them
+    syncUnits(ctx, b);
+    settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit holding the Fortify order digs in (`fortifyOrders`)
     // — is the engine's own step, run here where their turn closes the log's.
@@ -1677,7 +1849,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [u, stood] of barbRest) {
       if (state.units.includes(u)) restUnit(state, u, stood);
     }
-    syncDraws(ctx, b);
+    const campsHeld = syncDraws(ctx, b, tribesBefore);
     syncPillage(ctx);
     syncDedications(ctx);
     // the decisions landed after the engine's turn are the other players'
@@ -1691,6 +1863,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     killBoosts(ctx, read);
     const t = compareState(state, read);
     compareUnits(ctx, b, t);
+    note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
     const base = stateChecks(b, cat, read);
     for (const r of [...baseStep, ...base]) {
       if (r.ok || r.skip) continue;
@@ -1748,6 +1921,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdRng(null);
   holdFloodRiver(null);
   holdMinorItem(null);
+  holdMinorWalk(false);
+  holdBarbarians(null);
   return report;
 }
 

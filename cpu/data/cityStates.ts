@@ -341,6 +341,11 @@ export const CITY_STATE_NAMES: Record<CityStateType, string[]> = {
 
 export const ENVOY_COST = 100;
 export const INFLUENCE_PER_TURN = 3;
+/** the envoys a city-state takes from the first major to meet it
+ *  (runs/h1_duelw1117-1124: the first meeting of every minor, by either
+ *  major, adds one to its count that record; no later meeting does) */
+export const FIRST_MEET_ENVOYS = srcConst('cityState.firstMeetEnvoys', 1,
+  xml('GlobalParameters', 'Name=INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET', 'Value'));
 
 /** The queue kinds a city-state's envoys pay PRODUCTION TOWARD, per type —
  *  the Industrial rows' EFFECT_ADJUST_CITY_PRODUCTION_BUILDING / _DISTRICT and

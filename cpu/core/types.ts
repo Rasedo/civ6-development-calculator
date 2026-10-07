@@ -541,6 +541,11 @@ export interface GameState {
    * its width for the whole game. The GPU's `S`. */
   cityStateMax?: number;
   barbSeat: Seat;
+  /** the barbarian tribes, one a camp ever raised, the dead ones kept
+   *  (`cpu/core/barbarians.ts`) */
+  barbTribes?: BarbTribe[];
+  /** the camp step has added camps once: every later step adds one */
+  barbCampsBegun?: boolean;
   /** CIV6's FREE CITIES player (`FREE_SEAT`): the cities loyalty took from
    *  their owners, until each joins whoever pulled hardest. Created by
    *  `freeSeatOf` at the first revolt; absent until then. */
@@ -549,6 +554,23 @@ export interface GameState {
   /** every religion belief some religion holds, of every class — the one
    *  pool that keeps a belief to one religion */
   claimedBeliefs: string[];
+}
+
+/** A BARBARIAN TRIBE: a camp and its clocks (the game's BarbarianTribe_Instance). */
+export interface BarbTribe {
+  /** the camp's plot */
+  plot: number;
+  /** the camp stands; a cleared camp's tribe stays in the list, dead */
+  alive: boolean;
+  kind: 'NAVAL' | 'CAVALRY' | 'MELEE';
+  /** its BarbarianTribeNames row within its kind */
+  name: number;
+  /** turns since its last raised unit, and toward its next scout */
+  spawnTurns: number;
+  scoutTurns: number;
+  /** the ids of the units and scouts it raised */
+  units: number[];
+  scouts: number[];
 }
 
 export interface Unit {

@@ -1536,7 +1536,11 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
 
 /**
  * ONE GAME TURN, as Civ 6 runs it (tools/civ6lab/turn_order_civ6.md,
- * runs/turnorder/): the turn's random-event step — the storms, the volcano
+ * runs/turnorder/): the barbarians' turn, which closes the turn every
+ * player has just acted in (the game's draw log puts the camp step and the
+ * tribes' rolls after the last player's actions and before the next
+ * turn's random-event step: runs/h1_duelw1121 t1-t4); then the turn's
+ * random-event step — the storms, the volcano
  * roll and the random event (`disasterPhase`) — and the climate step, which
  * the game takes after every player's actions of the turn before and before
  * the first player's start (its draw log, `Logs/RandCalls.csv`: runs/
@@ -1544,18 +1548,18 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
  * then t41's volcano roll and event roll, then player 0's start); then the
  * players' starts one
  * at a time in ascending player id — the majors, the city-states, the Free
- * Cities, the barbarians (16 of 16 turns); then the World Congress session
+ * Cities (16 of 16 turns); then the World Congress session
  * and the heal of every unit and every city, before the counter moves; then,
  * on the new turn, the era and Ages, and the victory checks. The majors'
  * actions follow, between two turns.
  */
 export function endTurn(state: GameState): void {
+  if (state.unitsMode) barbarianPhase(state);
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   seatPhase(state);
   minorPhase(state);
   freeCitiesPhase(state);
-  if (state.unitsMode) barbarianPhase(state);
   theologicalCombatPhase(state);
   worldCongress(state);
   if (state.unitsMode) refreshUnits(state);

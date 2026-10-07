@@ -83,6 +83,7 @@ import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/c
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
+import { BARB_TRIBES } from '../data/barbarians';
 
 const MANIFEST_URL = new URL('../../shared/statecompare.manifest.json', import.meta.url);
 // `cpu/core/types.ts` re-exports `world/types.ts` (Tile, GameMap live there),
@@ -438,6 +439,17 @@ const GAME: Record<string, Extractor> = {
     ]];
   },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
+  barbTribes: (s) => {
+    const live = new Set(s.units.map((u) => u.id));
+    const tribes = s.barbTribes ?? [];
+    const r = s.barbSeat.research;
+    const techs = r.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b);
+    const civics = r.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b);
+    return [[s.barbCampsBegun ? 1 : 0, tribes.length, ...tribes.flatMap((t) => [t.plot, t.alive ? 1 : 0,
+      BARB_TRIBES.findIndex((d) => d.kind === t.kind), t.name, t.spawnTurns, t.scoutTurns,
+      t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length]),
+    techs.length, ...techs, civics.length, ...civics]];
+  },
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],
   climatePhase: (s) => [s.climateIdx ?? -1],

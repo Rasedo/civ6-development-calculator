@@ -250,6 +250,29 @@
           "note": "camp TILES, sorted. Only the barbarian seat holds camps; every other seat's list is empty by rule, which is why this is one game-level field instead of a per-seat one."
         },
         {
+          "name": "barbTribes",
+          "compare": "exact",
+          "covers": [
+            "GameState.barbTribes",
+            "GameState.barbCampsBegun"
+          ],
+          "planes": [
+            "tribe_plot",
+            "tribe_alive",
+            "tribe_kind",
+            "tribe_name",
+            "tribe_spawn",
+            "tribe_scoutc",
+            "n_tribes",
+            "barb_camps_begun",
+            "barb_techs",
+            "barb_civics",
+            "barb_unit_tribe",
+            "barb_unit_scout"
+          ],
+          "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length."
+        },
+        {
           "name": "cityCount",
           "compare": "exact",
           "covers": [],

@@ -1949,163 +1949,23 @@ class SimOrders:
             self.barb_unit_mp))
 
     def _barbarian_phase(self) -> None:
-        cb, B, T, dev = self.rules.combat, self.B, self.T, self.device
+        """`barbarianPhase`: the game's rules for the barbarians
+        (`_barbarian_rules`: their techs, the camp step, each tribe's turn),
+        then their units' AI — the driver's stand-in: one guard stays on each
+        camp, every other unit with moves acts."""
+        B, T = self.B, self.T
+        dev = self.device
+        self._barbarian_rules()
         self._barb_reset_mp()  # barbarianPhase's own movesLeft reset
-        # The shared barbarian MELEE era-ladder type index (barb_unit_type 0/1/2/3 =
-        # WARRIOR/SPEARMAN/PIKEMAN/MUSKETMAN), the TS barbMeleeType twin.
-        # self.turn is a batch scalar, so one index serves the whole batch, and
-        # it feeds ALL THREE spawn sites (new camp, empty-camp regarrison, the
-        # 0.1-roll raid). Barbarian barb_unit_type 6 = SCOUT in the unitCombat table.
-        self._barb_scout_type = 6 if self._barb_ladder.numel() > 6 else 0
-        melee_type = (
-            3 if self.turn > cb["musketmanAfterTurn"]
-            else 2 if self.turn > cb["pikemanAfterTurn"]
-            else 1 if self.turn > cb["spearmanAfterTurn"]
-            else 0
-        )
-        ranged_type = 5 if self.turn > cb["crossbowmanAfterTurn"] else 4
-        self._barb_naval_type = (
-            self._barb_quad_idx
-            if self.turn > cb["crossbowmanAfterTurn"]
-            else self._barb_galley_idx
-        )
-        # a HORSE camp's melee and ranged rungs — `barbCavalryType` and
-        # `barbCavalryRangedType`
-        cav_type = (
-            self._barb_knight_idx
-            if self.turn > cb["crossbowmanAfterTurn"]
-            else self._barb_horseman_idx
-            if self.turn > cb["spearmanAfterTurn"]
-            else self._barb_cav_first_idx
-        )
-        cav_ranged_type = (
-            ranged_type if self.turn > cb["spearmanAfterTurn"] else self._barb_cav_ranged_idx
-        )
-
-        any_city = self.city_alive[:, :self.n_majors].reshape(B, -1).any(dim=1)
-        can_roll = any_city & (self.n_camps < self.max_camps)
-        want = can_roll & (self._rand_range(can_roll, 100) < cb["campSpawnPct"])
-        if bool(want.count_nonzero()):
-            wr = want.nonzero(as_tuple=True)[0]
-            # campCandidates excludes t.district LIVE: camp_ok is static, but
-            # paves are not, and an orphaned pave left over from a razed city
-            # would pad the set and shift the draw-indexed camp spot. Camps rise
-            # away from EVERY major's live centre — ONE scan over the whole city
-            # block, which is also one gather instead of two.
-            cc_w = self.city_center[wr, :self.n_majors].reshape(len(wr), -1)
-            alive_w = self.city_alive[wr, :self.n_majors].reshape(len(wr), -1)
-            near_city_w = ((self.pair_dist[cc_w.clamp(min=0)] < 5) & alive_w.unsqueeze(2)).any(dim=1)  # [n, T]
-            # the HUT clause is LIVE, not baked into camp_ok: a village is
-            # claimed mid-game, and a Meteor Site laid and taken
-            # (`tileClaimed(t) || t.goodyHut || t.meteor`)
-            cand_w = (self.camp_ok[wr] & (self.tile_seat[wr] < 0) & ~near_city_w & (self.district[wr] < 0)
-                      & (self.built_wonder[wr] < 0) & ~self.tile_goody[wr] & ~self.tile_meteor[wr])
-            if self.fog_of_war:
-                # camps rise IN THE FOG — only on tiles dark to EVERY major
-                # seat (unexploredByAll; combat.ts's preferFog term).
-                cand_w = cand_w & ~self.seat_explored[wr].any(dim=1)
-            if self.K > 0:
-                camp_d_w = self.pair_dist[self.camp_tile[wr].clamp(min=0)].to(torch.long)
-                near_camp_w = ((camp_d_w < 5) & (self.camp_tile[wr] >= 0).unsqueeze(2)).any(dim=1)
-                cand_w = cand_w & ~near_camp_w
-            has = torch.zeros_like(want)
-            has[wr] = cand_w.any(dim=1)
-            n_c = torch.zeros(B, dtype=torch.long, device=dev)
-            n_c[wr] = cand_w.sum(dim=1)
-            k_all = self._rand_range(has, n_c)
-            if bool(has.count_nonzero()):
-                k_w = k_all[wr]
-                cum_w = cand_w.long().cumsum(dim=1)
-                sel_w = cand_w & (cum_w == (k_w + 1).unsqueeze(1))
-                spot = torch.zeros(B, dtype=torch.long, device=dev)
-                spot[wr] = sel_w.long().argmax(dim=1)
-                rows = has.nonzero(as_tuple=True)[0]
-                self.camp_tile[rows, self.n_camps[rows]] = spot[rows]
-                self._eff_version += 1  # a new outpost lowers its neighbours' appeal
-                self.n_camps[rows] += 1
-                # SCOUT-THEN-RAID: a BRAND-NEW camp opens with a SCOUT
-                # (barb_unit_type 6), as TS's camp spawn does, while regarrison and
-                # raid sites keep the melee/ranged ladders. Spawn TYPE only, so
-                # the camp roll above is untouched and this is draw-neutral.
-                self._spawn_barb(has, spot, self._barb_scout_type)
-
-        # Garrisons + growth. The near-camp check uses the unit list as it
-        # stood BEFORE this loop (TS snapshots `barbs` first); the cap check
-        # recounts live (TS calls barbUnits() fresh inside the condition).
-        # The camp↔unit distance matrix is hoisted: camps don't move, and units
-        # spawned mid-loop are invisible to the pre_alive mask. `_barbs` is the
-        # barbarian seat's own units (`barbUnits`): the hostile pool also holds
-        # the Free Cities', which no camp counts, guards with or sends raiding.
+        # `_barbs` is the barbarian seat's own units (`barbUnits`): the hostile
+        # pool also holds the Free Cities', which no camp guards or sends
+        # raiding.
         _barbs = lambda: self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)  # noqa: E731
-        pre_alive = _barbs()
         any_camp = bool((self.camp_tile >= 0).count_nonzero())
         _k_live: list[int] = []
         if any_camp:
-            du_all = self.pair_dist[self.camp_tile.clamp(min=0).unsqueeze(2), self.barb_unit_tile.unsqueeze(1)].to(torch.long)  # [B, K, U]
-            near_any_all = (pre_alive.unsqueeze(1) & (du_all <= 1)).any(dim=2)  # [B, K]
-            # WHICH camp slots are live at all, in ONE sync. Neither loop below
-            # writes `camp_tile` — the garrison loop touches only the barbarian
-            # pool and the guard loop only `guard` — so this one snapshot serves
-            # both, in place of a `bool(active.any())` sync per slot per loop.
+            # WHICH camp slots are live at all, in ONE sync
             _k_live = (self.camp_tile >= 0).any(dim=0).nonzero(as_tuple=True)[0].tolist()
-        for k in _k_live:
-            camp = self.camp_tile[:, k]
-            active = camp >= 0
-            near_any = near_any_all[:, k]
-            # A camp's CLASS is its LOCATION's: Horses within barbHorseRange
-            # makes it a cavalry outpost, a reachable coast a pirate camp. The
-            # horse test is per game because the camp tile is.
-            horse = (
-                ((self.pair_dist[camp.clamp(min=0)] <= self._barb_horse_range)
-                 & (self.res_id == self._barb_horse_res)).any(dim=1)
-                & active & (cav_type >= 0)
-            )
-            # REGARRISON on the camp's own land ladder — a hull cannot hold a
-            # camp. Per game only one of the two masks fires, so the pool's
-            # append order is the TS spawn order in every game.
-            _rg = active & ~near_any
-            self._spawn_barb(_rg & horse, camp, cav_type)
-            self._spawn_barb(_rg & ~horse, camp, melee_type)
-            can_grow = active & near_any & (_barbs().sum(dim=1) < self.n_camps * cb["maxBarbPerCamp"])
-            _raid = can_grow & (self._rand_range(can_grow, 100) < cb["raidPct"])
-            # The raid ROTATES: the camp's CLASS unit, then ranged, then melee,
-            # so every camp fields melee and ranged whatever it stands on. `k`
-            # IS the TS `campNo`: camps append at n_camps and _clear_camp_at
-            # splices left exactly like state.barbCamps.splice, so slots
-            # 0..n_camps-1 are dense and in the same order as the TS array.
-            # Zero-draw: the raid roll above already fired and nothing else is
-            # consulted.
-            _slot = (k + self.turn) % 3
-            if _slot == 1:
-                self._spawn_barb(_raid & horse, camp, cav_ranged_type)
-                self._spawn_barb(_raid & ~horse, camp, ranged_type)
-            elif _slot == 2:
-                self._spawn_barb(_raid, camp, melee_type)
-            else:
-                _nav = torch.zeros_like(_raid)
-                if self._barb_naval_type >= 0:
-                    _nb = self.neigh[camp.clamp(min=0)]
-                    _nbc = _nb.clamp(min=0)
-                    # `isWater` and not OCEAN (barbarians have no CARTOGRAPHY):
-                    # a Canal's ground is land here, as `barbarianPhase` reads it
-                    _free = (
-                        (_nb >= 0)
-                        & self.wpass.gather(1, _nbc)
-                        & ~self.ocean_tile.gather(1, _nbc)
-                        & (self.military_at.gather(1, _nbc) < 0)  # no unit at all (`unitsAt(...).length === 0`)
-                        & (self.civilian_at.gather(1, _nbc) < 0)
-                        & (self.support_at.gather(1, _nbc) < 0)
-                        & (self.embarked_at.gather(1, _nbc) < 0)
-                    )
-                    _key = torch.where(_free, _nb, torch.full_like(_nb, self.T + 1))
-                    _best = _key.min(dim=1).values
-                    _nav = _raid & (_best <= self.T)
-                    if bool(_nav.count_nonzero()):
-                        self._spawn_barb(_nav, _best.clamp(max=self.T - 1), self._barb_naval_type, naval=True)
-                _land = _raid & ~_nav
-                self._spawn_barb(_land & horse, camp, cav_type)
-                self._spawn_barb(_land & ~horse, camp, melee_type)
-
         # One guard stays home per camp: first unit (in unit order) within
         # reach of each camp (in camp order), like the TS guard set. Only
         # `guard` mutates inside this loop, so the distances hoist too
@@ -2383,9 +2243,10 @@ class SimOrders:
                 # difference (TS's tileFreeForUnit branches on
                 # UNITS[type].naval the same way).
                 _navm = self.unit_naval.take(self.barb_unit_type[:, u].clamp(min=0)).unsqueeze(1)
+                _cart = self._ocean_open(torch.full((B,), BARB_SEAT, dtype=torch.long, device=dev)).unsqueeze(1)
                 _plane = torch.where(
                     _navm,
-                    ((self.wpass.gather(1, nb2c) & ~self.ocean_tile.gather(1, nb2c))
+                    ((self.wpass.gather(1, nb2c) & (~self.ocean_tile.gather(1, nb2c) | _cart))
                      | self._canal_pass().gather(1, nb2c)),
                     self.passable.gather(1, nb2c),
                 )

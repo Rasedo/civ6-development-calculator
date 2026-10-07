@@ -669,7 +669,7 @@ class SimSpy:
             if chassis >= 0:
                 ctr = self.city_center[b, hr, hc].expand(self.B)
                 for _ in range(n):
-                    self._spawn_barb(one, ctr, chassis, ladder=False)
+                    self._spawn_barb(one, ctr, chassis)
             self._pillage_city_district(b, hr, hc, self._nbhd_didx)
         elif m == self._spy_m_steal:
             t = int(self._steal_first(row)[b, hr])

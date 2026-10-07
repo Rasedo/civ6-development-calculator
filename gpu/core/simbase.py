@@ -205,6 +205,42 @@ def los_tables(width: int, height: int, wrap_x: bool, rmax: int) -> tuple[torch.
             torch.tensor(mid, dtype=torch.long).reshape(T, n_t, n_m))
 
 
+def barb_ring_table(width: int, height: int, wrap_x: bool, radius: int) -> list[list[int]]:
+    """The plots `radius` rings round each plot in the game's ring order
+    (`ringPlots`, the DLL's 0x69010): the plot, then each ring from its six
+    corners (axial (0,+1), (-1,0), (+1,-1), (0,-1), (+1,0), (-1,+1)), each
+    corner walked along its next side; -1 where the walk leaves the map."""
+    dirs = [(0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1)]
+    side = [1, 2, 0, 4, 5, 3]
+    n = 1 + 3 * radius * (radius + 1)
+    out = []
+    for i in range(width * height):
+        c0, r0 = i % width, i // width
+        q0 = c0 - ((r0 - (r0 & 1)) >> 1)
+        lst = [i]
+
+        def add(q: int, r: int) -> None:
+            c = q + ((r - (r & 1)) >> 1)
+            if not (0 <= r < height):
+                lst.append(-1)
+                return
+            if wrap_x:
+                c %= width
+            elif not (0 <= c < width):
+                lst.append(-1)
+                return
+            lst.append(r * width + c)
+
+        for ring in range(1, radius + 1):
+            for j in range(6):
+                cq, cr = q0 + dirs[j][0] * ring, r0 + dirs[j][1] * ring
+                add(cq, cr)
+                for k in range(1, ring):
+                    add(cq + dirs[side[j]][0] * k, cr + dirs[side[j]][1] * k)
+        out.append(lst + [-1] * (n - len(lst)))
+    return out
+
+
 def neighbor_table(width: int, height: int, wrap_x: bool) -> torch.Tensor:
     """[T, 6] the neighbour in each direction (E NE NW W SW SE), -1 off the
     map; a column off either side wraps on a map with `wrap_x`."""
@@ -1007,6 +1043,10 @@ _MUTABLE = [
     "seat_science_total",
     "rng_state", "centre_slot_at", "tdef", "tmove", "railroad",
     "next_slot", "camp_tile", "n_camps", "game_over",
+    # the barbarians' tribes, their techs and civics, and the tribe each of
+    # their units was raised by (`cpu/core/barbarians.ts`)
+    "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "n_tribes",
+    "barb_camps_begun", "barb_techs", "barb_civics", "barb_unit_tribe", "barb_unit_scout",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
     "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
     "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)

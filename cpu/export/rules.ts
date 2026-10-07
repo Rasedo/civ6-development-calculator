@@ -22,7 +22,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS, FIRST_MEET_ENVOYS } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
@@ -48,7 +48,7 @@ import { BALANCED_WEIGHTS } from '../core/score';
 import { SCORING_LINE_ITEMS } from '../data/scoring';
 import { NUKE_COLS, unitActionNames } from '../core/unitActions';
 import { INTERCEPT_RANGE, INTERCEPT_SUPPORT_CS, PRIORITY_TARGET_DAMAGE } from '../core/air';
-import { MAX_BARB_PER_CAMP, BARB_CAMP_SPAWN_PCT, BARB_RAID_PCT, BARB_HORSE_RANGE, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
+import { CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV, FLANK_SUPPORT_CIVIC, AMPHIBIOUS_ATTACK_CS, FORT_DEFENSE_CS, THEO_HOLY_GROUND_STRENGTH, THEO_HOLY_CITY_STRENGTH } from '../core/combat';
 import { GDR_UPGRADES, GDR_DRONE_AA, GDR_PARTICLE_BEAM_CS, GDR_ENHANCED_MOVES, GDR_ARMOR_PLATING_CS, GDR_NAVAL_PENALTY, FORMATION_CS, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_RESOURCE_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING, OPEN_TERRAINS, UNITS, isLightCavalry, UNIT_HP, CITY_MAX_HP, WALLS_TIER_HP, WALLS_TIER_URBAN, URBAN_DEFENSES_TECH, REPAIR_QUIET_TURNS, WALL_DAMAGE_MELEE, WALL_DAMAGE_RANGED, WALL_BREACH_FRACTION, RANGED_CITY_PENALTY, ENCAMPMENT_HP, UNIT_CLASSES, UNIT_ERA_INDEX, unitHasClass, ROCK_BAND_VENUES, ROCK_BAND_WONDER_VENUE, ROCK_BAND_TIERS, ROCK_BAND_TIER_ODDS, ROCK_BAND_MAX_LEVEL, SETTLER_COST_STEP, BUILDER_COST_STEP, CITIZEN_NAMED_UNITS } from '../data/units';
 import { YIELD_KEYS } from '../core/types';
 import { FEATURE_SIGHT_THROUGH, ELEVATION_SIGHT, SIGHT_MAX } from '../data/sight';
@@ -309,6 +309,10 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import type { Era } from '../data/techs';
+import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
+  BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
+  BARB_CAMP_FEATURES, BARB_FREE_TECHS, BARB_TAG_UNITS, BARB_TRIBES, barbNameRangedPct, type BarbTag } from '../data/barbarians';
+const BARB_TAGS = Object.keys(BARB_TAG_UNITS) as BarbTag[];
 import { CHOP_ROWS, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
 import { TERRAINS } from '../../world/terrains';
 import { COAST_APPEAL } from '../data/appeal';
@@ -961,6 +965,7 @@ export function buildRules() {
     cityState: {
       envoyCost: ENVOY_COST,
       influencePerTurn: INFLUENCE_PER_TURN,
+      firstMeetEnvoys: FIRST_MEET_ENVOYS,
       // the envoy ladder (`CITY_STATE_ENVOY_ROWS`): `t` the type index, `e`
       // the envoys, `a` the amount, `b` the buildings (indices; empty = the
       // capital row); a type with item kinds pays production toward them,
@@ -1850,19 +1855,6 @@ export function buildRules() {
       capturedHp: CAPTURED_UNIT_HP,
       captureBaseDiff: CAPTURE_BASE_STRENGTH_DIFF,
       cityMaxHp: CITY_MAX_HP,
-      maxBarbPerCamp: MAX_BARB_PER_CAMP,
-      campSpawnPct: BARB_CAMP_SPAWN_PCT,
-      raidPct: BARB_RAID_PCT,
-      spearmanAfterTurn: 60,
-      // the shared barb MELEE era ladder thresholds
-      // (WARRIOR → SPEARMAN t>60 → PIKEMAN t>120 → MUSKETMAN t>180). The GPU
-      // reads these; the TS barbMeleeType hard-codes the same thresholds.
-      pikemanAfterTurn: 120,
-      musketmanAfterTurn: 180,
-      // the RANGED barb ladder threshold (barbRangedType —
-      // ARCHER, then CROSSBOWMAN after turn 120). The GPU reads this; the TS
-      // barbRangedType hard-codes the same number.
-      crossbowmanAfterTurn: 120,
       cityHealPerTurn: 20,
       // the outer-defense pool by WALLS TIER
       wallsTierHp: [...WALLS_TIER_HP],
@@ -1898,35 +1890,40 @@ export function buildRules() {
       formationResourceMult: [...FORMATION_RESOURCE_MULT],
       formationTrainDiscount: FORMATION_TRAIN_DISCOUNT,
       encampHp: ENCAMPMENT_HP, // the ENCAMPMENT garrison pool cap
-      barbLadder: [
-        'WARRIOR',
-        'SPEARMAN',
-        'PIKEMAN',
-        'MUSKETMAN',
-        'ARCHER',
-        'CROSSBOWMAN',
-        'SCOUT',
-        'GALLEY',
-        'QUADRIREME',
-        'HORSEMAN',
-        'KNIGHT',
-        'BARBARIAN_HORSEMAN',
-        'BARBARIAN_HORSE_ARCHER',
-      ].map((id) => {
-        const i = Object.keys(UNITS).indexOf(id);
-        if (i < 0) throw new Error(`barbLadder: ${id} is not in the unit roster`);
-        return i;
-      }),
-      barbNavalTypes: [7, 8], // ladder POSITIONS: GALLEY, then QUADRIREME past crossbowmanAfterTurn
-      // ladder POSITIONS of a HORSE camp's melee: BARBARIAN_HORSEMAN, HORSEMAN
-      // past spearmanAfterTurn, KNIGHT past crossbowmanAfterTurn
-      barbCavalryTypes: [11, 9, 10],
-      // ladder POSITION of a HORSE camp's ranged slot through spearmanAfterTurn
-      // (BARBARIAN_HORSE_ARCHER); the shared ranged ladder after it
-      barbCavalryRanged: 12,
-      barbHorseRes: RESOURCE_IDS.indexOf('HORSES'), // a camp with this within barbHorseRange is a CAVALRY outpost
-      barbHorseRange: BARB_HORSE_RANGE,
       campClearReward: CAMP_DISPERSAL_GOLD,
+      // THE BARBARIANS' TURN (cpu/core/barbarians.ts, the DLL's manager)
+      barbarians: {
+        campsPerMajor: BARB_CAMPS_PER_MAJOR,
+        firstTurnPct: BARB_FIRST_TURN_PCT,
+        campDistCamp: BARB_CAMP_DIST_CAMP,
+        campDistCity: BARB_CAMP_DIST_CITY,
+        techPct: BARB_TECH_PCT,
+        regionMin: BARB_REGION_MIN,
+        scoutWait: BARB_SCOUT_WAIT,
+        islandPlots: BARB_ISLAND_PLOTS,
+        coastWater: BARB_COAST_WATER,
+        maxUnits: BARB_MAX_UNITS,
+        maxScouts: BARB_MAX_SCOUTS,
+        namesPerKind: BARB_NAMES_PER_KIND,
+        // the Lake terrain (a naval tribe's shore needs water that is none)
+        lakeTerrain: TERRAIN_IDS.indexOf('LAKE'),
+        // the BARBARIAN_NAVAL_2 name's own ranged share: [kind, name, pct]
+        nameRangedPct: [[0, 1, barbNameRangedPct('NAVAL', 1) ?? -1]],
+        campTerrains: BARB_CAMP_TERRAINS.map((t) => TERRAIN_IDS.indexOf(t)),
+        campFeatures: BARB_CAMP_FEATURES.map((f) => featIdx.get(f) ?? -1),
+        freeTechs: BARB_FREE_TECHS.map((t) => techIdx.get(t) ?? -1),
+        // the class tags, each its units in the Units table's order: [roster
+        // index, Combat, tech index, civic index] (-1 none)
+        tags: BARB_TAGS,
+        tagUnits: BARB_TAGS.map((tag) => BARB_TAG_UNITS[tag].map((id) => [Object.keys(UNITS).indexOf(id), UNITS[id].combat,
+          UNITS[id].requiresTech ? (techIdx.get(UNITS[id].requiresTech!) ?? -1) : -1,
+          UNITS[id].requiresCivic ? (civicIdx.get(UNITS[id].requiresCivic!) ?? -1) : -1])),
+        // BarbarianTribes in table order: [coastal, resource, range, ranged %,
+        // spawn turns, scout tag, melee tag, ranged tag, defender tag]
+        tribes: BARB_TRIBES.map((d) => [d.coastal ? 1 : 0, d.resource ? RESOURCE_IDS.indexOf(d.resource) : -1, d.resourceRange,
+          d.rangedPct, d.spawnEvery, BARB_TAGS.indexOf(d.scoutTag), BARB_TAGS.indexOf(d.meleeTag), BARB_TAGS.indexOf(d.rangedTag),
+          BARB_TAGS.indexOf(d.defenderTag)]),
+      },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
       // COMBAT: the single-precision factor e^(x/256) per exponent x in
       // 1/256ths over ±DAMAGE_EXPONENT_REACH (`damageFactor`, the function

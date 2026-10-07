@@ -488,7 +488,7 @@ def test_treasury_and_join(rules, path) -> None:
     horse = UNI.index("TANK")
     far = spot_at(sim, centre, 6)
     one = torch.tensor([True])
-    sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
+    sim._spawn_barb(one, torch.tensor([far]), horse, seat=FREE_SEAT)
     other = [s for s, _t, _p in free_units(sim) if s not in granted]
     assert len(other) == 1 and int(sim.unit_free_city[B0, other[0]]) == -1
     # ITS TREASURY banks its cities' Gold and pays its units' upkeep
@@ -512,7 +512,7 @@ def test_treasury_and_join(rules, path) -> None:
     assert short > 0 and lost == (1 if short >= 10 else 0), (short, lost)
     sim.free_treasury[B0] = 50.0
     # a JOIN takes the city's grants with it; another Free Cities unit stays
-    sim._spawn_barb(one, torch.tensor([far]), horse, ladder=False, seat=FREE_SEAT)
+    sim._spawn_barb(one, torch.tensor([far]), horse, seat=FREE_SEAT)
     stay = [s for s, _t, _p in free_units(sim) if s not in granted]
     sim.city_free_press[B0, F, col, 1] = 10_000.0
     sim.city_loyalty[B0, F, col] = 0.0

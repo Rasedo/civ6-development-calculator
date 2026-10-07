@@ -110,6 +110,12 @@ def test_declare(rules, path):
     _kind = sim._default_war_kind(sim._war_kinds_allowed(0, 1))  # the kind the head takes
     sim._stamp_war_kind(0, 1, _kind, _one)
     sim._grievance_war_declared(0, 1, _one, _kind)  # declareWar's ledger stamp
+    # CIV6 (BOOST_TRIGGER_RECEIVE_DOW): the target's Defensive Tactics, which
+    # declareWar pays in both twins (Boosts CIVIC_DEFENSIVE_TACTICS); a casus
+    # belli kind also pays the declarer's DOW_CASUS_BELLI row
+    sim._grant_boost_rows(1, _one, lambda r: r["cls"] == "RECEIVE_DOW")
+    if sim._war_kinds and sim._war_kinds[int(_kind[0])][2] != 0:
+        sim._grant_boost_rows(0, _one, lambda r: r["cls"] == "DOW_CASUS_BELLI")
     sim.step()
     d = drift(sim, after)
     assert not d, f"declare != poked declareWar + plain step: {d}"

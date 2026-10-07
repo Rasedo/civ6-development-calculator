@@ -3,7 +3,7 @@ import type { City, CityState, GameState, ImprovementId, Seat, Tile, Unit } from
 import { darkBuildings } from './yields';
 import { ENKIDU_SHARE_RANGE } from '../data/civilizations';
 import { neighbors, hexDistance, tilesWithin } from '../../world/hex';
-import { isWater, isImpassable, naturalWonderAt , isCoastalLand } from '../../world/query';
+import { isWater, isImpassable,  isCoastalLand } from '../../world/query';
 import { civEraIndex, seatBuildingSum } from './city';
 import { logUnitOrder } from './seatTurn';
 import { MODERN_ERA_INDEX } from '../data/techs';
@@ -29,7 +29,7 @@ import { grievanceCityStateTaken } from './grievance';
 import { goldenDedication, worldEraIndex } from './eras';
 import { drawAndPayGoody, raiseBestMelee, unitReligious, unitStackSlot } from './units';
 import { randRange } from './rand';
-import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, spawnUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
+import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disbandUnit, unitsHostile, fortifyBonus, reseatUnit, cityAtIndex, encampmentBlocks, encampmentIntact, crossesRiver, cliffBlocks, cliffBlocksStep, stepUnit, unitVisibleTo, unitExertsZoc, formationTierFor } from './units';
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
@@ -38,8 +38,7 @@ import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
 import { ATHEISM_PRESSURE_PER_POP, ENHANCER_BELIEFS, JUST_WAR_RANGE, INQUISITOR_HOME_STRENGTH, type BeliefEffects } from '../data/religion';
-import { isExplored, revealAround, unexploredByAll } from './fog';
-import { srcConst, xml } from '../data/provenance';
+import { isExplored, revealAround } from './fog';
 import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
@@ -55,7 +54,7 @@ import { KILL_SPREAD_RANGE, UNIT_PROMO_CLASS , classBitOf } from '../data/promot
 import { transferCity } from './phase';
 import type { RuleResult } from './rules';
 import { civOf, isFreeSeat, seatsAllied } from './seats';
-import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileClaimed, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
+import { BARB_SEAT, NO_SEAT, allCities, allianceWarCS, capsOf, cityAtTile, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, markCityCentre, seatOf, seatOfCityState, setTileOwner, tileCity, tileSeat, unitSeat, visibilityCS , enkiduAllies, unitsOf, onHomeContinent, majorityReligionOf } from './seats';
 import { inGeneralAura, GENERAL_AURA_CS, generalAuraMP } from './aura'; // the shared aura predicate
 // The ONE full-MP contract, so the barbarian phase's reset cannot
 // drift from every other seat's. units.ts already imports from here, so this
@@ -67,16 +66,9 @@ import { unitKillEvent, campMoment } from './eras';
 import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
+import { barbarianRules, tribeDies } from './barbarians';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
-
-export const MAX_BARB_PER_CAMP = 3;
-/** the engine's barbarian turn: the percent a turn a new camp rises while
- *  below the cap, and the percent a garrisoned camp sends a raider — each one
- *  rand(100) on the game's generator (Civ 6's own camp step 0x14fcc0 counts
- *  its camps off a target and draws none of these) */
-export const BARB_CAMP_SPAWN_PCT = 8;
-export const BARB_RAID_PCT = 10;
 
 export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): void {
   // You do not clear your OWN camps: the camps belong to the barbarian seat.
@@ -84,6 +76,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
+  tribeDies(state, tileIndex);
   campMoment(state, unit.seat, tileIndex);
   // the outpost was the BARBARIANS' — theirs is the civilization buried here
   markAntiquitySite(state, tileIndex, BARB_SEAT);
@@ -2869,24 +2862,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
-function campCandidates(state: GameState): Tile[] {
-  const preferFog = state.fogOfWar;
-  return state.map.tiles.filter((t) => {
-    if (isWater(t) || isImpassable(t) || naturalWonderAt(t) || t.district || t.builtWonder) return false;
-    if (tileClaimed(t) || t.goodyHut || t.meteor) return false;
-    if (preferFog && !unexploredByAll(state, t.index)) return false; // camps rise in the fog
-    for (const c of allCities(state)) {
-      const ct = state.map.tiles[c.centerIndex];
-      if (hexDistance(state.map, ct.col, ct.row, t.col, t.row) < 5) return false;
-    }
-    for (const campIdx of state.barbSeat.camps) {
-      const camp = state.map.tiles[campIdx];
-      if (hexDistance(state.map, camp.col, camp.row, t.col, t.row) < 5) return false;
-    }
-    return true;
-  });
-}
-
 function barbUnits(state: GameState): Unit[] {
   return state.units.filter((u) => isBarbSeat(u.seat));
 }
@@ -3002,7 +2977,9 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     const step = neighbors(map, at)
       .filter(
         (n) =>
-          tileFreeForUnit(state, n.index, 0, unit, true) &&
+          // a barbarian raider keeps to its own domain: the AI never embarks
+          // one, though the barbarians hold Shipbuilding from the start
+          tileFreeForUnit(state, n.index, 0, unit, !isBarbSeat(unit.seat)) &&
           // A CLIFF closes the embark/disembark edge for the
           // war-march too — the GPU's _apply_seat_unit_actions war-march scan
           // masks it out of its step candidates, and TS did not, so a seat
@@ -3030,72 +3007,29 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   }
 }
 
-/**
- * The shared barbarian MELEE era ladder. All three
- * spawn sites in barbarianPhase (new camp, empty-camp regarrison, the 0.1-roll
- * raid) climb it together — WARRIOR → SPEARMAN (t>60) → PIKEMAN (t>120) →
- * MUSKETMAN (t>180). Sized to the model (real Civ 6 scales barbs by era). The
- * CS levy ladder in phase.ts is separate and untouched.
- */
-function barbMeleeType(turn: number): string {
-  return turn > 180 ? 'MUSKETMAN' : turn > 120 ? 'PIKEMAN' : turn > 60 ? 'SPEARMAN' : 'WARRIOR';
+/** THE ACTION REPLAY'S HOLD on the barbarians' turn: the replay lands the
+ *  other players' actions of the turn after the engine's turn, and the
+ *  barbarians close the turn after those actions, so the replay runs their
+ *  rules there (`barbarianRules`) and their units' moves and battles are
+ *  the record's; the hold takes the engine's barbarian turn. Null outside a
+ *  replay. */
+let barbHold: ((state: GameState) => void) | null = null;
+export function holdBarbarians(fn: ((state: GameState) => void) | null): void {
+  barbHold = fn;
 }
 
 /**
- * The RANGED barb ladder. CIV 6: "regardless of position every
- * outpost will spawn melee and ranged units", so RANGED is not a camp class —
- * every camp takes its turn at it in `barbarianPhase`'s raid rotation. ARCHER, then
- * CROSSBOWMAN past the era turn. TS needed no dispatch work — `hostileUnitAct`
- * already routes any `UNITS[type].ranged` attacker through
- * `hostileRangedStrike`; the GPU raider block has its own ranged path.
+ * THE BARBARIANS' TURN: the game's rules for them (`barbarianRules`: their
+ * techs, the camp step, each tribe's turn), then their units' AI — the
+ * driver's stand-in: one guard stays on each camp, every other unit with
+ * moves acts (`hostileUnitAct`).
  */
-function barbRangedType(turn: number): string {
-  return turn > 120 ? 'CROSSBOWMAN' : 'ARCHER';
-}
-
-/**
- * The barbarian NAVAL ladder — what a PIRATE camp (one with a
- * reachable coast) puts out. GALLEY, then QUADRIREME past the same era turn the
- * crossbow ladder uses.
- */
-function barbNavalType(turn: number): string {
-  return turn > 120 ? 'QUADRIREME' : 'GALLEY';
-}
-
-/**
- * The barbarian CAVALRY ladder — what a HORSE camp fields as its melee.
- * CIV6 (Barbarians.xml TRIBE_CAVALRY): a camp with Horses within
- * ResourceRange (`BARB_HORSE_RANGE`), MeleeTag CLASS_LIGHT_CAVALRY. The
- * barbarians' own BARBARIAN_HORSEMAN through the melee ladder's first era,
- * then HORSEMAN, then KNIGHT past the crossbow turn.
- */
-function barbCavalryType(turn: number): string {
-  return turn > 120 ? 'KNIGHT' : turn > 60 ? 'HORSEMAN' : 'BARBARIAN_HORSEMAN';
-}
-
-/**
- * What a HORSE camp fields in the raid rotation's RANGED slot. CIV6
- * (Barbarians.xml TRIBE_CAVALRY): RangedTag CLASS_MOBILE_RANGED — the
- * barbarians' own BARBARIAN_HORSE_ARCHER through the melee ladder's first
- * era, the shared ranged ladder after it.
- */
-function barbCavalryRangedType(turn: number): string {
-  return turn > 60 ? barbRangedType(turn) : 'BARBARIAN_HORSE_ARCHER';
-}
-
-/** CIV6 (Barbarians.xml TRIBE_CAVALRY): RequiredResource RESOURCE_HORSES
- *  within ResourceRange 3. */
-export const BARB_HORSE_RANGE = srcConst('combat.barbHorseRange', 3,
-  xml('BarbarianTribes', 'TribeType=TRIBE_CAVALRY', 'ResourceRange'));
-
-/** a camp is a HORSE camp when a Horses resource sits within BARB_HORSE_RANGE. */
-function campNearHorses(state: GameState, campIdx: number): boolean {
-  const camp = state.map.tiles[campIdx];
-  return tilesWithin(state.map, camp.col, camp.row, BARB_HORSE_RANGE)
-    .some((t) => t.resource === 'HORSES');
-}
-
 export function barbarianPhase(state: GameState): void {
+  if (barbHold) {
+    barbHold(state);
+    return;
+  }
+  barbarianRules(state, state.turn);
   const map = state.map;
   for (const u of state.units) {
     if (!isBarbSeat(u.seat)) continue;
@@ -3103,71 +3037,6 @@ export function barbarianPhase(state: GameState): void {
     u.movesFull = u.movesLeft;
     u.attacksLeft = attacksPerTurn(u);
   }
-  const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
-
-  const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
-  if (anyCivCity && state.barbSeat.camps.length < maxCamps && randRange(state, 100, 'Engine: barbarian camp') < BARB_CAMP_SPAWN_PCT) {
-    const candidates = campCandidates(state);
-    if (candidates.length > 0) {
-      const spot = candidates[randRange(state, candidates.length, 'Engine: barbarian camp')];
-      state.barbSeat.camps.push(spot.index);
-      // SCOUT-THEN-RAID: a brand-new camp opens with a scout that goes
-      // looking for a target; the regarrison and raid sites below keep the
-      // melee/ranged ladders. The scout rides the barb walker and attacks
-      // like any melee barb.
-      spawnUnit(state, 'SCOUT', spot.index, BARB_SEAT);
-    }
-  }
-
-  const barbs = barbUnits(state);
-  // Indexed loop (identical iteration ORDER, so no draw-order change)
-  // because the raid ROTATION keys off the camp's index as well as the turn.
-  for (let campNo = 0; campNo < state.barbSeat.camps.length; campNo++) {
-    const campIdx = state.barbSeat.camps[campNo];
-    const camp = map.tiles[campIdx];
-    const nearCamp = barbs.filter(
-      (u) =>
-        hexDistance(state.map, map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
-    );
-    const horseCamp = campNearHorses(state, campIdx);
-    if (nearCamp.length === 0) {
-      // REGARRISON on the camp's own land ladder — a hull cannot hold a camp.
-      spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
-    } else if (
-      barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
-      randRange(state, 100, 'Engine: barbarian raid') < BARB_RAID_PCT
-    ) {
-      const water = neighbors(map, map.tiles[campIdx])
-        // A tech-less barbarian cannot enter OCEAN (waterEnterable gates it on
-        // CARTOGRAPHY), so only COAST/LAKE count — otherwise spawnUnit's own
-        // probe would reject the pick and the two engines would disagree.
-        .filter(
-          (n) =>
-            isWater(n) &&
-            n.terrain !== 'OCEAN' &&
-            !isImpassable(n) &&
-            unitsAt(state, n.index).length === 0,
-        )
-        .sort((x, y) => x.index - y.index)[0];
-      // A camp's raid ROTATES: its CLASS unit, then ranged, then melee. CIV 6
-      // classes a camp by where it stands — a reachable coast makes it a
-      // pirate camp, Horses within 6 a cavalry outpost, everything else a land
-      // camp — and every camp fields melee and ranged whatever its class. The
-      // rotation is the turn plus the camp's index, so it costs no draw and
-      // neighbouring camps do not move in lockstep.
-      const slot = (campNo + state.turn) % 3;
-      if (slot === 1) {
-        spawnUnit(state, horseCamp ? barbCavalryRangedType(state.turn) : barbRangedType(state.turn), campIdx, BARB_SEAT);
-      } else if (slot === 2) {
-        spawnUnit(state, barbMeleeType(state.turn), campIdx, BARB_SEAT);
-      } else if (water) {
-        spawnUnit(state, barbNavalType(state.turn), water.index, BARB_SEAT);
-      } else {
-        spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
-      }
-    }
-  }
-
   const guards = new Set<number>();
   for (const campIdx of state.barbSeat.camps) {
     const camp = map.tiles[campIdx];
@@ -3182,5 +3051,4 @@ export function barbarianPhase(state: GameState): void {
     if (guards.has(unit.id)) continue;
     if (unit.movesLeft > 0) hostileUnitAct(state, unit);
   }
-
 }

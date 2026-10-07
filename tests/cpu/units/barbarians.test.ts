@@ -1,86 +1,95 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, FREE_SEAT, setTileOwner } from '../../../cpu/core/seats';
+import { BARB_SEAT, FREE_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { barbarianPhase, hostileUnitAct } from '../../../cpu/core/combat';
+import { hostileUnitAct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
+import { barbarianRules, barbarianTechs, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
+import { BARB_TRIBES } from '../../../cpu/data/barbarians';
 import type { GameState } from '../../../cpu/core/types';
 
-// CIV 6 classes a barbarian outpost by WHERE IT STANDS: a reachable coast makes
-// it a pirate camp, a Horses resource within 3 tiles (TRIBE_CAVALRY ResourceRange) a cavalry outpost, and
-// everything else a land camp — while "regardless of position every outpost
-// will spawn melee and ranged units".
-
-function campAt(col: number, row: number, opts: { horses?: boolean } = {}): { state: GameState; camp: number } {
+function land(): GameState {
   const state = makeState(makeMap(20, 20));
   state.unitsMode = true;
-  const camp = tileAtCoords(state.map, col, row);
-  state.barbSeat.camps.push(camp.index);
-  if (opts.horses) tileAtCoords(state.map, col + 3, row).resource = 'HORSES';
-  return { state, camp: camp.index };
+  return state;
 }
 
-/** Run the phase until it spawns one more barbarian, and name the newcomer. */
-function nextSpawn(state: GameState, cap = 4000): string {
-  const before = state.units.length;
-  for (let i = 0; i < cap; i++) {
-    barbarianPhase(state);
-    if (state.units.length > before) return state.units[state.units.length - 1].type;
-  }
-  throw new Error('the phase never spawned — the scenario is inert');
-}
-
-describe('barbarian camp classes', () => {
-  it('an empty camp regarrisons on its own land ladder', () => {
-    const plain = campAt(6, 6);
-    expect(nextSpawn(plain.state)).toBe('WARRIOR');
-
-    const horse = campAt(6, 6, { horses: true });
-    expect(nextSpawn(horse.state)).toBe('BARBARIAN_HORSEMAN');
+// THE BARBARIANS' TURN (cpu/core/barbarians.ts; tools/civ6lab/dll_readings.md
+// "H-1: the barbarians' turn"), read off the game's DLL.
+describe('the barbarians\' rules', () => {
+  it('take the free techs, and a tech half the majors hold', () => {
+    const state = land();
+    barbarianTechs(state);
+    expect(state.barbSeat.research.techs).toEqual(expect.arrayContaining(['SAILING', 'BRONZE_WORKING', 'SHIPBUILDING']));
+    expect(state.barbSeat.research.techs).not.toContain('ARCHERY');
+    spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 2, 2).index, 0);
+    state.seats[0].research.techs.push('ARCHERY');
+    barbarianTechs(state);
+    expect(state.barbSeat.research.techs).toContain('ARCHERY');
   });
 
-  it('the raid rotates CLASS, then ranged, then melee — every camp fields both', () => {
-    // campNo 0, so the rotation is the turn alone: 0 = class, 1 = ranged, 2 = melee.
-    const seen: Record<number, string> = {};
-    for (const turn of [0, 1, 2]) {
-      const { state, camp } = campAt(6, 6, { horses: true });
-      state.turn = turn;
-      spawnUnit(state, 'WARRIOR', camp, BARB_SEAT); // a garrison, so the camp RAIDS
-      seen[turn] = nextSpawn(state);
+  it('raise the best unit of a class their techs allow, the first of the highest Combat', () => {
+    const state = land();
+    expect(barbUnitFor(state, 'CLASS_ANTI_CAVALRY')).toBeNull();
+    barbarianTechs(state);
+    expect(barbUnitFor(state, 'CLASS_ANTI_CAVALRY')).toBe('SPEARMAN');
+    expect(barbUnitFor(state, 'CLASS_RANGED')).toBe('SLINGER');
+    state.barbSeat.research.techs.push('ARCHERY');
+    expect(barbUnitFor(state, 'CLASS_RANGED')).toBe('ARCHER');
+    expect(barbUnitFor(state, 'CLASS_LIGHT_CAVALRY')).toBe('BARBARIAN_HORSEMAN');
+  });
+
+  it('walk the rings from the plot, each corner along its next side', () => {
+    const state = land();
+    const c = tileAtCoords(state.map, 10, 10);
+    const ring = ringPlots(state, c.index, 1);
+    // the first corner is the plot below (axial +r): (10, 11) on an even row
+    expect(ring[0]).toBe(c.index);
+    expect(ring[1]).toBe(tileAtCoords(state.map, 10, 11).index);
+    expect(new Set(ring).size).toBe(7);
+    expect(ringPlots(state, c.index, 2).length).toBe(19);
+  });
+
+  it('give a camp the first tribe whose ground it meets', () => {
+    const state = land();
+    const camp = tileAtCoords(state.map, 6, 6);
+    expect(tribeKindAt(state, camp.index).kind).toBe('MELEE');
+    tileAtCoords(state.map, 8, 6).resource = 'HORSES';
+    expect(tribeKindAt(state, camp.index).kind).toBe('CAVALRY');
+  });
+
+  it('raise a new camp\'s defender on it and its scout beside it', () => {
+    const state = land();
+    barbarianTechs(state);
+    const camp = tileAtCoords(state.map, 6, 6);
+    raiseCamp(state, camp.index);
+    const barbs = state.units.filter((u) => isBarbSeat(u.seat));
+    expect(barbs.map((u) => u.type)).toEqual(['SPEARMAN', 'SCOUT']);
+    expect(barbs[0].tileIndex).toBe(camp.index);
+    expect(barbs[1].tileIndex).toBe(ringPlots(state, camp.index, 1)[1]);
+    expect(state.barbTribes?.[0]).toMatchObject({ plot: camp.index, alive: true, kind: 'MELEE', scouts: [barbs[1].id] });
+  });
+
+  it('a tribe raises one unit a TurnsToWarriorSpawn at the speed', () => {
+    const state = land();
+    barbarianTechs(state);
+    const camp = tileAtCoords(state.map, 6, 6);
+    raiseCamp(state, camp.index);
+    // a major with a unit holds the camp step at bay (no land unseen enough)
+    state.barbCampsBegun = true;
+    const every = BARB_TRIBES.find((d) => d.kind === 'MELEE')!.spawnEvery;
+    expect(every).toBe(7);
+    const count = () => state.units.filter((u) => isBarbSeat(u.seat)).length;
+    for (let k = 1; k < every; k++) {
+      barbarianRules(state, state.turn);
+      state.barbSeat.camps = [camp.index];
     }
-    expect(seen[0]).toBe('BARBARIAN_HORSEMAN');     // the camp's CLASS
-    expect(seen[1]).toBe('BARBARIAN_HORSE_ARCHER'); // the cavalry tribe's ranged
-    expect(seen[2]).toBe('WARRIOR');                // melee, whatever the class
-  });
-
-  it("a cavalry outpost's own cavalry gives way to the shared ladders past the first era", () => {
-    const seen: Record<number, string> = {};
-    for (const turn of [63, 64]) {
-      const { state, camp } = campAt(6, 6, { horses: true });
-      state.turn = turn; // > 60: HORSEMAN, and the shared ranged ladder
-      spawnUnit(state, 'WARRIOR', camp, BARB_SEAT);
-      seen[turn] = nextSpawn(state);
-    }
-    expect(seen[63]).toBe('HORSEMAN'); // 63 % 3 === 0 -> the class slot
-    expect(seen[64]).toBe('ARCHER');   // 64 % 3 === 1 -> the ranged slot
-  });
-
-  it('a land camp raids melee where a cavalry outpost raids mounted', () => {
-    const { state, camp } = campAt(6, 6);
-    state.turn = 0;
-    spawnUnit(state, 'WARRIOR', camp, BARB_SEAT);
-    expect(nextSpawn(state)).toBe('WARRIOR');
-  });
-
-  it('the ladders climb with the era', () => {
-    const { state, camp } = campAt(6, 6, { horses: true });
-    state.turn = 123; // > 120: KNIGHT and CROSSBOWMAN
-    spawnUnit(state, 'WARRIOR', camp, BARB_SEAT);
-    expect(nextSpawn(state)).toBe('KNIGHT'); // 123 % 3 === 0 -> the class slot
+    const before = count();
+    barbarianRules(state, state.turn);
+    expect(count()).toBeGreaterThanOrEqual(before + 1);
   });
 });
 
-// A raider's ground: `isTerritorial` — a major's, a city-state's or the FREE
-// CITIES' — and both engines walk it (seed 9092 t137: a Horseman beside a Free
+// A raid that walks onto a FREE CITY's district (the parity case: a Free
 // City's Campus held by a barbarian Crossbowman stood still on TS and marched
 // on the GPU, whose ground test stopped short of FREE_SEAT).
 describe('what a raider marches on', () => {

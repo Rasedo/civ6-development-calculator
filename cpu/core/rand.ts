@@ -32,7 +32,9 @@ export type DrawLabel =
   | 'Rolling Espionage Result' | 'Police Exit Covered' | 'Rolling Concert Result' | 'Free Cities Unit Choice'
   // the engines' draws at no labelled site of the game's
   | 'Engine: minor walk' | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
-  | 'Engine: barbarian camp' | 'Engine: barbarian raid' | 'Engine: partisans' | 'Engine: breached dam';
+  | 'Engine: partisans' | 'Engine: breached dam'
+  // the barbarians' turn
+  | 'Barbarian camp region placement' | 'Barbarian camp location' | 'Barb Tribe Roll' | 'Barbarian Ranged unit roll';
 
 function step(state: GameState): number {
   const s = (Math.imul(LCG_MUL, state.rngState) + LCG_ADD) >>> 0;

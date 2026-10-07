@@ -14,6 +14,7 @@
 import type { GameState } from '../core/types';
 import { YIELD_KEYS } from '../core/types';
 import type { WorldFile } from '../../world/file';
+import { BARB_CAMPS_PER_MAJOR } from '../data/barbarians';
 import { tileCity, tileSeat } from '../core/seats';
 import { baseYieldCtx } from '../core/effects';
 import { tileYields, districtAdjacency, wonderAdjacentYields } from '../core/yields';
@@ -316,8 +317,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     return { ...rec, nr };
   });
   const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => t.index);
-  const landTiles = map.tiles.filter((t) => !isWater(t)).length;
-  const maxCamps = Math.max(1, Math.floor(landTiles / 120));
+  // the camps the barbarians may hold at once: BARBARIAN_CAMP_MAX_PER_MAJOR_CIV
+  // for each major (`campStep`'s target before the fog's share)
+  const maxCamps = BARB_CAMPS_PER_MAJOR * state.seats.length;
 
   const ownerSeatInit = map.tiles.map((t) => tileSeat(t));
   const ownerInit = map.tiles.map((t) => tileCity(t));

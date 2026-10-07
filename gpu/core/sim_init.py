@@ -3813,6 +3813,27 @@ class SimInit:
         self.city_powered = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.bool, device=device)
         self.camp_tile = torch.full((B, max(self.K, 1)), -1, dtype=torch.long, device=device)
         self.n_camps = torch.zeros(B, dtype=torch.long, device=device)
+        # THE BARBARIANS' TURN (`cpu/core/barbarians.ts`): the tribes — one a
+        # camp ever raised, the dead kept (`BarbTribe`) —, whether the camp
+        # step has added camps once, the barbarians' techs and civics, and the
+        # tribe each barbarian unit was raised by (its scouts apart)
+        self._bb = cb["barbarians"]
+        self.KT = max(8, 6 * max(self.K, 1))
+        self.tribe_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_alive = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
+        self.tribe_kind = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_name = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_spawn = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_scoutc = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.n_tribes = torch.zeros(B, dtype=torch.long, device=device)
+        self.barb_camps_begun = torch.zeros(B, dtype=torch.bool, device=device)
+        self.barb_techs = torch.zeros(B, len(rules.t_cost), dtype=torch.bool, device=device)
+        self.barb_civics = torch.zeros(B, len(rules.c_cost), dtype=torch.bool, device=device)
+        self.barb_unit_tribe = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
+        self.barb_unit_scout = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        # the plots three rings round each plot in the game's ring order
+        # (`ringPlots`, 0x69010), -1 past the map's edge
+        self._barb_ring = torch.tensor(barb_ring_table(self.W, self.H, self.wrap_x, 3), dtype=torch.long, device=device)
         self.unit_next = torch.zeros(B, dtype=torch.long, device=device)
         self.tdef = torch.tensor([[t.get("tdef", 0) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         # the terrain PENALTY over a plain step, in `mp_scale` units
@@ -3833,28 +3854,6 @@ class SimInit:
         self._dmg_max_extra = int(cb["dmgMaxExtra"])
         self._dmg_min = int(cb["dmgMin"])
         self._dmg_max = int(cb["dmgMax"])
-        # The BARBARIAN ladder maps a ladder POSITION (0..3 melee, 4/5 ranged,
-        # 6 scout, 7/8 naval, 9/10 cavalry, 11/12 the barbarians' own cavalry) to a ROSTER index. barb_unit_type holds that roster index,
-        # exactly like major_unit_type and major_unit_type, so combat / moves / ranged strength /
-        # ranged range / naval all come from the one roster table. The exporter
-        # is the source of truth for the ladder's contents.
-        _bl = list(cb["barbLadder"] or [])
-        if not _bl:
-            raise ValueError(
-                "rules.json has no combat.barbLadder — this export predates the ladder. "
-                "Re-run the exporter for this fixture set (`npm run seed && npm run export`)."
-            )
-        self._barb_ladder = torch.tensor(_bl, dtype=torch.long, device=device)
-        _bn = rules.combat["barbNavalTypes"] or []
-        self._barb_galley_idx = int(_bn[0]) if len(_bn) > 0 else -1
-        self._barb_quad_idx = int(_bn[1]) if len(_bn) > 1 else -1
-        # a HORSE camp's melee rungs (BARBARIAN_HORSEMAN, HORSEMAN, KNIGHT) and
-        # its first-era ranged rung (BARBARIAN_HORSE_ARCHER), ladder positions
-        _bc = [int(x) for x in rules.combat["barbCavalryTypes"]]
-        self._barb_cav_first_idx, self._barb_horseman_idx, self._barb_knight_idx = _bc
-        self._barb_cav_ranged_idx = int(rules.combat["barbCavalryRanged"])
-        self._barb_horse_res = int(rules.combat["barbHorseRes"])
-        self._barb_horse_range = int(rules.combat["barbHorseRange"])
         # EMBARK: the Classical embarked pool, the rungs that raise it, the
         # Mathematics rung every hull and passenger reads, and the
         # embark/ocean tech gate indices (military embarks on SHIPBUILDING,

@@ -730,7 +730,7 @@ class SimPhase:
         best = key.min(dim=1).values
         spot = key.min(dim=1).indices
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
-        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), ladder=False, seat=FREE_SEAT, home=home)
+        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home)
 
     def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
         """[B] long — `freeCityGrantType` in the games of `due`: ONE weighted

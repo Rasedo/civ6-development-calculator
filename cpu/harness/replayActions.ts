@@ -46,7 +46,8 @@ export type Decision = Base & (
   | { kind: 'buyPlot'; player: number; city: number; plot: number }
   | { kind: 'buyBuilding'; player: number; city: number; building: number; currency: 'gold' | 'faith' }
   | { kind: 'buyUnit'; player: number; city: number; type: number; unit: string; currency: 'gold' | 'faith' }
-  | { kind: 'improve'; player: number; plot: number; improvement: number }
+  /** `unit`: the unit that laid it (the log's acting unit of its owner), where named */
+  | { kind: 'improve'; player: number; plot: number; improvement: number; unit?: string }
   | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' }
   /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
    *  down, standing on a wonder under construction) */
@@ -94,7 +95,9 @@ export type Decision = Base & (
   | { kind: 'camp'; player: number; plot: number; unit: string }
   | { kind: 'village'; player: number; plot: number; gold: number; faith: number; techBoosts: number[]; civicBoosts: number[];
       /** the city a citizen the village gave joined, -1 none */
-      popCity: number }
+      popCity: number;
+      /** the unit that entered (`GoodyHutReward`'s unit), where the log names it */
+      unit?: string }
 );
 
 export type DecisionKind = Decision['kind'];
@@ -389,11 +392,12 @@ export class InferredActions implements ActionSource {
       out.push({ kind: 'unitGone', phase: phaseOf(u.owner), player: u.owner, unit: k, why });
     }
 
-    // the barbarian camps cleared: the major's unit standing on the plot
+    // the barbarian camps cleared: the unit standing on the plot, a major's or
+    // a city-state's (runs/h1_duelw1124 t20: a city-state's unit cleared 624)
     const camp = cat.improvements.indexOf('IMPROVEMENT_BARBARIAN_CAMP');
     for (let i = 0; camp >= 0 && i < W * b.head.H; i++) {
       if (plotAt(a, i)[P.improvement] !== camp || plotAt(b, i)[P.improvement] === camp) continue;
-      const by = b.units.find((u) => u.y * W + u.x === i && b.players.some((p) => p.id === u.owner && bool(p.major)));
+      const by = b.units.find((u) => u.y * W + u.x === i && b.players.some((p) => p.id === u.owner && (bool(p.major) || bool(p.minor))));
       if (by) out.push({ kind: 'camp', phase: phaseOf(by.owner), player: by.owner, plot: i, unit: unitKey(by) });
     }
 
@@ -482,7 +486,7 @@ const PURCHASE_PLOT = gameHash('PLOT');
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
 const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged']);
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged', 'GoodyHutReward']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -551,8 +555,12 @@ export class RecordedActions implements ActionSource {
     const units1 = new Map(b.units.map((u) => [unitKey(u), u]));
     const completed = new Set<string>();
     const bought = new Map<string, number>();
+    // each player's unit the log last set acting: the one an improvement laid
+    // next is its work
+    const acting = new Map<number, string>();
     for (const r of ev) {
       const name = r[2];
+      if (name === 'UnitActivityChanged') acting.set(n(r, 0), `${n(r, 0)}:${n(r, 1)}`);
       if (name === 'CityAddedToMap') {
         const plot = n(r, 3) * W + n(r, 2);
         const inf = inferred.find((d) => d.kind === 'found' && d.plot === plot) as Extract<Decision, { kind: 'found' }> | undefined;
@@ -577,7 +585,8 @@ export class RecordedActions implements ActionSource {
         // the record t+1 plot must still carry it: one laid and gone again
         // across the pair leaves nothing to land
         if (/GOODY|BARBARIAN/.test(cat.improvements[imp] ?? '') || owner < 0 || plotAt(b, plot)[P.improvement] !== imp) continue;
-        put('improve', `${plot}:${imp}`, { kind: 'improve', phase: phaseOf(owner), player: owner, plot, improvement: imp });
+        const by = acting.get(owner);
+        put('improve', `${plot}:${imp}`, { kind: 'improve', phase: phaseOf(owner), player: owner, plot, improvement: imp, ...(by ? { unit: by } : {}) });
       } else if (name === 'UnitRemovedFromMap') {
         removed = `${n(r, 0)}:${n(r, 1)}`;
       } else if (name === 'UnitUpgraded') {
@@ -682,6 +691,13 @@ export class RecordedActions implements ActionSource {
         out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k });
       });
     }
+    // the unit each village rewarded: `GoodyHutReward` (player, unit, type,
+    // sub type), in the log's order, to its player's villages in plot order
+    for (const r of ev) {
+      if (r[2] !== 'GoodyHutReward') continue;
+      const v = inferred.find((d): d is Extract<Decision, { kind: 'village' }> => d.kind === 'village' && d.player === n(r, 0) && !d.unit);
+      if (v) v.unit = `${n(r, 0)}:${n(r, 1)}`;
+    }
     const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     for (const r of ev) {
       if (r[2] !== 'UnitAddedToMap') continue;
@@ -717,7 +733,7 @@ export class RecordedActions implements ActionSource {
     };
     const same = (x: Decision, y: Decision) => {
       if (x.kind === 'queue' && y.kind === 'queue') return !!x.items[0] && !!y.items[0] && x.items[0].kind === y.items[0].kind && x.items[0].row === y.items[0].row;
-      return JSON.stringify({ ...x, phase: 0 }) === JSON.stringify({ ...y, phase: 0 });
+      return JSON.stringify({ ...x, phase: 0, unit: 0 }) === JSON.stringify({ ...y, phase: 0, unit: 0 });
     };
     // an upgrade is neither the old unit's loss nor the new one's arrival
     const upgraded = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.unit, d.into] : [])));

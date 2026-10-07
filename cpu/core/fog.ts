@@ -1,7 +1,8 @@
 
 import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
-import { citiesOf, civOf, isCiv, leaderOf, seatOf, seatsAllied, tileSeat, unitsOf } from './seats';
+import { citiesOf, civOf, isCityStateSeat, isCiv, leaderOf, seatOf, seatsAllied, tileSeat, unitsOf } from './seats';
+import { hasMet, meetCityState } from './cityStates';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
 import { tilesWithin, hexDistance, axialDelta, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
@@ -118,6 +119,19 @@ export function revealAround(
   // so tracking it would be write-only state (and a digest liability).
   if (!isCiv(seat)) return;
   const { found, wonders } = liftFog(state, seat, tileIndex, radius, los);
+  // A city-state is MET the moment this look takes in a plot of its
+  // territory, in the move that does (runs/h1_duelw1121 t6: Rome's Scout
+  // two plots from Antananarivo's border, three from its centre, met it —
+  // the first meeting's envoy in record t7)
+  if (state.cityStates.length) {
+    const t = state.map.tiles[tileIndex];
+    for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
+      const owner = tileSeat(n);
+      if (!isCityStateSeat(owner) || (los && !canSee(state.map, t, n, los.seeThrough))) continue;
+      const cs = state.cityStates.find((c) => c.seat === owner);
+      if (cs && !hasMet(cs, seat)) meetCityState(state, cs, seat);
+    }
+  }
   // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
   // a new Continent or natural wonder" — one continent here, so wonders are
   // the whole event.

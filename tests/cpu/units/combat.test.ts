@@ -13,6 +13,7 @@ import {
   promoAvailable, promoReady, takePromotion, promoCS, unitPromoRows,
 } from '../../../cpu/core/promotions';
 import { routePlunderer } from '../../../cpu/core/trade';
+import { barbarianTechs, raiseCamp } from '../../../cpu/core/barbarians';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { neighbors } from '../../../world/hex';
 import { isWater } from '../../../world/query';
@@ -108,19 +109,13 @@ describe('combat', () => {
   it('a coastal camp fields a barbarian hull, on water', () => {
     const state = makeState(makeMap(20, 20));
     state.unitsMode = true;
-    settleAt(state, tileAtCoords(state.map, 9, 9).index);
-    // A reachable coast makes it a PIRATE camp; the raid rotation reaches its
-    // CLASS slot when (campNo + turn) % 3 === 0.
-    state.turn = 3;
+    barbarianTechs(state);
+    // a shore with four water plots round it, one no lake: a NAVAL tribe,
+    // whose scout is its naval melee hull (BarbarianTribes TRIBE_NAVAL)
     const camp1 = tileAtCoords(state.map, 15, 15);
-    state.barbSeat.camps.push(camp1.index);
-    for (const n of neighbors(state.map, camp1)) n.terrain = 'COAST';
-
-    let galley: ReturnType<typeof spawnUnit> = null;
-    for (let i = 0; i < 400 && !galley; i++) {
-      barbarianPhase(state);
-      galley = state.units.find((u) => isBarbSeat(u.seat) && u.type === 'GALLEY') ?? null;
-    }
+    for (const n of neighbors(state.map, camp1).slice(0, 4)) n.terrain = 'COAST';
+    raiseCamp(state, camp1.index);
+    const galley = state.units.find((u) => isBarbSeat(u.seat) && u.type === 'GALLEY') ?? null;
     expect(galley).not.toBeNull();
     expect(isWater(state.map.tiles[galley!.tileIndex])).toBe(true);
   });

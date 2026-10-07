@@ -3734,8 +3734,8 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
     }),
     // THE BARBARIANS' OWN CAVALRY, appended last. CIV6 (Units.xml): both carry
     // TraitType TRAIT_BARBARIAN_BUT_SHOWS_UP_IN_PEDIA, a trait no civilization
-    // holds, so a camp alone fields them (`barbCavalryType`,
-    // `barbCavalryRangedType`). The Horseman is CLASS_LIGHT_CAVALRY with no
+    // holds, so a camp alone fields them (the tribes' class tags,
+    // `BARB_TAG_UNITS`). The Horseman is CLASS_LIGHT_CAVALRY with no
     // PrereqTech and no StrategicResource; the Horse Archer CLASS_RANGED_CAVALRY
     // and CLASS_MOBILE_RANGED, ZoneOfControl false.
     U({

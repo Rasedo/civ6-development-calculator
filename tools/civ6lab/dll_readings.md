@@ -1554,21 +1554,50 @@ PURCHASE_DIVISOR (+0x5b0). Check: runs/h1_duelw1117 China t25, Slinger
 the chassis' catalog cost (a LAB line: whether 0x4f2b20 carries the player's
 own unit-cost percents).
 
-## H-1: the barbarians' turn (0x1514a0) — PARTLY READ
+## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)
 
-The barbarian manager's turn: 0x14f530, the camp step 0x14fcc0, each tribe's
-turn 0x1488a0 ("[BarbarianTribe_Instance] Conversion Point Chance", "Tech
-Steal Cooldown", "Barbarian Ranged unit roll" rand(100) per unit it raises),
-then the clans' 0x8e1bf0. The camp step: a target of max camps (+0x110) ×
-the land plots no major has seen over all land plots (0x50b2d0 on hash
-0x253718b0), less the camps standing (+0x170); the first placement adds
-BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33) % of it, every later
-turn one; each camp a weighted pick over the scored regions ("Barbarian camp
-region placement", the "Barbarian Camp Evaluation" jobs at +0x620), a plot in
-it ("Barbarian camp location"), a tribe ("Barb Tribe Roll" 0x152460).
-runs/h1_duelw1117: camps on t1-4 and t8 only. The engines keep their own
-camp and raid rolls (8%, 10%: `BARB_CAMP_SPAWN_PCT`, `BARB_RAID_PCT`) on
-integer draws — a BUILD line.
+The barbarian manager's turn (`barbarianRules`, cpu/core/barbarians.ts;
+`_barbarian_rules`, gpu/core/sim_barb.py), first in the turn's close: the
+techs, the camp step, each living tribe's turn in the tribes' order, then the
+clans' 0x8e1bf0 (no clans in these games).
+
+- Techs 0x14f530: the BarbarianFree techs (SAILING, BRONZE_WORKING,
+  SHIPBUILDING) and any tech or civic at least max(1, (BARBARIAN_TECH_PERCENT
+  50 x living majors + 50) / 100) living majors hold.
+- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major
+  sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps
+  (+0x170); the first step that adds adds
+  BARBARIAN_CAMP_FIRST_TURN_PERCENT_OF_TARGET_TO_ADD (33) % of it, every later
+  one 1. The regions are the continents of more than 10 plots; each keeps its
+  best-scored plots (stable order). "Barbarian camp region placement" weighs
+  the regions at the global top score by their plot counts, "Barbarian camp
+  location" is uniform over the region's plots, the region's weight goes to
+  0; adding more than one, a plot within 7 of a tribe is passed over.
+- Plot score 0x151fa0: unowned, seen by no major or minor, camp terrain and
+  feature, no resource the barbarians see; no major city nearer than 4, no
+  camp within 7; score = max(0, nearest + second-nearest tribe distance, dead
+  tribes counted) + the farthest major city within 7.
+- Tribe kind 0x154220: the first BarbarianTribes row the camp meets — NAVAL
+  on a landmass under 15 plots or with 4 water neighbours one not lake,
+  CAVALRY with an unowned Horses plot within ResourceRange 3, else MELEE.
+  "Barb Tribe Roll" 0x152460 draws over the kind's names no tribe holds.
+- Tribe init 0x147fc0: a CLASS_ANTI_CAVALRY defender on the camp, the scouts
+  within 3; the unit chooser 0x147470 takes the first unit of the highest
+  Combat in the tag that the barbarians' techs and civics allow; placement
+  walks rings 0x69010 (the centre, then each ring from axial corner
+  (0,1),(-1,0),(1,-1),(0,-1),(1,0),(-1,1) along sides 1,2,0,4,5,3).
+- Tribe turn 0x1488a0: the clock counts to TurnsToWarriorSpawn (speed
+  scaled) and resets; under 5 units "Barbarian Ranged unit roll" rand(100) <
+  PercentRangedUnits (BARBARIAN_NAVAL_2 100) picks ranged, else melee; off a
+  spawn turn a tribe short of its 1 scout counts 5 turns and raises one.
+- Raids are AI operations (0x1497d0 -> 0x7265b0): not read; the action replay
+  imposes their units.
+
+LAB: the max camps at +0x110 is taken as 3 per living major, a fit to the
+recorded camp counts; its writer is unread. The sight the score and
+the target read is the engines' line of sight plus each centre's two rings
+and each owned plot's ring — a fit; the t1 picks also hang on the game's
+continent partition, which the dumps do not record.
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 

@@ -273,6 +273,25 @@ def _treaty_clock_line(sim, b: int, seat: int) -> list[int]:
     return [x for p in pairs for x in p]
 
 
+def _barb_tribes_row(sim, b: int) -> list[int]:
+    """`barbTribes`: whether the camp step has added once, each tribe in order
+    (plot, alive, kind, name, its two clocks, the living units and scouts it
+    raised), then the barbarians' techs and civics, each behind its length."""
+    lo, hi = sim.POOL_LO["barb"], sim.POOL_HI["barb"]
+    alive = sim.unit_alive[b, lo:hi].tolist()
+    tribe = sim.barb_unit_tribe[b].tolist()
+    scout = sim.barb_unit_scout[b].tolist()
+    row = [int(sim.barb_camps_begun[b]), int(sim.n_tribes[b])]
+    for k in range(int(sim.n_tribes[b])):
+        units = sum(1 for a, t, sc in zip(alive, tribe, scout) if a and t == k and not sc)
+        scouts = sum(1 for a, t, sc in zip(alive, tribe, scout) if a and t == k and sc)
+        row += [int(sim.tribe_plot[b, k]), int(sim.tribe_alive[b, k]), int(sim.tribe_kind[b, k]),
+                int(sim.tribe_name[b, k]), int(sim.tribe_spawn[b, k]), int(sim.tribe_scoutc[b, k]), units, scouts]
+    techs = sim.barb_techs[b].nonzero().flatten().tolist()
+    civics = sim.barb_civics[b].nonzero().flatten().tolist()
+    return row + [len(techs), *techs, len(civics), *civics]
+
+
 GAME = {
     "turn": lambda sim, b, rows: [sim.turn],
     "rng": lambda sim, b, rows: [int(sim.rng_state[b])],
@@ -303,6 +322,7 @@ GAME = {
     # vary), then the offer, price and passed-by vectors (one per class)
     "greatPeopleByClass": lambda sim, b, rows: [_gp_by_class(sim, b)],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
+    "barbTribes": lambda sim, b, rows: [_barb_tribes_row(sim, b)],
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],

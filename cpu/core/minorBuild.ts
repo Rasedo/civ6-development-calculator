@@ -104,7 +104,7 @@ export function minorPhase(state: GameState): void {
     minorTrade(state, cityState);
     const city = minorCity(cityState);
     cityStrikes(state, city, centreStrength(state, city));
-    minorWalk(state, cityState);
+    if (!walkHeld) minorWalk(state, cityState);
     cityState.armySeen = minorMilitary(state, cityState).length;
   }
 }
@@ -392,6 +392,14 @@ function minorAnyResource(): boolean {
   return CIV_LEVELS.CITY_STATE.ignoresUnitStrategicResourceRequirements;
 }
 
+/** THE ACTION REPLAY'S HOLD on the minors' armies: a city-state's moves and
+ *  battles are its AI's, which the record carries, so its walk sits out.
+ *  False outside a replay. */
+let walkHeld = false;
+export function holdMinorWalk(on: boolean): void {
+  walkHeld = on;
+}
+
 /**
  * THE MINOR'S WALKER (`walkUnit`, C-38's census): each land military unit, in
  * unit order, walks around the minor's centre on the peace or the war tables
@@ -441,14 +449,20 @@ function minorBuilders(state: GameState, cityState: CityState): void {
     if (picks.length === 0) continue;
     if (randRange(state, 1000, 'Engine: minor builders') >= MINOR_BUILDER_RATE_PERMILLE) continue;
     const [ti, imp] = picks[randRange(state, picks.length, 'Engine: minor builders')];
-    const tile = state.map.tiles[ti];
-    u.tileIndex = ti;
-    tile.improvement = imp;
-    tile.pillaged = false;
-    u.charges = (u.charges ?? 0) - 1;
-    u.movesLeft = 0;
-    if (u.charges <= 0) disbandUnit(state, u.id);
+    minorBuilderLays(state, u, ti, imp);
   }
+}
+
+/** A MINOR'S BUILDER LAYS AN IMPROVEMENT: it stands on the plot, spends a
+ *  charge and its turn, and is gone with its last charge. */
+export function minorBuilderLays(state: GameState, u: Unit, plot: number, imp: string): void {
+  const tile = state.map.tiles[plot];
+  u.tileIndex = plot;
+  tile.improvement = imp;
+  tile.pillaged = false;
+  u.charges = (u.charges ?? 0) - 1;
+  u.movesLeft = 0;
+  if (u.charges <= 0) disbandUnit(state, u.id);
 }
 
 /** The (plot, improvement) pairs a minor's Builder may lay this turn. */

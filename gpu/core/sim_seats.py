@@ -14889,10 +14889,7 @@ class SimSeats:
             return
         B, S, dev = self.B, self.S, self.device
         rr = self.rules.citystate
-        csc = self.citystate_center[:, :S].clamp(min=0)
-        met = self.seat_citystate_met[:, row, :S]
-        newly = active.unsqueeze(1) & self.citystate_alive[:, :S] & ~met & self._explored_at(row, csc)
-        self.seat_citystate_met[:, row, :S] = met | newly
+        self._meet_citystates(active.nonzero(as_tuple=True)[0], row)
         met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.count_nonzero()):

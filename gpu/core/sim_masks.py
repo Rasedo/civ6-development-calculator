@@ -2579,15 +2579,16 @@ class SimMasks:
     def _seat_tech(self, seat: torch.Tensor, tech: int) -> torch.Tensor:
         """[B] bool — does the seat named per game in `seat` hold tech `tech`?
 
-        `seat` is an ABSOLUTE seat; anything outside the major rows (a barbarian, a
-        city-state, NO_SEAT) holds no tech, and a `tech` the rules table does
-        not define is False everywhere. The research planes are the merged
-        `civ_techs[:, row]` block, so no seat needs an arm of its own."""
+        `seat` is an ABSOLUTE seat: a major reads its row of `civ_techs`, the
+        barbarians their own (`barb_techs`, `barbarianTechs`); a city-state or
+        NO_SEAT holds none here, and a `tech` the rules table does not define
+        is False everywhere."""
         if tech < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         rows = seat.clamp(min=0, max=self.n_majors - 1)
         bidx = torch.arange(self.B, device=self.device)
-        return (seat >= 0) & (seat < self.n_majors) & self.civ_techs[bidx, rows, tech]
+        return (((seat >= 0) & (seat < self.n_majors) & self.civ_techs[bidx, rows, tech])
+                | ((seat == BARB_SEAT) & self.barb_techs[:, tech]))
 
     def _ocean_open(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] bool — may the seat named per game put a hull on OCEAN: its
@@ -2694,20 +2695,23 @@ class SimMasks:
         return torch.where(self.unit_water_walk[ut],
                            land_ok | self.wpass.gather(1, dc).squeeze(1), out)
 
-    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor, naval: bool = False, ladder: bool = True,
-                    seat: int = BARB_SEAT, home: torch.Tensor | None = None) -> torch.Tensor:
+    def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor,
+                    seat: int = BARB_SEAT, home: torch.Tensor | None = None, cart: torch.Tensor | None = None,
+                    naval_rows: torch.Tensor | None = None) -> torch.Tensor:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
-        seat walks. With `ladder` off, `unit_type` may be [B] roster indices,
+        seat walks. `unit_type` is a roster index or [B] roster indices,
         one per game; `home` [B] is the id of the Free City a grant comes from
-        (`unit_free_city`), -1 on every other spawn. Returns the games where
+        (`unit_free_city`), -1 on every other spawn; `naval_rows` [B] names
+        the games whose unit is a hull where it varies per game, `cart` [B]
+        the games whose owner may put one on OCEAN. Returns the games where
         the unit landed."""
         if not bool(mask.count_nonzero()):
             return mask & False
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
-        _nm = torch.ones(self.B, dtype=torch.bool, device=self.device) if naval else None
-        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm)
+        _nm = naval_rows
+        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm, cart=cart)
         can = mask & found
         if not bool(can.count_nonzero()):
             return can
@@ -2716,9 +2720,12 @@ class SimMasks:
         assert int(slot.max()) < simbase.BARB_POOL_MAX, "barbarian slot pool exhausted — raise simbase.BARB_POOL_MAX"
         self.barb_unit_alive[rows, slot] = True
         self.barb_unit_seat[rows, slot] = seat
-        self.barb_unit_type[rows, slot] = int(self._barb_ladder[unit_type]) if ladder else (
+        self.barb_unit_type[rows, slot] = (
             unit_type[rows] if isinstance(unit_type, torch.Tensor) else unit_type)
         self.barb_unit_free_city[rows, slot] = -1 if home is None else home[rows]
+        # no tribe's until the raise that made it says so (`_barb_raise`)
+        self.barb_unit_tribe[rows, slot] = -1
+        self.barb_unit_scout[rows, slot] = False
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat["unitHp"]
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug
@@ -2857,6 +2864,13 @@ class SimMasks:
                             if not bool((seen[i] & self.nwonder[b] & (self.feat_id[b] == f)).count_nonzero()))
                 kandy.extend([(b, g)] * (fresh * k))
         self.seat_explored[rows, seat_row] |= disk
+        # a minor is MET the moment the look takes in a plot of its
+        # territory (`revealAround`'s meeting)
+        if self.S > 0:
+            _own = self.tile_seat[rows]
+            _seen = torch.stack([(disk & (_own == 100 + s)).any(dim=1) for s in range(self.S)], dim=1)
+            if bool(_seen.count_nonzero()):
+                self._meet_citystates(rows, seat_row, _seen)
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
         # discover a new Continent or natural wonder" — one continent here,
         # so wonders are the whole event.
@@ -2950,6 +2964,40 @@ class SimMasks:
         pick = torch.where(up < BIG, up, lo)
         on_tunnel = tun.gather(1, tiles.clamp(min=0).unsqueeze(1)).squeeze(1)
         return torch.where(on_tunnel & (pick < BIG) & (tiles >= 0), pick, out)
+
+    def _meet_citystates(self, rows: torch.Tensor, seat_row, seen: torch.Tensor | None = None) -> None:
+        """`meetCityState` for every live minor `seen` ([K, S]; None: its
+        centre out of `seat_row`'s fog, the seat start's test) in the games
+        `rows` ([K] batch indices, unique): each newly met; a minor no major
+        had met takes the meeter's INFLUENCE_TOKENS_FREE_FOR_FIRST_PLAYER_MEET
+        envoys, the influence landing as `addEnvoys` lands it (the suzerains,
+        then the ground)."""
+        S = self.S
+        if S == 0 or rows.numel() == 0:
+            return
+        sr = seat_row if torch.is_tensor(seat_row) else torch.full_like(rows, int(seat_row))
+        centre = self.citystate_center[rows, :S]
+        if seen is None:
+            if self.fog_of_war:
+                seen = self.seat_explored[rows, sr].gather(1, centre.clamp(min=0))
+            else:
+                seen = torch.ones_like(centre, dtype=torch.bool)
+        met = self.seat_citystate_met[rows, sr, :S]
+        newly = seen & (centre >= 0) & self.citystate_alive[rows, :S] & ~met
+        if not bool(newly.count_nonzero()):
+            return
+        first = newly & ~self.seat_citystate_met[rows, : self.n_majors, :S].any(dim=1)
+        self.seat_citystate_met[rows, sr, :S] = met | newly
+        if not bool(first.count_nonzero()):
+            return
+        n = int(self.rules.citystate["firstMeetEnvoys"])
+        env = self.seat_citystate_envoys[rows, sr, :S]
+        self.seat_citystate_envoys[rows, sr, :S] = env + first.to(env.dtype) * n
+        self._cs_resolve_suzerain()
+        games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        games[rows] = first.any(dim=1)
+        self._minor_envoy_tiles(games)
+        self._eff_version += 1
 
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
         if not self.fog_of_war:
@@ -3588,6 +3636,8 @@ class SimMasks:
             camps[k:-1] = camps[k + 1 :].clone()
             camps[-1] = -1
             self.n_camps[b] -= 1
+            # its tribe is dead, kept in the list (`tribeDies`)
+            self.tribe_alive[b] &= ~(self.tribe_plot[b] == tile[b])
             self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal
             _s = int(seat[b])
             if 0 <= _s < self.n_majors:
