@@ -279,7 +279,7 @@ export function foundCityAt(state: GameState, seat: number, tile: Tile, owner: S
   // a major's city past its capital draws its name ("Choosing a City Name",
   // 0x328de0): ONE draw over the first CITY_NAME_CHOICES unused names
   // weighted n, n - 1, ... 1 (the engines keep their own name list)
-  if (seat < state.seats.length && list.length > 0) randRange(state, CITY_NAME_DRAW);
+  if (seat < state.seats.length && list.length > 0) randRange(state, CITY_NAME_DRAW, 'Choosing a City Name');
   const id = owner ? owner.nextCityId++ : seatOf(state, seat)!.nextCityId++;
   const city: City = {
     id,
@@ -1528,14 +1528,22 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
 
 /**
  * ONE GAME TURN, as Civ 6 runs it (tools/civ6lab/turn_order_civ6.md,
- * runs/turnorder/): the players one at a time in ascending player id — the
- * majors, the city-states, the Free Cities, the barbarians (16 of 16 turns);
- * then the World Congress session and the heal of every unit and every city,
- * both before the counter moves; then, on the new turn, the storms, the
- * volcano roll and the random event (`disasterPhase`), the climate step, the
- * era and Ages, and the victory checks.
+ * runs/turnorder/): the turn's random-event step — the storms, the volcano
+ * roll and the random event (`disasterPhase`) — and the climate step, which
+ * the game takes after every player's actions of the turn before and before
+ * the first player's start (its draw log, `Logs/RandCalls.csv`: runs/
+ * h1_duelw1117 t40's last "Unit Combat Damage" and "Random Direction" draws,
+ * then t41's volcano roll and event roll, then player 0's start); then the
+ * players' starts one
+ * at a time in ascending player id — the majors, the city-states, the Free
+ * Cities, the barbarians (16 of 16 turns); then the World Congress session
+ * and the heal of every unit and every city, before the counter moves; then,
+ * on the new turn, the era and Ages, and the victory checks. The majors'
+ * actions follow, between two turns.
  */
 export function endTurn(state: GameState): void {
+  if (state.disasters) disasterPhase(state);
+  climateTurn(state);
   seatPhase(state);
   minorPhase(state);
   freeCitiesPhase(state);
@@ -1546,8 +1554,6 @@ export function endTurn(state: GameState): void {
   healCities(state);
 
   state.turn += 1;
-  if (state.disasters) disasterPhase(state);
-  climateTurn(state);
   recordMoments(state);
   if (gameEraTurn(state)) eraInspirations(state);
   // THE EXOPLANET FLIGHT — CIV6: the craft covers 1 light-year/turn plus one
@@ -1689,8 +1695,8 @@ export function grantEraBoosts(state: GameState, seat: number, era: string): voi
   let civics = 0;
   for (const r of rows) { techs += r.techs; civics += r.civics; }
   const e = ERAS.indexOf(era as never);
-  drawBoosts(state, seat, boostPool(rsr, 'tech', e, e), techs);
-  drawBoosts(state, seat, boostPool(rsr, 'civic', e, e), civics);
+  drawBoosts(state, seat, 'tech', boostPool(rsr, 'tech', e, e), techs);
+  drawBoosts(state, seat, 'civic', boostPool(rsr, 'civic', e, e), civics);
 }
 
 /**
@@ -1707,7 +1713,7 @@ function eraInspirations(state: GameState): void {
   for (let seat = 0; seat < state.seats.length; seat++) {
     const sx = seatOf(state, seat);
     if (!sx || !suzerainEffect(state, seat, 'eraInspiration')) continue;
-    if (drawBoosts(state, seat, boostPool(sx.research, 'civic', era, era), 1)) {
+    if (drawBoosts(state, seat, 'civic', boostPool(sx.research, 'civic', era, era), 1)) {
       dedicationEvent(state, seat, DED_PEN_BRUSH_AND_VOICE);
     }
   }

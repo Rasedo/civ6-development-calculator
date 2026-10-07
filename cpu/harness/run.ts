@@ -22,8 +22,8 @@ import { advanceHistory, importTurn, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
 import { loadRandLog, randLogPath } from './randLog';
-import { streamLedger, turnDraws, type DrawLedger } from './drawLedger';
-import { rngHolds } from '../core/rand';
+import { turnDraws, type DrawLedger } from './drawLedger';
+import { lastStreamLedger } from './streamHold';
 import { replayMarkdown, runReplay } from './replay';
 
 interface Tally {
@@ -182,13 +182,20 @@ function main() {
   if (!dump) throw new Error('usage: run.ts <dump.jsonl> [--out file | --replay file] [--from T] [--to T]');
   if (opt.replay) {
     const r = runReplay(dump, { from: opt.from ? Number(opt.from) : undefined, to: opt.to ? Number(opt.to) : undefined });
-    // the engine's draws between the held points against the game's
-    const logPath = randLogPath(dump);
-    const holds = rngHolds();
-    const streams = streamLedger(holds, logPath ? loadRandLog(logPath, holds.map((h) => h.held)) : undefined);
+    // the engine's draws against the game's log, label by label
+    const streams = lastStreamLedger();
     writeFileSync(opt.replay, JSON.stringify({ ...r, streams }, null, 1) + '\n');
-    console.log(`streams: ${streams.exact} / ${streams.stretches} stretches between held points drew as the game did;`
-      + ` turns off: ${streams.turns.filter((t) => t.engine !== t.game).length} of ${streams.turns.length}; by point ${JSON.stringify(streams.byKind)}`);
+    if (streams) {
+      console.log(`streams (${streams.draws ? 'every labelled draw held' : 'the points alone held'}): ${streams.exact} / ${streams.stretches}`
+        + ` windows drew the game's rule draws exactly, by point ${JSON.stringify(streams.byKind)}; ${streams.points} points held;`
+        + ` covered turns ${streams.turns}: engine ${streams.engineDraws} draws, the log ${streams.loggedDraws}; turns off ${streams.turnsOff.length}`);
+      console.log(`steps off by their first difference: ${JSON.stringify(Object.fromEntries(Object.entries(streams.stepsOff).map(([k, v]) => [k, v.length] as const).sort((a, b) => b[1] - a[1])))}`);
+      console.log('label'.padEnd(52), 'owner'.padEnd(8), ['logged', 'engine', 'window', 'displ', 'rangeOff', 'unlogged', 'missing'].map((x) => x.padStart(8)).join(''));
+      for (const [k, t] of Object.entries(streams.byLabel)) {
+        console.log(k.slice(0, 52).padEnd(52), t.owner.padEnd(8),
+          [t.logged, t.engine, t.inWindow, t.displaced, t.rangeOff, t.unlogged, t.missing].map((x) => String(x).padStart(8)).join(''));
+      }
+    }
     writeFileSync(opt.replay.replace(/\.json$/, '.md'), replayMarkdown(r));
     console.log(`replay (${r.source}): ${r.perTurn.length} pairs, turns ${r.turns.join('-')}${r.stopped ? `; stopped: ${r.stopped}` : ''} -> ${opt.replay}`);
     console.log(`every subsystem held, nothing imposed: ${r.cleanEvery} pairs`);

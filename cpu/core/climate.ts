@@ -382,7 +382,7 @@ export function removeFertility(state: GameState, tile: Tile): void {
     if (c <= 0) continue;
     const x = chance * c;
     const q = Math.floor(x / 100);
-    const n = randRange(state, 100) < x - 100 * q ? q + 1 : q;
+    const n = randRange(state, 100, 'Remove Fertility Chance') < x - 100 * q ? q + 1 : q;
     tile[key] = Math.max(0, c - n);
   }
 }

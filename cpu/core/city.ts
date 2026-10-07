@@ -895,7 +895,7 @@ export function pickBorderTile(state: GameState, city: City, ctx?: YieldCtx): nu
 export function drawBorderPlot(state: GameState, city: City, ctx?: YieldCtx): number | null {
   const ties = borderBestPlots(state, city, ctx);
   if (ties.length === 0) return null;
-  return ties[randRange(state, ties.length)];
+  return ties[randRange(state, ties.length, 'GetNextBuyablePlot picker')];
 }
 
 /** A plot joins the city: its owner, and the seat's sight of it. A purchase

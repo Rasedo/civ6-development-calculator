@@ -54,7 +54,7 @@ export function grantFreeResearch(state: GameState, owner: Seat, kind: 'tech' | 
   const open = (kind === 'tech' ? [...availableTechsIn(rsr)] : [...availableCivicsIn(rsr)]).sort((a, b) => rank[a.id] - rank[b.id]);
   for (let i = 0; i < n; i++) {
     if (open.length === 0) return; // the tree is exhausted
-    const next = open.splice(randRange(state, open.length), 1)[0];
+    const next = open.splice(randRange(state, open.length, kind === 'tech' ? 'Choosing random tech to grant based on era' : 'Choosing random civic to grant based on era'), 1)[0];
     if (kind === 'tech') {
       if (next.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, owner.seat);
       if (!rsr.techs.includes(next.id)) rsr.techs.push(next.id);
@@ -380,7 +380,7 @@ export function completeQueueItem(
       // runs/h1_duelw1124 t189: the Dynastic Cycle's and its own, over 4 and 3)
       if (fx?.civicBoostsByEra) {
         const e = ERAS.indexOf(fx.civicBoostsByEra.era as never);
-        drawBoosts(state, city.seat, boostPool(owner.research, 'civic', e, e), fx.civicBoostsByEra.amount);
+        drawBoosts(state, city.seat, 'civic', boostPool(owner.research, 'civic', e, e), fx.civicBoostsByEra.amount);
       }
       // CIV6 (Great Library): "Receive boosts to all Ancient and Classical era
       // technologies" — one eureka per technology not already boosted or

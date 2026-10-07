@@ -42,7 +42,7 @@ function draws(s0: number, s1: number, most = 12): number {
 function drawAt(s: number, k: number): number {
   const probe = { rngState: s } as GameState;
   let v = 0;
-  for (let i = 0; i < k; i++) v = randRange(probe, 100);
+  for (let i = 0; i < k; i++) v = randRange(probe, 100, 'Pillage Improvement Chance');
   return v;
 }
 

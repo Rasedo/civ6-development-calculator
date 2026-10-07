@@ -192,7 +192,7 @@ export function boostRandom(
 ): void {
   const owner = seatOf(state, seat);
   if (!owner) return;
-  const k = drawBoosts(state, seat, boostPool(owner.research, kind, lo, hi), n);
+  const k = drawBoosts(state, seat, kind, boostPool(owner.research, kind, lo, hi), n);
   for (let i = 0; i < k; i++) dedicationEvent(state, seat, kind === 'tech' ? DED_FREE_INQUIRY : DED_PEN_BRUSH_AND_VOICE, 1);
 }
 
@@ -207,7 +207,7 @@ function freeTechs(state: GameState, seat: number, n: number): void {
     (d) => !rsr.techs.includes(d.id) && d.prereqs.every((p) => rsr.techs.includes(p)),
   );
   for (let i = 0; i < n && open.length > 0; i++) {
-    const pick = open.splice(randRange(state, open.length), 1)[0];
+    const pick = open.splice(randRange(state, open.length, 'Choosing random tech to grant based on era'), 1)[0];
     if (pick.id === URBAN_DEFENSES_TECH) urbanDefensesFit(state, seat);
     rsr.techs.push(pick.id);
     delete rsr.techRetained[pick.id];

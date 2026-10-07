@@ -24,9 +24,9 @@
  * verb takes it), the recorded outcome of THAT decision is imposed and
  * counted per kind (`fallbacks`), so a divergence can be told apart from a
  * decision the replay could not express. The generator is held on the
- * game's stream (`holdRng`, `gameStream`): each seat's start from its
- * player's witness, the random-event step from the game's draw log where
- * the recording kept it.
+ * game's stream at every draw of its rules (`streamHold`): each seat's start
+ * from its player's witness, the random-event step and each labelled draw
+ * from the game's draw log where the recording kept it.
  */
 import { readFileSync } from 'node:fs';
 import type { City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
@@ -71,9 +71,8 @@ import { num, bool } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
 import { loadRandLog, randLogPath, type RandLog } from './randLog';
-import { loggedStep } from './drawSites';
-import { lcgStep } from './civ6Random';
-import { holdRng, type RngPoint } from '../core/rand';
+import { streamHold } from './streamHold';
+import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId } from './aliases';
 import { InferredActions, RecordedActions, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
@@ -1490,7 +1489,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
-  holdRng(gameStream(recs, first.playerOfSeat, history));
+  const stream = streamHold(first.state, recs, first.playerOfSeat, history);
+  holdRng(stream);
   holdMinorItem(minorItems(recs, cat));
   const state = first.state;
   // the record holds no plot's revealed state: each seat starts on what its
@@ -1539,10 +1539,11 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.paths = new Map();
     traceTurn = b.turn;
     const ds = source.decisions(a, b, cat);
+    stream.actions(a.turn);
     applyPhase(ctx, ds, 'before', b, a);
     const envoysWere = stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
-    // the generator: held at each witnessed point (`gameStream`)
+    // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
     const improvements = state.map.tiles.map((x) => x.improvement ?? null);
@@ -1614,6 +1615,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const claimed = state.claimedPantheons;
     state.claimedPantheons = Object.keys(PANTHEONS);
     const rosters = new Map(state.seats.map((s) => [s.seat, structuredClone(governorsOf(s))]));
+    stream.actions(null);
     try {
       endTurn(state);
     } catch (e) {
@@ -1623,6 +1625,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       state.claimedPantheons = claimed;
     }
     undoGovernorScript(state, rosters);
+    stream.actions(a.turn);
     for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
     // a rested unit struck in a later player's turn heals at its own next
     // turn's start, after the blow (runs/h1_duelw1118 t8: a city-state's
@@ -1782,54 +1785,8 @@ function floodRivers(recs: readonly TurnRecord[], cat: Catalog) {
       if (sev >= 0 && num(e[3]) >= 0) plot.set(`${num(e[0])}:${sev}`, num(e[3]));
     }
   }
-  // the engine's step of turn t is the game's of turn t + 1 (`gameStream`)
+  // the engine's step of turn t is the game's of turn t + 1 (`streamHold`)
   return (state: GameState, sev: number): number | undefined => plot.get(`${state.turn + 1}:${sev}`);
-}
-
-/**
- * THE GAME'S RANDOM STREAM, held at the points the records witness (\`holdRng\`):
- * the engine's seat phase of turn t is each player's start between record t
- * and record t + 1 (the active player's of turn t + 1, the others' of turn
- * t), so each seat, a city-state's included, takes the generator that start
- * began from (its \`PlayerTurnStarted\` witness); the random-event step that follows,
- * the game's step of turn t + 2, takes the state its first draw was taken
- * from — the game's log places it (\`loggedStep\`), else the event replay's
- * start (\`EventReplay.steps\`).
- */
-function gameStream(recs: readonly TurnRecord[], playerOfSeat: Map<number, number>, history: History) {
-  // each player's start between record t and record t + 1: the last one
-  // record t + 1 witnesses — the active player's of turn t + 1, every other
-  // player's of turn t (runs/h1_duelw1117 record 25 holds China's 24 start
-  // at 142670580, and its 25 start, 3965475004, falls after the record)
-  const pre = new Map<string, number>();
-  for (const r of recs) {
-    const last = new Map<number, number>();
-    for (const w of r.witness ?? []) {
-      if (w.point !== 'pre' || typeof w.seed !== 'number' || (last.get(w.player) ?? -Infinity) > w.turn) continue;
-      last.set(w.player, w.turn);
-      pre.set(`${r.turn}:${w.player}`, w.seed >>> 0);
-    }
-  }
-  return (_: GameState, point: RngPoint): number | undefined => {
-    if (point.kind === 'seat') {
-      const player = playerOfSeat.get(point.seat);
-      return player === undefined ? undefined : pre.get(`${point.turn + 1}:${player}`);
-    }
-    const T = point.turn + 1;
-    const gap = history.replay?.gaps.get(T);
-    if (!gap) return undefined;
-    const log = history.randLog;
-    const gapDraws = log?.between(gap[0], gap[1]);
-    if (log && gapDraws) {
-      const b = loggedStep(gapDraws);
-      return b ? log.stateAt(log.index(gap[0])! + b[0]) : undefined;
-    }
-    const at = history.replay?.steps.get(T)?.at ?? -1;
-    if (at < 0) return undefined;
-    let st = gap[0];
-    for (let k = 0; k < at; k++) st = lcgStep(st);
-    return st;
-  };
 }
 
 /** the replay report as Markdown: per subsystem the turns held, the first

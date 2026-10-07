@@ -350,7 +350,7 @@ export function placeGreatWorkIn(state: GameState, cities: WorkCity[], work: Omi
 export function createRelic(state: GameState, seat: number): boolean {
   const made = state.relicsMade ?? 0;
   if (made >= RELIC_COUNT) return false;
-  randRange(state, RELIC_COUNT - made);
+  randRange(state, RELIC_COUNT - made, 'Choosing a Relic');
   state.relicsMade = made + 1;
   if (!placeGreatWorkIn(state, citiesOf(state, seat), { obj: GWO_RELIC, maker: -1, era: -1, seat })) {
     const owner = seatOf(state, seat);

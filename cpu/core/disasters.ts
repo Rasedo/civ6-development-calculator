@@ -8,7 +8,7 @@ import { hasRiver, isCoastalLand, isImpassable, isWater } from '../../world/quer
 import { isFloodplains } from '../../world/features';
 import { TERRAINS } from '../../world/terrains';
 import { RESOURCES } from '../../world/resources';
-import { atRngPoint, randRange, randWeighted } from './rand';
+import { atRngPoint, randRange, randWeighted, type DrawLabel } from './rand';
 import { fogActive, isExplored } from './fog';
 import { seatOf, tileSeat, civOf, leaderOf, civsAtWar, isCiv, cityHolders, drawCitizenName } from './seats';
 import { raiseAidRequest } from './competition';
@@ -41,9 +41,9 @@ function log(state: GameState, text: string): void {
   if (state.eventLog.length > 20) state.eventLog.shift();
 }
 
-function pick<T>(state: GameState, arr: T[]): T | undefined {
+function pick<T>(state: GameState, arr: T[], label: DrawLabel): T | undefined {
   if (arr.length === 0) return undefined;
-  return arr[randRange(state, arr.length)];
+  return arr[randRange(state, arr.length, label)];
 }
 
 /** CIV6 (Reinforced Materials): "This city's improvements, buildings and
@@ -191,7 +191,7 @@ function unitDamageDraws(state: GameState, tile: Tile, naval: boolean, lo: numbe
   for (const u of unitsAt(state, tile.index)) {
     const dom = unitDomain(u.type);
     if (dom === 'air' || dom === 'spy' || dom === 'civilian' || !!UNITS[u.type]?.naval !== naval) continue;
-    out.set(u.id, lo + randRange(state, hi - lo));
+    out.set(u.id, lo + randRange(state, hi - lo, 'Random Event Unit Damage Roll'));
   }
   return out;
 }
@@ -411,7 +411,7 @@ export function floodWeights(degrees: number): number[] {
  *  (`randWeighted`) names the severity by the flood rows' integer weights at
  *  the world's warming. */
 export function floodSeverity(state: GameState): number {
-  return randWeighted(state, floodWeights(warmingDegrees(state)));
+  return randWeighted(state, floodWeights(warmingDegrees(state)), 'Engine: breached dam');
 }
 
 /** A river a flood may strike: the plot its flood STARTS on and every plot
@@ -526,7 +526,7 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
     for (const row of FLOOD_DAMAGE_ROWS[sev]) {
       for (const t of reach) {
         if (floodImmune(state, t)) continue;
-        if (randRange(state, 100) < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
+        if (randRange(state, 100, 'Pillage Improvement Chance') < row.pct) eventDamage(state, t, row.kind, row.lo, row.hi);
       }
     }
   }
@@ -534,7 +534,7 @@ export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   for (const row of FLOOD_YIELD_ROWS[sev]) {
     const pct = mitigated ? Math.floor(((100 - FLOOD_MITIGATED_YIELD_REDUCTION) * row.pct) / 100) : row.pct;
     for (const t of reach) {
-      if (randRange(state, 100) >= pct || t.feature !== row.feature) continue;
+      if (randRange(state, 100, 'Boosted Yield Chance') >= pct || t.feature !== row.feature) continue;
       silt(t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
     }
   }
@@ -618,7 +618,7 @@ export function stormStart(state: GameState, ev: StormEvent): Tile | undefined {
     return ring.length === 6 && ring.some((n) => stormFamilyAt(n) === ev.family);
   });
   if (!cands.length) return undefined;
-  return cands[randRange(state, cands.length)];
+  return cands[randRange(state, cands.length, 'Pick Storm Start Plot')];
 }
 
 /** A city whose reactor can melt down, and its seat. */
@@ -695,7 +695,7 @@ export function droughtStart(state: GameState): Tile | undefined {
   for (const cs of state.cityStates) centres.add(cs.centerIndex);
   const cands = map.tiles.filter((t) => droughtCandidate(map, t, centres, (u) => !!u.stormStruck));
   if (!cands.length) return undefined;
-  return cands[randRange(state, cands.length)];
+  return cands[randRange(state, cands.length, 'Pick Drought Start Plot')];
 }
 
 /**
@@ -731,9 +731,9 @@ export function volcanoRoll(state: GameState): void {
   } else if (active.length === 0) {
     return;
   }
-  if (randRange(state, d) !== 0) return;
+  if (randRange(state, d, 'Active Volcano Roll') !== 0) return;
   const from = wake ? named.filter((t) => !t.volcanoActive) : active;
-  const t = from[randRange(state, from.length)];
+  const t = from[randRange(state, from.length, wake ? 'Choose Inactive Volcano Roll' : 'Choose Active Volcano Roll')];
   t.volcanoActive = wake;
 }
 
@@ -832,7 +832,7 @@ function randomEvent(state: GameState): void {
   // a sea level rise the climate step left waiting is the turn's event by
   // force: the roll is a draw over its one row (`seaRise`)
   if (state.seaRiseFrom !== undefined) {
-    randRange(state, 1);
+    randRange(state, 1, 'Random Event Roll');
     seaRise(state);
     return;
   }
@@ -845,7 +845,7 @@ function randomEvent(state: GameState): void {
     : k.map((t) => sitePairWeight(rows[i], ((t.eventFired ?? 0) >> i) & 1 ? 100 : 100 + FIRST_TIME_OCCURRENCE_BOOST, degrees))));
   let total = 0;
   for (const p of pairs) for (const x of p) total += x;
-  const at = randRange(state, Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total));
+  const at = randRange(state, Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total), 'Random Event Roll');
   let cum = 0;
   for (let i = 0; i < rows.length; i++) {
     for (let k = 0; k < pairs[i].length; k++) {
@@ -918,16 +918,16 @@ function fireEvent(state: GameState, row: EventRow, sites: EventSites, k: number
       // (0x2867f0) — no yield row; its two damage rows (IMPROVEMENT_PILLAGED,
       // DISTRICT_PILLAGED at 101) draw once each on a plot that holds
       // neither
-      const at = pick(state, sites.meteor);
+      const at = pick(state, sites.meteor, 'Pick One Off Start Plot');
       if (!at) return;
-      randRange(state, 100);
-      randRange(state, 100);
+      randRange(state, 100, 'Pillage Improvement Chance');
+      randRange(state, 100, 'Pillage Improvement Chance');
       at.meteor = true;
       log(state, `Meteor shower at (${at.col}, ${at.row}) — a Meteor Site lies there.`);
       return;
     }
     case 'fire': {
-      const at = pick(state, sites.fire[row.sev]);
+      const at = pick(state, sites.fire[row.sev], 'Pick One Off Start Plot');
       if (!at) return;
       fireBirth(state, at, row.sev);
       log(state, `Fire at (${at.col}, ${at.row}).`);
@@ -970,14 +970,14 @@ function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
   const map = state.map;
   if (!barren(t)) {
     if (age === 0) {
-      randRange(state, 100);
+      randRange(state, 100, 'Boosted Yield Chance');
       t.feature = FIRE_BURNING_FEATURE[row] as Tile['feature'];
     } else if (age === FIRE_BURNT_TURN) {
-      randRange(state, 100);
+      randRange(state, 100, 'Boosted Yield Chance');
       t.feature = FIRE_BURNT_FEATURE[row] as Tile['feature'];
       fertilize(t);
     } else if (age === FIRE_REGROW_TURN) {
-      randRange(state, 100);
+      randRange(state, 100, 'Boosted Yield Chance');
       t.feature = FIRE_START_FEATURE[row] as Tile['feature'];
       t.fireStart = undefined;
       t.fireSeq = undefined;
@@ -986,23 +986,23 @@ function fireStrike(state: GameState, t: Tile, row: number, age: number): void {
   }
   const owner = tileSeat(t);
   if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
-    randRange(state, 100);
+    randRange(state, 100, 'Pillage Improvement Chance');
     if (owner >= 0) scorch(state, t);
-    randRange(state, 100);
+    randRange(state, 100, 'Pillage Improvement Chance');
     if (owner >= 0) pillageDistrict(state, t);
   }
   if (age === FIRE_POP_TURN) {
-    randRange(state, 100);
+    randRange(state, 100, 'Pillage Improvement Chance');
     if (owner >= 0) losePopulation(state, t);
   }
   if (age >= FIRE_DAMAGE_TURNS[0] && age <= FIRE_DAMAGE_TURNS[1]) {
-    randRange(state, 100);
+    randRange(state, 100, 'Pillage Improvement Chance');
     strikeUnits(state, t, owner, { land: null, naval: null, civ: true }, null);
-    randRange(state, 100);
+    randRange(state, 100, 'Pillage Improvement Chance');
     strikeUnits(state, t, owner, { land: unitDamageDraws(state, t, false, FIRE_DMG[0], FIRE_DMG[1]), naval: null, civ: false }, null);
   }
   if (age >= FIRE_SPREAD_TURNS[0] && age <= FIRE_SPREAD_TURNS[1]
-      && randRange(state, 100) < Math.round(FIRE_SPREAD_P * 100)) {
+      && randRange(state, 100, 'Pillage Improvement Chance') < Math.round(FIRE_SPREAD_P * 100)) {
     for (const d of RING_DIRS) {
       const n = neighborTile(map, t, d);
       if (n && n.fireStart === undefined && fireCandidate(n, row)) fireBirth(state, n, row);
@@ -1068,10 +1068,10 @@ export function drought(state: GameState, center: Tile, sev: number): void {
  */
 function droughtTile(state: GameState, t: Tile, sev: number, turns: number): void {
   const listed = () => !!t.improvement && DROUGHT_IMPROVEMENTS.includes(t.improvement) && !envImmune(state, t);
-  if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100) < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
+  if (DROUGHT_DESTROY_P[sev] > 0 && randRange(state, 100, 'Pillage Improvement Chance') < Math.round(DROUGHT_DESTROY_P[sev] * 100) && listed()) {
     destroyImprovement(state, t);
   }
-  randRange(state, 100);
+  randRange(state, 100, 'Pillage Improvement Chance');
   if (listed()) t.pillaged = true;
   t.droughtTurns = Math.max(t.droughtTurns, turns);
   removeFertility(state, t);
@@ -1152,7 +1152,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
       for (const n of ring) {
         if (!eruptionReaches(n)) continue;
         if (n.resource && RESOURCES[n.resource].category === 'bonus') n.resource = null;
-        if (randRange(state, 100) < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
+        if (randRange(state, 100, 'Pillage Improvement Chance') < Math.round(p * 100)) eventDamage(state, n, kind, ERUPTION_DMG_LO[row], ERUPTION_DMG_HI[row]);
       }
     }
   }
@@ -1164,7 +1164,7 @@ export function erupt(state: GameState, plots: readonly Tile[], row: number): vo
       if (p <= 0) continue;
       for (const n of ring) {
         if (!soilPaintable(n)) continue;
-        if (randRange(state, 100) >= Math.round(p * 100)) continue;
+        if (randRange(state, 100, 'Fertility Gain Chance') >= Math.round(p * 100)) continue;
         if (n.feature !== 'VOLCANIC_SOIL') paintVolcanicSoil(n);
         silt(n, key);
       }
@@ -1210,7 +1210,7 @@ function eventDamage(state: GameState, tile: Tile, kind: DamageKind, lo: number,
       const held = cityAtIndex(state, tile.index);
       if (!held) return;
       if (kind === 'CITY_WALLS' && outerPool(state, held.city) <= 0) return;
-      const dmg = lo + randRange(state, hi - lo);
+      const dmg = lo + randRange(state, hi - lo, 'Random Event Unit Damage Roll');
       if (kind === 'CITY_GARRISON') hitCityHp(state, tile, dmg);
       else hitCityWalls(state, tile, dmg);
       return;
@@ -1262,7 +1262,7 @@ export function nuclearAccident(state: GameState, seat: number, city: City, sev:
   const roll = new Map<string, number>();
   let land: Map<number, number> | null = null;
   for (const kind of ACCIDENT_ROWS[sev]) {
-    const r = randRange(state, 100);
+    const r = randRange(state, 100, 'Pillage Improvement Chance');
     roll.set(kind, r);
     // the row's applier draws right after it, one per land unit on the plot
     if (kind === 'UNIT_DAMAGE_LAND' && r < Math.round(ACCIDENT_LAND_P[sev] * 100) && t) {
@@ -1375,7 +1375,7 @@ export function stormWalk(state: GameState, s: StormRecord, pct: number): void {
       .map((w) => ({ to: neighborTile(map, c, DIRECTION_TYPES[w.dir]), weight: w.weight }))
       .filter((r) => r.to);
     if (!rows.length) break;
-    const to = rows[randWeighted(state, rows.map((r) => r.weight))].to!;
+    const to = rows[randWeighted(state, rows.map((r) => r.weight), 'Storm Direction')].to!;
     const cost = stormFamilyAt(to) === ev.family ? STORM_STEP_COST_ON : STORM_STEP_COST_OFF;
     if (cost > left) break;
     left -= cost;
@@ -1391,7 +1391,7 @@ export function stormWalk(state: GameState, s: StormRecord, pct: number): void {
  *  the heading the game shows; the engine keeps none of it. */
 function stormPreview(state: GameState, at: number): void {
   const rows = windRowsAt(state.map.tiles[at].row, state.map.height);
-  if (rows.length) randWeighted(state, rows.map((r) => r.weight));
+  if (rows.length) randWeighted(state, rows.map((r) => r.weight), 'Storm Direction Preview');
 }
 
 /**
@@ -1488,13 +1488,13 @@ export function stormPlot(state: GameState, t: Tile, e: number, pct: number): vo
   const lowland = (t.lowland ?? 0) > 0;
   for (const row of rows.dmg) {
     const chance = row.lowland >= 0 && lowland ? row.lowland : Math.floor((row.pct * pct) / 100);
-    if (randRange(state, 100) < chance) eventDamage(state, t, row.kind as DamageKind, row.lo, row.hi, ev);
+    if (randRange(state, 100, 'Pillage Improvement Chance') < chance) eventDamage(state, t, row.kind as DamageKind, row.lo, row.hi, ev);
   }
   if (stormFertilityHalted(state)) {
     if (!barren(t)) removeFertility(state, t);
   } else if (!barren(t)) {
     for (const row of rows.yields) {
-      if (randRange(state, 100) >= Math.floor((row.pct * pct) / 100)) continue;
+      if (randRange(state, 100, 'Boosted Yield Chance') >= Math.floor((row.pct * pct) / 100)) continue;
       silt(t, row.yield === 'YIELD_FOOD' ? 'fertility' : 'fertilityProd');
     }
   }

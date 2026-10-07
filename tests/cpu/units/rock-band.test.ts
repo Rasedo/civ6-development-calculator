@@ -80,7 +80,7 @@ function drawsTaken(before: number, state: GameState): number {
   const probe = { rngState: before } as GameState;
   for (let k = 0; k < 32; k++) {
     if (probe.rngState === state.rngState) return k;
-    randRange(probe, 1);
+    randRange(probe, 1, 'Rolling Concert Result');
   }
   throw new Error('more than 32 draws');
 }
@@ -92,7 +92,7 @@ function seedForTier(level: number, tier: number): number {
   for (let i = 0; i < tier; i++) lo += odds[i];
   const hi = lo + odds[tier];
   for (let s = 1; s < 2_000_000; s++) {
-    const roll = randRange({ rngState: s } as GameState, 1000);
+    const roll = randRange({ rngState: s } as GameState, 1000, 'Rolling Concert Result');
     if (roll >= lo && roll < hi) return s;
   }
   throw new Error(`no rngState lands in tier ${tier} at level ${level}`);
@@ -276,7 +276,7 @@ describe('performing a concert', () => {
     const b = band(state, tile);
     state.rngState = seedForTier(1, 2);
     const after = { rngState: state.rngState } as GameState;
-    randRange(after, 1);
+    randRange(after, 1, 'Rolling Concert Result');
     performConcert(state, b.id, 0);
     expect(state.rngState).toBe(after.rngState);
   });
@@ -348,7 +348,7 @@ describe('the band tree', () => {
     const [o1, o2] = ROCK_BAND_TIER_ODDS;
     let seed = 0;
     for (let s = 1; s < 2_000_000 && !seed; s++) {
-      const roll = randRange({ rngState: s } as GameState, 1000);
+      const roll = randRange({ rngState: s } as GameState, 1000, 'Rolling Concert Result');
       if (roll >= o1[0] + o1[1] && roll < o2[0] + o2[1]) seed = s;
     }
     const plain = band(state, w);

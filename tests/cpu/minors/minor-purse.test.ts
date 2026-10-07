@@ -60,7 +60,7 @@ function pillageForRepair(cs: CityState): void {
 function seek(state: GameState, pred: (r: number) => boolean): void {
   for (let s = 1; s < 1_000_000; s++) {
     state.rngState = s;
-    if (pred(randRange(state, 10000))) {
+    if (pred(randRange(state, 10000, 'Engine: minor buy'))) {
       state.rngState = s;
       return;
     }
@@ -271,7 +271,7 @@ describe('the walker', () => {
     walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);
     expect(u.tileIndex).toBe(cs.centerIndex);
     state.rngState = s0;
-    randRange(state, 1);
+    randRange(state, 1, 'Engine: minor buy');
     const s1 = state.rngState;
     state.rngState = s0;
     walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);

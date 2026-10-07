@@ -914,7 +914,7 @@ export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = 
   const q = Math.round(strengthDiff * 10);
   const c0 = state.rngState >>> 0;
   // the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
-  const roll = randRange(state, COMBAT_MAX_EXTRA_DAMAGE);
+  const roll = randRange(state, COMBAT_MAX_EXTRA_DAMAGE, 'Unit Combat Damage');
   const dmg = damageOf(roll, x);
   const cb = (globalThis as any).__cbLog;
   // `parts` (where a call site passes them) splits the diff into the two
@@ -1269,7 +1269,7 @@ export function captureRoll(state: GameState, strengthDiff: number, t = -1): boo
   const pct = Math.min(100, Math.max(0, Math.round(50 + (q * 5) / CAPTURE_BASE_STRENGTH_DIFF)));
   const c0 = state.rngState >>> 0;
   // the game's "Unit Capture Chance" draw: rand(100)
-  const r = randRange(state, 100);
+  const r = randRange(state, 100, 'Unit Capture Chance');
   const hit = r < pct;
   const cb = (globalThis as any).__cbLog;
   if (cb) cb.push(`k:cap t:${t} c:${c0} diff${q} r${r} pct${pct} hit${hit ? 1 : 0}`);
@@ -3106,10 +3106,10 @@ export function barbarianPhase(state: GameState): void {
   const maxCamps = Math.max(1, Math.floor(map.tiles.filter((t) => !isWater(t)).length / 120));
 
   const anyCivCity = state.seats.some((sx) => sx.cities.length > 0);
-  if (anyCivCity && state.barbSeat.camps.length < maxCamps && randRange(state, 100) < BARB_CAMP_SPAWN_PCT) {
+  if (anyCivCity && state.barbSeat.camps.length < maxCamps && randRange(state, 100, 'Engine: barbarian camp') < BARB_CAMP_SPAWN_PCT) {
     const candidates = campCandidates(state);
     if (candidates.length > 0) {
-      const spot = candidates[randRange(state, candidates.length)];
+      const spot = candidates[randRange(state, candidates.length, 'Engine: barbarian camp')];
       state.barbSeat.camps.push(spot.index);
       // SCOUT-THEN-RAID: a brand-new camp opens with a scout that goes
       // looking for a target; the regarrison and raid sites below keep the
@@ -3135,7 +3135,7 @@ export function barbarianPhase(state: GameState): void {
       spawnUnit(state, horseCamp ? barbCavalryType(state.turn) : barbMeleeType(state.turn), campIdx, BARB_SEAT);
     } else if (
       barbUnits(state).length < state.barbSeat.camps.length * MAX_BARB_PER_CAMP &&
-      randRange(state, 100) < BARB_RAID_PCT
+      randRange(state, 100, 'Engine: barbarian raid') < BARB_RAID_PCT
     ) {
       const water = neighbors(map, map.tiles[campIdx])
         // A tech-less barbarian cannot enter OCEAN (waterEnterable gates it on

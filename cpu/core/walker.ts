@@ -44,7 +44,7 @@ function walkerGround(state: GameState, t: Tile, seat: number): boolean {
 
 /** The step table's draw: the first k whose running per-mille sum exceeds it. */
 function drawStep(state: GameState, steps: readonly number[]): number {
-  const x = randRange(state, 1000);
+  const x = randRange(state, 1000, 'Engine: minor walk');
   let run = 0;
   for (let k = 0; k < steps.length; k++) {
     run += steps[k];
@@ -80,7 +80,7 @@ export function walkUnit(
   let total = 0;
   for (const t of ring) total += weight(t);
   if (total <= 0) return;
-  const pick = randRange(state, total);
+  const pick = randRange(state, total, 'Engine: minor walk');
   let run = 0;
   let target: Tile = ring[0];
   for (const t of ring) {

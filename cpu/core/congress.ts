@@ -490,11 +490,11 @@ export function congressSession(state: GameState, worldEra: number,
     const before = [slate[0], slate[1]];
     const want = Math.min(2, pool.length);
     const drawn: number[] = [];
-    for (let k = Math.min(want + 1, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length), 1)[0]);
+    for (let k = Math.min(want + 1, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length, 'World Congress Resolutions'), 1)[0]);
     const kept = drawn.length > want ? drawn.filter((r) => !before.includes(r)).slice(0, want) : drawn;
     slate[0] = kept[0] ?? -1;
     slate[1] = kept[1] ?? -1;
-    if (worldEra >= CONGRESS_DV_MIN_ERA) randRange(state, 1);
+    if (worldEra >= CONGRESS_DV_MIN_ERA) randRange(state, 1, 'World Congress Resolutions');
   };
   // a session whose slate was never announced (the FIRST one, or an
   // announcement that found nothing eligible) draws its own, now

@@ -62,7 +62,7 @@ export function ensureGpOffer(state: GameState, cls: GreatPersonClass): void {
     state.gpOffer[i] = -2;
     return;
   }
-  const at = pool[randRange(state, pool.length)];
+  const at = pool[randRange(state, pool.length, 'Generating a random new Great Person')];
   state.gpOffer[i] = at;
   state.gpPrice[i] = gpCost(cls, roster[at].era, worldEraIndex(state));
 }
@@ -317,7 +317,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
         (id) => !o.research.techs.includes(id) && !o.research.boosted.includes(id),
       );
       if (pool.length === 0) continue;
-      const pick = pool[randRange(state, pool.length)];
+      const pick = pool[randRange(state, pool.length, 'Choosing random tech boost to grant based on era')];
       if (pick) markBoost(state, o.seat, pick);
     }
   }

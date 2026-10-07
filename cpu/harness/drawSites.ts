@@ -118,7 +118,8 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
 
 /** The engines' draw sites the game has no site for: the driver's stand-ins
  *  for the AI's choices the game takes without a draw of its own, or by
- *  another rule. */
+ *  another rule. Each draws under an `Engine:` label (`DrawLabel`), which the
+ *  action replay never holds (`streamHold`). */
 export const ENGINE_ONLY_SITES: readonly { cpu: string; gpu: string; why: string }[] = [
   { cpu: 'walkUnit, drawStep', gpu: '_walk_units', why: "a city-state's and a Free City's units' walk: the AI's moves (the game's \"Random Direction\" is its own)" },
   { cpu: 'minorPlan, minorPurchases, minorBuyMilitary, minorBuyNaval, minorBuilders', gpu: '_minor_plan, _minor_buy_land, _minor_buy_naval, _minor_builders', why: "a city-state's builds and buys: the AI's" },

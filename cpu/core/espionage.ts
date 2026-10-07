@@ -505,7 +505,7 @@ export function missionWeights(t: number): number[] {
  *  over `missionWeights`, the outcome (`MISSION_*`). `_mission_draw` is the
  *  twin. */
 export function missionDraw(state: GameState, t: number): number {
-  return 5 - randWeighted(state, missionWeights(t));
+  return 5 - randWeighted(state, missionWeights(t), 'Rolling Espionage Result');
 }
 
 /** An ESCAPE's three bands (0x52b090): killed 3 .. v − 3, caught v − 2 ..
@@ -650,7 +650,7 @@ function spyEscape(state: GameState, unit: Unit,
   const v = SPY_ESCAPE_BASE
     - SPY_ESCAPE_LEVEL * (spyLevel(unit) + promoValue(unit, 'SPY_ESCAPE_LEVEL'))
     - (guessed ? SPY_ESCAPE_POLICE : 0);
-  const band = randWeighted(state, escapeWeights(v));
+  const band = randWeighted(state, escapeWeights(v), 'Rolling Espionage Result');
   if (band === 2) {
     const home = citiesOf(state, unit.seat).find((c) => c.isCapital)
       ?? citiesOf(state, unit.seat)[0];
@@ -676,7 +676,7 @@ function spyEscape(state: GameState, unit: Unit,
  *  air 4. */
 function policeCover(state: GameState, offered: readonly (typeof SPY_ESCAPE_ROUTES)[number][]): (typeof SPY_ESCAPE_ROUTES)[number] {
   const longest = Math.max(...SPY_ESCAPE_ROUTES.map((r) => r.turns));
-  return offered[randWeighted(state, offered.map((r) => longest - r.turns + 1))];
+  return offered[randWeighted(state, offered.map((r) => longest - r.turns + 1), 'Police Exit Covered')];
 }
 
 /** The catch — from the roll's own CAPTURED band or an escape's. The capture
@@ -770,7 +770,7 @@ function applyMission(state: GameState, unit: Unit, m: number, city: City, holde
       // current World Era", and the mission "pillages the Neighborhood
       // district to prevent Spies from completing it in rapid succession."
       const span = SPY_PARTISANS_MAX - SPY_PARTISANS_MIN + 1;
-      const n = SPY_PARTISANS_MIN + randRange(state, span);
+      const n = SPY_PARTISANS_MIN + randRange(state, span, 'Engine: partisans');
       const chassis = partisanChassis(state);
       if (chassis) for (let i = 0; i < n; i++) spawnUnit(state, chassis, city.centerIndex, BARB_SEAT);
       pillageDistrict(state, city, 'NEIGHBORHOOD');

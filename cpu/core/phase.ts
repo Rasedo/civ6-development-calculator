@@ -819,7 +819,7 @@ function freeCityGrantType(state: GameState): string | null {
     if (id) open.push([id, FREE_CITY_GRANT_WEIGHTS[i]]);
   });
   if (open.reduce((s, [, w]) => s + w, 0) <= 0) return null;
-  const k = randWeighted(state, open.map(([, w]) => w));
+  const k = randWeighted(state, open.map(([, w]) => w), 'Free Cities Unit Choice');
   return k >= 0 ? open[k][0] : null;
 }
 
@@ -2994,7 +2994,7 @@ export function seatPhase(state: GameState): void {
       const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
       if (open.length > 0) {
         actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
-        const pick = open[randRange(state, open.length)];
+        const pick = open[randRange(state, open.length, 'Engine: pantheon')];
         state.claimedPantheons.push(pick);
         pantheonMoment(state, actor.seat);
         actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers

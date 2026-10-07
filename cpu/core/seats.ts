@@ -102,7 +102,7 @@ export function drawCitizenName(state: GameState, seat: number): void {
   if (!civ) return;
   const left = (civ === 'FRANCE' ? CITIZEN_NAME_ROWS_FRANCE : CITIZEN_NAME_ROWS) - (s.citizenNames ?? 0);
   if (left <= 0) return;
-  randRange(state, left);
+  randRange(state, left, 'Choosing a Citizen Name');
   s.citizenNames = (s.citizenNames ?? 0) + 1;
 }
 

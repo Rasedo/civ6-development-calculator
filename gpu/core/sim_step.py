@@ -8,13 +8,18 @@ class SimStep:
     def step(self) -> None:
         dev = self.device
         # ONE GAME TURN, as Civ 6 runs it (`endTurn`; tools/civ6lab/
-        # turn_order_civ6.md, runs/turnorder/): the players one at a time in
-        # ascending player id — the majors, the city-states, the Free Cities,
-        # the barbarians (16 of 16 turns); then the World Congress session and
-        # the heal of every unit and every city, both before the counter
-        # moves; then, on the new turn, the storms, the volcano roll and the
-        # random event, the climate step, the era and Ages, and the victory
-        # checks.
+        # turn_order_civ6.md, runs/turnorder/): the turn's random-event step
+        # — the storms, the volcano roll and the random event — and the
+        # climate step, after every player's actions of the turn before and
+        # before the first player's start (the game's draw log); then the
+        # players' starts one at a time in ascending player id — the majors,
+        # the city-states, the Free Cities, the barbarians (16 of 16 turns);
+        # then the World Congress session and the heal of every unit and every
+        # city, before the counter moves; then, on the new turn, the era and
+        # Ages, and the victory checks.
+        if self.disasters:
+            self._disaster_phase()
+        self._climate_turn()
         self._seat_phase()
         self._city_state_phase()
         self._free_cities_phase()
@@ -81,9 +86,6 @@ class SimStep:
         # the government channels change with no record behind them
         if self._ngov and bool((self.civ_gov_anarchy_end == self.turn).count_nonzero()):
             self._eff_version += 1
-        if self.disasters:
-            self._disaster_phase()
-        self._climate_turn()
 
         # --- Dead-slot reclamation, at the step END and never the top:
         # callers sample slot-keyed unit actions from the PRE-step masks, so

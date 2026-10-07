@@ -56,7 +56,7 @@ export function drawGoodyReward(state: GameState, claimer: Seat): GoodySubType |
   const had = claimer.goodyKinds ?? GOODY_KINDS.map(() => 0);
   const weights = kinds.map((k) => goodyKindWeight(had[GOODY_KINDS.indexOf(k)]));
   // "Choosing a Goody Hut Type", then "Choosing a Sub Type": the game's draws
-  let at = randRange(state, weights.reduce((n, w) => n + w, 0));
+  let at = randRange(state, weights.reduce((n, w) => n + w, 0), 'Choosing a Goody Hut Type');
   let kind = kinds[kinds.length - 1];
   for (let i = 0; i < kinds.length; i++) {
     at -= weights[i];
@@ -64,7 +64,7 @@ export function drawGoodyReward(state: GameState, claimer: Seat): GoodySubType |
   }
   const subs = GOODY_SUBTYPES.filter((s) => s.hut === kind && goodyEligible(state, s, claimer));
   const total = subs.reduce((n, s) => n + s.weight, 0);
-  let r = randRange(state, total);
+  let r = randRange(state, total, 'Choosing a Sub Type');
   let out = subs[subs.length - 1];
   for (const s of subs) {
     r -= s.weight;

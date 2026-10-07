@@ -200,7 +200,7 @@ export function drawPromoOffer(state: GameState, unit: Unit): void {
   const pool = rows.map((_, k) => k);
   let offer = 0;
   for (let j = 0; pool.length > 0; j++) {
-    const k = pool.splice(randRange(state, pool.length), 1)[0];
+    const k = pool.splice(randRange(state, pool.length, 'Random Promotion'), 1)[0];
     if (j < PROMO_OFFER_DRAW) offer |= 1 << k;
   }
   unit.promoOffer = offer;

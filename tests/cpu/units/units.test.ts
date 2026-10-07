@@ -25,10 +25,10 @@ describe('in-state RNG', () => {
     const b = makeState();
     a.rngState = 12345;
     b.rngState = 12345;
-    const seqA = [randRange(a, 1000), randRange(a, 1000), randRange(a, 1000)];
+    const seqA = [randRange(a, 1000, 'Rolling Concert Result'), randRange(a, 1000, 'Rolling Concert Result'), randRange(a, 1000, 'Rolling Concert Result')];
     const restored = deserialize(serialize(b));
-    randRange(restored, 1000);
-    const seqB = [seqA[0], randRange(restored, 1000), randRange(restored, 1000)];
+    randRange(restored, 1000, 'Rolling Concert Result');
+    const seqB = [seqA[0], randRange(restored, 1000, 'Rolling Concert Result'), randRange(restored, 1000, 'Rolling Concert Result')];
     expect(seqB).toEqual(seqA);
   });
 });

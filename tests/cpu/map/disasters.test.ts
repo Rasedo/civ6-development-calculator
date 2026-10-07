@@ -414,7 +414,7 @@ describe('the flood\'s row walk', () => {
     const probe = { rngState: before } as GameState;
     let n = 0;
     while (probe.rngState !== state.rngState && n < 10000) {
-      randRange(probe, 1);
+      randRange(probe, 1, 'Pillage Improvement Chance');
       n++;
     }
     return n;
@@ -969,7 +969,7 @@ describe('the nuclear accident', () => {
       fn();
       for (let n = 0; n < 32; n++) {
         if (probe.rngState === state.rngState) return n;
-        randRange(probe, 1);
+        randRange(probe, 1, 'Pillage Improvement Chance');
       }
       throw new Error('more than 32 draws');
     };
@@ -1206,9 +1206,9 @@ describe('the eruption on owned and unowned ground', () => {
     };
     const none = run([]);
     const probe = { rngState: none } as GameState;
-    randRange(probe, 1);
+    randRange(probe, 1, 'Pillage Improvement Chance');
     expect(run(['WARRIOR'])).toBe(probe.rngState);
-    randRange(probe, 1);
+    randRange(probe, 1, 'Pillage Improvement Chance');
     expect(run(['WARRIOR', 'BATTERING_RAM'])).toBe(probe.rngState);
     // a civilian draws no damage
     expect(run(['BUILDER'])).toBe(none);

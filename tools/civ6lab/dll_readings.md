@@ -1159,6 +1159,19 @@ order: `stormsTurn`, `fireTurn`, `volcanoRoll`, `randomEvent`, each new
 event's own draws inside it. 0x33a280's draws: unread (no labelled site in
 it; the replay on 1115 / 1116 places every event without one).
 
+Where the step falls against the players' ACTIONS (the draw log, read with
+the witnesses): every player's start is followed by its own actions ("Unit
+Combat Damage", "Random Direction", "City Build District Choice") before the
+next player's start, the barbarians' turn and the congress close the turn,
+and the step of turn T+1 comes after all of them, before player 0's start
+(runs/h1_duelw1117 t40: player 0's start, its 3 combat and 4 walk draws,
+player 1's start ... the barbarians' combat and walks, then t41's volcano
+and event rolls, then player 0's t41 start). The engines' turn takes the
+starts in `endTurn` and the majors' actions between two calls, so the step
+and the climate step open `endTurn` / `step`: the event strikes the units
+where the actions left them (runs/h1_duelw1118 t8: the step run before the
+actions struck a Warrior the game's fire missed).
+
 ## C-74: the fire — READ
 
 The one-off birth (0x291a20's one-off arm): "Pick One Off Start Plot"
@@ -1464,7 +1477,17 @@ previous session did not hold stand, else all drawn; then ONE draw over the
 InjectionOnly rows (the Diplomatic Victory resolution, Modern on: a lone row,
 a draw over 1). runs/h1_duelw1117 t61, t81, t101: 10, 9, 8; t121, t141: 12,
 11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's
-(one draw over a list of rows not in play, called from 0x599275) — unread.
+(called from 0x599275): it walks a database collection (0xad5430: the
+game's +0xb40 table), keeps each row whose byte +0x48 is set and +0x50 non-
+null and whose live record (0x27a680 -> 0x25bef0 on the row's +0x20) reads
+-1 at +0x0 and +0xc — not in play —, weighs each 1 and draws ONE "World
+Congress Resolutions" pick over them (0x59a540), appending the pick at
++0x310. The scored competitions fit it: 1117 / 1118 / 1121 all draw it at
+t161, and at t181, after the step, China (player 1) draws two "Choosing
+random civic boost to grant based on era" — the World's Fair's top tier
+(WORLD_FAIR_TOP_TIER_CULTURE, MODIFIER_EMERGENCY_PLAYERS_GRANT_RANDOM_CIVIC_
+BOOST_BY_ERA, Expansion2_Emergencies.xml). Which table +0xb40 is stays
+unread (LAB).
 The "Random congress resolution target" draws after them (16 sites,
 0x611140..) are the AI's targets. The engines (`congressSession` /
 `_congress_draw_slate`) follow, over the resolutions they model.

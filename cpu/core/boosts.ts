@@ -324,8 +324,8 @@ export function earliestBoostEra(rsr: ResearchState, kind: 'tech' | 'civic'): nu
 
 /** `n` draws over `pool`, each removing its pick, the picks landed on
  *  `seat` (`markBoost`); the count drawn (none from an empty pool). */
-export function drawBoosts(state: GameState, seat: number, pool: string[], n: number): number {
+export function drawBoosts(state: GameState, seat: number, kind: 'tech' | 'civic', pool: string[], n: number): number {
   let k = 0;
-  for (; k < n && pool.length > 0; k++) markBoost(state, seat, pool.splice(randRange(state, pool.length), 1)[0]);
+  for (; k < n && pool.length > 0; k++) markBoost(state, seat, pool.splice(randRange(state, pool.length, kind === 'tech' ? 'Choosing random tech boost to grant based on era' : 'Choosing random civic boost to grant based on era'), 1)[0]);
   return k;
 }

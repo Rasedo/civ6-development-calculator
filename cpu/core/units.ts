@@ -1475,7 +1475,7 @@ export function performConcert(state: GameState, unitId: number, seat: number): 
   const odds = ROCK_BAND_TIER_ODDS[rollLevel - 1];
   // "Rolling Concert Result" (0x535830): one weighted draw over the tier
   // odds, which sum to 1000
-  const roll = randRange(state, 1000);
+  const roll = randRange(state, 1000, 'Rolling Concert Result');
   let acc = 0;
   let tier = odds.length - 1;
   for (let i = 0; i < odds.length; i++) {
@@ -2198,13 +2198,13 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       // pick (runs/h1_duelw1117 t6: 8 Ancient techs, t30: 6 then 5 civics)
       const kind = p.kind === 'techBoost' ? 'tech' : 'civic';
       const era = earliestBoostEra(owner.research, kind);
-      if (era >= 0) drawBoosts(state, unit.seat, boostPool(owner.research, kind, era, era), amount);
+      if (era >= 0) drawBoosts(state, unit.seat, kind, boostPool(owner.research, kind, era, era), amount);
       break;
     }
     case 'tech': {
       const pool = Object.keys(TECHS).filter((id) => !owner.research.techs.includes(id));
       for (let i = 0; i < amount && pool.length; i++) {
-        owner.research.techs.push(pool.splice(randRange(state, pool.length), 1)[0]);
+        owner.research.techs.push(pool.splice(randRange(state, pool.length, 'Choosing random tech to grant based on era'), 1)[0]);
       }
       break;
     }
