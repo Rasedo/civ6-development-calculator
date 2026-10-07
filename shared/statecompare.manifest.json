@@ -3509,6 +3509,10 @@
         "why": "the join key is (tile, military/civilian); the GPU has no unit-id plane."
       },
       {
+        "path": "Tile.lockRank",
+        "why": "set only by a recorded game's replay (the record's citizens' order); no driver writes it, so every engine game holds it unset."
+      },
+      {
         "path": "Tile.col",
         "why": "world geometry, fixed at build."
       },

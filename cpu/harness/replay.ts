@@ -33,12 +33,12 @@ import type { City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActio
 import { NO_SEAT } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
-  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice } from '../core/game';
-import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, paveGround,
+  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost } from '../core/game';
+import { applySeatActionRecord, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, sueForPeace, transferCity } from '../core/phase';
-import { declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
+import { declareWarOnCityState, minorCity, placeCityStateAt, resolveSuzerain, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements } from '../core/rules';
-import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, grantedMoves, upgradeUnit } from '../core/units';
+import { spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, grantedMoves, restUnit, upgradeUnit } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
@@ -48,7 +48,7 @@ import { recordMoments } from '../core/moments';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, clearCampFor } from '../core/combat';
-import { goodyMoment, pantheonMoment, unitKillEvent } from '../core/eras';
+import { goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
 import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, seatOf, setTileOwner, setWar, BARB_SEAT } from '../core/seats';
 import { BUILDINGS } from '../data/buildings';
@@ -59,7 +59,7 @@ import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
 import { PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
 import { UNITS, UNIT_HP } from '../data/units';
-import { MP_SCALE } from '../data/constants';
+import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import type { Catalog, DumpCity, TurnRecord } from './record';
@@ -79,6 +79,14 @@ type Outcome = 'applied' | 'fallback' | 'refused';
 
 /** a village's Gold or Faith below this is the turn's income moving, not a reward */
 const VILLAGE_MIN = 8;
+
+/** a human seat's camp dispersal past the engine's: the camp's DispersalGold
+ *  (50) plus the human's change through the speed, less the engine's own.
+ *  The change is LinearScaleFromDefaultHandicap −5 a level from Prince, which
+ *  the lab's human seat reads as +5: 27 online on every clean clear
+ *  (runs/h1_duelw1118 Rome t10 45 + 5 → 77, 1120 t36, 1121 t36, 1123 t61;
+ *  an AI's 25, 1116 China t7) */
+const HUMAN_CAMP_GOLD = scaleByGameSpeed(50 + 5) - CAMP_DISPERSAL_GOLD;
 
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
@@ -437,7 +445,7 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
  *  gives the queue its city), then the seats, the cities' orders, the plots,
  *  the units */
 const ORDER: Decision['kind'][] = ['found', 'capture', 'research', 'civic', 'policies', 'pantheon', 'religion', 'governors', 'war',
-  'envoy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'unitGone', 'unitNew', 'move', 'combat', 'kill', 'promote', 'upgrade', 'camp', 'village'];
+  'envoy', 'levy', 'routes', 'congress', 'buyPlot', 'buyBuilding', 'wonderCharge', 'queue', 'worked', 'improve', 'clear', 'buyUnit', 'unitGone', 'unitNew', 'move', 'combat', 'kill', 'promote', 'upgrade', 'camp', 'village'];
 
 function applyPhase(ctx: Ctx, ds: Decision[], phase: Decision['phase'], b: TurnRecord): void {
   const { state, next } = ctx;
@@ -465,11 +473,17 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const minor = state.cityStates.find((x) => x.centerIndex === d.city);
         const city = cityAt(state, d.city) ?? (minor ? minorCity(minor) : undefined);
         if (!city) break;
-        for (const t of state.map.tiles) if (t.ownerSeat === city.seat && t.ownerCity === city.id) t.locked = false;
-        for (const q of d.plots) {
-          const t = state.map.tiles[q];
-          if (q !== city.centerIndex && !t.district) t.locked = true;
+        for (const t of state.map.tiles) {
+          if (t.ownerSeat !== city.seat || t.ownerCity !== city.id) continue;
+          t.locked = false;
+          t.lockRank = undefined;
         }
+        d.plots.forEach((q, i) => {
+          const t = state.map.tiles[q];
+          if (q === city.centerIndex || t.district) return;
+          t.locked = true;
+          if (d.ranks?.[i]) t.lockRank = d.ranks[i];
+        });
         const read = [...next.dumpOfCity].find(([, c]) => c.y * ctx.W + c.x === d.city)?.[0];
         if (read?.specialistPref) city.specialistPref = [...read.specialistPref];
         count(ctx, 'worked', 'applied');
@@ -484,6 +498,44 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         t.improvement = want;
         t.pillaged = false;
         count(ctx, 'improve', ok ? 'applied' : 'fallback', d.player);
+        break;
+      }
+      case 'levy': {
+        // the order is the suzerain's, through the engine's verb; the game's
+        // new ids name the same units from here on
+        const seat = seatOfP(ctx, d.player);
+        const ms = seatOfP(ctx, d.minor);
+        const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
+        const s = seatOf(state, seat) as Seat | undefined;
+        if (!cs || !s) { count(ctx, 'levy', 'refused', d.player); break; }
+        const price = levyGoldCost(state, seat, cs);
+        const res = levyUnits(state, cs.id, seat);
+        for (const [from, to] of d.units) {
+          const u = unitOf(ctx, from);
+          ctx.units.delete(from);
+          if (!u) continue;
+          ctx.units.set(to, u);
+          if (!res.ok) {
+            u.seat = seat;
+            u.leviedFrom = cs.seat;
+          }
+        }
+        if (!res.ok) {
+          s.treasury -= price;
+          cs.levySeat = seat;
+        }
+        count(ctx, 'levy', res.ok ? 'applied' : 'fallback', d.player, res.reason);
+        break;
+      }
+      case 'wonderCharge': {
+        // the order is the player's, through the engine's verb, from where
+        // the Builder stood
+        const u = unitOf(ctx, d.unit);
+        const actor = seatOf(state, seatOfP(ctx, d.player)) as Seat | undefined;
+        if (!u || !actor) { count(ctx, 'wonderCharge', 'refused', d.player); break; }
+        u.tileIndex = d.plot;
+        const res = wonderChargeBoost(state, u, actor);
+        count(ctx, 'wonderCharge', res.ok ? 'applied' : 'refused', d.player, res.reason);
         break;
       }
       case 'clear': {
@@ -506,7 +558,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const was = cs.envoys[seat] ?? 0;
         applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [], envoys: new Array(d.n).fill(cs.id) });
         const got = (cs.envoys[seat] ?? 0) - was;
-        if (got < d.n) cs.envoys[seat] = was + d.n;
+        // every envoy write ends at the stored contest (`resolveSuzerain`)
+        if (got < d.n) {
+          cs.envoys[seat] = was + d.n;
+          resolveSuzerain(state, cs);
+        }
         count(ctx, 'envoy', got >= d.n ? 'applied' : 'fallback', d.player);
         break;
       }
@@ -537,6 +593,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const r = seatOf(next.state, seat)?.religion;
         if (!s || !r) { count(ctx, 'religion', 'refused', d.player); break; }
         const founding = !s.religion.founded && r.founded;
+        // the founding's moment, as the engine's own founding pays it
+        if (founding) religionMoment(state, seat);
         s.religion = { ...structuredClone(r), pantheon: s.religion.pantheon };
         // a founding's holy city takes the pressure and the following the
         // founding gave it, as record t+1 shows them
@@ -621,6 +679,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // make; a city-state's, a Free City's or the barbarians' is their
         // scripts' decision, which the engine does not replay
         const major = seatOfP(ctx, d.player) >= 0 && seatOfP(ctx, d.player) < state.seats.length;
+        // a unit an engine verb of this phase made (a wonder a charge
+        // completed grants its Great Person) is the record's
+        if (major) matchNewUnits(ctx, b);
         if ((d.why === 'trained' && major) || unitOf(ctx, d.unit)) break;
         spawnRecorded(ctx, b, d.unit);
         count(ctx, major ? 'unitNew:other' : 'minorAi:unitNew', 'fallback', d.player);
@@ -633,6 +694,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const u = unitOf(ctx, d.unit);
         if (!u || !state.barbSeat.camps.includes(d.plot)) { count(ctx, 'camp', 'refused', d.player); break; }
         clearCampFor(state, u, d.plot);
+        // the lab's HUMAN seat holds the install's BARBARIAN_CAMP_GOLD_SCALING
+        // (Leaders.xml, TRAIT_LEADER_MAJOR_CIV on PLAYER_IS_HUMAN): its
+        // dispersal change before the speed, which no engine seat holds
+        if (bool(b.players.find((p) => p.id === d.player)?.human)) {
+          const s = seatOf(state, u.seat);
+          if (s) s.treasury += HUMAN_CAMP_GOLD;
+        }
         count(ctx, 'camp', 'applied');
         break;
       }
@@ -646,6 +714,15 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         goodyMoment(state, s.seat);
         if (d.gold >= VILLAGE_MIN) s.treasury += d.gold;
         if (d.faith >= VILLAGE_MIN) s.faith += d.faith;
+        // the unit it gave arrives as the record's (`unitNew`); a Builder or a
+        // Settler is a copy its price climbs on, as the engine's own village
+        // counts it (`drawAndPayGoody`)
+        for (const x of ds) {
+          if (x.kind !== 'unitNew' || x.why !== 'other' || x.player !== d.player) continue;
+          const type = engineRowOf(ctx.cat, 'unit', x.type);
+          if (type === 'BUILDER') s.buildersTrained += 1;
+          else if (type === 'SETTLER') s.settlersTrained = (s.settlersTrained ?? 0) + 1;
+        }
         const grew = d.popCity >= 0 ? cityAt(state, d.popCity) : undefined;
         if (grew && grew.seat === s.seat) {
           gainPopulationPressure(grew, 1);
@@ -855,6 +932,20 @@ function undoMinorPlots(ctx: Ctx, before: (string | null)[]): void {
   }
 }
 
+/** THE DEDICATIONS are each player's pick at its age's start, which the
+ *  engines' own round robin stands in for: each seat holds the ones record
+ *  t+1 shows (runs/h1_duelw1117 Rome's Dark Age from t31 holds none, where the
+ *  round robin's paid +1 on a boost at t35) */
+function syncDedications(ctx: Ctx): void {
+  ctx.state.seats.forEach((s, seat) => {
+    const want = seatOf(ctx.next.state, seat)?.dedicationPicks ?? [];
+    if ((s.dedicationPicks ?? []).join() === want.join()) return;
+    s.dedicationPicks = [...want];
+    s.dedications = want.length;
+    count(ctx, 'dedications', 'fallback', ctx.playerOfSeat.get(seat));
+  });
+}
+
 /** THE PILLAGES AND REPAIRS: a pillage is a unit's action (the barbarians'
  *  and the players' alike), which the record's units carry, and so is a
  *  Builder's repair: each improvement standing on both sides takes record
@@ -921,7 +1012,10 @@ export function compareState(state: GameState, read: Imported): Tallies {
     const rh = rc.queue[0];
     if (rh || eh) {
       const same = !!eh && !!rh && itemKey(eh) === itemKey(rh);
-      const ok = same && (!read.queueProgressRead || near(eh.progress, rh.progress, 0.5));
+      // the record's progress is the game's 24.8 value truncated to whole
+      // points (every recorded `queueProgress` is whole; runs/h1_duelw1117
+      // Xi'an t19 a Settler at 0.80078125 overflow + 10.80078125 reads 11)
+      const ok = same && (!read.queueProgressRead || Math.floor(eh.progress + 1e-9) === rh.progress);
       note(t, 'city.production', ok, name, rh ? `${itemKey(rh)} ${r3(rh.progress)}` : null, eh ? `${itemKey(eh)} ${r3(eh.progress)}` : null,
         same ? Math.abs(eh.progress - rh.progress) : 1000);
     }
@@ -1200,6 +1294,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const logged = Array.isArray((b as { actions?: unknown }).actions);
     const walked = new Set(ds.flatMap((d) => (d.kind === 'move' && d.path ? [d.unit] : [])));
     const spent = new Map<Unit, number>();
+    // a city-state's unit the record rested, as it stood before the turn: the
+    // engine's own walk for it (`minorWalk`) is its script's decision, which
+    // the record's moves stand in for
+    const restedMinor = new Map<Unit, { at: number; from: number; hp: number; fortifyTurns?: number }>();
     for (const r of b.units) {
       const key = `${r.owner}:${r.id}`;
       const u = unitOf(ctx, key);
@@ -1208,6 +1306,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const rested = stood && !fought.has(key);
       u.movesLeft = rested ? grantedMoves(state, u) : 0;
       if (!rested) spent.set(u, u.hp);
+      else if (isCityStateSeat(u.seat)) restedMinor.set(u, { at: r.y * ctx.W + r.x, from: u.tileIndex, hp: u.hp, fortifyTurns: u.fortifyTurns });
     }
     // THE BARBARIANS' TURN IS THE RECORD'S: their units are its units
     // (`syncUnits`), their battles its battles (`combat`, `kill`) and their
@@ -1220,11 +1319,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // draw took a citizen of Rome the game's spared)
     const barbs = state.units.filter((u) => isBarbSeat(u.seat));
     state.units = state.units.filter((u) => !isBarbSeat(u.seat));
+    // A PANTHEON is its player's decision (`pantheon`), which the game's AI
+    // takes when it will, not on the first turn its faith covers the price
+    // (runs/h1_duelw1118 China: 12 Faith at t28, founded at t29): the
+    // engine's own race finds none open in the turn
+    const claimed = state.claimedPantheons;
+    state.claimedPantheons = Object.keys(PANTHEONS);
     try {
       endTurn(state);
     } catch (e) {
       report.stopped = `endTurn threw at turn ${a.turn}: ${(e as Error).message}`;
       break;
+    } finally {
+      state.claimedPantheons = claimed;
     }
     for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
     state.units.push(...barbs);
@@ -1243,10 +1350,20 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // names on one of them was the engine's to pay, and it paid it
     const live = new Set(state.units);
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
+    // the rested city-state units the engine's walk moved spent their moves
+    // there and missed the turn's rest: they rest where the record holds them
+    for (const [u, w] of restedMinor) {
+      if (!live.has(u) || u.tileIndex === w.from) continue;
+      u.tileIndex = w.at;
+      u.hp = w.hp;
+      u.fortifyTurns = w.fortifyTurns;
+      restUnit(state, u, true);
+    }
     applyPhase(ctx, ds, 'after', b);
     syncUnits(ctx, b);
     syncDraws(ctx, b);
     syncPillage(ctx);
+    syncDedications(ctx);
     // the decisions landed after the engine's turn are the other players'
     // actions within their own turns: the boosts those earn land there
     // (`detectBoosts` at the seat block's end)

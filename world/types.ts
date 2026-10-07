@@ -239,6 +239,11 @@ export interface Tile {
    *  way a specialist pin overrides it for slots. The lock lives on the PLOT
    *  and dies when the plot changes hands (`setTileOwner`). */
   locked?: boolean;
+  /** where a city holds more locked plots than citizens: the order its
+   *  citizens take them, the lower rank first (unset ranks 0), a rank's
+   *  plots in tile order. A recorded game's replay ranks the plots its
+   *  record says each citizen of a turn worked. */
+  lockRank?: number;
   /** how many times a river flood has reached this tile — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
    *  Flooded" reads it. A flood counts once per episode (`floodRiver`). */

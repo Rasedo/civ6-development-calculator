@@ -194,6 +194,39 @@ def test_a_project_converts_its_production(rules, path) -> None:
     print(f"  8 project OK — {want:.4f} Science of 12.4 Production, cleared by the next step")
 
 
+def test_the_overflow_caps_at_the_plain_production(rules, path) -> None:
+    """A completion's overflow is the smaller of the Production toward the
+    item and the city's PLAIN Production (no city-state flat toward the head:
+    `plainProduction`), less what the item lacked."""
+    sim = build(rules, path)
+    j = a_city(sim)
+    load_queue(sim, j, [unit(sim, 0)], costs=[12], progs=[5])
+    sim.city_prod_bank[B0, ROW, j] = 0
+    col = torch.full((sim.B,), j, dtype=torch.long)
+    act = torch.zeros(sim.B, dtype=torch.bool)
+    act[B0] = True
+    sim._seat_city_produce(ROW, col, act, torch.full((sim.B,), 10.0, dtype=torch.float64),
+                           plain=torch.full((sim.B,), 9.0, dtype=torch.float64))
+    assert int(q(sim, j)[0]) == -1, "the head did not complete"
+    bank = float(sim.city_prod_bank[B0, ROW, j])
+    assert abs(bank - 2.0) < 1e-9, f"overflow {bank}, want min(10, 9) - 7 = 2"
+    print("  9 plain OK — the overflow reads the city's plain Production")
+
+
+def test_a_head_completes_now(rules, path) -> None:
+    """`_complete_head_now` (a Builder's wonder charge covering the cost): the
+    head completes off the step's body, putting no Production in, the
+    overflow store kept as it stood."""
+    sim = build(rules, path)
+    j = a_city(sim)
+    load_queue(sim, j, [unit(sim, 0)], costs=[10], progs=[12])
+    sim.city_prod_bank[B0, ROW, j] = 3.0
+    sim._complete_head_now(ROW, torch.tensor([B0]), torch.tensor([j]))
+    assert int(q(sim, j)[0]) == -1, "the head did not complete"
+    assert float(sim.city_prod_bank[B0, ROW, j]) == 3.0, "the overflow store moved"
+    print(" 10 now OK — the head completes at once, the store untouched")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -204,6 +237,8 @@ def main() -> int:
     test_a_queued_building_is_not_offered_twice(rules, path)
     test_a_drop_empties_the_head(rules, path)
     test_a_project_converts_its_production(rules, path)
+    test_the_overflow_caps_at_the_plain_production(rules, path)
+    test_a_head_completes_now(rules, path)
     print("BATTERY OK production_queue")
     return 0
 

@@ -1,6 +1,6 @@
 
 import type { City, DistrictId, GameState, QueueItem, ResearchState, Tile, Seat, Unit } from './types';
-import { dropQueuedBuilding } from './production';
+import { completeQueueItem, dropQueuedBuilding } from './production';
 import { GP_CLASSES } from '../data/greatPeople';
 import { placeGreatWorkIn } from './greatWorks';
 import { GWO_RELIC } from '../data/greatWorks';
@@ -1449,7 +1449,16 @@ export function wonderChargeBoost(state: GameState, unit: Unit, actor: Seat): Ru
   if (q.kind !== 'wonder') return { ok: false, reason: 'No wonder under construction here.' };
   const pct = wonderChargePct(state, actor.seat, q.wonder);
   if (pct <= 0) return { ok: false, reason: "This wonder's era is outside the ability." };
-  q.progress += Math.round(itemCost(q, state, city) * pct / 100);
+  const cost = itemCost(q, state, city);
+  q.progress += Math.round(cost * pct / 100);
+  // a charge that covers the cost completes the wonder at once, the excess
+  // banked nowhere (runs/h1_duelw1117 China t26: Stonehenge's completion
+  // logged ahead of the charge's own event, the turn's Production having
+  // left it 2.29 short)
+  if (q.progress >= cost) {
+    city.queue.shift();
+    completeQueueItem(state, city, q, cost);
+  }
   unit.charges = (unit.charges ?? 1) - 1;
   unit.movesLeft = 0;
   if ((unit.charges ?? 0) <= 0) disbandUnit(state, unit.id);

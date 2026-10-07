@@ -63,6 +63,18 @@ describe("the Builder's charge into a wonder", () => {
     expect(r.endEra).toBe('Classical');
   });
 
+  it('completes the wonder at once when the charge covers its cost', () => {
+    const { inside } = wondersInAndOut();
+    const { state, city, at } = scene(QIN, inside);
+    const u = spawnUnit(state, 'BUILDER', at.index, 1);
+    const cost = itemCost(city.queue[0], state, city);
+    city.queue[0].progress = cost - 1;
+    expect(wonderChargeBoost(state, u!, seatOf(state, 1)!).ok).toBe(true);
+    expect(city.queue.length).toBe(0);
+    expect(city.wonders.some((w) => w.id === inside) || at.builtWonderComplete).toBe(true);
+    expect(city.productionBank ?? 0).toBe(0);
+  });
+
   it('pays a percentage of the ORIGINAL cost and spends one charge', () => {
     const { inside } = wondersInAndOut();
     const { state, city, at } = scene(QIN, inside);

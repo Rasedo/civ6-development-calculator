@@ -1358,7 +1358,12 @@ appeal before the Conservation term until t242 — the same cache. LAB lines.
   queued the step adds B to the overflow (0x16f62d → 0x0ac650). Records:
   1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on
   5 a turn; 1117 Xi'an's Scout done at 16 of 15, the Builder 0 at t7 and 6 at
-  t8. Engines: `City.productionBank` / `city_prod_bank`.
+  t8. Engines: `City.productionBank` / `city_prod_bank`. B, read with no
+  item, holds none of the city-states' Production toward the head (the
+  Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,
+  a Warrior at 12 + 9 of 20 with one Militaristic envoy's +1 leaves 0, the
+  next Warrior reading 9 on 8 + 1 (`CityStats.plainProduction`, the walk's
+  `item_flat=False`).
 - The research and civic overflows (`m_xResearchOverflow`, serializer
   0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the
   records fit the production rule's shape — a completion's remainder is held

@@ -48,7 +48,16 @@ export type Decision = Base & (
   | { kind: 'buyUnit'; player: number; city: number; type: number; unit: string; currency: 'gold' | 'faith' }
   | { kind: 'improve'; player: number; plot: number; improvement: number }
   | { kind: 'clear'; player: number; plot: number; what: 'feature' | 'resource' }
-  | { kind: 'worked'; player: number; city: number; plots: number[] }
+  /** a Builder's charge spent on the wonder its plot holds (`UnitChargesChanged`
+   *  down, standing on a wonder under construction) */
+  | { kind: 'wonderCharge'; player: number; unit: string; plot: number }
+  /** a city-state's army levied: its units leave it and come back the
+   *  major's on their plots (`UnitRemovedFromMap` then `UnitAddedToMap`),
+   *  each record key old → new */
+  | { kind: 'levy'; player: number; minor: number; units: [string, string][] }
+  | { kind: 'worked'; player: number; city: number; plots: number[];
+      /** each plot's lock rank (`Tile.lockRank`), all 0 when absent */
+      ranks?: number[] }
   | { kind: 'envoy'; player: number; minor: number; n: number }
   | { kind: 'pantheon'; player: number; belief: number }
   | { kind: 'religion'; player: number }
@@ -281,15 +290,25 @@ export class InferredActions implements ActionSource {
       const isMajor = b.players.find((p) => p.id === c1.owner)?.major === true;
       const queue = stepQueue(a, b, c0, c1, active);
       if (isMajor) out.push({ kind: 'queue', phase: ph, player: c1.owner, city: at, items: queue });
-      // the citizens the step works: the active player's as record t left
-      // them, unless its city stood still across the pair (it reassigned in
-      // its actions); every other player's as record t+1 shows
-      const worked = active && c0 && (c0.pop !== c1.pop || c0.plots.length !== c1.plots.length) ? c0.worked : c1.worked;
-      out.push({ kind: 'worked', phase: ph, player: c1.owner, city: at, plots: [...worked] });
-      // and after its start of turn the active player's city works what
-      // record t+1 shows: where a citizen its growth gave or a plot its
-      // border took went is the game's citizen placement, not the engine's
-      if (active && worked !== c1.worked) out.push({ kind: 'worked', phase: 'after', player: c1.owner, city: at, plots: [...c1.worked] });
+      // the citizens the step works: the plots both records work, then, where
+      // the city's size moved, the plots record t+1 adds ahead of the ones it
+      // leaves, else the other way round. A citizen the city's growth gave is
+      // placed as it grows, before its border box banks (runs/h1_duelw1117
+      // Rome t19: the new citizen on the Culture plot 894, the box read with
+      // it; Xi'an t22: the Settler's citizen off 562, the regrown one on
+      // 563); a citizen moved with the size standing moved after the turn's
+      // yields (Rome t25: 894 to 806 with plot 850 claimed, the box and the
+      // Production read 894; 1118 Rome t28: 627 to 495 as the Water Mill
+      // completed, the growth read 627)
+      const w0 = c0 ? c0.worked : c1.worked;
+      const both = c1.worked.filter((q) => w0.includes(q));
+      const added = c1.worked.filter((q) => !w0.includes(q));
+      const left = w0.filter((q) => !c1.worked.includes(q));
+      const groups = c0 && c0.pop !== c1.pop ? [both, added, left] : [both, left, added];
+      out.push({ kind: 'worked', phase: 'before', player: c1.owner, city: at, plots: groups.flat(),
+        ranks: groups.flatMap((g, i) => g.map(() => i)) });
+      // and after the turn the city works what record t+1 shows
+      out.push({ kind: 'worked', phase: 'after', player: c1.owner, city: at, plots: [...c1.worked] });
       if (!c0) continue;
       // plots bought: gained with gold spent, but the one the box paid for
       const had = new Set(c0.plots);
@@ -452,7 +471,7 @@ const PURCHASE_PLOT = gameHash('PLOT');
 const PRODUCTION_KIND = ['unit', 'building', 'district', 'project'] as const;
 /** the events a reader takes */
 const READ_EVENTS = new Set(['CityAddedToMap', 'CityProductionCompleted', 'CityMadePurchase', 'ImprovementAddedToMap', 'PantheonFounded',
-  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded']);
+  'ResearchChanged', 'CivicChanged', 'CityProductionChanged', 'UnitAddedToMap', 'UnitKilledInCombat', 'UnitMoved', 'UnitPromoted', 'UnitRemovedFromMap', 'UnitUpgraded', 'UnitChargesChanged']);
 
 /** the decisions of the kinds the log settles, keyed for the comparison */
 type Keyed = Map<string, Decision>;
@@ -559,6 +578,14 @@ export class RecordedActions implements ActionSource {
         const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
         out0.push({ kind: 'promote', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, promotion: n(r, 2),
           xp: u0 ? num(u0.xp) : 0 });
+      } else if (name === 'UnitChargesChanged' && n(r, 2) < n(r, 3)) {
+        // a charge spent where the Builder stands on a wonder under
+        // construction is a charge toward the wonder
+        const u = units1.get(`${n(r, 0)}:${n(r, 1)}`) ?? a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
+        const plot = u ? u.y * W + u.x : -1;
+        if (u && cat.units[u.type] === 'UNIT_BUILDER' && plot >= 0 && (plotAt(a, plot)[P.wonder] as number) >= 0 && !plotAt(a, plot)[P.wonderComplete]) {
+          out0.push({ kind: 'wonderCharge', phase: phaseOf(n(r, 0)), player: n(r, 0), unit: `${n(r, 0)}:${n(r, 1)}`, plot });
+        }
       } else if (name === 'UnitMoved') {
         const k = `${n(r, 0)}:${n(r, 1)}`;
         paths.set(k, [...(paths.get(k) ?? []), n(r, 3) * W + n(r, 2)]);
@@ -585,6 +612,22 @@ export class RecordedActions implements ActionSource {
         put('queueHead', `${centre}`, { kind: 'queue', phase: 'before', player: act, city: centre, items: [{ kind: pk, row: n(r, 3), plot: -1 }] });
       }
     }
+    // a levy: a city-state's unit removed and a major's added on its plot in
+    // the next event
+    const minors = new Set(b.players.filter((p) => bool(p.minor)).map((p) => p.id));
+    const majorIds = new Set(b.players.filter((p) => bool(p.major)).map((p) => p.id));
+    const levies = new Map<string, Extract<Decision, { kind: 'levy' }>>();
+    ev.forEach((r, i) => {
+      const nx = ev[i + 1];
+      if (r[2] !== 'UnitRemovedFromMap' || !nx || nx[2] !== 'UnitAddedToMap' || !minors.has(n(r, 0)) || !majorIds.has(n(nx, 0))) return;
+      const u0 = a.units.find((x) => x.owner === n(r, 0) && x.id === n(r, 1));
+      if (!u0 || u0.x !== n(nx, 2) || u0.y !== n(nx, 3)) return;
+      const key = `${n(nx, 0)}:${n(r, 0)}`;
+      const d = levies.get(key) ?? { kind: 'levy', phase: phaseOf(n(nx, 0)), player: n(nx, 0), minor: n(r, 0), units: [] };
+      d.units.push([`${n(r, 0)}:${n(r, 1)}`, `${n(nx, 0)}:${n(nx, 1)}`]);
+      levies.set(key, d);
+    });
+    out0.push(...levies.values());
     const upgradedInto = new Set(out0.flatMap((d) => (d.kind === 'upgrade' ? [d.into] : [])));
     for (const r of ev) {
       if (r[2] !== 'UnitAddedToMap') continue;

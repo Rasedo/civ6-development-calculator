@@ -1748,8 +1748,9 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     ctx.scopeSeat = undefined;
     s.bestMeleeCS = history?.bestMelee.get(p.id) ?? 0;
     // the copies a price progression counts are the game's own, read off its
-    // quote where one stands: a free Builder (a Tribal Village's) moves no
-    // price (runs/h1_duelw1105, China's t46 and t52 Builders left it at 31)
+    // quote where one stands: a Builder taken back in the field moves no
+    // price (runs/h1_duelw1105, China's t46 and t52 three-charge Builders
+    // away from its cities left it at 31), a village's does (1117 China t8)
     const builders = copiesQuoted(rec, ctx.cat, p.id, 'UNIT_BUILDER',
       (n) => UNITS.BUILDER.cost + scaleByGameSpeed(BUILDER_COST_STEP) * n);
     s.buildersTrained = builders ?? history?.builders.get(p.id) ?? 0;

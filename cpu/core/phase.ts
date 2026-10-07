@@ -3018,9 +3018,14 @@ export function seatPhase(state: GameState): void {
     const walkCities = [...actor.cities];
     const seatMods = getModifiers(state, actor.seat);
     const madeOf = new Map<number, number>();
+    const plainOf = new Map<number, number>();
     {
       const luxMap = luxuryAmenities(state, actor.seat);
-      for (const civCity of walkCities) madeOf.set(civCity.id, computeCityStats(state, civCity, luxMap, seatMods).total.production);
+      for (const civCity of walkCities) {
+        const st = computeCityStats(state, civCity, luxMap, seatMods);
+        madeOf.set(civCity.id, st.total.production);
+        plainOf.set(civCity.id, st.plainProduction);
+      }
     }
     // CIV6 (Military alliance 2): "+15% Production toward military units
     // when you or your ally are at war."
@@ -3174,12 +3179,15 @@ export function seatPhase(state: GameState): void {
           completeQueueItem(state, civCity, q, cost, sciPerTurnSeat);
           // CIV6 (City_BuildQueue 0x16f050): a completion's OVERFLOW is the
           // smaller of the Production toward the item and the city's plain
-          // Production, less what the item still lacked before this step
-          // (the bank paid in not counted), never below 0. It goes to the
-          // city's overflow store, which the next step pays into whatever
-          // heads the queue then: one completion per city per turn.
+          // Production (no city-state flat toward the head: runs/h1_duelw1117
+          // Rome t15, a Warrior done at 12 + 9 of 20 with one Militaristic
+          // envoy's +1, the next Warrior at 9 on 9), less what the item still
+          // lacked before this step (the bank paid in not counted), never
+          // below 0. It goes to the city's overflow store, which the next step
+          // pays into whatever heads the queue then: one completion per city
+          // per turn.
           const lacked = Math.max(0, cost - progressBefore);
-          const made = Math.min(production * _em, production);
+          const made = Math.min(production * _em, plainOf.get(civCity.id)!);
           if (made > lacked) civCity.productionBank = (civCity.productionBank ?? 0) + made - lacked;
         }
       } else if (!q) {

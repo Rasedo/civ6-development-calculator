@@ -600,6 +600,12 @@ class SimOrders:
                             _wq.clamp(min=0, max=max(self._wond_n - 1, 0))]
                         self.city_progress[_r, row, _c, 0] += js_round(
                             _cst * _pct / 100.0).to(self.city_progress.dtype)
+                        # a charge that covers the cost completes the wonder
+                        # at once, the excess banked nowhere (TS
+                        # `wonderChargeBoost`)
+                        _wdone = self.city_progress[_r, row, _c, 0].double() >= _cst.double()
+                        if bool(_wdone.count_nonzero()):
+                            self._complete_head_now(row, _r[_wdone], _c[_wdone])
                         self._spend_build_charge(_r, sc, hc)
 
             if _rk_finish[n] and _fnc >= 0 and self._eng_idx >= 0:

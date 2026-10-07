@@ -57,6 +57,9 @@ export interface CityStats {
     trade: Yields;
   };
   total: Yields;
+  /** the Production with nothing at the queue's head: `total.production`
+   *  without the city-states' flat toward the head */
+  plainProduction: number;
   foodSurplus: number;
   effectiveFoodSurplus: number;
   growthNeeded: number;
@@ -311,9 +314,10 @@ export function assignWorkedTiles(
     .map((t) => ({ index: t.index, score: tileScore(tileYields(yctx, t), city.focus) }))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  // LOCKED plots first, in tile order — the citizens the player placed by
-  // hand, ahead of anything the score would have chosen.
-  const lockedValid = candidates.filter((t) => t.locked).map((t) => t.index).sort((a, b) => a - b);
+  // LOCKED plots first, by rank then in tile order — the citizens the player
+  // placed by hand, ahead of anything the score would have chosen.
+  const lockedValid = candidates.filter((t) => t.locked)
+    .sort((a, b) => (a.lockRank ?? 0) - (b.lockRank ?? 0) || a.index - b.index).map((t) => t.index);
   const worked: number[] = lockedValid.slice(0, workers);
   for (const s of scored) {
     if (worked.length >= workers) break;
@@ -1701,7 +1705,8 @@ export function computeCityStats(
   // (runs/h1_duelw1108, Xi'an: 10 at t25 building an Archer with one envoy
   // in Militaristic Wolin where its plots, Palace and Urban Planning pay 9;
   // 14.4 at t95, (15 + 1) x 0.9 at its tier)
-  if (city.queue[0]) bonuses.production += cityStateItemProduction(state, city, city.queue[0].kind);
+  const itemFlat = city.queue[0] ? cityStateItemProduction(state, city, city.queue[0].kind) : 0;
+  bonuses.production += itemFlat;
   // CIV6 (Project_YieldConversions): the yield the last production step
   // converted from a district project, under the city's percents
   // (runs/h1_duelw1108, Aquileia t112-125: Campus Research Grants on 9.9
@@ -1801,6 +1806,9 @@ export function computeCityStats(
       for (const k of Object.keys(mult) as YieldKey[]) pct[k] += (mult[k] ?? 1) - 1;
     }
   }
+  // the city's PLAIN Production (City_BuildQueue 0x16f050's read with no
+  // item, 0x1c5350): the same sum without the flat toward the head
+  const plainProduction = withPercent256(total.production - itemFlat, pct.production);
   for (const k of YIELD_KEYS) total[k] = withPercent256(total[k], pct[k]);
   const maintenance = cityMaintenance(state, city);
   total.gold -= maintenance;
@@ -1839,6 +1847,7 @@ export function computeCityStats(
     workedTiles: worked,
     breakdown: { tiles, districts, buildings, citizens, bonuses, trade },
     total,
+    plainProduction,
     foodSurplus,
     effectiveFoodSurplus: effective,
     growthNeeded,

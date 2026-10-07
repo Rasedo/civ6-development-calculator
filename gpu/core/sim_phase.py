@@ -245,11 +245,18 @@ class SimPhase:
         # loop and handed to every column: nothing in either reads a plane a
         # column writes (see `_produce_pre` / `_loyalty_pre`).
         made = self._seat_city_stats(row, record=False)[0][:, :, 1]
+        # the cities' PLAIN Production, which a completion's overflow is capped
+        # at (`plainProduction`): the same read without the city-states' flat
+        # toward the head
+        plain = made
+        if self._item_flat_live(row):
+            _ptier, _pgf, _pyf, _plux = self._seat_amenity(row)
+            plain = self._seat_city_walk(row, amen_yf=_pyf, amen_tier=_ptier, item_flat=False)[:, :, 1]
         prod_pre = self._produce_pre(row)
         for j in range(self.RC):
             if cact_any_l[j]:
                 jc = torch.full((B,), j, dtype=torch.long, device=dev)
-                self._seat_city_produce(row, jc, cact_all[:, j], made[:, j], sci_turn, prod_pre)
+                self._seat_city_produce(row, jc, cact_all[:, j], made[:, j], sci_turn, prod_pre, plain=plain[:, j])
         total, eff, need, tier_idx = self._seat_city_stats(row)
         flip = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
         loy_pre = self._loyalty_pre(row)
@@ -1014,9 +1021,31 @@ class SimPhase:
             flat = flat + torch.einsum("bs,bst,bt->b", on, tsel, amt)
         return flat
 
+    def _complete_head_now(self, row: int, rows: torch.Tensor, cols: torch.Tensor) -> None:
+        """The queue head of city `cols` on each of `rows` completes now,
+        outside the production step (`completeQueueItem` from an order: TS
+        `wonderChargeBoost`): the step's own completion body run on a step
+        that puts no Production in, the city's overflow store and converted
+        project yield kept as they stood."""
+        B, dev = self.B, self.device
+        bidx = self._bidx
+        act = torch.zeros(B, dtype=torch.bool, device=dev)
+        act[rows] = True
+        col = torch.zeros(B, dtype=torch.long, device=dev)
+        col[rows] = cols
+        bank = self.city_prod_bank[bidx, row, col].clone()
+        conv = self.city_proj_conv[bidx, row, col].clone()
+        pyld = self.city_proj_yield[bidx, row, col].clone()
+        self.city_prod_bank[bidx, row, col] = torch.where(act, torch.zeros_like(bank), bank)
+        zero = torch.zeros(B, dtype=torch.float64, device=dev)
+        self._seat_city_produce(row, col, act, zero, plain=zero)
+        self.city_prod_bank[bidx, row, col] = torch.where(act, bank, self.city_prod_bank[bidx, row, col])
+        self.city_proj_conv[bidx, row, col] = torch.where(act, conv, self.city_proj_conv[bidx, row, col])
+        self.city_proj_yield[bidx, row, col] = torch.where(act, pyld, self.city_proj_yield[bidx, row, col])
+
     def _seat_city_produce(self, row: int, col: torch.Tensor, act: torch.Tensor,
                            prod: torch.Tensor, sci_turn: torch.Tensor | None = None,
-                           pre: dict | None = None) -> None:
+                           pre: dict | None = None, plain: torch.Tensor | None = None) -> None:
         """The queue head's turn — the production add, the banked chop, the
         completion and every completion's payout. ONE body, every seat row, at
         the per-city seatPhase position (the city's first step, before its
@@ -1029,7 +1058,9 @@ class SimPhase:
         head.
 
         `pre` is `_produce_pre(row)`, the seat half of the multiplier chain;
-        a caller with one city (every direct test) may leave it out."""
+        a caller with one city (every direct test) may leave it out. `plain`
+        is the city's Production with no city-state flat toward the head
+        (`plainProduction`); left out, it is `prod`."""
         bidx = self._bidx
         if pre is None:
             pre = self._produce_pre(row)
@@ -1399,7 +1430,8 @@ class SimPhase:
         # bank paid in not counted), never below 0. It goes to the city's
         # overflow store, which the next step pays into whatever heads the
         # queue then: one completion per city per turn.
-        ovf = (torch.minimum(prod, raw) - (cost - prog).clamp(min=0)).clamp(min=0)
+        ovf = (torch.minimum(prod, raw if plain is None else plain.to(raw.dtype))
+               - (cost - prog).clamp(min=0)).clamp(min=0)
         # queue.shift() — the head goes BEFORE completeQueueItem runs
         self._q_pop(row, col, done)
         _bk = self.city_prod_bank[bidx, row, col]

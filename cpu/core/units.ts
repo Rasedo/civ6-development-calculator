@@ -921,7 +921,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const naval = !!UNITS[unit.type]?.naval;
   // CIV6 (Movement): the one-step allowance reads "full Movement" as "has
   // spent nothing this turn" — measured against the GRANTED pool, exactly as
-  // the heal gate's `grantedLast`. A live recompute drifts the moment a tech
+  // the heal gate's `grantedMoves`. A live recompute drifts the moment a tech
   // or aura lands mid-turn, and the GPU afford reads its stored pool.
   const full = unit.movesFull ?? unitFullMoves(state, unit);
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
@@ -1845,101 +1845,12 @@ export function refreshUnits(state: GameState): void {
   };
   for (const unit of state.units) {
     const tile = state.map.tiles[unit.tileIndex];
-    const naval = !!UNITS[unit.type]?.naval;
     const full = unitFullMoves(state, unit);
-    // Real Civ 6: a unit heals only if it
-    // spent NO movement since its last refresh (the heal runs before the
-    // reset below, so any move/attack/build blocks it) — +20 in a friendly
-    // city, +15 in own territory, +10 on neutral ground, +5 on foreign-owned
-    // land. A barbarian never heals by resting (runs/h1_duelw1103–1118: 5,099
-    // turns a damaged barbarian stood still unhealed, 1,544 of them on its
-    // camp; its every gain a pillage's).
     // "spent no MP" is measured against what this unit was GRANTED
     // last refresh, not against its type's base moves — the aura's +1 MP makes
     // the granted pool vary per turn. A unit that has never been refreshed
     // measures against its live full pool (`grantedMoves`).
-    const grantedLast = grantedMoves(state, unit);
-    // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
-    // have no continuous access to Iron Mines, those Swordsmen won't be able to
-    // Heal." A minor keeps no bank and is not held to it.
-    const need = UNITS[unit.type]?.requiresResource;
-    const starved = !!need && isCiv(unit.seat)
-      && !civHasStrategic(state, unit.seat, need);
-    // CIV6 (Twilight Valor): "Cannot heal outside your territory" — the
-    // seat's OWN ground. CIV6 (Giant Death Robot): "Can only heal in friendly
-    // territory", which is its own ground or an ally's. Two different bars, so
-    // two predicates.
-    const ownGround = tileSeat(tile) === unit.seat;
-    const friendly = ownGround || seatsAllied(state, unit.seat, tileSeat(tile));
-    const healBlocked = (getModifiers(state, unit.seat).healOnlyHome && !ownGround)
-      || (!!UNITS[unit.type]?.healFriendlyOnly && !friendly);
-    // CIV6 (Tactical Maintenance): "Can heal after attacking." The kind lives
-    // on the bomber's list alone, and a sortie is the only thing that spends an
-    // aircraft's turn, so a spent attack excuses the spent movement. The
-    // fortify gate below keeps the plain reading — no aircraft digs in.
-    // CIV6 (Ground Crews): "Heal while patrolling or deployed" — the fighter's
-    // HEAL_AFTER_ACTION excuses a sortie, a rebase and a deployment alike.
-    // CIV6 (Mamluk): "This unit heals every turn, even after moving or
-    // combat" — the rest gate does not apply to that chassis at all.
-    // CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved or
-    // attacked" — the improvement's OWN civilization's units, so the tile's
-    // row and the unit's seat both have to agree.
-    const paHeal = !tile.pillaged && !!tile.improvement
-      && !!IMPROVEMENTS[tile.improvement as ImprovementId]?.healsAfterAction
-      && IMPROVEMENTS[tile.improvement as ImprovementId]?.uniqueTo === civOf(state, unit.seat);
-    const rested = unit.movesLeft >= grantedLast
-      || !!UNITS[unit.type]?.healsAlways
-      || paHeal
-      || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'))
-      || promoFlag(unit, 'HEAL_AFTER_ACTION');
-    // CIV6 (Patrols): "Aircraft can heal at the end of the game turn when
-    // stationed on a City Center, Aerodrome, Airstrip, or Aircraft Carrier" —
-    // a fighter out on patrol heals only by Ground Crews' clause.
-    const patrolBar = unit.patrol !== undefined && !promoFlag(unit, 'HEAL_AFTER_ACTION');
-    if (rested && !starved && !healBlocked && !patrolBar && unit.seat !== BARB_SEAT) {
-      const home = ownGround;
-      const religious = (UNITS[unit.type]?.religiousStrength ?? 0) > 0;
-      const naval = !!UNITS[unit.type]?.naval;
-      const table = religious ? religiousHeal(state, unit, yctx(unit.seat))
-        : naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
-        // a city-state's centre carries no CITY_CENTER district, and is a city
-        : home && (tile.district === 'CITY_CENTER'
-          || state.cityStates.some((c) => c.centerIndex === tile.index)) ? 20
-        : home ? 15
-        : tileSeat(tile) === NO_SEAT ? 10
-        : 5;
-      // CIV6 (MILITARY_EMERGENCY_MEMBER_HEALING_REWARD, MEDIC_INCREASE_HEAL_RATE,
-      // APOSTLE_CHAPLAIN): no domain clause — a hull heals by them too; (Abu
-      // Al-Qasim Al-Zahrawi): attached to DOMAIN_LAND units alone.
-      const heal = religious ? table
-        : table
-          + emergencyHeal(state, unit.seat, tileSeat(tile))
-          + chaplainHeal(state, unit)
-          + (naval ? 0 : gpPermOf(seatOf(state, unit.seat), 'healBonus'));
-      // CIV6 (Laying On Of Hands): "All Governor's units heal fully in one
-      // turn in tiles of this city."
-      unit.hp = governorTileFlag(state, tile, (e) => e.fullHeal) && home
-        ? UNIT_HP
-        : Math.min(UNIT_HP, unit.hp + heal);
-    }
-    // FORTIFY: the EXACT heal gate (movesLeft >= full = spent
-    // no MP since the last refresh). A military unit that stayed put digs in
-    // (+1, cap 2); any move/attack (movesLeft < full) resets it. Symmetric
-    // across owners; read movesLeft BEFORE the reset below.
-    // NAVAL units never fortify (real Civ 6). (Embarked land units are still military but march every turn, so
-    // their fortify gate resets to 0 in practice.)
-    if (unitDomain(unit.type) === 'military' && !naval) {
-      const dug = unit.movesLeft >= grantedLast ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
-      // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
-      // "automatically gains 2 turns of fortification" — a floor, not a step.
-      // CIV6 (`Improvements.GrantFortification`): the Fort, the Great Wall and
-      // the Pa say the same thing on their own rows, so the floor is the
-      // larger of the two.
-      const floor = Math.max(
-        wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : 0,
-        IMPROVEMENTS[tile.improvement as ImprovementId]?.grantsFortification ?? 0);
-      unit.fortifyTurns = Math.max(dug, Math.min(FORTIFY_MAX_TURNS, floor));
-    }
+    restUnit(state, unit, unit.movesLeft >= grantedMoves(state, unit), yctx);
     // The Great General/Admiral aura grants +1 MP alongside its
     // +5 CS (real Civ 6). Record what was granted so NEXT turn's gates above
     // can tell "spent no MP" from "was simply given less".
@@ -1959,6 +1870,102 @@ export function refreshUnits(state: GameState): void {
         continue;
       }
     }
+  }
+}
+
+/**
+ * ONE UNIT'S REST at the game turn's end (`refreshUnits`): its heal and its
+ * fortification, given whether it spent no movement since its last refresh
+ * (`still`). Real Civ 6: a unit heals only if it spent NO movement (the heal
+ * runs before the moves' reset, so any move/attack/build blocks it) — +20 in
+ * a friendly city, +15 in own territory, +10 on neutral ground, +5 on
+ * foreign-owned land. A barbarian never heals by resting
+ * (runs/h1_duelw1103–1118: 5,099 turns a damaged barbarian stood still
+ * unhealed, 1,544 of them on its camp; its every gain a pillage's).
+ */
+export function restUnit(state: GameState, unit: Unit, still: boolean,
+  yctx: (seat: number) => YieldCtx = (seat) => makeYieldCtx(state, seat)): void {
+  const tile = state.map.tiles[unit.tileIndex];
+  const naval = !!UNITS[unit.type]?.naval;
+  // CIV6 (Resource, GS): "if you had acquired Iron to produce Swordsmen, but
+  // have no continuous access to Iron Mines, those Swordsmen won't be able to
+  // Heal." A minor keeps no bank and is not held to it.
+  const need = UNITS[unit.type]?.requiresResource;
+  const starved = !!need && isCiv(unit.seat)
+    && !civHasStrategic(state, unit.seat, need);
+  // CIV6 (Twilight Valor): "Cannot heal outside your territory" — the
+  // seat's OWN ground. CIV6 (Giant Death Robot): "Can only heal in friendly
+  // territory", which is its own ground or an ally's. Two different bars, so
+  // two predicates.
+  const ownGround = tileSeat(tile) === unit.seat;
+  const friendly = ownGround || seatsAllied(state, unit.seat, tileSeat(tile));
+  const healBlocked = (getModifiers(state, unit.seat).healOnlyHome && !ownGround)
+    || (!!UNITS[unit.type]?.healFriendlyOnly && !friendly);
+  // CIV6 (Tactical Maintenance): "Can heal after attacking." The kind lives
+  // on the bomber's list alone, and a sortie is the only thing that spends an
+  // aircraft's turn, so a spent attack excuses the spent movement. The
+  // fortify gate below keeps the plain reading — no aircraft digs in.
+  // CIV6 (Ground Crews): "Heal while patrolling or deployed" — the fighter's
+  // HEAL_AFTER_ACTION excuses a sortie, a rebase and a deployment alike.
+  // CIV6 (Mamluk): "This unit heals every turn, even after moving or
+  // combat" — the rest gate does not apply to that chassis at all.
+  // CIV6 (Pa): "A Maori unit occupying a Pa heals even if they just moved or
+  // attacked" — the improvement's OWN civilization's units, so the tile's
+  // row and the unit's seat both have to agree.
+  const paHeal = !tile.pillaged && !!tile.improvement
+    && !!IMPROVEMENTS[tile.improvement as ImprovementId]?.healsAfterAction
+    && IMPROVEMENTS[tile.improvement as ImprovementId]?.uniqueTo === civOf(state, unit.seat);
+  const rested = still
+    || !!UNITS[unit.type]?.healsAlways
+    || paHeal
+    || (attacksLeftOf(unit) < attacksPerTurn(unit) && promoFlag(unit, 'HEAL_AFTER_ATTACK'))
+    || promoFlag(unit, 'HEAL_AFTER_ACTION');
+  // CIV6 (Patrols): "Aircraft can heal at the end of the game turn when
+  // stationed on a City Center, Aerodrome, Airstrip, or Aircraft Carrier" —
+  // a fighter out on patrol heals only by Ground Crews' clause.
+  const patrolBar = unit.patrol !== undefined && !promoFlag(unit, 'HEAL_AFTER_ACTION');
+  if (rested && !starved && !healBlocked && !patrolBar && unit.seat !== BARB_SEAT) {
+    const home = ownGround;
+    const religious = (UNITS[unit.type]?.religiousStrength ?? 0) > 0;
+    const naval = !!UNITS[unit.type]?.naval;
+    const table = religious ? religiousHeal(state, unit, yctx(unit.seat))
+      : naval ? navalHeal(state, unit, home, tileSeat(tile) === NO_SEAT)
+      // a city-state's centre carries no CITY_CENTER district, and is a city
+      : home && (tile.district === 'CITY_CENTER'
+        || state.cityStates.some((c) => c.centerIndex === tile.index)) ? 20
+      : home ? 15
+      : tileSeat(tile) === NO_SEAT ? 10
+      : 5;
+    // CIV6 (MILITARY_EMERGENCY_MEMBER_HEALING_REWARD, MEDIC_INCREASE_HEAL_RATE,
+    // APOSTLE_CHAPLAIN): no domain clause — a hull heals by them too; (Abu
+    // Al-Qasim Al-Zahrawi): attached to DOMAIN_LAND units alone.
+    const heal = religious ? table
+      : table
+        + emergencyHeal(state, unit.seat, tileSeat(tile))
+        + chaplainHeal(state, unit)
+        + (naval ? 0 : gpPermOf(seatOf(state, unit.seat), 'healBonus'));
+    // CIV6 (Laying On Of Hands): "All Governor's units heal fully in one
+    // turn in tiles of this city."
+    unit.hp = governorTileFlag(state, tile, (e) => e.fullHeal) && home
+      ? UNIT_HP
+      : Math.min(UNIT_HP, unit.hp + heal);
+  }
+  // FORTIFY: the EXACT heal gate (spent no MP since the last refresh). A
+  // military unit that stayed put digs in (+1, cap 2); any move/attack
+  // resets it. Symmetric across owners.
+  // NAVAL units never fortify (real Civ 6). (Embarked land units are still military but march every turn, so
+  // their fortify gate resets to 0 in practice.)
+  if (unitDomain(unit.type) === 'military' && !naval) {
+    const dug = still ? Math.min(2, (unit.fortifyTurns ?? 0) + 1) : 0;
+    // CIV6 (Alhambra, Mont St. Michel): a unit occupying the wonder
+    // "automatically gains 2 turns of fortification" — a floor, not a step.
+    // CIV6 (`Improvements.GrantFortification`): the Fort, the Great Wall and
+    // the Pa say the same thing on their own rows, so the floor is the
+    // larger of the two.
+    const floor = Math.max(
+      wonderOccupyDefense(state, unit.tileIndex) > 0 ? FORTIFY_MAX_TURNS : 0,
+      IMPROVEMENTS[tile.improvement as ImprovementId]?.grantsFortification ?? 0);
+    unit.fortifyTurns = Math.max(dug, Math.min(FORTIFY_MAX_TURNS, floor));
   }
 }
 
@@ -2207,8 +2214,14 @@ export function drawAndPayGoody(state: GameState, unit: Unit, tile: Tile): void 
       break;
     }
     case 'unitInCity': {
+      // a village's Builder or Settler is a copy the chassis' price climbs on
+      // (COST_PROGRESSION_PREVIOUS_COPIES): every logged village Builder moved
+      // its player's quote one step (runs/h1_duelw1117 China t8 25 -> 27, 1118
+      // Rome t14, 1120 t25 and t170, 1121 t80, 1124 t149)
       const city = nearestCityTo(state, owner, tile);
-      if (city) spawnUnit(state, p.unit, city.centerIndex, unit.seat);
+      if (!city || !spawnUnit(state, p.unit, city.centerIndex, unit.seat)) break;
+      if (p.unit === 'BUILDER') owner.buildersTrained += 1;
+      else if (p.unit === 'SETTLER') owner.settlersTrained = (owner.settlersTrained ?? 0) + 1;
       break;
     }
     case 'experience':

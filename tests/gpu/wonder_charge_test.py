@@ -212,6 +212,22 @@ def test_the_charge_is_spent(rules, path) -> None:
     print("  7 the charge OK — one charge per helping")
 
 
+def test_a_covering_charge_completes(rules, path) -> None:
+    """A charge that covers the cost completes the wonder at once, the excess
+    banked nowhere (TS `wonderChargeBoost`)."""
+    sim = fresh(rules, path)
+    row = 1
+    inside, _out = _wonders_in_and_out(sim)
+    j, at, slot = _scene(sim, row, inside, True)
+    cost = float(sim._wond_cost[inside])
+    sim.city_progress[B0, row, j, 0] = cost - 1
+    bank = float(sim.city_prod_bank[B0, row, j])
+    _charge(sim, row, slot)
+    assert int(sim.city_current[B0, row, j, 0]) == -1, "the covered wonder stayed at the head"
+    assert float(sim.city_prod_bank[B0, row, j]) == bank, "the excess reached the overflow store"
+    print("  8 the completion OK — a covering charge completes the wonder at once")
+
+
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
@@ -222,6 +238,7 @@ def main() -> int:
     test_refuses_a_tile_that_is_not_the_site(rules, path)
     test_only_the_head_accrues(rules, path)
     test_the_charge_is_spent(rules, path)
+    test_a_covering_charge_completes(rules, path)
     print("BATTERY OK wonder_charge")
     return 0
 

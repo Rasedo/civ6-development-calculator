@@ -6873,7 +6873,7 @@ class SimEconomy:
 
     def _seat_city_walk(self, row: int, j: int | None = None, *, amen_yf: torch.Tensor,
                         pick: list | None = None, maint: torch.Tensor | None = None,
-                        amen_tier: torch.Tensor | None = None) -> torch.Tensor:
+                        amen_tier: torch.Tensor | None = None, item_flat: bool = True) -> torch.Tensor:
         """THE computeCityStats twin — [B, n, 6] f64 per-city totals in engine
         yield order (food, production, gold, science, culture, faith) for ANY
         seat row, dead columns zeroed and gold NET of cityMaintenance. n is the
@@ -6898,7 +6898,9 @@ class SimEconomy:
         amen_tier: [B, RC] that same ranking's tier, full width, when the
            caller holds it; otherwise the walk ranks again for the tier rows.
         pick: when given, the worked-tile pick of the columns walked is
-           appended to it, [B, n, M] tile ids, -1 unused."""
+           appended to it, [B, n, M] tile ids, -1 unused.
+        item_flat: False reads the city's PLAIN Production — the city-states'
+           flat toward the queue's head left out (`CityStats.plainProduction`)."""
         rd = self.rules_dev
         B, dev, F64 = self.B, self.device, torch.float64
         cols = self.RC
@@ -7543,8 +7545,7 @@ class SimEconomy:
         # CIV6 (Industrial / Militaristic envoys, ADJUST_*_PRODUCTION): the
         # flat toward the item at the head of each city's queue is its
         # Production as the game reads it (City:GetYield), under its percents
-        if (self.S > 0 and row < self.n_majors
-                and bool((self.citystate_alive & self._citystate_item_type).count_nonzero())):
+        if item_flat and self._item_flat_live(row):
             bon = bon.clone()
             for _c in range(n):
                 _col = torch.full((B,), _c if j is None else j, dtype=torch.long, device=dev)
@@ -7679,6 +7680,13 @@ class SimEconomy:
         total[:, :, 2] = total[:, :, 2] - maint[:, sl]
         # Dead columns contribute nothing (their static centre yields preload).
         return torch.where(alive.unsqueeze(2), total, torch.zeros_like(total))
+
+    def _item_flat_live(self, row: int) -> bool:
+        """may a city of seat row `row` hold a city-state's flat toward its
+        queue's head: a major row, with a live city-state of a production
+        type"""
+        return (self.S > 0 and row < self.n_majors
+                and bool((self.citystate_alive & self._citystate_item_type).count_nonzero()))
 
     def _seat_city_stats(self, row: int, record: bool = True) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """The city-stats read for seat row `row` as the state stands now: the
