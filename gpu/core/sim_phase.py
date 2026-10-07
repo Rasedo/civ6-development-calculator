@@ -947,6 +947,11 @@ class SimPhase:
             if not bool(_hk.count_nonzero()):
                 _hk = None
         pre["hk"] = _hk
+        _bru = None
+        if self._suz_c_wonder_prod >= 0 and row < self.n_majors:
+            _bru = self._suz_effect_count(row, self._suz_c_wonder_prod).take(self._bidx)
+            _bru = _bru.double() * (self._suz_wonder_pct / 100.0) if bool(_bru.count_nonzero()) else None
+        pre["bru"] = _bru
         pre["plaza"] = [(_zp, self._row_is(row, _zc, _zl)[self._bidx])
                         for _zc, _zl, _zp in self._live_rows(row, self._plaza_district_prod_rows)] \
             if (self._plaza_district_prod_rows and self._govplaza_didx >= 0) else []
@@ -1312,13 +1317,15 @@ class SimPhase:
         _add = torch.zeros_like(prod)
         _pb = pre["pb"]
         if _pb:
-            for _pact, _isw, _cmask, _eramax, _pct in _pb:
+            for _pact, _isw, _cmask, _eramax, _pct, _eramin in _pb:
                 if _isw == 1:
                     _nw = self._wonder_era.shape[0]
                     _wid = (cur - self.WONDER_BASE).clamp(min=0, max=_nw - 1)
                     _hit = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _nw)
                     if _eramax >= 0:
                         _hit = _hit & (self._wonder_era[_wid] <= _eramax)
+                    if _eramin > 0:
+                        _hit = _hit & (self._wonder_era[_wid] >= _eramin)
                 elif _isw == 2:
                     # CIV6 (Fascism): "+50% Production toward Units" —
                     # class-FREE, every unit the queue can hold.
@@ -1326,13 +1333,23 @@ class SimPhase:
                     _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU)
                     if _eramax >= 0:
                         _hit = _hit & (self._type_era[_ui] <= _eramax)
+                    if _eramin > 0:
+                        _hit = _hit & (self._type_era[_ui] >= _eramin)
                 else:
                     _ui = (cur - self.UNIT_BASE).clamp(min=0, max=self.NU - 1)
                     _hit = (cur >= self.UNIT_BASE) & (cur < self.UNIT_BASE + self.NU) \
                         & ((self._type_cls.take(_ui) & _cmask) != 0)
                     if _eramax >= 0:
                         _hit = _hit & (self._type_era.take(_ui) <= _eramax)
+                    if _eramin > 0:
+                        _hit = _hit & (self._type_era.take(_ui) >= _eramin)
                 _add = _add + (_pact & _hit).to(_add.dtype) * _pct
+        # CIV6 (Brussels, EFFECT_ADJUST_WONDER_PRODUCTION): percent toward
+        # wonders, in the same additive sum (`suzerainWonderPct`)
+        if pre["bru"] is not None:
+            _bnw = self._wonder_era.shape[0]
+            _bwon = (cur >= self.WONDER_BASE) & (cur < self.WONDER_BASE + _bnw)
+            _add = _add + torch.where(_bwon, pre["bru"], torch.zeros_like(pre["bru"])).to(_add.dtype)
         # CIV6 (Ancestral Hall): "50% increased Production toward Settlers in
         # this city"; (Warlord's Throne): "Capturing an enemy City grants 20%
         # bonus Production in all Cities for 5 turns". Percentages both, so
@@ -1863,9 +1880,9 @@ class SimPhase:
                                 f":{int(_vat[_hb])} hull{int(_hull[_hb])}")
                     self._spawn_unit(row, _vw & (_hull >= 0), _vat, _hull.clamp(min=0))
         # MONUMENTALITY pays era score per SPECIALTY district completed
-        # (a city centre is never queued here).
+        # (`countsTowardLimit`; an Aqueduct, a Bath or a Dam pays nothing)
         mon = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        mon[dr] = True
+        mon[dr] = self._is_specialty[self.district[dr, dt].clamp(min=0)] & (self.district[dr, dt] >= 0)
         self._dedication_event(row, 0, mon)
         # CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): `districtMoment` — a
         # major's first district of a type whose yield where it completed,

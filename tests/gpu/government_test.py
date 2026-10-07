@@ -257,7 +257,7 @@ def main() -> None:
     fxF = sim._gov_policy_mods(cF)[12]
     assert float(fxF["wwcut"][0]) == 20.0 and float(fxF["xppct"][0]) == 0.0, "FASCISM fx: -20% weariness, no xp term"
     assert float(fxF["gppmult"][0]) == 1.0, "FASCISM fx: no GPP factor"
-    _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p in fxF["prod"] if bool(_a[0])]
+    _prows = [(int(w), int(cm), int(e), float(p)) for _a, w, cm, e, p, _mn in fxF["prod"] if bool(_a[0])]
     assert (2, 0, -1, 0.5) in _prows, "FASCISM fx: its flat bonus, +50% toward every unit"
 
     # 11) `_gov_unit_cs` — seat 0 under FASCISM pays +5 to combatants only;

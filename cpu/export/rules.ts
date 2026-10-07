@@ -21,7 +21,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../core/aura';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
-import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT } from '../data/cityStates';
+import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
@@ -192,14 +192,14 @@ const effectRow = (fx: PolicyEffects) => ({
   housingIfDistricts: fx.housingIfDistricts ? [fx.housingIfDistricts.min, fx.housingIfDistricts.housing] : [-1, 0],
   amenitiesIfSpecialty: fx.amenitiesIfSpecialty ? [fx.amenitiesIfSpecialty.min, fx.amenitiesIfSpecialty.amenities] : [-1, 0],
   newDeal: fx.newDeal ? [fx.newDeal.min, fx.newDeal.housing, fx.newDeal.amenities] : [-1, 0, 0],
-  // [target, unit-class mask over UNIT_CLASSES, eraMax, pct]; target -1 =
+  // [target, unit-class mask over UNIT_CLASSES, eraMax, pct, eraMin]; target -1 =
   // the row carries no production boost, 0 = the named unit classes,
   // 1 = wonders, 2 = EVERY unit (Fascism's class-free arm).
   prodBoost: fx.prodBoost
     ? [fx.prodBoost.target === 'wonder' ? 1 : fx.prodBoost.target === 'anyUnit' ? 2 : 0,
        fx.prodBoost.classes.reduce((m, c) => m | (1 << UNIT_CLASSES.indexOf(c)), 0),
-       fx.prodBoost.eraMax, fx.prodBoost.pct]
-    : [-1, 0, 0, 0],
+       fx.prodBoost.eraMax, fx.prodBoost.pct, fx.prodBoost.eraMin ?? 0]
+    : [-1, 0, 0, 0, 0],
   builderCharges: fx.builderCharges ?? 0,
   unitMaintenanceCut: fx.unitMaintenanceCut ?? 0,
   wmdUpkeepPct: fx.wmdUpkeepPct ?? 0,
@@ -1099,6 +1099,12 @@ export function buildRules() {
         hubDistrict: PLACEABLE_DISTRICTS.indexOf(MUSCAT_HUB_DISTRICT),
         // Kandy: percent more Faith from a Relic
         relicFaithPct: KANDY_RELIC_FAITH_PCT,
+        // Kandy: Relics per natural wonder first revealed
+        wonderRelics: KANDY_WONDER_RELICS,
+        // Singapore: Production per foreign major a city's routes run to
+        partnerProd: SINGAPORE_PARTNER_PROD,
+        // Brussels: percent toward wonders
+        wonderPct: BRUSSELS_WONDER_PCT,
         // Auckland: [yield, amount, terrain, the seat's own era at least (-1
         // none)] on every plot of the suzerain
         shallowWaterRows: AUCKLAND_PLOT_ROWS.map((r) => [
@@ -1499,6 +1505,7 @@ export function buildRules() {
         relicTourismMult: w.effects?.religiousTourismMult ?? 1,
         resortTourismMult: w.effects?.resortTourismMult ?? 1,
         loyaltyAura: w.effects?.loyaltyAura ?? 0,
+        regLoyalty: w.effects?.regionalLoyalty ?? 0,
         occupyDefense: w.effects?.occupyDefense ?? 0,
         freeCivics: w.effects?.freeCivics ?? 0,
         freeTechs: w.effects?.freeTechs ?? 0,

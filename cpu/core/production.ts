@@ -257,7 +257,11 @@ export function completeQueueItem(
       dt.districtComplete = true;
       // the type's own price takes the completed count afresh
       if (dt.district) refreshDistrictDiscount(state, city.seat, dt.district);
-      if (dt.district !== 'CITY_CENTER') dedicationEvent(state, city.seat, DED_MONUMENTALITY);
+      // CIV6 (Monumentality, EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED):
+      // a specialty district (`countsTowardLimit`) completed pays; an
+      // Aqueduct, a Bath or a Dam pays nothing (runs/h1_duelw1109 t99, 1110
+      // t101 and t107, 1118 t98, 1120 t94, 1124 t97)
+      if (dt.district && DISTRICTS[dt.district]?.countsTowardLimit) dedicationEvent(state, city.seat, DED_MONUMENTALITY);
       if (dt.district) districtMoment(state, city.seat, city, dt.index, dt.district);
       if (dt.district === 'ENCAMPMENT') {
         dt.encampHp = ENCAMPMENT_HP;

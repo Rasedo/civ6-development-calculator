@@ -79,6 +79,9 @@ export interface BuiltWonderDef {
     regionalRange?: number;
     /** Amenities to the city that holds the wonder (regional with `regionalRange`). */
     cityAmenities?: number;
+    /** Loyalty a turn to every city of the owner within `regionalRange` of
+     *  the wonder tile (MODIFIER_PLAYER_CITIES_ADJUST_IDENTITY_PER_TURN). */
+    regionalLoyalty?: number;
     /** Housing to the city that holds the wonder. */
     cityHousing?: number;
     /** Housing to every city the owner holds. */
@@ -333,8 +336,8 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
       requiresCivic: 'GAMES_AND_RECREATION',
       placement: { flatOnly: true, adjacentDistrict: 'ENTERTAINMENT_COMPLEX' },
       cityYields: { culture: 2 },
-      effects: { cityAmenities: 2, regionalRange: 6 },
-      description: '+2 culture and +2 amenities to each of your cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
+      effects: { cityAmenities: 2, regionalRange: 6, regionalLoyalty: 2 },
+      description: '+2 culture, +2 amenities and +2 loyalty to each of your cities within 6 tiles. Flat, adjacent to an Entertainment Complex.',
       src: {
         code: { stylized: 'a display code, not a game constant' },
         cost: xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Cost', { scale: GAME_SPEED }),
@@ -344,6 +347,9 @@ export const BUILT_WONDERS: Record<string, BuiltWonderDef> = Object.fromEntries(
         'placement.adjacentDistrict': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'AdjacentDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
         'effects.cityAmenities': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'Entertainment'),
         'effects.regionalRange': xml('Buildings', 'BuildingType=BUILDING_COLOSSEUM', 'RegionalRange'),
+        // COLOSSEUM_IDENTITY's subjects: the cities REQUIRES_PLOT_HAS_COLOSSEUM_WITHIN_6
+        // takes in (MaxRange 6, the RegionalRange)
+        'effects.regionalLoyalty': xml('ModifierArguments', 'ModifierId=COLOSSEUM_IDENTITY&Name=Amount', 'Value'),
       },
     }),
     W({

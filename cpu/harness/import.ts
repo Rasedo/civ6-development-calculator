@@ -36,6 +36,7 @@ import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
+import { floodplainList } from './eventDraws';
 import { eruptionRings, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
@@ -619,12 +620,12 @@ interface PolicySlots {
 }
 
 /** A record route's identity: its Trader and its two cities. */
-function routeKey(r: Record<string, number>): string {
+export function routeKey(r: Record<string, number>): string {
   return `${r.TraderUnitPlayer}:${r.TraderUnitID}:${r.OriginCityPlayer}:${r.OriginCityID}:${r.DestinationCityPlayer}:${r.DestinationCityID}`;
 }
 
 /** Every trade route a record carries, as the game's route tables. */
-function recordRoutes(rec: TurnRecord): Record<string, number>[] {
+export function recordRoutes(rec: TurnRecord): Record<string, number>[] {
   const out: Record<string, number>[] = [];
   for (const c of rec.cities) {
     if (Array.isArray(c.routes)) out.push(...(c.routes as Record<string, number>[]));
@@ -967,9 +968,32 @@ function foldPeople(h: History, rec: TurnRecord, cat: Catalog): boolean {
     if (u) {
       p.at = u.y * W + u.x;
       p.city = cityOwning(rec, p.at, p.player);
-    } else p.spent = rec.turn;
+    } else {
+      p.spent = rec.turn;
+      // where the log walks the unit before its activation, it was spent
+      // there (1123 t91: Hildegard walks from Xi'an's centre to its Holy
+      // Site at 39,16 and is spent on it, its Science from t92)
+      const at = activationPlot(rec, p.unit, W);
+      if (at >= 0) {
+        p.at = at;
+        p.city = cityOwning(rec, at, p.player);
+      }
+    }
   }
   return true;
+}
+
+/** The plot the log last moves unit `key` (`owner:id`) to before its great
+ *  person activation, -1 where the log activates it without a move. */
+function activationPlot(rec: TurnRecord, key: string, W: number): number {
+  const logged = (rec as TurnRecord & { actions?: unknown }).actions;
+  let at = -1;
+  for (const r of Array.isArray(logged) ? logged as unknown[][] : []) {
+    if (`${r[3]}:${r[4]}` !== key) continue;
+    if (r[2] === 'UnitMoved' || r[2] === 'UnitMoveComplete') at = (r[6] as number) * W + (r[5] as number);
+    else if (r[2] === 'UnitGreatPersonActivated') return at;
+  }
+  return -1;
 }
 
 /**
@@ -1518,11 +1542,30 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
       if (!bool(p.major)) continue;
       const counts = h.discountDistricts.get(p.id) ?? new Map<DistrictId, number>();
       h.discountDistricts.set(p.id, counts);
-      if (done(rec, p.id) !== done(h.last, p.id)) {
-        const D = completedSpecialty(h.last, cat, p.id);
-        for (const t of PLACEABLE_DISTRICTS) counts.set(t, D);
+      // the log's order: a technology or civic completed takes every type's
+      // count to the specialty districts completed so far, a district of a
+      // type its own (1124 t212: Jiaodong's Water Park completes before
+      // Guangzhou's Commercial Hub, 26 of 13 types, its quote 218 until the
+      // research of t215; 1123 t190: Xi'an's Industrial Zone and Jiaodong's
+      // Campus complete before a technology completed in the turn, the
+      // Harbor quoted 112 at t191). Without the log, or where it misses a
+      // completion, the research takes the count of the record before and a
+      // completed type the count of this record.
+      const steps = loggedDiscountSteps(rec, cat, p.id);
+      const before = completedSpecialty(h.last, cat, p.id);
+      const after = completedSpecialty(rec, cat, p.id);
+      const researched = done(rec, p.id) !== done(h.last, p.id);
+      const districts = steps.filter((x) => x !== 'research').length;
+      if (before + districts === after && (!researched || steps.includes('research'))) {
+        let cur = before;
+        for (const x of steps) {
+          if (x === 'research') for (const t of PLACEABLE_DISTRICTS) counts.set(t, cur);
+          else counts.set(x, (cur += 1));
+        }
+      } else {
+        if (researched) for (const t of PLACEABLE_DISTRICTS) counts.set(t, before);
+        for (const t of completedSince(h.last, rec, cat, p.id)) counts.set(t, after);
       }
-      for (const t of completedSince(h.last, rec, cat, p.id)) counts.set(t, completedSpecialty(rec, cat, p.id));
       // a district placed: its own price took the count standing, the type's
       // later prices take the count at its placement (1117 t175: China's
       // Aerodrome placed, the other cities quote it at 95, not 160)
@@ -1709,6 +1752,29 @@ function completedSince(a: TurnRecord, b: TurnRecord, cat: Catalog, pid: number,
       const at = `${d[1]},${d[2]}`;
       if (id && id !== 'CITY_CENTER' && (placed ? !stood.has(at) : d[3] === true && !was.has(at))) out.add(id);
     }
+  }
+  return out;
+}
+
+/** The steps of a player's turn that move its district-price counts, in
+ *  the log's order: 'research' for a technology or civic completed, a type
+ *  for a specialty district (`countsTowardLimit`) completed, each city's
+ *  district once. */
+function loggedDiscountSteps(rec: TurnRecord, cat: Catalog, pid: number): ('research' | DistrictId)[] {
+  const logged = (rec as TurnRecord & { actions?: unknown }).actions;
+  const seen = new Set<string>();
+  const out: ('research' | DistrictId)[] = [];
+  for (const r of Array.isArray(logged) ? logged as unknown[][] : []) {
+    if (r[3] !== pid) continue;
+    if (r[2] === 'ResearchCompleted' || r[2] === 'CivicCompleted') {
+      out.push('research');
+      continue;
+    }
+    if (r[2] !== 'CityProductionCompleted' || r[5] !== 2) continue;
+    const id = engineRowOf(cat, 'district', r[6] as number) as DistrictId | null;
+    if (!id || !DISTRICTS[id]?.countsTowardLimit || seen.has(`${r[4]}:${r[6]}`)) continue;
+    seen.add(`${r[4]}:${r[6]}`);
+    out.push(id);
   }
   return out;
 }
@@ -2620,15 +2686,21 @@ function importShortfalls(rec: TurnRecord, state: GameState, seatOfGame: (pid: n
 }
 
 /**
- * The floods the records named (`History.floods`): each one's river from
- * the plot it started on (`riverReach`), every plot of it one flood more
- * (`Tile.floodCount`, the Great Bath's Faith). Nothing is read back.
+ * The floods the records named (`History.floods`): each one's plots the
+ * game's Floodplains list from the plot it started on, read off the
+ * record's river edges (`floodplainList`) where they give one list, else
+ * the engine's river (`riverReach`); every plot of it one flood more
+ * (`Tile.floodCount`, the Great Bath's Faith). Two rivers meeting are one
+ * chain to the engine's rivers and two lists to the game's (runs/h1_duelw1123:
+ * river 181 from 480 and river 201 from 612; Xi'an's Great Bath reads river
+ * 201's floods alone on its centre 611, t83-250). Nothing is read back.
  */
 function importFloods(state: GameState, floods: Map<string, number>): Map<number, Set<number>> {
   for (const start of floods.values()) {
     const t = state.map.tiles[start];
     if (!t) continue;
-    for (const r of riverReach(state.map, t)) r.floodCount = (r.floodCount ?? 0) + 1;
+    const lists = floodplainList(state.map, t);
+    for (const r of lists.length === 1 ? lists[0] : riverReach(state.map, t)) r.floodCount = (r.floodCount ?? 0) + 1;
   }
   return new Map();
 }

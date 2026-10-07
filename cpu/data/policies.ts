@@ -60,6 +60,8 @@ export interface ProdBoost {
   classes: UnitClass[];
   /** the highest era index it still pays; -1 = every era */
   eraMax: number;
+  /** the lowest era index it pays (0 when absent: from the Ancient era) */
+  eraMin?: number;
   /** the fraction added (0.5 = +50%) */
   pct: number;
 }
@@ -304,6 +306,7 @@ const CLASSICAL = 1;
 const RENAISSANCE = 3;
 const INDUSTRIAL = 4;
 const MODERN = 5;
+const INFORMATION = 7;
 const EVERY_ERA = -1;
 
 /** PROVENANCE (cpu/data/provenance.ts): where each column of a policy card row came from in
@@ -896,6 +899,14 @@ const POLICY_SRC: Record<string, SrcMap> = {
     'effects.stockpilePerSource.ALUMINUM': xml('ModifierArguments', 'ModifierId=RESOURCE_MANAGEMENT_ADDITIONAL_ALUMINUM_EXTRACTION&Name=Amount', 'Value'),
     'effects.stockpilePerSource.OIL': xml('ModifierArguments', 'ModifierId=RESOURCE_MANAGEMENT_ADDITIONAL_OIL_EXTRACTION&Name=Amount', 'Value'),
   },
+  INTERNATIONAL_WATERS: {
+    kind: xml('Policies', 'PolicyType=POLICY_INTERNATIONAL_WATERS', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
+    'effects.prodBoost.pct': { derived: 'Amount/100 - the install writes the percentage, this catalog the fraction', inputs: [xml('ModifierArguments', 'ModifierId=INTERNATIONALWATERS_MODERN_NAVAL_MELEE_PRODUCTION&Name=Amount', 'Value')] },
+    'effects.prodBoost.target': { derived: 'unit - the install attaches unit-production modifiers', inputs: [xml('Modifiers', 'ModifierId=INTERNATIONALWATERS_MODERN_NAVAL_MELEE_PRODUCTION', 'ModifierType', { expect: 'MODIFIER_PLAYER_CITIES_ADJUST_UNIT_TAG_ERA_PRODUCTION' })] },
+    'effects.prodBoost.classes': { derived: 'the UnitPromotionClass arguments of the install modifiers this card attaches (naval melee, ranged, raider), as engine classes', inputs: [xml('ModifierArguments', 'ModifierId=INTERNATIONALWATERS_MODERN_NAVAL_MELEE_PRODUCTION&Name=UnitPromotionClass', 'Value')] },
+    'effects.prodBoost.eraMin': { derived: 'the ERA INDEX of the earliest modifier era id the install names', inputs: [xml('ModifierArguments', 'ModifierId=INTERNATIONALWATERS_MODERN_NAVAL_MELEE_PRODUCTION&Name=EraType', 'Value', { expect: 'ERA_MODERN' })] },
+    'effects.prodBoost.eraMax': { derived: 'the ERA INDEX of the latest modifier era id the install names', inputs: [xml('ModifierArguments', 'ModifierId=INTERNATIONALWATERS_INFORMATION_NAVAL_MELEE_PRODUCTION&Name=EraType', 'Value', { expect: 'ERA_INFORMATION' })] },
+  },
   THIRD_ALTERNATIVE: {
     kind: xml('Policies', 'PolicyType=POLICY_THIRD_ALTERNATIVE', 'GovernmentSlotType', { expect: 'SLOT_MILITARY' }),
     'effects.buildingYields.MILITARY_ACADEMY.gold': xml('ModifierArguments', 'ModifierId=THIRDALTERNATIVE_MILITARY_ACADEMY_GOLD_MODIFIER&Name=Amount', 'Value'),
@@ -1360,6 +1371,9 @@ export const POLICIES: Record<string, PolicyDef> = Object.fromEntries(
     }),
     P('LIGHTNING_WARFARE', 'Lightning Warfare', 'military', '+50% production toward heavy and light cavalry of every era.', undefined, {
       prodBoost: { target: 'unit', classes: ['cavalry'], eraMax: EVERY_ERA, pct: 0.5 },
+    }),
+    P('INTERNATIONAL_WATERS', 'International Waters', 'military', '+100% production toward Modern, Atomic and Information era naval units.', undefined, {
+      prodBoost: { target: 'unit', classes: ['naval'], eraMin: MODERN, eraMax: INFORMATION, pct: 1 },
     }),
     P('PRESS_GANGS', 'Press Gangs', 'military', '+100% production toward Industrial-era and earlier naval units.', 'COLD_WAR', {
       prodBoost: { target: 'unit', classes: ['naval'], eraMax: INDUSTRIAL, pct: 1 },

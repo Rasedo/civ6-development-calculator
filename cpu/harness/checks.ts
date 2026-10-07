@@ -47,6 +47,7 @@ import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT, WONDER_FREE_TILES } from '../data/constants';
 import { CITIZEN_NAMED_UNITS, PROMO_OFFER_UNITS, UNITS } from '../data/units';
 import { BUILDINGS } from '../data/buildings';
+import { DISTRICTS } from '../data/districts';
 import { gainPopulationPressure } from '../data/religion';
 import type { DistrictId, FeatureId, YieldKey } from '../../world/types';
 import { YIELD_KEYS } from '../../world/types';
@@ -56,7 +57,7 @@ import { Civ6Random, drawsBetween } from './civ6Random';
 import type { LoggedDraw } from './randLog';
 import { DRAW_SITES, siteLabel } from './drawSites';
 import {
-  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, recordMap, routeChanges,
+  AGE_DARK, AGE_GOLDEN_ONLY, AGE_HEROIC, AGE_NORMAL, PURCHASE_PLOT_HASH, ageOf, congressOfRecord, engineFeature, engineRowOf, eraBegan, importTurn, majorEras, notStarted, citiesNotStarted, recordMap, recordRoutes, routeChanges, routeKey,
   type History, type Imported,
 } from './import';
 import {
@@ -66,7 +67,7 @@ import {
 } from '../core/eras';
 import { LARGEST_KEY, districtMoment, momentKeyId, momentKeysHeld, recordMoment, researchKeys } from '../core/moments';
 import { citiesOf, isCiv } from '../core/seats';
-import { AGE_GOLDEN, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, goldShortfall } from '../data/seats';
+import { AGE_GOLDEN, DED_COINAGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, goldShortfall } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { engineId, gameHash } from './aliases';
@@ -2176,7 +2177,7 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
           const city = st.seats[seat]?.cities.find((q) => q.centerIndex === k);
           // the completion site's two payouts (`completeQueueItem`): the
           // Monumentality dedication's, then the district's moment
-          if (type !== 'CITY_CENTER') dedicationEvent(st, seat, DED_MONUMENTALITY);
+          if (DISTRICTS[type]?.countsTowardLimit) dedicationEvent(st, seat, DED_MONUMENTALITY);
           if (city) districtMoment(st, seat, city, tile, type);
         }]);
       }
@@ -2253,6 +2254,19 @@ export function eraEvents(a: TurnRecord, b: TurnRecord, cat: Catalog, prev?: Tur
         of(u.owner).events.push(['levy', levyMoment]);
       }
     }
+  }
+  // a route gone with its Trader alive ran to its end: Reform the Coinage's
+  // era score per route completed (`tradeRouteExpiry`; 1124 China: three
+  // pairs t124–146 at +1 with no moment)
+  {
+    const liveNow = new Set(recordRoutes(b).map(routeKey));
+    const units = new Set(b.units.map((u) => `${u.owner}:${u.id}`));
+    const done = new Map<number, number>();
+    for (const r of recordRoutes(a)) {
+      if (liveNow.has(routeKey(r)) || !units.has(`${r.TraderUnitPlayer}:${r.TraderUnitID}`)) continue;
+      done.set(r.TraderUnitPlayer, (done.get(r.TraderUnitPlayer) ?? 0) + 1);
+    }
+    for (const [pid, n] of done) of(pid).events.push([`routes done ${n}`, (st, seat) => dedicationEvent(st, seat, DED_COINAGE, n)]);
   }
   // a barbarian camp gone from its plot: the major whose unit stands there
   // at t+1 destroyed it

@@ -69,7 +69,9 @@ export type SuzEffect =
   | 'shallowWaterProd'   // Auckland
   | 'resourceTypeProduction' // Johannesburg
   | 'hubAmenities'       // Muscat
-  | 'relicFaith';        // Kandy
+  | 'relicFaith'         // Kandy
+  | 'partnerProduction' // Singapore
+  | 'wonderProduction';  // Brussels
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -83,6 +85,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
+  'partnerProduction', 'wonderProduction',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -213,6 +216,24 @@ export const MUSCAT_HUB_DISTRICT = 'COMMERCIAL_HUB';
  *  (runs/h1_duelw1120 Xi'an: its two Relics pay 12 Faith under China's
  *  suzerainty, not 8). */
 export const KANDY_RELIC_FAITH_PCT = 50;
+/** CIV6 (Leaders.xml, MINOR_CIV_KANDY_GRANT_RELIC_BONUS):
+ *  `MODIFIER_PLAYER_ADJUST_NATURAL_WONDER_RELIC` Amount 1 — the Relics the
+ *  suzerain is given as it first reveals a natural wonder (the visibility
+ *  manager 0x50d390 creates that many through 0x495860 on the discovery). */
+export const KANDY_WONDER_RELICS = 1;
+
+/** CIV6 (GranColombia_Maya_Leaders.xml, MINOR_CIV_SINGAPORE_PRODUCTION_PER_MAJOR_TRADE_PARTNER):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_CITY_YIELD_PER_MAJOR_TRADE_PARTNER`
+ *  YIELD_PRODUCTION Amount 2 — each city of the suzerain, per distinct
+ *  foreign major its own Trade Routes run to (runs/h1_duelw1119 Taiyuan,
+ *  China's suzerainty: +2 Production from t229, its route to Rome; its route
+ *  to Babylon, a city-state, pays nothing at t247). */
+export const SINGAPORE_PARTNER_PROD = 2;
+
+/** CIV6 (Leaders.xml, MINOR_CIV_BRUSSELS_WONDER_PRODUCTION_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_WONDER_PRODUCTION` Amount 15 — percent
+ *  toward wonders, joining the production cards' additive sum. */
+export const BRUSSELS_WONDER_PCT = 15;
 
 /** CIV6 (Expansion2_Leaders.xml, the three MINOR_CIV_NGAZARGAMU_*_PURCHASE
  *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_UNITS_PURCHASE_COST` Amount 20
@@ -282,6 +303,8 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', suz: 'bonusAmenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
   Muscat: { name: 'Muscat', type: 'trade', bonus: '+1 Amenity in cities with a Commercial Hub district.', suz: 'hubAmenities' },
+  Brussels: { name: 'Brussels', type: 'industrial', bonus: 'Your cities get +15% Production towards wonders.', suz: 'wonderProduction' },
+  Singapore: { name: 'Singapore', type: 'industrial', bonus: '+2 Production in your cities for each major civilization their Trade Routes go to.', suz: 'partnerProduction' },
   Kandy: { name: 'Kandy', type: 'religious', bonus: 'Receive a Relic every time you discover a new natural wonder, and earn +50% Faith from all Relics.', suz: 'relicFaith' },
   Johannesburg: { name: 'Johannesburg', type: 'industrial', bonus: 'Cities receive +1 Production for every improved resource type. After researching Industrialization it becomes +2 Production.', suz: 'resourceTypeProduction' },
   Auckland: { name: 'Auckland', type: 'industrial', bonus: 'Shallow water tiles you own provide +1 Production. Additional +1 when you reach the Industrial era.', suz: 'shallowWaterProd' },

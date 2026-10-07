@@ -6639,6 +6639,11 @@ class SimSeats:
             match, mismatch = self._religion_loyalty
             term = mismatch + (match - mismatch) * (fol == row).double()
             out = out + (founded & (fol >= 0)).double() * term
+        # CIV6 (Colosseum): the seat's regional wonders' Loyalty at every city
+        # centre they reach (`wonderRegionalLoyalty`)
+        _rl = self._wonder_regional_loyalty(row)
+        if _rl is not None:
+            out = out + _rl[bidx, col]
         # CIV6 (Preslav): "You receive +2 Loyalty per turn in cities for each
         # Encampment district building" (`suzerainBuildingLoyalty`)
         if self._suz_c_mil_loy >= 0 and row < self.n_majors:
@@ -9937,6 +9942,16 @@ class SimSeats:
         if hits is None:
             return None
         return torch.einsum("bwc,w->bc", hits, self._wond_regam)
+
+    def _wonder_regional_loyalty(self, row: int) -> torch.Tensor | None:
+        """[B, cols] f64 — wonderRegionalLoyalty: a regional wonder's Loyalty
+        a turn at every city centre it reaches."""
+        if not self._wond_n or not bool(self._wond_regloy.count_nonzero()):
+            return None
+        hits = self._wonder_regional_hits(row)
+        if hits is None:
+            return None
+        return torch.einsum("bwc,w->bc", hits, self._wond_regloy)
 
     def _wonder_regional_yields(self, row: int) -> torch.Tensor | None:
         """[B, cols, 6] f64 — a regional wonder's `cy` at every city centre it

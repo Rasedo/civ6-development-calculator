@@ -437,6 +437,27 @@ def main() -> None:
     drop(sim)
     print("kandy ok — a Relic's Faith x1.5 under the suzerainty")
 
+    # Singapore: Production per distinct foreign MAJOR the city's own live
+    # routes run to — a second route to that major adds nothing
+    assert sim._suz_c_partner_prod >= 0, "Singapore's code is missing from the rules"
+    drop(sim)
+    assert sim._partner_prod(0) is None, "no suzerainty, no term"
+    hold(sim, 0, sim._suz_c_partner_prod)
+    _cid = int(sim.city_id[0, 0, _jcol])
+    sim.seat_routes[0, 0] = -1
+    sim.seat_route_dseat[0, 0] = -1
+    for _k in range(2):
+        sim.seat_routes[0, 0, _k, 0] = _cid
+        sim.seat_routes[0, 0, _k, 1] = 0
+        sim.seat_route_dseat[0, 0, _k] = 1
+    assert float(sim._partner_prod(0)[0, _jcol]) == sim._suz_partner_prod, "one partner, two routes"
+    sim.seat_route_dseat[0, 0, 1] = 0
+    assert float(sim._partner_prod(0)[0, _jcol]) == sim._suz_partner_prod, "a route home is no partner"
+    sim.seat_routes[0, 0] = -1
+    sim.seat_route_dseat[0, 0] = -1
+    drop(sim)
+    print("singapore ok — +2 Production per foreign major a city's routes reach")
+
     print("SUZERAIN RULES OK — every coded perk fires, only for the strict "
           "suzerain, and Geneva's percent only at peace")
 

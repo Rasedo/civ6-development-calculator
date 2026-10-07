@@ -27,7 +27,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
+import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainPartnerProduction, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES, MINOR_PRODUCTION_PCT } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
@@ -38,6 +38,7 @@ import { tileSeat, tileCity, setTileOwner, tileBelongsTo,tileOwnedByCiv, seatOf,
 import { warWearinessLosses } from './weariness';
 import { ANTIQUITY_CIVIC, SHIPWRECK_CIVIC, garrisonOf } from './units';
 import { floodBarrierScale } from './climate';
+import { droughtShielded } from '../data/disasters';
 import { DED_STEAM, DED_WISH, WISH_PARK_TOURISM_MULT, WISH_WONDER_TOURISM_NUM, WISH_WONDER_TOURISM_DEN } from '../data/seats';
 
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, gpCityPermOf, gpPermOf, gpTilePermOf } from '../data/greatPeople';
@@ -331,12 +332,16 @@ export function assignWorkedTiles(
  *  YIELD_PRODUCTION_CITY_TERRAIN_REPLACE, and what the natural wonders beside
  *  it pay added after the floor (the DLL's plot yield 0x538a60: the city's
  *  cmovl at 0x53916e, the neighbours' rows after it; runs/h1_duelw1121
- *  Chengdu, Plains beside Yosemite: Food 3). */
+ *  Chengdu, Plains beside Yosemite: Food 3). A drought's −1 Food comes after
+ *  the floors, with the game effects' rows (0xc7e9b0 after the cmovl;
+ *  runs/h1_duelw1124 Shenyang, a Grassland centre in the drought footprint
+ *  t162-163, t194-195, t234-235: Food 1). */
 export function tileYieldsForCenter(ctx: YieldCtx, center: Tile): Yields {
-  const y = tileYields(ctx, { ...center, district: null });
+  const y = tileYields(ctx, { ...center, district: null, droughtTurns: 0 });
   const adj = wonderAdjacentYields(ctx.map, center);
   y.food = Math.max(y.food - adj.food, CITY_CENTER_MIN_FOOD) + adj.food;
   y.production = Math.max(y.production - adj.production, CITY_CENTER_MIN_PRODUCTION) + adj.production;
+  if (center.droughtTurns > 0 && !droughtShielded(ctx.map.tiles, center)) y.food = Math.max(0, y.food - 1);
   return y;
 }
 
@@ -1081,6 +1086,14 @@ function wonderRegionalAmenities(state: GameState, city: City): number {
   return regionalWondersReaching(state, city).reduce((n, w) => n + (w.def.effects?.cityAmenities ?? 0), 0);
 }
 
+/** CIV6 (Colosseum, COLOSSEUM_IDENTITY): the Loyalty a turn the seat's
+ *  regional wonders pay every city centre they reach (runs/h1_duelw1119:
+ *  Xi'an's Colosseum t168, Other +2 in Changsha, Shenyang, Xi'an and
+ *  Jiaodong from t169). */
+export function wonderRegionalLoyalty(state: GameState, city: City): number {
+  return regionalWondersReaching(state, city).reduce((n, w) => n + (w.def.effects?.regionalLoyalty ?? 0), 0);
+}
+
 /** CIV6 (Disinformation Campaign): "+3 Diplomatic Favor per turn for each
  *  Broadcast Center" — the card names a building and pays per copy standing. */
 export function cardFavorPerBuilding(state: GameState, seat: number): number {
@@ -1723,6 +1736,9 @@ export function computeCityStats(
   // CIV6 (Johannesburg, EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES): Production
   // per improved resource type of the city
   bonuses.production += suzerainResourceTypeProduction(state, city);
+  // CIV6 (Singapore, EFFECT_ADJUST_CITY_YIELD_PER_MAJOR_TRADE_PARTNER):
+  // Production per foreign major the city's routes run to
+  bonuses.production += suzerainPartnerProduction(state, city);
   // CIV6 (Project_YieldConversions): the yield the last production step
   // converted from a district project, under the city's percents
   // (runs/h1_duelw1108, Aquileia t112-125: Campus Research Grants on 9.9

@@ -11,6 +11,8 @@ import { ELEVATION_SIGHT, FEATURE_SIGHT_THROUGH } from '../data/sight';
 import { DED_DRACONES, DRACONES_DISCOVERY_SCORE } from '../data/seats';
 import { UNITS } from '../data/units';
 import { gpPermOf } from '../data/greatPeople';
+import { suzerainWonderRelics } from './cityStates';
+import { createRelic } from './greatWorks';
 
 export const SIGHT_RANGE = 2;
 
@@ -115,11 +117,16 @@ export function revealAround(
   // MAJOR seats only: nothing reads a city-state's or the barbarians' fog,
   // so tracking it would be write-only state (and a digest liability).
   if (!isCiv(seat)) return;
-  const found = liftFog(state, seat, tileIndex, radius, los);
+  const { found, wonders } = liftFog(state, seat, tileIndex, radius, los);
   // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
   // a new Continent or natural wonder" — one continent here, so wonders are
   // the whole event.
   if (found > 0) dedicationEvent(state, seat, DED_DRACONES, DRACONES_DISCOVERY_SCORE * found);
+  // CIV6 (Kandy): a Relic for each natural wonder first revealed
+  if (wonders > 0) {
+    const relics = wonders * suzerainWonderRelics(state, seat);
+    for (let i = 0; i < relics; i++) createRelic(state, seat);
+  }
   // CIV6 (Poundmaker): "...all alliances provide shared visibility" — an ally
   // sees what this seat uncovers, and the clause is MUTUAL, so either side
   // carrying it opens both. The discovery EVENT above is the discoverer's
@@ -143,22 +150,35 @@ function sharesVisWithAllies(state: GameState, seat: number): boolean {
   return ALLIANCE_SHARED_VIS_ROWS.some((r) => rowIsFor(r, civ, leader));
 }
 
-/** Lift one seat's fog around a tile; answer how many NEW natural wonders it
- *  uncovered. The write alone — the discovery event is the caller's, so a
- *  seat merely SHOWN a wonder does not score it. */
+/** Lift one seat's fog around a tile; answer how many NEW natural-wonder
+ *  plots it uncovered (`found`) and how many natural wonders none of whose
+ *  plots the seat had seen (`wonders`). The write alone — the discovery
+ *  event is the caller's, so a seat merely SHOWN a wonder does not score it. */
 function liftFog(state: GameState, seat: number, tileIndex: number, radius: number,
-                 los?: { seeThrough: boolean }): number {
+                 los?: { seeThrough: boolean }): { found: number; wonders: number } {
   const s = seatOf(state, seat);
-  if (!s) return 0;
+  if (!s) return { found: 0, wonders: 0 };
   if (s.explored.length === 0) s.explored = new Array(state.map.tiles.length).fill(0);
   const t = state.map.tiles[tileIndex];
   let found = 0;
+  const fresh = new Set<string>();
+  const seen: Tile[] = [];
   for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
     if (los && !canSee(state.map, t, n, los.seeThrough)) continue;
-    if (s.explored[n.index] !== 1 && naturalWonderAt(n)) found++;
-    s.explored[n.index] = 1;
+    seen.push(n);
+    const nw = naturalWonderAt(n);
+    if (s.explored[n.index] !== 1 && nw) {
+      found++;
+      fresh.add(nw);
+    }
   }
-  return found;
+  // a wonder is new where no plot of it was seen before this look
+  let wonders = 0;
+  for (const nw of fresh) {
+    if (!state.map.tiles.some((u) => s.explored[u.index] === 1 && naturalWonderAt(u) === nw)) wonders++;
+  }
+  for (const n of seen) s.explored[n.index] = 1;
+  return { found, wonders };
 }
 
 export function unexploredByAll(state: GameState, tileIndex: number): boolean {

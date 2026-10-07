@@ -2839,6 +2839,23 @@ class SimMasks:
             disk = self.pair_dist[tiles.clamp(min=0)] <= (
                 radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
         new = disk & ~self.seat_explored[rows, seat_row]
+        # CIV6 (Kandy): the natural wonders none of whose plots the seat had
+        # seen before this look, read before the write (`liftFog`)
+        kandy = []
+        if self._suz_c_relic_faith >= 0 and bool((new & self.nwonder[rows]).count_nonzero()):
+            seen = self.seat_explored[rows, seat_row]
+            for i in range(rows.numel()):
+                b = int(rows[i])
+                g = seat_row if isinstance(seat_row, int) else int(seat_row[i])
+                if g >= self.n_majors:
+                    continue
+                k = int(self._suz_effect_count(g, self._suz_c_relic_faith)[b]) * self._suz_wonder_relics
+                hit = new[i] & self.nwonder[b]
+                if k <= 0 or not bool(hit.count_nonzero()):
+                    continue
+                fresh = sum(1 for f in self.feat_id[b][hit].unique().tolist()
+                            if not bool((seen[i] & self.nwonder[b] & (self.feat_id[b] == f)).count_nonzero()))
+                kandy.extend([(b, g)] * (fresh * k))
         self.seat_explored[rows, seat_row] |= disk
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
         # discover a new Continent or natural wonder" — one continent here,
@@ -2863,6 +2880,9 @@ class SimMasks:
                         full.zero_()
                         full.index_add_(0, rows[m], cnt[m])
                         self._dedication_event(g, self._ded_dracones, full)
+        for b, g in kandy:
+            self._create_relic(torch.tensor([b], dtype=torch.long, device=self.device),
+                               torch.tensor([g], dtype=torch.long, device=self.device))
 
     def _share_fog_with_allies(self, rows: torch.Tensor, seat_row, disk: torch.Tensor) -> None:
         """CIV6 (Poundmaker): open `disk` to every ALLY of the revealing seat

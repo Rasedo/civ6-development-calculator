@@ -3820,7 +3820,7 @@ class SimEconomy:
                 if _gi in _gov_on and float(self._gov_prodb[_gi, 0]) >= 0:
                     _r = self._gov_prodb[_gi]
                     fx["prod"].append((has_gov & (adopted == _gi), int(_r[0]), int(_r[1]),
-                                       int(_r[2]), float(_r[3])))
+                                       int(_r[2]), float(_r[3]), int(_r[4])))
         if self._npol:
             if row is None:
                 # no seat to hold a store: the greedy reference (pokes drive this arm)
@@ -3924,7 +3924,7 @@ class SimEconomy:
                     if _card_on[_pi] and float(self._pol_prodb[_pi, 0]) >= 0:
                         _r = self._pol_prodb[_pi]
                         fx["prod"].append((cards[:, _pi], int(_r[0]), int(_r[1]),
-                                           int(_r[2]), float(_r[3])))
+                                           int(_r[2]), float(_r[3]), int(_r[4])))
                 # ---- the DARK-AGE channels ----
                 for _k, _t in (("relighome", self._pol_relig_home), ("loyall", self._pol_loyalty_all),
                                ("concert", self._pol_concert), ("milmaint", self._pol_mil_maint)):
@@ -4580,6 +4580,27 @@ class SimEconomy:
         seen.scatter_add_(1, key, on.long())
         types = (seen.reshape(self.B, self.RC, nres) > 0).sum(dim=2).double()
         return types * (n.double() * per).unsqueeze(1)
+
+    def _partner_prod(self, row: int) -> torch.Tensor | None:
+        """[B, RC] f64 or None — `suzerainPartnerProduction`: per city of
+        major row `row`, its Singapore suzerainties x the amount x the distinct
+        foreign majors the city's own live routes run to. None where the row
+        holds no such suzerainty."""
+        code = self._suz_c_partner_prod
+        if code < 0 or row >= self.n_majors:
+            return None
+        n = self._suz_effect_count(row, code)
+        if not bool(n.count_nonzero()):
+            return None
+        NM = self.n_majors
+        rr = self.seat_routes[:, row]                                   # [B, K, 2]
+        ds = self.seat_route_dseat[:, row]                              # [B, K]
+        live = (rr[:, :, 1] >= 0) & (ds >= 0) & (ds < NM) & (ds != row)
+        org = rr[:, :, 0].unsqueeze(1) == self.city_id[:, row].unsqueeze(2)  # [B, RC, K]
+        hit = org & live.unsqueeze(1)
+        oh = ds.clamp(min=0).unsqueeze(2) == torch.arange(NM, device=self.device).view(1, 1, NM)  # [B, K, NM]
+        partners = (hit.unsqueeze(3) & oh.unsqueeze(1)).any(dim=2).sum(dim=2).double()  # [B, RC]
+        return partners * (n.double() * self._suz_partner_prod).unsqueeze(1)
 
     def _res_live(self) -> torch.Tensor:
         """[B, T] bool — this tile HAS a resource, right now.
@@ -7107,8 +7128,18 @@ class SimEconomy:
         # the floors take the plot's own Food and Production; what the natural
         # wonders beside it pay rides on top (`tileYieldsForCenter`)
         _nwa = self.tile_nw_adj.gather(1, ctr.unsqueeze(2).expand(-1, -1, 2)).double()
-        ctr6[:, :, 0] = torch.maximum(f_plane.gather(1, ctr).double() - _nwa[:, :, 0],
+        # a drought's −1 Food lands after the floors: the floor reads the
+        # plot's food as the drought found it (the tail's cut put back)
+        _fc = f_plane.gather(1, ctr).double()
+        _dry_c = None
+        if bool((self.drought > 0).count_nonzero()):
+            _dry_c = ((self.drought > 0) & ~self._drought_shield()).gather(1, ctr).double()
+            _pre = (self._food_base() + self.fertility.to(self.dtype)).gather(1, ctr).double()
+            _fc = _fc + _dry_c * (_pre - (_pre - 1).clamp(min=0))
+        ctr6[:, :, 0] = torch.maximum(_fc - _nwa[:, :, 0],
                                       torch.tensor(float(self.rules.center_min_food), dtype=F64, device=dev)) + _nwa[:, :, 0]
+        if _dry_c is not None:
+            ctr6[:, :, 0] = (ctr6[:, :, 0] - _dry_c).clamp(min=0)
         ctr6[:, :, 1] = torch.maximum(p_plane.gather(1, ctr).double() - _nwa[:, :, 1],
                                       torch.tensor(float(self.rules.center_min_production), dtype=F64, device=dev)) + _nwa[:, :, 1]
         # CIV6 (EFFECT_TERRAIN_ADJACENCY): the roster's centre rows, per adjacent
@@ -7432,6 +7463,34 @@ class SimEconomy:
             _wc = self._gp_perm(row, self._gp_perm_names[_pk]).double()
             if bool(_wc.count_nonzero()):
                 bld_y[:, :, _yi] = bld_y[:, :, _yi] + _wc.unsqueeze(1) * lit[:, :, _bi].double()
+        # the beliefs', the city-states' and the cards' add to a building's
+        # own yield, per lit copy standing here, a REGIONAL one's included:
+        # its add stays in its own city (`cityBuildingYields`)
+        if bool(lit.count_nonzero()):
+            litf = lit.double()
+            if has_bel or fol_live:
+                if has_bel:
+                    bld_y = bld_y + torch.einsum("bjn,bnk->bjk", litf, self._bel_add_pf("bldgY", row))
+                if fol_live:
+                    bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", litf, self._fol_tab_for("bldgY", row, sl))
+            if self.S > 0 and row < self.n_majors:  # only a major sends envoys
+                # `cityStateEnvoyBonuses`' building rows: per envoy bar, the
+                # yield-type city-states reached, counted by type, times each
+                # type's building amounts, on the type's yield
+                env, nB = self._envoys_here(row), lit.shape[2]
+                ylad = self.citystate_alive & ~self._citystate_item_type
+                csf = torch.zeros(B, nB, 6, dtype=F64, device=dev)
+                for _e in self._cs_env_bars:
+                    _cnt = torch.einsum("bs,bst->bt", ((env >= _e) & ylad).double(), self._cs_type_onehot)
+                    csf.index_add_(2, self._cs_type_yidx,
+                                   (_cnt.unsqueeze(2) * self._cs_env_ybld[_e]).transpose(1, 2))
+                bld_y = bld_y + torch.einsum("bjn,bnk->bjk", litf, csf)
+            # CIV6 (Military Research, Third Alternative,
+            # EFFECT_ADJUST_BUILDING_YIELD_CHANGE): the seat's cards' add to
+            # the named buildings standing here
+            for _pbo, _pbb, _pby in self._gov_mods(row)[12]["byield"]:
+                bld_y = bld_y + (litf[:, :, _pbb] * _pbo.double().unsqueeze(1)).unsqueeze(2) \
+                    * torch.tensor(_pby, dtype=F64, device=dev).reshape(1, 1, 6)
         selb = lit & ~bcol["regional"].unsqueeze(1)
         if bool(selb.count_nonzero()):
             selbf = selb.double()
@@ -7458,28 +7517,6 @@ class SimEconomy:
                 _fon = (_ft >= 0) & self.district_complete.gather(1, _ft.clamp(min=0))
                 bld_y[:, :, 5] = bld_y[:, :, 5] + (
                     selbf[:, :, _fbi] * _fw.double().unsqueeze(1) * _fon.double() * _fadj)
-            if has_bel or fol_live:
-                if has_bel:
-                    bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, self._bel_add_pf("bldgY", row))
-                if fol_live:
-                    bld_y = bld_y + torch.einsum("bjn,bjnk->bjk", selbf, self._fol_tab_for("bldgY", row, sl))
-            if self.S > 0 and row < self.n_majors:  # only a major sends envoys
-                # `cityStateEnvoyBonuses`' building rows: per envoy bar, the
-                # yield-type city-states reached, counted by type, times each
-                # type's building amounts, on the type's yield
-                env, nB = self._envoys_here(row), selb.shape[2]
-                ylad = self.citystate_alive & ~self._citystate_item_type
-                csf = torch.zeros(B, nB, 6, dtype=F64, device=dev)
-                for _e in self._cs_env_bars:
-                    _cnt = torch.einsum("bs,bst->bt", ((env >= _e) & ylad).double(), self._cs_type_onehot)
-                    csf.index_add_(2, self._cs_type_yidx,
-                                   (_cnt.unsqueeze(2) * self._cs_env_ybld[_e]).transpose(1, 2))
-                bld_y = bld_y + torch.einsum("bjn,bnk->bjk", selbf, csf)
-            # CIV6 (Military Research, EFFECT_ADJUST_BUILDING_YIELD_CHANGE): the
-            # seat's cards' add to the named buildings standing here
-            for _pbo, _pbb, _pby in self._gov_mods(row)[12]["byield"]:
-                bld_y = bld_y + (selbf[:, :, _pbb] * _pbo.double().unsqueeze(1)).unsqueeze(2) \
-                    * torch.tensor(_pby, dtype=F64, device=dev).reshape(1, 1, 6)
             if bool((selb & self._b_pow_y_any.reshape(1, 1, -1)).count_nonzero()):
                 # GS POWER: the second half of a late building's yields, paid
                 # while its city meets its whole load.
@@ -7660,6 +7697,12 @@ class SimEconomy:
         if _jrt is not None:
             bon = bon.clone()
             bon[:, :, 1] = bon[:, :, 1] + _jrt[:, sl].double() * alivef
+        # CIV6 (Singapore, EFFECT_ADJUST_CITY_YIELD_PER_MAJOR_TRADE_PARTNER):
+        # Production per foreign major the city's routes run to
+        _spp = self._partner_prod(row)
+        if _spp is not None:
+            bon = bon.clone()
+            bon[:, :, 1] = bon[:, :, 1] + _spp[:, sl].double() * alivef
         # CIV6 (Project_YieldConversions): the yield the last production step
         # converted from a district project, under the city's percents
         # (`City.projectYield`); a column it does not name adds an exact 0

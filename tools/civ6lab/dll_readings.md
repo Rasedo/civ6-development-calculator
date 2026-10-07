@@ -2179,6 +2179,33 @@ re-placement Culture-first on the Great Walls; the border banks 25.5 and
 own placement (`assignWorkedTiles` / the GPU walk: locked plots, then
 FOCUS_BASE 2/2/1/1/1/1) is not this reading (AUDIT C-94 BUILD).
 
+## H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ
+
+- The plot yield 0x538a60 adds the game effects' per-plot rows (0xc7e9b0, a
+  scan of the plot's (amount, yield) pairs) AFTER the city's floors (the cmovl
+  at 0x53916e). The drought's −1 Food is read there: the records put it after
+  the floors — runs/h1_duelw1124 Shenyang, a Grassland centre in the
+  footprint t162–163, t194–195, t234–235, reads Food 1 and the city's
+  surplus one less; 1111 Shanghai's centre the same (t186, t212, t223). That
+  the drought writes one of 0xc7e9b0's rows is unread (a LAB line in AUDIT
+  C-94). `tileYieldsForCenter` / the GPU walk's centre floors.
+- EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED (Monumentality's
+  COMMEMORATION_INFRASTRUCTURE_QUEST): the factory 0xc25910, the effect
+  vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to
+  the era manager's player entry +0x34 (the +0x560 vector, stride 0x78).
+  Where the district completion reads it is unread; the records fit "a
+  specialty district (RequiresPopulation) completed pays": an Aqueduct pays
+  nothing under the dedication (1109 t99, 1110 t107, 1120 t94, 1124 t97),
+  nor a Dam (1118 t98) nor the Bath (1110 Rome t101). `completeQueueItem`'s
+  Monumentality event / `_district_completed`.
+- MODIFIER_PLAYER_ADJUST_NATURAL_WONDER_RELIC (Kandy's
+  MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's
+  reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder
+  discovery notification), for i below the player's count (+0x1340 → +0x7f0),
+  creates a Relic through 0x495860 → 0x296c00 ("Choosing a Relic") with the
+  player's capital (0x36f460). No record shows it (no Kandy suzerain
+  discovered a wonder in the duels). `revealAround` / `_reveal_around`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

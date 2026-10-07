@@ -79,8 +79,8 @@ def main() -> None:
     # 4) The production cards' two axes.
     prod = [p for p in fx_of(AGOGE_IN)[12]["prod"] if bool(p[0][0])]
     assert len(prod) == 1, f"AGOGE is the one live production boost, got {len(prod)}"
-    _pact, _isw, _cmask, _eramax, _pct = prod[0]
-    assert _isw == 0 and _eramax == 1 and abs(_pct - 0.5) < 1e-12, "AGOGE: units, Classical and earlier, +50%"
+    _pact, _isw, _cmask, _eramax, _pct, _eramin = prod[0]
+    assert _isw == 0 and _eramax == 1 and _eramin == 0 and abs(_pct - 0.5) < 1e-12, "AGOGE: units, Classical and earlier, +50%"
     war = unit_i["WARRIOR"]
     xbow = unit_i["CROSSBOWMAN"]
     assert int(sim._type_cls[war]) & _cmask, "a WARRIOR is melee — AGOGE reaches it"

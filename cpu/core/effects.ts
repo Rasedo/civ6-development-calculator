@@ -1430,11 +1430,13 @@ export function prodBoostPct(mods: Modifiers, q: QueueItem, gpPerm?: number[]): 
     if (b.target === 'wonder') {
       if (q.kind !== 'wonder') continue;
       if (b.eraMax >= 0 && (WONDER_ERA_INDEX[q.wonder] ?? 0) > b.eraMax) continue;
+      if ((WONDER_ERA_INDEX[q.wonder] ?? 0) < (b.eraMin ?? 0)) continue;
     } else {
       const id = q.kind === 'unit' ? q.unit : q.kind === 'settler' ? 'SETTLER' : null;
       const def = id ? UNITS[id] : undefined;
       if (!id || !def) continue;
       if (b.eraMax >= 0 && (UNIT_ERA_INDEX[id] ?? 0) > b.eraMax) continue;
+      if ((UNIT_ERA_INDEX[id] ?? 0) < (b.eraMin ?? 0)) continue;
       if (b.target !== 'anyUnit' && !b.classes.some((c) => unitHasClass(def, c))) continue;
     }
     pct += b.pct;

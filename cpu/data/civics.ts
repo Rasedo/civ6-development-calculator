@@ -384,6 +384,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
     prereqs: xml('CivicPrereqs', 'Civic=CIVIC_COLD_WAR&PrereqCivic=CIVIC_IDEOLOGY', 'PrereqCivic', { expect: 'CIVIC_IDEOLOGY' }),
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_CONTAINMENT', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_SECOND_STRIKE_CAPABILITY', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
+    'effects.2.policy': xml('Policies', 'PolicyType=POLICY_INTERNATIONAL_WATERS', 'PrereqCivic', { expect: 'CIVIC_COLD_WAR' }),
   },
   SPACE_RACE: {
     era: xml('Civics', 'CivicType=CIVIC_SPACE_RACE', 'EraType', { expect: 'ERA_ATOMIC' }),
@@ -741,6 +742,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
     C('COLD_WAR', 'Cold War', 'Atomic', 2185, ['IDEOLOGY'], [
       { kind: 'unlockPolicy', policy: 'CONTAINMENT' },
       { kind: 'unlockPolicy', policy: 'SECOND_STRIKE_CAPABILITY' },
+      { kind: 'unlockPolicy', policy: 'INTERNATIONAL_WATERS' },
     ]),
     C('SPACE_RACE', 'Space Race', 'Atomic', 2415, ['COLD_WAR'], [
       { kind: 'unlockPolicy', policy: 'SATELLITE_BROADCASTS' },

@@ -571,8 +571,14 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
     // regional reach all arrive through `effectiveBuilding`
     const def = effectiveBuilding(ctx.mods.civ, id);
     if (!def) continue;
-    if (def.regional) continue; // handled by regional scan (affects own city too)
     if (dark.has(id)) continue; // in a pillaged district, or pillaged itself
+    // the beliefs', city-states' and cards' add to the building's own yield
+    // stays in the city it stands in, a regional building's too (1123
+    // Chengdu's Oil Power Plant under Third Alternative: +4 Gold, +2 Culture
+    // in Chengdu alone, t195-204)
+    const beliefAdd = ctx.mods.buildingYieldAdd[id];
+    if (beliefAdd) addYields(out, beliefAdd);
+    if (def.regional) continue; // handled by regional scan (affects own city too)
     if (def.yields) addYields(out, def.yields);
     if (powered && def.poweredYields) {
       addYields(out, def.poweredYields);
@@ -584,8 +590,6 @@ export function cityBuildingYields(ctx: YieldCtx, city: City, powered = false): 
         out.production += effectiveAdjacency(ctx, ctx.map.tiles[iz.tileIndex], 'INDUSTRIAL_ZONE');
       }
     }
-    const beliefAdd = ctx.mods.buildingYieldAdd[id];
-    if (beliefAdd) addYields(out, beliefAdd);
     const bv = buildingVariantFor(ctx.mods.civ, id);
     // CIV6 (Tsikhe, TSIKHE_FAITH_GOLDEN_AGE): a unique row may pay again
     // while its seat stands in a Golden (or Heroic) Age.

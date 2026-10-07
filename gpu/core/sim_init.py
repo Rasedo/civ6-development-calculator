@@ -482,9 +482,18 @@ class SimInit:
         # (`suzerainHubAmenities`); Kandy: percent more Faith from a Relic
         # (`suzerainRelicFaithPct`)
         self._suz_c_hub_amen = _sfx.index("hubAmenities") if "hubAmenities" in _sfx else -1
+        # Singapore: Production per foreign major a city's routes run to
+        # (`suzerainPartnerProduction`)
+        self._suz_c_partner_prod = _sfx.index("partnerProduction") if "partnerProduction" in _sfx else -1
+        self._suz_partner_prod = float(_suz["partnerProd"])
+        # Brussels: percent toward wonders (`suzerainWonderPct`)
+        self._suz_c_wonder_prod = _sfx.index("wonderProduction") if "wonderProduction" in _sfx else -1
+        self._suz_wonder_pct = float(_suz["wonderPct"])
         self._suz_hub_amen = (float(_suz["hubAmenities"]), int(_suz["hubDistrict"]))
         self._suz_c_relic_faith = _sfx.index("relicFaith") if "relicFaith" in _sfx else -1
         self._suz_relic_faith_pct = float(_suz["relicFaithPct"])
+        # Kandy: Relics per natural wonder first revealed (`suzerainWonderRelics`)
+        self._suz_wonder_relics = int(_suz["wonderRelics"])
         rr = rules.seats
         n_gp = len(rr["gpClassDistrict"]) or 5
 
@@ -1615,6 +1624,8 @@ class SimInit:
             _amen = torch.tensor([float(w["cityAmenities"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             # wonderRegionalAmenities — a regional wonder's amenities.
             self._wond_regam = _amen * (1.0 - _local)  # [nW]
+            # wonderRegionalLoyalty — a regional wonder's Loyalty a turn (the Colosseum's).
+            self._wond_regloy = torch.tensor([float(w["regLoyalty"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
             # ...and the ones a wonder pays only to the city that holds it.
             self._wond_cityamen = _amen * _local  # [nW]
             self._wond_cityhouse = torch.tensor([float(w["cityHousing"]) for w in self._wond_rows], dtype=torch.float64, device=device)  # [nW]
@@ -2672,7 +2683,7 @@ class SimInit:
             self._gov_byb = torch.tensor(
                 [[float(x) for x in g["buildingYieldBoost"]] for g in _govs],
                 dtype=torch.float64, device=device)  # [nGov, 6]
-            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
+            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct, eraMin], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._gov_prodb = torch.tensor(
                 [[float(x) for x in r["prodBoost"]] for r in _govs],
@@ -2810,7 +2821,7 @@ class SimInit:
             self._pol_byb = torch.tensor(
                 [[float(x) for x in p["buildingYieldBoost"]] for p in _pols],
                 dtype=torch.float64, device=device)  # [nPol, 6]
-            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct], the
+            # prodBoost: [wonderTarget, unit-class mask, eraMax, pct, eraMin], the
             # production cards' two axes. wonderTarget -1 = no boost.
             self._pol_prodb = torch.tensor(
                 [[float(x) for x in r["prodBoost"]] for r in _pols],

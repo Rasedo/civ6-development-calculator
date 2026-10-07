@@ -63,11 +63,23 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   // each record kept as its line and parsed when read: the walk below holds
   // three records at a time, not the whole game
   const lines = new Map<number, string>();
+  // a record not read still names its random events: the next record read
+  // carries those it no longer lists (runs/h1_duelw1119: record 4 alone
+  // shows the t3 eruption of Eyjafjallajökull, its soil read at record 5)
+  let unread: unknown[][] = [];
   for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     const rec = JSON.parse(line) as TurnRecord;
-    if (rec.moved || rec.turn < from || rec.turn > to) continue;
-    lines.set(rec.turn, line);
+    if (rec.turn < from || rec.turn > to) continue;
+    const events = Array.isArray(rec.events) ? rec.events as unknown[][] : [];
+    if (rec.moved) {
+      unread.push(...events);
+      continue;
+    }
+    const listed = new Set(events.map((e) => `${e[0]}:${e[1]}`));
+    const carried = unread.filter((e) => !listed.has(`${e[0]}:${e[1]}`));
+    unread = [];
+    lines.set(rec.turn, carried.length ? JSON.stringify({ ...rec, events: [...carried, ...events] }) : line);
   }
   const turns = [...lines.keys()].sort((a, b) => a - b);
   const window = new Map<number, TurnRecord>();
