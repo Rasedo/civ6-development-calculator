@@ -2372,6 +2372,40 @@ t62 Swordsman; ~14,700 quotes over the 22 duels at 1/512). Engines:
 `mercenaryCost` / `mercenary_cost`, `unitProdCost` (the production step's
 fill and the harness's quote), `unitBuyBase` / `_unit_buy_base`.
 
+## H-1: a National Park's amenities, stored at the owner's turn — READ
+
+- City::GetAmenities 0x1b4af0 sums the luxury amenities 0x1b5210 (a COUNT of
+  the entries of `m_aLuxuryAllocations` (Player_Resources +0x460; data
+  +0x4b8, count +0x4c8) naming the city's id, 0x4aa0e0 — a city the last
+  rebuild did not list holds none), the entertainment 0x1b4c10, and stored
+  per-city counts, among them +0x54 of the city's +0x1730 object.
+- Game_NationalParks 0x32deb0 (player) zeroes +0x54 on every city of the
+  player, then per park of that player adds NATIONAL_PARK_AMENITIES_OWNING_CITY
+  (GlobalParameters +0x514) to its city and, via 0x32dc40, 1 to the nearest
+  NATIONAL_PARK_NUM_OTHER_AMENITY_CITIES (+0x51c) others. Its only caller is
+  the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0,
+  the allocation 0x4a6110, then the parks), reached from Player DoTurn
+  0x4e46c0 alone; no vtable holds either.
+- So a park designated in the action phase pays from its owner's next turn
+  processing. Recorded: every park lands in the record one turn before its
+  cities' parts[6] (1109 t225/t226 and t233/t234, 1111 t175/t176 and
+  t205/t206, 1113 t212/t213 and t222/t223, 1115 t216/t217, 1117 t244/t245,
+  1119 t194/t195 and t217/t218, 1121 t227/t228 and t243/t244, 1123
+  t220/t221); 1110 and 1114, whose local player is gone and whose records
+  are read at the park owner's turn start, show both at once. The engines:
+  `refreshParkAmenities` / `_refresh_park_amenities` at the seat's resources
+  step, `City.parkAmenities` / `city_park_amen` read by the amenity sum.
+- Not explained by this reading (C-94 LAB): a city founded in its owner's
+  action phase holds its first luxury at the next record in 28 of 45 cases
+  (1117 Handan t94, 1121 Shanghai t45, 1124 Chengdu t82, ...) and none in 17
+  (1121 Taiyuan t37, 1124 Shenyang t54, Beijing t60, Shanghai t118, 1118
+  Longxi t26, ...) — some rebuild follows the founding in the first group;
+  neither the claimed plots' resources, a free building, the holdings, nor
+  the suzerainties tell the groups apart. And the 1121 t222 ranking (China's
+  cards changed at the processing's start, the record holds t221's ranking)
+  is no rule: ranking every non-active major under the record before's cards
+  where they changed loses 26 passes on 1117/1118/1121/1124.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

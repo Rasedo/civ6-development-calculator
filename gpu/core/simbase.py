@@ -1078,6 +1078,7 @@ _MUTABLE = [
     "city_growth_drift",  # the residue each city's growth accumulator keeps
     "city_worked",  # the worked-tile pick — a city plane, so it rides the compaction
     "city_amen_tier",  # the amenity tier the walk ran on — a city plane, same reason
+    "city_park_amen",  # the park amenities the owner's last processing stored
     "city_spy_sources",  # the per-seat Gain Sources clock a spy mission leaves behind
     "city_free_press", "free_next_city_id",  # a FREE CITY's race per major, and the Free Cities seat's city-id counter
     "city_founded_turn",  # the turn its owner founded or took the city

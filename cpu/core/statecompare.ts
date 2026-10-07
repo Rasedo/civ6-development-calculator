@@ -797,6 +797,8 @@ const CITY: Record<string, Extractor> = {
   // surfaces as a fraction of a food box in whatever city straddles a
   // threshold — which is how it was found.
   amenityTier: overCities((r) => r.city.amenityTier ?? -1),
+  // the park amenities the owner's last processing stored
+  parkAmenities: overCities((r) => r.city.parkAmenities ?? 0),
   foodBox: overCities((r) => r.city.foodBox),
   cultureBox: overCities((r) => r.city.cultureBox),
   nextPlot: overCities((r) => r.city.nextPlot ?? -1),

@@ -41,6 +41,17 @@ export function governedCityIds(seat: Seat): Set<number> {
     .map((g) => g.cityId));
 }
 
+/** The ids of the seat's cities whose governor has finished establishing —
+ *  the cities an ability "with a Governor" reaches (Wish You Were Here's
+ *  wonder Tourism: runs/h1_duelw1124 t189-t193, Shanghai and Shenyang hold
+ *  Pingala and Liang not yet established and read their wonders' plain
+ *  Tourism, 23 and 52, until both establish at t194). */
+export function establishedGovernorCityIds(seat: Seat): Set<number> {
+  return new Set(governorsOf(seat)
+    .filter((g) => g.appointed && g.cityId >= 0 && g.outTurns <= 0 && (g.establishTurns ?? 0) <= 0)
+    .map((g) => g.cityId));
+}
+
 /**
  * CIV6 (Governor): thirteen named civics "will grant 1 Governor Title", and
  * the Government Plaza plus each of its buildings grants one more. A pillaged

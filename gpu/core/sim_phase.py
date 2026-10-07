@@ -199,6 +199,7 @@ class SimPhase:
         self._seat_accrue_stockpile(row)
         self._seat_charge_upkeep(row)
         self._resolve_seat_power(row)
+        self._refresh_park_amenities(row, active)
         # ESPIONAGE: this seat's own spies move a turn closer to arriving or to
         # resolving, and the clocks their missions left behind tick down.
         self._tick_spies(row)
@@ -224,7 +225,7 @@ class SimPhase:
         cact_any_l = cact_all.any(dim=0).tolist()
 
         gov = self._seat_governor_seats(row)
-        sci_turn = self._seat_economy(row, active, cact_all, cact_any_l, gov)
+        sci_turn = self._seat_economy(row, active, cact_all, cact_any_l)
         # its religion, if it founded one, spreads with its faith, before its
         # cities (`spreadReligiousPressure`'s place in `seatPhase`)
         self._spread_religious_pressure(row, active)
@@ -466,8 +467,8 @@ class SimPhase:
     def _governor_tiles(self, row: int, gov: torch.Tensor) -> torch.Tensor:
         """[B, T] bool — the row's tiles whose OWNING city is governor-seated,
         all-False unless the seat is riding the GOLDEN Wish dedication (nothing
-        else reads it). `gov` is the loop-top seating, taken before any loyalty
-        moved, which is the snapshot `seatTourism` is handed."""
+        else reads it). `gov` is the row's cities with an ESTABLISHED
+        governor, the set `seatTourism` is handed."""
         golden = self._golden_ded(row, self._ded_wish)
         if not bool(golden.count_nonzero()):
             return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
@@ -783,6 +784,7 @@ class SimPhase:
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
         self._age_reactors(row)
+        self._refresh_park_amenities(row, alive.any(dim=1))
         _tier, _gf, _yf, _lux = self._seat_amenity(row)
         self.city_amen_tier[:, row, : self.RC] = torch.where(
             alive[:, : self.RC], _tier.to(self.city_amen_tier.dtype),
@@ -2148,7 +2150,7 @@ class SimPhase:
             plane[:, row] += torch.where(fin, amt.gather(0, at), torch.zeros_like(cur)).to(plane.dtype)
 
     def _seat_economy(self, row: int, active: torch.Tensor, cact_all: torch.Tensor,
-                      cact_any_l: list, gov: torch.Tensor) -> torch.Tensor:
+                      cact_any_l: list) -> torch.Tensor:
         """The seat's ECONOMY, for seat row `row` — ONE body every seat runs,
         ahead of its city walk; the `seatPhase` twin.
 
@@ -2342,7 +2344,9 @@ class SimPhase:
         self._governor_phase(row, active)
         if self.S:
             self._cs_resolve_suzerain()
-        _tin = self._tourism_inputs(row, gov)
+        # the Wish face's wonder Tourism reaches the ESTABLISHED governors'
+        # cities (`establishedGovernorCityIds`)
+        _tin = self._tourism_inputs(row, self._governor_established(row))
         _nat_gen = self._seat_tourism_general(row, _tin)
         # CIV6 (Film Studio): the per-rival extra, read with the same snapshot
         _late = self._late_era_tourism(row, _tin)

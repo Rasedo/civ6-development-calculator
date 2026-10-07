@@ -29,7 +29,7 @@ import type { City, CityState, GameState, Tile, Unit } from '../core/types';
 import { NO_SEAT } from '../core/types';
 import { congressBorderFrozen } from '../core/congress';
 import { spreadFromUnit } from '../core/unitOrders';
-import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, placeIdleCitizens, seatTourism, seatTourismReligious } from '../core/city';
+import { borderBestPlots, cityCentreYields, cityPlotBonus, cityTourism, cityYieldCtx, computeCityStats, buildingMaintenance, districtMaintenance, luxuryAmenities, placeIdleCitizens, refreshParkAmenities, seatTourism, seatTourismReligious } from '../core/city';
 import { buildingPillaged, tileYields } from '../core/yields';
 import { baseYieldCtx, computeUnlocks, getModifiers, goldPrice, makeYieldCtx, unitUpkeep } from '../core/effects';
 import { centreStrength, cityDefenseStrength } from '../core/combat';
@@ -42,7 +42,7 @@ import { builderCost, traderCost } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
 import { monumentalityBuyMult } from '../core/eras';
 import { FREE_SEAT, hiddenResourcesFor, isCityStateSeat, seatOf, setTileOwner } from '../core/seats';
-import { governedCityIds, governorClocks, governorFlag } from '../core/governors';
+import { establishedGovernorCityIds, governorClocks, governorFlag } from '../core/governors';
 import { chopGrant, harvestGrant, type LumpGrant } from '../core/economy';
 import { growthFoodNeeded, amenityTierIndex, AMENITY_TIERS, BORDER_MAX_RADIUS, GOLD_PURCHASE_MULT, WONDER_FREE_TILES } from '../data/constants';
 import { CITIZEN_NAMED_UNITS, PROMO_OFFER_UNITS, UNITS } from '../data/units';
@@ -1324,7 +1324,7 @@ export function stateChecks(rec: TurnRecord, cat: Catalog, imp: Imported = impor
     // left them; a record whose cities moved since (a wonder completed in
     // the turn: 1108 Rome t102, the Pyramids' 3 in Rome's figure, 0 in the
     // seat's) holds no reading of the seat's
-    const tour = seatTourism(state, seat, governedCityIds(seatOf(state, seat)!)) + seatTourismReligious(state, seat);
+    const tour = seatTourism(state, seat, establishedGovernorCityIds(seatOf(state, seat)!)) + seatTourismReligious(state, seat);
     const citySum = rec.cities.filter((c) => c.owner === pid).reduce((n, c) => n + num(c.tourism), 0);
     if (rec.cities.some((c) => c.owner === pid && c.tourism !== undefined) && citySum !== num(p.tourism)) {
       out.push({ turn, check: 'seat.tourism', subject, ok: true, skip: 'the seat figure predates its cities\'' });
@@ -1819,7 +1819,10 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     // seated in Changsha, Civil Prestige's amenity re-ranks the luxuries
     // only at t201); a policy change at the processing's start rebuilds it
     // before the cities (the 9 recorded policy-change turns of 1117, 1118,
-    // 1121, 1122 read the new ranking, the 6 others the standing one)
+    // 1121, 1122 read the new ranking, the 6 others the standing one); the
+    // same resources step stores the seat's park amenities
+    // (`refreshParkAmenities`)
+    refreshParkAmenities(state, seat);
     const standing = luxuryAmenities(state, seat);
     // the governors' clocks, before the cities (`governorClocks`)
     governorClocks(state, seat);

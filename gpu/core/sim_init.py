@@ -2023,6 +2023,11 @@ class SimInit:
         # plane, so it rides the compaction.
         self.city_amen_tier = torch.full(
             (B, self.CITY_ROWS, self.RC), -1, dtype=torch.long, device=device)
+        # THE PARK AMENITIES each city's owner's last processing stored
+        # (`refreshParkAmenities`, `_refresh_park_amenities`), 0 before its
+        # first. A registered CITY plane, so it rides the compaction.
+        self.city_park_amen = torch.zeros(
+            (B, self.CITY_ROWS, self.RC), dtype=torch.long, device=device)
         self._off5 = tiles_within_offsets(5).to(device)
         self._off7 = tiles_within_offsets(7).to(device)
         self._off2 = tiles_within_offsets(2).to(device)

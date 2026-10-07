@@ -954,6 +954,7 @@ CITY = {
     # the city pays, so a disagreement is otherwise invisible until it
     # surfaces as a fraction of a food box.
     "amenityTier": _cty("city_amen_tier"),
+    "parkAmenities": _cty("city_park_amen"),
     "foodBox": _cty("city_growth"),
     "cultureBox": _cty("city_cbox"),
     "nextPlot": _cty("city_next_plot"),

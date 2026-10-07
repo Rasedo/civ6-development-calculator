@@ -49,7 +49,7 @@ import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
-import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, placeIdleCitizens, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
+import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, drawBorderPlot, acquireTile, placeIdleCitizens, refreshParkAmenities, seatBuildingSum, swapTileOk, wonderRegionalLoyalty } from './city';
 import { accrueStockpiles, canTrainWithStockpile, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
@@ -114,7 +114,7 @@ import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
 import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
-import { cityAppealResolver, cityGovernorEstablished, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
+import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
 import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
@@ -894,6 +894,7 @@ export function freeCitiesPhase(state: GameState): void {
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
   // age is kept here
   ageReactors(free.cities);
+  refreshParkAmenities(state, FREE_SEAT);
   const luxMap = luxuryAmenities(state, FREE_SEAT);
   const mods = getModifiers(state, FREE_SEAT);
   const stats = free.cities.map((city) => computeCityStats(state, city, luxMap, mods));
@@ -2630,6 +2631,7 @@ export function seatPhase(state: GameState): void {
     accrueStockpiles(state, actor.seat);
     chargeUnitUpkeep(state, actor.seat);
     resolveSeatPower(state, actor.seat);
+    refreshParkAmenities(state, actor.seat);
     // ESPIONAGE: this seat's own spies move a turn closer to arriving or to
     // resolving, and the clocks their missions left behind tick down.
     tickSpies(state, actor.seat);
@@ -2927,7 +2929,7 @@ export function seatPhase(state: GameState): void {
     resolveSuzerains(state);
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes
-    seatAccumulators(state, actor.seat, rGovIds);
+    seatAccumulators(state, actor.seat, establishedGovernorCityIds(actor));
     rsr.civicProgress += culSum + (rsr.civicOverflow ?? 0);
     rsr.civicOverflow = 0;
     // LIFETIME culture — the same per-turn sum, banked separately

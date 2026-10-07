@@ -33,7 +33,7 @@ import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
-import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
+import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
@@ -2393,6 +2393,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
   const b2 = b1 && history?.beforeThat?.turn === rec.turn - 2 ? history.beforeThat : null;
   const late = new Set([...(b1 ? notStarted(b1, rec) : []), ...(b1 && b2 ? notStarted(b2, b1) : [])]);
   const prevCities = new Map((b1?.cities ?? []).map((c) => [`${c.owner}:${c.id}`, c]));
+  importParkAmenities(state, b1, active?.id, playerOfSeat);
   const projectYieldUnread = new Map<string, number>();
   for (const [key, city] of cityByKey) {
     const c = dumpOfCity.get(city)!;
@@ -3355,6 +3356,37 @@ export function citiesNotStarted(a: TurnRecord, b: TurnRecord): Set<string> {
     if (num(c1.food) === num(c0.food) && num(c1.culture) === num(c0.culture)) out.add(k);
   }
   return out;
+}
+
+/**
+ * THE PARK AMENITIES each city's owner's last processing stored
+ * (`refreshParkAmenities`): the parks standing at that owner's latest turn
+ * start. The record is read at the active player's turn start, so its own
+ * parks are the record's; every other player's last processing came before
+ * its own action phase of the turn before, where its parks still stood as
+ * the record before shows them (runs/h1_duelw1121 China's t226 park pays at
+ * t228, not t227). With no record of the turn before, the record's own.
+ */
+function importParkAmenities(state: GameState, b1: TurnRecord | null, activeId: number | undefined,
+  playerOfSeat: Map<number, number>): void {
+  const tiles = state.map.tiles;
+  const now = tiles.map((t) => t.park);
+  const parksBefore = b1 && Array.isArray(b1.parks) ? b1.parks as [string, number[]][] : null;
+  const setParks = (parks: [string, number[]][]) => {
+    for (const t of tiles) delete t.park;
+    for (const [, plots] of parks) {
+      const anchor = Math.min(...plots);
+      for (const q of plots) if (tiles[q]) tiles[q].park = anchor;
+    }
+  };
+  const stale = state.seats.filter((s) => parksBefore && (playerOfSeat.get(s.seat) ?? -1) !== activeId);
+  for (const s of [...state.seats, ...(state.freeSeat ? [state.freeSeat] : [])]) {
+    for (const c of s.cities) c.parkAmenities = parkAmenities(state, c);
+  }
+  if (stale.length === 0) return;
+  setParks(parksBefore!);
+  for (const s of stale) for (const c of s.cities) c.parkAmenities = parkAmenities(state, c);
+  tiles.forEach((t, i) => { if (now[i] === undefined) delete t.park; else t.park = now[i]; });
 }
 
 /**

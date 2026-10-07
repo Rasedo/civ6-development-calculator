@@ -18,7 +18,7 @@ import { DISTRICTS, PLACEABLE_DISTRICTS } from '../data/districts';
 import { BUILDINGS, buildingVariantFor, effectiveBuilding, isGovYieldBuilding } from '../data/buildings';
 import { YIELD_KEYS } from '../../world/types';
 import { wallsLevel } from './rules';
-import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles, governedCityIds } from './governors';
+import { cityAppealResolver, governorBuildingYields, governorFlag, governorMult, governorSum, minorGovernorEffects, cityGovernorEffects, cityGovernorTitles, establishedGovernorCityIds } from './governors';
 import { BUILT_WONDERS, type BuiltWonderDef } from '../data/builtWonders';
 import { completedWonders, seatWonderSum, seatWonders } from './wonders';
 import { goldenCulturePerDistrict, goldenDedication } from './eras';
@@ -649,7 +649,7 @@ function nonLuxuryAmenities(
   const center = state.map.tiles[city.centerIndex];
   let have =
     localAmenities(state, city) +
-    parkAmenities(state, city) +
+    (city.parkAmenities ?? 0) +
     regionalAmenities +
     wonderRegionalAmenities(state, city) +
     wonderCityFlat(state, city, 'cityAmenities') +
@@ -1245,6 +1245,8 @@ export function cityHasPark(state: GameState, city: City): boolean {
  * park, ties by city id, and the OWNING city never double-dips as one of the
  * four. A park is four tiles; the CLUSTER pays once, so the payout is keyed
  * on the park tile with the LOWEST index in each owning-city group.
+ * A city's amenities read the count its owner's last processing stored
+ * (`refreshParkAmenities`), never this live sum.
  */
 export function parkAmenities(state: GameState, city: City): number {
   const cities = citiesOf(state, city.seat);
@@ -1264,6 +1266,19 @@ export function parkAmenities(state: GameState, city: City): number {
     if (near.some((n) => n.c.id === city.id)) have += PARK_AMENITIES_NEAR;
   }
   return have;
+}
+
+/**
+ * THE SEAT'S PARK COUNT, stored on each of its cities at its turn's
+ * resources step (Player DoTurn 0x4e46c0 -> 0x4a8ed0: the holdings, the
+ * luxury allocation, then Game_NationalParks 0x32deb0, which zeroes every
+ * city's park amenities and pays each park's 2 and 1s again — its only
+ * caller). A park designated in the action phase pays from the owner's next
+ * processing: runs/h1_duelw1109, 1111, 1113, 1115, 1117, 1119, 1121, 1123,
+ * every park lands in the record one turn before its cities' amenities.
+ */
+export function refreshParkAmenities(state: GameState, seat: number): void {
+  for (const city of citiesOf(state, seat)) city.parkAmenities = parkAmenities(state, city);
 }
 
 function hexDistance2(state: GameState, a: number, b: number): number {
@@ -1410,7 +1425,7 @@ export function cityTourism(state: GameState, city: City): number {
   const s = seatOf(state, city.seat);
   if (!s) return 0;
   const pct = seatTourismPct(state, city.seat);
-  return raisedTourism(tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city), governedCityIds(s)), pct)
+  return raisedTourism(tourismOf(state, s, [city], citiesOf(state, city.seat), (tile: Tile) => tileBelongsTo(tile, city), establishedGovernorCityIds(s)), pct)
     + raisedTourism(cityReligiousTourism(state, city), pct);
 }
 
@@ -1468,8 +1483,8 @@ function tourismOf(
   const era = civEraIndex(s.research.techs, s.research.civics);
   // CIV6 (Wish You Were Here, Golden face): "+100% Tourism to all National
   // Parks", and "Cities with Governors receive 50% Tourism from World
-  // Wonders". `govCityIds` is the caller's loop-top governor seating — the
-  // same snapshot the loyalty payout used, taken before any loyalty moved.
+  // Wonders". `govCityIds` is the caller's cities with an ESTABLISHED
+  // governor (`establishedGovernorCityIds`).
   const golden = goldenDedication(state, seat, DED_WISH);
   const parkMult = golden ? WISH_PARK_TOURISM_MULT : 1;
   return t + suzerainTourism(state, seat, owns) + gpDistrictTourism(state, seat, cities) + buildingTourism(state, seat, cities)

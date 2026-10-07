@@ -10733,8 +10733,9 @@ class SimSeats:
         _regional = self._seat_regional(row)
         if _regional is not None:
             have = have + _regional[1]
-        # NATIONAL PARK amenities (`parkAmenities`)
-        have = have + self._park_amenities(row)
+        # NATIONAL PARK amenities, as the owner's last processing stored them
+        # (`refreshParkAmenities`)
+        have = have + self.city_park_amen[:, row, :cols].double() * alive.double()
         # CIV6 (CITY_POP_PER_AMENITY): one Amenity per this many citizens,
         # rounded up
         need = torch.ceil(self.city_pop[:, row, :cols].double() / self.rules.amenity_pop_per)
@@ -10913,6 +10914,7 @@ class SimSeats:
         # (`workedTiles` / `amenityTier` unset on a new City object)
         self.city_worked[b, row, col, :] = -1
         self.city_amen_tier[b, row, col] = -1
+        self.city_park_amen[b, row, col] = 0
 
     def _city_col_at(self, row: int, rows: torch.Tensor, tiles: torch.Tensor) -> torch.Tensor:
         """`cityAtTile` in COLUMN space — the column of seat row `row`'s
@@ -11298,6 +11300,7 @@ class SimSeats:
         # the flipped City is a new object: no walk has read it yet
         self.city_worked[b, dst_row, col, :] = -1
         self.city_amen_tier[b, dst_row, col] = -1
+        self.city_park_amen[b, dst_row, col] = 0
         # CIV6 (Military Emergency): "The Target has conquered the city of
         # another nation; it must be Liberated!" The seat that LOST it is the
         # affected one.
@@ -12532,6 +12535,15 @@ class SimSeats:
         near = (rank < self._park_amen_cities) & (key < BIG)
         out = out + self._park_amen_near * (near & anchor.unsqueeze(1)).sum(dim=2).double()
         return out * alive.double()
+
+    def _refresh_park_amenities(self, row: int, active: torch.Tensor) -> None:
+        """THE SEAT'S PARK COUNT, stored on each of its cities at its turn's
+        resources step for the games in `active` [B] — `refreshParkAmenities`'
+        twin: a city's amenities read `city_park_amen`, never the live sum."""
+        cols = self.RC
+        now = self._park_amenities(row).to(self.city_park_amen.dtype)
+        self.city_park_amen[:, row, :cols] = torch.where(
+            active.unsqueeze(1), now, self.city_park_amen[:, row, :cols])
 
     def _do_excavate(self, row: int, mask: torch.Tensor, tile: torch.Tensor, slot: torch.Tensor) -> None:
         """EXCAVATE for the games in `mask` — `archaeologistExcavate`'s twin.

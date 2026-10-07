@@ -82,6 +82,10 @@ export interface City {
    *  city pays, so a disagreement about it is invisible until it shows up as
    *  a fraction of a food box. Read it through the census, never inline. */
   amenityTier?: number;
+  /** the National Park amenities its owner's last turn processing counted
+   *  (`refreshParkAmenities`): a park designated since pays from the owner's
+   *  next processing; absent before the city's first. */
+  parkAmenities?: number;
   cultureBox: number;
   tilesAcquired: number;
   /** CIV6 (City_Culture): the plot this city's culture claims next — drawn
