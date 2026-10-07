@@ -56,7 +56,7 @@ def main() -> int:
     civ = sim._seat_civics(ROW)
     adopted, has_gov = sim._adopted_gov(ROW)
     want = sim._policy_unlocked(civ, sim.civ_age[:, ROW] == 0,
-                                sim._civ_era(sim.civ_techs[:, ROW], sim.civ_civics[:, ROW]),
+                                sim.game_era,
                                 sim.civ_gov_held[:, ROW], adopted) & has_gov.unsqueeze(1)
     assert torch.equal(mask, want), "the mask is not the unlock predicate under the live government"
     assert int(mask[0].sum()) > 0, "the scene unlocks no card at all"

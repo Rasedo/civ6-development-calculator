@@ -36,7 +36,7 @@ import { centreStrength, cityDefenseStrength } from '../core/combat';
 import { minorCity, resolveSuzerains } from '../core/cityStates';
 import { applyLoyalty, cityBorderGrowth, cultureAfterGrowth, districtSiteCost, loyaltyPerTurn } from '../core/phase';
 import { seatGrowth } from '../core/seatTurn';
-import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, pressureFromCity, religiousUnitLost, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
+import { buildingFaithPrice, unitFaithPrice, buildingPurchaseCost, settlerCost, gpActivatedPressure, pressureFromCity, religiousUnitLost, spreadReligiousPressure, tilePurchaseCost, unitProdCost, unitGoldPrice, unitStepCost, unitsAcquired, wallsGoldBlocked } from '../core/game';
 import { buildingCostIn, buildingFullCost } from '../core/rules';
 import { builderCost, spawnUnit, traderCost, unitDomain, unitReligious } from '../core/units';
 import { minorRouteOriginYields, routeDestYields, routeOriginYields, routeYieldCut } from '../core/trade';
@@ -2018,10 +2018,30 @@ export function transitionChecks(a: TurnRecord, b: TurnRecord, cat: Catalog, his
     for (const [rel, at] of killsBy.get(seat) ?? []) religiousUnitLost(spreadState, rel, at);
     killsBy.delete(seat);
   };
+  // each Great Person the log activates, on its owner's turn, where the log
+  // last placed its unit (Vatican City's suzerain, `gpActivatedPressure`)
+  const activations: { seat: number; at: number }[] = [];
+  {
+    const placeOf = new Map<string, number>();
+    for (const u of a.units) placeOf.set(`${u.owner}:${u.id}`, u.y * a.head.W + u.x);
+    for (const r of logged ?? []) {
+      if (r[2] === 'UnitMoveComplete' || r[2] === 'UnitAddedToMap' || r[2] === 'UnitTeleported') {
+        placeOf.set(`${r[3]}:${r[4]}`, (r[6] as number) * a.head.W + (r[5] as number));
+      } else if (r[2] === 'UnitGreatPersonActivated') {
+        const seat = spreadImp.seatOfPlayer.get(r[3] as number);
+        const at = placeOf.get(`${r[3]}:${r[4]}`);
+        if (seat !== undefined && at !== undefined) activations.push({ seat, at });
+      }
+    }
+  }
+  const gpTurn = (seat: number) => {
+    for (const x of activations) if (x.seat === seat) gpActivatedPressure(spreadState, seat, x.at);
+  };
   for (const s of spreadState.seats) {
     spreadReligiousPressure(spreadState, s.seat);
     growAt(s.seat);
     unitTurn(s.seat);
+    gpTurn(s.seat);
     killTurn(s.seat);
     routeTurn(s.seat);
   }

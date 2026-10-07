@@ -98,8 +98,8 @@ describe('theological combat', () => {
     expect(woundedTook).toBeLessThan(healthyTook);
   });
 
-  it('CIV6: the duel sways cities within 10 tiles', () => {
-    expect(THEO_PRESSURE_RANGE).toBe(10);
+  it('the duel sways cities within RELIGION_SPREAD_RANGE_COMBAT_VICTORY 6 (0x493f80)', () => {
+    expect(THEO_PRESSURE_RANGE).toBe(6);
   });
 });
 

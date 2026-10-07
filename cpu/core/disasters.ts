@@ -484,9 +484,44 @@ function riverHeight(t: Tile): number {
  * the whole flood, then each reached tile takes the effects at that severity.
  */
 export function riverReach(map: GameMap, start: Tile): Tile[] {
+  const k = floodRiverIndex(map, start);
+  return k >= 0 ? floodRivers(map)[k].list : [start];
+}
+
+/** The flood river (its `floodRivers` index) a flood starting on `start`
+ *  floods: the one it starts, else the first that holds it; -1 none. */
+export function floodRiverIndex(map: GameMap, start: Tile): number {
   const rivers = floodRivers(map);
-  const r = rivers.find((x) => x.start === start) ?? rivers.find((x) => x.list.includes(start));
-  return r ? r.list : [start];
+  const k = rivers.findIndex((x) => x.start === start);
+  return k >= 0 ? k : rivers.findIndex((x) => x.list.includes(start));
+}
+
+/**
+ * Each plot's FLOOD HOME, by plot index: the first flood river (`floodRivers`
+ * order) whose Floodplains list holds it, -1 none. A plot's floods are its
+ * home river's (GameCore_XP2 0x539645, the plot yield's per-flood term: the
+ * river 0xa2b810 finds — the first in the vector whose floodplain list holds
+ * the plot — and its flood count 0xa2b410, every flood the river's record
+ * holds).
+ */
+const homeCache = new WeakMap<readonly Tile[], Int32Array>();
+export function floodHome(map: GameMap): Int32Array {
+  const hit = homeCache.get(map.tiles);
+  if (hit) return hit;
+  const out = new Int32Array(map.tiles.length).fill(-1);
+  floodRivers(map).forEach((r, k) => {
+    for (const t of r.list) if (out[t.index] < 0) out[t.index] = k;
+  });
+  homeCache.set(map.tiles, out);
+  return out;
+}
+
+/** A flood of river `k` (`floodRiverIndex`) counts on the plots it is the
+ *  home of (`floodHome`, `Tile.floodCount`, the Great Bath's faith). */
+export function countFlood(map: GameMap, k: number): void {
+  if (k < 0) return;
+  const home = floodHome(map);
+  for (const t of floodRivers(map)[k].list) if (home[t.index] === k) t.floodCount = (t.floodCount ?? 0) + 1;
 }
 
 /** Every plot of the river network beside `tile` (`riverOfPlots`), the plot
@@ -605,9 +640,9 @@ function riverRevealed(state: GameState, river: FloodRiver): boolean {
 
 /**
  * A FLOOD of severity `sev` on the river through `start` (GameCore_XP2
- * 0xa2f200: the damage pass 0xa2a4d0, then the yields pass 0xa2ed80). Every
- * plot of the river (`riverReach`, in its order) remembers the episode
- * (`Tile.floodCount`, the Great Bath's faith). A river carrying its shield
+ * 0xa2f200: the damage pass 0xa2a4d0, then the yields pass 0xa2ed80) over
+ * the river's plots (`riverReach`, in its order). The river counts the
+ * episode on the plots it is the home of (`countFlood`). A river carrying its shield
  * (`riverShielded`) skips the damage pass whole; otherwise, for each
  * `RandomEvent_Damages` row of the severity in the install's order
  * (`FLOOD_DAMAGE_ROWS`), for each plot: a plot whose owner is immune to the
@@ -623,7 +658,7 @@ function riverRevealed(state: GameState, river: FloodRiver): boolean {
 export function floodRiver(state: GameState, start: Tile, sev: number): Tile[] {
   const reach = riverReach(state.map, start);
   const mitigated = riverShielded(reach);
-  for (const t of reach) t.floodCount = (t.floodCount ?? 0) + 1;
+  countFlood(state.map, floodRiverIndex(state.map, start));
   if (!mitigated) {
     for (const row of FLOOD_DAMAGE_ROWS[sev]) {
       for (const t of reach) {

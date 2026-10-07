@@ -280,6 +280,12 @@ describe('loyalty', () => {
     expect(off(1, 2.5)).toBeCloseTo(0, 12); // 1 + 1 + 0.5
     me.age = 0;
     expect(off(0.5, 2.5)).toBeCloseTo(0, 12);
+    // CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE: a major dominant over
+    // the pressed city's owner presses 25% harder a citizen (0x1a1640)
+    civ.culturallyDominant = [true, false];
+    expect(off(0.5, 2.5 * 1.25)).toBeCloseTo(0, 12);
+    me.culturallyDominant = [false, true]; // the city's own owner's dominance is no term
+    expect(off(0.5, 2.5 * 1.25)).toBeCloseTo(0, 12);
   });
 
   it('a city at zero loyalty revolts into a Free City, not to the pressuring civ', () => {

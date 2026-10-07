@@ -2109,8 +2109,9 @@ class SimEconomy:
         if bool(hit.count_nonzero()):
             # the flood tables are read for every game of the batch, so a game
             # whose row is another family's reads a clamped (unused) index
-            self._flood_river(hit, self._flood_lists[torch.arange(B, device=dev), site.clamp(max=self._flood_lists.shape[1] - 1)],
-                              sev.clamp(min=0, max=len(self._flood_damage) - 1))
+            river = site.clamp(max=self._flood_lists.shape[1] - 1)
+            self._flood_river(hit, self._flood_lists[torch.arange(B, device=dev), river],
+                              sev.clamp(min=0, max=len(self._flood_damage) - 1), river)
 
         for r in range(len(self._eruption_weight)):
             hit = (fam == self._EV_ERUPTION) & (sev == r)
@@ -2794,14 +2795,16 @@ class SimEconomy:
                     alive[gone_u, us[gone_u]] = False
                     self._vacate(pool, gone_u, us[gone_u])
 
-    def _flood_river(self, hit: torch.Tensor, lists: torch.Tensor, sev: torch.Tensor) -> None:
+    def _flood_river(self, hit: torch.Tensor, lists: torch.Tensor, sev: torch.Tensor, river: torch.Tensor) -> None:
         """`floodRiver` — a FLOOD of each game's severity `sev` [B] where
-        `hit`, over each game's Floodplains list `lists` [B, L] (plots in
+        `hit`, over each game's Floodplains list `lists` [B, L] of flood river
+        `river` [B] (its `_flood_lists` index, -1 the plot alone; plots in
         flood order, -1 pads; 0xa2f200: the damage pass 0xa2a4d0, then the
-        yields pass 0xa2ed80). Every plot of the list remembers the episode
-        (`tile_flood_ct`). A shielded river (`_river_shielded`) skips the
-        damage pass whole; otherwise, for each damage row of the severity in
-        the install's order (`_flood_damage`), for each plot: a plot whose
+        yields pass 0xa2ed80). The river counts the episode on the plots it is
+        the home of (`_flood_home`, `tile_flood_ct`). A shielded river
+        (`_river_shielded`) skips the damage pass whole; otherwise, for each
+        damage row of the severity in the install's order (`_flood_damage`),
+        for each plot: a plot whose
         owner is immune (Egypt) takes no draw, any other ONE draw rand(100) <
         Percentage applies the row through the shared applier
         (`_event_damage`). Then, unless the climate has stopped laying
@@ -2820,7 +2823,8 @@ class SimEconomy:
             on = lists[:, k] >= 0
             reach[bidx[on], lists[on, k]] = True
         shield = self._river_shielded(reach)
-        self.tile_flood_ct += reach.long()
+        home = (self._flood_home == river.unsqueeze(1)) & (river >= 0).unsqueeze(1)
+        self.tile_flood_ct += (reach & home).long()
         plots = [(lists[:, k] >= 0, lists[:, k].clamp(min=0)) for k in range(lists.shape[1])]
         for s, rows in enumerate(self._flood_damage):
             hs = hit & (sev == s) & ~shield
@@ -3467,8 +3471,7 @@ class SimEconomy:
         B, dev, npol = self.B, self.device, self._npol
         civ = self._seat_civics(row)
         adopted, has_gov = self._adopted_gov(row)
-        _open = self._policy_unlocked(civ, self.civ_age[:, row] == 0,
-                                      self._civ_era(self.civ_techs[:, row], civ),
+        _open = self._policy_unlocked(civ, self.civ_age[:, row] == 0, self.game_era,
                                       self.civ_gov_held[:, row], adopted)
         stored = self.civ_policies[:, row]
         # each stored card's OLD slot kind: its own kind within that kind's
@@ -3517,7 +3520,7 @@ class SimEconomy:
                          era: torch.Tensor | None, held: torch.Tensor | None,
                          adopted: torch.Tensor) -> torch.Tensor:
         """[B, nPol] — the cards a seat may SLOT under `adopted`: the civic
-        unlock, a Dark Age card's age-and-era window, a legacy card's held
+        unlock, a Dark Age card's age and game-era window, a legacy card's held
         government (never the one the seat is in), the obsoleting civic and
         the Policy Treaty's ban. `unlockedPolicyIds`' twin — ONE predicate the
         greedy fill, the driver mask and the record's validator all read."""
@@ -3529,8 +3532,9 @@ class SimEconomy:
             torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
         )  # [B, nPol]
         obs = self._pol_obsolete_civic  # [nPol], -1 = never retires
-        # CIV6 (Dark Age policy card): no civic unlocks one — the seat's AGE
-        # and the card's own era window are the whole gate, and the window
+        # CIV6 (Dark Age policy card, Policies_XP1 MinimumGameEra /
+        # MaximumGameEra): no civic unlocks one — the seat's AGE and the card's
+        # window over the GAME era (`era`) are the whole gate, and the window
         # RETIRES it, so the obsolete-civic test never touches these rows.
         is_dark = self._pol_dark_lo.unsqueeze(0) >= 0
         if dark is not None and era is not None:
@@ -3567,8 +3571,7 @@ class SimEconomy:
         civ = self._seat_civics(row)
         adopted, has_gov = self._adopted_gov(row)
         dark = self.civ_age[:, row] == 0
-        era = self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
-        return self._policy_unlocked(civ, dark, era, self.civ_gov_held[:, row], adopted) & has_gov.unsqueeze(1)
+        return self._policy_unlocked(civ, dark, self.game_era, self.civ_gov_held[:, row], adopted) & has_gov.unsqueeze(1)
 
     def _policy_set_ok(self, row: int, chosen: torch.Tensor) -> torch.Tensor:
         """[B] — `fitPolicies`' twin: every chosen card is unlocked for the seat
@@ -3641,7 +3644,7 @@ class SimEconomy:
         civ = self._seat_civics(row)
         self.civ_policies[:, row] = self._slotted_policies(
             civ, self._wonder_extra_slots(row), self.civ_age[:, row] == 0,
-            self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row]), self.civ_gov_held[:, row],
+            self.game_era, self.civ_gov_held[:, row],
             self._adopted_gov(row))
         self.civ_policy_lapsed[:, row] = False
         self._eff_version += 1
@@ -4054,7 +4057,7 @@ class SimEconomy:
     def _gov_mod_inputs(self, row: int) -> tuple[torch.Tensor, ...]:
         """`_gov_mods`' inputs for seat row `row`, each a copy, never a view
         of a live plane (a key that is a view compares equal to itself forever
-        and freezes the answer): (civics, extra slots, dark age, era, legacy
+        and freezes the answer): (civics, extra slots, dark age, game era, legacy
         held, the cards chosen beside the lapsed ones, the government chosen — read -2 in Anarchy,
         empty on a minor's row)."""
         civ = self._seat_civics(row).clone()
@@ -4065,7 +4068,7 @@ class SimEconomy:
         major = row < self.n_majors
         dark = (self.civ_age[:, row] == 0) if major \
             else torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        era = self._civ_era(self._seat_techs(row), civ)
+        era = self.game_era.clone()
         held = self.civ_gov_held[:, row].clone() if major else torch.zeros(
             (self.B,) + tuple(self.civ_gov_held.shape[2:]), dtype=self.civ_gov_held.dtype, device=self.device)
         pols = torch.cat([self._seat_policies(row), self._seat_lapsed(row)], dim=1)
@@ -7315,7 +7318,7 @@ class SimEconomy:
             _fnc = _uf.gather(1, ctr).double()
             tiles_y[:, :, 2] = tiles_y[:, :, 2] + _fg * (_fnw + _fnc)
         # CIV6 (Great Bath, GREATBATH_FLOODFAITH): Faith on a Floodplains plot
-        # per flood that plot has taken — a PLOT yield, worked or the centre.
+        # per flood of the plot's home river — a PLOT yield, worked or the centre.
         if compw is not None and bool(self._wond_faithflood.count_nonzero()):
             _ffw = compw.double() @ self._wond_faithflood  # [B, n]
             if bool(_ffw.count_nonzero()):

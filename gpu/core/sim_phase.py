@@ -559,10 +559,13 @@ class SimPhase:
         loy_gov = self._ungoverned_loyalty(row) if pre["nogov_on"] else pre["z"]
         d = self.pair_dist[here.unsqueeze(1), pre["ctr"]].long().reshape(B, nrow, self.RC)
         # each citizen presses at base + capital + its seat's age, weighted
-        # (CUTOFF - d) / CUTOFF, all in 24.8 fixed point (`citizenPressure`)
+        # (CUTOFF - d) / CUTOFF, all in 24.8 fixed point (`citizenPressure`);
+        # a major culturally dominant over this row presses the dominance
+        # percent harder
+        dom = torch.where(self.civ_dominant[:, :, row], 1.0 + self._citizen_press_dom / 100, 1.0)  # [B, n_majors]
         each = (self._citizen_press_base
                 + self._citizen_press_cap * self.city_is_cap[:, :nrow].double()
-                + pre["age_p"].unsqueeze(2))
+                + pre["age_p"].unsqueeze(2)) * dom.unsqueeze(2)
         cits = (self.city_pop[:, :nrow].double() - pre["cut"].unsqueeze(2)).clamp(min=0)
         sub = self._pressure_fixed(d, cits, each, self.city_alive[:, :nrow], rng).sum(dim=2)
         own = sub[:, row]

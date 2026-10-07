@@ -35,7 +35,7 @@ import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMA
 import { landWalker, walkUnit } from './walker';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
-import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, inDarkAge, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
+import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
 import type { RuleResult } from './rules';
 import { TECHS, type ResearchEffect } from '../data/techs';
 import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
@@ -108,7 +108,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -410,15 +410,19 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
  *  (runs/h1_duelw1112 Yiyang t192: own 3.79, foreign 3.59 in 256ths read
  *  the game's 0.546875 where the reals read 0.411; the H-1 duels' recorded
  *  terms 2,036 -> 2,092 of 2,097 on 1112, 2,038 -> 2,092 of 2,114 on 1106,
- *  1,619 -> 1,751 of 1,843 on 1110). The sum is in pressure units. */
-function citizenPressure(state: GameState, here: Tile, cities: City[]): number {
+ *  1,619 -> 1,751 of 1,843 on 1110). A major culturally dominant over the
+ *  pressed city's owner presses CITIZEN_PRESSURE_DOMINANCE_PCT harder per
+ *  citizen (`pct`; 0x1a1640: runs/h1_duelw1130 Rome t95 reads 18.671875 and
+ *  t100 18.4375 with China's Taiyuan and Handan at 1.875 a citizen). The sum
+ *  is in pressure units. */
+function citizenPressure(state: GameState, here: Tile, cities: City[], pct = 0): number {
   const cutoff = LOYALTY_RANGE + 1;
   let raw = 0;
   for (const c of cities) {
     const t = state.map.tiles[c.centerIndex];
     const d = hexDistance(state.map, here.col, here.row, t.col, t.row);
     if (d <= LOYALTY_RANGE) {
-      const each = CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat);
+      const each = (CITIZEN_PRESSURE_BASE + (c.isCapital ? CITIZEN_PRESSURE_CAPITAL : 0) + agePressure(state, c.seat)) * (100 + pct) / 100;
       const w = Math.floor((FIXED_ONE * (cutoff - d)) / cutoff);
       const cits = Math.max(0, c.population - emergencyPressureCut(state, c.seat));
       raw += Math.floor((cits * Math.round(each * FIXED_ONE) * w) / FIXED_ONE);
@@ -464,7 +468,7 @@ export function loyaltyDelta(state: GameState, city: City, amenityTierName: stri
   let own = 0;
   let foreign = 0;
   for (const s of state.seats) {
-    const sub = citizenPressure(state, here, s.cities);
+    const sub = citizenPressure(state, here, s.cities, s.culturallyDominant?.[city.seat] ? CITIZEN_PRESSURE_DOMINANCE_PCT : 0);
     if (s.seat === city.seat) own += sub;
     // CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure on
     // each other."
@@ -1592,7 +1596,7 @@ export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatAction
   if (rec.policies) {
     const gov = seatGovernment(state, actor.seat);
     if (gov) {
-      const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), inDarkAge(state, actor.seat), actor.government.held, gov);
+      const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), darkAgeEra(state, actor.seat), actor.government.held, gov);
       const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
       const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
       // a lapsed card the set keeps keeps its standing; one it drops is gone

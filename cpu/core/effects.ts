@@ -1090,10 +1090,10 @@ function plotRowsGateOnEra(civ: string | null, leader: string | null): boolean {
  *
  *  - the roster: `civOf` / `leaderOf` (the ~100 `rowIsFor` table filters,
  *    Phoenicia's coastal loyalty);
- *  - `age` (the golden-age flag and `inDarkAge`);
+ *  - `age` and the game era (the golden-age flag, `inDarkAge`, `darkAgeEra`);
  *  - `research.techs` / `research.civics` (`modifiersFromResearch`,
  *    `completedEffectsIn`, `computeUnlocksIn`, `computeAdoption`,
- *    `unlockedPolicyIds`'s `civEraIndex`, `plotYieldRowsFor`'s civic clause);
+ *    `plotYieldRowsFor`'s civic clause);
  *  - the city count and population SUM (the belief seat's `followers`/`cities`);
  *  - `religion`'s pantheon / founded / founder / enhancer;
  *  - `government.policies` (the stored cards), `government.held` (the
@@ -1113,6 +1113,8 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
   fpPush(m, civ);
   fpPush(m, leader);
   fpPush(m, s.age);
+  // a Dark Age card's window reads the game era (`darkAgeEra`)
+  fpPush(m, state.gameEra ?? 0);
 
   const techs = s.research.techs;
   for (let i = 0; i < techs.length; i++) fpPush(m, techs[i]);
@@ -1354,7 +1356,7 @@ function buildModifiers(state: GameState, seat: number, s: Seat): Modifiers {
   const lapsed = s.government.lapsed;
   applyGovernment(mods, seatGovernment(state, seat), s.research,
                   lapsed.length ? s.government.policies.filter((p) => !p || !lapsed.includes(p)) : s.government.policies,
-                  congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held);
+                  congressPolicyBlocked(state), darkAgeEra(state, seat), s.government.held);
 
   const beliefSeat = { followers: pop, cities: cities.length };
   applyBeliefEffects(mods, rel?.pantheon ? PANTHEONS[rel.pantheon] : undefined, beliefSeat);
@@ -1640,6 +1642,15 @@ export function inDarkAge(state: GameState, seat: number): boolean {
   return (seatOf(state, seat)?.age ?? 1) === 0;
 }
 
+/** The GAME era while the seat is in a Dark Age, -1 otherwise: what a Dark
+ *  Age card's window reads (Policies_XP1 MinimumGameEra / MaximumGameEra,
+ *  RequiresDarkAge; runs/h1_duelw1129 t154-181: China, in its Industrial era
+ *  and a Dark Age, slots Collectivism, Modern to Atomic, in the game's
+ *  Modern era, its Farms +1 Food and every city +2 Housing). */
+export function darkAgeEra(state: GameState, seat: number): number {
+  return inDarkAge(state, seat) ? (state.gameEra ?? 0) : -1;
+}
+
 /** The `GOVERNMENT_LIST` position of one government id, -1 for an unknown or
  *  absent one — the index `governmentBit` shifts by. */
 function governmentIndex(id: string | null): number {
@@ -1761,7 +1772,7 @@ export function policySetChanges(state: GameState, seat: number, cards: readonly
   const s = seatOf(state, seat);
   const gov = seatGovernment(state, seat);
   if (!s || !gov) return false;
-  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, seat), s.government.held, gov);
   const now = new Set(s.government.policies.filter((p): p is string => !!p && open.has(p)));
   const next = new Set(cards.filter((p): p is string => !!p));
   return now.size !== next.size || [...next].some((p) => !now.has(p));
@@ -1777,7 +1788,7 @@ export function carryPolicies(state: GameState, seat: number, before: readonly S
   const s = seatOf(state, seat)!;
   const gov = seatGovernment(state, seat);
   if (!gov) return;
-  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, seat), s.government.held, gov);
   const old = fitPoliciesLoose(before, s.government.policies.filter((p): p is string => !!p));
   const laid = carryLayout(old.map((c, i) => [before[i], c] as const), governmentSlots(state, seat), (c) => open.has(c));
   s.government.policies = laid;
@@ -1837,7 +1848,7 @@ export function carryLayout(old: readonly (readonly [SlotKind, string | null])[]
  * `_slotted_policies` is the twin.
  */
 export function computeAdoption(research: ResearchState, extra?: Record<SlotKind, number>,
-                                blocked = -1, dark = false, held = 0,
+                                blocked = -1, darkEra = -1, held = 0,
                                 gov: string | null = newestGovernment(research)): {
   government: string | null;
   policies: (string | null)[];
@@ -1849,7 +1860,7 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
   const slots = [...chosen.slots];
   for (const k of SLOT_KINDS) for (let i = 0; i < (extra?.[k] ?? 0); i++) slots.push(k);
   const policies: (string | null)[] = slots.map(() => null);
-  const open = unlockedPolicyIds(research, blocked, dark, held, chosen.id);
+  const open = unlockedPolicyIds(research, blocked, darkEra, held, chosen.id);
   for (const card of Object.values(POLICIES)) {
     if (!open.has(card.id)) continue;
     const slot = slots.findIndex((kind, i) => policies[i] === null && cardFitsSlot(card, kind));
@@ -1863,13 +1874,13 @@ export function computeAdoption(research: ResearchState, extra?: Record<SlotKind
  *  (never the one the seat is in), and the Policy Treaty's ban. ONE gate the
  *  greedy fill and the record's validator both read — `_policy_unlocked` is
  *  the twin. */
-export function unlockedPolicyIds(research: ResearchState, blocked: number, dark: boolean, held: number,
+export function unlockedPolicyIds(research: ResearchState, blocked: number, darkEra: number, held: number,
                                   chosenId: string): Set<string> {
   const u = computeUnlocksIn(research, []);
   const banned = blocked >= 0 ? POLICY_LIST[blocked]?.id : undefined;
   // CIV6 (Dark Age policy card): a Dark Age card needs no civic — the seat's
-  // AGE and the card's own era window are the whole gate.
-  const era = civEraIndex(research.techs, research.civics);
+  // AGE and the card's window over the GAME era (`darkAgeEra`) are the whole
+  // gate.
   const out = new Set<string>();
   for (const card of Object.values(POLICIES)) {
     if (card.id === banned) continue;
@@ -1878,7 +1889,7 @@ export function unlockedPolicyIds(research: ResearchState, blocked: number, dark
     if (card.legacyOf !== undefined) {
       if (!(held & governmentBit(card.legacyOf)) || card.legacyOf === chosenId) continue;
     } else if (card.dark
-      ? !(dark && era >= card.dark.firstEra && era <= card.dark.lastEra)
+      ? !(darkEra >= card.dark.firstEra && darkEra <= card.dark.lastEra)
       : !u.policies.has(card.id)) continue;
     out.add(card.id);
   }
@@ -1924,7 +1935,7 @@ export function slottedPolicyIndices(state: GameState, seat: number): number[] {
   if (!s) return [];
   const gov = seatGovernment(state, seat);
   if (!gov) return [];
-  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), inDarkAge(state, seat), s.government.held, gov);
+  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, seat), s.government.held, gov);
   const out: number[] = [];
   for (const p of s.government.policies) {
     if (!p || !open.has(p)) continue;
@@ -1955,7 +1966,7 @@ export function fitPoliciesLoose(slots: readonly SlotKind[], cards: readonly str
 export function slotGreedily(state: GameState, seat: number): void {
   const s = seatOf(state, seat)!;
   s.government.policies = computeAdoption(s.research, wonderExtraSlots(state, seat), congressPolicyBlocked(state),
-    inDarkAge(state, seat), s.government.held, seatGovernment(state, seat)).policies;
+    darkAgeEra(state, seat), s.government.held, seatGovernment(state, seat)).policies;
   s.government.lapsed = [];
 }
 
@@ -1976,13 +1987,13 @@ export function fitPolicies(slots: readonly SlotKind[], cards: readonly string[]
 }
 
 function applyGovernment(mods: Modifiers, government: string | null, research: ResearchState,
-                         stored: readonly (string | null)[], blocked = -1, dark = false, held = 0): void {
+                         stored: readonly (string | null)[], blocked = -1, darkEra = -1, held = 0): void {
   // the government the seat is in (`seatGovernment`) and the CARDS it chose
   // (`government.policies`, a driver decision), minus any card whose unlock
   // has lapsed since
   const gov = government ? GOVERNMENTS[government] : null;
   if (!gov) return;
-  const open = unlockedPolicyIds(research, blocked, dark, held, government!);
+  const open = unlockedPolicyIds(research, blocked, darkEra, held, government!);
   const policies = stored.filter((p): p is string => !!p && open.has(p));
   applyPolicyEffects(mods, gov.effects);
   // the flat bonus is the government's alone: its legacy card never pays it

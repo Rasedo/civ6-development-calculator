@@ -81,7 +81,7 @@ def flood(sim, t: int) -> None:
     (`_flood_severity_draw`, the breached Dam's)."""
     one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
     sim._flood_river(one, alone(sim, t),
-                     sim._flood_severity_draw(one))
+                     sim._flood_severity_draw(one), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
 
 
 def main() -> None:
@@ -188,7 +188,7 @@ def main() -> None:
         sim.improvement[0, t] = 0
         sim.pillaged[0, t] = False
         one = torch.ones(sim.B, dtype=torch.bool, device=sim.device)
-        sim._flood_river(one, two, sim._flood_severity_draw(one))
+        sim._flood_river(one, two, sim._flood_severity_draw(one), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
         assert int(sim.improvement[0, t]) >= 0, "the Great Bath let a flood destroy an improvement"
         assert not bool(sim.pillaged[0, t]), "the Great Bath let a flood pillage an improvement"
         assert not bool(sim.district_pillaged[0, t]), "the Great Bath let a flood take a district"
@@ -269,7 +269,7 @@ def poke_row_walk() -> None:
         for sev in range(len(sim._flood_damage)):
             want = spent_by_walk(sim, [t], sev, egypt)
             seed = int(sim.rng_state[0])
-            sim._flood_river(one, at, torch.tensor([sev], dtype=torch.long, device=sim.device))
+            sim._flood_river(one, at, torch.tensor([sev], dtype=torch.long, device=sim.device), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
             spent = 0
             probe = int(sim.rng_state[0])
             sim.rng_state[0] = seed
@@ -284,14 +284,14 @@ def poke_row_walk() -> None:
     assert fid in kinds, "the floodplain's feature is no row's kind"
     sim.fertility_prod[0, t] = 0
     for _ in range(N):
-        sim._flood_river(one, at, torch.zeros(1, dtype=torch.long, device=sim.device))
+        sim._flood_river(one, at, torch.zeros(1, dtype=torch.long, device=sim.device), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
     assert int(sim.fertility_prod[0, t]) == 0, "a MODERATE flood silted Production"
     # a row naming another kind never lands: the plot recast as no floodplain
     # kind any row names gains nothing
     sim.fertility[0, t] = 0
     sim.feat_id[0, t] = max(kinds) + 1000
     for _ in range(N):
-        sim._flood_river(one, at, torch.full((1,), 2, dtype=torch.long, device=sim.device))
+        sim._flood_river(one, at, torch.full((1,), 2, dtype=torch.long, device=sim.device), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
     assert int(sim.fertility[0, t]) == 0 and int(sim.fertility_prod[0, t]) == 0, \
         "a yield row landed on a plot of another kind"
     sim.feat_id[0, t] = fid
@@ -329,7 +329,7 @@ def poke_river_reach() -> None:
     lst = torch.full((1, sim._flood_lists.shape[2]), -1, dtype=torch.long, device=sim.device)
     lst[0, :n] = torch.tensor(reach, dtype=torch.long, device=sim.device)
     sim._flood_river(torch.ones(1, dtype=torch.bool, device=sim.device), lst,
-                     torch.tensor([2], dtype=torch.long, device=sim.device))
+                     torch.tensor([2], dtype=torch.long, device=sim.device), torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
     spent = 0
     st = torch.tensor([seed], dtype=sim.rng_state.dtype, device=sim.device)
     probe = sim.rng_state.clone()

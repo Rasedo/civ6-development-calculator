@@ -336,7 +336,7 @@ def test_iteru_flood(rules, path) -> None:
         sim.improvement[B0, t] = farm
         sim.pillaged[B0, t] = False
         slot = place(sim, t, warrior, egypt)
-        sim._flood_river(torch.tensor([True]), torch.tensor([[t]]), torch.tensor([sev]))
+        sim._flood_river(torch.tensor([True]), torch.tensor([[t]]), torch.tensor([sev]), torch.tensor([-1]))
         return int(sim.major_unit_hp[B0, slot]), int(sim.improvement[B0, t])
 
     hp_e, imp_e = run("EGYPT")

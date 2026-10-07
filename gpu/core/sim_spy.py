@@ -706,16 +706,20 @@ class SimSpy:
             self._eff_version += 1
             one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             one[b] = True
-            # the river's Floodplains list holding the Dam (`riverReach`), else
+            # the flood river the Dam starts, else the first whose Floodplains
+            # list holds it (`floodRiverIndex`), else
             # the Dam's plot alone
             lists = self._flood_lists
             lst = torch.full((self.B, lists.shape[2]), -1, dtype=torch.long, device=self.device)
-            held = (lists[b] == dt).any(dim=1).nonzero(as_tuple=True)[0]
+            starts = (lists[b, :, 0] == dt).nonzero(as_tuple=True)[0]
+            held = starts if starts.numel() else (lists[b] == dt).any(dim=1).nonzero(as_tuple=True)[0]
+            river = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
             if held.numel():
                 lst[b] = lists[b, int(held[0])]
+                river[b] = int(held[0])
             else:
                 lst[b, 0] = dt
-            self._flood_river(one, lst, self._flood_severity_draw(one))
+            self._flood_river(one, lst, self._flood_severity_draw(one), river)
 
     def _congress_pact_ban(self) -> torch.Tensor:
         """[B] long — CIV6 (Espionage Pact, outcome B): "Target Operation is

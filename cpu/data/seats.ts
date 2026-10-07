@@ -204,6 +204,10 @@ export const CITIZEN_PRESSURE_BASE = srcConst('seats.citizenPressureBase', 1,
  *  1 pressure". */
 export const CITIZEN_PRESSURE_CAPITAL = srcConst('seats.citizenPressureCapital', 1,
   gp('CITIZEN_IDENTITY_PRESSURE_CAPITAL'));
+/** The percent a major's citizens press harder on a city whose owner it is
+ *  culturally dominant over (0x1a1640, before the distance falloff). */
+export const CITIZEN_PRESSURE_DOMINANCE_PCT = srcConst('seats.citizenPressureDominancePct', 25,
+  gp('CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE'));
 /** CIV6 (`Happinesses_XP1.IdentityPerTurnChange`): the loyalty an amenity tier
  *  pays per turn, one install row per tier. */
 const happy = (tier: string) =>

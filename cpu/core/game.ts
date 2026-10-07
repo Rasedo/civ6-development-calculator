@@ -3,7 +3,7 @@ import type { City, DistrictId, GameState, QueueItem, ResearchState, Tile, Seat,
 import { completeQueueItem, dropQueuedBuilding } from './production';
 import { GP_CLASSES } from '../data/greatPeople';
 import { createRelic } from './greatWorks';
-import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
+import { VALLETTA_FAITH_DISTRICTS, VALLETTA_WALLS_DISCOUNT_PCT, VATICAN_GP_PRESSURE } from '../data/cityStates';
 import { tilesWithin, hexDistance, neighbors } from '../../world/hex';
 import { claimTile, borderCandidates, newCityGrantUnit, seatBuildingSum } from './city';
 import { canFoundCity, availableBuildings, buildingCompletable, purchasableBuildings, worshipOffered, type RuleResult } from './rules';
@@ -1880,6 +1880,33 @@ export function pressureFromCity(state: GameState, city: City, g: number): numbe
   const pct = (governorTileMult(state, tiles[city.centerIndex], (e) => e.pressureMult) - 1) * 100
     + (project ? PROJECTS[project]?.pressurePct ?? 0 : 0);
   return (RELIGION_PRESSURE_PER_TURN * mult * (100 + pct)) / 100;
+}
+
+/**
+ * CIV6 (Vatican City's suzerain, MODIFIER_PLAYER_GRANT_RELIGIOUS_PRESSURE_GREAT_PERSON_ACTIVATED;
+ * GameCore_XP2 0x497d40): a Great Person `seat` activates on `tileIndex`
+ * spreads VATICAN_GP_PRESSURE of the seat's founded religion, else its
+ * majority one, to every city within THEO_PRESSURE_RANGE of the plot —
+ * a major's, a city-state's, a Free City's (runs/h1_duelw1126: China's
+ * activations from t78, +400 in each city within 6 tiles, the Vatican's own
+ * included, none at 7). `_gp_activated_pressure` is the GPU twin.
+ */
+export function gpActivatedPressure(state: GameState, seat: number, tileIndex: number): void {
+  if (!suzerainEffect(state, seat, 'gpActivatedPressure')) return;
+  const s = seatOf(state, seat);
+  const g = s?.religion.founded ? seat : majorityReligionOf(state, seat);
+  if (g < 0) return;
+  const nRel = state.seats.length;
+  const at = state.map.tiles[tileIndex];
+  const minors = (state.cityStates ?? []).filter((cs) => cs.centerIndex >= 0);
+  const cities: { centerIndex: number; religionPressure?: number[] }[] = [
+    ...state.seats.flatMap((sx) => sx.cities), ...minors, ...(state.freeSeat?.cities ?? [])];
+  for (const c of cities) {
+    const ct = state.map.tiles[c.centerIndex];
+    if (hexDistance(state.map, at.col, at.row, ct.col, ct.row) > THEO_PRESSURE_RANGE) continue;
+    if (!c.religionPressure || c.religionPressure.length !== nRel) c.religionPressure = new Array(nRel).fill(0);
+    c.religionPressure[g] += VATICAN_GP_PRESSURE;
+  }
 }
 
 /**

@@ -37,7 +37,7 @@ import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, lux
 import { tileYields } from '../core/yields';
 import type { EventReplay } from './eventReplay';
 import { floodplainList } from './eventDraws';
-import { eruptionRings, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
+import { countFlood, eruptionRings, floodRiverIndex, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
 import { goldShortfall } from '../data/seats';
@@ -1218,18 +1218,27 @@ function foldCultureTourism(h: History, prev: TurnRecord, rec: TurnRecord, cat: 
   const routed = new Set(recordRoutes(prev).map((r) => `${r.OriginCityPlayer}:${r.DestinationCityPlayer}`));
   const govOf = (p: DumpPlayer) => strip(cat.governments[num(p.government)] ?? '', 'GOVERNMENT_');
   for (const p of majors) {
+    const q = rec.players.find((x) => x.id === p.id);
+    // the civic in progress in both records: its progress moved by exactly
+    // what landed, a boost toward it included (runs/h1_duelw1130: Rome founds
+    // after record 1, which reads Culture 0, and gains 3.296875 by record 2)
+    const civic = num(p.civic);
+    const same = civic >= 0 && q !== undefined && num(q.civic) === civic
+      && Number.isFinite(num(p.civicProgress)) && Number.isFinite(num(q.civicProgress));
     const cy = num(p.cultureYield);
-    if (num(p.civic) >= 0) {
+    if (same) {
+      h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + (h.cultureHeld.get(p.id) ?? 0) + num(q!.civicProgress) - num(p.civicProgress));
+      h.cultureHeld.set(p.id, 0);
+    } else if (civic >= 0) {
       h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + (h.cultureHeld.get(p.id) ?? 0) + cy);
       h.cultureHeld.set(p.id, 0);
     } else {
       h.cultureHeld.set(p.id, (h.cultureHeld.get(p.id) ?? 0) + cy);
     }
-    const q = rec.players.find((x) => x.id === p.id);
     const was = p.civicBoosts ?? '';
     const now = q?.civicBoosts ?? '';
     for (let k = 0; k < now.length; k++) {
-      if (now[k] !== '1' || was[k] === '1' || (q?.civics ?? '')[k] === '1') continue;
+      if (now[k] !== '1' || was[k] === '1' || (q?.civics ?? '')[k] === '1' || (same && k === civic)) continue;
       const cost = CIVICS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.cost ?? 0;
       h.culture.set(p.id, (h.culture.get(p.id) ?? 0) + boostAmount(cost, BOOSTS[strip(cat.civics[k] ?? '', 'CIVIC_')]?.pct ?? 0, 0));
     }
@@ -2995,21 +3004,19 @@ function importShortfalls(rec: TurnRecord, state: GameState, seatOfGame: (pid: n
 }
 
 /**
- * The floods the records named (`History.floods`): each one's plots the
- * game's Floodplains list from the plot it started on, read off the
- * record's river edges (`floodplainList`) where they give one list, else
- * the engine's river (`riverReach`); every plot of it one flood more
- * (`Tile.floodCount`, the Great Bath's Faith). Two rivers meeting are one
- * chain to the engine's rivers and two lists to the game's (runs/h1_duelw1123:
- * river 181 from 480 and river 201 from 612; Xi'an's Great Bath reads river
- * 201's floods alone on its centre 611, t83-250). Nothing is read back.
+ * The floods the records named (`History.floods`): each one floods the
+ * river it started on (`floodRiverIndex`) and counts on the plots that river
+ * is the home of (`countFlood`, `Tile.floodCount`, the Great Bath's Faith):
+ * a plot in two rivers' Floodplains lists counts the first river's floods
+ * alone (runs/h1_duelw1131: Beijing's 534 in the lists of rivers 0 and 1
+ * reads 1 Faith at t96 after a flood of each, 2 after river 0's t122 flood;
+ * 1126's 473 in rivers 1 and 6 reads 0 after five floods of river 6, 1 after
+ * river 1's first). Nothing is read back.
  */
 function importFloods(state: GameState, floods: Map<string, number>): Map<number, Set<number>> {
   for (const start of floods.values()) {
     const t = state.map.tiles[start];
-    if (!t) continue;
-    const lists = floodplainList(state.map, t);
-    for (const r of lists.length === 1 ? lists[0] : riverReach(state.map, t)) r.floodCount = (r.floodCount ?? 0) + 1;
+    if (t) countFlood(state.map, floodRiverIndex(state.map, t));
   }
   return new Map();
 }

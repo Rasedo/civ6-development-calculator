@@ -247,9 +247,9 @@ export interface Tile {
    *  plots in tile order. A recorded game's replay ranks the plots its
    *  record says each citizen of a turn worked. */
   lockRank?: number;
-  /** how many times a river flood has reached this tile — the Great Bath's
+  /** the floods of this tile's home river (`floodHome`) — the Great Bath's
    *  "+1 Faith for every time a tile belonging to this city has been
-   *  Flooded" reads it. A flood counts once per episode (`floodRiver`). */
+   *  Flooded" reads it. A flood counts once per episode (`countFlood`). */
   floodCount?: number;
   /** CIV6 (Marina Raskova): a permanent "+1 air unit slots" on this
    *  district tile, written at the general's retirement. */

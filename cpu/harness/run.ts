@@ -66,6 +66,8 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   // carries those it no longer lists (runs/h1_duelw1119: record 4 alone
   // shows the t3 eruption of Eyjafjallajökull, its soil read at record 5)
   let unread: unknown[][] = [];
+  // the records not read, for their witnesses (`replayEvents`)
+  const moved: TurnRecord[] = [];
   for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     const rec = JSON.parse(line) as TurnRecord;
@@ -73,6 +75,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     const events = Array.isArray(rec.events) ? rec.events as unknown[][] : [];
     if (rec.moved) {
       unread.push(...events);
+      moved.push(rec);
       continue;
     }
     const listed = new Set(events.map((e) => `${e[0]}:${e[1]}`));
@@ -110,7 +113,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
   if (existsSync(`${logs}Player_WarWeariness.csv`) && existsSync(`${logs}CombatLog.csv`)) {
     history.weary = readWeariness(readFileSync(`${logs}Player_WarWeariness.csv`, 'utf8'), readFileSync(`${logs}CombatLog.csv`, 'utf8'));
   }
-  history.replay = replayEvents(all, cat, history.randLog);
+  history.replay = replayEvents(all, cat, history.randLog, moved);
   history.legs = routeLegs(all);
   all.length = 0;
   const starts: StartReplay[] = [];

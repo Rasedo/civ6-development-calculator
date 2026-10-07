@@ -13,7 +13,7 @@ import { naturalWonderAt } from '../../world/query';
 import { LUXURY_IDS, RESOURCES } from '../../world/resources';
 import { cityAtTile, citiesOf, civOf, civsAtWar, isCityStateSeat, leaderOf, seatOf, tileOwnedByCiv, tileSeat } from './seats';
 import { captureCityStateFor } from './combat';
-import { adjacentBarbarians, convertAdjacentBarbarians } from './game';
+import { adjacentBarbarians, convertAdjacentBarbarians, gpActivatedPressure } from './game';
 import { boostPool, drawBoosts, markBoost } from './boosts';
 import {
   GP_CITY_PERM, GP_CLASSES, GP_PERM, GP_TILE_PERM, GREAT_PEOPLE, GW_WORK_CLASSES,
@@ -505,6 +505,8 @@ export function activateGreatPerson(state: GameState, unit: Unit): boolean {
   }
   // the install's DISTRICT_IN_TILE attachment: the tile stood on keeps it
   for (const [k, n] of Object.entries(fx.tilePerm ?? {})) permAdd(tile, GP_TILE_PERM.length, k, GP_TILE_PERM, n);
+  // CIV6 (Vatican City's suzerain): the activation's pressure around the plot
+  gpActivatedPressure(state, unit.seat, unit.tileIndex);
 
   (owner.gpActivated ??= []).push(person.id);
   unit.charges = (unit.charges ?? 1) - 1;

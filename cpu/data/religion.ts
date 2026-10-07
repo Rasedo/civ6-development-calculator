@@ -803,12 +803,17 @@ export function followedReligionOf(pres: readonly number[], population: number, 
 export const MISSIONARY_CAP = 2;
 export const APOSTLE_CAP = 1;
 /**
- * THEOLOGICAL COMBAT. CIV6: the winner's religion gains pressure "in all
- * cities within 10 tiles" and the loser's sheds the same —
- * RELIGION_SPREAD_COMBAT_VICTORY 250 (GlobalParameters.xml).
+ * THEOLOGICAL COMBAT. The winner's religion gains RELIGION_SPREAD_COMBAT_VICTORY
+ * in every city within RELIGION_SPREAD_RANGE_COMBAT_VICTORY of the fallen
+ * unit and the loser's sheds the same (GameCore_XP2 0x493f80, the combat
+ * resolvers' spread: gp +0x5ec the range, +0x5dc the amount; the
+ * Civilopedia's "10 tiles" is not the game's). The same range carries Vatican
+ * City's Great Person pressure (0x497d40).
  */
-export const THEO_PRESSURE_RANGE = 10;
-export const THEO_PRESSURE_SWING = 250;
+export const THEO_PRESSURE_RANGE = srcConst('religion.theoPressureRange', 6,
+  xml('GlobalParameters', 'Name=RELIGION_SPREAD_RANGE_COMBAT_VICTORY', 'Value'));
+export const THEO_PRESSURE_SWING = srcConst('religion.theoPressureSwing', 250,
+  xml('GlobalParameters', 'Name=RELIGION_SPREAD_COMBAT_VICTORY', 'Value'));
 
 /** CIV6 (Inquisitor): the Apostle's "Launch Inquisition" needs friendly
  *  territory and "at least 3 charges", and consumes the unit. */

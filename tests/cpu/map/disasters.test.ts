@@ -458,6 +458,29 @@ describe('the flood\'s row walk', () => {
     return { state, plots };
   };
 
+  it("a plot in two rivers' lists counts its first river's floods alone", () => {
+    // GameCore_XP2 0x539645: the plot's per-flood term reads the first river
+    // in the vector whose floodplain list holds it (0xa2b810), and every flood
+    // that river's record holds (0xa2b410)
+    const state = makeState(makeMap(16, 16));
+    const at = (c: number, r: number) => tileAtCoords(state.map, c, r).index;
+    const shared = at(6, 4);
+    state.map.rivers = [
+      [at(3, 4), at(4, 4), at(5, 4), shared],
+      [at(10, 6), at(9, 6), shared, at(8, 6), at(7, 6)],
+    ];
+    for (const plots of state.map.rivers) for (const i of plots) state.map.tiles[i].feature = 'FLOODPLAINS_GRASSLAND';
+    const [first, second] = floodRivers(state.map);
+    expect(first.start.index).toBe(shared);
+    expect(second.list.map((t) => t.index)).toContain(shared);
+    floodRiver(state, second.start, 0);
+    expect(state.map.tiles[shared].floodCount ?? 0).toBe(0);
+    expect(second.start.floodCount).toBe(1);
+    floodRiver(state, first.start, 0);
+    expect(state.map.tiles[shared].floodCount).toBe(1);
+    expect(state.map.tiles[at(3, 4)].floodCount).toBe(1);
+  });
+
   it('draws once per damage row per plot, then once per yield row per plot', () => {
     for (let sev = 0; sev < 3; sev++) {
       const { state, plots } = river();

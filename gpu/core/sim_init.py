@@ -502,6 +502,10 @@ class SimInit:
         self._suz_wonder_pct = float(_suz["wonderPct"])
         # Mohenjo-Daro: every city houses as a fresh-water one
         self._suz_c_fresh_house = _sfx.index("freshWaterHousing") if "freshWaterHousing" in _sfx else -1
+        # Vatican City: a Great Person's activation spreads pressure around
+        # its plot (`gpActivatedPressure`)
+        self._suz_c_gp_press = _sfx.index("gpActivatedPressure") if "gpActivatedPressure" in _sfx else -1
+        self._vatican_gp_pressure = float(rules.citystate["vaticanGpPressure"])
         self._suz_hub_amen = (float(_suz["hubAmenities"]), int(_suz["hubDistrict"]))
         self._suz_c_relic_faith = _sfx.index("relicFaith") if "relicFaith" in _sfx else -1
         self._suz_relic_faith_pct = float(_suz["relicFaithPct"])
@@ -974,6 +978,9 @@ class SimInit:
         # CIV6 (the Loyalty pedia): each citizen's base pressure and a capital's extra
         self._citizen_press_base = float(rules.seats["citizenPressureBase"])
         self._citizen_press_cap = float(rules.seats["citizenPressureCapital"])
+        # ...and the percent harder a major presses where it is culturally
+        # dominant over the pressed city's owner
+        self._citizen_press_dom = float(rules.seats["citizenPressureDominancePct"])
         # THE GOVERNOR CATALOG. `governors` order IS the governor index; the
         # thirteen title civics, the neutralize clock and the Governance
         # Doctrine favor ride the era block beside the ages that gate them.
@@ -2071,6 +2078,13 @@ class SimInit:
             for i, lst in enumerate(f["floodLists"]):
                 _fl[b, i, :len(lst)] = torch.tensor(lst, dtype=torch.long, device=device)
         self._flood_lists = _fl
+        # each plot's flood home (`floodHome`): the first flood river whose
+        # list holds it, -1 none — its floods are that river's
+        _fh = torch.full((B, T), -1, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            for i in range(len(f["floodLists"]) - 1, -1, -1):
+                _fh[b, _fl[b, i, :len(f["floodLists"][i])]] = i
+        self._flood_home = _fh
         _fl_idx = _fl[:, :, 0]
         self._flood_sites = (_fl_idx, (_fl_idx >= 0).sum(dim=1))
         # CIV6 (FEATURE_VOLCANO, Expansion2_Features.xml): a volcano is its
@@ -4812,7 +4826,7 @@ class SimInit:
             [[int(t.get("lw", 0)) for t in f["tiles"]] for f in fixtures],
             dtype=torch.long, device=dev)
         self.tile_flooded = torch.zeros(B, T, dtype=torch.bool, device=dev)
-        # every river-flood EPISODE a tile has taken — the Great Bath's faith
+        # the river-flood EPISODES of each tile's home river — the Great Bath's faith
         # counts them (`Tile.floodCount`)
         self.tile_flood_ct = torch.zeros(B, T, dtype=torch.long, device=dev)
         # the random-event rows (a bit per `_event_rows` index) that have

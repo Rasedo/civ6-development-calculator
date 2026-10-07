@@ -854,10 +854,23 @@ fraction bits (every amount is written `<< 8`).
   `_update_cultural_dominance`, `Seat.culturallyDominant` / `civ_dominant`;
   the culture victory reads the same counts, `visitingTourists` /
   `domesticTourists`). 1108 Jiaodong -> Rome +4 from its first record t200.
+  The importer's lifetime fold takes a pair's gain as the progress move of the
+  civic both records research (a city founded after record 1 lands its
+  Culture by record 2: runs/h1_duelw1130 Rome 3.296875 at a recorded 0), the
+  record before's yield otherwise (`foldCultureTourism`). Open: 1129 Rome
+  t146-239 reads no dominance at the fold's 108.9 lifetime culture (AUDIT C-94
+  ASK).
 - CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE (gp +0xec, 25): 0x1a1640
-  raises a player's great-work identity pressure (+0x588, + Great Works x
-  +0x1aec) at a plot whose owner it dominates by 25%, before the distance
-  falloff (gp +0xf0). No engine term matched yet (AUDIT C-94 BUILD).
+  is a city's citizen pressure at a plot (City_CulturalIdentity.cpp, the one
+  reader of gp +0xec): the city's citizens (+0x588; a city with none presses
+  nothing) plus Great Works x +0x1aec (a per-work pressure no install row
+  writes), shifted to 24.8, times the per-citizen term (0x1a1370: base,
+  capital, age); where the city's owner dominates the plot's owner
+  (+0x1b8 against the plot's, 0x106660) that product x (100 + 25) / 100,
+  then the distance falloff (gp +0xf0). runs/h1_duelw1130
+  Rome t95 reads 18.671875 and t100 18.4375 with China's Taiyuan (8 at 9
+  tiles) and Handan (3, then 4, at 7) at 1.875 a citizen, the unraised term
+  reading the full 20 (`citizenPressure`'s `pct`, the GPU's `dom`).
 
 ## H-1: a route's yield per path plot (Hunza) — READ
 
@@ -2934,13 +2947,41 @@ these records (C-94 LAB): the line of a look across a ridge of two plots
 (1124 t28: Cardiff's Warrior at (7,11) and China's Scout at (6,12) met; the
 engines' line between them takes the Rainforest at (7,12) and blocks).
 
+## H-1: the Great Bath's Faith per flood — READ
+
+The plot yield's per-flood term (0x539645, inside the plot-yield builder
+0x538a60): when the owning city's `m_aYieldPerFlood` (City +0x2728, filled by
+EFFECT_ADJUST_CITY_YIELD_PER_FLOOD, the Bath's GREATBATH_FLOODFAITH Amount 1
+Faith) is above 0 for the yield, 0xa2b810 walks the river vector in order and
+returns the id of the FIRST river whose floodplain plot vector (+0x28..+0x30,
+`m_aRiverFloodPlains`) holds the plot (-1 none); 0xa2b4f0 finds that river's
+record; 0xa2b410(record, -1) counts every flood its record holds (+0x78..+0x80,
+stride 0x10; a negative filter counts all). The yield adds amount x count.
+No per-plot count exists: a plot's floods are its home river's, before the
+Bath or after, and a plot in no river's list takes none. Ships as
+`floodHome` / `countFlood` (GPU `_flood_home`). Confirmed on the two recorded
+plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1)
+reads 1 Faith at t96 after floods of both (the first river's alone: 1; every
+list: 2), 2 at t122 after river 0's next; runs/h1_duelw1126 473 (rivers 1
+and 6) reads 0 at t54 after five floods of river 6, 1 at t59 after river 1's
+first (the last list's count would read 5).
+
+## H-1: an unread record's random-event step — the harness
+
+A record whose counter moved while it was dumped is not read, but its
+witnesses bracket its own turn's step (`T-1:63:post`, `T:0:pre`) and its
+units stand where the step struck: the event replay runs that step on the
+read record before it and lands what it laid at the next read record
+(`replayEvents`, `unread`). runs/h1_duelw1131: record 5 unread, record 6
+missing; the t3 dust storm's last walk at t5 lays 229 and 272 +1 Production
+(plot.yields 377 -> 39, city.centreYields 122 -> 0 on Handan's centre 272),
+its steps landing on the game's log.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
   `woundPenalty` / its GPU twin round 10 - HP/10 (AUDIT C-94 BUILD); the
   garrison term reads the law.
-- CITIZEN_IDENTITY_PRESSURE_MOD_CULTURAL_DOMINANCE's 0x1a1640 term (AUDIT
-  C-94 BUILD).
 - Lifetime culture (0x3a1fb0) grows by every gain of civic progress, a
   boost's share included, and not by culture held with no civic chosen: the
   engines' `cultureTotal` / `civ_culture` sum the culture yield (AUDIT C-94

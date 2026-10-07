@@ -22,7 +22,7 @@ function world(): GameState {
  *  cannot starve the one under test. */
 function slotted(state: GameState, seat = 0): string[] {
   const s = seatOf(state, seat)!;
-  return computeAdoption(s.research, { ...WIDE }, -1, false, s.government.held)
+  return computeAdoption(s.research, { ...WIDE }, -1, -1, s.government.held)
     .policies.filter((p): p is string => p !== null);
 }
 
@@ -93,7 +93,7 @@ describe('what the greedy fill does with one', () => {
     const s = seatOf(state, 0)!;
     return computeAdoption(s.research,
       { military: 0, economic: 0, diplomatic: 0, wildcard: wildcards },
-      -1, false, s.government.held)
+      -1, -1, s.government.held)
       .policies.filter((p): p is string => p !== null);
   }
 

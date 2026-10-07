@@ -52,16 +52,17 @@ export interface ReplayedEvent {
 export interface EventReplay {
   /** the events whose every draw the replay placed, by key */
   events: Map<string, ReplayedEvent>;
-  /** by key, the turns whose step the replay placed for each event, one not
+  /** by key, the read records whose turns' steps the replay placed for each
+   *  event (an unread record's turn counts at the next read record), one not
    *  in `events` included (a storm whose last step was not placed): their
    *  draws are in `gains` */
   placedTurns: Map<string, Set<number>>;
-  /** the fertility the replayed events laid between record T-1 and record
-   *  T, by T: plot -> [Food, Production, Science, Culture] */
+  /** the fertility the replayed events laid between the read record before
+   *  T and read record T, by T: plot -> [Food, Production, Science, Culture] */
   gains: Map<number, Map<number, number[]>>;
   /** each witnessed turn's outcome: `ok`, or why the step was not placed */
   turns: Map<number, string>;
-  /** by T, the plots whose fertility the starts that reproduce the step lay
+  /** by read record T, the plots whose fertility the starts that reproduce the step lay
    *  differently, or that a storm laid after such a turn: `gains` holds the
    *  latest start's */
   unsure: Map<number, number[]>;
@@ -209,12 +210,25 @@ function unownedAtStep(after: TurnRecord, T: number): Set<number> {
   return out;
 }
 
-export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: RandLog): EventReplay {
+/**
+ * `recs` are the records read; `unread` the records whose counter moved
+ * while they were dumped. An unread record's witnesses still bracket its
+ * turn's step and its units still stand where the step struck, so the step
+ * of its turn is replayed on the read record before it, and what it laid
+ * lands at the next read record (runs/h1_duelw1131: record 5 unread, record
+ * 6 missing; the t3 dust storm's last walk at t5 lays 229 and 272 +1
+ * Production, first read at record 7).
+ */
+export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: RandLog, unread: readonly TurnRecord[] = []): EventReplay {
   const result: EventReplay = { events: new Map(), placedTurns: new Map(), gains: new Map(), turns: new Map(), unsure: new Map(), steps: new Map(), gaps: new Map() };
   const names = cat.randomEvents ?? [];
   const byTurn = new Map(recs.map((r) => [r.turn, r]));
+  const unreadAt = new Map(unread.filter((r) => !byTurn.has(r.turn)).map((r) => [r.turn, r]));
+  const readTurns = [...byTurn.keys()].sort((a, b) => a - b);
+  // the read record a step's fertility first shows in
+  const readAt = (T: number) => readTurns.find((t) => t >= T) ?? T;
   const seeds = new Map<string, number>();
-  for (const r of recs) {
+  for (const r of [...recs, ...unreadAt.values()]) {
     for (const w of r.witness ?? []) {
       const s = (w as { seed?: unknown }).seed;
       if (typeof s === 'number') seeds.set(`${w.turn}:${w.player}:${w.point}`, s >>> 0);
@@ -249,13 +263,13 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
   // the events a turn with an unknown start drew for
   const doubtful = new Set<string>();
   let volcano: VolcanoDraws = 1;
-  const turns = [...byTurn.keys()].sort((a, b) => a - b);
+  const turns = [...new Set([...readTurns, ...unreadAt.keys()])].sort((a, b) => a - b);
   for (const T of turns) {
-    // the map the step struck: the record before, or the latest earlier one
-    // where that record was not read (runs/h1_duelw1119: record 3 missing,
-    // record 4 read while its counter moved; the step of t5 runs on record 2)
-    const before = byTurn.get(T - 1) ?? byTurn.get(turns.filter((t) => t < T).pop() ?? -1);
-    const after = byTurn.get(T)!;
+    // the map the step struck: the read record before, or the latest earlier
+    // one where that record was not read (runs/h1_duelw1119: record 3
+    // missing, record 4 unread; the step of t5 runs on record 2)
+    const before = byTurn.get(T - 1) ?? byTurn.get(readTurns.filter((t) => t < T).pop() ?? -1);
+    const after = byTurn.get(T) ?? unreadAt.get(T)!;
     const news = [...first.values()].filter((e) => e[0] === T);
     live = live.filter((s) => T - s.storm.start <= STORM_WALKS);
     const fail = (why: string) => {
@@ -523,7 +537,11 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
         && byRecords.trace.every((d, i) => sameDraw(d, loggedStepDraws[i])) } : {}) });
     for (const s of alts) for (const [i, [f, p]] of s.out.gains) addGain(s.soil, i, [f, p, 0, 0]);
     const g = step.soil;
-    if (g.size) result.gains.set(T, g);
+    if (g.size) {
+      const acc = result.gains.get(readAt(T)) ?? new Map<number, number[]>();
+      for (const [i, f] of g) addGain(acc, i, f);
+      result.gains.set(readAt(T), acc);
+    }
     // the plots where the starts that reproduce the step lay different
     // fertility, and every plot a storm whose earlier turn was so lays: the
     // draws before the step are not recorded, so which start ran is not known
@@ -533,7 +551,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
     const unsure = [...plots].filter((i) => inherited || alts.some((s) => (s.soil.get(i) ?? []).join() !== (g.get(i) ?? []).join()));
     const walks = (s: Step) => s.st.map((x) => `${x.at}:${[...x.struck].sort((p, q) => p - q).join()}`).join('|')
       + `|${s.born ? `${s.born.at}:${[...s.born.struck].join()}` : ''}`;
-    if (unsure.length) result.unsure.set(T, unsure);
+    if (unsure.length) result.unsure.set(readAt(T), [...new Set([...(result.unsure.get(readAt(T)) ?? []), ...unsure])]);
     if (unsure.length || alts.some((s) => walks(s) !== walks(step))) {
       for (const s of live) doubtful.add(s.key);
       for (const e of news) doubtful.add(`${e[0]}:${e[1]}`);
@@ -563,7 +581,7 @@ export function replayEvents(recs: readonly TurnRecord[], cat: Catalog, log?: Ra
   }
   // an event is replayed when every turn its draws fell on was placed
   for (const [key, p] of placed) {
-    result.placedTurns.set(key, new Set([...p.turns].filter(([, g]) => g !== null).map(([t]) => t)));
+    result.placedTurns.set(key, new Set([...p.turns].filter(([, g]) => g !== null).map(([t]) => readAt(t))));
     if ([...p.turns.values()].some((g) => g === null)) continue;
     const e = first.get(key);
     if (!e) continue;

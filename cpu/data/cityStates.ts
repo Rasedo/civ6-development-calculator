@@ -72,7 +72,8 @@ export type SuzEffect =
   | 'relicFaith'         // Kandy
   | 'partnerProduction' // Singapore
   | 'wonderProduction'   // Brussels
-  | 'freshWaterHousing'; // Mohenjo-Daro
+  | 'freshWaterHousing' // Mohenjo-Daro
+  | 'gpActivatedPressure'; // Vatican City
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -86,7 +87,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
   'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
-  'partnerProduction', 'wonderProduction', 'freshWaterHousing',
+  'partnerProduction', 'wonderProduction', 'freshWaterHousing', 'gpActivatedPressure',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -115,6 +116,12 @@ export const VALLETTA_FAITH_DISTRICTS: DistrictId[] = ['CITY_CENTER', 'ENCAMPMEN
  *  are half price for a Valletta suzerain, who is also the only seat that may
  *  buy them at all (`wallsGoldBlocked`). */
 export const VALLETTA_WALLS_DISCOUNT_PCT = 50;
+/** Vatican City: the pressure a Great Person's activation spreads for the
+ *  suzerain (0x497d40: the player's founded religion, else its majority one,
+ *  to every city within RELIGION_SPREAD_RANGE_COMBAT_VICTORY of the person's
+ *  plot, `THEO_PRESSURE_RANGE`, 0x498860). */
+export const VATICAN_GP_PRESSURE = srcConst('cityStates.vaticanGpPressure', 400,
+  xml('ModifierArguments', 'ModifierId=MINOR_CIV_VATICAN_CITY_GREAT_PERSON_RELIGIOUS_PRESSURE&Name=Amount', 'Value'));
 /** Kumasi: routes to any city-state pay "+2 Culture and +1 Gold for every
  *  specialty district in the origin city". */
 export const KUMASI_ROUTE_CULTURE = 2;
@@ -323,6 +330,10 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   // CIV6 (Leaders.xml, MINOR_CIV_MOHENJO_DARO_CITIES_FRESHWATER_HOUSING_BONUS:
   // MODIFIER_PLAYER_GRANT_CITIES_FRESHWATER_HOUSING_BONUS, HasBonus true)
   'Mohenjo-Daro': { name: 'Mohenjo-Daro', type: 'cultural', bonus: 'Your cities have full Housing from water, as if they were adjacent to a River.', suz: 'freshWaterHousing' },
+  // CIV6 (GranColombia_Maya_Leaders.xml, MINOR_CIV_VATICAN_CITY_UNIQUE_INFLUENCE_BONUS
+  // attaching MINOR_CIV_VATICAN_CITY_GREAT_PERSON_RELIGIOUS_PRESSURE to the
+  // suzerain: MODIFIER_PLAYER_GRANT_RELIGIOUS_PRESSURE_GREAT_PERSON_ACTIVATED)
+  'Vatican City': { name: 'Vatican City', type: 'religious', bonus: 'When you activate a Great Person they spread 400 Religious pressure of your founded (or majority) religion to cities within 10 tiles.', suz: 'gpActivatedPressure' },
 };
 
 export const CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = Object.fromEntries(

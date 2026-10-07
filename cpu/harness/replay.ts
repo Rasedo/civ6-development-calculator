@@ -41,7 +41,7 @@ import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
-import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, inDarkAge, seatGovernment,
+import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, pillagePlunder } from '../core/economy';
@@ -695,7 +695,7 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
     let why: string | undefined;
     if (!same) {
       const gov = seatGovernment(ctx.state, s.seat);
-      const open = gov ? unlockedPolicyIds(s.research, congressPolicyBlocked(ctx.state), inDarkAge(ctx.state, s.seat), s.government.held, gov)
+      const open = gov ? unlockedPolicyIds(s.research, congressPolicyBlocked(ctx.state), darkAgeEra(ctx.state, s.seat), s.government.held, gov)
         : new Set<string>();
       why = !govOk ? `government ${gid} not adopted (in ${s.government.chosen})`
         : ids.some((id) => !open.has(id)) ? `a card not unlocked: ${ids.filter((id) => !open.has(id)).join(',')}`

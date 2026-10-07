@@ -513,11 +513,38 @@ class SimGp:
             _r = m.nonzero(as_tuple=True)[0]
             self.tile_gp_perm[_r, hc[_r]] += _rowfx[_r, self._GP_TPERM0:self._GP_TPERM0 + _ntp].long()
 
+        # CIV6 (Vatican City's suzerain): the activation's pressure around the plot
+        self._gp_activated_pressure(row, m, hc)
+
         # ---- a PROPHET's charge is what founds a religion, not the recruit
         if self._prophet_cls >= 0:
             self.civ_prophets[:, row] = self.civ_prophets[:, row] + (m & (cls == self._prophet_cls)).long()
         self.civ_gp_used[:, row] = self.civ_gp_used[:, row] + m.long()
         self._eff_version += 1
+
+    def _gp_activated_pressure(self, row: int, m: torch.Tensor, hc: torch.Tensor) -> None:
+        """`gpActivatedPressure`'s twin (CIV6, Vatican City's suzerain;
+        GameCore_XP2 0x497d40): an activation on tile `hc` [B] in the games of
+        `m` spreads the Vatican's pressure of the row's founded religion,
+        else its majority one, to every live city row within the combat
+        victory's spread range of the plot (`_theo_range`) — a major's, a
+        city-state's, a Free City's."""
+        if self._suz_c_gp_press < 0 or row >= self.n_majors:
+            return
+        go = m & self._suz_effect(row, self._suz_c_gp_press)
+        if not bool(go.count_nonzero()):
+            return
+        g = torch.where(self.civ_religion_done[:, row], torch.full_like(hc, row), self._dominant_religion()[:, row])
+        go = go & (g >= 0)
+        if not bool(go.count_nonzero()):
+            return
+        B = self.B
+        ctr = self.city_center.clamp(min=0)  # [B, ROWS, RC]
+        d = self.pair_dist[ctr.reshape(B, -1), hc.unsqueeze(1)].reshape(ctr.shape)
+        near = (d <= self._theo_range) & self.city_alive & go.view(B, 1, 1)
+        hot = torch.nn.functional.one_hot(g.clamp(min=0), self.city_pressure.shape[3]).to(self.city_pressure.dtype)
+        self.city_pressure += (near.to(self.city_pressure.dtype).unsqueeze(3)
+                               * hot.view(B, 1, 1, -1) * self._vatican_gp_pressure)
 
     # ---------------------------------------------------------------- the verbs
     def _enemy_ground(self, row: int, ts: torch.Tensor) -> torch.Tensor:

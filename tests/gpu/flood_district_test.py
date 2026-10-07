@@ -64,7 +64,7 @@ def main() -> None:
     top = torch.full((sim.B,), len(sim._flood_damage) - 1, dtype=torch.long)
     n = 0
     while not bool(sim.district_pillaged[0, t]) and n < 200:
-        sim._flood_river(hit, at, top)
+        sim._flood_river(hit, at, top, torch.full((sim.B,), -1, dtype=torch.long, device=sim.device))
         n += 1
     assert bool(sim.district_pillaged[0, t]), f"{n} top-severity floods and the district is still whole"
     print(f"  a complete district on a floodplain is pillaged (after {n} floods)")
@@ -77,9 +77,12 @@ def main() -> None:
     hit = torch.zeros(sim.B, dtype=torch.bool)
     hit[0] = True
     at = torch.full((sim.B, 1), t, dtype=torch.long)  # a Floodplains list of `t` alone
+    # `t` made the home of flood river 0, so each flood counts on it
+    sim._flood_home[0, t] = 0
+    home = torch.zeros(sim.B, dtype=torch.long)
     before = int(sim.tile_flood_ct[0, t])
     for _ in range(200):
-        sim._flood_river(hit, at, sim._flood_severity_draw(hit))
+        sim._flood_river(hit, at, sim._flood_severity_draw(hit), home)
     assert int(sim.tile_flood_ct[0, t]) - before == 200, "the flood did not land on the tile every time"
     assert not bool(sim.district_pillaged[0, t]), "a district still building was pillaged"
     print("  an unfinished district is left alone")

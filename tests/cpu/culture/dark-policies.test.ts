@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computeAdoption, getModifiers, withGovernor } from '../../../cpu/core/effects';
 import { POLICIES, POLICY_LIST, GOVERNMENTS, type PolicyDef, type SlotKind } from '../../../cpu/data/policies';
 import { CIVICS } from '../../../cpu/data/civics';
-import { civEraIndex } from '../../../cpu/core/city';
+import { ERAS } from '../../../cpu/data/techs';
 import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { seatOf } from '../../../cpu/core/seats';
@@ -32,20 +32,20 @@ describe('dark-age policy cards', () => {
     }
   });
 
-  it('a dark card is offered only in a DARK AGE and only inside its era window', () => {
+  it('a dark card is offered only in a DARK AGE and only inside its window over the game era', () => {
     const research = omniscient();
-    const era = civEraIndex(research.techs, research.civics);
     const wide = bench(POLICY_LIST.length);
-    const normal = new Set(computeAdoption(research, wide, -1, false).policies.filter(Boolean) as string[]);
-    const dark = new Set(computeAdoption(research, wide, -1, true).policies.filter(Boolean) as string[]);
-
-    for (const card of DARK) {
-      expect(normal.has(card.id)).toBe(false); // never outside a Dark Age
-      expect(dark.has(card.id)).toBe(era >= card.dark!.firstEra && era <= card.dark!.lastEra);
-    }
-    // the ORDINARY rows do not read the age at all
+    const normal = new Set(computeAdoption(research, wide, -1, -1).policies.filter(Boolean) as string[]);
     const ordinary = (s: Set<string>) => [...s].filter((id) => !POLICIES[id]?.dark).sort();
-    expect(ordinary(dark)).toEqual(ordinary(normal));
+    for (let era = 0; era < ERAS.length; era++) {
+      const dark = new Set(computeAdoption(research, wide, -1, era).policies.filter(Boolean) as string[]);
+      for (const card of DARK) {
+        expect(normal.has(card.id)).toBe(false); // never outside a Dark Age
+        expect(dark.has(card.id)).toBe(era >= card.dark!.firstEra && era <= card.dark!.lastEra);
+      }
+      // the ORDINARY rows do not read the age at all
+      expect(ordinary(dark)).toEqual(ordinary(normal));
+    }
   });
 
   it('the whole window is a real gate — some era offers a card another era does not', () => {
@@ -57,10 +57,8 @@ describe('dark-age policy cards', () => {
 
   it('a dark card never takes a typed slot, however wide the typed bench', () => {
     const research = omniscient();
-    const era = civEraIndex(research.techs, research.civics);
-    const live = DARK.filter((c) => era >= c.dark!.firstEra && era <= c.dark!.lastEra);
-    if (live.length === 0) return; // this era carries no dark card — nothing to place
-    const adopted = computeAdoption(research, { military: 8, economic: 8, diplomatic: 8, wildcard: 0 }, -1, true);
+    const era = DARK[0].dark!.firstEra;
+    const adopted = computeAdoption(research, { military: 8, economic: 8, diplomatic: 8, wildcard: 0 }, -1, era);
     const gov = GOVERNMENTS[adopted.government!]!;
     const baseWild = gov.slots.filter((k) => k === 'wildcard').length;
     const placedDark = (adopted.policies.filter(Boolean) as string[]).filter((id) => POLICIES[id]?.dark);

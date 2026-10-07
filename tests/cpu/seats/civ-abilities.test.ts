@@ -118,7 +118,7 @@ describe('Iteru', () => {
     expect(dry('EGYPT')).toBe(dry('ROME'));
   });
 
-  it("takes no flood damage on Egypt's ground; the flood still counts", () => {
+  it("takes no flood damage on Egypt's ground", () => {
     const run = (id: string) => {
       const state = makeState(makeMap(12, 12, 'GRASSLAND'));
       state.unitsMode = true;
@@ -129,11 +129,10 @@ describe('Iteru', () => {
       setTileOwner(t, 0);
       const u = spawnUnit(state, 'WARRIOR', t.index, 0)!;
       floodRiver(state, t, 2);
-      return { hp: u.hp, count: t.floodCount ?? 0 };
+      return { hp: u.hp };
     };
     const egypt = run('EGYPT');
     expect(egypt.hp).toBe(100);
-    expect(egypt.count).toBe(1);
     expect(run('ROME').hp).toBeLessThan(100);
   });
 });

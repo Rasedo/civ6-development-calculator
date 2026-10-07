@@ -117,7 +117,7 @@ export interface BuiltWonderDef {
      *  carries no Amount). */
     amenityPerLake?: { range: number };
     /** CIV6 (Great Bath, GREATBATH_FLOODFAITH): faith on each Floodplains
-     *  plot of the city per flood that plot has taken (`Tile.floodCount`),
+     *  plot of the city per flood of the plot's home river (`Tile.floodCount`),
      *  a plot yield (`cityPlotBonus`). */
     faithPerFlood?: number;
     /** CIV6 (Ruhr Valley): "+1 Production for each Mine and Quarry in this

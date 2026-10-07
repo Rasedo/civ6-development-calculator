@@ -12,17 +12,18 @@ import { getModifiers, goldPrice } from '../../../cpu/core/effects';
 import { cityDistrictYields, onOrNextToShallowWater } from '../../../cpu/core/yields';
 import { luxuryAmenities } from '../../../cpu/core/city';
 import { greatPersonPointsPerTurn } from '../../../cpu/core/greatPeople';
-import { unitGoldPrice, unitPurchaseCost } from '../../../cpu/core/game';
+import { gpActivatedPressure, unitGoldPrice, unitPurchaseCost } from '../../../cpu/core/game';
 import { suzerainProjectMult, suzerainLandPurchaseOffPct } from '../../../cpu/core/cityStates';
 import { routeChainGold, routeLengthGold, routeDestLuxuryGold } from '../../../cpu/core/trade';
 import {
   CITY_STATE_SUZERAIN_BONUS, SUZ_EFFECTS, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING,
   NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES,
   ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX,
-  HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, BUENOS_AIRES_AMENITIES,
+  HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, BUENOS_AIRES_AMENITIES, VATICAN_GP_PRESSURE,
   type SuzEffect,
 } from '../../../cpu/data/cityStates';
 import { GP_CLASSES, GP_CLASS_DISTRICT } from '../../../cpu/data/greatPeople';
+import { THEO_PRESSURE_RANGE } from '../../../cpu/data/religion';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import type { City, GameState, TradeRoute } from '../../../cpu/core/types';
 
@@ -191,6 +192,23 @@ describe("Zanzibar's spices and Buenos Aires' bonuses", () => {
     const before = sum();
     suzerainOf(state, 'bonusAmenities');
     expect(sum() - before).toBe(BUENOS_AIRES_AMENITIES);
+  });
+});
+
+describe("Vatican City's great people", () => {
+  it('spread the founded religion around the activation plot, to 6 tiles', () => {
+    const { state, city } = scene();
+    const far = settleAt(state, tileAtCoords(state.map, 12, 5).index, 0); // 7 from the plot
+    seatOf(state, 0)!.religion.founded = true;
+    gpActivatedPressure(state, 0, city.centerIndex);
+    expect(city.religionPressure?.[0] ?? 0).toBe(0); // no suzerain, no spread
+    suzerainOf(state, 'gpActivatedPressure');
+    gpActivatedPressure(state, 0, city.centerIndex);
+    expect(city.religionPressure?.[0]).toBe(VATICAN_GP_PRESSURE);
+    expect(far.religionPressure?.[0] ?? 0).toBe(0);
+    gpActivatedPressure(state, 0, tileAtCoords(state.map, 6, 5).index); // 6 from far
+    expect(far.religionPressure?.[0]).toBe(VATICAN_GP_PRESSURE);
+    expect(THEO_PRESSURE_RANGE).toBe(6);
   });
 });
 
