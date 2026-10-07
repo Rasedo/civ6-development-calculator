@@ -45,6 +45,10 @@ interface WorldMapLayers {
   cliffMask: number[];
   volcano: number[];
   goodyHut: number[];
+  /** the game's river vector (`GameMap.rivers`), where the generator kept it */
+  rivers?: number[][];
+  /** the game's volcano vector (`GameMap.volcanoes`), where the generator kept it */
+  volcanoOrder?: number[];
 }
 
 interface WorldCatalogs {

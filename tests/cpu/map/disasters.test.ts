@@ -4,7 +4,7 @@ import { governorsOf } from '../../../cpu/core/governors';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
 import { makeMap, makeState, settleAt, tileAtCoords, bareCtx, orderUnit } from '../helpers';
 import { foundCity, endTurn, serialize, deserialize, TURN_LIMIT } from '../../../cpu/core/game';
-import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, volcanoRoll } from '../../../cpu/core/disasters';
+import { disasterPhase, riverReach, nuclearAccident, sitePairWeight, floodRivers, floodRiver, erupt, drought, ageReactors, droughtCandidate, droughtStart, eventRows, volcanoRoll, laidRivers, riverPlotList, volcanoOrder } from '../../../cpu/core/disasters';
 import { ACCIDENT_ROWS, ACCIDENT_FALLOUT, RANDOM_EVENT_START_TURN, volcanoRow, ERUPTION_ROWS, droughtGround, DROUGHT_TURNS, FLOOD_WEIGHT, FLOOD_DAMAGE_ROWS, FLOOD_YIELD_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION } from '../../../cpu/data/disasters';
 import { CLIMATE_PHASES } from '../../../cpu/data/climate';
 import { CIV_IDS } from '../../../cpu/data/seats';
@@ -341,6 +341,32 @@ function floodRun(map: ReturnType<typeof makeMap>, col: number, row: number,
   }
   return run;
 }
+
+describe('the game\'s river and volcano vectors', () => {
+  it('the flood rivers walk the map\'s river vector; a map without one, the lists by lowest plot', () => {
+    const board = () => {
+      const state = makeState(makeMap(30, 12, 'COAST'));
+      for (let k = 0; k < 3; k++) floodRun(state.map, 2 + 9 * k, 3);
+      return state.map;
+    };
+    const plain = board();
+    const byPlot = floodRivers(plain).map((r) => r.start.index);
+    expect(byPlot).toHaveLength(3);
+    const lists = laidRivers(plain).map(riverPlotList);
+    // the same board carrying its river vector, the rivers in reverse
+    const held = board();
+    held.rivers = [...lists].reverse();
+    expect(floodRivers(held).map((r) => r.start.index)).toEqual([...byPlot].reverse());
+  });
+
+  it('the volcanoes stand in the map\'s volcano vector; a map without one, in plot order', () => {
+    const map = makeMap(10, 10);
+    for (const i of [12, 57, 33]) map.tiles[i].volcano = true;
+    expect(volcanoOrder(map).map((t) => t.index)).toEqual([12, 33, 57]);
+    map.volcanoes = [57, 12, 33];
+    expect(volcanoOrder(map).map((t) => t.index)).toEqual([57, 12, 33]);
+  });
+});
 
 describe('the flood reaches the whole river', () => {
   it('floods the river\'s Floodplains list, and nothing off it', () => {

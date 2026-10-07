@@ -758,7 +758,8 @@ export function recordMap(rec: TurnRecord, cat: Catalog): GameMap {
   const ctx: Ctx = { cat, gaps: new Map(), bReplace: new Map(), dReplace: new Map(), uReplace: new Map(), wonders: new Set() };
   const tiles: Tile[] = [];
   for (let i = 0; i < rec.head.W * rec.head.H; i++) tiles.push(tileOf(ctx, rec, i));
-  const map: GameMap = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
+  const map: GameMap = { width: rec.head.W, height: rec.head.H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes };
   for (const t of tiles) t.riverMask = edgeMask(map, rec, t, P.riverBits);
   return map;
 }
@@ -1877,7 +1878,10 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     for (const l of labels) gap(ctx, 'event-draw', l);
   }
   ctx.scopeTile = undefined;
-  const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles };
+  // the game's river and volcano vectors (`Catalog.orders`); a dump without
+  // them leaves the engine its own orders, a gap on the turn's event pick
+  const map: GameMap = { width: W, height: H, wrapX: bool(rec.head.wrapX), seed: 0, tiles,
+    rivers: cat.orders?.rivers, volcanoes: cat.orders?.volcanoes };
   for (const t of tiles) {
     t.riverMask = edgeMask(map, rec, t, P.riverBits);
     t.cliffMask = edgeMask(map, rec, t, P.cliffBits);

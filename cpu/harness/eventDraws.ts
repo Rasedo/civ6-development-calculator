@@ -12,24 +12,26 @@ import { FEATURES } from '../../world/features';
 import { isImpassable, isWater } from '../../world/query';
 import { ERUPTION_BLDG_P, ERUPTION_CIV_KILL_P, ERUPTION_CUL_P, ERUPTION_DESTROY_P, ERUPTION_DISTRICT_P, ERUPTION_DMG_HI, ERUPTION_DMG_LO, ERUPTION_PAINT_P, ERUPTION_WONDER, ERUPTION_POP_P, ERUPTION_PROD_P, ERUPTION_SCI_P, FLOOD_DAMAGE_ROWS, FLOOD_MITIGATED_YIELD_REDUCTION, FLOOD_YIELD_ROWS, SOIL_REPLACES, STORM_EVENTS, STORM_LAST_TURN_PCT, STORM_MOVEMENT, STORM_ROWS, STORM_STEP_COST_OFF, STORM_STEP_COST_ON, WIND_ROWS, DROUGHT_DESTROY_P, DROUGHT_HEXES, gameLatitude, stormFamilyAt } from '../data/disasters';
 import { Civ6Random, lcgStep, pickWeighted } from './civ6Random';
-import { droughtCandidate, floodplainRun, riverGraph, stormFootprint, type RiverEdge } from '../core/disasters';
+import { droughtCandidate, floodplainRun, floodRivers, riverGraph, riverPlotList, stormFootprint, type RiverEdge } from '../core/disasters';
 
 /**
  * A FLOOD'S PLOTS, in the order its draws walk them: the river's Floodplains
- * list (`floodplainRun`, 0xa2aa30 → 0xa2aca0). The record keeps no flow and
- * no river identity, only the river edges and the plot the list begins on
- * (`start`, the flood's start plot): every walk up the river edges from an
- * edge `start` borders, laid from its top down, whose run begins on `start`.
- * The candidates: every distinct run (two rivers meeting above a shared
- * mouth give two).
+ * list (`floodplainRun`, 0xa2aa30 → 0xa2aca0) — on a map that carries the
+ * game's river vector (`GameMap.rivers`) the list of the river whose run
+ * begins on `start` (the flood's start plot). Else the record keeps no flow
+ * and no river identity, only the river edges: every walk up the river edges
+ * from an edge `start` borders, laid from its top down, whose run begins on
+ * `start`. The candidates: every distinct run (two rivers meeting above a
+ * shared mouth give two).
  */
 export function floodplainList(map: GameMap, start: Tile): Tile[][] {
+  if (map.rivers) return floodRivers(map).filter((r) => r.start === start).map((r) => r.list);
   const { edges, at } = riverGraph(map);
   const runs = new Map<string, Tile[]>();
   const walk = (path: RiverEdge[], top: string) => {
     const next = (at.get(top) ?? []).filter((g) => !path.includes(g));
     if (!next.length) {
-      const run = floodplainRun(map, [...path].reverse());
+      const run = floodplainRun(map, riverPlotList([...path].reverse()));
       if (run[0] === start) runs.set(run.map((t) => t.index).join(','), run);
       return;
     }

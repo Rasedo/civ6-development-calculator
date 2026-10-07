@@ -3553,6 +3553,14 @@
         "why": "world geometry (see GameMap.width)."
       },
       {
+        "path": "GameMap.rivers",
+        "why": "the world's river vector, fixed at build; both engines read it through the fixture's floodLists."
+      },
+      {
+        "path": "GameMap.volcanoes",
+        "why": "the world's volcano vector, fixed at build; both engines read it through the fixture's volcanoes list."
+      },
+      {
         "path": "Seat.name",
         "why": "presentation."
       },

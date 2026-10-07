@@ -67,10 +67,9 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdFloodRiver } from '../core/disasters';
 import { holdMinorItem, holdMinorWalk, minorBuilderLays, type MinorItem } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS } from '../core/unitActions';
-import type { Catalog, DumpCity, TurnRecord } from './record';
+import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
@@ -1625,7 +1624,7 @@ const STEP_OF: Record<string, string> = {
 };
 
 function loadRecords(dumpPath: string, from: number, to: number): { cat: Catalog; recs: TurnRecord[] } {
-  const cat = JSON.parse(readFileSync(dumpPath.replace(/\.jsonl$/, '.cat.json'), 'utf8')) as Catalog;
+  const cat = loadCatalog(dumpPath);
   const byTurn = new Map<number, TurnRecord>();
   for (const line of readFileSync(dumpPath, 'utf8').split('\n')) {
     if (!line.trim()) continue;
@@ -1676,7 +1675,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog,
   };
-  holdFloodRiver(floodRivers(recs, cat), () => count(ctx, 'draw:floodRiver', 'fallback'));
   // the record's units in the importer's order
   let k = 0;
   for (const u of recs[0].units) {
@@ -1919,7 +1917,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
-  holdFloodRiver(null);
   holdMinorItem(null);
   holdMinorWalk(false);
   holdBarbarians(null);
@@ -1940,28 +1937,6 @@ function minorItems(recs: readonly TurnRecord[], cat: Catalog) {
     const c = rec?.cities.find((x) => x.y * rec.head.W + x.x === cs.centerIndex);
     return rec && c ? minorHead(cat, c, rec.head.W) : undefined;
   };
-}
-
-const FLOOD_ROWS = ['RANDOM_EVENT_FLOOD_MODERATE', 'RANDOM_EVENT_FLOOD_MAJOR', 'RANDOM_EVENT_FLOOD_1000_YEAR'];
-
-/**
- * THE FLOODS' RIVERS: the game weighs its rivers in the map generator's list
- * order, which no record carries (runs/h1_duelw1117 t13: the roll 107 lands
- * on the second river of the major row, the Amur at plot 608, where the
- * rivers by plot index put the Tiber second). The replay's flood of a row
- * strikes the river the record's flood of that row and turn names (its start
- * plot); the roll and its row stay the engine's.
- */
-function floodRivers(recs: readonly TurnRecord[], cat: Catalog) {
-  const plot = new Map<string, number>();
-  for (const r of recs) {
-    for (const e of r.events ?? []) {
-      const sev = FLOOD_ROWS.indexOf(cat.randomEvents?.[num(e[1])] ?? '');
-      if (sev >= 0 && num(e[3]) >= 0) plot.set(`${num(e[0])}:${sev}`, num(e[3]));
-    }
-  }
-  // the engine's step of turn t is the game's of turn t + 1 (`streamHold`)
-  return (state: GameState, sev: number): number | undefined => plot.get(`${state.turn + 1}:${sev}`);
 }
 
 /** the replay report as Markdown: per subsystem the turns held, the first

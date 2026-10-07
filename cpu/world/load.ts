@@ -61,7 +61,8 @@ export function loadWorld(world: WorldFile): GameState {
       ownerCity: -1,
     });
   }
-  const map: GameMap = { width: m.width, height: m.height, wrapX: m.wrapX, seed: world.gen.seed, tiles };
+  const map: GameMap = { width: m.width, height: m.height, wrapX: m.wrapX, seed: world.gen.seed, tiles,
+    rivers: m.rivers, volcanoes: m.volcanoOrder };
 
   const state = createGameFromMap(map, world.rngInit);
 

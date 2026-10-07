@@ -5,6 +5,7 @@
  * threw arrives as the string `err:<msg>`, which `num` turns into NaN so no
  * check reads it as a value.
  */
+import { existsSync, readFileSync } from 'node:fs';
 
 /** A value a Lua reader may have failed on. */
 export type Read<T> = T | string;
@@ -234,6 +235,14 @@ export interface TurnRecord {
   congress?: unknown;
   cities: DumpCity[];
   units: DumpUnit[];
+  /** the volcano vector's named entries in its order, [plot, NamedVolcanoes
+   *  index], and the vector's size (MapFeatureManager.GetNamedVolcanoes) —
+   *  absent from records the dumper wrote before it read them */
+  volcanoes?: { list: Read<[number, number][]>; total: Read<number> };
+  /** per major player id its revealed plots, a hex string of plot bits,
+   *  four plots a digit, plot 4k the digit's lowest bit — absent from
+   *  records the dumper wrote before it read them */
+  revealed?: Record<string, Read<string>>;
   errors: string[];
   /** the random events of the record's turn and the one before: [turn,
    *  RandomEvents index, current plot, start plot, fertility added, tiles
@@ -283,6 +292,10 @@ export interface StartWitness {
 }
 
 export interface Catalog {
+  /** the game's map orders (`<stem>.orders.json`, `tools/civ6lab/h1/
+   *  map_orders.py`): the river vector, each river's plot list, and the
+   *  volcano vector's plots; absent when the dump has no such file */
+  orders?: MapOrders;
   terrains: string[];
   features: string[];
   resources: string[];
@@ -316,6 +329,30 @@ export interface Catalog {
   greatPersonClasses?: string[];
   randomEvents?: string[];
   coastalLowlands?: string[];
+}
+
+/** The game's river and volcano vectors in their own orders (`GameMap.rivers`,
+ *  `GameMap.volcanoes`): the map script's river IDs and volcano placements. */
+export interface MapOrders {
+  /** "game" (the dump read the game's river vector) or "map script" (the
+   *  map generator run on the game's map seed) */
+  source: string;
+  rivers: number[][];
+  volcanoes: number[];
+}
+
+/** A dump's catalog (`<stem>.cat.json`) with the map orders beside it
+ *  (`<stem>.orders.json`) when the dump has them. */
+export function loadCatalog(dumpPath: string): Catalog {
+  const catPath = dumpPath.replace(/\.jsonl$/, '.cat.json');
+  if (!existsSync(catPath)) throw new Error(`no catalog beside the dump: ${catPath}`);
+  const cat = JSON.parse(readFileSync(catPath, 'utf8')) as Catalog;
+  const ordersPath = dumpPath.replace(/\.jsonl$/, '.orders.json');
+  if (existsSync(ordersPath)) {
+    const o = JSON.parse(readFileSync(ordersPath, 'utf8')) as MapOrders;
+    cat.orders = { source: o.source, rivers: o.rivers, volcanoes: o.volcanoes };
+  }
+  return cat;
 }
 
 /** The plot at game (x, y) of a record: rows are y, plots x. */

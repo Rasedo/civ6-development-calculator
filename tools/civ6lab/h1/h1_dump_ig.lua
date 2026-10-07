@@ -499,4 +499,28 @@ for _, p in ipairs(players) do
       fortify = P(function() return u:GetFortifyTurns() end)})
   end
 end
+-- each major's revealed plots (PlayersVisibility IsRevealed), a hex string
+-- of the plot bits in plot order, four plots a digit (plot 4k the digit's
+-- lowest bit)
+local HEX = "0123456789abcdef"
+local revealed = {}
+for _, p in ipairs(players) do
+  if Players[p]:IsMajor() then
+    revealed[tostring(p)] = P(function()
+      local vis = PlayersVisibility[p]
+      local s = {}
+      for i = 0, W * H - 1, 4 do
+        local d = 0
+        for b = 0, 3 do
+          local j = i + b
+          if j < W * H and vis:IsRevealed(j % W, math.floor(j / W)) then d = d + 2 ^ b end
+        end
+        s[#s + 1] = HEX:sub(d + 1, d + 1)
+      end
+      return table.concat(s)
+    end)
+  end
+end
+OUT({k = "revealed", players = revealed})
+
 OUT({k = "end", turn = Game.GetCurrentGameTurn()})

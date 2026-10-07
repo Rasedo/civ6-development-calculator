@@ -59,6 +59,10 @@ class World:
         self.river_flow = [[-1, -1, -1] for _ in range(N)]
         self.river_id = [[-1, -1, -1] for _ in range(N)]
         self.river_order: list[tuple[int, int, int]] = []   # (river id, plot, edge) in the order set
+        # the volcanoes in the order SetFeatureType laid them: the game's
+        # volcano vector (Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360
+        # appends each volcano as its feature is set)
+        self.volcano_order: list[int] = []
         self.cliff = [[False, False, False] for _ in range(N)]
         self.starting = [False] * N
         self.ice_phase = {}
@@ -469,6 +473,8 @@ class World:
             plots = self.footprint(i, f, replace=True)
             if plots is None:
                 return
+        if f >= 0 and self.f_rows[f]["FeatureType"] == "FEATURE_VOLCANO":
+            self.volcano_order.append(i)
         for p in plots:
             self.feature[p] = f
             if f >= 0 and self.f_rows[f]["Lake"]:

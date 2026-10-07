@@ -140,7 +140,12 @@ def world_file(w: World, script: str, size: str, map_seed: int) -> dict:
         "map": {"width": w.W, "height": w.H, "wrapX": w.wrap_x, "terrain": terrain, "elevation": elevation,
                 "feature": feature,
                 "resource": resource, "riverMask": river_mask, "cliffMask": cliff_mask, "volcano": volcano,
-                "goodyHut": goody},
+                "goodyHut": goody,
+                # the game's river vector (river-ID order, each river's plot
+                # list as its edges were set) and volcano vector (placement
+                # order): `GameMap.rivers`, `GameMap.volcanoes`
+                "rivers": [lst for rid, lst in w.river_plots().items() if rid >= 0],
+                "volcanoOrder": [i for i in dict.fromkeys(w.volcano_order) if w.feature[i] == w.fix["FEATURE_VOLCANO"]]},
         "civs": civs,
         "cityStates": city_states,
         "rngInit": (map_seed ^ 0x9E3779B9) & 0xFFFFFFFF,

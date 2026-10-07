@@ -8,7 +8,8 @@ against the engine.
 Per seed (map seed s, game seed s + 1000), on the next free host: a new game
 from the main menu (`game.py new`), then `dump.py play` in wall-bounded
 chunks until the game reaches `--turns` or ends or stalls, then the exit to
-the main menu, then the engine's report over the dump (`.report.json`, `.report.md`)
+the main menu, then the game's map orders beside the dump (`map_orders.py`,
+`.orders.json`), then the engine's report over the dump (`.report.json`, `.report.md`)
 (`npx vite-node cpu/harness/run.ts`). Every game call is a subprocess under
 `--chunk` seconds (`h3_bounded.py`'s kill-on-deadline), so no call can hang
 the loop. One manifest line per game: host, seeds, dump and report paths,
@@ -156,6 +157,8 @@ def play_game(host: str, seed: int, a, stamp: str, lock: threading.Lock) -> dict
              "Events.ExitToMainMenu()"], 40, log)
     rec["logs"] = save_logs(log_start, dump)
     rec["logsMixed"] = a.hosts.count(",") > 0
+    # the game's river and volcano orders beside the dump (`map_orders.py`)
+    bounded([PY, str(HERE / "map_orders.py"), str(dump), "--map-seed", str(seed), "--config", a.config], 120, log)
     with lock:  # the report is CPU work; one at a time keeps the box for the games
         rc, tail = bounded(["npx.cmd" if sys.platform == "win32" else "npx", "vite-node", "cpu/harness/run.ts", "--",
                             str(dump)], a.report_timeout, log)

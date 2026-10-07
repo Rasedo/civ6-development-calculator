@@ -710,6 +710,37 @@ def main() -> int:
     assert abs(fert_rate(100) - pf) < 0.04
     assert abs(fert_rate(sim._st_last_pct) - half) < 0.04, half
     print("  15 last turn OK — the fertility rows at the last turn's percent, truncated")
+
+    # 16 — THE VOLCANO VECTOR (`_volcano_order`, `volcanoOrder`): the roll's
+    # wake names the k-th sleeping named volcano in the vector's order, so the
+    # same draws on the reversed vector wake the mirrored volcano
+    s16 = fresh(rules)
+    s16.disasters = True
+    s16.fog_of_war = False
+    order0 = s16._volcano_order.clone()
+    vols = [int(v) for v in order0[0].tolist() if v >= 0]
+    assert len(vols) >= 2, "the fixture holds fewer than two volcanoes"
+    s16.volcano_active.zero_()
+    woke, state = None, None
+    for _ in range(20000):
+        state = s16.rng_state.clone()
+        s16._volcano_roll()
+        if bool(s16.volcano_active[0].any()):
+            woke = int(s16.volcano_active[0].nonzero().flatten()[0])
+            break
+    assert woke is not None, "no wake in 20000 rolls"
+    k = vols.index(woke)
+    s16.volcano_active.zero_()
+    s16.rng_state.copy_(state)
+    rev = order0.clone()
+    rev[0, :len(vols)] = torch.tensor(vols[::-1], dtype=torch.long)
+    s16._volcano_order = rev
+    s16._volcano_roll()
+    woke_rev = int(s16.volcano_active[0].nonzero().flatten()[0])
+    s16._volcano_order = order0
+    s16.volcano_active.zero_()
+    assert woke_rev == vols[::-1][k], (woke, woke_rev, vols)
+    print(f"  16 volcano vector OK — index {k} of {vols} wakes {woke}, of the reversed vector {woke_rev}")
     print("BATTERY OK storms")
     return 0
 

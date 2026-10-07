@@ -13,7 +13,11 @@ row y, one plot list per x — the layout `h1_dump_ig.lua` documents),
 raw), `events` (the random events of the turn and the one before),
 `greatPeople` (every recruited person by individual), `parks` (the
 National Parks' plots), `cities` (each with its `plots`: the map plots whose
-owner and owning city are the city's), `units`, and from the turn-start
+owner and owning city are the city's), `units`, `volcanoes` (`h1_dump_gc.lua`:
+the volcano vector's named entries in its order, [plot, NamedVolcanoes
+index], and the vector's size), `revealed` (per major player id its revealed
+plots, a hex string of plot bits, four plots a digit, plot 4k the digit's
+lowest bit), and from the turn-start
 witness (`h1_starts.lua`, armed by `play`) `starts` (per player the last turn
 its PlayerTurnStarted and PlayerTurnStartComplete fired, read before the
 dump; `startsMoved: true` when one fired while it read) and `witness` (each
@@ -23,7 +27,10 @@ the one before), and from the action log (`h1_actions.lua`, armed by `play`)
 event, args...] for unit moves, operations and combat, city production,
 purchases and tiles, research, civics, policies, governments, governors,
 beliefs, envoys, routes, wars and deals. The catalogs (index -> type name)
-go once to `<out>.cat.json`.
+go once to `<out>.cat.json`, with the map's lists read once a game
+(`h1_dump_gc.lua`): `rivers` (the river vector in its own index order, each
+river's index, ID, name, plots, Floodplains list and edges), `continents`
+(each plot's Plot:GetContinentType(), plot order), `mapSeed`, `gameSeed`.
 
 `play` passes turns one at a time and dumps after each until `--turns` more
 turns are recorded or the wall `--deadline` is near; it is resumable — run it
@@ -140,13 +147,14 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
     before = lab.turn(t)
     acts = actions(t, "read", timeout)
     st = starts(t, "read", timeout)
-    gc_lines = t.run(GC, lua("h1_dump_gc.lua"), timeout=timeout)
+    gc_lines = t.run(GC, lua("h1_dump_gc.lua", cat), timeout=timeout)
     ig_lines = t.run(IG, lua("h1_dump_ig.lua", cat), timeout=timeout)
     st_after = starts(t, "starts", timeout)
     after = lab.turn(t)
     rec: dict = {"turnBefore": before, "turnAfter": after, "moved": before != after,
                  "map": [], "players": [], "cities": [], "units": [], "religions": None, "errors": []}
     catalog = None
+    map_lists = None
     for ln in gc_lines + ig_lines:
         try:
             o = json.loads(ln)
@@ -156,6 +164,12 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
         k = o.pop("k", None)
         if k == "gc":
             rec["turn"], rec["seed"] = o["turn"], o["seed"]
+        elif k == "volcanoes":
+            rec["volcanoes"] = o
+        elif k == "revealed":
+            rec["revealed"] = o["players"]
+        elif k == "mapLists":
+            map_lists = o
         elif k == "head":
             rec["head"] = o
         elif k == "cat":
@@ -200,6 +214,8 @@ def snapshot(t: Tuner, cat: bool, timeout: float) -> tuple[dict, dict | None]:
         rec["witness"] = st.get("witness") or []
         if (st_after.get("starts") or {}) != rec["starts"]:
             rec["startsMoved"] = True
+    if catalog is not None and map_lists is not None:
+        catalog.update(map_lists)
     return rec, catalog
 
 

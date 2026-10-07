@@ -15,21 +15,24 @@
  *   cities and units reveal (`initFog`);
  * - which volcanoes are active: the log's choices ("Choose Active" wakes,
  *   "Choose Inactive" puts to sleep), each the logged index into the
- *   candidates in plot order, and every recorded eruption's volcano (which
- *   names a wake the choice could not).
+ *   candidates (a wake's the sleeping named ones) in the volcano vector's
+ *   order (`volcanoOrder`), and every
+ *   recorded eruption's volcano (which names a wake the choice could not).
  *
- * Gaps: the game's own river and volcano orders, which no record carries
- * (`map:riverOrder` where the right flood row fell on another named river,
- * `map:volcanoOrder` while a wake is unnamed), a volcano choice the
- * candidates do not explain (`volcano:activity`). Warming reads the
- * imported state's carbon.
+ * The rivers and volcanoes walk the game's own vectors where the dump has
+ * them (`Catalog.orders`, `GameMap.rivers` / `GameMap.volcanoes`). Gaps: a
+ * dump without them (`map:riverOrder` where the right flood row fell on
+ * another named river, `map:volcanoOrder` while a wake is unnamed), a
+ * volcano choice the candidates do not explain (`volcano:activity`).
+ * Warming reads the imported state's carbon.
  */
 import type { GameState, Tile } from '../core/types';
 import type { CheckResult } from './checks';
 import type { Catalog, TurnRecord } from './record';
 import type { Imported } from './import';
 import type { RandLog } from './randLog';
-import { droughtStarts, eventAt, eventTable, floodplainRun, laidRivers, sitePairWeight, stormStarts, type EventTable } from '../core/disasters';
+import { droughtStarts, eventAt, eventTable, floodplainRun, laidRivers, riverPlotList, sitePairWeight, stormStarts, volcanoOrder, type EventTable } from '../core/disasters';
+import type { GameMap } from '../../world/types';
 import { warmingDegrees } from '../core/climate';
 import { TURN_LIMIT } from '../core/game';
 import { EVENT_OCC_SCALE, FIRST_TIME_OCCURRENCE_BOOST } from '../data/disasters';
@@ -77,8 +80,15 @@ export class EventPicks {
   /** the active volcanoes' plots, and whether a choice could not be followed */
   private readonly active = new Set<number>();
   private volcanoUnknown = false;
-  /** per laid river (`laidRivers`): the record a major's sight first reached it */
+  /** per river (`riverLists`): the record a major's sight first reached it */
   private readonly firstSeen = new Map<number, number>();
+  /** per volcano plot: the record a major's sight first reached it */
+  private readonly volcanoSeen = new Map<number, number>();
+  /** the named volcanoes the last record read (`TurnRecord.volcanoes`);
+   *  null on a dump without them */
+  private recordNamed: Set<number> | null = null;
+  /** the recorded eruptions already read into `active` */
+  private readonly erupted = new Set<string>();
   private lastVolcanoTurn = -1;
   /** wakes whose volcano the choice did not name (the game's volcano order
    *  is the map's own), until an eruption names it */
@@ -110,11 +120,18 @@ export class EventPicks {
       s.explored.forEach((v, i) => { if (v) acc![i] = 1; });
       s.explored = Array.from(acc);
     }
-    laidRivers(state.map).forEach((r, i) => {
+    riverLists(state.map).forEach((r, i) => {
       if (this.firstSeen.has(i)) return;
-      const seen = r.some((e) => e.plots.some((p) => [...this.explored.values()].some((acc) => acc[p] === 1)));
+      const seen = r.some((p) => p >= 0 && [...this.explored.values()].some((acc) => acc[p] === 1));
       if (seen) this.firstSeen.set(i, rec.turn);
     });
+    const nv = rec.volcanoes?.list;
+    if (Array.isArray(nv)) this.recordNamed = new Set(nv.map((e) => e[0]));
+    for (const t of volcanoOrder(state.map)) {
+      if (!this.volcanoSeen.has(t.index) && [...this.explored.values()].some((acc) => acc[t.index] === 1)) {
+        this.volcanoSeen.set(t.index, rec.turn);
+      }
+    }
     state.unitsMode = true;
     state.fogOfWar = true;
     const tiles = state.map.tiles;
@@ -165,9 +182,9 @@ export class EventPicks {
     const gaps: string[] = [];
     if (this.volcanoUnknown) gaps.push('volcano:activity');
     if (this.guessed.length) gaps.push('map:volcanoOrder');
-    // the game walks its rivers in the map generator's laying order, which no
-    // record carries: the right flood row on another of the named rivers
-    if (!ok && g && ours === g.name && table.rows[p!.row].family === 'flood' && table.sites.flood.some((r) => r.list.some((t) => t.index === g.plot))) gaps.push('map:riverOrder');
+    // a dump without the game's river vector: the right flood row on another
+    // of the named rivers
+    if (!ok && g && !state.map.rivers && ours === g.name && table.rows[p!.row].family === 'flood' && table.sites.flood.some((r) => r.list.some((t) => t.index === g.plot))) gaps.push('map:riverOrder');
     if (at.range !== table.range) gaps.push(`roll:range ${at.range} vs ${table.range}`);
     const band = p ? bandOf(table, p.row) : null;
     return [{ turn: T, check: 'step.eventPick', subject, ok,
@@ -182,9 +199,9 @@ export class EventPicks {
    *  the log's "Random River" draws before the step (a river takes its name
    *  when a major first reveals a plot beside it, 0xa29730 -> 0xa292a0), the
    *  rivers the majors' sight reached first (firstSeen, ties to the
-   *  generator's order); with fewer seen than named, every seen one. */
+   *  river vector's order); with fewer seen than named, every seen one. */
   private named(state: GameState, T: number, table: EventTable): EventTable {
-    const laid = laidRivers(state.map);
+    const laid = riverLists(state.map);
     const n = this.log?.draws.filter((d) => d.turn < T && siteLabel(d.label) === 'Random River').length ?? 0;
     const order = laid.map((_r, i) => i).filter((i) => this.firstSeen.has(i))
       .sort((a, b) => this.firstSeen.get(a)! - this.firstSeen.get(b)! || a - b).slice(0, n);
@@ -199,36 +216,48 @@ export class EventPicks {
     return { rows: table.rows, sites, keys, pairs, range: Math.max(EVENT_OCC_SCALE * TURN_LIMIT, total) };
   }
 
-  /** the log's volcano choices up to step T's roll, each on the engine's
-   *  candidates in ascending plot order; every recorded eruption's volcano
-   *  is active */
+  /** the log's volcano choices up to step T's roll, each on the candidates
+   *  in the volcano vector's order (`volcanoOrder`): a wake's the sleeping
+   *  NAMED volcanoes (0xa20f20) — those the record names
+   *  (`TurnRecord.volcanoes`), else as many as the log's "Random Volcano"
+   *  draws before it, those the majors' sight reached first (ties to the
+   *  vector's order) —, a sleep's the active ones; every recorded
+   *  eruption's volcano is active */
   private followVolcanoes(state: GameState, T: number): void {
-    const volcanoes = state.map.tiles.filter((t) => t.volcano).map((t) => t.index);
-    // an eruption names an active volcano: a wake the choice could not name
-    // was that one
-    for (const e of this.seen.values()) {
-      if (e.turn >= T || !volcanoes.includes(e.plot) || !e.name.includes('VOLCANO_') || this.active.has(e.plot)) continue;
+    const volcanoes = volcanoOrder(state.map).map((t) => t.index);
+    // an eruption names an active volcano at its turn, once: a wake the
+    // choice could not name was that one
+    for (const [key, e] of this.seen) {
+      if (e.turn >= T || this.erupted.has(key) || !volcanoes.includes(e.plot) || !e.name.includes('VOLCANO_')) continue;
+      this.erupted.add(key);
+      if (this.active.has(e.plot)) continue;
       const guess = this.guessed.pop();
       if (guess !== undefined) this.active.delete(guess);
       this.active.add(e.plot);
     }
     if (!this.log || this.lastVolcanoTurn >= T) return;
+    let namedCount = 0;
     for (const d of this.log.draws) {
-      if (d.turn <= this.lastVolcanoTurn || d.turn > T) continue;
+      if (d.turn > T) break;
       const k = siteLabel(d.label);
+      if (k === 'Random Volcano') namedCount++;
+      if (d.turn <= this.lastVolcanoTurn) continue;
       if (k !== 'Choose Active Volcano Roll' && k !== 'Choose Inactive Volcano Roll') continue;
       // the wake draws "Choose Active", the sleep "Choose Inactive" (`volcanoRoll`)
       const wake = k === 'Choose Active Volcano Roll';
-      const from = wake ? volcanoes.filter((v) => !this.active.has(v)) : [...this.active].sort((a, b) => a - b);
+      const seen = volcanoes.filter((v) => this.volcanoSeen.has(v));
+      const named = this.recordNamed ?? new Set([...seen].sort((a, b) => this.volcanoSeen.get(a)! - this.volcanoSeen.get(b)!
+        || seen.indexOf(a) - seen.indexOf(b)).slice(0, namedCount));
+      const from = wake ? volcanoes.filter((v) => !this.active.has(v) && named.has(v)) : volcanoes.filter((v) => this.active.has(v));
       if (from.length !== d.range) this.volcanoUnknown = true;
       const v = from[d.value];
       if (v === undefined) continue;
       if (wake) {
         this.active.add(v);
-        if (d.range > 1) this.guessed.push(v);
+        if (d.range > 1 && !state.map.volcanoes) this.guessed.push(v);
       } else {
         this.active.delete(v);
-        if (d.range > 1) this.volcanoUnknown = true;
+        if (d.range > 1 && !state.map.volcanoes) this.volcanoUnknown = true;
       }
     }
     this.lastVolcanoTurn = T;
@@ -252,4 +281,10 @@ function bandOf(t: EventTable, i: number): [number, number] {
   let lo = 0;
   for (let j = 0; j < i; j++) for (const x of t.pairs[j]) lo += x;
   return [lo, lo + t.pairs[i].reduce((a, b) => a + b, 0)];
+}
+
+/** each river's plot list in the river vector's order: the map's own
+ *  (`GameMap.rivers`), else laid back from its edges (`laidRivers`) */
+function riverLists(map: GameMap): number[][] {
+  return map.rivers ?? laidRivers(map).map(riverPlotList);
 }

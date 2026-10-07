@@ -16,8 +16,8 @@
  * free from the first record on the recorded decisions, its report and
  * Markdown summary written to the named file.
  */
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import type { Catalog, TurnRecord } from './record';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
@@ -58,9 +58,7 @@ function args(argv: string[]) {
 }
 
 export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
-  const catPath = dumpPath.replace(/\.jsonl$/, '.cat.json');
-  if (!existsSync(catPath)) throw new Error(`no catalog beside the dump: ${catPath}`);
-  const cat = JSON.parse(readFileSync(catPath, 'utf8')) as Catalog;
+  const cat = loadCatalog(dumpPath);
   // each record kept as its line and parsed when read: the walk below holds
   // three records at a time, not the whole game
   const lines = new Map<number, string>();

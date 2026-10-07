@@ -1548,8 +1548,9 @@ class SimEconomy:
         roll's turns (the event roll's, `_event_turns`) // 2V. No named volcano, no draw. Below the realism's
         percent, while a named volcano sleeps: D //= (target - pct)N // 100
         when that product reaches 200, and rand(D) = 0 wakes ONE sleeping named
-        volcano drawn uniformly in tile order; at or above it, with an active
-        volcano, rand(D) = 0 puts ONE active volcano to sleep the same way."""
+        volcano drawn uniformly in the volcano vector's order
+        (`_volcano_order`); at or above it, with an active volcano, rand(D) =
+        0 puts ONE active volcano to sleep the same way."""
         vol = self.volcano_at
         v = vol.sum(dim=1)
         if not bool((v > 0).count_nonzero()):
@@ -1571,7 +1572,10 @@ class SimEconomy:
         fire = roll & (self._rand_range(roll, d) == 0)
         if not bool(fire.count_nonzero()):
             return
-        got, t = self._pick_live(fire, torch.where(wake.unsqueeze(1), named & ~self.volcano_active, act))
+        order = self._volcano_order
+        cand = torch.where(wake.unsqueeze(1), named & ~self.volcano_active, act).gather(1, order.clamp(min=0)) & (order >= 0)
+        got, k = self._pick_live(fire, cand)
+        t = order.gather(1, k.unsqueeze(1)).squeeze(1)
         g = got.nonzero(as_tuple=True)[0]
         self.volcano_active[g, t[g]] = wake[g]
 
@@ -1995,7 +1999,8 @@ class SimEconomy:
         a storm's, the meteor's and a fire's plot is a second draw, a
         drought's a weighted one over the map (`_drought_start`). The sites: a flood one per river a major has
         revealed (`_flood_open`), keyed on its start plot; a volcano's
-        eruption one per ACTIVE volcano; a natural wonder's one while it
+        eruption one per ACTIVE volcano in the volcano vector's order
+        (`_volcano_order`); a natural wonder's one while it
         stands, keyed on its lowest-index plot; an accident one per city — a
         major's or a Free City's — whose reactor has reached the row's
         `MinTurnAtRisk`, keyed on its centre. The draw is spent every turn,
@@ -2020,8 +2025,10 @@ class SimEconomy:
                 keys.append(self._flood_sites[0])
                 stand.append(self._flood_open())
             elif fam == self._EV_ERUPTION and self._er_on_volcano[s]:
-                keys.append(every_plot)
-                stand.append(self.volcano_active)
+                # the active volcanoes in the volcano vector's order
+                order = self._volcano_order
+                keys.append(order)
+                stand.append(self.volcano_active.gather(1, order.clamp(min=0)) & (order >= 0))
             elif fam == self._EV_ERUPTION:
                 keys.append(wonder[s].long().argmax(dim=1, keepdim=True))
                 stand.append(wonder[s].any(dim=1, keepdim=True))

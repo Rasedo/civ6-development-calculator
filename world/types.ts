@@ -316,6 +316,15 @@ export interface GameMap {
   wrapX: boolean;
   seed: number;
   tiles: Tile[];
+  /** the game's river vector, in its own order (the map script's river IDs):
+   *  per river its plot list as its edges were set, each edge adding its own
+   *  plot then the plot across, each plot once, -1 for a partner off the map
+   *  (`floodRivers` walks it); unset on a map whose generator kept none */
+  rivers?: number[][];
+  /** the game's volcano vector: the volcanoes' plots in the order the map
+   *  script placed them (`volcanoOrder`); unset on a map whose generator
+   *  kept none */
+  volcanoes?: number[];
 }
 
 export interface MapGenOptions {

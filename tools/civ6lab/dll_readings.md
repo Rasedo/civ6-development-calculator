@@ -2228,12 +2228,21 @@ holds no entry of the row; it tests no reveal itself. The reveal gate is the
 NAME: a plot first revealed (0x534950) names its rivers (0xa29730 ->
 "Random River" 0xa292a0, an unused name of the namer's civilization; runs/
 h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ; a
-river whose namer field is 0 — player 0's — is named again). The order is no
-record's: 1117's floods fall in the order 181, 8, 207, 251 (sources by plots
-~386, ~523, ~540, ~164), 1118's 152, 243, 251, 250, 12 — no source-order or
-edge-order law fits both (docs/AUDIT.md C-74, ASK); the engines walk their
-lists by each one's lowest plot, `step.eventPick` counts it as a gap and the
-action replay holds the record's river (`holdFloodRiver`).
+river whose namer field is 0 — player 0's — is named again). The order is the map script's river IDs: Expansion2's RiversLakes.lua (the
+Base copy passes none) hands every SetXOfRiver its river's ID — `nextRiverID`,
+taken by each DoRiver call of AddRivers' four passes over the plots (hills
+and mountains; inland plots at a 1-in-8 draw; then both again at half the
+ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.)
+call 0xa28900 only when the ID argument is present, so the vector runs in
+ID order and no source-plot or edge law of the finished map fits it (1117's
+floods 181, 8, 207, 251; 1118's 152, 243, 251, 250, 12). `tools/civ6map`
+runs the script on the game's map seed: its setter calls give the vector
+(`tools/civ6lab/h1/map_orders.py`; 1103–1124 every river edge and volcano
+plot as recorded); the dumper reads the game's own (RiverManager.
+GetRiverByIndex, `cat.rivers`): runs/h1_duelw1126 7 of 7 rivers in the
+generator's ID order, each plot list the generator's, and on 1125 / 1126 all
+22 Floodplains lists the run their plot list gives from the mouth. The
+engines walk the map's vector (`GameMap.rivers`, `floodRivers`).
 
 The damage pass 0xa2a4d0 decides the shield: mitigated when the river is
 unnamed or its list empty, or when the Great Bath (0xa2b280: the first
@@ -2257,9 +2266,18 @@ branch "Choose Inactive Volcano Roll" (0xa212d0: active and named; +0x14 =
 the engines had the two labels crossed (`volcanoRoll` now draws Active for a
 wake). The wake's gate is the named count less the active: 1121 t70–99 (two
 volcanoes, one named and active: share 50, named − active 0) draws nothing
-until the second is named (its "Random Volcano", t99). The candidates walk the
-vector's own order, no record's: 1118 t53 woke 803 at index 0 of {534, 803},
-1117 t154 827 at index 1 of {206, 827} (docs/AUDIT.md C-74, ASK).
+until the second is named (its "Random Volcano", t99). The vector is filled as the map
+script sets each volcano's feature: TerrainGenerator.lua's SetFeatureType
+(FEATURE_VOLCANO) -> Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360 appends
+an entry (a natural wonder's volcano goes to its own list, 0xa18f20) — the
+continent-boundary pass column by column (x outer, y inner), then the lone
+mountains shuffled per continent. The eruption weights (0xa1e470) walk the
+same vector (+0x1b8). 1118 t53 woke 803 at index 0 of [803, 534], 1117 t154
+827 at index 1 of [206, 827], each the generator's placement order; 1123
+t35 / t130 and 1124 t120 / t211 (eruptions after each) fit [539, 474] and
+[716, 500]. GetNamedVolcanoes walks the vector by index and leaves out an
+unnamed one (the dumper's per-record `volcanoes`). The engines walk the
+map's vector (`GameMap.volcanoes`, `volcanoOrder` / `_volcano_order`).
 
 ## H-1: the citizen manager's placement — READ (the AI's favored yields unrecorded)
 

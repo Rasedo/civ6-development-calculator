@@ -2058,6 +2058,14 @@ class SimInit:
         for b, f in enumerate(fixtures):
             for v in f["volcanoes"]:
                 self.volcano_at[b, v] = True
+        # the volcano vector (`volcanoOrder`): the volcanoes' plots in the
+        # order the map script placed them, -1 pads; the roll's choice and the
+        # eruption sites walk it
+        n_vo = max(max((len(f["volcanoes"]) for f in fixtures), default=0), 1)
+        self._volcano_order = torch.full((B, n_vo), -1, dtype=torch.long, device=device)
+        for b, f in enumerate(fixtures):
+            if f["volcanoes"]:
+                self._volcano_order[b, :len(f["volcanoes"])] = torch.tensor(f["volcanoes"], dtype=torch.long, device=device)
         # an ACTIVE volcano, the eruption rows' sites (`Tile.volcanoActive`):
         # every volcano starts dormant, and the map's one roll a turn wakes
         # or sleeps one (`_volcano_roll`)

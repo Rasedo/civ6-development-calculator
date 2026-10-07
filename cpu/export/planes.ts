@@ -24,7 +24,7 @@ import { hasFreshWater, hasRiver, isCoastalLand, isCoastalWater, isImpassable, i
 import { neighbors } from '../../world/hex';
 import { UNITS } from '../data/units';
 import { stormFamilyAt, STORM_FAMILIES, droughtTerrain } from '../data/disasters';
-import { floodRivers } from '../core/disasters';
+import { floodRivers, volcanoOrder } from '../core/disasters';
 import { TERRAINS } from '../../world/terrains';
 import { FEATURES, isFloodplains } from '../../world/features';
 import { RESOURCES, resourceImprovement } from '../../world/resources';
@@ -316,7 +316,9 @@ export function buildFixture(state: GameState, world: WorldFile): object {
     }
     return { ...rec, nr };
   });
-  const volcanoes = map.tiles.filter((t) => t.volcano).map((t) => t.index);
+  // the volcano vector's order (`volcanoOrder`): the roll's choice and the
+  // eruption sites walk it
+  const volcanoes = volcanoOrder(map).map((t) => t.index);
   // the camps the barbarians may hold at once: BARBARIAN_CAMP_MAX_PER_MAJOR_CIV
   // for each major (`campStep`'s target before the fog's share)
   const maxCamps = BARB_CAMPS_PER_MAJOR * state.seats.length;
