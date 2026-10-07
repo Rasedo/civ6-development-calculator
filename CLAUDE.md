@@ -12,9 +12,14 @@ by one scripted decision server (`policy/`), verified against each other by
   Install XML (Base <- Exp1 <- Exp2, modinfo load order) first, the live game
   second, forums last. An unsourced magnitude is an ASK in AUDIT, never an
   invention and never a reason to stop other work.
-- **The engine, not the AI.** Opinion, agendas, preference weights are out.
-  The driver is our own scripted AI: change its decisions freely — the
-  applier validates them, and every reshuffle is fuzzing, not damage.
+- **The game's AI is ported too (owner 2026-10-08).** Civ 6's own decision
+  logic for every party — majors, city-states, Free Cities, barbarians — is
+  read from the install and the DLL and ported, so a free run plays as the
+  real game does and fidelity is compared end to end. In training the
+  majors are RL agents in symmetric play and everything else is the ported
+  Civ 6 environment; our scripted driver (`policy/`) goes once the port
+  drives every party. What must survive is the interface RL agents act and
+  observe through.
 - **Delete, don't preserve.** No shims, aliases, re-exports, fallbacks,
   "legacy" paths or historical names. When two paths disagree, keep the one
   that deletes code. Tests written for one whim are disposable.

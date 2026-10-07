@@ -3107,6 +3107,88 @@ its steps landing on the game's log.
   `_seize_civilians` / `_seize_open`; a barbarian's captive holds where it
   stands and guards no camp (`hostileUnitAct`, the GPU's barbarian walk).
 
+## H-1: why a seed does not replay — the AI's worker threads — READ (the off-switch a LAB)
+
+The synchronous generator is never raced. 0x8b6c10 (Random.cpp) takes no
+lock: it reads the state at 0x8b6c98, logs the old state (the RandCalls seed
+column) through a virtual call at 0x8b6da9 and stores the new state only at
+0x8b6dd9. Its guards are logical, not mutual exclusion: `!IsLocked()` (+0x14)
+and "App side is accessing the synchronous random number generator while the
+game core is running" (an engine-utility check, vtable +0x50 / +0x58). Two
+draws racing that window would log one seed twice; every recording the lab
+holds (28 games, 600k sync draws) is one unbroken LCG chain, breaking only at
+a new game. A reorder in the log is therefore a different ORDER OF WORK on
+the game-core thread, not two threads drawing at once.
+
+The order of work comes from AI decisions that differ on identical state. The
+two recordings of 1117, 1121 and 1123 hold identical records (the action log
+and the units, compared on the action kinds both recorder versions log) until
+one decision of player 1 (the AI major; seat 0 is the autoplayed human slot)
+differs, with no draw affected; the draws part only turns later:
+
+| seed | first differing record | the decision | draws part |
+|---|---|---|---|
+| 1117 | t162 | Qin's Builder 3407873 at (38,16) spends a charge on building 50 in 458758 (new) or keeps it (old) | t169, draw 12,185 |
+| 1121 | t242 | player 1's unit order: 4718611 (embarked) moves before 6356992 (new) | t246, draw 19,468 |
+| 1123 | t163 | city 458758 places district 2 at (42,13) (old) or finishes building 10 (new) | t169, draw 14,945 |
+
+1119, 1122, 1124 (whole games) and 1118, 1120 (over the shorter recording)
+are identical; the old 1119-1124 slices of `h1_logs_duelw1119_1124` agree with
+the 000315Z files. The first labels to part are not one fixed pair: 1117
+Random Direction / GetNextBuyablePlot picker, 1121 Random Direction / City
+Build District Choice, 1123 City Build District Choice / Random Promotion —
+whatever the turn's first changed decision draws next.
+
+Where the AI runs off the game-core thread:
+- The AI's job list (the global AI at game +0x408): push 0x6e29d0
+  (EXP_JobManager_PushJobOntoList, list +0x660, job set +0x648), spawn
+  0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020
+  (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f
+  (asserting `!GetGlobalAi().IsProcessingAi()`). The JobManager lives in the
+  engine (Platform_JobManager.cpp; the DLL resolves the exports by name
+  through 0xcc8d90).
+- Jobs pushed: "City Analysis" (0x5ce3f0 — pushed and SPAWNED with no wait in
+  the function: AI::CityBuild's analysis runs beside the game-core thread
+  until the processor's next wait), "Settle City Evaluation", "Victory
+  Conditions", "Governor Analyzer", "Belief Analysis", "Tech Tree Analysis",
+  "Barbarian Camp Evaluation", "Nearest City Search", "AI Influence Map"
+  (0x717460, with a critical section 0xcc6d60), "AI Unit Planning".
+- "AI Unit Planning" (0x792c90) is a fork-join: N = min(units, the path
+  finder pool's count) chunks; N <= 1 plans each unit serially on the
+  calling thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then
+  the wait. The pool (0xf01920, count at +8, read by 0xb2f410) also bounds
+  the influence map's split (0x7176dd) and serves the units' path searches
+  ("Unable to acquire a path finder, all %d are busy").
+- The pool's count is set at game init (0x91e590 -> 0x26f7d0) to
+  max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's
+  (0x557e40 / 0x5582a0) under 0xe09781a7.
+- The exe (CivilizationVI.exe 0x6ca90, the AppOptions [Performance] reader)
+  sets those hashes: game-core threads (0x7ec3df64) = MaxGameCoreThreads (-1:
+  the hardware count) less GameCoreReserveThreads (-1: 2 under 9 threads, 4
+  under 17), floored; 0xc181eb6e = MaxGameCoreUnitMovementThreads and
+  0xe09781a7 = MaxGameCoreTradeRouteThreads, each the game-core count when
+  <= 0. MaxJobThreads (the engine's job threads, the main thread included)
+  is read at 0x6cb59.
+
+No wall-clock budget gates an AI decision: the DLL's only clock reads
+(QueryPerformanceCounter through 0xcc6080) feed the scoped profiler
+(0x8c05a0 / 0x8c0640) and timing totals (0x5bce20, Player::Processor::EndTurn
+0x7ed0a); none is compared to a limit.
+
+The reading: an AI job that reads shared state while the game-core thread
+(or another chunk) changes it — City Analysis spawned without a wait, the
+unit-planning chunks sharing the path-finder pool and their reservations —
+decides by thread timing, and a loaded box shifts the timing (the new 1117
+was recorded under load). LAB: the off-switch. `AppOptions.txt`
+[Performance] `MaxGameCoreThreads 1`, `GameCoreReserveThreads 0`,
+`MaxGameCoreUnitMovementThreads 1`, `MaxGameCoreTradeRouteThreads 1`
+(the community's multiplayer-desync setting; read once at the exe's start),
+and `MaxJobThreads 1` as the second arm if the first still parts; then one
+seed recorded twice, once under load, must give identical RandCalls.csv.
+No gameplay mod reaches it: the options are the exe's, read before the mod
+system loads, no GlobalParameters row or Lua binding sets them (the Lua
+`GetWorkerCount` 0x23ce0 only reads), and the jobs are DLL code.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
