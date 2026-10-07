@@ -27,7 +27,7 @@ import { SPECIALIST_YIELDS, SPECIALIST_TIERS, GW_PRINTING_TECH } from '../data/g
 import { greatWorkTourism, greatWorkYields, gwCountsByObj, relicTourism } from './greatWorks';
 import { GWO_ARTIFACT, GWO_RELIC, GWO_WRITING } from '../data/greatWorks';
 import { congressBannedLuxury, congressDuplicateLuxury, congressGrowthMult, congressGwMult } from './congress';
-import { cityStateItemProduction, suzerainEffect, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
+import { cityStateItemProduction, suzerainEffect, suzerainHubAmenities, suzerainResourceTypeProduction, minorCity, minorLuxuries, suzerainMinorSeats } from './cityStates';
 import { ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, BUENOS_AIRES_AMENITIES } from '../data/cityStates';
 import { bankruptAmenities, DEAL_LUXURY, DED_FREE_INQUIRY, HOLY_CITY_TOURISM, TOURISM_PCT_ROWS, LOYALTY_MAX, GOV_INTOLERANCE, TOURISM_GOV_MULT, TOURISM_OPEN_BORDERS_PCT, TOURISM_ROUTE_PCT } from '../data/seats';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
@@ -393,7 +393,8 @@ export function buildingCoastYields(state: GameState, seat: number, buildings: r
  *   Coast plot, the Shipyard's only where nothing is built.
  * - CIV6 (Stave Church, Aquarium; REQUIRES_PLOT_HAS_VISIBLE_RESOURCE): a Coast
  *   tile carrying a resource the city's owner can SEE.
- * - CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): every tile of one feature.
+ * - CIV6 (Aquarium's Reef, Zoo's Rainforest and Marsh; `plotFeatureYields`):
+ *   every tile of a named feature, from the base row alone.
  * - CIV6 (Marae): every tile with a passable feature or natural wonder.
  * - CIV6 (Forestry Management, FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD
  *   under PLOT_HAS_ANY_FEATURE_NO_IMPROVEMENTS): the city's governor pays a
@@ -420,7 +421,8 @@ export function cityPlotBonus(state: GameState, city: City): (t: Tile, isCenter:
   const hasWaterMill = lit.includes('WATER_MILL');
   const coastRows = lit.flatMap((id) => BUILDINGS[id]?.coastPlotYields ?? []);
   const coastResY = buildingCoastYields(state, city.seat, lit);
-  const featPlotY = lit.flatMap((id) => BUILDINGS[id]?.plotFeatureYields ?? []);
+  const civ = civOf(state, city.seat);
+  const featPlotY = lit.flatMap((id) => (buildingVariantFor(civ, id) ? [] : BUILDINGS[id]?.plotFeatureYields ?? []));
   const hiddenRes = hiddenResourcesFor(state, city.seat);
   const featTileY = buildingVariantFeatureYields(state, city.seat, lit);
   const goldPerFeature = governorSum(state, city, (e) => e.goldPerFeature);
@@ -653,6 +655,8 @@ function nonLuxuryAmenities(
     (m.riverCity && hasRiver(center) ? m.riverCity.amenities : 0) +
     gpCityPermOf(city, 'amenities') +
     notFoundedSum(state, city, 'amenity') +
+    // CIV6 (Muscat): +1 in a city with a Commercial Hub
+    suzerainHubAmenities(state, city) +
     // CIV6 (Dharma): "Cities gain an Amenity for every Religion with at least
     // 1 Follower" (`RELIGION_AMENITY_ROWS`)
     (m.religionAmenities.length
@@ -1713,6 +1717,9 @@ export function computeCityStats(
   // 14.4 at t95, (15 + 1) x 0.9 at its tier)
   const itemFlat = city.queue[0] ? cityStateItemProduction(state, city, city.queue[0].kind) : 0;
   bonuses.production += itemFlat;
+  // CIV6 (Johannesburg, EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES): Production
+  // per improved resource type of the city
+  bonuses.production += suzerainResourceTypeProduction(state, city);
   // CIV6 (Project_YieldConversions): the yield the last production step
   // converted from a district project, under the city's percents
   // (runs/h1_duelw1108, Aquileia t112-125: Campus Research Grants on 9.9

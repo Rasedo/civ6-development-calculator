@@ -196,9 +196,12 @@ export interface BuildingDef {
    *  the city carrying a resource its owner can SEE — the Stave Church's
    *  clause, paid by a base row. */
   coastResourceYields?: Partial<Yields>;
-  /** CIV6 (Aquarium, AQUARIUM_REEF_SCIENCE under AQUARIUM_REEF_REQUIREMENTS):
-   *  yields on every tile of the city carrying this feature. */
-  plotFeatureYields?: { feature: FeatureId; yields: Partial<Yields> };
+  /** CIV6 (MODIFIER_CITY_PLOT_YIELDS_ADJUST_PLOT_YIELD under a
+   *  REQUIRES_PLOT_HAS_<feature> set: the Aquarium's Reef, the Zoo's
+   *  Rainforest and Marsh): yields on every tile of the city carrying each
+   *  row's feature — the base row's modifiers, which a civilization's unique
+   *  building standing in for it does not carry. */
+  plotFeatureYields?: { feature: FeatureId; yields: Partial<Yields> }[];
   /** CIV6 (Audience Chamber): "-2 Loyalty in Cities without Governors" — over
    *  every city the OWNING SEAT holds, not just the building's own. */
   loyaltyWithoutGovernor?: number;
@@ -898,6 +901,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   },
   {
     id: 'ZOO', name: 'Zoo', district: 'ENTERTAINMENT_COMPLEX', cost: 360, requiresAny: ['ARENA'], amenities: 1, regional: true, maintenance: 2,
+    // CIV6 (ZOO_RAINFOREST_SCIENCE, ZOO_MARSH_SCIENCE): +1 Science on each
+    // Rainforest and Marsh tile of the city (runs/h1_duelw1124 Taiyuan's
+    // Rainforest Cocoa plantation 575, Science 0 -> 1 from t239 with the Zoo)
+    plotFeatureYields: [{ feature: 'RAINFOREST', yields: { science: 1 } }, { feature: 'MARSH', yields: { science: 1 } }],
     // CIV6 (BUILDING_THERMAL_BATH): Cost 360, the same price as the Zoo.
     // Entertainment 2 against the Zoo's 1, Production 2 of its own,
     // RegionalRange 6 — both reach every city centre within six tiles, as the
@@ -911,6 +918,10 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
       tourismWithFeature: { feature: 'GEOTHERMAL_FISSURE', amount: 3 },
     }],
     src: {
+      'plotFeatureYields.0.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_JUNGLE&Name=FeatureType', 'Value', { expect: 'FEATURE_JUNGLE' }),
+      'plotFeatureYields.0.yields.science': xml('ModifierArguments', 'ModifierId=ZOO_RAINFOREST_SCIENCE&Name=Amount', 'Value'),
+      'plotFeatureYields.1.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_MARSH&Name=FeatureType', 'Value', { expect: 'FEATURE_MARSH' }),
+      'plotFeatureYields.1.yields.science': xml('ModifierArguments', 'ModifierId=ZOO_MARSH_SCIENCE&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_ZOO', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_ZOO', 'PrereqDistrict', { expect: 'DISTRICT_ENTERTAINMENT_COMPLEX' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_ZOO', 'Maintenance'),
@@ -1030,11 +1041,11 @@ const rawList: Omit<BuildingDef, 'buyCost'>[] = [
   },
   { id: 'AQUARIUM', name: 'Aquarium', district: 'WATER_PARK', cost: 360, requiresAny: ['FERRIS_WHEEL'], maintenance: 2, amenities: 1, regional: true, regionalRange: 9,
     coastResourceYields: { science: 1 },
-    plotFeatureYields: { feature: 'REEF', yields: { science: 1 } },
+    plotFeatureYields: [{ feature: 'REEF', yields: { science: 1 } }],
     src: {
       'coastResourceYields.science': xml('ModifierArguments', 'ModifierId=AQUARIUM_SEARESOURCE_SCIENCE&Name=Amount', 'Value'),
-      'plotFeatureYields.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_REEF&Name=FeatureType', 'Value', { expect: 'FEATURE_REEF' }),
-      'plotFeatureYields.yields.science': xml('ModifierArguments', 'ModifierId=AQUARIUM_REEF_SCIENCE&Name=Amount', 'Value'),
+      'plotFeatureYields.0.feature': xml('RequirementArguments', 'RequirementId=REQUIRES_PLOT_HAS_REEF&Name=FeatureType', 'Value', { expect: 'FEATURE_REEF' }),
+      'plotFeatureYields.0.yields.science': xml('ModifierArguments', 'ModifierId=AQUARIUM_REEF_SCIENCE&Name=Amount', 'Value'),
       cost: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'Cost', { scale: GAME_SPEED }),
       district: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'PrereqDistrict', { expect: 'DISTRICT_WATER_ENTERTAINMENT_COMPLEX' }),
       maintenance: xml('Buildings', 'BuildingType=BUILDING_AQUARIUM', 'Maintenance'),

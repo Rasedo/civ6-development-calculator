@@ -9501,14 +9501,14 @@ class SimSeats:
                         _wa * _icnt * self.city_alive[:, row, :cols].double() * _ww).to(inc.dtype)
                 inc = inc + _addi.reshape(B, -1)
         # CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS): "This
-        # city receives +2 Gold from foreign Trade Routes" — the FOREIGN count
-        # Cleopatra's Gold reads (`incomingIntlRoutes`)
+        # city receives +2 Gold from foreign Trade Routes" — every other
+        # player's route in, a city-state's included (`incomingForeignRoutes`)
         if bool(_fg_in.count_nonzero()):
             _fcnt = torch.zeros(B, cols, dtype=torch.double, device=self.device)
-            for r2 in range(self.n_majors):
+            for r2 in [*range(self.n_majors), *range(self._CITY_MINOR0, self._CITY_MINOR0 + self.S)]:
                 if r2 == row:
                     continue
-                _fhit = ((self.seat_route_dseat[:, r2] == row).unsqueeze(2)
+                _fhit = (((self.seat_routes[:, r2, :, 0] >= 0) & (self.seat_route_dseat[:, r2] == row)).unsqueeze(2)
                          & (self.seat_route_dcity[:, r2].unsqueeze(2) == ids.unsqueeze(1)))
                 _fcnt = _fcnt + _fhit.sum(dim=1).double()
             _addf = torch.zeros(B, cols, 6, dtype=inc.dtype, device=self.device)
@@ -10714,6 +10714,17 @@ class SimSeats:
         # rounded up
         need = torch.ceil(self.city_pop[:, row, :cols].double() / self.rules.amenity_pop_per)
         have = have + self._gp_city_perm(row, "amenities").double()
+        # CIV6 (Muscat): +1 in a city with a completed, unpillaged Commercial
+        # Hub, per such suzerainty (`suzerainHubAmenities`)
+        if self._suz_c_hub_amen >= 0 and row < self.n_majors:
+            _mn = self._suz_effect_count(row, self._suz_c_hub_amen)
+            if bool(_mn.count_nonzero()):
+                _amt, _hd = self._suz_hub_amen
+                _ht = self.city_dist_tile[:, row, :cols, _hd]
+                _hat = _ht.clamp(min=0)
+                _hub = ((_ht >= 0) & self.district_complete.gather(1, _hat)
+                        & ~self.district_pillaged.gather(1, _hat))
+                have = have + _hub.double() * (_mn.double() * _amt).unsqueeze(1)
         # CIV6 (Great Turkish Bombard): "+1 Amenity" in a city not founded here
         have = have + self._not_founded_sum(row, 0)[:, :cols]
         # CIV6 (Dharma): "Cities gain an Amenity for every Religion with at
@@ -14999,8 +15010,8 @@ class SimSeats:
     def _route_path_gold(self, row: int, d: torch.Tensor, want: torch.Tensor) -> torch.Tensor:
         """[B, K] f64 — `routePathGold` for row `row`'s route slots where
         `want`, D `d` [B, K]: D x min(cap, floor(denom x S / n)) / denom + T
-        over the stored course — S the water and railroad plots past the
-        origin and the portals taken, n every plot, T the foreign cities
+        over the stored course — S the water, railroad and Canal plots past
+        the origin and the portals taken, n every plot, T the foreign cities
         passed through that hold this row's Trading Post
         (`_route_course_posts`). 0 where the course is shorter than a step."""
         B, K = want.shape
@@ -15015,6 +15026,7 @@ class SimSeats:
         prev, cur = c0[:, :-1], c0[:, 1:]
         b1 = bb.unsqueeze(1)
         sc = (self.water[b1, cur].long() * self._path_water + self.railroad[b1, cur].long() * self._path_rail
+              + self._multi_domain_plot()[b1, cur].long() * self._path_multi
               + (self.pair_dist[prev, cur].long() > 1).long() * self._path_portal)
         score = (sc * valid[:, 1:].long()).sum(dim=1)
         eff = torch.clamp(torch.div(self._path_denom * score, n.clamp(min=1), rounding_mode="floor"), max=self._path_cap)
@@ -15280,11 +15292,11 @@ class SimSeats:
         city, after the destination seat's Letters of Marque cut
         (`routeDestYields`): a city-state destination Democracy's half on its
         suzerain's route; a major's city Democracy's half on an ally's route,
-        Trade Policy's Gold on any other player's route, and from a foreign
-        major Cleopatra's Gold, the destination seat's
-        incoming-route rows and the city's Great Person Gold; every route of a
-        major the destination seat's improvement rows and its wonders' Science
-        (Sankore). One route at a time:
+        Trade Policy's Gold, its wonders' Science (Sankore) and the city's
+        Great Person Gold on any other player's route, and from a foreign
+        major Cleopatra's Gold and the destination seat's incoming-route rows;
+        every route of a major the destination seat's improvement rows. One
+        route at a time:
         only plundered routes ask."""
         n = int(hb.shape[0])
         out = torch.zeros(n, 6, dtype=torch.float64, device=self.device)
@@ -15325,6 +15337,9 @@ class SimSeats:
                 _cw = self._completed_wonders(d)
                 if _cw is not None:
                     y[3] += float(_cw[b, c].double() @ self._wond_routes_sci)
+                # CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS):
+                # the city's Gold on any other player's route in
+                y[2] += float(self.city_gp_perm[b, d, c, _fgk])
             foreign = major and d != row and dcity >= 0
             if foreign:
                 if bool(self._leads_vec("CLEOPATRA")[b, d]):
@@ -15332,7 +15347,6 @@ class SimSeats:
                 for _wc, _wl, _wy, _wa in self._live_rows(d, self._incoming_route_yield_rows):
                     if bool(self._row_is(d, _wc, _wl)[b]):
                         y[_wy] += _wa
-                y[2] += float(self.city_gp_perm[b, d, c, _fgk])
             if major and (foreign or d == row):
                 for _ic, _il, _ii, _iy, _ia, _is in self._live_rows(d, self._route_improvement_rows):
                     if _is == 1 and bool(self._row_is(d, _ic, _il)[b]):

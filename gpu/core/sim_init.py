@@ -473,6 +473,18 @@ class SimInit:
         # Auckland: (yield, amount, terrain, own-era floor) plot rows
         self._suz_c_shallow_prod = _sfx.index("shallowWaterProd") if "shallowWaterProd" in _sfx else -1
         self._suz_shallow_rows = [(int(r[0]), float(r[1]), int(r[2]), int(r[3])) for r in _suz["shallowWaterRows"]]
+        # Johannesburg: Production per improved resource type of a city, the
+        # more once the seat holds the technology (`suzerainResourceTypeProduction`)
+        self._suz_c_res_type_prod = _sfx.index("resourceTypeProduction") if "resourceTypeProduction" in _sfx else -1
+        self._suz_res_type_prod = (float(_suz["resourceTypeProd"]), float(_suz["resourceTypeProdLate"]),
+                                   int(_suz["resourceTypeLateTech"]))
+        # Muscat: Amenities in a city with the district complete
+        # (`suzerainHubAmenities`); Kandy: percent more Faith from a Relic
+        # (`suzerainRelicFaithPct`)
+        self._suz_c_hub_amen = _sfx.index("hubAmenities") if "hubAmenities" in _sfx else -1
+        self._suz_hub_amen = (float(_suz["hubAmenities"]), int(_suz["hubDistrict"]))
+        self._suz_c_relic_faith = _sfx.index("relicFaith") if "relicFaith" in _sfx else -1
+        self._suz_relic_faith_pct = float(_suz["relicFaithPct"])
         rr = rules.seats
         n_gp = len(rr["gpClassDistrict"]) or 5
 
@@ -3002,10 +3014,11 @@ class SimInit:
         self._trader_guard_radius = int(_tr["guardRadius"])  # an escort's reach (`routePlunderer`)
         self._trade_walk_rail = int(_tr["walkRail"])
         # the path term (`routePathGold`): the score per water plot, railroad
-        # plot and portal taken, the ratio's cap (in denominators) and its
-        # floor's denominator
+        # plot, Canal plot and portal taken, the ratio's cap (in denominators)
+        # and its floor's denominator
         self._path_water = int(_tr["pathWater"])
         self._path_rail = int(_tr["pathRail"])
+        self._path_multi = int(_tr["pathMultiDomain"])
         self._path_portal = int(_tr["pathPortal"])
         self._path_denom = int(_tr["pathDenom"])
         self._path_cap = int(round(float(_tr["pathMaxRatio"]) * self._path_denom))
@@ -3669,11 +3682,17 @@ class SimInit:
             (bi, torch.tensor([float(x) for x in b["coastPlotY"]], dtype=dtype, device=device),
              bool(int(b["coastPlotUnimproved"])))
             for bi, b in enumerate(rules.buildings) if any(float(x) for x in b["coastPlotY"])]
-        # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): a base row's yields on
-        # every tile of its city carrying one feature — (building, feature, y6).
-        self._b_feat_plot: list[tuple[int, int, torch.Tensor]] = [
-            (bi, int(b["plotFeat"]), torch.tensor([float(x) for x in b["plotFeatY"]], dtype=dtype, device=device))
-            for bi, b in enumerate(rules.buildings) if int(b["plotFeat"]) >= 0]
+        # CIV6 (`plotFeatureYields`: the Aquarium's Reef, the Zoo's Rainforest
+        # and Marsh): a base row's yields on every tile of its city carrying
+        # the row's feature — (building, feature, y6, the civs whose unique
+        # building stands in for the row and so carries none of it).
+        _var_civs: dict[int, list[int]] = {}
+        for _vb, vs in enumerate(rules.b_variants):
+            _var_civs[_vb] = [int(v["civ"]) for v in vs]
+        self._b_feat_plot: list[tuple[int, int, torch.Tensor, list[int]]] = [
+            (bi, int(r["feat"]), torch.tensor([float(x) for x in r["y"]], dtype=dtype, device=device),
+             _var_civs.get(bi, []))
+            for bi, b in enumerate(rules.buildings) for r in b["plotFeats"] if int(r["feat"]) >= 0]
         # The COLUMN overrides a unique building carries (`effectiveBuilding`'s
         # `BUILDING_VARIANT_COLUMNS`): (building idx, civ idx, the variant row).
         # -1 in a scalar column, an all-zero `hasYields`, means "take the base

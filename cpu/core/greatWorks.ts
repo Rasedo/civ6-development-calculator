@@ -24,6 +24,7 @@ import { rowIsFor } from '../data/civilizations';
 import { citiesOf, civOf, leaderOf, seatOf } from './seats';
 import { randRange } from './rand';
 import { getModifiers } from './effects';
+import { suzerainRelicFaithPct } from './cityStates';
 import {
   AUTO_THEME_ROWS, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GW_THEME_ART, GW_THEME_ARTIFACT,
   GWO_ARTIFACT, GWO_CULTURE, GWO_FAITH, GWO_RELIC, GWO_TOURISM, GWO_WRITING, RELIC_COUNT, THEMING_MULT, gwKindObjects, gwKindOf,
@@ -219,6 +220,9 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
   const works = gwWorks(city);
   if (works.length === 0) return { culture: 0, faith: 0 };
   const mult = gwSlotMults(state, city);
+  // CIV6 (Kandy): a Relic's Faith scaled up, the percent summed with a
+  // themed holder's as the tourism scalings are
+  const relicPct = suzerainRelicFaithPct(state, city.seat);
   let culture = 0;
   let faith = 0;
   for (const w of works) {
@@ -226,7 +230,7 @@ export function greatWorkYields(state: GameState, city: WorkCity): { culture: nu
     // already has one in an earlier slot of the holder pays the row's figure
     const nu = GW_LAYOUT[w.slot]!.nonUniqueYield;
     culture += (nu && gwRepeatsPerson(works, w) ? nu : gwWorkCulture(w)) * mult[w.slot]!;
-    faith += GWO_FAITH[w.obj]! * mult[w.slot]!;
+    faith += GWO_FAITH[w.obj]! * (mult[w.slot]! + (w.obj === GWO_RELIC ? relicPct / 100 : 0));
   }
   return { culture, faith };
 }

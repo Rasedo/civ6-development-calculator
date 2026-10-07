@@ -257,6 +257,23 @@ class SimMinors:
             rk = rk + intl6 * valid.double().unsqueeze(2)
             _p_d = torch.where(valid, intl6[:, :, 2], _p_d)
             _p_want = _p_want | valid
+            # a major's city paying other players' routes into it
+            # (..._YIELD_TO_OTHERS: Zhang Qian, Marco Polo, Zheng He's Gold,
+            # Sankore's Science and Gold) — a city-state's route is another
+            # player's
+            _fgk = self._gp_city_perm_names.index("foreignRouteGold")
+            _fgd = self.city_gp_perm[:, :, :, _fgk]
+            if bool(_fgd.count_nonzero()):
+                rk[:, :, 2] += _fgd.gather(1, _rx).gather(2, _col).squeeze(2).double() * valid.double()
+            if getattr(self, "_wond_sender_gold", None) is not None and (
+                    bool(self._wond_sender_gold.count_nonzero()) or bool(self._wond_sender_sci.count_nonzero())):
+                _nwW = self.city_wonder.shape[3]
+                _wr4 = self.city_wonder.gather(1, _rx.unsqueeze(3).expand(B, K, RCw, _nwW))
+                _wr = _wr4.gather(2, _col.unsqueeze(3).expand(B, K, 1, _nwW)).squeeze(2)  # [B, K, nW]
+                _wcp = (_wr >= 0) & self.built_wonder_complete.gather(
+                    1, _wr.clamp(min=0).reshape(B, -1)).reshape_as(_wr)
+                rk[:, :, 2] += (_wcp.double() @ self._wond_sender_gold) * valid.double()
+                rk[:, :, 3] += (_wcp.double() @ self._wond_sender_sci) * valid.double()
         if bool(_p_want.count_nonzero()):
             _oc, _dc = self._route_centres(row)
             rk[:, :, 2] += self._route_path_gold(row, _p_d, _p_want) \

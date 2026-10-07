@@ -2031,6 +2031,73 @@ over 24). The engines draw it (`createRelic` / `_create_relic`,
   move: runs/h1_duelw1120 t161, Xi'an's stored 275), is no culture claim:
   the city holds no next plot after it.
 
+## H-1: the trade path's search, its score and the Canal — READ
+
+- The path search is the generic CvAStar (Pathfinder_Instance.cpp, the base
+  vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops
+  SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the
+  children are made (0x77a50: the six neighbours from the axial tables, then
+  the callback's extra neighbours, a portal), the popped node is the
+  destination test's last. The open list is a list sorted by total cost,
+  equal totals by known cost (AddToOpen 0x775a0 scans from the head or the
+  tail by a float midpoint, so a tie lands first or last by the side it
+  scanned from). LinkChild 0x78750: a child is linked only when the valid
+  callback passed; an open child is re-parented on a STRICTLY cheaper cost
+  (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents
+  0x79660, a new one opened. The trade path's callbacks (0x557e40): the
+  destination test 0x271490, destination-valid 0x629460 (1), no heuristic
+  (both slots null: the total is the known cost), cost 0x558970, valid
+  0x558db0, notify 0x558900 (type 5 a no-op; 1, 2, 4 store the child's range
+  off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0.
+  The range callback 0x5579b0 memoises its answer on the (parent, child)
+  node pair.
+- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14
+  (masks 4 and 1): both, or neither, is neither land nor water. The cost
+  callback adds nothing onto a plot whose word holds both (0x810a0 mask 5) or
+  onto a city centre (0x81120, the district row's hash). The route's path
+  score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the
+  origin, a centre counts its Trading Post (foreign, own); any other plot
+  whose district word holds both masks counts MULTIPLE_DOMAINS (gp +0x708,
+  15); a step of more than one plot a PORTAL (+0x70c, 15); the best route
+  unpillaged (+0x4d bit 1) BEST_ROUTE (+0x704, 2); a water plot WATER
+  (+0x710, 2). A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->
+  Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold
+  district rows twice over (score 23 >= 11) — 12 Gold, which water alone
+  (score 8, 10.36) does not. The engines: `multiDomainPlot` /
+  `_multi_domain_plot`, neither to `walk` / `_trade_reach`, MULTI_DOMAIN in
+  `routePathGold` / `_route_path_gold`.
+- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the
+  Taiyuan - sea - Granada path although the walk as read labels the shared
+  plot (40,10) off the cheaper road first with 3 range left, and Xi'an -> Rome
+  (t198) passes Bologna, 24 steps past Shanghai's refuel, with no Trading
+  Post there (the route's own yield counts none until t223). The path cache
+  (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a
+  pair before any search (0x5526a0); whether an edge holds the reverse
+  route's path is unread.
+
+## H-1: a district's locked price and the turn's research — READ (log)
+
+The record's action log orders a turn's events: 1124
+China t198 runs CivicCompleted 47, CityProductionCompleted (Beijing's
+Research Lab), DistrictAddedToMap (Beijing's Canal), PlayerTurnActivated,
+UnitGreatPersonActivated, ResearchCompleted 53 — the Great Scientist's
+technology lands after the placement, and the Canal locks at 310, the price
+before the climb every other city quotes (313) from t199. The harness prices
+a lock on the research held at the placement: the technologies and civics
+the log completes after the seat's DistrictAddedToMap left out
+(`researchAfterPlacement`; 1117 buy.districtCost 20 -> 6, 1124 74 -> 22).
+
+## H-1: Johannesburg's yield per resource type — PARTLY READ
+
+EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the
+instance vtable 0xdece90): its apply (0xb48710) registers the yield type and
+Amount on the city's +0x1da8 table (0xc705d0); the count that table is
+multiplied by is read where the city's yields sum (unread). The records fix
+it: distinct resources the owner sees under an unpillaged improvement on the
+city's plots (runs/h1_duelw1123: Jiaodong's Cotton and Cocoa +2, Chengdu's
+Coal mine nothing before Industrialization shows Coal; city.yields 1,091 ->
+266 gap-free). `suzerainResourceTypeProduction` / `_res_type_prod`.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

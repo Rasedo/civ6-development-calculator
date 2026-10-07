@@ -2013,6 +2013,14 @@ class SimMasks:
         return ((self.district == self._canal_didx) & self.district_complete
                 & ~self.district_pillaged)
 
+    def _multi_domain_plot(self) -> torch.Tensor:
+        """[B, T] — `multiDomainPlot`: a completed Canal's plot, land and
+        water at once to the trade path (neither to the Trader's walk, a
+        multiple-domain plot to the route's path score)."""
+        if self._canal_didx < 0:
+            return torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        return (self.district == self._canal_didx) & self.district_complete
+
     def _trade_walkable(self, rows: torch.Tensor, tiles: torch.Tensor, water: torch.Tensor) -> torch.Tensor:
         """`plotOpen`'s ground half — may a Trader at this water level stand
         here? A portal's mountain is ground to walk onto, as it is to every
@@ -2028,13 +2036,14 @@ class SimMasks:
 
     def _trade_graphs(self, row: int, games: list[int]) -> dict[int, tuple]:
         """Per game `b` of `games`: the facts `tradeReach` reads for row
-        `row`'s Traders, origin aside — (open, water, centre, embark, refuel
+        `row`'s Traders, origin aside — (open, water, neither, embark, refuel
         at a post, danger, term, exit), each a list over the plots, then the
         embark plots short of a centre.
 
         open: `plotOpen` — walkable at the row's water level, revealed to a
-        major, not a centre of a holder at war with the row. centre: a living
-        city's centre (majors, the Free Cities, city-states). embark: the
+        major, not a centre of a holder at war with the row. neither: a living
+        city's centre (majors, the Free Cities, city-states) or a Canal's plot
+        (`_multi_domain_plot`), neither land nor water to the walk. embark: the
         centre of the city a TradeEmbark plot belongs to, -1 elsewhere. refuel
         at a post: an embark plot of a city whose centre holds the row's
         Trading Post, its holder not at war with the row. danger: a feature
@@ -2080,14 +2089,15 @@ class SimMasks:
         term = torch.where(self.road[gi], torch.full_like(land, self._trade_cost_route), land)
         term = torch.where(self.water[gi] & ~self.road[gi], torch.full_like(land, self._trade_cost_water), term)
         term = torch.where(self.railroad[gi], torch.full_like(land, self._trade_cost_rail), term)
-        term = torch.where(centre | portal, torch.zeros_like(land), term)
+        neither = centre | self._multi_domain_plot()[gi]
+        term = torch.where(neither | portal, torch.zeros_like(land), term)
         exit_ = torch.full((n, T), -1, dtype=torch.long, device=dev)
         if bool(portal.count_nonzero()):
             for i in range(n):
                 pt = portal[i].nonzero(as_tuple=True)[0]
                 if len(pt):
                     exit_[i, pt] = self._portal_exit(pt, gi[i].expand(len(pt)))
-        cols = [x.tolist() for x in (opn, water, centre, embark, refuel, danger, term, exit_)]
+        cols = [x.tolist() for x in (opn, water, neither, embark, refuel, danger, term, exit_)]
         out = {}
         for i, b in enumerate(games):
             gr = [c[i] for c in cols]
@@ -2103,9 +2113,10 @@ class SimMasks:
         least cost pops first, the lower plot index on a tie; a label is
         replaced by a cheaper one, or by an equally cheap one leaving more
         range; edges in neighbour-direction order, then the portal exit. A
-        land<->water step with no centre at either end caps the range at 1
-        and, where `u` refuels nothing, costs `_trade_cost_switch` more; a
-        refuel onto a centre is the larger of the two. Bound
+        land<->water step with no neither plot (a centre, a Canal) at either
+        end caps the range at 1 and, where `u` refuels nothing, costs
+        `_trade_cost_switch` more; a refuel onto a neither plot is the larger
+        of the two. Bound
         to a destination centre `dest` (-1 none), that city's own TradeEmbark
         plots refuel to `_trade_dest_refuel` where no other refuel applies.
         Kept per (game, row, origin, dest) against the graph it walked."""
@@ -2113,7 +2124,7 @@ class SimMasks:
         memo = self._trade_reach_memo.get(key)
         if memo is not None and memo[0] == gr:
             return memo[1]
-        opn, water, centre, embark, refuel, danger, term, exit_, _harb = gr
+        opn, water, neither, embark, refuel, danger, term, exit_, _harb = gr
         T = self.T
         neigh = self._neigh_list
         g = [-1] * T
@@ -2137,13 +2148,13 @@ class SimMasks:
             nb = [x for x in neigh[u] if x >= 0]
             if exit_[u] >= 0:
                 nb.append(exit_[u])
-            wu, cu, eu = water[u], centre[u], embark[u] >= 0
+            wu, cu, eu = water[u], neither[u], embark[u] >= 0
             fuel = embark[u] >= 0 and (embark[u] == origin or refuel[u])
             dfuel = not fuel and dest >= 0 and embark[u] == dest
             for v in nb:
                 if done[v] or not opn[v]:
                     continue
-                wv, cv = water[v], centre[v]
+                wv, cv = water[v], neither[v]
                 sw = not cu and not cv and wu != wv
                 if sw and not eu and embark[v] < 0:
                     continue

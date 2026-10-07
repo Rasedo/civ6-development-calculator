@@ -21,7 +21,7 @@ import { GENERAL_AURA_CS, GENERAL_AURA_RANGE } from '../core/aura';
 import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
-import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS } from '../data/cityStates';
+import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT } from '../data/cityStates';
 import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, QUEST_COOLDOWN, QUEST_ENVOYS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, QUEST_CAMP_RADIUS, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_WEIGHTS_PEACE, MINOR_WALK_WEIGHTS_WAR, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, FREE_CITY_BUILD_ROWS } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
@@ -33,7 +33,7 @@ import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
-import { TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
+import { TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_MULTI_DOMAIN, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
 import { TRADE_BASE_RANGE, TRADE_LAND_REFUEL, TRADE_WATER_REFUEL, TRADE_DEST_REFUEL, TRADE_COST_STEP, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_WATER, TRADE_COST_LAND, TRADE_COST_SWITCH, TRADE_EMBARK_DISTRICTS, TRADE_DANGER_FEATURES } from '../core/tradePath';
 import { SUZERAIN_ENVOYS } from '../data/cityStates';
 import { CITIZEN_NAME_ROWS, CITIZEN_NAME_ROWS_FRANCE } from '../data/seats';
@@ -753,9 +753,11 @@ export function buildRules() {
       guardRadius: TRADER_GUARD_RADIUS,
       walkRail: TRADE_WALK_EXPIRY_RAIL,
       // the path term (`routePathGold`): the score per water plot, railroad
-      // plot and portal taken, the ratio's cap, its floor's denominator
+      // plot, Canal plot and portal taken, the ratio's cap, its floor's
+      // denominator
       pathWater: ROUTE_PATH_WATER,
       pathRail: ROUTE_PATH_RAIL,
+      pathMultiDomain: ROUTE_PATH_MULTI_DOMAIN,
       pathPortal: ROUTE_PATH_PORTAL,
       pathMaxRatio: ROUTE_PATH_MAX_RATIO,
       pathDenom: ROUTE_PATH_DENOM,
@@ -1087,6 +1089,16 @@ export function buildRules() {
           (any) => any.map((b) => buildingIdx.get(b) ?? -1)),
         // Buenos Aires: reach of a bonus resource turned luxury
         bonusAmenities: BUENOS_AIRES_AMENITIES,
+        // Johannesburg: Production per improved resource type of a city, and
+        // the more from the technology that raises it
+        resourceTypeProd: JOHANNESBURG_RESOURCE_PROD,
+        resourceTypeProdLate: JOHANNESBURG_RESOURCE_PROD_LATE,
+        resourceTypeLateTech: techIdx.get(JOHANNESBURG_LATE_TECH) ?? -1,
+        // Muscat: Amenities in a city with the named district complete
+        hubAmenities: MUSCAT_HUB_AMENITIES,
+        hubDistrict: PLACEABLE_DISTRICTS.indexOf(MUSCAT_HUB_DISTRICT),
+        // Kandy: percent more Faith from a Relic
+        relicFaithPct: KANDY_RELIC_FAITH_PCT,
         // Auckland: [yield, amount, terrain, the seat's own era at least (-1
         // none)] on every plot of the suzerain
         shallowWaterRows: AUCKLAND_PLOT_ROWS.map((r) => [
@@ -2688,8 +2700,10 @@ export function buildRules() {
       amenities: b.amenities ?? 0,
       // the row's own plot clauses (`buildingCoastYields`, `plotFeatureYields`)
       coastResY: YIELD_KEYS.map((k) => b.coastResourceYields?.[k] ?? 0),
-      plotFeat: b.plotFeatureYields ? FEAT_IDS.indexOf(b.plotFeatureYields.feature) : -1,
-      plotFeatY: YIELD_KEYS.map((k) => b.plotFeatureYields?.yields[k] ?? 0),
+      plotFeats: (b.plotFeatureYields ?? []).map((r) => ({
+        feat: FEAT_IDS.indexOf(r.feature),
+        y: YIELD_KEYS.map((k) => r.yields[k] ?? 0),
+      })),
       // a civilization's UNIQUE BUILDING standing in for this row. The
       // OVERRIDE half mirrors `effectiveBuilding`: -1 (or an empty yield
       // vector, or -1 amenities/housing) means "take the base row's".

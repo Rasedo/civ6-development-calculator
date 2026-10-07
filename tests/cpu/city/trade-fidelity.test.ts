@@ -654,7 +654,7 @@ describe('trading posts', () => {
     const T = TRADE_COURSE_MAX + 2;
     const reach: TradeReach = {
       state: makeState(makeMap(4, 4)), seat: 0,
-      graph: { water: 0, major: true, holder: new Map(), embark: new Map(), refuel: new Set(), exit: new Map() },
+      graph: { water: 0, major: true, holder: new Map(), neither: new Set(), embark: new Map(), refuel: new Set(), exit: new Map() },
       origin: 0, g: new Int32Array(T).fill(1), left: new Int32Array(T),
       parent: Int32Array.from({ length: T }, (_, i) => i - 1), steps: Int32Array.from({ length: T }, (_, i) => i),
     };

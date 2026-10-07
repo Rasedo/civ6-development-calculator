@@ -4555,6 +4555,32 @@ class SimEconomy:
             return torch.where(who.unsqueeze(1), v, self._district_adj_floor(di))
         return None
 
+    def _res_type_prod(self, row: int) -> torch.Tensor | None:
+        """[B, RC] f64 or None — `suzerainResourceTypeProduction`: per city of
+        major row `row`, its Johannesburg suzerainties x (the per-type amount,
+        plus the late amount once the row holds the technology) x the distinct
+        resources the row sees standing under an unpillaged improvement on the
+        city's own plots. None where the row holds no such suzerainty."""
+        code = self._suz_c_res_type_prod
+        if code < 0 or row >= self.n_majors:
+            return None
+        n = self._suz_effect_count(row, code)
+        if not bool(n.count_nonzero()):
+            return None
+        amt, late, tech = self._suz_res_type_prod
+        per = torch.full((self.B,), amt, dtype=torch.float64, device=self.device)
+        if tech >= 0:
+            per = per + late * self.civ_techs[:, row, tech].double()
+        nres = int(self._res_reveal_tech.shape[0])
+        has = self._res_live() & ~self._res_hidden(row) & (self.improvement >= 0) & ~self.pillaged
+        sl = self.city_slot_at(row)                                             # [B, T]
+        on = has & (sl >= 0)
+        key = (sl.clamp(min=0) * nres + self.res_id.clamp(min=0)) * on.long()
+        seen = torch.zeros(self.B, self.RC * nres, dtype=torch.long, device=self.device)
+        seen.scatter_add_(1, key, on.long())
+        types = (seen.reshape(self.B, self.RC, nres) > 0).sum(dim=2).double()
+        return types * (n.double() * per).unsqueeze(1)
+
     def _res_live(self) -> torch.Tensor:
         """[B, T] bool — this tile HAS a resource, right now.
 
@@ -5361,7 +5387,15 @@ class SimEconomy:
             nu = torch.tensor(self._gw_slot_nonunique_yield, dtype=torch.float64, device=self.device)
             face = torch.where(rep & (nu > 0), nu.expand_as(face), face)
         cul = (face * mult * held.double()).sum(dim=2)
-        fai = (self._gw_obj_faith.take(oc) * mult * held.double()).sum(dim=2)
+        # CIV6 (Kandy): a Relic's Faith scaled up, the percent summed with a
+        # themed holder's (`suzerainRelicFaithPct`)
+        fmult = mult
+        if self._suz_c_relic_faith >= 0 and row < self.n_majors:
+            _kn = self._suz_effect_count(row, self._suz_c_relic_faith)
+            if bool(_kn.count_nonzero()):
+                _kp = (_kn.double() * self._suz_relic_faith_pct / 100.0).reshape(-1, 1, 1)
+                fmult = mult + (obj == 7).double() * _kp
+        fai = (self._gw_obj_faith.take(oc) * fmult * held.double()).sum(dim=2)
         return cul, fai
 
     def _gw_tourism_general(self, row: int, printing: torch.Tensor | None, km: torch.Tensor | None) -> torch.Tensor:
@@ -7190,10 +7224,14 @@ class SimEconomy:
             _hw = ((_tw == self._coast_terr) & _rw & take & sv.unsqueeze(2)).sum(dim=2).double()
             _hc = ((_tc == self._coast_terr) & _rc & sv).double()
             tiles_y = tiles_y + (_hw + _hc).unsqueeze(2) * _y6.double().view(1, 1, 6)
-        # CIV6 (Aquarium, AQUARIUM_REEF_REQUIREMENTS): "+1 Science to each Reef
-        # tile in this city" — a plot yield, worked or the centre, the same way.
-        for _pbi, _pfid, _py6 in self._b_feat_plot:
+        # CIV6 (`plotFeatureYields`: the Aquarium's "+1 Science to each Reef
+        # tile in this city", the Zoo's Rainforest and Marsh) — a plot yield,
+        # worked or the centre, the same way; a unique building standing in
+        # for the row pays none of it.
+        for _pbi, _pfid, _py6, _pvc in self._b_feat_plot:
             _psv = lit[:, :, _pbi]
+            for _vc in _pvc:
+                _psv = _psv & ~self._row_plays_idx(row, _vc).reshape(-1, *([1] * (_psv.dim() - 1)))
             if not (_psv.numel() and bool(_psv.count_nonzero())):
                 continue
             _pfw = (self.feat_id.gather(1, stf) == _pfid) & ~self.feat_stripped.gather(1, stf)
@@ -7609,6 +7647,12 @@ class SimEconomy:
                 _col = torch.full((B,), _c if j is None else j, dtype=torch.long, device=dev)
                 _cur = self._q_unit_of(self.city_current[self._bidx, row, _col, 0])
                 bon[:, _c, 1] = bon[:, _c, 1] + self._cs_item_prod(row, _col, _cur) * alivef[:, _c]
+        # CIV6 (Johannesburg, EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES):
+        # Production per improved resource type of the city
+        _jrt = self._res_type_prod(row)
+        if _jrt is not None:
+            bon = bon.clone()
+            bon[:, :, 1] = bon[:, :, 1] + _jrt[:, sl].double() * alivef
         # CIV6 (Project_YieldConversions): the yield the last production step
         # converted from a district project, under the city's percents
         # (`City.projectYield`); a column it does not name adds an exact 0

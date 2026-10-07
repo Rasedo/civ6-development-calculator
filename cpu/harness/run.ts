@@ -18,7 +18,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import type { Catalog, TurnRecord } from './record';
-import { advanceHistory, importTurn, newHistory } from './import';
+import { advanceHistory, importTurn, newHistory, routeLegs } from './import';
 import { replayEvents } from './eventReplay';
 import { stateChecks, transitionChecks, type CheckResult, type StartReplay } from './checks';
 import { loadRandLog, randLogPath } from './randLog';
@@ -97,6 +97,7 @@ export function runReport(dumpPath: string, from = -Infinity, to = Infinity) {
     history.randLog = loadRandLog(logPath, seeds);
   }
   history.replay = replayEvents(all, cat, history.randLog);
+  history.legs = routeLegs(all);
   all.length = 0;
   const starts: StartReplay[] = [];
   const add = (r: CheckResult) => {

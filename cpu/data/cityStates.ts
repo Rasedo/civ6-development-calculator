@@ -66,7 +66,10 @@ export type SuzEffect =
   | 'projectProduction'  // Hong Kong
   | 'landPurchaseDiscount' // Ngazargamu
   | 'bonusAmenities'     // Buenos Aires
-  | 'shallowWaterProd';  // Auckland
+  | 'shallowWaterProd'   // Auckland
+  | 'resourceTypeProduction' // Johannesburg
+  | 'hubAmenities'       // Muscat
+  | 'relicFaith';        // Kandy
 
 /** The WIRE order the exported `suzCode` indexes — append only. */
 export const SUZ_EFFECTS: SuzEffect[] = [
@@ -79,7 +82,7 @@ export const SUZ_EFFECTS: SuzEffect[] = [
   'routePostGold',
   'sciencePeace', 'districtGpp', 'waterDistrictCulture', 'routeLuxuryGold',
   'spiceLuxuries', 'routeLengthGold', 'projectProduction', 'landPurchaseDiscount',
-  'bonusAmenities', 'shallowWaterProd',
+  'bonusAmenities', 'shallowWaterProd', 'resourceTypeProduction', 'hubAmenities', 'relicFaith',
 ];
 
 /** Cardiff: "Cities receive +2 Power for every Harbor building." Renewable,
@@ -183,6 +186,34 @@ export const HUNZA_PATH_TILE_GOLD_FX = Math.floor(0.2 * 256);
  *  `MODIFIER_PLAYER_CITIES_ADJUST_ALL_PROJECTS_PRODUCTION` Amount 20. */
 export const HONG_KONG_PROJECT_PCT = 20;
 
+/** CIV6 (Babylon_Leaders.xml, MINOR_CIV_JOHANNESBURG_PRODUCTION_RESOURCES and
+ *  _LATE under PLAYER_HAS_INDUSTRIALIZATION):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_YIELD_BY_NUMBER_RESOURCES` YIELD_PRODUCTION
+ *  Amount 1 each — "Cities receive +1 Production for every improved resource
+ *  type. After researching Industrialization it becomes +2 Production." The
+ *  type count is each city's distinct resources standing under an unpillaged
+ *  improvement on its own plots (runs/h1_duelw1123, China's suzerainty:
+ *  Jiaodong's Cotton and Cocoa plantations, Shanghai's Niter and Iron mines,
+ *  +2 Production each from t107). */
+export const JOHANNESBURG_RESOURCE_PROD = 1;
+export const JOHANNESBURG_RESOURCE_PROD_LATE = 1;
+export const JOHANNESBURG_LATE_TECH = 'INDUSTRIALIZATION';
+
+/** CIV6 (VikingsLandmarks_CityStates.xml, MINOR_CIV_MUSCAT_COMMERCIAL_HUB_AMENITY_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_CITY_AMENITIES_FROM_CITY_STATES` Amount 1
+ *  under CITY_HAS_COMMERCIAL_HUB_VIKING — "+1 Amenity in cities with a
+ *  Commercial Hub district" (runs/h1_duelw1120 Wuhan: the city-state part 1
+ *  from t200, its Hub complete at t197). */
+export const MUSCAT_HUB_AMENITIES = 1;
+export const MUSCAT_HUB_DISTRICT = 'COMMERCIAL_HUB';
+
+/** CIV6 (Leaders.xml, MINOR_CIV_KANDY_BETTER_RELIC_BONUS):
+ *  `MODIFIER_PLAYER_CITIES_ADJUST_GREATWORK_YIELD` GREATWORKOBJECT_RELIC
+ *  YIELD_FAITH ScalingFactor 150 — "+50% Faith from all Relics"
+ *  (runs/h1_duelw1120 Xi'an: its two Relics pay 12 Faith under China's
+ *  suzerainty, not 8). */
+export const KANDY_RELIC_FAITH_PCT = 50;
+
 /** CIV6 (Expansion2_Leaders.xml, the three MINOR_CIV_NGAZARGAMU_*_PURCHASE
  *  _BONUS rows): `MODIFIER_PLAYER_CITIES_ADJUST_UNITS_PURCHASE_COST` Amount 20
  *  with `UnitDomain DOMAIN_LAND`, one row per Encampment building — Barracks OR
@@ -250,6 +281,9 @@ const RAW_CITY_STATE_SUZERAIN_BONUS: Record<string, SuzerainBonusDef> = {
   'Hong Kong': { name: 'Hong Kong', type: 'industrial', bonus: 'Your Cities get +20% bonus Production towards city projects.', suz: 'projectProduction' },
   'Buenos Aires': { name: 'Buenos Aires', type: 'industrial', bonus: 'Your bonus resources behave like luxury resources, providing +1 Amenity per resource.', suz: 'bonusAmenities' },
   Cardiff: { name: 'Cardiff', type: 'industrial', bonus: 'Cities receive +2 Power for every Harbor building.', suz: 'harborPower' },
+  Muscat: { name: 'Muscat', type: 'trade', bonus: '+1 Amenity in cities with a Commercial Hub district.', suz: 'hubAmenities' },
+  Kandy: { name: 'Kandy', type: 'religious', bonus: 'Receive a Relic every time you discover a new natural wonder, and earn +50% Faith from all Relics.', suz: 'relicFaith' },
+  Johannesburg: { name: 'Johannesburg', type: 'industrial', bonus: 'Cities receive +1 Production for every improved resource type. After researching Industrialization it becomes +2 Production.', suz: 'resourceTypeProduction' },
   Auckland: { name: 'Auckland', type: 'industrial', bonus: 'Shallow water tiles you own provide +1 Production. Additional +1 when you reach the Industrial era.', suz: 'shallowWaterProd' },
   'Mexico City': { name: 'Mexico City', type: 'industrial', bonus: 'Regional effects from your Industrial Zone, Water Park, and Entertainment Complex districts reach 3 tiles farther.', suz: 'regionalReach' },
   Akkad: { name: 'Akkad', type: 'militaristic', bonus: "Melee and anti-cavalry units' attacks do full damage to the city's walls.", suz: 'wallsFullDamage' },

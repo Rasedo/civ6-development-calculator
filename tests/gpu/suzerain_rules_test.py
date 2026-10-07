@@ -397,6 +397,46 @@ def main() -> None:
     assert [int(x) for x in _hg[0]] == [0, 1, 2], "four plots pay 0, five 1, ten 2"
     print("hunza ok — the gold is the course's plots in fixed point")
 
+    # Johannesburg: Production per improved resource TYPE of the city — a
+    # second copy of a type adds nothing, a pillaged one counts nothing
+    assert sim._suz_c_res_type_prod >= 0, "Johannesburg's code is missing from the rules"
+    drop(sim)
+    assert sim._res_type_prod(0) is None, "no suzerainty, no term"
+    hold(sim, 0, sim._suz_c_res_type_prod)
+    _sl = sim.city_slot_at(0)[0]
+    _jcol = int(sim.city_alive[0, 0].long().argmax())
+    _own = [int(t) for t in (_sl == _jcol).nonzero(as_tuple=True)[0].tolist()]
+    assert len(_own) >= 3, "the capital owns too few plots for the probe"
+    _vis = [r for r in range(int(sim._res_reveal_tech.shape[0])) if int(sim._res_reveal_tech[r]) < 0][:2]
+    for _t in _own:
+        sim.res_id[0, _t] = -1
+        sim.improvement[0, _t] = -1
+    for _t, _r in zip(_own[:3], [_vis[0], _vis[0], _vis[1]]):
+        sim.res_id[0, _t] = _r
+        sim.res_stripped[0, _t] = False
+        sim.improvement[0, _t] = 0
+        sim.pillaged[0, _t] = False
+    _amt, _late, _tech = sim._suz_res_type_prod
+    _per = _amt + (_late if _tech >= 0 and bool(sim.civ_techs[0, 0, _tech]) else 0.0)
+    assert float(sim._res_type_prod(0)[0, _jcol]) == 2 * _per, "two types, the copy adds nothing"
+    sim.pillaged[0, _own[2]] = True
+    assert float(sim._res_type_prod(0)[0, _jcol]) == _per, "a pillaged plot counts nothing"
+    drop(sim)
+    print("johannesburg ok — one Production per improved type, a copy and a pillaged plot nothing")
+
+    # Kandy: a Relic pays half again its Faith
+    assert sim._suz_c_relic_faith >= 0, "Kandy's code is missing from the rules"
+    sim.city_gw_obj[0, 0, _jcol] = -1
+    sim.city_gw_obj[0, 0, _jcol, 0] = 7
+    drop(sim)
+    _f0 = float(sim._gw_yields(0)[1][0, _jcol])
+    hold(sim, 0, sim._suz_c_relic_faith)
+    _f1 = float(sim._gw_yields(0)[1][0, _jcol])
+    assert _f0 > 0 and _f1 == _f0 * (1 + sim._suz_relic_faith_pct / 100.0), (_f0, _f1)
+    sim.city_gw_obj[0, 0, _jcol] = -1
+    drop(sim)
+    print("kandy ok — a Relic's Faith x1.5 under the suzerainty")
+
     print("SUZERAIN RULES OK — every coded perk fires, only for the strict "
           "suzerain, and Geneva's percent only at peace")
 

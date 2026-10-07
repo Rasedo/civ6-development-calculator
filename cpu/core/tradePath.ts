@@ -27,7 +27,7 @@ import type { GameState, Tile } from './types';
 import { srcConst, xml } from '../data/provenance';
 import { MP_SCALE, TRADE_COURSE_MAX } from '../data/constants';
 import { neighborTile } from '../../world/hex';
-import { isImpassable, isWater } from '../../world/query';
+import { isImpassable, isWater, multiDomainPlot } from '../../world/query';
 import { civsAtWar, isCityStateSeat, seatOf } from './seats';
 import { isExplored } from './fog';
 import { portalAt, portalExit } from './rules';
@@ -88,6 +88,9 @@ interface TradeGraph {
   major: boolean;
   /** living city centre -> its holder */
   holder: Map<number, number>;
+  /** the plots that are neither land nor water to the walk: every living
+   *  city centre and every Canal plot (`multiDomainPlot`) */
+  neither: Set<number>;
   /** TradeEmbark plot -> its city's centre */
   embark: Map<number, number>;
   /** the embark plots this walk refuels at */
@@ -130,8 +133,12 @@ function tradeGraph(state: GameState, seat: number, origin: number): TradeGraph 
     if (centre === origin || (posts.includes(centre) && (who === seat || !civsAtWar(state, seat, who)))) refuel.add(plot);
   }
   const exit = new Map<number, number>();
-  for (const t of state.map.tiles) if (portalAt(t)) exit.set(t.index, portalExit(state.map, t));
-  return { water: tradeWaterLevel(state, seat), major: !isCityStateSeat(seat), holder, embark, refuel, exit };
+  const neither = new Set(holder.keys());
+  for (const t of state.map.tiles) {
+    if (portalAt(t)) exit.set(t.index, portalExit(state.map, t));
+    if (multiDomainPlot(t)) neither.add(t.index);
+  }
+  return { water: tradeWaterLevel(state, seat), major: !isCityStateSeat(seat), holder, neither, embark, refuel, exit };
 }
 
 /** 0x558db0: may the walk enter this plot? Impassable ground and a mountain
@@ -147,7 +154,7 @@ function plotOpen(state: GameState, gr: TradeGraph, seat: number, t: Tile): bool
 
 /** 0x558970's plot term: what stepping ONTO this plot adds. */
 function plotTerm(gr: TradeGraph, t: Tile): number {
-  if (gr.holder.has(t.index) || portalAt(t)) return 0;
+  if (gr.neither.has(t.index) || portalAt(t)) return 0;
   if (t.railroad) return TRADE_COST_RAIL;
   if (t.road) return TRADE_COST_ROUTE;
   if (isWater(t)) return TRADE_COST_WATER;
@@ -193,11 +200,11 @@ class KeyHeap {
 /**
  * THE WALK from `origin` for `seat`'s Traders, over every plot. Per edge
  * u -> v: a switch, a step between land and water (0x558300 over IsLand
- * 0x5583a0 / IsWater 0x558460: a City Centre's plot answers neither, any
- * other plot its ground, a Harbor water), needs a TradeEmbark district at
- * one end (0x558db0) and caps the range r left at u to 1; r is then
- * refuelled at u's refuelling district to TRADE_LAND_REFUEL onto land,
- * TRADE_WATER_REFUEL onto water, the larger onto a centre, or else at a
+ * 0x5583a0 / IsWater 0x558460: a City Centre's plot and a Canal's answer
+ * neither, any other plot its ground, a Harbor water), needs a TradeEmbark
+ * district at one end (0x558db0) and caps the range r left at u to 1; r is
+ * then refuelled at u's refuelling district to TRADE_LAND_REFUEL onto land,
+ * TRADE_WATER_REFUEL onto water, the larger onto a neither plot, or else at a
  * district of the destination's city (`dest`'s embark plots, -1 none) to
  * TRADE_DEST_REFUEL; the edge leaves r - 1 and is refused below 0. The cost:
  * TRADE_COST_STEP, v's plot term, and TRADE_COST_SWITCH on a switch u did not
@@ -233,7 +240,7 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
     const ex = gr.exit.get(u) ?? -1;
     if (ex >= 0) nb.push(ex);
     const wu = isWater(at);
-    const cu = gr.holder.has(u);
+    const cu = gr.neither.has(u);
     const eu = gr.embark.has(u);
     const fuel = gr.refuel.has(u);
     const dfuel = !fuel && dest >= 0 && gr.embark.get(u) === dest;
@@ -242,7 +249,7 @@ function walk(state: GameState, seat: number, origin: number, gr: TradeGraph, de
       const to = tiles[v];
       if (!plotOpen(state, gr, seat, to)) continue;
       const wv = isWater(to);
-      const cv = gr.holder.has(v);
+      const cv = gr.neither.has(v);
       const sw = !cu && !cv && wu !== wv;
       if (sw && !eu && !gr.embark.has(v)) continue;
       let r = sw ? Math.min(left[u], 1) : left[u];

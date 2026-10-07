@@ -1,6 +1,6 @@
 
 import type { City, CityState, CityStateQuest, CityStateType, GameState, QueueItem, Yields } from './types';
-import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileSeat, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
+import { NO_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
@@ -16,7 +16,7 @@ import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -395,6 +395,40 @@ export function suzerainSciencePct(state: GameState, seat: number): number {
   if (!suzerainEffect(state, seat, 'sciencePeace')) return 0;
   if (state.seats.some((s) => s.seat !== seat && civsAtWar(state, seat, s.seat))) return 0;
   return GENEVA_SCIENCE_PCT;
+}
+
+/** CIV6 (Johannesburg): a city's Production per distinct resource its owner
+ *  sees standing under an unpillaged improvement on its plots (runs/h1_duelw1123
+ *  Chengdu's Coal mine pays nothing before Industrialization shows the Coal) — +1, +2 once the seat holds
+ *  Industrialization — per such suzerainty. */
+export function suzerainResourceTypeProduction(state: GameState, city: City): number {
+  const n = suzerainEffectCount(state, city.seat, 'resourceTypeProduction');
+  if (!n) return 0;
+  const hidden = hiddenResourcesFor(state, city.seat);
+  const types = new Set<string>();
+  for (const t of state.map.tiles) {
+    if (t.resource && t.improvement && !t.pillaged && !hidden.has(t.resource) && tileBelongsTo(t, city)) types.add(t.resource);
+  }
+  const late = seatOf(state, city.seat)?.research.techs.includes(JOHANNESBURG_LATE_TECH) ? JOHANNESBURG_RESOURCE_PROD_LATE : 0;
+  return n * (JOHANNESBURG_RESOURCE_PROD + late) * types.size;
+}
+
+/** CIV6 (Muscat): the Amenities a city holding a completed, unpillaged
+ *  Commercial Hub gets, per such suzerainty. */
+export function suzerainHubAmenities(state: GameState, city: City): number {
+  const n = suzerainEffectCount(state, city.seat, 'hubAmenities');
+  if (!n) return 0;
+  const hub = city.districts.some((d) => {
+    const t = state.map.tiles[d.tileIndex];
+    return d.type === MUSCAT_HUB_DISTRICT && t.districtComplete && !t.districtPillaged;
+  });
+  return hub ? n * MUSCAT_HUB_AMENITIES : 0;
+}
+
+/** CIV6 (Kandy): the percent more Faith a seat's Relics pay, per such
+ *  suzerainty. */
+export function suzerainRelicFaithPct(state: GameState, seat: number): number {
+  return suzerainEffectCount(state, seat, 'relicFaith') * KANDY_RELIC_FAITH_PCT;
 }
 
 /** CIV6 (Hong Kong): "+20% Production towards city projects." */

@@ -30,7 +30,7 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { createGameFromMap } from '../core/game';
 import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
-import { stampTradingPost, tradeRouteMinDuration } from '../core/trade';
+import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings } from '../core/city';
 import { tileYields } from '../core/yields';
@@ -500,6 +500,9 @@ export interface History {
   /** the plots each live route's Trader stood on, record by record, by
    *  `routeKey` (a plot repeated is kept once) */
   trail: Map<string, number[]>;
+  /** each route's first leg as the whole recording saw its Trader walk it,
+   *  by `routeKey` (`routeLegs`) */
+  legs: Map<string, number[]>;
   /** the Trading Posts each player holds, by centre plot: both ends of
    *  every route that left the records while its Trader lived on (a route
    *  run to its end; a plundered route takes its Trader with it) */
@@ -606,6 +609,36 @@ function recordRoutes(rec: TurnRecord): Record<string, number>[] {
   return out;
 }
 
+/**
+ * Each route's first leg across the whole recording, by `routeKey`: the
+ * plots its Trader stood on from the first record carrying the route until
+ * the record that finds it on the destination's centre, that centre last. A
+ * route whose Trader the records never see arrive has no leg.
+ */
+export function routeLegs(recs: TurnRecord[]): Map<string, number[]> {
+  const legs = new Map<string, number[]>();
+  const open = new Map<string, number[]>();
+  for (const rec of recs) {
+    const W = rec.map[0]?.length ?? 0;
+    const centre = new Map(rec.cities.map((c) => [`${c.owner}:${c.id}`, c.y * W + c.x]));
+    for (const r of recordRoutes(rec)) {
+      const k = routeKey(r);
+      if (legs.has(k)) continue;
+      const u = rec.units.find((x) => x.owner === r.TraderUnitPlayer && x.id === r.TraderUnitID);
+      if (!u) continue;
+      const seen = open.get(k) ?? [];
+      const at = u.y * W + u.x;
+      if (seen[seen.length - 1] !== at) seen.push(at);
+      open.set(k, seen);
+      if (at === centre.get(`${r.DestinationCityPlayer}:${r.DestinationCityID}`)) {
+        legs.set(k, seen);
+        open.delete(k);
+      }
+    }
+  }
+  return legs;
+}
+
 export const AGE_DARK = 0;
 export const AGE_NORMAL = 1;
 export const AGE_GOLDEN_ONLY = 2;
@@ -637,7 +670,7 @@ export function eraBegan(a: TurnRecord, b: TurnRecord): boolean {
 export function newHistory(): History {
   return { firstTurn: -1, last: null, before: null, beforeThat: null, bestMelee: new Map(), levied: new Map(), govSeated: new Map(), cultureTaken: new Map(), growthDrift: new Map(), builders: new Map(), gpSpent: new Map(), revealed: new Map(),
     unknownSince: new Set(), nextPlotUnheld: new Set(), fireFood: new Map(), fireProd: new Map(), eventYields: new Map(), eventCounts: new Map(), openEvents: [], eventRead: new Map(), eventDraws: new Map(), droughts: [], bare: new Map(), discountDistricts: new Map(), discountPlaced: new Map(), ages: new Map(), moments: new Map(), momentsWorld: [],
-    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), posts: new Map(), policySlots: new Map(),
+    eraTurns: [], gameEra: 0, eraStartTurn: 1, eraCountdown: -1, routeSeen: new Map(), routeCourse: new Map(), trail: new Map(), legs: new Map(), posts: new Map(), policySlots: new Map(),
     competitionSeen: new Map(), competitionScore: new Map(), podium: new Map(), culture: new Map(), cultureHeld: new Map(), tourismTo: new Map(),
     dominant: new Map(), districtQuoted: new Set(), districtPriced: new Map(), districtLocked: new Map(), floods: null, startTies: new Map(), startPicks: new Map(), seaLevel: 0, people: null, stockpile: new Map() };
 }
@@ -1193,6 +1226,15 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
         // capture, then 10 and 17; runs/h1_duelw1114, the Free City of Rome
         // taken at t197 with one plot gained: 10, then 17 and 26)
         if (b) h.cultureTaken.set(k, Math.max(0, c.plots.length - b.plots.length));
+        // a city new since a record before the turn's last took its founding
+        // ring there; a plot beyond it was taken since, in the turns no record
+        // read (runs/h1_duelw1119 Rome, founded t3: the t4 record read
+        // mid-turn and dropped, t5 holds 8 plots with the box fallen to 1.6
+        // and the price 10)
+        else if (h.last.turn < rec.turn - 1) {
+          const shape = { width: W, height: rec.head.H, wrapX: bool(rec.head.wrapX) };
+          h.cultureTaken.set(k, c.plots.filter((q) => hexDistance(shape, c.x, c.y, q % W, Math.floor(q / W)) > 1).length);
+        }
         continue;
       }
       // the box fell on a plot gained or a next plot held: culture paid for
@@ -2305,6 +2347,13 @@ function wonderFreeTiles(rec: TurnRecord, pid: number, cityId: number): number {
   return n;
 }
 
+/** whether the record's action log names player `pid`'s placement of the
+ *  district of row `idx` for city `cityId` (`DistrictAddedToMap`) */
+function placedInLog(rec: TurnRecord, pid: number, cityId: number, idx: number): boolean {
+  const rows = (rec as TurnRecord & { actions?: unknown }).actions;
+  return Array.isArray(rows) && (rows as unknown[][]).some((r) => r[2] === 'DistrictAddedToMap' && r[3] === pid && r[5] === cityId && r[8] === idx);
+}
+
 /** the technologies and civics (engine ids) a player's log completes after
  *  it places a district of row `idx` in its city `cityId`; none where the
  *  record carries no log or the placement is not in it */
@@ -2363,7 +2412,9 @@ function lockDistrictPrices(rec: TurnRecord, cat: Catalog, state: GameState, cit
         }
         continue;
       }
-      if (was?.turn === rec.turn - 1 && human) {
+      // a human seat's district locks at the record before's quote where the
+      // record's log does not name the placement (records without a log)
+      if (was?.turn === rec.turn - 1 && human && !placedInLog(rec, c.owner, c.id, idx)) {
         h.districtLocked.set(key, was.price);
         continue;
       }
@@ -2609,6 +2660,12 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     const made = routeOfRecord(r, state, cityByKey, minorOfPlayer);
     if (!made) continue;
     const { owner, route } = made;
+    // a route the engine's walk cannot lay (1124 Shenyang -> Bologna, Xi'an
+    // -> Rome) runs the course its Trader walked to the destination
+    const leg = history?.legs.get(routeKey(r));
+    if ((route.course ?? []).length < 2 && leg) {
+      route.course = legCourse(state, owner.seat, routeOriginCenter(state, owner as Seat, route), leg);
+    }
     const kept = history?.routeCourse.get(routeKey(r));
     if (kept) route.course = [...kept];
     else history?.routeCourse.set(routeKey(r), [...(route.course ?? [])]);
@@ -2621,6 +2678,26 @@ function importTradeRoutes(rec: TurnRecord, state: GameState, cityByKey: Map<str
     }
     (owner.tradeRoutes ??= []).push(route);
     out.push({ owner: owner.seat, route, game: r });
+  }
+  return out;
+}
+
+/** A first leg as a course: the origin, then the plots its Trader stood on
+ *  through the destination's centre, two plots the records saw apart joined
+ *  by the engine's walk between them (`tradeCourse`). */
+function legCourse(state: GameState, seat: number, origin: number, leg: number[]): number[] {
+  const out = [origin];
+  const tiles = state.map.tiles;
+  for (const at of leg) {
+    const a = out[out.length - 1];
+    if (at === a) continue;
+    const ta = tiles[a];
+    const tb = tiles[at];
+    if (hexDistance(state.map, ta.col, ta.row, tb.col, tb.row) > 1) {
+      const join = tradeCourse(tradeReach(state, seat, a), at);
+      if (join) out.push(...join.slice(1, -1));
+    }
+    out.push(at);
   }
   return out;
 }

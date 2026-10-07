@@ -103,7 +103,7 @@ def main() -> None:
     print(f"  B Stave Church OK (hidden 0, seen +{n})")
 
     # -- C: the Reef --------------------------------------------------------
-    fid = int(rules.buildings[aq]["plotFeat"])
+    fid = int(rules.buildings[aq]["plotFeats"][0]["feat"])
     assert fid >= 0, "the Aquarium carries its Reef clause on the wire"
     for x in coast:
         sim.res_id[0, x] = -1

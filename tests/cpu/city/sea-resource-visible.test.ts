@@ -36,7 +36,7 @@ function clause(state: GameState, city: City, id: string, key: 'science' | 'prod
 describe('the sea-resource clause reads only a resource the seat can see', () => {
   it('the Aquarium carries the install\'s two plot clauses', () => {
     expect(BUILDINGS.AQUARIUM!.coastResourceYields).toEqual({ science: 1 });
-    expect(BUILDINGS.AQUARIUM!.plotFeatureYields).toEqual({ feature: 'REEF', yields: { science: 1 } });
+    expect(BUILDINGS.AQUARIUM!.plotFeatureYields).toEqual([{ feature: 'REEF', yields: { science: 1 } }]);
   });
 
   it('the Aquarium pays +1 Science per coastal resource tile, nothing on an unseen strategic', () => {

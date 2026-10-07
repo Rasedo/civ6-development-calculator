@@ -82,6 +82,17 @@ export function canalPassage(tile: Tile): boolean {
   return tile.district === 'CANAL' && tile.districtComplete && !tile.districtPillaged;
 }
 
+/**
+ * A completed Canal's plot answers both land and water in the district word
+ * the trade path reads (GameCore_XP2 0x81240 masks 1 and 4): the Trader's walk
+ * takes it as neither (no land-water switch, the larger refuel onto it, no
+ * step term) and the route's path score counts it as a multiple-domain plot
+ * (runs/h1_duelw1124 Cardiff -> Xiurong through Shenyang's Canal: 12 Gold).
+ */
+export function multiDomainPlot(tile: Tile): boolean {
+  return tile.district === 'CANAL' && tile.districtComplete;
+}
+
 /** where a HULL may float: open water, or a Canal's passage. */
 export function hullTile(tile: Tile): boolean {
   return isWater(tile) || canalPassage(tile);

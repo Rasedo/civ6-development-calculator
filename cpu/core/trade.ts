@@ -12,7 +12,7 @@ import { NO_SEAT, seatOf, citiesOf, isBarbSeat, civsAtWar, allianceTypeWith, isC
 import { ROME_OWN_POST_GOLD, CLEOPATRA_INTL_ROUTE_GOLD, CLEOPATRA_INCOMING_ROUTE_FOOD, CLEOPATRA_INCOMING_ROUTE_GOLD, ROUTE_CAPACITY_ROWS, rowIsFor, type RouteYieldRow } from '../data/civilizations';
 import { ALLIANCE_ROUTE_TO, ALLIANCE_ROUTE_YKEY } from '../data/seats';
 import { hexDistance, tilesWithin } from '../../world/hex';
-import { isImpassable, isWater, isMountain } from '../../world/query';
+import { isImpassable, isWater, isMountain, multiDomainPlot } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { disbandUnit, spawnUnit } from './units';
@@ -177,8 +177,9 @@ export function routeChainGold(state: GameState, seat: number, r: TradeRoute): n
  * / DENOM) + T. D is the Gold the destination's own rows pay the leg
  * (`District_TradeRouteYields`); n every plot of
  * the Trader's path, both ends included; S the path's score — WATER per
- * water plot and RAIL per railroad plot past the origin, PORTAL per portal
- * the Trader takes; T one per foreign city the path crosses that holds this
+ * water plot, RAIL per railroad plot and MULTI_DOMAIN per Canal plot past the
+ * origin, PORTAL per portal the Trader takes; T one per foreign city the
+ * path crosses that holds this
  * seat's Trading Post (the destination's own post is `routePostGold`). The
  * path is the route's stored course (`tradeCourse`).
  */
@@ -188,6 +189,11 @@ export const ROUTE_PATH_RAIL = srcConst('trade.pathRail', 2, {
   ...xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_BEST_ROUTE_TILE', 'Value'),
   note: 'the best route is the Railroad; the lab laid them one plot at a time',
 });
+/** a Canal's plot on the path (`multiDomainPlot`; Trade_Manager 0x5500b0
+ *  counts the non-centre plots whose district answers land and water, and
+ *  0x54eeb0 weighs that count by this) */
+export const ROUTE_PATH_MULTI_DOMAIN = srcConst('trade.pathMultiDomain', 15,
+  xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_MULTIPLE_DOMAINS', 'Value'));
 export const ROUTE_PATH_PORTAL = srcConst('trade.pathPortal', 15,
   xml('GlobalParameters', 'Name=TRADE_ROUTE_TRANSPORTATION_EFFICIENCY_SCORE_PORTAL_USE', 'Value'));
 export const ROUTE_PATH_MAX_RATIO = srcConst('trade.pathMaxRatio', 1,
@@ -195,7 +201,7 @@ export const ROUTE_PATH_MAX_RATIO = srcConst('trade.pathMaxRatio', 1,
 export const ROUTE_PATH_DENOM = srcConst('trade.pathDenom', 256, {
   lab: 'runs/trade_path_20260926T_c20.jsonl (railroads one plot at a time: D x floor(512/n)/256 per plot)'
     + ' and runs/trade_sweep_20260926T.jsonl (1,948 of 1,948 gold rows)',
-  note: 'the ratio is floored to 256ths; _SCORE_MULTIPLE_DOMAINS 15 enters nowhere',
+  note: 'the ratio is floored to 256ths',
 });
 
 export function routePathGold(state: GameState, seat: number, r: TradeRoute, d: number): number {
@@ -208,6 +214,7 @@ export function routePathGold(state: GameState, seat: number, r: TradeRoute, d: 
     const prev = tiles[path[i - 1]];
     if (isWater(at)) score += ROUTE_PATH_WATER;
     if (at.railroad) score += ROUTE_PATH_RAIL;
+    if (multiDomainPlot(at)) score += ROUTE_PATH_MULTI_DOMAIN;
     if (hexDistance(state.map, prev.col, prev.row, at.col, at.row) > 1) score += ROUTE_PATH_PORTAL;
   }
   const t = routeCoursePosts(state, seat, r).filter((c) => tileSeat(tiles[c]) !== seat).length;
@@ -772,15 +779,28 @@ export function minorRouteOriginYields(state: GameState, minor: Seat, r: TradeRo
   const y = minorRouteYields(state, r);
   if (!y) return null;
   y.gold += routePathGold(state, minor.seat, r, y.gold) + routePostGold(state, minor.seat, routeDestCenter(state, minor, r));
+  // a major's city paying OTHER players' routes into it
+  // (MODIFIER_SINGLE_CITY_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS — Zhang Qian,
+  // Marco Polo, Zheng He, Sankore): a city-state's route is another player's
+  // (runs/h1_duelw1123 Johannesburg and Akkad -> Beijing, +2 Gold each)
+  const civCity = r.toSeatCity !== undefined
+    ? seatOf(state, r.toSeat ?? NO_SEAT)?.cities.find((c) => c.id === r.toSeatCity) : undefined;
+  if (civCity) {
+    y.gold += gpCityPermOf(civCity, 'foreignRouteGold');
+    const snd = wonderRouteSenderYields(state, civCity);
+    y.science += snd.science;
+    y.gold += snd.gold;
+  }
   return y;
 }
 
 /** What ONE route of seat `owner` pays its DESTINATION city — the per-route
  *  share of the destination's incoming terms in `cityTradeYields`: a
  *  city-state destination Democracy's half on its suzerain's route; a major's
- *  city Democracy's half, from any other player Trade Policy's Gold, and from
- *  a foreign major Cleopatra's Gold, the destination seat's incoming-route
- *  rows and the city's Great Person Gold; every route in the destination
+ *  city Democracy's half, from any other player Trade Policy's Gold, the
+ *  wonders' Science and the city's Great Person Gold, and from a foreign major
+ *  Cleopatra's Gold and the destination seat's incoming-route rows; every
+ *  route in the destination
  *  seat's improvement rows. Before the
  *  destination seat's Letters of Marque cut. */
 export function routeDestYields(state: GameState, owner: number, r: TradeRoute): Yields {
@@ -809,13 +829,16 @@ export function routeDestYields(state: GameState, owner: number, r: TradeRoute):
     // (runs/h1_duelw1110, the city-state Lisbon's route to Antium: 2 Science
     // at Antium)
     out.science += wonderRouteGainScience(state, dest);
+    // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS): the
+    // city's +2 Gold on any other player's route in, a city-state's included
+    // (runs/h1_duelw1123 Johannesburg and Akkad -> Beijing)
+    out.gold += gpCityPermOf(dest, 'foreignRouteGold');
   }
   const major = state.seats.some((s) => s.seat === owner);
   const foreign = major && owner !== dSeat && r.toSeat === dSeat;
   if (foreign) {
     if (leaderOf(state, dSeat) === 'CLEOPATRA') out.gold += CLEOPATRA_INCOMING_ROUTE_GOLD;
     for (const row of getModifiers(state, dSeat).incomingRouteYields) out[row.yield] += row.amount;
-    out.gold += gpCityPermOf(dest, 'foreignRouteGold');
   }
   if (major && (foreign || (owner === dSeat && r.toSeat === undefined))) {
     for (const row of getModifiers(state, dSeat).routeImprovement) {
@@ -1037,9 +1060,10 @@ export function cityTradeYields(state: GameState, city: City): Yields {
     if (foreignIn) for (const r of inRows) out[r.yield] += r.amount * foreignIn;
   }
   // CIV6 (Zhang Qian, Marco Polo, Zheng He; ..._YIELD_FROM_OTHERS): "This
-  // city receives +2 Gold from foreign Trade Routes"
+  // city receives +2 Gold from foreign Trade Routes" — every other player's,
+  // a city-state's included
   const gpForeign = gpCityPermOf(city, 'foreignRouteGold');
-  if (gpForeign) out.gold += gpForeign * incomingIntlRoutes(state, city);
+  if (gpForeign) out.gold += gpForeign * incomingForeignRoutes(state, city);
   // TRADE POLICY outcome A: every route another player sends into a city of
   // the named seat pays that city
   const policyGold = congressTradeGold(state, seat);
