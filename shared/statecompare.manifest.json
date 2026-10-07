@@ -254,7 +254,8 @@
           "compare": "exact",
           "covers": [
             "GameState.barbTribes",
-            "GameState.barbCampsBegun"
+            "GameState.barbCampsBegun",
+            "GameState.barbSpotNext"
           ],
           "planes": [
             "tribe_plot",
@@ -268,9 +269,24 @@
             "barb_techs",
             "barb_civics",
             "barb_unit_tribe",
-            "barb_unit_scout"
+            "barb_unit_scout",
+            "tribe_bold",
+            "tribe_every",
+            "tribe_queue",
+            "tribe_raidq",
+            "tribe_assq",
+            "tribe_home_slot",
+            "tribe_home_seat",
+            "tribe_saw",
+            "tribe_op",
+            "tribe_op_seat",
+            "tribe_op_turns",
+            "tribe_op_rec",
+            "barb_unit_op",
+            "barb_unit_fresh",
+            "barb_spot_next"
           ],
-          "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length."
+          "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length; per tribe also its raid and city assault (Boldness, the interval its operation set, the units asked for, the owners of the cities waited for, the homing scout's city owner, the operation's kind, owner, turns, force taken and living units), and per major the turn a scout may report it again. A scout's sight memory (tribe_saw) and the fresh marks show through the homing and the recruit."
         },
         {
           "name": "cityCount",
@@ -3578,6 +3594,10 @@
       {
         "path": "Seat.name",
         "why": "presentation."
+      },
+      {
+        "path": "Seat.handicap",
+        "why": "a scenario setting the action replay imports for the lab's human seat; the engines' own seats carry none and both read the AI's Prince."
       },
       {
         "path": "Seat.color",

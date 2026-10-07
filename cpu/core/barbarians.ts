@@ -5,6 +5,10 @@
  * camps rise (the camp step 0x14fcc0), and each living tribe takes its turn
  * (0x1488a0) — its spawn clock, its ranged roll, its scout. What the
  * barbarians' units then do is their AI's (`hostileUnitAct`, the driver's).
+ * After their moves come their operations (`barbarianOps`): a scout that
+ * saw a major's city walks it home, its tribe raids the city once its
+ * Boldness allows (or waits for it), and the raid recruits its force from
+ * the tribe's units, asking the spawn clock for the rest.
  *
  * A camp is a TRIBE: its plot, its kind (naval, cavalry or melee: the first
  * whose ground the camp meets, 0x154220), its name (a draw over the kind's
@@ -12,12 +16,12 @@
  * stays in the list, dead: the camp step still measures from it, and its
  * name is the last to be taken again.
  */
-import type { GameState, Tile, BarbTribe } from './types';
+import type { GameState, Tile, BarbTribe, BarbOp, BarbTarget, Unit } from './types';
 import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffset } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
 import { randRange, randWeighted, atRngPoint } from './rand';
-import { BARB_SEAT, NO_SEAT, hiddenResourcesFor, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, hiddenResourcesFor, isBarbSeat, isTerritorial, seatOfCityState, tileCity, tileSeat } from './seats';
 import { canSee, unitSight, unitSeesThrough } from './fog';
 import { spawnUnit, tileFreeForUnit } from './units';
 import { UNITS } from '../data/units';
@@ -27,6 +31,9 @@ import {
   BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_CAMP_TERRAINS, BARB_CAMP_FEATURES, BARB_TRIBES,
   BARB_NAMES_PER_KIND, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_TAG_UNITS, BARB_FREE_TECHS, barbNameRangedPct,
+  BARB_BOLD_TURN, BARB_BOLD_KILL, BARB_BOLD_UNIT_LOST, BARB_BOLD_SCOUT_LOST, BARB_RAID_BOLDNESS, BARB_ASSAULT_BOLDNESS,
+  BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL, BARB_HOME_RANGE, BARB_RAID_RECRUIT_TURNS, BARB_ASSAULT_RECRUIT_TURNS,
+  DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness,
   type BarbTag, type BarbTribeDef,
 } from '../data/barbarians';
 
@@ -328,7 +335,10 @@ export function barbUnitFor(state: GameState, tag: BarbTag): string | null {
  *  ids raised */
 function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number, n: number): number[] {
   const type = barbUnitFor(state, tag);
-  if (!type) return [];
+  return type ? raiseType(state, tribe, type, radius, n) : [];
+}
+
+function raiseType(state: GameState, tribe: BarbTribe, type: string, radius: number, n: number): number[] {
   const naval = !!UNITS[type].naval;
   const probe = { type, seat: BARB_SEAT };
   const out: number[] = [];
@@ -343,32 +353,232 @@ function raise(state: GameState, tribe: BarbTribe, tag: BarbTag, radius: number,
   return out;
 }
 
-const living = (state: GameState, ids: number[]) => ids.filter((id) => state.units.some((u) => u.id === id)).length;
+const alive = (state: GameState, id: number) => state.units.some((u) => u.id === id);
+const living = (state: GameState, ids: number[]) => ids.filter((id) => alive(state, id)).length;
+
+/** the tribe that raised a unit */
+function tribeOfUnit(state: GameState, id: number): BarbTribe | undefined {
+  return tribesOf(state).find((tr) => tr.units.includes(id) || tr.scouts.includes(id));
+}
+
+/** a player's handicap (a Difficulties index): a seat's own, else the AI's */
+function handicapOf(state: GameState, seat: number): number {
+  return state.seats[seat]?.handicap ?? DEFAULT_HANDICAP;
+}
+
+/** the boldness a tribe's raid waits for: its name's own, else its kind's */
+function raidBoldness(tribe: BarbTribe): number {
+  return barbNameRaidBoldness(tribe.kind, tribe.name) ?? BARB_RAID_BOLDNESS;
+}
 
 /**
- * A TRIBE'S TURN (0x1488a0): its spawn clock runs; at the tribe's
- * TurnsToWarriorSpawn (at the speed) it resets and, while the tribe holds
- * fewer than its NumMilitary, raises one unit within a plot of the camp —
- * ranged when "Barbarian Ranged unit roll" falls under PercentRangedUnits,
- * else melee. A turn the clock does not strike, a tribe short of scouts
- * counts toward one, raised within two plots on the fifth.
+ * A TRIBE'S TURN (0x1488a0): its spawn clock runs; at its interval — the
+ * tribe's TurnsToWarriorSpawn at the speed, or the SpawnRate its operation
+ * set — it resets and raises the first unit its operation asked for, else,
+ * while the tribe holds fewer than its NumMilitary, one unit within a plot of
+ * the camp — ranged when "Barbarian Ranged unit roll" falls under
+ * PercentRangedUnits, else melee. A turn the clock does not strike, a tribe
+ * short of scouts counts toward one, raised within two plots on the fifth.
+ * Then its Boldness grows, its operation is forgotten once gone, and the
+ * cities it waits to go after are tried: a city assault at
+ * CityAttackBoldness, else a raid at RaidingBoldness.
  */
 function tribeTurn(state: GameState, tribe: BarbTribe): void {
   const def = BARB_TRIBES.find((d) => d.kind === tribe.kind)!;
+  tribe.fresh = [];
   tribe.spawnTurns += 1;
-  if (tribe.spawnTurns >= def.spawnEvery) {
+  if (tribe.spawnTurns >= (tribe.every ?? def.spawnEvery)) {
     tribe.spawnTurns = 0;
-    if (living(state, tribe.units) >= BARB_MAX_UNITS) return;
-    const pct = barbNameRangedPct(tribe.kind, tribe.name) ?? def.rangedPct;
-    const ranged = randRange(state, 100, 'Barbarian Ranged unit roll') < pct;
-    tribe.units.push(...raise(state, tribe, ranged ? def.rangedTag : def.meleeTag, 1, 1));
+    if (tribe.queue?.length) {
+      const ids = raiseType(state, tribe, tribe.queue.shift()!, 1, 1);
+      tribe.units.push(...ids);
+      tribe.fresh.push(...ids);
+    } else if (living(state, tribe.units) < BARB_MAX_UNITS) {
+      const pct = barbNameRangedPct(tribe.kind, tribe.name) ?? def.rangedPct;
+      const ranged = randRange(state, 100, 'Barbarian Ranged unit roll') < pct;
+      const ids = raise(state, tribe, ranged ? def.rangedTag : def.meleeTag, 1, 1);
+      tribe.units.push(...ids);
+      tribe.fresh.push(...ids);
+    }
+  } else if (living(state, tribe.scouts) < BARB_MAX_SCOUTS) {
+    tribe.scoutTurns += 1;
+    if (tribe.scoutTurns >= BARB_SCOUT_WAIT) {
+      tribe.scouts.push(...raise(state, tribe, def.scoutTag, 2, 1));
+      tribe.scoutTurns = 0;
+    }
+  }
+  tribe.boldness = (tribe.boldness ?? 0) + BARB_BOLD_TURN;
+  if (tribe.op && !opStands(state, tribe.op)) delete tribe.op;
+  if (tribe.assaultTargets?.length && !tribe.op?.assault) {
+    if (tribe.boldness < BARB_ASSAULT_BOLDNESS) return;
+    if (startOp(tribe, tribe.assaultTargets[0], true)) tribe.assaultTargets.shift();
+  } else if (tribe.raidTargets?.length && !(tribe.op && !tribe.op.assault)) {
+    if (tribe.boldness < raidBoldness(tribe)) return;
+    if (startOp(tribe, tribe.raidTargets[0], false)) tribe.raidTargets.shift();
+  }
+}
+
+/** an operation stands while it recruits, then while one of its units lives */
+function opStands(state: GameState, op: BarbOp): boolean {
+  return !op.recruited || op.units.some((id) => alive(state, id));
+}
+
+/** a tribe takes on a raid or a city assault (0x149980 / 0x1497d0): never
+ *  beside another; whether it took it */
+function startOp(tribe: BarbTribe, target: BarbTarget, assault: boolean): boolean {
+  if (tribe.op) return false;
+  tribe.op = { assault, target, turns: 0, recruited: false, units: [] };
+  return true;
+}
+
+/**
+ * AN OPERATION'S TURN while it recruits ("Raid City" / "Barbarian City
+ * Attack"): its first sets the tribe's spawn interval to its force's
+ * SpawnRate ("Barbarian Spawn Change", 0x7c6e50); each takes the force
+ * (0x7c7580: the BarbarianAttackForces row by the target owner's handicap,
+ * each class the barbarians cannot raise dropped, 0x144610) from the tribe's
+ * units of each class, those raised this turn not yet among them, and asks
+ * for the rest, melee first — raised one a spawn turn. Once the force is
+ * whole it is the operation's and the tribe's interval is its own again;
+ * past its Turn Limiter it gives up the same way, with no force.
+ */
+function opTurn(state: GameState, tribe: BarbTribe, op: BarbOp): void {
+  const force = barbForce(tribe.kind, !op.assault, handicapOf(state, op.target.seat));
+  if (op.turns === 0 && force) tribe.every = force.rate;
+  op.turns += 1;
+  if (op.turns > (op.assault ? BARB_ASSAULT_RECRUIT_TURNS : BARB_RAID_RECRUIT_TURNS)) {
+    op.recruited = true;
+    delete tribe.every;
     return;
   }
-  if (living(state, tribe.scouts) >= BARB_MAX_SCOUTS) return;
-  tribe.scoutTurns += 1;
-  if (tribe.scoutTurns < BARB_SCOUT_WAIT) return;
-  tribe.scouts.push(...raise(state, tribe, def.scoutTag, 2, 1));
-  tribe.scoutTurns = 0;
+  const fresh = new Set(tribe.fresh ?? []);
+  const free = tribe.units.filter((id) => alive(state, id) && !fresh.has(id));
+  const taken: number[] = [];
+  const missing: string[] = [];
+  for (const [tag, n] of force?.units ?? []) {
+    const type = barbUnitFor(state, tag);
+    if (!type) continue;
+    let have = 0;
+    for (const id of free) {
+      if (have >= n) break;
+      const u = state.units.find((x) => x.id === id)!;
+      if (taken.includes(id) || !BARB_TAG_UNITS[tag].includes(u.type)) continue;
+      taken.push(id);
+      have++;
+    }
+    for (let k = have; k < n; k++) missing.push(type);
+  }
+  if (missing.length) {
+    tribe.queue = missing;
+    return;
+  }
+  op.recruited = true;
+  op.units = taken;
+  delete tribe.every;
+}
+
+/** the centre of the city a plot belongs to */
+function cityCentreOf(state: GameState, t: Tile): number {
+  const seat = tileSeat(t);
+  const cs = state.cityStates.find((c) => seatOfCityState(c.id) === seat);
+  if (cs) return cs.centerIndex;
+  const owner = seat === FREE_SEAT ? state.freeSeat : state.seats[seat];
+  const id = tileCity(t);
+  return owner?.cities.find((c) => c.id === id)?.centerIndex ?? -1;
+}
+
+/**
+ * A BARBARIAN SCOUT LOOKS from its plot: each owned plot newly in its sight
+ * (a city's territory, any player's), in plot order, is a report (0x153ef0) — once
+ * the player's throttle allows, its tribe's scout walks home with a major's
+ * city when none walks yet (0x1485c0), and the player is spared further reports
+ * BARBARIAN_MAX_THROTTLE_PER_RAID less BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY
+ * a handicap level turns.
+ */
+export function barbScoutLook(state: GameState, unit: Unit): void {
+  const tribe = tribesOf(state).find((tr) => tr.alive && tr.scouts.includes(unit.id));
+  if (!tribe) return;
+  const { map } = state;
+  const from = map.tiles[unit.tileIndex];
+  const through = unitSeesThrough(unit);
+  const now: number[] = [];
+  for (const t of tilesWithin(map, from.col, from.row, unitSight(unit, state))) {
+    if (isTerritorial(tileSeat(t)) && canSee(map, from, t, through)) now.push(t.index);
+  }
+  now.sort((x, y) => x - y);
+  const saw = new Set((tribe.saw ??= {})[unit.id] ?? []);
+  tribe.saw[unit.id] = now;
+  const next = (state.barbSpotNext ??= {});
+  for (const p of now) {
+    if (saw.has(p)) continue;
+    const t = map.tiles[p];
+    const seat = tileSeat(t);
+    if (state.turn < (next[seat] ?? 0)) continue;
+    // a major's city alone sends the scout home (0x484a10: a full civ)
+    if (!tribe.homing && seat >= 0 && seat < state.seats.length) tribe.homing = { scout: unit.id, target: { seat, plot: cityCentreOf(state, t) } };
+    next[seat] = state.turn + Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * handicapOf(state, seat));
+  }
+}
+
+/**
+ * A SCOUT HOME WITH ITS REPORT (0x148270): within BARB_HOME_RANGE of its
+ * camp the city is its tribe's — a raid at once where the tribe's Boldness
+ * reaches its RaidingBoldness and no raid runs, else a city its raid waits
+ * for. A scout lost on the way reports nothing.
+ */
+function scoutReports(state: GameState, tribe: BarbTribe): void {
+  const h = tribe.homing;
+  if (!h) return;
+  const u = state.units.find((x) => x.id === h.scout);
+  if (!u) { delete tribe.homing; return; }
+  const a = state.map.tiles[u.tileIndex];
+  const c = state.map.tiles[tribe.plot];
+  if (hexDistance(state.map, a.col, a.row, c.col, c.row) > BARB_HOME_RANGE) return;
+  delete tribe.homing;
+  const can = !(tribe.op && !tribe.op.assault);
+  if (can && (tribe.boldness ?? 0) >= raidBoldness(tribe) && startOp(tribe, h.target, false)) return;
+  (tribe.raidTargets ??= []).push(h.target);
+}
+
+/**
+ * THE BARBARIANS' OPERATIONS in their player's turn, after their units
+ * moved: each living tribe's scouts look where they stand, a scout home
+ * reports, and each operation recruiting takes its turn.
+ */
+export function barbarianOps(state: GameState): void {
+  for (const tr of tribesOf(state)) {
+    if (!tr.alive) continue;
+    for (const id of tr.scouts) {
+      const u = state.units.find((x) => x.id === id);
+      if (u) barbScoutLook(state, u);
+    }
+    scoutReports(state, tr);
+    if (tr.op && !tr.op.recruited) opTurn(state, tr, tr.op);
+  }
+}
+
+/**
+ * A BATTLE'S DEAD MOVE A TRIBE'S BOLDNESS (0x1540b0 / 0x148e90): the
+ * defender dead, else the attacker — an enemy a tribe's unit killed
+ * BARBARIAN_BOLDNESS_PER_KILL, a tribe's unit lost
+ * BARBARIAN_BOLDNESS_PER_UNIT_LOST, its scout BARBARIAN_BOLDNESS_PER_SCOUT_LOST.
+ */
+export function barbBattleBoldness(state: GameState, attacker: Unit, defender: Unit, aDied: boolean, dDied: boolean): void {
+  if (!dDied && !aDied) return;
+  const [killer, victim] = dDied ? [attacker, defender] : [defender, attacker];
+  if (isBarbSeat(killer.seat) && !isBarbSeat(victim.seat)) {
+    const tr = tribeOfUnit(state, killer.id);
+    if (tr) tr.boldness = (tr.boldness ?? 0) + BARB_BOLD_KILL;
+  } else if (isBarbSeat(victim.seat) && !isBarbSeat(killer.seat)) {
+    const tr = tribeOfUnit(state, victim.id);
+    if (tr) tr.boldness = (tr.boldness ?? 0) + (tr.scouts.includes(victim.id) ? BARB_BOLD_SCOUT_LOST : BARB_BOLD_UNIT_LOST);
+  }
+}
+
+/** where a scout walking home with its report heads: its camp */
+export function barbHomingCamp(state: GameState, unit: Unit): number | undefined {
+  const tr = tribesOf(state).find((x) => x.alive && x.homing?.scout === unit.id);
+  return tr?.plot;
 }
 
 /** the camp is gone: its tribe is dead, kept in the list */
@@ -387,4 +597,3 @@ export function barbarianRules(state: GameState, closing: number): void {
   campStep(state);
   for (const tr of [...tribesOf(state)]) if (tr.alive) tribeTurn(state, tr);
 }
-

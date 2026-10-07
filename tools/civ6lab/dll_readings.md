@@ -1596,8 +1596,7 @@ clans' 0x8e1bf0 (no clans in these games).
   scaled) and resets; under 5 units "Barbarian Ranged unit roll" rand(100) <
   PercentRangedUnits (BARBARIAN_NAVAL_2 100) picks ranged, else melee; off a
   spawn turn a tribe short of its 1 scout counts 5 turns and raises one.
-- Raids are AI operations (0x1497d0 -> 0x7265b0): not read; the action replay
-  imposes their units.
+- Raids: "H-1: the raids" below.
 
 LAB: the max camps at +0x110 is taken as 3 per living major, a fit to the
 recorded camp counts; its writer is unread. The sight the score and
@@ -1632,6 +1631,65 @@ scripts call it last; "Choke Points" 0x8783c0, the medial graph and its
 pruning 0x87a1d0 / 0x87f100; Plot:IsChokepoint reads them) — not read. The
 engines hold neither: they take each area as one region (`Tile.area`),
 which agrees with the game only where no chokepoint splits an area.
+
+## H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)
+
+`barbarianOps` / `opTurn` / `barbScoutLook` / `barbBattleBoldness` in
+cpu/core/barbarians.ts; `_barbarian_ops` & co in gpu/core/sim_barb.py.
+
+- Boldness (tribe +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn
+  (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else
+  the attacker): an enemy a tribe's unit killed +PER_KILL (15), a tribe's
+  unit lost PER_UNIT_LOST (-10), a scout PER_SCOUT_LOST (-5). PER_CAMP_ATTACK
+  has no reader found.
+- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout
+  (unit +0x1c0 == 2) seeing an owned plot of a city, its owner's throttle
+  (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's
+  ScoutingBehaviorTree ("Barbarian Found City": Move Unit to the camp, To
+  Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full
+  civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn +
+  max(0, BARBARIAN_MAX_THROTTLE_PER_RAID 18 - handicap x
+  BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY 3), handicap = player +0x908
+  (m_eHandicap).
+- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the
+  scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's
+  +0x38 override: BARBARIAN_NAVAL_3 100); boldness at it, no raid running
+  (+0x3c) and no bribe -> the raid starts at once (0x149980), else the city
+  goes on the raid list (+0x48). For a raid's own tree ending: threshold
+  CityAttackBoldness (+0x1c) and the city assault (0x1497d0) or its list
+  (+0x60).
+- The tribe turn after its spawn (0x148cad..): an operation gone is forgotten
+  (0x148c6b); an assault city waiting (+0x70), no assault running: boldness
+  >= CityAttackBoldness starts it (below it nothing more happens), else a
+  raid city waiting (+0x58), no raid running: boldness >= RaidingBoldness
+  starts it; either pops its list. 0x149980 / 0x1497d0 refuse while either
+  operation runs.
+- "Raid City" / "Barbarian City Attack" (BehaviorTrees.xml): Barbarian Spawn
+  Change (0x7c6e50): the force (0x147640: the name's then the tribe's
+  BarbarianTribeForces rows, RaidingForce matching, Min/MaxTargetDifficulty
+  holding the target owner's handicap) sets the spawn interval to its
+  SpawnRate at the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the
+  tribe's own). Barbarian Recruit (0x7c7580) under a Turn Limiter (10 / 15):
+  the force's counts (0x144610, each class the barbarians cannot raise
+  dropped, 0x147e70); the units it finds join, success; else the missing
+  units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs
+  again next turn. Success or the limiter's end: Spawn Change back to the
+  tribe's interval. The tribe turn's tick spawns the queue's head first
+  (0x148ac6, popped whatever the raise did), with no roll and no unit cap.
+
+Cases (the log's rolls tell a queue spawn from a clock one): 1124 camp
+(40,21): its scout home at t8's pass, then t9 W, t10 W, t11 S, t12 S with no
+"Barbarian Ranged unit roll" for them, the clock back at t19 (t12 + 7); 1117
+camp (9,24): home at t9, t10 W (no roll), t11 W, t12 W, t13 S, t14 S, the
+clock at t21 with its roll; 1124 camp (41,7): home at t22, t23 W, t24 W, t25
+W, t26 S, t27 S, the clock at t34. StandardRaid (2 melee, 1 ranged) fits all
+three only if a unit raised in the turn is not yet recruitable (W at t7
+recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is
+unread. The raid operation's own end (its tree's last Notify Owner, which
+opens the city assault) is unread: the engines end an operation once the
+units it took are gone (ASK in docs/AUDIT.md C-94). The visibility event's
+exact trigger (a plot newly in the scout's own sight, the plots in index
+order) is the engines' reading.
 
 ## H-1: the draw log's labels (RandCalls.csv) — READ
 

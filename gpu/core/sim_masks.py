@@ -2726,6 +2726,13 @@ class SimMasks:
         # no tribe's until the raise that made it says so (`_barb_raise`)
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
+        # a reclaimed slot is no operation's, raised in no tribe's turn, and
+        # the scout a tribe waited on there is lost (-2: its report falls at
+        # the tribe's next look, `scoutReports`)
+        self.barb_unit_op[rows, slot] = False
+        self.barb_unit_fresh[rows, slot] = False
+        _hs = self.tribe_home_slot[rows]
+        self.tribe_home_slot[rows] = torch.where(_hs == slot.unsqueeze(1), torch.full_like(_hs, -2), _hs)
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat["unitHp"]
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug

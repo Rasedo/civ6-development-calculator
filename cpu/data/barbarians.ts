@@ -48,7 +48,7 @@ export const BARB_CAMP_FEATURES: readonly string[] = srcConst('barb.campFeatures
 
 export type BarbTribeKind = 'NAVAL' | 'CAVALRY' | 'MELEE';
 export type BarbTag = 'CLASS_MELEE' | 'CLASS_RANGED' | 'CLASS_ANTI_CAVALRY' | 'CLASS_RECON' | 'CLASS_SIEGE' | 'CLASS_LIGHT_CAVALRY'
-  | 'CLASS_HEAVY_CAVALRY' | 'CLASS_MOBILE_RANGED' | 'CLASS_NAVAL_MELEE' | 'CLASS_NAVAL_RANGED';
+  | 'CLASS_HEAVY_CAVALRY' | 'CLASS_MOBILE_RANGED' | 'CLASS_NAVAL_MELEE' | 'CLASS_NAVAL_RANGED' | 'CLASS_BATTERING_RAM';
 
 export interface BarbTribeDef {
   kind: BarbTribeKind;
@@ -114,6 +114,7 @@ export const BARB_TAG_UNITS: Readonly<Record<BarbTag, readonly string[]>> = {
   CLASS_MOBILE_RANGED: ['BARBARIAN_HORSE_ARCHER', 'RANGER', 'SKIRMISHER'],
   CLASS_NAVAL_MELEE: ['GALLEY', 'CARAVEL', 'IRONCLAD', 'DESTROYER'],
   CLASS_NAVAL_RANGED: ['QUADRIREME', 'FRIGATE', 'PRIVATEER', 'BATTLESHIP', 'SUBMARINE', 'NUCLEAR_SUBMARINE', 'MISSILE_CRUISER'],
+  CLASS_BATTERING_RAM: ['BATTERING_RAM'],
 };
 srcConst('barb.tagUnits', Object.values(BARB_TAG_UNITS).flat(), {
   derived: 'the TypeTags rows of each CLASS_ tag on a Units row with no TraitType but TRAIT_BARBARIAN_BUT_SHOWS_UP_IN_PEDIA, in the Units table\'s order',
@@ -128,3 +129,107 @@ export const BARB_FREE_TECHS: readonly string[] = srcConst('barb.freeTechs', ['S
     xml('Technologies', 'TechnologyType=TECH_BRONZE_WORKING', 'BarbarianFree', { expect: true }),
     xml('Technologies', 'TechnologyType=TECH_SHIPBUILDING', 'BarbarianFree', { expect: true })],
 });
+
+/**
+ * THE ATTACK FORCES (BarbarianAttackForces, BarbarianTribeForces): a raid's
+ * or a city assault's units, by the tribe's kind, picked by the target
+ * owner's handicap (0x147640: the first row of the tribe's whose RaidingForce
+ * matches and whose Min/MaxTargetDifficulty hold the handicap). The counts
+ * are its Num*Units, each a class tag; SpawnRate is the tribe's spawn
+ * interval while the operation recruits (0x149760, at the speed).
+ */
+export interface BarbForce {
+  raiding: boolean;
+  /** Min / MaxTargetDifficulty as Difficulties indices (-1: open) */
+  minDiff: number;
+  maxDiff: number;
+  /** SpawnRate at the game's speed */
+  rate: number;
+  /** [tag, count] in the recruit's order: melee, ranged, siege, support */
+  units: readonly (readonly [BarbTag, number])[];
+}
+
+/** Difficulties, in the table's order (Difficulties.xml): a handicap is its index */
+export const DIFFICULTIES = ['SETTLER', 'CHIEFTAIN', 'WARLORD', 'PRINCE', 'KING', 'EMPEROR', 'IMMORTAL', 'DEITY'] as const;
+srcConst('barb.difficulties', [...DIFFICULTIES], {
+  derived: 'the Difficulties rows in the table\'s order, DIFFICULTY_ prefix stripped',
+  inputs: [xml('Difficulties', 'DifficultyType=DIFFICULTY_PRINCE', 'DifficultyType')],
+});
+/** the handicap of a player the game set none for: the AI's (Prince) */
+export const DEFAULT_HANDICAP = DIFFICULTIES.indexOf('PRINCE');
+
+const forceSrc = (f: string, col: string) => xml('BarbarianAttackForces', `AttackForceType=${f}`, col);
+const diff = (d: string | null) => (d ? DIFFICULTIES.indexOf(d as typeof DIFFICULTIES[number]) : -1);
+function force(id: string, raiding: boolean, min: string | null, max: string | null, rate: number,
+  units: [BarbTag, number][]): BarbForce {
+  srcConst(`barb.force.${id}`, [rate, ...units.map(([, n]) => n)], {
+    derived: `BarbarianAttackForces ${id}: SpawnRate, then NumMeleeUnits / NumRangeUnits / NumSiegeUnits / NumSupportUnits that are set`,
+    inputs: [forceSrc(id, 'SpawnRate'), forceSrc(id, 'NumMeleeUnits')],
+  });
+  return { raiding, minDiff: diff(min), maxDiff: diff(max), rate: scaleByGameSpeed(rate), units };
+}
+/** BarbarianTribeForces by tribe kind, in the table's order */
+export const BARB_FORCES: Readonly<Record<BarbTribeKind, readonly BarbForce[]>> = {
+  MELEE: [
+    force('LowDifficultyStandardRaid', true, null, 'CHIEFTAIN', 2, [['CLASS_MELEE', 1]]),
+    force('StandardRaid', true, 'WARLORD', 'EMPEROR', 2, [['CLASS_MELEE', 2], ['CLASS_RANGED', 1]]),
+    force('HighDifficultyStandardRaid', true, 'IMMORTAL', null, 1, [['CLASS_MELEE', 3], ['CLASS_RANGED', 2]]),
+    force('LowDifficultyStandardAttack', false, null, 'CHIEFTAIN', 2, [['CLASS_MELEE', 2], ['CLASS_RANGED', 1], ['CLASS_SIEGE', 1]]),
+    force('StandardAttack', false, 'WARLORD', 'EMPEROR', 2, [['CLASS_MELEE', 3], ['CLASS_RANGED', 2], ['CLASS_SIEGE', 1], ['CLASS_BATTERING_RAM', 1]]),
+    force('HighDifficultyStandardAttack', false, 'IMMORTAL', null, 1, [['CLASS_MELEE', 4], ['CLASS_RANGED', 3], ['CLASS_SIEGE', 2], ['CLASS_BATTERING_RAM', 1]]),
+  ],
+  CAVALRY: [
+    force('LowDifficultyCavalryRaid', true, null, 'CHIEFTAIN', 2, [['CLASS_LIGHT_CAVALRY', 1]]),
+    force('CavalryRaid', true, 'WARLORD', 'EMPEROR', 2, [['CLASS_LIGHT_CAVALRY', 2], ['CLASS_MOBILE_RANGED', 1]]),
+    force('HighDifficultyCavalryRaid', true, 'IMMORTAL', null, 1, [['CLASS_LIGHT_CAVALRY', 3], ['CLASS_MOBILE_RANGED', 2]]),
+    force('LowDifficultyCavalryAttack', false, null, 'CHIEFTAIN', 2, [['CLASS_LIGHT_CAVALRY', 2], ['CLASS_MOBILE_RANGED', 1], ['CLASS_HEAVY_CAVALRY', 1]]),
+    force('CavalryAttack', false, 'WARLORD', 'EMPEROR', 2, [['CLASS_LIGHT_CAVALRY', 3], ['CLASS_MOBILE_RANGED', 2], ['CLASS_HEAVY_CAVALRY', 1]]),
+    force('HighDifficultyCavalryAttack', false, 'IMMORTAL', null, 1, [['CLASS_LIGHT_CAVALRY', 4], ['CLASS_MOBILE_RANGED', 3], ['CLASS_HEAVY_CAVALRY', 2]]),
+  ],
+  NAVAL: [
+    force('LowDifficultyNavalRaid', true, null, 'CHIEFTAIN', 2, [['CLASS_NAVAL_MELEE', 1]]),
+    force('NavalRaid', true, 'WARLORD', 'EMPEROR', 2, [['CLASS_NAVAL_MELEE', 2], ['CLASS_NAVAL_RANGED', 1]]),
+    force('HighDifficultyNavalRaid', true, 'IMMORTAL', null, 1, [['CLASS_NAVAL_MELEE', 3], ['CLASS_NAVAL_RANGED', 2]]),
+    force('LowDifficultyNavalAttack', false, null, 'CHIEFTAIN', 2, [['CLASS_NAVAL_MELEE', 2], ['CLASS_NAVAL_RANGED', 1], ['CLASS_NAVAL_RANGED', 1]]),
+    force('NavalAttack', false, 'WARLORD', 'EMPEROR', 2, [['CLASS_NAVAL_MELEE', 3], ['CLASS_NAVAL_RANGED', 2], ['CLASS_NAVAL_RANGED', 1]]),
+    force('HighDifficultyNavalAttack', false, 'IMMORTAL', null, 1, [['CLASS_NAVAL_MELEE', 4], ['CLASS_NAVAL_RANGED', 3], ['CLASS_NAVAL_RANGED', 2]]),
+  ],
+};
+
+/** the force a tribe of this kind raises against a city of this handicap
+ *  (0x147640), undefined where no row holds it */
+export function barbForce(kind: BarbTribeKind, raiding: boolean, handicap: number): BarbForce | undefined {
+  return BARB_FORCES[kind].find((f) => f.raiding === raiding
+    && (f.minDiff < 0 || f.minDiff <= handicap) && (f.maxDiff < 0 || f.maxDiff >= handicap));
+}
+
+/** a tribe's boldness: each of its turns, an enemy its unit kills, a unit of
+ *  it lost in combat, a scout of it lost in combat (0x1488a0, 0x148e90) */
+export const BARB_BOLD_TURN = srcConst('barb.boldTurn', 2, gp('BARBARIAN_BOLDNESS_PER_TURN'));
+export const BARB_BOLD_KILL = srcConst('barb.boldKill', 15, gp('BARBARIAN_BOLDNESS_PER_KILL'));
+export const BARB_BOLD_UNIT_LOST = srcConst('barb.boldUnitLost', -10, gp('BARBARIAN_BOLDNESS_PER_UNIT_LOST'));
+export const BARB_BOLD_SCOUT_LOST = srcConst('barb.boldScoutLost', -5, gp('BARBARIAN_BOLDNESS_PER_SCOUT_LOST'));
+/** the boldness a raid and a city assault wait for (BarbarianTribes
+ *  RaidingBoldness / CityAttackBoldness; BARBARIAN_NAVAL_3's own 100) */
+export const BARB_RAID_BOLDNESS = srcConst('barb.raidBoldness', 10, tribeSrc('MELEE', 'RaidingBoldness'));
+export const BARB_ASSAULT_BOLDNESS = srcConst('barb.assaultBoldness', 25, tribeSrc('MELEE', 'CityAttackBoldness'));
+const NAVAL_3_RAID_BOLDNESS = srcConst('barb.naval3.raidBoldness', 100,
+  xml('BarbarianTribeNames', 'TribeNameType=BARBARIAN_NAVAL_3', 'RaidingBoldness'));
+/** a name's own RaidingBoldness, by kind and name index */
+export function barbNameRaidBoldness(kind: BarbTribeKind, name: number): number | undefined {
+  return kind === 'NAVAL' && name === 2 ? NAVAL_3_RAID_BOLDNESS : undefined;
+}
+/** a scout's report of a player's city waits this many turns after the last,
+ *  less the throttle per handicap level (0x153ef0) */
+export const BARB_SPOT_THROTTLE = srcConst('barb.spotThrottle', 18, gp('BARBARIAN_MAX_THROTTLE_PER_RAID'));
+export const BARB_SPOT_THROTTLE_PER_LEVEL = srcConst('barb.spotThrottlePerLevel', 3, gp('BARBARIAN_LOWER_THROTTLE_PER_DIFFICULTY'));
+/** "Barbarian Found City": the scout walks home to this range of its camp,
+ *  then reports (Move Unit's To Range) */
+export const BARB_HOME_RANGE = srcConst('barb.homeRange', 1,
+  xml('TreeData', 'TreeName=Barbarian Found City&NodeId=4&DefnId=4', 'DefaultData'));
+/** the turns a raid ("Raid City" node 5) and a city assault ("Barbarian City
+ *  Attack" node 7) recruit before their Turn Limiter gives up */
+export const BARB_RAID_RECRUIT_TURNS = srcConst('barb.raidRecruitTurns', 10,
+  xml('TreeData', 'TreeName=Raid City&NodeId=5&DefnId=0', 'DefaultData'));
+export const BARB_ASSAULT_RECRUIT_TURNS = srcConst('barb.assaultRecruitTurns', 15,
+  xml('TreeData', 'TreeName=Barbarian City Attack&NodeId=7&DefnId=0', 'DefaultData'));

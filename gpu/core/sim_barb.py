@@ -87,16 +87,18 @@ class SimBarb:
             out.append(best)
         return torch.stack(out, dim=1)
 
-    def _barb_raise(self, mask: torch.Tensor, k: torch.Tensor, tag: torch.Tensor, radius: int, n: int,
-                    scout: bool, track: bool = True) -> None:
-        """`raise`: up to `n` units of each game's class `tag` on the first
-        free plots `radius` round its tribe `k`'s camp in ring order — no city
-        on the plot, the unit's own domain (`tileFreeForUnit`) —, counted to
-        the tribe's units or its scouts where `track`."""
+    def _barb_raise(self, mask: torch.Tensor, k: torch.Tensor, tag: torch.Tensor | None, radius: int, n: int,
+                    scout: bool, track: bool = True, utype: torch.Tensor | None = None) -> None:
+        """`raise`: up to `n` units of each game's class `tag` (`raiseType`:
+        of the roster type `utype`) on the first free plots `radius` round its
+        tribe `k`'s camp in ring order — no city on the plot, the unit's own
+        domain (`tileFreeForUnit`) —, counted to the tribe's units (raised in
+        its turn) or its scouts where `track`; a new scout has seen nothing."""
         if not bool(mask.count_nonzero()):
             return
         bidx = torch.arange(self.B, device=self.device)
-        utype = self._barb_unit_for().gather(1, tag.clamp(min=0).unsqueeze(1)).squeeze(1)
+        if utype is None:
+            utype = self._barb_unit_for().gather(1, tag.clamp(min=0).unsqueeze(1)).squeeze(1)
         mask = mask & (utype >= 0)
         if not bool(mask.count_nonzero()):
             return
@@ -122,6 +124,10 @@ class SimBarb:
                 rows = landed.nonzero(as_tuple=True)[0]
                 self.barb_unit_tribe[rows, before[rows]] = k[rows]
                 self.barb_unit_scout[rows, before[rows]] = scout
+                if scout:
+                    self.tribe_saw[rows, k[rows]] = False
+                else:
+                    self.barb_unit_fresh[rows, before[rows]] = True
 
     def _barb_living(self, k: torch.Tensor, scout: bool) -> torch.Tensor:
         """[B] long — the living units (or scouts) tribe `k` raised (`living`)."""
@@ -173,6 +179,18 @@ class SimBarb:
         self.tribe_name[rows, k[rows]] = name[rows]
         self.tribe_spawn[rows, k[rows]] = 0
         self.tribe_scoutc[rows, k[rows]] = 0
+        self.tribe_bold[rows, k[rows]] = 0
+        self.tribe_every[rows, k[rows]] = -1
+        self.tribe_queue[rows, k[rows]] = -1
+        self.tribe_raidq[rows, k[rows]] = -1
+        self.tribe_assq[rows, k[rows]] = -1
+        self.tribe_home_slot[rows, k[rows]] = -1
+        self.tribe_home_seat[rows, k[rows]] = -1
+        self.tribe_saw[rows, k[rows]] = False
+        self.tribe_op[rows, k[rows]] = 0
+        self.tribe_op_seat[rows, k[rows]] = -1
+        self.tribe_op_turns[rows, k[rows]] = 0
+        self.tribe_op_rec[rows, k[rows]] = False
         self.n_tribes[rows] += 1
         has = (self.camp_tile[rows] == plot[rows].unsqueeze(1)).any(dim=1)
         put = rows[~has]
@@ -317,36 +335,263 @@ class SimBarb:
 
     # ------------------------------------------------------------ the tribes
 
+    def _barb_kind_col(self, col: int, kind: torch.Tensor) -> torch.Tensor:
+        """[B] long — column `col` of each game's tribe kind's BarbarianTribes row."""
+        return torch.tensor([r[col] for r in self._bb["tribes"]], dtype=torch.long, device=self.device).take(kind)
+
+    def _barb_raid_boldness(self, k: int) -> torch.Tensor:
+        """[B] long — `raidBoldness`: tribe `k`'s name's own RaidingBoldness,
+        else its kind's."""
+        rb = torch.full((self.B,), int(self._bb["raidBoldness"]), dtype=torch.long, device=self.device)
+        for nk, nn, nv in self._bb["nameRaidBoldness"]:
+            if nv >= 0:
+                rb = torch.where((self.tribe_kind[:, k] == nk) & (self.tribe_name[:, k] == nn), torch.full_like(rb, nv), rb)
+        return rb
+
+    def _barb_pop(self, q: torch.Tensor, rows: torch.Tensor, k: int) -> None:
+        """the front of tribe `k`'s list `q` dropped in the games `rows`."""
+        if rows.numel():
+            q[rows, k, :-1] = q[rows, k, 1:].clone()
+            q[rows, k, -1] = -1
+
+    def _barb_push(self, q: torch.Tensor, mask: torch.Tensor, k: int, val: torch.Tensor) -> None:
+        """`val` to the back of tribe `k`'s list `q` in the games `mask` (a
+        full list keeps what it holds)."""
+        rows = mask.nonzero(as_tuple=True)[0]
+        if not rows.numel():
+            return
+        L = q.shape[2]
+        free = q[rows, k] < 0
+        at = torch.where(free, torch.arange(L, device=self.device), L).min(dim=1).values
+        ok = at < L
+        q[rows[ok], k, at[ok]] = val[rows[ok]]
+
+    def _barb_start_op(self, mask: torch.Tensor, k: int, assault: bool, seat: torch.Tensor) -> None:
+        """`startOp`: tribe `k` takes on a raid or a city assault on `seat`'s
+        city in the games `mask`, its force yet to recruit."""
+        rows = mask.nonzero(as_tuple=True)[0]
+        if not rows.numel():
+            return
+        self.tribe_op[rows, k] = 2 if assault else 1
+        self.tribe_op_seat[rows, k] = seat[rows]
+        self.tribe_op_turns[rows, k] = 0
+        self.tribe_op_rec[rows, k] = False
+        self.barb_unit_op[rows] &= self.barb_unit_tribe[rows] != k
+
     def _barb_tribe_turn(self, k: int) -> None:
-        """`tribeTurn` for the tribes in slot `k` that live: the spawn clock,
-        the ranged roll under NumMilitary, the scout's wait."""
+        """`tribeTurn` for the tribes in slot `k` that live: the spawn clock at
+        its interval (the operation's while it recruits) raising the unit the
+        operation asked for, else the ranged roll under NumMilitary; the
+        scout's wait; the Boldness; a spent operation forgotten; the assault,
+        else the raid, the tribe waits to start."""
         bb = self._bb
-        tr = bb["tribes"]
         on = self.tribe_alive[:, k] & (k < self.n_tribes)
         if not bool(on.count_nonzero()):
             return
         kk = torch.full((self.B,), k, dtype=torch.long, device=self.device)
         kind = self.tribe_kind[:, k]
-        every = torch.tensor([r[4] for r in tr], dtype=torch.long, device=self.device).take(kind)
+        mine = self.barb_unit_tribe == k
+        self.barb_unit_fresh &= ~(on.unsqueeze(1) & mine)
+        every = torch.where(self.tribe_every[:, k] >= 0, self.tribe_every[:, k], self._barb_kind_col(4, kind))
         self.tribe_spawn[:, k] += on.long()
         hit = on & (self.tribe_spawn[:, k] >= every)
         self.tribe_spawn[:, k] = torch.where(hit, torch.zeros_like(every), self.tribe_spawn[:, k])
-        room = hit & (self._barb_living(kk, False) < bb["maxUnits"])
-        pct = torch.tensor([r[3] for r in tr], dtype=torch.long, device=self.device).take(kind)
+        q0 = self.tribe_queue[:, k, 0]
+        qhit = hit & (q0 >= 0)
+        if bool(qhit.count_nonzero()):
+            self._barb_raise(qhit, kk, None, 1, 1, scout=False, utype=q0.clamp(min=0))
+            self._barb_pop(self.tribe_queue, qhit.nonzero(as_tuple=True)[0], k)
+        room = hit & ~qhit & (self._barb_living(kk, False) < bb["maxUnits"])
+        pct = self._barb_kind_col(3, kind)
         for nk, nn, np_ in bb["nameRangedPct"]:
             if np_ >= 0:
                 pct = torch.where((kind == nk) & (self.tribe_name[:, k] == nn), torch.full_like(pct, np_), pct)
         roll = self._rand_range(room, 100)
         ranged = roll < pct
-        tag = torch.where(ranged, torch.tensor([r[7] for r in tr], dtype=torch.long, device=self.device).take(kind),
-                          torch.tensor([r[6] for r in tr], dtype=torch.long, device=self.device).take(kind))
+        tag = torch.where(ranged, self._barb_kind_col(7, kind), self._barb_kind_col(6, kind))
         self._barb_raise(room, kk, tag, 1, 1, scout=False)
         wait = on & ~hit & (self._barb_living(kk, True) < bb["maxScouts"])
         self.tribe_scoutc[:, k] += wait.long()
         due = wait & (self.tribe_scoutc[:, k] >= bb["scoutWait"])
-        stag = torch.tensor([r[5] for r in tr], dtype=torch.long, device=self.device).take(kind)
-        self._barb_raise(due, kk, stag, 2, 1, scout=True)
+        self._barb_raise(due, kk, self._barb_kind_col(5, kind), 2, 1, scout=True)
         self.tribe_scoutc[:, k] = torch.where(due, torch.zeros_like(self.tribe_scoutc[:, k]), self.tribe_scoutc[:, k])
+        self.tribe_bold[:, k] += on.long() * int(bb["boldTurn"])
+        # an operation that took its force stands while one of its units lives
+        held = (self.barb_unit_alive & self.barb_unit_op & (self.barb_unit_tribe == k)).any(dim=1)
+        gone = on & (self.tribe_op[:, k] > 0) & self.tribe_op_rec[:, k] & ~held
+        self.tribe_op[:, k] = torch.where(gone, torch.zeros_like(self.tribe_op[:, k]), self.tribe_op[:, k])
+        op = self.tribe_op[:, k]
+        bold = self.tribe_bold[:, k]
+        first = on & (self.tribe_assq[:, k, 0] >= 0) & (op != 2)
+        start_a = first & (bold >= int(bb["assaultBoldness"])) & (op == 0)
+        second = on & ~first & (self.tribe_raidq[:, k, 0] >= 0) & (op != 1)
+        start_r = second & (bold >= self._barb_raid_boldness(k)) & (op == 0)
+        if bool(start_a.count_nonzero()):
+            self._barb_start_op(start_a, k, True, self.tribe_assq[:, k, 0])
+            self._barb_pop(self.tribe_assq, start_a.nonzero(as_tuple=True)[0], k)
+        if bool(start_r.count_nonzero()):
+            self._barb_start_op(start_r, k, False, self.tribe_raidq[:, k, 0])
+            self._barb_pop(self.tribe_raidq, start_r.nonzero(as_tuple=True)[0], k)
+
+    # ------------------------------------------------------- the operations
+
+    def _barb_scout_look(self, on: torch.Tensor, k: int) -> None:
+        """`barbScoutLook` for tribe `k`'s living scout: the owned plots newly
+        in its sight, in plot order — per major the first, once its throttle
+        allows, sends the scout home when none walks yet and spares the major
+        further reports."""
+        sc = self.barb_unit_alive & (self.barb_unit_tribe == k) & self.barb_unit_scout
+        has = on & sc.any(dim=1)
+        rows = has.nonzero(as_tuple=True)[0]
+        if not rows.numel():
+            return
+        slot = sc[rows].long().argmax(dim=1)
+        ut = self.barb_unit_type[rows, slot]
+        pr = self.barb_unit_promos[rows, slot]
+        st = torch.full_like(ut, BARB_SEAT)
+        rad = self._unit_sight(ut, pr, st, rows)
+        vis = self._los_disk(rows, self.barb_unit_tile[rows, slot].clamp(min=0), rad, self._sees_through(ut, pr))
+        ts = self.tile_seat[rows]
+        now = vis & (ts >= 0) & ((ts < BARB_SEAT) | (ts == FREE_SEAT))
+        new = now & ~self.tribe_saw[rows, k]
+        self.tribe_saw[rows, k] = now
+        T = self.T
+        ar = torch.arange(T, device=self.device)
+        best = torch.full((rows.numel(),), T, dtype=torch.long, device=self.device)
+        best_g = torch.full((rows.numel(),), -1, dtype=torch.long, device=self.device)
+        for g in range(self.n_majors):
+            ng = new & (ts == g)
+            first = torch.where(ng, ar, T).min(dim=1).values
+            ok = (first < T) & (int(self.turn) >= self.barb_spot_next[rows, g])
+            self.barb_spot_next[rows, g] = torch.where(
+                ok, torch.full_like(first, int(self.turn) + int(self._bb["spotThrottle"])), self.barb_spot_next[rows, g])
+            take = ok & (first < best)
+            best = torch.where(take, first, best)
+            best_g = torch.where(take, torch.full_like(best_g, g), best_g)
+        go = (best_g >= 0) & (self.tribe_home_slot[rows, k] == -1)
+        r2 = rows[go]
+        self.tribe_home_slot[r2, k] = slot[go]
+        self.tribe_home_seat[r2, k] = best_g[go]
+
+    def _barb_scout_report(self, on: torch.Tensor, k: int) -> None:
+        """`scoutReports`: tribe `k`'s homing scout within its home range of
+        the camp reports its city — a raid at once where the Boldness reaches
+        the raid's and no raid runs, else a city the raid waits for; a scout
+        lost reports nothing."""
+        hs = self.tribe_home_slot[:, k]
+        bidx = torch.arange(self.B, device=self.device)
+        live = (hs >= 0) & self.barb_unit_alive[bidx, hs.clamp(min=0)]
+        lost = on & (hs != -1) & ~live
+        d = self.pair_dist[self.barb_unit_tile[bidx, hs.clamp(min=0)].clamp(min=0), self.tribe_plot[:, k].clamp(min=0)].to(torch.long)
+        rep = on & live & (d <= int(self._bb["homeRange"]))
+        seat = self.tribe_home_seat[:, k].clone()
+        done = lost | rep
+        self.tribe_home_slot[:, k] = torch.where(done, torch.full_like(hs, -1), hs)
+        op = self.tribe_op[:, k]
+        start = rep & (op == 0) & (self.tribe_bold[:, k] >= self._barb_raid_boldness(k))
+        self._barb_start_op(start, k, False, seat)
+        self._barb_push(self.tribe_raidq, rep & ~start, k, seat)
+
+    def _barb_op_turn(self, act: torch.Tensor, k: int) -> None:
+        """`opTurn` for tribe `k`'s operation recruiting: its first turn sets
+        the force's SpawnRate; past its Turn Limiter it gives up; else it takes
+        its force from the tribe's units of each class not raised this turn,
+        in raise order, and asks for the rest, melee first."""
+        if not bool(act.count_nonzero()):
+            return
+        bb = self._bb
+        dev = self.device
+        kind = self.tribe_kind[:, k]
+        assault = self.tribe_op[:, k] == 2
+        forces = bb["forces"]  # [kind][raid 0 / assault 1] = [rate, [[tag, n] ...]]
+        rate = torch.tensor([[f[0] for f in fk] for fk in forces], dtype=torch.long, device=dev)[kind, assault.long()]
+        turns = self.tribe_op_turns[:, k]
+        self.tribe_every[:, k] = torch.where(act & (turns == 0), rate, self.tribe_every[:, k])
+        self.tribe_op_turns[:, k] = turns + act.long()
+        limit = torch.where(assault, int(bb["assaultRecruitTurns"]), int(bb["raidRecruitTurns"]))
+        give = act & (self.tribe_op_turns[:, k] > limit)
+        self.tribe_op_rec[:, k] |= give
+        self.tribe_every[:, k] = torch.where(give, torch.full_like(rate, -1), self.tribe_every[:, k])
+        go = act & ~give
+        if not bool(go.count_nonzero()):
+            return
+        unit_for = self._barb_unit_for()  # [B, n_tags]
+        free = (self.barb_unit_alive & (self.barb_unit_tribe == k) & ~self.barb_unit_scout & ~self.barb_unit_fresh
+                & go.unsqueeze(1))
+        taken = torch.zeros_like(free)
+        queue = torch.full((self.B, self.TQ), -1, dtype=torch.long, device=dev)
+        off = torch.zeros(self.B, dtype=torch.long, device=dev)
+        n_e = max(len(f[1]) for fk in forces for f in fk)
+        ptype = self.barb_unit_type.clamp(min=0, max=self.NU - 1)
+        for e in range(n_e):
+            tag_t = torch.tensor([[f[1][e][0] if e < len(f[1]) else -1 for f in fk] for fk in forces],
+                                 dtype=torch.long, device=dev)[kind, assault.long()]
+            n_t = torch.tensor([[f[1][e][1] if e < len(f[1]) else 0 for f in fk] for fk in forces],
+                               dtype=torch.long, device=dev)[kind, assault.long()]
+            utype = unit_for.gather(1, tag_t.clamp(min=0).unsqueeze(1)).squeeze(1)
+            valid = go & (tag_t >= 0) & (utype >= 0) & (n_t > 0)
+            member = self._barb_tag_member[tag_t.clamp(min=0).unsqueeze(1), ptype]  # [B, P]
+            elig = free & ~taken & member & valid.unsqueeze(1)
+            take = elig & (elig.long().cumsum(dim=1) <= n_t.unsqueeze(1))
+            taken |= take
+            miss = torch.where(valid, n_t - take.long().sum(dim=1), torch.zeros_like(n_t))
+            for j in range(int(n_t.max()) if n_t.numel() else 0):
+                put = valid & (j < miss) & (off + j < self.TQ)
+                rows = put.nonzero(as_tuple=True)[0]
+                queue[rows, (off + j)[rows]] = utype[rows]
+            off = off + miss
+        need = go & (off > 0)
+        self.tribe_queue[need, k] = queue[need]
+        done = go & (off == 0)
+        self.tribe_op_rec[:, k] |= done
+        self.tribe_every[:, k] = torch.where(done, torch.full_like(rate, -1), self.tribe_every[:, k])
+        self.barb_unit_op |= taken & done.unsqueeze(1)
+
+    def _barbarian_ops(self) -> None:
+        """`barbarianOps`: each living tribe's scout looks where it stands, a
+        scout home reports, and each operation recruiting takes its turn."""
+        for k in range(int(self.n_tribes.max())):
+            on = self.tribe_alive[:, k] & (k < self.n_tribes)
+            if not bool(on.count_nonzero()):
+                continue
+            self._barb_scout_look(on, k)
+            self._barb_scout_report(on, k)
+            self._barb_op_turn(on & (self.tribe_op[:, k] > 0) & ~self.tribe_op_rec[:, k], k)
+
+    def _barb_battle_boldness(self, live: torch.Tensor, a_kind: str, u: int, a_seat: torch.Tensor,
+                              d_slot: torch.Tensor, d_is_barb: torch.Tensor,
+                              a_died: torch.Tensor, d_died: torch.Tensor) -> None:
+        """`barbBattleBoldness`: the defender dead, else the attacker — an
+        enemy a tribe's unit killed raises its tribe's Boldness, a tribe's
+        unit or scout lost lowers it."""
+        kd = live & d_died
+        ka = live & ~d_died & a_died
+        if not bool((kd | ka).count_nonzero()):
+            return
+        bidx = torch.arange(self.B, device=self.device)
+        lo, hi = self.POOL_LO["barb"], self.POOL_HI["barb"]
+        neg = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        a_barb = a_seat == BARB_SEAT
+        if a_kind == "barb":
+            a_tr, a_sc = self.barb_unit_tribe[:, u], self.barb_unit_scout[:, u]
+        else:
+            a_tr, a_sc = neg, torch.zeros_like(kd)
+        d_in = (d_slot >= lo) & (d_slot < hi)
+        dl = (d_slot - lo).clamp(min=0, max=hi - lo - 1)
+        d_tr = torch.where(d_in, self.barb_unit_tribe[bidx, dl], neg)
+        d_sc = d_in & self.barb_unit_scout[bidx, dl]
+        bb = self._bb
+        lost = lambda sc: torch.where(sc, int(bb["boldScoutLost"]), int(bb["boldUnitLost"]))  # noqa: E731
+        for m, tr, delta in (
+            (kd & a_barb & ~d_is_barb, a_tr, torch.full_like(neg, int(bb["boldKill"]))),
+            (kd & d_is_barb & ~a_barb, d_tr, lost(d_sc)),
+            (ka & d_is_barb & ~a_barb, d_tr, torch.full_like(neg, int(bb["boldKill"]))),
+            (ka & a_barb & ~d_is_barb, a_tr, lost(a_sc)),
+        ):
+            m = m & (tr >= 0)
+            rows = m.nonzero(as_tuple=True)[0]
+            if rows.numel():
+                self.tribe_bold[rows, tr[rows]] += delta[rows]
 
     def _barbarian_rules(self) -> None:
         """`barbarianRules`: the techs, the camp step, each living tribe's
@@ -355,5 +600,3 @@ class SimBarb:
         self._barb_camp_step()
         for k in range(int(self.n_tribes.max())):
             self._barb_tribe_turn(k)
-
-

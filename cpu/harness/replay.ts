@@ -51,7 +51,8 @@ import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, clearCampFor, holdBarbarians, meleeAttack, rangedAttack } from '../core/combat';
-import { barbarianRules, foundTribe, tribeKindAt } from '../core/barbarians';
+import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
+import { DIFFICULTIES } from '../data/barbarians';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, routeDestCenter, routeOriginCenter } from '../core/trade';
 import { goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
@@ -74,7 +75,7 @@ import { num, bool } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { replayEvents } from './eventReplay';
 import { loadRandLog, randLogPath, type RandLog } from './randLog';
-import { streamHold } from './streamHold';
+import { streamHold, type StreamHold } from './streamHold';
 import { holdRng } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId } from './aliases';
@@ -93,6 +94,10 @@ const VILLAGE_MIN = 8;
  *  (runs/h1_duelw1118 Rome t10 45 + 5 → 77, 1120 t36, 1121 t36, 1123 t61;
  *  an AI's 25, 1116 China t7) */
 const HUMAN_CAMP_GOLD = scaleByGameSpeed(50 + 5) - CAMP_DISPERSAL_GOLD;
+
+/** the lab's human seat's handicap (tools/civ6lab/h1/h1_duel.json
+ *  "difficulty": DIFFICULTY_WARLORD); the AI seats keep the AI's Prince */
+const LAB_HUMAN_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
@@ -134,6 +139,8 @@ interface Ctx {
   lateEnvoys: EnvoyDecision[];
   /** the game's draw log, where the recording kept it */
   log?: RandLog;
+  /** the hold on the game's stream (`streamHold`) */
+  stream: StreamHold;
 }
 
 /** REPLAY_TRACE=<subsystem or decision kind>,... prints every mismatch of
@@ -195,24 +202,31 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   return unit;
 }
 
-/** a barbarian scout the record raised, to the scouts of the nearest living
- *  camp's tribe within three plots, where no tribe counts it yet (a raid's
- *  units are the barbarians' AI operation's, no tribe's) */
+/** a barbarian unit the record raised, to the nearest living camp's tribe
+ *  where no tribe counts it yet: a scout to the scouts of one within three
+ *  plots, any other unit to the units of one within a plot (raised there
+ *  this turn) */
 function adoptByTribe(state: GameState, u: Unit): void {
   const def = UNITS[u.type];
   const tribes = state.barbTribes ?? [];
-  if (!def?.recon && !(def?.naval && !def.ranged)) return;
-  if (tribes.some((tr) => tr.alive && (tr.scouts.includes(u.id) || tr.units.includes(u.id)))) return;
+  if (!def || tribes.some((tr) => tr.alive && (tr.scouts.includes(u.id) || tr.units.includes(u.id)))) return;
+  const scout = !!def.recon || (!!def.naval && !def.ranged);
   const at = state.map.tiles[u.tileIndex];
   let best: BarbTribe | undefined;
-  let bd = 4;
+  let bd = scout ? 4 : 2;
   for (const tr of tribes) {
-    if (!tr.alive || (!def.recon && tr.kind !== 'NAVAL')) continue;
+    if (!tr.alive || (scout && !def.recon && tr.kind !== 'NAVAL')) continue;
     const ct = state.map.tiles[tr.plot];
     const d = hexDistance(state.map, at.col, at.row, ct.col, ct.row);
     if (d < bd) [bd, best] = [d, tr];
   }
-  best?.scouts.push(u.id);
+  if (!best) return;
+  // a galley is a naval tribe's scout where it lacks one, else its unit
+  if (scout && (def.recon || !best.scouts.some((id) => state.units.some((x) => x.id === id)))) best.scouts.push(u.id);
+  else {
+    best.units.push(u.id);
+    (best.fresh ??= []).push(u.id);
+  }
 }
 
 /**
@@ -221,8 +235,9 @@ function adoptByTribe(state: GameState, u: Unit): void {
  * the camp step, each tribe's turn, on the barbarian player's own stream);
  * the units their tribes raise are the record's new barbarian units where
  * they match by type, nearest first. A record unit no tribe raised is the
- * record's (a raid's force is the barbarians' AI operation), and a unit a
- * tribe raised that the game did not is unmade.
+ * record's, and a unit a tribe raised that the game did not is unmade. Their
+ * operations then take their turn (`barbarianOps`: the scouts' reports, the
+ * raids' recruits).
  */
 function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const { state } = ctx;
@@ -241,6 +256,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     disbandUnit(state, u.id);
     count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
   }
+  barbarianOps(state);
 }
 
 /**
@@ -746,7 +762,7 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const ok = valid.includes(want as never);
         t.improvement = want;
         t.pillaged = false;
-        count(ctx, 'improve', 'fallback', d.player, ok ? (builder ? 'the builder\'s order refused' : 'no builder the log names')
+        count(ctx, 'improve', 'fallback', d.player, ok ? (builder ? 'the builder\'s order refused' : d.unit ? 'a builder the replay does not hold' : 'no builder the log names')
           : `${want} on ${t.terrain}/${t.elevation}/${t.feature}/${t.resource} seat ${seat}: the engine offers [${valid.join(',')}]`);
         break;
       }
@@ -1110,7 +1126,13 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         atk.movesLeft = Math.max(atk.movesLeft, grantedMoves(state, atk));
         atk.attacksLeft = Math.max(1, atk.attacksLeft ?? 1);
         state.rngState = s0;
+        const hp0 = [atk.hp, def.hp];
+        if (TRACE.has('battleHp')) (globalThis as { __cbLog?: string[] }).__cbLog = [];
+        // the battle draws where the log drew it, the hold standing aside
+        ctx.stream.placed(true);
         const r = d.ranged ? rangedAttack(state, atk.id, d.at) : meleeAttack(state, atk.id, d.at, atk.seat);
+        ctx.stream.placed(false);
+        if (TRACE.has('battleHp')) console.error(`t${traceTurn} battle ${d.attacker} ${atk.type} ${hp0[0]}->${atk.hp} vs ${d.defender} ${def.type} ${hp0[1]}->${def.hp} ${d.ranged ? 'ranged' : 'melee'} seq${d.seq} game[${d.dmg}] ours[${hp0[1] - def.hp},${hp0[0] - atk.hp}] ${r.ok ? '' : r.reason} ${((globalThis as { __cbLog?: string[] }).__cbLog ?? []).join(' | ')}`);
         if (!r.ok) { count(ctx, 'battle', 'refused', d.player, r.reason); break; }
         ctx.battled.add(d.attacker);
         ctx.battled.add(d.defender);
@@ -1237,8 +1259,12 @@ function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
       u.fortifyTurns = 0;
       // the unit sees from every plot the log's steps entered, and from where
       // it stopped
+      // (a barbarian scout reports the cities it comes to see, `barbScoutLook`)
       for (const p of [...(ctx.paths.get(`${r.owner}:${r.id}`) ?? []), at]) {
         revealAround(ctx.state, u.seat, p, unitSight(u, ctx.state), { seeThrough: unitSeesThrough(u) });
+        if (!isBarbSeat(u.seat)) continue;
+        u.tileIndex = p;
+        barbScoutLook(ctx.state, u);
       }
     }
     u.tileIndex = at;
@@ -1680,11 +1706,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const read = state.seats.map((s) => s.explored);
   initFog(state);
   state.seats.forEach((s, i) => { if (read[i]?.length) s.explored = read[i]; });
+  for (const p of recs[0].players) {
+    const seat = first.seatOfPlayer.get(p.id);
+    if (bool(p.human) && seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HUMAN_HANDICAP;
+  }
   seedMoments(state, first, history);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog,
+    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), barbNew: [], lateEnvoys: [], log: history.randLog, stream,
   };
   // the record's units in the importer's order
   let k = 0;
@@ -1696,8 +1726,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (cs.centerIndex >= 0) continue;
     ctx.pendingMinors.set(pid, cs);
   }
-  const held = new Map<string, number>();
-  const broken = new Set<string>();
+  // per subsystem, the index of the first pair it diverged on: the pairs
+  // before it held, those it had nothing to compare on included
+  const brokeAt = new Map<string, number>();
   // every check the per-turn harness fails, by subject, on the records so far
   const baseFails = new Map<string, Set<string>>();
   let prev: TurnRecord | undefined;
@@ -1817,12 +1848,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // a rested unit struck in a later player's turn heals at its own next
     // turn's start, after the blow (runs/h1_duelw1118 t8: a city-state's
     // Warrior 23 damaged, fortified, took the barbarians' two attacks at 77
-    // health and read +10 after them)
-    const heals = new Map<Unit, number>();
-    for (const [u, hp] of struckHp) {
-      if (u.hp > hp) heals.set(u, u.hp - hp);
-      u.hp = Math.min(u.hp, hp);
-    }
+    // health and read +10 after them; runs/h1_duelw1124 t9: Rome's Warrior,
+    // whole when a barbarian Warrior struck it for 24, read 86): its rest
+    // heal is taken at the health the blows left
+    for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
     state.units.push(...barbs);
     for (const [u, charges] of minorBuilders) u.charges = charges;
     verifyPolicies(ctx, staged);
@@ -1843,7 +1872,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
     fortifyOrders(ctx, b);
     applyPhase(ctx, ds, 'after', b, b);
-    for (const [u, heal] of heals) if (state.units.includes(u)) u.hp = Math.min(UNIT_HP, u.hp + heal);
+    for (const u of struckHp.keys()) {
+      if (!state.units.includes(u) || u.hp >= UNIT_HP) continue;
+      const rest = { ...u };
+      restUnit(state, rest, true);
+      u.hp = rest.hp;
+    }
     syncUnits(ctx, b);
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
@@ -1896,11 +1930,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const bad = sub.startsWith('read.') ? (x.drift ?? 0) > 0 : x.fail > 0;
       if (!bad) {
         s.matched += 1;
-        if (!broken.has(sub)) held.set(sub, (held.get(sub) ?? 0) + 1);
         continue;
       }
-      if (broken.has(sub)) continue;
-      broken.add(sub);
+      if (brokeAt.has(sub)) continue;
+      brokeAt.set(sub, report.perTurn.length - 1);
       const w = x.worst!;
       const step = STEP_OF[sub];
       const stepRow = step ? baseStep.find((r) => r.check === step && r.subject === w.subject) : undefined;
@@ -1913,7 +1946,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     prev = a;
   }
   for (const [sub, s] of Object.entries(report.subsystems)) {
-    s.held = held.get(sub) ?? 0;
+    s.held = brokeAt.get(sub) ?? report.perTurn.length;
     const at = report.perTurn.findIndex((p) => Object.keys(p.imposed).some((k) => imposesOn(k, sub)));
     if (at >= 0) s.imposedFrom = report.perTurn[at].turn;
     s.clean = at >= 0 ? Math.min(s.held, at) : s.held;

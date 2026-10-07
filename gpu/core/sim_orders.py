@@ -2005,10 +2005,21 @@ class SimOrders:
         _rng_val = torch.zeros(0, dtype=torch.long, device=dev)
         _rng_pfp = torch.zeros(0, dtype=self.barb_unit_promos.dtype, device=dev)
         _rng_tfp = torch.zeros(0, dtype=self.barb_unit_type.dtype, device=dev)
+        # a scout carrying a city home walks to its camp and nothing else
+        # (`barbHomingCamp`): the slot each living tribe waits on, and its camp
+        _homing = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=dev)
+        _home_camp = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=dev)
+        _hs = self.tribe_home_slot
+        _hok = (_hs >= 0) & self.tribe_alive
+        if bool(_hok.count_nonzero()):
+            _hb, _hk = _hok.nonzero(as_tuple=True)
+            _homing[_hb, _hs[_hb, _hk]] = True
+            _home_camp[_hb, _hs[_hb, _hk]] = self.tribe_plot[_hb, _hk]
         for u in u_live:
             act = self.barb_unit_alive[:, u] & (self.barb_unit_seat[:, u] == BARB_SEAT) & ~guard[:, u]
             if not bool(act.count_nonzero()):
                 continue
+            hm = act & _homing[:, u]
             here = self.barb_unit_tile[:, u]
             _here1 = here.unsqueeze(1)
             nb = self.neigh[here]
@@ -2078,7 +2089,7 @@ class SimOrders:
                 ) | ((d_all == 1) & ((self.centre_slot_at >= 0) | _cs_ctr))
                 rng_key = torch.where(rng_valid, self._arange_bt, self._tile_miss)
                 target_tile = torch.where(rngd, rng_key.min(dim=1).values, target_tile)
-            attack = act & (target_tile <= T)
+            attack = act & ~hm & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             ctr_here = self.centre_slot_at.gather(1, ttc.unsqueeze(1)).squeeze(1) >= 0
             _csp = _cplane.gather(1, ttc.unsqueeze(1)).squeeze(1)
@@ -2154,7 +2165,7 @@ class SimOrders:
             pillage = torch.zeros_like(act)
             h_imp = self.improvement.gather(1, _here1).squeeze(1) >= 0
             h_unpil = ~self.pillaged.gather(1, _here1).squeeze(1)
-            pillage = act & ~attack & h_imp & h_unpil & h_owned
+            pillage = act & ~hm & ~attack & h_imp & h_unpil & h_owned
             if bool(pillage.count_nonzero()):
                 rows = pillage.nonzero(as_tuple=True)[0]
                 _impv = self.improvement[rows, here[rows]].clamp(min=0)
@@ -2176,7 +2187,7 @@ class SimOrders:
             h_dcomp = self.district_complete.gather(1, _here1).squeeze(1)
             h_dunpil = ~self.district_pillaged.gather(1, _here1).squeeze(1)
             # CIV6: the Encampment "cannot be pillaged normally".
-            dist_pillage = (act & ~attack & ~pillage & (h_dist >= 0)
+            dist_pillage = (act & ~hm & ~attack & ~pillage & (h_dist >= 0)
                             & (h_dist != self._encamp_didx)
                             & h_dcomp & h_dunpil & h_owned)
             if bool(dist_pillage.count_nonzero()):
@@ -2228,8 +2239,9 @@ class SimOrders:
             city_tgt = torch.where(ckey_min < 10**18,
                                    _cc.gather(1, _cwin.unsqueeze(1)).squeeze(1),
                                    here.clamp(min=0))
-            tgt = torch.where(has_imp, imp_tgt, city_tgt)
-            has_tgt = has_imp | (ckey_min < 10**18)
+            has_imp = has_imp & ~hm
+            tgt = torch.where(hm, _home_camp[:, u].clamp(min=0), torch.where(has_imp, imp_tgt, city_tgt))
+            has_tgt = hm | has_imp | (ckey_min < 10**18)
             d_here = self.pair_dist[here, tgt].to(torch.long)
             cur = here.clone()
             d_cur = d_here.clone()
@@ -2270,5 +2282,5 @@ class SimOrders:
                 d_cur = torch.where(mv, torch.div(best, 8, rounding_mode="floor"), d_cur)
                 cur = torch.where(mv, dest, cur)
                 moving = mv & (mp > 0)
-
-
+        # the barbarians' operations, after their units moved (`barbarianOps`)
+        self._barbarian_ops()

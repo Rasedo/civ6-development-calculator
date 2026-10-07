@@ -66,7 +66,7 @@ import { unitKillEvent, campMoment } from './eras';
 import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
-import { barbarianRules, tribeDies } from './barbarians';
+import { barbarianOps, barbarianRules, barbBattleBoldness, barbHomingCamp, tribeDies } from './barbarians';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -389,6 +389,7 @@ export function awardBattleXp(
   state: GameState, attacker: Unit, defender: Unit,
   o: { ranged: boolean; aDied: boolean; dDied: boolean },
 ): void {
+  barbBattleBoldness(state, attacker, defender, o.aDied, o.dDied);
   const aCS = xpStrength(attacker.type, o.ranged);
   const dCS = xpStrength(defender.type, false);
   for (const [self, foe, initiated, ownCS, foeCS, foeDied] of [
@@ -2870,6 +2871,13 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const seat = unit.seat;
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
+  // a barbarian scout carrying a city home walks to its camp and nothing
+  // else ("Barbarian Found City"), stopping beside it
+  const home = barbHomingCamp(state, unit);
+  if (home !== undefined) {
+    marchOn(state, unit, map.tiles[home], false);
+    return;
+  }
 
   const targets = attackTargets(state, unit);
   if (targets.length > 0) {
@@ -2972,6 +2980,15 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
     target = best;
   }
   if (!target) return;
+  marchOn(state, unit, target, marchOnto);
+}
+
+/** a hostile unit's march toward a plot, a step nearer each time while its
+ *  moves last: onto it (an improvement to wreck) or to its side (a city, a
+ *  camp) */
+function marchOn(state: GameState, unit: Unit, target: Tile, marchOnto: boolean): void {
+  const map = state.map;
+  const tile = () => map.tiles[unit.tileIndex];
   for (;;) {
     const at = tile();
     const step = neighbors(map, at)
@@ -3048,7 +3065,8 @@ export function barbarianPhase(state: GameState): void {
     if (guard) guards.add(guard.id);
   }
   for (const unit of barbUnits(state)) {
-    if (guards.has(unit.id)) continue;
-    if (unit.movesLeft > 0) hostileUnitAct(state, unit);
+    if (guards.has(unit.id) || unit.movesLeft <= 0) continue;
+    hostileUnitAct(state, unit);
   }
+  barbarianOps(state);
 }

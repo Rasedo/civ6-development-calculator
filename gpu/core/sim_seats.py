@@ -13861,6 +13861,7 @@ class SimSeats:
     ) -> None:
         """`awardBattleXp` — ONE battle between units pays BOTH sides, after the
         rolls, because the doubling asks who died."""
+        self._barb_battle_boldness(live, a_kind, u, a_seat, d_slot, d_is_barb, a_died, d_died)
         _pro, a_lvl, a_pct = self._promo_pool(a_kind)
         a_barb = a_seat == BARB_SEAT
         if SEAT_CAPS[POOL_CLASS[a_kind]]["xp"]:

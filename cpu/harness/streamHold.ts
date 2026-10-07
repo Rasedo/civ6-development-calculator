@@ -82,6 +82,10 @@ export interface StreamHold extends RngHooks {
   /** the draws that follow are the record's actions of `turn` (outside the
    *  engine's turn); null: the engine's turn, whose points place its draws */
   actions(turn: number | null): void;
+  /** the draws that follow stand where the replay placed the generator (a
+   *  battle on its logged damage draws): each takes the logged draw of its
+   *  state, the generator untouched; false ends it */
+  placed(on: boolean): void;
   ledger(): StreamLedger;
 }
 
@@ -128,6 +132,7 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
     });
   }
   const taken = new Uint8Array(n);
+  let placedDraws = false;
   const marks: number[] = [];
   if (log) {
     for (const s of pre.values()) {
@@ -239,6 +244,14 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
       bt.set(k, (bt.get(k) ?? 0) + 1);
       engineByTurn.set(turn, bt);
       if (!log || k.startsWith('Engine:')) return;
+      if (placedDraws) {
+        const i = log.index(state.rngState >>> 0);
+        if (i !== undefined && !taken[i]) {
+          taken[i] = 1;
+          t.inWindow++;
+        } else t.unlogged++;
+        return;
+      }
       if (window?.kind === 'step') window.seq.push(k);
       let j = from >= 0 ? find(k, turn, from, to, max) : -1;
       if (j >= 0) t.inWindow++;
@@ -258,6 +271,9 @@ function makeHold(game: GameState, recs: readonly TurnRecord[], playerOfSeat: Ma
         if (window) window.spoiled = true;
       }
       if (holdDraws) state.rngState = log.stateAt(j);
+    },
+    placed(on: boolean): void {
+      placedDraws = on;
     },
     actions(T: number | null): void {
       from = to = -1;

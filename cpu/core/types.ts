@@ -550,6 +550,9 @@ export interface GameState {
   barbTribes?: BarbTribe[];
   /** the camp step has added camps once: every later step adds one */
   barbCampsBegun?: boolean;
+  /** per player (seat), the first turn a barbarian scout may report one of
+   *  its cities again (the manager's throttle, 0x153ef0) */
+  barbSpotNext?: Record<number, number>;
   /** CIV6's FREE CITIES player (`FREE_SEAT`): the cities loyalty took from
    *  their owners, until each joins whoever pulled hardest. Created by
    *  `freeSeatOf` at the first revolt; absent until then. */
@@ -575,6 +578,43 @@ export interface BarbTribe {
   /** the ids of the units and scouts it raised */
   units: number[];
   scouts: number[];
+  /** the units it raised in its last turn, which its operation cannot take
+   *  in the same turn */
+  fresh?: number[];
+  /** its Boldness: the raid and the assault wait for it */
+  boldness?: number;
+  /** the cities its raid and its assault wait to go after */
+  raidTargets?: BarbTarget[];
+  assaultTargets?: BarbTarget[];
+  /** a scout that saw a city walks home to report it ("Barbarian Found
+   *  City") */
+  homing?: { scout: number; target: BarbTarget };
+  /** per scout, the city plots it saw at its last look */
+  saw?: Record<number, number[]>;
+  /** its raid or city assault (the AI operation it runs) */
+  op?: BarbOp;
+  /** the spawn interval its operation set (the force's SpawnRate) while it
+   *  recruits, and the units it asked for, raised one a spawn turn */
+  every?: number;
+  queue?: string[];
+}
+
+/** a city a barbarian tribe goes after: its owner and its centre */
+export interface BarbTarget {
+  seat: number;
+  plot: number;
+}
+
+/** A BARBARIAN OPERATION: a raid ("Raid City") or a city assault
+ *  ("Barbarian City Attack") on a target, recruiting its force, then on
+ *  its way with the units it took */
+export interface BarbOp {
+  assault: boolean;
+  target: BarbTarget;
+  /** the turns it has recruited; done once it took its force */
+  turns: number;
+  recruited: boolean;
+  units: number[];
 }
 
 export interface Unit {
@@ -696,6 +736,8 @@ export interface Unit {
 
 export interface Seat {
   seat: number;
+  /** the player's handicap, a Difficulties index; absent, the AI's Prince */
+  handicap?: number;
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.

@@ -82,7 +82,7 @@ export type Decision = Base & (
    *  battle's place among its player's hits of the pair (its "Unit Combat
    *  Damage" draws, `battle`) */
   | { kind: 'battle'; player: number; attacker: string; defender: string; from: number; at: number;
-      ranged: boolean; seq: number }
+      ranged: boolean; seq: number; dmg: [number, number] }
   /** a unit killed in combat (`UnitKilledInCombat`): the killer's player and
    *  type (-1 a city's shot or unknown), the victim's player and type */
   | { kind: 'kill'; player: number; killerType: number; victim: number; victimType: number; victimUnit: string }
@@ -688,7 +688,8 @@ export class RecordedActions implements ActionSource {
           out0.push({ kind: 'hit', phase: phaseOf(actor), player: n(r, 0), unit: defender, dmg: n(r, 2) - n(r, 3) });
           return;
         }
-        out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k });
+        out0.push({ kind: 'battle', phase: phaseOf(actor), player: actor, attacker, defender, from, at, ranged: !melee, seq: k,
+          dmg: [n(r, 2) - n(r, 3), melee ? n(nx!, 2) - n(nx!, 3) : 0] });
       });
     }
     // the unit each village rewarded: `GoodyHutReward` (player, unit, type,

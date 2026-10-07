@@ -287,6 +287,18 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
         scouts = sum(1 for a, t, sc in zip(alive, tribe, scout) if a and t == k and sc)
         row += [int(sim.tribe_plot[b, k]), int(sim.tribe_alive[b, k]), int(sim.tribe_kind[b, k]),
                 int(sim.tribe_name[b, k]), int(sim.tribe_spawn[b, k]), int(sim.tribe_scoutc[b, k]), units, scouts]
+        # the raid and the city assault
+        queue = [int(x) for x in sim.tribe_queue[b, k].tolist() if x >= 0]
+        raidq = [int(x) for x in sim.tribe_raidq[b, k].tolist() if x >= 0]
+        assq = [int(x) for x in sim.tribe_assq[b, k].tolist() if x >= 0]
+        op = int(sim.tribe_op[b, k])
+        opu = sum(1 for a, t, o in zip(alive, tribe, sim.barb_unit_op[b].tolist()) if a and t == k and o)
+        row += [int(sim.tribe_bold[b, k]), int(sim.tribe_every[b, k]), len(queue), *queue,
+                len(raidq), *raidq, len(assq), *assq,
+                int(sim.tribe_home_seat[b, k]) if int(sim.tribe_home_slot[b, k]) != -1 else -1,
+                op, int(sim.tribe_op_seat[b, k]) if op else -1, int(sim.tribe_op_turns[b, k]) if op else 0,
+                int(sim.tribe_op_rec[b, k]) if op else 0, opu if op else 0]
+    row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
     techs = sim.barb_techs[b].nonzero().flatten().tolist()
     civics = sim.barb_civics[b].nonzero().flatten().tolist()
     return row + [len(techs), *techs, len(civics), *civics]

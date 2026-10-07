@@ -3849,6 +3849,32 @@ class SimInit:
         self.barb_civics = torch.zeros(B, len(rules.c_cost), dtype=torch.bool, device=device)
         self.barb_unit_tribe = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
         self.barb_unit_scout = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        # THE RAIDS AND CITY ASSAULTS (`barbarianOps`): each tribe's Boldness,
+        # the spawn interval its operation set (-1 its own), the unit types it
+        # asked for (-1 empty), the owners of the cities its raid and its
+        # assault wait for, its homing scout's slot and city owner, the owned
+        # plots its scout saw at its last look; its operation (0 none, 1 a
+        # raid, 2 an assault), the owner it goes after, its turns recruiting,
+        # whether it took its force; per unit, taken by its tribe's operation,
+        # raised in its tribe's last turn; per major, the turn a scout may
+        # report it again
+        self.tribe_bold = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_every = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.TQ = 10
+        self.tribe_queue = torch.full((B, self.KT, self.TQ), -1, dtype=torch.long, device=device)
+        self.TL = 8
+        self.tribe_raidq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
+        self.tribe_assq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
+        self.tribe_home_slot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_home_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_saw = torch.zeros(B, self.KT, self.T, dtype=torch.bool, device=device)
+        self.tribe_op = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_op_seat = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_op_turns = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_op_rec = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
+        self.barb_unit_op = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.barb_unit_fresh = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order
         # (`ringPlots`, 0x69010), -1 past the map's edge
         self._barb_ring = torch.tensor(barb_ring_table(self.W, self.H, self.wrap_x, 3), dtype=torch.long, device=device)
@@ -3897,6 +3923,13 @@ class SimInit:
         self._celestial_tech = int(cb["celestialTech"])
         ru = rules.units or [{"id": "WARRIOR", "cost": 40, "combat": 20, "maintenance": 0, "civilian": 0, "requiresTech": -1}]
         self.NU = len(ru)
+        # [n_tags, NU] bool: the roster types each barbarian class tag holds
+        # (a raid's recruit counts a unit to its class by them)
+        self._barb_tag_member = torch.zeros(len(self._bb["tagUnits"]), self.NU, dtype=torch.bool, device=device)
+        for _ti, _rows in enumerate(self._bb["tagUnits"]):
+            for _r in _rows:
+                if 0 <= _r[0] < self.NU:
+                    self._barb_tag_member[_ti, _r[0]] = True
         # how many copies of each chassis a seat has ever acquired — what a
         # `costStep` price progression counts (`unitsAcquired`'s twin).
         self.civ_unit_acq = torch.zeros(B, self.n_majors, self.NU, dtype=torch.long, device=device)

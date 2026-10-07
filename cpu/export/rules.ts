@@ -311,7 +311,10 @@ import { RESOURCES } from '../../world/resources';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
-  BARB_CAMP_FEATURES, BARB_FREE_TECHS, BARB_TAG_UNITS, BARB_TRIBES, barbNameRangedPct, type BarbTag } from '../data/barbarians';
+  BARB_CAMP_FEATURES, BARB_FREE_TECHS, BARB_TAG_UNITS, BARB_TRIBES, barbNameRangedPct, type BarbTag,
+  BARB_BOLD_TURN, BARB_BOLD_KILL, BARB_BOLD_UNIT_LOST, BARB_BOLD_SCOUT_LOST, BARB_RAID_BOLDNESS, BARB_ASSAULT_BOLDNESS,
+  BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL, BARB_HOME_RANGE, BARB_RAID_RECRUIT_TURNS, BARB_ASSAULT_RECRUIT_TURNS,
+  DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness } from '../data/barbarians';
 const BARB_TAGS = Object.keys(BARB_TAG_UNITS) as BarbTag[];
 import { CHOP_ROWS, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
 import { TERRAINS } from '../../world/terrains';
@@ -1923,6 +1926,27 @@ export function buildRules() {
         tribes: BARB_TRIBES.map((d) => [d.coastal ? 1 : 0, d.resource ? RESOURCE_IDS.indexOf(d.resource) : -1, d.resourceRange,
           d.rangedPct, d.spawnEvery, BARB_TAGS.indexOf(d.scoutTag), BARB_TAGS.indexOf(d.meleeTag), BARB_TAGS.indexOf(d.rangedTag),
           BARB_TAGS.indexOf(d.defenderTag)]),
+        // the raids and the city assaults (`barbarianOps`): per tribe kind,
+        // raid then assault, the force a city of the AI's handicap draws —
+        // [SpawnRate at the speed, [tag, count] ...] (the engines' seats
+        // carry no handicap of their own)
+        forces: BARB_TRIBES.map((d) => [true, false].map((raid) => {
+          const f = barbForce(d.kind, raid, DEFAULT_HANDICAP);
+          return [f ? f.rate : -1, (f?.units ?? []).map(([tag, n]) => [BARB_TAGS.indexOf(tag), n])];
+        })),
+        boldTurn: BARB_BOLD_TURN,
+        boldKill: BARB_BOLD_KILL,
+        boldUnitLost: BARB_BOLD_UNIT_LOST,
+        boldScoutLost: BARB_BOLD_SCOUT_LOST,
+        raidBoldness: BARB_RAID_BOLDNESS,
+        assaultBoldness: BARB_ASSAULT_BOLDNESS,
+        // the BARBARIAN_NAVAL_3 name's own RaidingBoldness: [kind, name, value]
+        nameRaidBoldness: [[0, 2, barbNameRaidBoldness('NAVAL', 2) ?? -1]],
+        // the throttle on a player's reports at the AI's handicap
+        spotThrottle: Math.max(0, BARB_SPOT_THROTTLE - BARB_SPOT_THROTTLE_PER_LEVEL * DEFAULT_HANDICAP),
+        homeRange: BARB_HOME_RANGE,
+        raidRecruitTurns: BARB_RAID_RECRUIT_TURNS,
+        assaultRecruitTurns: BARB_ASSAULT_RECRUIT_TURNS,
       },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
       // COMBAT: the single-precision factor e^(x/256) per exponent x in

@@ -445,9 +445,20 @@ const GAME: Record<string, Extractor> = {
     const r = s.barbSeat.research;
     const techs = r.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b);
     const civics = r.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b);
+    const uidx = (id: string) => UNIT_INDEX[id] ?? -1;
     return [[s.barbCampsBegun ? 1 : 0, tribes.length, ...tribes.flatMap((t) => [t.plot, t.alive ? 1 : 0,
       BARB_TRIBES.findIndex((d) => d.kind === t.kind), t.name, t.spawnTurns, t.scoutTurns,
-      t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length]),
+      t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length,
+      // the raid and the city assault: Boldness, the interval set, the units
+      // asked for, the cities waited for (their owners), the homing scout's
+      // city owner, the operation (kind, owner, turns, force taken, its units)
+      t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(uidx),
+      (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat),
+      (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat),
+      t.homing ? t.homing.target.seat : -1,
+      t.op ? (t.op.assault ? 2 : 1) : 0, t.op?.target.seat ?? -1, t.op?.turns ?? 0, t.op?.recruited ? 1 : 0,
+      t.op ? t.op.units.filter((id) => live.has(id)).length : 0]),
+    ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0),
     techs.length, ...techs, civics.length, ...civics]];
   },
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],

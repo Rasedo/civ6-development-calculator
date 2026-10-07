@@ -4,7 +4,7 @@ import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { deriveAreas } from '../../../world/query';
 import { hostileUnitAct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
-import { barbarianRules, barbarianTechs, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
+import { barbarianOps, barbarianRules, barbarianTechs, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
 import { BARB_TRIBES } from '../../../cpu/data/barbarians';
 import type { GameState } from '../../../cpu/core/types';
 
@@ -127,5 +127,39 @@ describe('what a raider marches on', () => {
     expect(second.tileIndex).toBe(tileAtCoords(state.map, 9, 8).index);
     hostileUnitAct(state, second);
     expect(second.tileIndex).toBe(tileAtCoords(state.map, 9, 8).index);
+  });
+});
+
+// THE RAIDS (tools/civ6lab/dll_readings.md "H-1: the raids"): a scout that
+// sees a major's city walks it home; its tribe raids at its RaidingBoldness,
+// the raid's force asked of the spawn clock one a turn, melee first, the units
+// raised in a turn not yet the raid's; the force whole, the clock its own.
+describe('a barbarian raid', () => {
+  it("a scout home with a major's city starts the raid, which raises its force one a turn", () => {
+    const state = land();
+    barbarianTechs(state);
+    const camp = tileAtCoords(state.map, 6, 6);
+    raiseCamp(state, camp.index);
+    state.barbCampsBegun = true;
+    setTileOwner(tileAtCoords(state.map, 8, 6), 0);
+    const tribe = state.barbTribes![0];
+    tribe.boldness = 10;
+    barbarianOps(state);
+    expect(tribe.op).toMatchObject({ assault: false, target: { seat: 0 }, recruited: false });
+    expect(tribe.every).toBe(1);
+    expect(tribe.queue).toEqual(['WARRIOR', 'WARRIOR', 'SLINGER']);
+    const raised: string[] = [];
+    for (let k = 0; k < 6 && !tribe.op!.recruited; k++) {
+      const before = new Set(state.units.map((u) => u.id));
+      barbarianRules(state, state.turn);
+      raised.push(...state.units.filter((u) => !before.has(u.id) && isBarbSeat(u.seat)).map((u) => u.type));
+      state.barbSeat.camps = [camp.index];
+      barbarianOps(state);
+    }
+    // the unit raised in a turn joins the next: W, W, W, S, S
+    expect(raised).toEqual(['WARRIOR', 'WARRIOR', 'WARRIOR', 'SLINGER', 'SLINGER']);
+    expect(tribe.op!.recruited).toBe(true);
+    expect(tribe.op!.units.length).toBe(3);
+    expect(tribe.every).toBeUndefined();
   });
 });

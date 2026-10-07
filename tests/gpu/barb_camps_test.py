@@ -177,7 +177,46 @@ def main() -> None:
         f"(start {start}, mid {_mid}, alive {bool(sim.barb_unit_alive[0, slot])})")
     print("  a Free City's district is a raid target — the raider walked onto it")
 
-    print("BARB CAMPS OK — the tribe's kind is its ground, it raises its units on its clock")
+    # THE RAID (`barbarianOps`, the TS twin's "a barbarian raid"): a scout
+    # beside its camp sees a major's plot, so it reports at once; at
+    # RaidingBoldness the raid starts and asks for its force, melee first,
+    # raised one a turn, a unit raised in a turn not the raid's until the next
+    clear_barbs(sim)
+    sim.barb_camps_begun[0] = True
+    horses_near(sim, tile, on=False)
+    k = camp(sim, tile)
+    kk = torch.full((sim.B,), k, dtype=torch.long)
+    sc = [s for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
+          if int(sim.barb_unit_tribe[0, s]) == k and bool(sim.barb_unit_scout[0, s])][0]
+    st = int(sim.barb_unit_tile[0, sc])
+    seen = [n for n in sim.neigh[st].tolist() if n >= 0 and n != tile and int(sim.pair_dist[tile, n]) >= 1
+            and not bool(sim.wpass[0, n])][0]
+    sim.tile_seat[0, seen] = 0
+    sim._tile_owner_ver += 1
+    sim.tribe_bold[0, k] = 10
+    sim.barb_spot_next[0, :] = 0  # no earlier report throttles the major
+    sim._barbarian_ops()
+    melee = int(sim._barb_unit_for()[0, int(tribes[2][6])])
+    ranged = int(sim._barb_unit_for()[0, int(tribes[2][7])])
+    assert int(sim.tribe_op[0, k]) == 1 and int(sim.tribe_home_slot[0, k]) == -1, "the scout's report started no raid"
+    assert int(sim.tribe_every[0, k]) == 1, f"the raid's interval {int(sim.tribe_every[0, k])}"
+    q = [x for x in sim.tribe_queue[0, k].tolist() if x >= 0]
+    assert q == [melee, melee, ranged], f"the raid asked for {q}"
+    raised = []
+    for _ in range(6):
+        if bool(sim.tribe_op_rec[0, k]):
+            break
+        before = set(sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist())
+        sim._barb_tribe_turn(k)
+        raised += [int(sim.barb_unit_type[0, s]) for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
+                   if s not in before]
+        sim._barbarian_ops()
+    assert raised == [melee, melee, melee, ranged, ranged], f"the raid raised {raised}"
+    assert bool(sim.tribe_op_rec[0, k]) and int(sim.tribe_every[0, k]) == -1, "the force taken, the clock not the tribe's"
+    assert int((sim.barb_unit_op[0] & (sim.barb_unit_tribe[0] == k)).sum()) == 3, "the raid took no force of three"
+    print("  a scout's report starts a raid, which raises its force one a turn")
+
+    print("BARB CAMPS OK — the tribe's kind is its ground, it raises its units on its clock, it raids")
 
 
 if __name__ == "__main__":
