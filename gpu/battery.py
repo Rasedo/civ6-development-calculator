@@ -868,6 +868,10 @@ def _main() -> int:
                 ("culture_victory", [py, "tests/gpu/culture_victory_test.py"], 4),  # the culture win, which the serve gate never reaches
                 ("relics", [py, "tests/gpu/relics_test.py"], 4),  # martyr relics — temple slots, faith + tourism
                 ("festival", [py, "tests/gpu/festival_test.py"], 4),  # Festival pays THREE GP classes at 0.11 (serve gate never reaches it)
+                ("boost_progress", [py, "tests/gpu/boost_progress_test.py"], 4),  # a boost lands as progress on its item
+                ("city_name_draw", [py, "tests/gpu/city_name_draw_test.py"], 4),  # a city's name drawn as the DLL draws it
+                ("h1_rules", [py, "tests/gpu/h1_rules_test.py"], 4),  # rules read off the H-1 recordings (Vatican City, the Great Bath, dominance)
+                ("melee_result", [py, "tests/gpu/melee_result_test.py"], 4),  # the melee result: the embarked defender, the mutual kill
                 ("citystate_war", [py, "tests/gpu/cs_war_test.py"], 4),  # war with a city-state gates the attack mask
                 ("snapshot", [py, "tests/gpu/snapshot_restore_test.py"], 4),  # _MUTABLE round-trip + step determinism (the ONLY lane that restores)
                 ("naval", [py, "tests/gpu/naval_test.py"], 4),  # naval surfaces the serve gate never reaches
