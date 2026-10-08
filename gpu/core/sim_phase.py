@@ -1915,7 +1915,7 @@ class SimPhase:
             _cw = torch.zeros(self.B, dtype=torch.long, device=self.device)
             _cw[dr] = (self.district[dr, dt] == self._canal_didx).long()
             if bool(_cw.count_nonzero()):
-                self._add_era_score(row, int(self._mom[canal]), _cw)
+                self._add_era_score(row, int(self._mom["canal"]), _cw)
         # CIV6 (DISTRICT_CONSTRUCTED_HIGH_ADJACENCY_*): `districtMoment` — a
         # major's first district of a type whose yield where it completed,
         # before any percent (its adjacency and Nan Madol's Culture beside
@@ -2417,8 +2417,8 @@ class SimPhase:
         # The GRIEVANCE ledger's own turn: every original capital this row
         # sits in keeps charging while that war is over, and each pair decays
         # once, on its lower seat.
-        self._grievance_held_capitals(row)
-        self._grievance_decay(row)
+        self._grievance_held_capitals(row, active)
+        self._grievance_decay(row, active)
         bank(self.civ_civic_prog, cul_sum + self.civ_civic_ovf[:, row])
         self.civ_civic_ovf[:, row] = torch.where(active, torch.zeros_like(cul_sum), self.civ_civic_ovf[:, row])
         bank(self.civ_culture, cul_sum)
@@ -3103,10 +3103,16 @@ class SimPhase:
         # transcribed — a hand-written list drifts and silently leaves a plane
         # behind at the old slot index. `alive` permutes separately.
         counter = self.POOL_NEXT[prefix]
-        maps: list = []
-        fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
         alive = getattr(self, f"{prefix}_unit_alive")
         B, U = alive.shape
+        fields = [f"{prefix}_unit_{pl}" for pl in self._UNIT_PLANES if pl != "alive"]
+        # ...and the pool's OWN per-slot planes (the barbarians' tribe, scout,
+        # operation and fresh marks), taken from `_MUTABLE` by name and shape
+        fields += [n for n in simbase._MUTABLE
+                   if n.startswith(f"{prefix}_unit_") and n not in fields and n != f"{prefix}_unit_alive"
+                   and getattr(self, n).dim() >= 2 and tuple(getattr(self, n).shape[:2]) == (B, U)]
+        # the planes that hold one of this pool's slot numbers, remapped by value
+        maps: list = ["tribe_home_slot"] if prefix == "barb" else []
         perm = torch.argsort((~alive).long(), dim=1, stable=True)
         inv = torch.empty_like(perm)
         inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))

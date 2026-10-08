@@ -390,7 +390,7 @@ def main() -> int:
     fired = {"flood": 0, "volcano": 0, "storm": 0, "drought": 0, "accident": 0, "meteor": 0, "fire": 0,
              "empty": 0}
     turn = {}
-    sim10._flood_river = lambda hit, tile, sev: turn.__setitem__("flood", bool(hit[0]))
+    sim10._flood_river = lambda hit, tile, sev, river: turn.__setitem__("flood", bool(hit[0]))
     sim10._erupt = lambda hit, ring, sev: turn.__setitem__("volcano", bool(hit[0]))
     sim10._nuclear_accident = lambda hit, centre, sev: turn.__setitem__("accident", bool(hit[0]))
     sim10._ignite = lambda rows, tiles, start: turn.__setitem__("fire", bool((rows == 0).any()))

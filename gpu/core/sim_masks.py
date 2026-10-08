@@ -2779,6 +2779,27 @@ class SimMasks:
         self.barb_unit_promo_offer[rows, slot] = 0
         self.barb_unit_promo_bonus[rows, slot] = 0
         self.barb_unit_xp_pct[rows, slot] = 0
+        # ...and every other fact a reclaimed slot would hand on from its dead
+        # occupant: TS's spawnUnit builds a fresh object, its charges the
+        # chassis' own, no levy, formation, escort, Great Person queue
+        # place, band career or spy record (`_spawn_unit`'s resets)
+        _ut_b = self.barb_unit_type[rows, slot].clamp(min=0, max=self.NU - 1)
+        self.barb_unit_charges[rows, slot] = self._type_charges[_ut_b]
+        self.barb_unit_promo_used[rows, slot] = 0
+        self.barb_unit_mp_bonus[rows, slot] = 0
+        self.barb_unit_aura_mp[rows, slot] = 0
+        self.barb_unit_levied[rows, slot] = False
+        self.barb_unit_levy_src[rows, slot] = -1
+        self.barb_unit_no_res_upkeep[rows, slot] = False
+        self.barb_unit_gp_at[rows, slot] = -1
+        self.barb_unit_formation[rows, slot] = 0
+        self.barb_unit_escorted[rows, slot] = False
+        self.barb_unit_band_level[rows, slot] = 0
+        self.barb_unit_band_album[rows, slot] = 0
+        self.barb_unit_spy_mission[rows, slot] = self._spy_idle
+        self.barb_unit_spy_turns[rows, slot] = 0
+        self.barb_unit_spy_target[rows, slot] = -1
+        self.barb_unit_spy_level[rows, slot] = 0
         # TS spawnUnit writes `movesLeft: def.moves` plus the seat's golden
         # dedication and leaves movesFull undefined — a unit trained mid-turn
         # CAN move before its first refresh, and a reclaimed slot must not
@@ -2921,7 +2942,9 @@ class SimMasks:
             _own = self.tile_seat[rows]
             _ua = self.major_unit_alive[rows]
             _us = self.major_unit_seat[rows]
-            _uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & _ua
+            # `disk` is already the games of `rows`, so its index is too
+            _ut = self.major_unit_tile[rows].clamp(min=0)
+            _uin = disk.gather(1, _ut) & _ua
             _seen = torch.stack([(disk & (_own == 100 + s)).any(dim=1) | (_uin & (_us == 100 + s)).any(dim=1)
                                  for s in range(self.S)], dim=1)
             if bool(_seen.count_nonzero()):
@@ -3032,7 +3055,10 @@ class SimMasks:
         at = tiles.clamp(min=0)
         disk = self._los_disk(rows, at, radius, see_through)
         own = self.tile_seat[rows]
-        uin = disk.gather(1, self.major_unit_tile[rows].clamp(min=0)) & self.major_unit_alive[rows]
+        # `disk`, `dist` and each `look` are already the games they are
+        # gathered for, so every index below is narrowed to the same rows
+        ut_all = self.major_unit_tile[rows].clamp(min=0)
+        uin = disk.gather(1, ut_all) & self.major_unit_alive[rows]
         us = self.major_unit_seat[rows]
         col = torch.nn.functional.one_hot(s.clamp(min=0), self.S).bool()
         dist = self.pair_dist[at].long()  # [K, T]
@@ -3042,7 +3068,6 @@ class SimMasks:
             # `seatSeesPlot`: its plot or one beside, a centre within two, a
             # unit whose sight reaches the plot
             seen = seen | ((own == g) & (dist <= 1)).any(dim=1) | ((ctr == g) & (dist <= 2)).any(dim=1)
-            ut_all = self.major_unit_tile[rows].clamp(min=0)
             mine = self.major_unit_alive[rows] & (us == g)
             near = mine & (dist.gather(1, ut_all) <= 8)
             for j in near.any(dim=0).nonzero(as_tuple=True)[0].tolist():
@@ -3054,7 +3079,8 @@ class SimMasks:
                 upr = self.unit_promos[kr, j]
                 rad = self._unit_sight(utp, upr, self.unit_seat[kr, j], kr)
                 look = self._los_disk(kr, self.unit_tile[kr, j].clamp(min=0), rad, self._sees_through(utp, upr))
-                seen[k] = seen[k] | look.gather(1, at[k].unsqueeze(1)).squeeze(1)
+                at_k = at[k].unsqueeze(1)
+                seen[k] = seen[k] | look.gather(1, at_k).squeeze(1)
             if bool(seen.count_nonzero()):
                 k = seen.nonzero(as_tuple=True)[0]
                 self._meet_citystates(rows[k], g, col[k])

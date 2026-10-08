@@ -47,7 +47,7 @@ import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Un
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
+import { BARB_SEAT, alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
@@ -440,7 +440,7 @@ const GAME: Record<string, Extractor> = {
   },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
   barbTribes: (s) => {
-    const live = new Set(s.units.map((u) => u.id));
+    const live = new Set(s.units.filter((u) => u.seat === BARB_SEAT).map((u) => u.id));
     const tribes = s.barbTribes ?? [];
     const r = s.barbSeat.research;
     const techs = r.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b);

@@ -365,7 +365,10 @@ function raiseType(state: GameState, tribe: BarbTribe, type: string, radius: num
   return out;
 }
 
-const alive = (state: GameState, id: number) => state.units.some((u) => u.id === id);
+/** a tribe's unit still stands AND is still the barbarians': one that
+ *  changed sides (a conversion, a capture) is its new owner's unit, no
+ *  longer the tribe's */
+const alive = (state: GameState, id: number) => state.units.some((u) => u.id === id && isBarbSeat(u.seat));
 const living = (state: GameState, ids: number[]) => ids.filter((id) => alive(state, id)).length;
 
 /** the tribe that raised a unit */
@@ -563,7 +566,7 @@ function threatened(state: GameState, plot: number): boolean {
 function scoutReports(state: GameState, tribe: BarbTribe): void {
   const h = tribe.homing;
   if (!h) return;
-  const u = state.units.find((x) => x.id === h.scout);
+  const u = state.units.find((x) => x.id === h.scout && isBarbSeat(x.seat));
   if (!u) { delete tribe.homing; return; }
   const a = state.map.tiles[u.tileIndex];
   const c = state.map.tiles[tribe.plot];
@@ -585,7 +588,7 @@ export function barbarianOps(state: GameState): void {
     if (!tr.alive) continue;
     for (const id of tr.scouts) {
       const u = state.units.find((x) => x.id === id);
-      if (u) barbScoutLook(state, u);
+      if (u && isBarbSeat(u.seat)) barbScoutLook(state, u);
     }
     scoutReports(state, tr);
     if (tr.op && !tr.op.recruited) opTurn(state, tr, tr.op);

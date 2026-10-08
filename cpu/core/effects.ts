@@ -1201,6 +1201,8 @@ function modsFingerprint(state: GameState, seat: number, s: Seat, m: ModsMemo): 
       fpPush(m, cs.id);
       fpPush(m, cs.type);
       fpPush(m, cs.name);
+      // a war with the minor stops its envoys paying (`envoysPaying`)
+      fpPush(m, civsAtWar(state, seat, cs.seat));
       const envoys = cs.envoys;
       for (const k in envoys) {
         fpPush(m, k);

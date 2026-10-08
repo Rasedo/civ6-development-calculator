@@ -1931,9 +1931,8 @@ export function buildRules() {
         campTerrains: BARB_CAMP_TERRAINS.map((t) => TERRAIN_IDS.indexOf(t)),
         campFeatures: BARB_CAMP_FEATURES.map((f) => featIdx.get(f) ?? -1),
         freeTechs: BARB_FREE_TECHS.map((t) => techIdx.get(t) ?? -1),
-        // the class tags, each its units in the Units table's order: [roster
-        // index, Combat, tech index, civic index] (-1 none)
-        tags: BARB_TAGS,
+        // per class tag (`BARB_TAGS` order), its units in the Units table's
+        // order: [roster index, Combat, tech index, civic index] (-1 none)
         tagUnits: BARB_TAGS.map((tag) => BARB_TAG_UNITS[tag].map((id) => [Object.keys(UNITS).indexOf(id), UNITS[id].combat,
           UNITS[id].requiresTech ? (techIdx.get(UNITS[id].requiresTech!) ?? -1) : -1,
           UNITS[id].requiresCivic ? (civicIdx.get(UNITS[id].requiresCivic!) ?? -1) : -1])),

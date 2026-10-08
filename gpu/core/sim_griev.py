@@ -61,14 +61,15 @@ class SimGriev:
         return torch.where(cap, torch.full_like(cap, self._griev_occ_cap_decay, dtype=torch.long),
                            any_city.long() * self._griev_occ_decay)
 
-    def _grievance_decay(self, row: int) -> None:
+    def _grievance_decay(self, row: int, active: torch.Tensor) -> None:
         """CIV6: "10 - x per turn, where x is each era after the Ancient Era",
         never while that pair is at war. Runs on the LOWER seat of each pair so
-        one turn decays each pair once."""
+        one turn decays each pair once, in the games where that seat's
+        economy turn runs (`active`: it holds a city)."""
         base = (self._griev_decay_base - self._world_era().clamp(min=0)).clamp(min=self._griev_decay_floor)
         for other in range(row + 1, self.n_majors):
             bal = self._grievance_with(row, other)
-            live = (bal != 0) & ~self.war[:, row, other]
+            live = active & (bal != 0) & ~self.war[:, row, other]
             if not bool(live.count_nonzero()):
                 continue
             # the victim's side of the pair, per game
@@ -84,15 +85,16 @@ class SimGriev:
             step = torch.minimum(bal.abs(), rate.clamp(min=0)) * live.long()
             self._add_grievance(row, other, torch.where(v_is_row, -step, step), generated=False)
 
-    def _grievance_held_capitals(self, row: int) -> None:
+    def _grievance_held_capitals(self, row: int, active: torch.Tensor) -> None:
         """CIV6: "Controlling the civ's original Capital: 3 per turn while not
         at war". The table's 1/turn row for any other founded city is marked
-        "(not working anymore)" and has no twin here."""
+        "(not working anymore)" and has no twin here. In the games where the
+        holder's economy turn runs (`active`)."""
         alive = self.city_alive[:, row]
         for other in range(self.n_majors):
             if other == row:
                 continue
-            hold = (alive & (self.city_orig_cap[:, row] == other)).any(dim=1) & ~self.war[:, row, other]
+            hold = active & (alive & (self.city_orig_cap[:, row] == other)).any(dim=1) & ~self.war[:, row, other]
             self._add_grievance(other, row, self._griev_held_capital, hold)
 
     # ------------------------------------------------------------------ events

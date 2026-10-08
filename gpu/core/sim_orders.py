@@ -758,8 +758,10 @@ class SimOrders:
                 # ONE call with the mover's own class flags: the rule takes
                 # per-unit tensors, so no class needs a call of its own.
                 is_nav = self.unit_naval.take(ut)
+                # a WATER-WALKER on water is no passenger: it stands in its own
+                # class there, as a hull does (`tileFreeForUnit`'s `walks`)
                 blocked = self._blocked_for(
-                    tgt.unsqueeze(1), row, is_naval=is_nav,
+                    tgt.unsqueeze(1), row, is_naval=is_nav | self.unit_water_walk.take(ut),
                     is_civilian=is_civ, is_support=self._type_support.take(utp.clamp(min=0)),
                 ).squeeze(1)
                 _tc1 = tc.unsqueeze(1)
@@ -1940,18 +1942,17 @@ class SimOrders:
         return gold * (100.0 + pct) / 100.0
 
     def _barb_reset_mp(self) -> None:
-        """Reset barbarian MP: `u.movesLeft = UNITS[u.type].moves`.
-
-        Deliberately NOT `_reset_mp`: TS writes movesLeft ONLY, so movesFull
-        keeps refreshUnits' embark-aware value — which is what stepUnit's
-        afford rule and next turn's "spent no MP" gate both read — and it uses
-        the plain type pool, not the embark one. The hostile pool also holds
-        the Free Cities' units, which are no barbarians and keep theirs.
+        """barbarianPhase's own reset: each barbarian's `movesLeft` and
+        `movesFull` to `unitFullMoves + generalAuraMP` (`_full_mp`, which
+        reads the barbarians' own research for the Mathematics rung) and its
+        `attacksLeft` to `attacksPerTurn`. The hostile pool also holds the
+        Free Cities' units, which are no barbarians and keep theirs.
         """
-        self.barb_unit_mp.copy_(torch.where(
-            self.barb_unit_seat == BARB_SEAT,
-            self._mp_scale * self._type_moves.take(self.barb_unit_type.clamp(min=0, max=self.NU - 1)),
-            self.barb_unit_mp))
+        barb = self.barb_unit_seat == BARB_SEAT
+        f = self._full_mp("barb")
+        self.barb_unit_mp_full.copy_(torch.where(barb, f, self.barb_unit_mp_full))
+        self.barb_unit_mp.copy_(torch.where(barb, f, self.barb_unit_mp))
+        self.barb_unit_attacks.copy_(torch.where(barb, self._full_attacks("barb"), self.barb_unit_attacks))
 
     def _barbarian_phase(self) -> None:
         """`barbarianPhase`: the game's rules for the barbarians

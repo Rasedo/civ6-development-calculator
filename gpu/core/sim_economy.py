@@ -4999,7 +4999,7 @@ class SimEconomy:
         nbc = nb.clamp(min=0)
         on = (nb >= 0).unsqueeze(0)           # [1, T, 6]
         entry = self.water[:, nbc] & ~self.ocean_tile[:, nbc] & on   # COAST or LAKE
-        exit_ = (self.water[:, nbc] | (self.centre_slot_at[:, nbc] >= 0)) & on
+        exit_ = (self.water[:, nbc] | self._centre_plane()[:, nbc]) & on
         out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
         for a in range(6):
             for b in range(6):
@@ -6257,16 +6257,17 @@ class SimEconomy:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
         reaches anything AT SEA (a hull or a passenger); the three embark rungs
         raise the passenger's own pool. Each reads the unit's seat's own
-        research — a major's, or a city-state's (`citystate_techs`); a
-        barbarian researches nothing."""
+        research — a major's, a city-state's (`citystate_techs`) or the
+        barbarians' (`barb_techs`, `state.barbSeat.research`)."""
         row = self._row_of(seat)
         ok = (row >= 0) & (row < self.n_majors)
         r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
         minor = (seat >= 100) & (seat < 100 + self.S)
         s0 = (seat - 100).clamp(min=0, max=max(self.S - 1, 0))
+        barb = seat == BARB_SEAT
 
         def has_tech(ti: int) -> torch.Tensor:
-            h = self.civ_techs[:, :, ti].gather(1, r0) & ok
+            h = (self.civ_techs[:, :, ti].gather(1, r0) & ok) | (self.barb_techs[:, ti].unsqueeze(1) & barb)
             if self.S > 0:
                 h = h | (self.citystate_techs[:, :, ti].gather(1, s0) & minor)
             return h

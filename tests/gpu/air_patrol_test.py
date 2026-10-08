@@ -37,8 +37,17 @@ def _steps(s0: int, s1: int, most: int = 64) -> int:
 
 
 def fresh(rules, path, turns=30):
-    """ONE warmed engine per (fixture, warmup); every scene restores it."""
-    return warm_base((str(path), turns), lambda: opened(rules, path, turns))
+    """ONE warmed engine per (fixture, warmup); every scene restores it. The
+    warm-up's barbarians are cleared: they are hostile to every seat and,
+    first in tile order, would fill an aircraft's target columns before the
+    units and centres a scene places."""
+    sim = warm_base((str(path), turns), lambda: opened(rules, path, turns))
+    ba = sim.barb_unit_alive
+    if bool(ba.count_nonzero()):
+        br, bs = ba.nonzero(as_tuple=True)
+        sim._vacate("barb", br, bs)
+        ba[br, bs] = False
+    return sim
 
 
 def a_city(sim, row):

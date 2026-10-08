@@ -8430,7 +8430,9 @@ class SimSeats:
                 # (DLL 0x365ae0)
                 live_d = self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
                 if int(r["anyd"]):
-                    hit |= ((self.district[:, nbc] >= 0) & live_d
+                    # a city centre is one of the owner's districts too
+                    # (`tile.district = 'CITY_CENTER'`)
+                    hit |= ((((self.district[:, nbc] >= 0) & live_d) | self._centre_plane()[:, nbc])
                             & (self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)))
                 elif di >= 0:
                     hit |= (self.district[:, nbc] == di) & live_d
@@ -11644,14 +11646,16 @@ class SimSeats:
         """[B, T] bool — `seenResourceAt`'s twin: a resource this row's
         research reveals, and a dig site its civics reveal (an Antiquity Site
         past `_antiquity_civic`, a Shipwreck past `_shipwreck_civic`; a
-        city-state's dig sites past its suzerain's civics)."""
+        city-state's dig sites past its own civics or its suzerain's)."""
         seen = self._res_live() & ~self._res_hidden(row)
         s = row - self._CITY_MINOR0
         for plane, civic in ((self.antiquity, self._antiquity_civic), (self.shipwreck, self._shipwreck_civic)):
             if civic >= 0 and row < self.n_majors:
                 seen = seen | (plane & self.civ_civics[:, row, civic].unsqueeze(1))
             elif civic >= 0 and 0 <= s < self.S:
-                # a city-state sees the dig sites its suzerain's civics reveal
+                # a city-state sees the dig sites its own civics reveal, and
+                # those its suzerain's do
+                seen = seen | (plane & self.citystate_civics[:, s, civic].unsqueeze(1))
                 suz = self.citystate_suzerain[:, s]                               # [B]
                 for x in range(self.n_majors):
                     on = (suz == x) & self.civ_civics[:, x, civic]
@@ -12550,14 +12554,15 @@ class SimSeats:
 
     def _nonbarb_unit_at(self, tiles: torch.Tensor) -> torch.Tensor:
         """[B, N] — a unit a barbarian's melee may take stands AT `tiles`: a
-        non-barbarian military unit, civilian or passenger (a civilian the
-        barbarians hold is theirs). A prober asking about one tile per game
-        has no business building the whole map."""
+        non-barbarian military unit, civilian, support unit or passenger (a
+        civilian the barbarians hold is theirs) — every class the raider's
+        adjacency scan offers. A prober asking about one tile per game has no
+        business building the whole map."""
         t = tiles.clamp(min=0)
         mil = self._visible_military_at(BARB_SEAT).gather(1, t)
         mseat = torch.where(mil >= 0, self.unit_seat.gather(1, mil.clamp(min=0)), torch.full_like(mil, -1))
         foe = (mil >= 0) & (mseat != BARB_SEAT)
-        for plane in (self.civilian_at, self.embarked_at):
+        for plane in (self.civilian_at, self.support_at, self.embarked_at):
             o = plane.gather(1, t)
             foe = foe | ((o >= 0) & (self.unit_seat.gather(1, o.clamp(min=0)) != BARB_SEAT))
         return foe
@@ -13118,7 +13123,10 @@ class SimSeats:
         # `_canal_pass()` rebuilds a [B, T] plane to be asked.
         if bool(naval.count_nonzero()):
             to_water = to_water | (naval & self._canal_pass().gather(1, dc1).squeeze(1))
-        transition = (emb != to_water) & ~naval & ~self.unit_water_walk.take(_ut)
+        # a SHORE crossing is the two plots' water differing (`stepUnit`'s
+        # `isWater(from) !== isWater(to)`), never the mover's own flag
+        from_water = self.wpass.gather(1, hc.unsqueeze(1)).squeeze(1)
+        transition = (from_water != to_water) & ~naval & ~self.unit_water_walk.take(_ut)
         base_step = torch.where(
             to_water, torch.full_like(land_cost, self._mp_scale), land_cost)
         if bool(transition.count_nonzero()):
@@ -13135,7 +13143,8 @@ class SimSeats:
             l_end = torch.where(to_water, hc, dc1.squeeze(1))
             easy_dock = (
                 (self.district.gather(1, w_end.unsqueeze(1)).squeeze(1) == self._harbor_didx)
-                | ((self.centre_slot_at.gather(1, l_end.unsqueeze(1)).squeeze(1) >= 0)
+                # any city's centre, a city-state's included (`markCityCentre`)
+                | (self._centre_plane().gather(1, l_end.unsqueeze(1)).squeeze(1)
                    & self.coastal_land.gather(1, l_end.unsqueeze(1)).squeeze(1))
             )
             cost = torch.where(
@@ -13227,9 +13236,9 @@ class SimSeats:
                 self.unit_promo_used[rows, gs] = torch.where(
                     _near & (_pv > 0), _pu, self.unit_promo_used[rows, gs])
                 self.unit_charges[rows, gs] += _pv
-        self.unit_emb[rows, gs] = (
-            to_water & ~naval
-            & ~self.unit_water_walk.take(u_type.clamp(min=0, max=self.NU - 1)))[rows]
+        # the flag moves with a shore crossing alone (`unit.embarked =
+        # isWater(to)` under `transition`)
+        self.unit_emb[rows, gs] = torch.where(transition, to_water, emb)[rows]
         # OCCUPANCY FIRST, and it has to be: a village may GRANT a unit, and
         # `_first_free_spot` would otherwise hand it the tile the mover has
         # just taken. TS reads `unit.tileIndex`, already updated by here, so

@@ -1144,7 +1144,9 @@ class SimMinors:
                 g = gate & (item == dv)
                 unlock = (self.citystate_techs[:, s, ut_d] if ut_d >= 0
                           else (self.citystate_civics[:, s, uc_d] if uc_d >= 0 else ones_b))
-                held = self.city_dist_tile[:, row, 0, dv] >= 0
+                # one of a type to a city, a repeatable one aside
+                # (`canPlaceDistrictIn`'s allowMultiple: the Neighborhood)
+                held = (self.city_dist_tile[:, row, 0, dv] >= 0) & ~self._is_repeatable[dv]
                 if bool(self._is_specialty[dv]):
                     spec_cnt = ((self.city_dist_tile[:, row, 0] >= 0) & self._is_specialty).sum(dim=1)
                     cap_ok = spec_cnt < (torch.div(self.city_pop[:, row, 0] - 1, 3, rounding_mode="floor") + 1)
@@ -1184,7 +1186,10 @@ class SimMinors:
                     self.district[rr, tt] = dv
                     self.district_complete[rr, tt] = True
                     self._pave_plot(rr, tt)
-                    self.city_dist_tile[rr, row, 0, dv] = tt
+                    # the registry keeps a repeatable type's FIRST tile
+                    _held = self.city_dist_tile[rr, row, 0, dv]
+                    self.city_dist_tile[rr, row, 0, dv] = (torch.where(_held >= 0, _held, tt)
+                                                           if bool(self._is_repeatable[dv]) else tt)
                     if dv == self._encamp_didx:
                         self.encamp_hp[rr, tt] = self._encamp_hp_max
                         self.encamp_outer_hp[rr, tt] = self._walls_tier_hp[self._minor_walls_tier(s)][rr]

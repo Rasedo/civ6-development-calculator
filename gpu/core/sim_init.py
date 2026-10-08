@@ -3904,7 +3904,10 @@ class SimInit:
         self.tribe_every = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.TQ = 10
         self.tribe_queue = torch.full((B, self.KT, self.TQ), -1, dtype=torch.long, device=device)
-        self.TL = 8
+        # a scout's report adds one city owner to its tribe's raid list, at
+        # most once per major per throttle window, so over the game's turns
+        # the list (unbounded on TS) can hold no more than this
+        self.TL = self.n_majors * (int(self.rules.turn_limit) // int(self._bb["spotThrottle"]) + 1)
         self.tribe_raidq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_assq = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_home_slot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
