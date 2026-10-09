@@ -8,7 +8,7 @@ UserPromptSubmit: print one usage line, which Claude Code adds to the
 prompt's context, so the agent always knows how much of the 5-hour and
 7-day windows is spent.
 PreToolUse on Agent: refuse to start a new subagent once the 5-hour window
-is at GUARD_5H % or the 7-day window at GUARD_7D % — the agents already
+is at GUARD_5H % — the agents already
 running finish, nothing new starts a job the limit would cut in half.
 A missing or unreadable file never blocks anything.
 """
@@ -22,7 +22,6 @@ import time
 
 FILE = pathlib.Path.home() / ".claude" / "rate_limits.txt"
 GUARD_5H = 90
-GUARD_7D = 95
 STALE_S = 30 * 60
 
 
@@ -79,8 +78,7 @@ def main() -> int:
         return 0
     if name == "PreToolUse" and event.get("tool_name") == "Agent":
         p5 = windows.get("five_hour", (0, ""))[0]
-        p7 = windows.get("seven_day", (0, ""))[0]
-        if p5 >= GUARD_5H or p7 >= GUARD_7D:
+        if p5 >= GUARD_5H:
             why = (f"{line(windows, at)}. A new subagent now would likely be cut off by the usage "
                    f"limit mid-task: let the running agents finish, and start it after the window "
                    f"resets (or when the owner says to anyway).")
