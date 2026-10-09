@@ -45,6 +45,7 @@ import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldP
   unlockedPolicyIds } from '../core/effects';
 import { congressPolicyBlocked } from '../core/congress';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra } from '../core/economy';
+import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/aiResearch';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
 import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '../core/governors';
@@ -72,7 +73,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, holdMinorResearch, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, holdMinorCivics, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -151,6 +152,105 @@ interface Ctx {
   log?: RandLog;
   /** the hold on the game's stream (`streamHold`) */
   stream: StreamHold;
+  /** the research AI's choices against the record's and the game's AI log
+   *  (`ResearchAiTally`), and each seat's research as the pair opened */
+  researchAi: Record<'major' | 'minor', ResearchAiTally>;
+  researchBefore: Map<number, string | null>;
+  /** the game's AI log of research (`<dump>.logs/AI_Research.csv`): per
+   *  `${turn}:${player}` the row researched and the goal */
+  aiResearchLog: Map<string, AiResearchRows>;
+  researchScores: Record<'major' | 'minor', ResearchScoreTally>;
+}
+
+/** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
+ *  city-state's, in its turn) or would make (a major's, at each research
+ *  decision of the record), how many the record's research took, how many
+ *  the game's AI log names (its RESEARCHING row of the turn, where it logs
+ *  the player), and the first that differs from the record */
+export interface ResearchAiTally {
+  choices: number;
+  record: number;
+  logged: number;
+  log: number;
+  random: number;
+  first?: { turn: number; player: number; ours: string | null; record: string | null; log: string | null };
+}
+
+const newResearchTally = (): ResearchAiTally => ({ choices: 0, record: 0, logged: 0, log: 0, random: 0 });
+
+/** the game's AI research log beside the dump, or an empty map */
+function loadAiResearchLog(dumpPath: string): Map<string, AiResearchRows> {
+  const out = new Map<string, AiResearchRows>();
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Research.csv');
+  let text = '';
+  try {
+    text = readFileSync(path, 'utf8');
+  } catch {
+    return out;
+  }
+  for (const line of text.split('\n').slice(1)) {
+    const p = line.split(',').map((x) => x.trim());
+    if (p[2] !== 'Tech') continue;
+    const k = `${p[0]}:${p[1]}`;
+    const row = out.get(k) ?? { tech: null, goal: null, rows: new Map() };
+    const eid = engineId('tech', p[3], 'TECH_', TECHS);
+    if (!eid) continue;
+    row.rows.set(eid, { score: Number(p[4]), turns: Number(p[6]), owned: p[5] === 'OWNED' });
+    if (p[5] === 'RESEARCHING') row.tech = eid;
+    else if (p[5] === 'GOAL') row.goal = eid;
+    out.set(k, row);
+  }
+  return out;
+}
+
+/** a turn's AI research log of one player: the row researched, the goal,
+ *  and every row it scored */
+interface AiResearchRows {
+  tech: string | null;
+  goal: string | null;
+  rows: Map<string, { score: number; turns: number; owned: boolean }>;
+}
+
+/** THE RESEARCH AI'S ANALYSIS against the log: per party, the rows the log
+ *  scored at the turn, those whose turns the engine's analysis gives, and
+ *  those whose score it gives within the log's rounding */
+export interface ResearchScoreTally {
+  rows: number;
+  turns: number;
+  score: number;
+  first?: { turn: number; player: number; tech: string; log: [number, number]; ours: [number, number] };
+}
+
+/** a research AI analysis against the log's rows of the turn */
+function scoreAgainstLog(ctx: Ctx, kind: 'major' | 'minor', turn: number, player: number, entries: readonly ResearchEntry[]): void {
+  const logged = ctx.aiResearchLog.get(`${turn}:${player}`);
+  if (!logged) return;
+  const t = ctx.researchScores[kind];
+  const ours = new Map(entries.map((e) => [e.tech, e]));
+  for (const [tech, g] of logged.rows) {
+    if (g.owned) continue;
+    const e = ours.get(tech);
+    if (!e) continue;
+    t.rows += 1;
+    const sc = e.score / 256;
+    if (e.turns === g.turns) t.turns += 1;
+    if (Math.abs(sc - g.score) <= 0.051) t.score += 1;
+    else if (!t.first) t.first = { turn, player, tech, log: [g.score, g.turns], ours: [Math.round(sc * 10) / 10, e.turns] };
+  }
+}
+
+/** a research AI choice tallied against the record's research and the log's */
+function tallyResearchAi(ctx: Ctx, kind: 'major' | 'minor', turn: number, player: number, ours: string | null, record: string | null): void {
+  const t = ctx.researchAi[kind];
+  t.choices += 1;
+  if (ours === record) t.record += 1;
+  const logged = ctx.aiResearchLog.get(`${turn}:${player}`);
+  if (logged) {
+    t.logged += 1;
+    if (ours === logged.tech) t.log += 1;
+  }
+  if (!t.first && ours !== record) t.first = { turn, player, ours, record, log: logged?.tech ?? null };
+  if (TRACE.has('researchAi')) console.error(`t${turn} research ${kind} p${player} ours ${ours} record ${record} log ${logged?.tech ?? '-'} goal ${logged?.goal ?? '-'}`);
 }
 
 /** REPLAY_TRACE=<subsystem or decision kind>,... prints every mismatch of
@@ -451,6 +551,15 @@ function applyResearch(ctx: Ctx, player: number, row: number, civic: boolean): v
     return;
   }
   const r = s.research;
+  if (!civic) {
+    // the major's research AI asked at the record's decision: after the
+    // research the pair opened on completed, the completion's choice, else
+    // the turn's; a random pick is taken as none
+    const was = ctx.researchBefore.get(s.seat) ?? null;
+    const done = was && r.techs.includes(was) ? was : null;
+    const c = researchAiChoice(ctx.state, s.seat, s.sciRate ?? 0, done, () => -1);
+    tallyResearchAi(ctx, 'major', ctx.state.turn, player, c?.tech ?? r.tech, id);
+  }
   if ((civic ? r.civics : r.techs).includes(id)) {
     count(ctx, kind, 'refused', player, 'already complete in the engine');
     return;
@@ -2052,6 +2161,10 @@ export interface ReplayReport {
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
   refusals: Record<string, Record<string, number>>;
+  /** the research AI's choices, majors' and city-states' (`ResearchAiTally`) */
+  researchAi: Record<'major' | 'minor', ResearchAiTally>;
+  /** the research AI's analysis against the game's AI log (`ResearchScoreTally`) */
+  researchScores: Record<'major' | 'minor', ResearchScoreTally>;
 }
 
 /** the per-turn step check that reads each state subsystem */
@@ -2096,14 +2209,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // the battles of the turns its event log covers (`RecordedActions`)
   const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
-  const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {} };
+  const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
+    researchAi: { major: newResearchTally(), minor: newResearchTally() }, researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } } };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
   holdMinorItem(minorItems(recs, cat));
-  holdMinorResearch(minorResearchPicks(recs, cat, first.playerOfSeat));
+  holdMinorCivics(minorCivicPicks(recs, cat, first.playerOfSeat));
   // a city-state's army moves and fights as the record's moves and battles
   // say (`syncUnits`, `battle`), its Builders lay what the record's
   // improvements carry (`improve`), it buys what the log's purchases name
@@ -2128,6 +2242,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
   };
   // the record's units in the importer's order
   let k = 0;
@@ -2169,6 +2284,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
     traceTurn = b.turn;
+    ctx.researchBefore = new Map([...state.seats, ...state.cityStates].map((s) => [s.seat, s.research.tech]));
     const ds = source.decisions(a, b, cat);
     stream.actions(a.turn);
     applyPhase(ctx, ds, 'before', b, a);
@@ -2362,6 +2478,32 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     recordMoments(state);
     killBoosts(ctx, read);
     holdResearchEra(null);
+    // the research AI's analysis of the turn, past its Science, against the
+    // game's AI log of the turn: a city-state's own (its turn's), a major's
+    // made here
+    for (const s of state.seats) {
+      const pid = ctx.playerOfSeat.get(s.seat);
+      if (pid !== undefined) scoreAgainstLog(ctx, 'major', a.turn, pid, researchAnalysis(state, s.seat, s.sciRate ?? 0));
+    }
+    for (const cs of state.cityStates) {
+      const pid = ctx.playerOfSeat.get(cs.seat);
+      if (pid !== undefined && cs.research.aiEntries) scoreAgainstLog(ctx, 'minor', a.turn, pid, cs.research.aiEntries);
+    }
+    // the city-states' research AI: each choice its turn made, against the
+    // research record t+1 shows
+    const recTech = (rec: TurnRecord, pid: number) => {
+      const row = num(rec.players.find((p) => p.id === pid)?.researching);
+      return row >= 0 ? engineId('tech', cat.techs[row], 'TECH_', TECHS) : null;
+    };
+    for (const cs of state.cityStates) {
+      const pid = ctx.playerOfSeat.get(cs.seat);
+      if (pid === undefined) continue;
+      const ours = cs.research.tech;
+      const rec = recTech(b, pid);
+      if (ours === ctx.researchBefore.get(cs.seat) && rec === recTech(a, pid)) continue;
+      tallyResearchAi(ctx, 'minor', a.turn, pid, ours, rec);
+      if (ours && !cs.research.goal) ctx.researchAi.minor.random += 1;
+    }
     const t = compareState(state, read);
     compareUnits(ctx, b, t);
     note(t, 'barb.camps', campsHeld, 'camps', ctx.next.state.barbSeat.camps.length, state.barbSeat.camps.length);
@@ -2420,7 +2562,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
   holdMinorItem(null);
-  holdMinorResearch(null);
+  holdMinorCivics(null);
   holdMinorCatchUp(null);
   holdResearchEra(null);
   holdMinorOrders(false);
@@ -2446,18 +2588,17 @@ function minorItems(recs: readonly TurnRecord[], cat: Catalog) {
   };
 }
 
-/** THE CITY-STATES' RESEARCH PICKS: what a city-state researches is its AI's
- *  pick, taken on a completion, so the item it works at its turn t is the
- *  one record t shows (runs/h1_duelw1121 Antioch: Pottery done at t6,
- *  Astrology at 0 in record t7, then Animal Husbandry over the cheaper
- *  Mining at t16). The engine's own research step works it. */
-function minorResearchPicks(recs: readonly TurnRecord[], cat: Catalog, playerOfSeat: Map<number, number>) {
+/** THE CITY-STATES' CIVIC PICKS: what a city-state studies is its civics
+ *  AI's pick, taken on a completion, so the item it works at its turn t is
+ *  the one record t shows. The engine's own step works it; its technologies
+ *  are the engine's research AI's (`aiResearch.ts`). */
+function minorCivicPicks(recs: readonly TurnRecord[], cat: Catalog, playerOfSeat: Map<number, number>) {
   const byTurn = new Map(recs.map((r) => [r.turn, r]));
-  return (state: GameState, cs: CityState, civic: boolean): string | undefined => {
+  return (state: GameState, cs: CityState): string | undefined => {
     const p = byTurn.get(state.turn)?.players.find((x) => x.id === playerOfSeat.get(cs.seat));
-    const row = num(civic ? p?.civic : p?.researching);
+    const row = num(p?.civic);
     if (!(row >= 0)) return undefined;
-    return (civic ? engineId('civic', cat.civics[row], 'CIVIC_', CIVICS) : engineId('tech', cat.techs[row], 'TECH_', TECHS)) ?? undefined;
+    return engineId('civic', cat.civics[row], 'CIVIC_', CIVICS) ?? undefined;
   };
 }
 
@@ -2483,6 +2624,20 @@ export function replayMarkdown(r: ReplayReport): string {
   for (const p of r.perTurn) {
     const ks = Object.entries(p.imposed);
     if (ks.length) out.push(`| ${p.turn} | ${ks.map(([k, n]) => `${k} ×${n}`).join(', ')} |`);
+  }
+  out.push('', '## The research AI', '', 'A city-state\'s choices its turn made (or the record changed), a major\'s at each research decision of the record;',
+    'the record\'s and the game\'s AI log\'s (its RESEARCHING row of the turn) research against the engine\'s.', '',
+    '| party | choices | as the record | logged | as the log | random picks | first differing (turn player ours / record / log) |',
+    '|---|---:|---:|---:|---:|---:|---|');
+  for (const [k, x] of Object.entries(r.researchAi ?? {})) {
+    const f = x.first;
+    out.push(`| ${k} | ${x.choices} | ${x.record} | ${x.logged} | ${x.log} | ${x.random} | ${f ? `t${f.turn} p${f.player} ${f.ours} / ${f.record} / ${f.log}` : '-'} |`);
+  }
+  out.push('', 'The analysis as each pair opens against the log\'s rows of the turn (unowned rows the log scored):', '',
+    '| party | rows | turns as the log | score within 0.05 | first differing (turn player tech log [score, turns] / ours) |', '|---|---:|---:|---:|---|');
+  for (const [k, x] of Object.entries(r.researchScores ?? {})) {
+    const f = x.first;
+    out.push(`| ${k} | ${x.rows} | ${x.turns} | ${x.score} | ${f ? `t${f.turn} p${f.player} ${f.tech} ${JSON.stringify(f.log)} / ${JSON.stringify(f.ours)}` : '-'} |`);
   }
   out.push('', '## Decisions', '',
     '| kind | applied | imposed (fell back to the record) | refused |', '|---|---:|---:|---:|');

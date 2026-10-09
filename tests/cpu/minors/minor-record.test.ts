@@ -113,12 +113,9 @@ describe('Containment', () => {
 
 // ---------------------------------------------------------------------------
 describe("the minor's research record", () => {
-  it("banks its city's own Science a turn and completes the cheapest available row", () => {
+  it("banks its city's own Science a turn and completes the research AI's pick", () => {
     const state = makeState(makeMap(24, 24));
     const cs = addCs(state, 12, 12, { population: 5 });
-    const cheapestTech = Object.entries(TECHS)
-      .filter(([, d]) => d.prereqs.length === 0)
-      .sort((a, b) => a[1].cost - b[1].cost)[0];
     state.turn = 1;
     // the pot takes the yield walk's Science over `minorCity` — its five
     // citizens alone pay some (`tests/cpu/citystates/minor-yields.test.ts`
@@ -126,10 +123,16 @@ describe("the minor's research record", () => {
     const sci = computeCityStats(state, minorCity(cs)).total.science;
     expect(sci).toBeGreaterThan(0);
     minorPhase(state);
-    expect(cs.research.techProgress).toBe(sci);   // the city's Science into the pot, nothing done
+    // with nothing in hand the Science waits in the overflow; the research
+    // AI's pick, a root row leading to its goal, holds nothing yet
+    const pick = cs.research.tech!;
+    expect(TECHS[pick].prereqs).toEqual([]);
+    expect(cs.research.goal).toBeTruthy();
+    expect(cs.research.techOverflow).toBe(sci);
+    expect(cs.research.techProgress).toBe(0);
     expect(cs.research.techs).toEqual([]);
-    for (let i = 0; i < Math.ceil(cheapestTech[1].cost / sci); i++) minorPhase(state);
-    expect(cs.research.techs).toContain(cheapestTech[0]);
+    for (let i = 0; i < Math.ceil(TECHS[pick].cost / sci); i++) minorPhase(state);
+    expect(cs.research.techs).toContain(pick);
     expect(cs.research.techProgress).toBeGreaterThanOrEqual(0);
   });
 

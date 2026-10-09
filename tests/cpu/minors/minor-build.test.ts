@@ -513,8 +513,9 @@ describe("the minor's Urban Defenses", () => {
     const cs = addCs(state, 12, 12, { buildings: ['ANCIENT_WALLS'], outerHp: 30 });
     idleBuilder(state, cs);
     plan(cs, []);
-    // every tech but Urban Defenses held, so it is the only one available
+    // every tech but Urban Defenses held, Urban Defenses in hand
     cs.research.techs = Object.keys(TECHS).filter((t) => t !== URBAN_DEFENSES_TECH);
+    cs.research.tech = URBAN_DEFENSES_TECH;
     cs.research.techProgress = 1e9;
     state.turn = 1;
     minorPhase(state);
@@ -574,7 +575,7 @@ describe('the rows the table grew', () => {
     state.turn = 1;
     cs.prodProgress = 0;
     minorPhase(state);
-    const sci0 = cs.research.techProgress;
+    const sci0 = cs.research.techProgress + (cs.research.techOverflow ?? 0);
     hold(cs, 'CAMPUS', tileAtCoords(state.map, 13, 12));
     const cost = projectCost(state, cs.seat, 'RESEARCH_GRANTS');
     inHand(cs, 'project:RESEARCH_GRANTS', cost);

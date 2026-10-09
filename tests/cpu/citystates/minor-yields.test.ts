@@ -86,7 +86,8 @@ describe("the minor's city rides the yield walk", () => {
     cs.armyCap = 0;
     const y = computeCityStats(state, minorCity(cs)).total;
     minorPhase(state);
-    expect(cs.research.techProgress).toBe(y.science);
+    // the Science waits in the overflow under the research AI's fresh pick
+    expect(cs.research.techProgress + (cs.research.techOverflow ?? 0)).toBe(y.science);
     expect(cs.research.civicProgress).toBe(y.culture);
     // so nothing is in hand and the step adds the city's Production (the
     // minor's -50% among its percents) to the overflow store

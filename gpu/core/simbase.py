@@ -477,6 +477,9 @@ class Rules:
     c_award_titles: torch.Tensor  # long [NC]
     c_award_projpct: torch.Tensor  # long [NC]
     t_repeat: torch.Tensor  # bool [NT] — CIV6 `Repeatable`: researchable again once complete
+    t_ai_unlocks: torch.Tensor  # long [NT, 3] — what the research AI's value counts: buildings, districts, wonders (`techUnlocks`)
+    t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
+    research_ai: dict  # the research AI's constants (`aiResearch.ts`): horizon, discountPct, taskBias, the pseudo-yields, embarkAll, unlockShare
     c_repeat: torch.Tensor  # bool [NC]
     t_prereqs: list  # list of lists
     c_cost: torch.Tensor
@@ -720,6 +723,9 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         c_award_titles=torch.tensor([int(c["awardTitles"]) for c in r["civics"]], dtype=torch.long),
         c_award_projpct=torch.tensor([int(c["awardProjectPct"]) for c in r["civics"]], dtype=torch.long),
         t_repeat=torch.tensor([bool(t["repeatable"]) for t in r["techs"]], dtype=torch.bool),
+        t_ai_unlocks=torch.tensor([[int(t["aiBuildings"]), int(t["aiDistricts"]), int(t["aiWonders"])] for t in r["techs"]], dtype=torch.long),
+        t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
+        research_ai=r["researchAi"],
         c_repeat=torch.tensor([bool(c["repeatable"]) for c in r["civics"]], dtype=torch.bool),
         t_prereqs=[t["prereqs"] for t in r["techs"]],
         c_cost=torch.tensor([c["cost"] for c in r["civics"]], dtype=torch.float64),
@@ -1148,6 +1154,8 @@ _MUTABLE = [
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_cur_tech", "citystate_cur_civic", "citystate_tech_retain", "citystate_civic_retain",  # the minor's research in hand and kept
     "citystate_tech_ovf", "citystate_civic_ovf",
+    "citystate_tech_goal", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
+    "citystate_ai_valid",  # the research AI's goal and its last turn's analysis
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_faith",
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",

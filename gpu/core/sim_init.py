@@ -264,6 +264,18 @@ class SimInit:
         self.citystate_civic_retain = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.float64, device=device)
         self.citystate_tech_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
         self.citystate_civic_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the research AI's goal (-1 none) and its analysis of the minor's
+        # last turn, which a completion's choice reads (`ResearchState.goal`,
+        # `ResearchState.aiEntries`): per row its turns, next step, own value
+        # and score (raw 24.8) and owned flag
+        nt_ai = len(rules.t_cost)
+        self.citystate_tech_goal = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_ai_turns = torch.full((B, s_pad, nt_ai), -1, dtype=torch.long, device=device)
+        self.citystate_ai_next = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_base = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_score = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_owned = torch.zeros(B, s_pad, nt_ai, dtype=torch.bool, device=device)
+        self.citystate_ai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
         # spent down the fitted build table. The built results live on the
         # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)

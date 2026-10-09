@@ -65,24 +65,28 @@ def test_resolved_suzerain(rules) -> None:
 
 
 def test_minor_research(rules) -> None:
-    """CIV6 (City-state): a minor "develops scientifically and culturally...
-    it will apparently research certain techs" — POPULATION a turn into each
-    pot, the cheapest available row completing at most once per pot."""
+    """CIV6 (City-state): a minor "develops scientifically and culturally" —
+    its city's Science a turn into the technology pot, on the research AI's
+    pick (`_rai_turn`), which completes and is replaced by the AI's next;
+    its Culture into the civic pot, the cheapest available civic."""
     sim = build(rules)
     sim.citystate_techs[0, 0].zero_()
     sim.citystate_civics[0, 0].zero_()
     sim.citystate_tech_prog[0, 0] = 0
+    sim.citystate_tech_ovf[0, 0] = 0
+    sim.citystate_cur_tech[0, 0] = -1
+    sim.citystate_tech_goal[0, 0] = -1
     sim.citystate_civic_prog[0, 0] = 0
     row = sim._CITY_MINOR0
     yf = sim._seat_amenity(row)[2][:, 0:1]
     sci = float(sim._seat_city_walk(row, 0, amen_yf=yf)[0, 0, 3])
     assert sci > 0, "a live minor's city yields Science (its citizens alone pay some)"
     cost = sim.rules_dev.t_cost
-    avail = sim._available_mask(sim.citystate_techs[0:1, 0], sim._prereq_t)[0]
-    cheapest = int(torch.where(avail, cost.to(sim.device),
-                               torch.full_like(cost.to(sim.device), float("inf"))).argmin())
     sim._city_state_phase()
-    assert float(sim.citystate_tech_prog[0, 0]) == sci, "the pot takes the city's own Science"
+    pick = int(sim.citystate_cur_tech[0, 0])
+    assert pick >= 0 and not sim.rules.t_prereqs[pick], "the research AI picks a root row"
+    assert int(sim.citystate_tech_goal[0, 0]) >= 0, "and holds the goal it leads to"
+    assert float(sim.citystate_tech_ovf[0, 0]) == sci, "the turn's Science waits in the overflow"
     assert int(sim.citystate_techs[0, 0].sum()) == 0, "and nothing completes below the price"
     # the horizon covers BOTH pots: the tech at the walk's Science and the
     # cheapest available civic at its Culture
@@ -91,12 +95,12 @@ def test_minor_research(rules) -> None:
     ccost = sim.rules_dev.c_cost
     cavail = sim._available_mask(sim.citystate_civics[0:1, 0], sim._prereq_c)[0]
     ccheap = float(torch.where(cavail, ccost.to(sim.device), torch.full_like(ccost.to(sim.device), float("inf"))).min())
-    turns = max(int(float(cost[cheapest]) // sci), int(ccheap // cul)) + 2
+    turns = max(int(float(cost[pick]) // sci), int(ccheap // cul)) + 2
     for _ in range(turns):
         sim._city_state_phase()
-    assert bool(sim.citystate_techs[0, 0, cheapest]), "the cheapest available row lands first"
+    assert bool(sim.citystate_techs[0, 0, pick]), "the research AI's pick lands first"
     assert int(sim.citystate_civics[0, 0].sum()) > 0, "the civic pot walks its own row"
-    print(f"  minor research OK: {sci}/turn, cheapest row {cheapest} at cost {float(cost[cheapest]):.0f}")
+    print(f"  minor research OK: {sci}/turn, the AI's row {pick} at cost {float(cost[pick]):.0f}")
 
 
 def test_civ_levels(rules) -> None:

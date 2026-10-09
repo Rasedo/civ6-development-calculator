@@ -3468,6 +3468,84 @@ low byte / 256 plus the rest). Check: `dll_citybuild.py`.
   FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 ("Canceling current
   build"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970.
 
+## H-1: the research AI — READ (the choice), PARTLY READ (the value)
+
+AI/Research.cpp. The object (the player's +0x12a8) keeps one 0x50-byte entry
+per technology in table order (+0x318 tracked, data at +0x370): +0 the row,
++4 its next step, +0x10 its own value, +0x14 its score, +0x18 owned, +0x19
+boosted, +0x1a leaf (0x761b70: no row lists it as a prerequisite), +0x1b
+Repeatable (`Technologies` +0x70 bit 8), +0x1c turns; the goal at +0x450
+(tracked +0x3f8), the favored flags (AiFavoredItems of the leader's
+Technologies list) at +0x4b0. Its log is AI_Research.csv (0x762b40: "%d, %d,
+Tech, %s, %3.1f, %s, %d" — OWNED / RESEARCHING / GOAL / BOOSTED, the score
+and the turns; a row with turns < 0 unowned is not logged; 0x5f4be0 "Tech
+Contract %d").
+
+- THE ANALYSIS, 0x761170 (the "Tech Tree Analysis" job 0x760890): next :=
+  row, turns := -1; a non-repeatable row the player holds is owned, value 0.
+  Else three levels: each walked row adds its turns left (0x4ca000: the cost
+  0x353a70 in fixed point less the progress kept on it [+0x388] and the bank
+  [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 —
+  0x8c4540 compares the remainder to rate x the truncated quotient; with no
+  Science the cost); a row not researchable (0x4c8c40) adds its unowned
+  prerequisites, each level's rows once, the next step the last one added
+  that is not the research in hand ([PlayerTechs+0x178][0]). Rows still
+  added at the third level leave the entry out of reach (turns -1, value
+  untouched: 0 for every row the walk never reached). Else turns = max(0,
+  sum) and value = 0x7b3e50(row, turns, H, discount); score = value.
+- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's
+  record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY
+  of 1.0 (0x7a60d0: amount x DefaultValue x max(0, 1 + bias), the bias
+  0x700810 the sum of four per-player arrays, unread), +1.0 where row +0xc0
+  is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row
+  of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENAGE_POINT
+  of 0x2c4170(player). Each term is paid from landing to the horizon:
+  PV(H) - PV(turns) (0x7a16e0: a(D-1)/(kD), D = 1 + nk + n(n-1)k²/2 +
+  n(n-1)(n-2)k³ x 0.16667, k = rate/100, a perpetuity a/k past nk >= 10;
+  the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667).
+  Then: per unlocked unit the player's version, 10 x the cities' average
+  City Analysis value (0x5d4cd0, capped 50.0), and its upgrade sources'
+  gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where
+  0x4f2af0 names the row; PSEUDOYIELD_TOURISM of the +0xe8 list's count;
+  per building 0.5, a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5; per
+  district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5; per
+  project (+0x160) PSEUDOYIELD_SPACE_RACE of 0x7b8a30² or NUCLEAR_WEAPON of
+  1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
+  the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88
+  and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The
+  discount is the GlobalAI's +0x290, 2.0 (its constructor 0x6db0cf); H the
+  value horizon [GlobalAI+0x2f0][1]: 50 on every duel (632,528 rows: past 50
+  -9999, at or under 50 not, but contracts and Future Tech).
+- THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned
+  prerequisites one and two levels up (each level's rows once; a negative
+  one adds 0), then x1.5 if favored (Rome's Animal Husbandry 90.4 = 60.3 x
+  1.5 at 1124 t1, China's Masonry -14908.1 = -9938.8 x 1.5).
+- THE CHOICE, 0x763020 (key): the comparator 0x75d530 over the entries —
+  the same next step: the larger turns where their product is not positive;
+  a row whose next step is the key loses, another takes its place; unowned
+  before owned; a leaf researchable now before a required row that is not
+  (and the reverse); else the higher score, the first on a tie. A best row
+  with turns > 0 and a researchable next step: goal := row, research := next.
+  Else a goal still unowned stays; else one draw "BT Research Choice" over
+  the researchable rows in table order (range 5 at 1124 t1: the five roots).
+- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the
+  score), the propagation, then: with no research the choice (key -1); with
+  one, the best (first entry, then any unowned higher) replaces it only if
+  its next step differs, it scores more than the goal's (the research's
+  without a goal) + AI_CURRENT_TASK_BIAS x 10, it is researchable itself.
+- A COMPLETION, 0x762d60 (the completed row): the propagation once more on
+  the entries as they stand, then the choice with the row as the key
+  (1124 t6: minors 2 and 3 pass Writing, Currency and Irrigation over —
+  their next step was Pottery — and take Celestial Navigation through
+  Astrology and Bronze Working through Mining, as logged).
+- MEASURED on the logs alone (29 duels, a goal change the comparator's best
+  over the turn before's or the turn's logged scores): majors 1,654 of 1,805,
+  minors 4,244 of 4,980 by one of the timings (1,017 minor changes with every
+  score negative: the random pick). The ported value does not reproduce the
+  logged scores (0 of 18,000 within 0.05; the read terms come out about 1.5x
+  the log's — 1124 t2 Pottery 113.0 at 4 turns, the read terms 172.1); the
+  terms marked unread above, the pseudo-yield weights first, are AUDIT C-96.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

@@ -1875,6 +1875,33 @@
           ]
         },
         {
+          "name": "minorTechGoal",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.goal"
+          ],
+          "planes": [
+            "citystate_tech_goal"
+          ],
+          "note": "the research AI's goal, -1 none"
+        },
+        {
+          "name": "minorResearchAi",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.aiEntries"
+          ],
+          "planes": [
+            "citystate_ai_turns",
+            "citystate_ai_next",
+            "citystate_ai_base",
+            "citystate_ai_score",
+            "citystate_ai_owned",
+            "citystate_ai_valid"
+          ],
+          "note": "the research AI's analysis of the last turn, per tech in table order [turns, next, base, score, owned]; empty before the first"
+        },
+        {
           "name": "minorCurrentCivic",
           "compare": "exact",
           "covers": [

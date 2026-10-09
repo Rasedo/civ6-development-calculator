@@ -96,7 +96,7 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   // the AI's
   'Random Direction': { owner: 'ai', n: [12754, 10982] },
   'City Build District Choice': { owner: 'ai', n: [105, 171] },
-  'BT Research Choice': { owner: 'ai', dll: '0x763020', n: [108, 121] },
+  'BT Research Choice': { owner: 'ai', cpu: 'researchChoice', gpu: '_research_choice', dll: '0x763020', n: [108, 121] },
   'Random Civic Choice': { owner: 'ai', dll: '0x626600', n: [1, 0] },
   'Random congress resolution target': { owner: 'ai', dll: '0x611140', n: [18, 12] },
   'Choose random agenda': { owner: 'ai', n: [3, 3] },

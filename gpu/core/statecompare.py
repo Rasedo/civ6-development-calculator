@@ -830,6 +830,12 @@ CITY_STATE = {
     "civicProgress": lambda sim, b, rows: [float(sim.citystate_civic_prog[b, s]) for s in rows],
     "minorCurrentTech": lambda sim, b, rows: [int(sim.citystate_cur_tech[b, s]) for s in rows],
     "minorCurrentCivic": lambda sim, b, rows: [int(sim.citystate_cur_civic[b, s]) for s in rows],
+    "minorTechGoal": lambda sim, b, rows: [int(sim.citystate_tech_goal[b, s]) for s in rows],
+    "minorResearchAi": lambda sim, b, rows: [
+        [v for t in range(sim.citystate_ai_turns.shape[2]) for v in (
+            int(sim.citystate_ai_turns[b, s, t]), int(sim.citystate_ai_next[b, s, t]), int(sim.citystate_ai_base[b, s, t]),
+            int(sim.citystate_ai_score[b, s, t]), int(sim.citystate_ai_owned[b, s, t]))]
+        if bool(sim.citystate_ai_valid[b, s]) else [] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],
     "minorTechRetained": lambda sim, b, rows: [sim.citystate_tech_retain[b, s].tolist() for s in rows],

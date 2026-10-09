@@ -61,6 +61,8 @@ export interface TechDef {
   /** CIV6 (`Repeatable`): the row stays researchable once complete, and each
    *  completion pays its award again. */
   repeatable?: boolean;
+  /** CIV6 (`EmbarkAll`): every land unit may embark once it lands. */
+  embarkAll?: boolean;
   /** PROVENANCE, per column — see TECH_SRC below. */
   src?: SrcMap;
 }
@@ -303,6 +305,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
     era: xml('Technologies', 'TechnologyType=TECH_SHIPBUILDING', 'EraType', { expect: 'ERA_CLASSICAL' }),
     cost: xml('Technologies', 'TechnologyType=TECH_SHIPBUILDING', 'Cost', { scale: GAME_SPEED }),
     prereqs: xml('TechnologyPrereqs', 'Technology=TECH_SHIPBUILDING&PrereqTech=TECH_SAILING', 'PrereqTech', { expect: 'TECH_SAILING' }),
+    embarkAll: xml('Technologies', 'TechnologyType=TECH_SHIPBUILDING', 'EmbarkAll', { expect: true }),
   },
   MACHINERY: {
     era: xml('Technologies', 'TechnologyType=TECH_MACHINERY', 'EraType', { expect: 'ERA_MEDIEVAL' }),
@@ -712,7 +715,8 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     ]),
 
     T('IRON_WORKING', 'Iron Working', 'Classical', 120, ['BRONZE_WORKING']),
-    T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']),
+    // CIV6 (Technologies EmbarkAll): every land unit may embark
+    { ...T('SHIPBUILDING', 'Shipbuilding', 'Classical', 200, ['SAILING']), embarkAll: true },
 
     T('MACHINERY', 'Machinery', 'Medieval', 300, ['IRON_WORKING', 'ENGINEERING']),
     T('BUTTRESS', 'Buttress', 'Medieval', 300, ['SHIPBUILDING', 'MATHEMATICS'], [

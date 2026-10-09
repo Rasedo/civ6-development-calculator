@@ -739,6 +739,15 @@ const CITY_STATE_G: Record<string, Extractor> = {
   civicProgress: overCityStates((cityState) => cityState.research.civicProgress),
   minorCurrentTech: overCityStates((cityState) => idx(TECH_IDX, cityState.research.tech)),
   minorCurrentCivic: overCityStates((cityState) => idx(CIVIC_IDX, cityState.research.civic)),
+  minorTechGoal: overCityStates((cityState) => idx(TECH_IDX, cityState.research.goal ?? null)),
+  minorResearchAi: overCityStates((cityState) => {
+    const ents = new Map((cityState.research.aiEntries ?? []).map((e) => [e.tech, e]));
+    if (!ents.size) return [];
+    return [...TECH_IDX.keys()].flatMap((id) => {
+      const e = ents.get(id)!;
+      return [e.turns, idx(TECH_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
+    });
+  }),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),
   minorTechRetained: overCityStates((cityState) => [...TECH_IDX.keys()].map((id) => cityState.research.techRetained[id] ?? 0)),

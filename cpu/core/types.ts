@@ -1,4 +1,5 @@
 export * from '../../world/types';
+import type { ResearchEntry } from './aiResearch';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
@@ -203,6 +204,12 @@ export interface ResearchState {
    *  t6→t8: Pottery done at 13 of 12, Mining reads 0 then 4 at +3) */
   techOverflow?: number;
   civicOverflow?: number;
+  /** the research AI's GOAL (`aiResearch.ts`): the technology its research
+   *  leads to; absent or null, none */
+  goal?: string | null;
+  /** the research AI's analysis of its last turn, which a completion's
+   *  choice reads (`researchCompletionChoice`); absent before its first */
+  aiEntries?: ResearchEntry[];
 }
 
 export interface GovernmentState {
