@@ -3273,6 +3273,117 @@ beside each other on the scheduler's two threads.
   Great Bath's Floodplains Faith unpaid at the re-place, surplus 9 under
   every flag set its standing citizens fit; Jiaodong t185 7).
 
+## C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ
+
+AI::CityBuild, one per city (city +0x31d0, `m_pCityBuildAI`); its log is
+AI_CityBuild.csv. Values are 24.8 fixed point throughout (the log prints the
+low byte / 256 plus the rest). Check: `dll_citybuild.py`.
+
+- Fixed point (CivTech Math_FixedPointT): fx(f) = floor(f) << 8 | trunc(frac
+  x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0),
+  div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a
+  "percent" product is a b / 25600 truncated toward 0 (the /100 magic
+  0xa3d70a3d70a3d70b, shift 14).
+- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its
+  cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield
+  advantages and weights; logged by 0x5cdd70: Food Adv. / Prod. Adv. are
+  adv[YIELD_FOOD] / adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is
+  CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military
+  AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job
+  object at +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot
+  evaluation, 0x78 bytes each, `m_plotEvaluations` at +0xcf8 / +0xd08, the
+  city centre's first; spawned with no wait, "H-1: why a seed does not
+  replay"). Then, for a player the AI drives: 0x5cdae0, the City Defense
+  event 0x5cced0, the unit-or-building event 0x5cd150 (tree "Build City
+  Building"), the district event 0x5cc910 (its "City Build District Choice"
+  draw in 0x5d0c20), the improvement event 0x5ccc10 ("Build City
+  Improvement"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0
+  or +0x2340 null), the Default Specialization pick 0x5d4d70. A second hook
+  (0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0)
+  and then walks 0x5d2810's items through 0x68be60.
+- The Default Specialization pick (0x5d4d70): the best building (0x5d0860),
+  unit (0x5d2600) and project (0x5d1f10) of the city centre's evaluation
+  (tables +0x28, +0x40, +0x38; each best starts at FX(-9999)); the building
+  wins when its value is at least the unit's and the project's, else the
+  unit when at least the project's, else the project. A building already
+  queued or held (0x17e690 > 0) is skipped; its value x0.5 when the city's
+  favoured-items list (CityBuildAI +0x528, 0x5d2d10) holds it negative, x2
+  when positive, x5 for a wonder (Buildings +0x159 bit 4) under the
+  condition at 0x5d0b0f. A unit with Units +0x1b9 bit 2 or +0x44 > 0 is
+  skipped, and under the caller's flags it must pass CanTrain (0x172820).
+  The pick is queued (0x5c9ea0 / 0x5ca5a0 / 0x5ca450, "Unable to build
+  building, errored in making..."); a refusal falls to 0x5d2810, logged
+  "Generic Offense" ("NO BUILDS AT ALL (maybe city was nuked?)" with
+  nothing to take). The log line is the pick and its value.
+- The tables (0x5ce970, per plot evaluation). A building other than a
+  wonder is valued on the city centre only: T = max(tech turns 0x7610e0,
+  civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10
+  when not the current production) + the build turns (0x17b1e0, the
+  queue's own estimate) + 10 while the city builds something else (city
+  +0x2350 set and the current item not this one) + each missing
+  prerequisite building's turns; value = 0x7a4d40(building, T, no plot,
+  valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and
+  train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0;
+  a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the
+  horizon values FX(-9999).
+- The rate and the horizons: GlobalAI (game +0x408) +0x290 is the discount
+  rate, 0x200 (2.0) from the constructor (0x6db0cf; no other writer);
+  `m_valueHorizons` (+0x298, data +0x2f0) is filled by 0x6dd9a0 as
+  [speed(50), speed(100), speed(200), 50], speed(x) = x x
+  GameSpeeds.CostMultiplier / 100 (0x5254d0 -> 0x525400; 100 when the speed
+  row is unresolved).
+- A building's or project's value 0x7a7590: per Building_YieldChanges row
+  (Buildings +0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct
+  0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value
+  0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(w[y], 9.0)),
+  w[y] = 0x702ad0, the sum of five per-player arrays (0x4681a0 +0x340, player
+  +0x1288 +0x528, the AI yields' +0x638, +0x7a8, the +0x6b0 list or +0x6c8);
+  per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT
+  from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 for a prerequisite
+  of era 5 or later); then a second yields pass (0x18e570), the great person
+  points (+0x1b0, each class's pseudo-yield), PSEUDOYIELD_WONDER for a wonder,
+  the era moment (0x93e4e0, 0x3002f0), the defence terms (+0x54 with city
+  +0x1a60, +0x5e8, +0x588), Housing (+0x44) as raw value, the great work
+  slots (+0x1c8), the prerequisite chain (+0x1f8: x(1 + 2 depth)), less
+  Maintenance (+0x38) as Gold; the sum v becomes PV(v, rate, H) - PV(v,
+  rate, T) (0x7a16e0 twice); a regional building (+0x2c) adds 0x79f7c0 over
+  the player's cities in its range, capped at 50.0.
+- The present value 0x7a16e0 (FinalRelease 0x528310, the same code): n 0 ->
+  v; n < 0 -> 0; rate 0 -> v n; rate >= 50.0 or rate n fx(0.01) >= 10.0 ->
+  v / (rate fx(0.01)); else n <= 400 and (1 + r)^n - 1 by its binomial to
+  the third power, each product truncated (a = n r, c = n(n-1) r^2, e =
+  n(n-1)(n-2) r^3; s = a + c/2 + e fx(1/6)), PV = (s v) / max(r (1 + s),
+  fx(0.01)).
+- A unit's value 0x7b62c0: a combat unit (PSEUDOYIELD_UNIT_COMBAT, _NAVAL_,
+  _AIR_) takes the military AI's unit value 0x79ca90 (player AI +0x1290
+  +0x268), x3 when 0x79d2d0 holds, + 0.5 x (player +0x12f0 +0xc0) when its
+  era (Units +0x48) is past the player's (0x4d9320), x (the city's extra
+  copies + 1), x the promotion class weight 0x723bb0 (AiFavoredItems
+  UnitPromotionClasses: MinorCivUnitBuilds RECON -100), through its
+  pseudo-yield, less its Gold maintenance below handicap 3 (player +0x908),
+  then the PV difference; a Trader 0x7a7110 (PSEUDOYIELD_UNIT_TRADE);
+  religious units by their charges and spread.
+- OPEN (the routine as read against the log): the Monument (+1 Culture, no
+  maintenance, cost 60) picked with the city's production steady over the
+  records t-1..t+1 (29 picks), T = ceil(60 / production): with v 1.0 the
+  horizon that fits is 100 (valueHorizons[1] at an unresolved speed, 100%,
+  not Online's 50; H 50 and 200 fit 2 at most). The routine as read hits 6
+  within 0.05 (T 18 28.04 and T 24 24.20 to the tenth; T 20 reads 25.04
+  where 1107 Brussels t5 and 1120 Kandy t5 log 26.7), the exact annuity v (1
+  - 1.02^-n) / 0.02 hits 11 (T 20 26.75); T 30 logs 20.6 x5 and 18.9 x4
+  (read 20.10, exact 20.70), T 40 14.6 (15.05 / 15.74), T 50 10.4 (10.86 /
+  11.67). v is 1 + w[Culture] and w is unread, so the picks spread v over
+  0.94..1.07 under the routine as read and 0.89..1.00 under the exact
+  annuity: they do not tell the two apart until w is read.
+- Unread: the military unit value (0x79ca90), the writers of w[y]'s five
+  arrays (the per-city weights logged on the advantage lines are CityBuildAI
+  +0x908, not among them), the modifier evaluator (0x79f7c0, 0x7a67f0,
+  0x7a3d70, 0x7b1320, 0x7a21e0), the events (0x5cd150, 0x5cc910, 0x5ccc10,
+  0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp:
+  the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40,
+  FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 ("Canceling current
+  build"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
