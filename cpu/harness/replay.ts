@@ -56,9 +56,10 @@ import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } 
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
+import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { civsAtWar, cityStateOfSeat, isBarbSeat, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
+import { civsAtWar, cityStateOfSeat, isBarbSeat, isCiv, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -216,6 +217,8 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
   ctx.state.nextUnitId += 1;
   ctx.state.units.push(unit);
   ctx.units.set(key, unit);
+  // the unit added answers the engine's Train Unit quests
+  questUnitAdded(ctx.state, unit.seat, unit.type);
   return unit;
 }
 
@@ -502,20 +505,6 @@ function stagePolicies(ctx: Ctx, ds: Decision[]): PolicyDecision[] {
 
 type EnvoyDecision = Extract<Decision, { kind: 'envoy' }>;
 
-/** each staged envoy the engine's turn did not land is the record's */
-function verifyEnvoys(ctx: Ctx, was: Map<EnvoyDecision, number>): void {
-  const { state } = ctx;
-  for (const [d, n0] of was) {
-    const seat = seatOfP(ctx, d.player);
-    const cs = state.cityStates.find((c) => c.id === cityStateOfSeat(seatOfP(ctx, d.minor)));
-    const got = cs ? (cs.envoys[seat] ?? 0) - n0 : d.n;
-    if (cs && got < d.n) {
-      addEnvoys(state, cs, seat, d.n - got);
-      count(ctx, 'envoy', 'fallback', d.player, 'the staged envoy did not land');
-    }
-  }
-}
-
 /** the generator a player's start between record b's predecessor and record
  *  b began and completed from: the last of each record b witnesses */
 type BattleDecision = Extract<Decision, { kind: 'battle' }>;
@@ -678,20 +667,18 @@ function envoysInStart(log: RandLog | undefined, a: TurnRecord, b: TurnRecord, p
  * before its cities, or in its actions after it (`tools/civ6lab/
  * dll_readings.md` "H-1: the envoy annex"; the game's log places them,
  * `envoysInStart`), and the minor annexes a plot for each with a draw there.
- * The start's go on the wire, which the engine's turn spends at that seat's
- * start (`applySeatActionRecord`); an envoy the engine's purse holds no token
- * for — the game's civic paid one in that same start, the engine's only
- * after its actions — is the record's: the token is put in its purse first
- * (runs/h1_duelw1117 t28: China's two to Caguana annex 526 and 612 before
- * Xi'an's pick). The actions' land after the engine's turn, on the
- * generator the giver's start completed with (`applyPhase`; t24: China's
- * envoy to Caguana annexes 702 on the first draw past its start). Returns the
- * staged envoys' minors' counts before the turn.
+ * The start's go on the wire, as many as the engine's purse holds tokens
+ * for, which the engine's turn spends at that seat's start
+ * (`applySeatActionRecord`; runs/h1_duelw1117 t28: China's two to Caguana
+ * annex 526 and 612 before Xi'an's pick). An envoy no token pays for is a
+ * quest's the engine's own turn completes (t24: China's Archer, the envoy
+ * to Caguana annexing 702 in China's start) or the record's, which
+ * `settleEnvoys` brings once the pair's moves have landed.
  */
-function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log: RandLog | undefined): Map<EnvoyDecision, number> {
+function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log: RandLog | undefined): void {
   const { state } = ctx;
   ctx.envoys = [];
-  const was = new Map<EnvoyDecision, number>();
+  const purse = new Map<number, number>();
   for (const d of ds) {
     if (d.kind !== 'envoy' || d.phase !== 'after' || !envoysInStart(log, a, b, d.player)) continue;
     const seat = seatOfP(ctx, d.player);
@@ -699,13 +686,11 @@ function stageEnvoys(ctx: Ctx, ds: Decision[], a: TurnRecord, b: TurnRecord, log
     const ms = seatOfP(ctx, d.minor);
     const cs = isCityStateSeat(ms) ? state.cityStates.find((c) => c.id === cityStateOfSeat(ms)) : undefined;
     if (!s || !cs || seat >= state.seats.length || !cs.met.includes(seat)) continue;
-    const short = d.n - (s.envoysAvailable ?? 0);
-    if (short > 0) s.envoysAvailable = (s.envoysAvailable ?? 0) + short;
-    ctx.envoys.push(d);
-    was.set(d, cs.envoys[seat] ?? 0);
-    count(ctx, 'envoy', short > 0 ? 'fallback' : 'applied', d.player, short > 0 ? 'no token in the engine purse at its start' : undefined);
+    const left = purse.get(seat) ?? (s.envoysAvailable ?? 0);
+    const n = Math.min(d.n, left);
+    purse.set(seat, left - n);
+    if (n > 0) ctx.envoys.push({ ...d, n });
   }
-  return was;
 }
 
 /** each staged set the engine refused is the record's */
@@ -1053,10 +1038,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         break;
       }
       case 'envoy': {
-        // the other players' envoys went to the engine's turn (`stageEnvoys`)
-        if (ctx.envoys.includes(d)) break;
-        // the rest land once the pair's moves have met what they met
-        // (`settleEnvoys`)
+        // the start's envoys the purse held went to the engine's turn
+        // (`stageEnvoys`); every count is brought to the record's once the
+        // pair's moves have met what they met (`settleEnvoys`)
         ctx.lateEnvoys.push(d);
         break;
       }
@@ -1207,6 +1191,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           (s.tradeRoutes ??= []).push({ ...structuredClone(r), from: remap(seat, r.from) ?? -1,
             ...(r.to !== undefined ? { to: remap(seat, r.to) } : {}),
             ...(r.toSeatCity !== undefined && r.toSeat !== undefined ? { toSeatCity: remap(r.toSeat, r.toSeatCity) } : {}) });
+          // the route started answers the engine's Send Trade Route quests
+          if (r.toCs !== undefined) questRouteStarted(state, seat, r.toCs);
           count(ctx, 'routes', 'fallback', d.player, res.reason);
         }
         break;
@@ -1378,8 +1364,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (s) s.treasury -= minor ? MINOR_UPGRADE_GOLD : upgradeGoldCost(state, u.seat, u.type, u.leviedFrom !== undefined, u.formation ?? 0);
           if (t) u.type = t;
           u.movesLeft = 0;
-          // the upgrade the record made raises its seat's bests as the verb's does
+          // the upgrade the record made raises its seat's bests and answers
+          // its Train Unit quests as the verb's does
           if (t) raiseBestTrained(state, u.seat, t, u.formation ?? 0);
+          if (t) questUnitAdded(state, u.seat, t);
         }
         count(ctx, 'upgrade', res.ok ? 'applied' : 'fallback', d.player, res.reason);
         break;
@@ -1726,6 +1714,10 @@ function syncDraws(ctx: Ctx, b: TurnRecord, tribesBefore: number): boolean {
     for (const c of [...state.barbSeat.camps]) {
       if (camps.includes(c)) continue;
       state.barbSeat.camps.splice(state.barbSeat.camps.indexOf(c), 1);
+      // a camp a major's unit stands on in the record is that major's clear,
+      // which answers its Clear Barbarian Camp quests
+      const clearer = b.units.find((x) => x.y * ctx.W + x.x === c && isCiv(seatOfP(ctx, x.owner)));
+      if (clearer) questCampCleared(state, seatOfP(ctx, clearer.owner), c);
       const k = tribes.findIndex((tr) => tr.plot === c && tr.alive);
       if (k >= tribesBefore) tribes.splice(k, 1);
       else if (k >= 0) tribes[k].alive = false;
@@ -2184,7 +2176,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     // next start (`endTurn`'s seat phase): its moves reveal, and meet, there
     syncUnits(ctx, b, activePlayer(a));
     activeBoosts(ctx, b, activePlayer(a));
-    const envoysWere = stageEnvoys(ctx, ds, a, b, history.randLog);
+    stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
@@ -2311,7 +2303,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
-    verifyEnvoys(ctx, envoysWere);
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
     // that the record's players did not: their decision, undone

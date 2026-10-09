@@ -1,5 +1,6 @@
 export * from '../../world/types';
 import type { GreatWork } from '../data/greatWorks';
+import type { QuestType } from '../data/quests';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
 
 export type FocusId = 'balanced' | YieldKey;
@@ -1008,11 +1009,13 @@ export type CityStateType =
   | 'militaristic'
   | 'religious';
 
+/** a city-state's quest for a major (`cpu/core/quests.ts`) */
 export interface CityStateQuest {
-  kind: 'clearCamp' | 'sendTradeRoute' | 'buildDistrict';
-  district?: DistrictId;
-  /** For clearCamp: the camp tile that must be cleared. */
-  campIndex?: number;
+  type: QuestType;
+  /** the type's target: the unit, district, tech, civic or Great Person
+   *  class to train, complete, boost or recruit; the actor's own religion
+   *  (its seat) to convert the capital to; null for a Trade Route or a camp */
+  target: string | number | null;
 }
 
 export interface CityState extends Seat {
@@ -1099,9 +1102,10 @@ export interface CityState extends Seat {
   cultureBox?: number;
   tilesAcquired?: number;
   nextPlot?: number;
-  /** The per-seat quest, keyed by ABSOLUTE SEAT. The kind is the first
-   *  satisfiable option in a fixed order, no RNG. */
+  /** the quest standing for each major, keyed by seat */
   seatQuest?: (CityStateQuest | null)[];
-  seatQuestIssuedTurn?: number[];
+  /** the type of each major's last completed quest, keyed by seat — the
+   *  type its next quest skips */
+  seatQuestLast?: (QuestType | null)[];
 }
 

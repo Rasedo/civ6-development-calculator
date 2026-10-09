@@ -52,6 +52,7 @@ import type { CivId, LeaderId } from '../../world/roster';
 import { BARB_SEAT, allCities, grantFoundingPressure, majorityReligionOf, prophetsOf, citiesOf, civOf, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, markCityCentre, seatOf, setTileOwner, tileClaimed, tileSeat, unitSeat, visibilityCS, allianceTheoCS, alliedAtLevel, civVariantOf , leaderOf, onHomeContinent, civLevelOf } from './seats';
 import { irradiated } from './nuclear';
 import { formationBanned } from './units';
+import { giveEraQuests } from './quests';
 import { allRoadsLeadToRome, routeCities, routeDestCenter } from './trade';
 
 /** CIV6 (GameSpeeds.xml, GameSpeed_Turns): the online game's eight calendar
@@ -1573,7 +1574,11 @@ export function endTurn(state: GameState): void {
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   if (state.unitsMode) releaseBarbarians(state);
-  if (gameEraTurn(state, state.turn + 1)) eraInspirations(state);
+  if (gameEraTurn(state, state.turn + 1)) {
+    // the era's quests (0x93ac50) before its inspirations (runs/h1_duelw1104 t181)
+    giveEraQuests(state);
+    eraInspirations(state);
+  }
   seatPhase(state);
   minorPhase(state);
   freeCitiesPhase(state);

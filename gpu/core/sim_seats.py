@@ -626,6 +626,7 @@ class SimSeats:
                 return
         self.war[:, row, tgt] |= declare
         self.war[:, tgt, row] |= declare
+        self._quest_war(row, tgt, declare)
         self._reset_war_clock(row, tgt, declare)
         # CIV6: war cancels every route between the two civs; the Traders
         # return.
@@ -667,6 +668,7 @@ class SimSeats:
         crow = self.n_majors + s
         self.war[:, row, crow] |= declare
         self.war[:, crow, row] |= declare
+        self._quest_war(row, crow, declare)
         self._reset_war_clock(row, crow, declare)
         # CIV6: war cancels the routes with the new enemy, both ways; the
         # Traders return.
@@ -935,6 +937,7 @@ class SimSeats:
                 continue
             self.war[:, ally, aggressor] |= join
             self.war[:, aggressor, ally] |= join
+            self._quest_war(ally, aggressor, join)
             self._reset_war_clock(ally, aggressor, join)
             self._stamp_war_kind(ally, aggressor, torch.ones(self.B, dtype=torch.long, device=self.device), join)
             self.treaty_turns[:, ally, aggressor] = torch.where(
@@ -1431,6 +1434,8 @@ class SimSeats:
         adv = run & (self.era_countdown < 0)
         if bool(adv.count_nonzero()):
             self._enter_era(adv, t)
+            # the era's quests (0x93ac50) before its inspirations
+            self._give_era_quests(adv)
             self._era_inspirations(adv)
 
     def _enter_era(self, adv: torch.Tensor, t: int) -> None:
@@ -4137,6 +4142,7 @@ class SimSeats:
                               torch.where(ok, torch.zeros_like(here),
                                           self.unit_mp.gather(1, sc.unsqueeze(1)).squeeze(1)).unsqueeze(1))
         self._raise_best_trained(row, ok, nc, formation=self.unit_formation.gather(1, sc.unsqueeze(1)).squeeze(1))
+        self._quest_unit_added(row, ok, nc)
 
     def _seat_charge_upkeep(self, row: int) -> None:
         """`chargeUnitUpkeep` — CIV6 (Resource, GS): "each turn, the unit will
@@ -6208,6 +6214,7 @@ class SimSeats:
                 continue
             self.war[:, member, tgt] |= hit
             self.war[:, tgt, member] |= hit
+            self._quest_war(member, tgt, hit)
             self._reset_war_clock(member, tgt, hit)
             self.treaty_turns[:, member, tgt] = torch.where(
                 hit, torch.zeros_like(self.treaty_turns[:, member, tgt]), self.treaty_turns[:, member, tgt])
@@ -15147,85 +15154,292 @@ class SimSeats:
             self.civ_influence[:, row] = torch.where(earn, self.civ_influence[:, row] - cost, self.civ_influence[:, row])
             self.civ_envoys_avail[:, row] = self.civ_envoys_avail[:, row] + earn.long()
 
-    def _quest_owns_dist(self, row: int) -> torch.Tensor:
-        """[B, S] — does seat-row `row` own a COMPLETE district of each CS's
-        asked type (the CS type's own, _citystate_didx):
-        questSatisfied's buildDistrict and issueQuest's `alreadyBuilt`. ONE
-        registry read for every row — city_dist_tile[:, row]; dead columns
-        are cleared at every city-exit path, so no alive gate is needed."""
-        B, S = self.B, self.S
-        dt = self.city_dist_tile[:, row]
-        nCol, nD = dt.shape[1], dt.shape[2]
-        di = self._citystate_didx[:, :S].clamp(min=0, max=nD - 1)
-        own_tile = dt.unsqueeze(1).expand(B, S, nCol, nD).gather(
-            3, di.reshape(B, S, 1, 1).expand(B, S, nCol, 1)
-        ).squeeze(3)
-        own_dc = self.district_complete.gather(1, own_tile.clamp(min=0).reshape(B, -1)).reshape(B, S, nCol)
-        return ((own_tile >= 0) & own_dc).any(dim=2)
+    # THE CITY-STATES' QUESTS — `cpu/core/quests.ts`'s twin. A pair's quest
+    # is `seat_citystate_quest` (its type's code: 1 Convert, 2 Trade, 3 Camp,
+    # 4 Train, 5 Zone, 6 Tech, 7 Civic, 8 Great Person; 0 none) and
+    # `seat_citystate_quest_target` (`questCode`'s index); the type of the
+    # pair's last completed one is `seat_citystate_quest_last`.
+    _Q_CONVERT, _Q_TRADE, _Q_CAMP, _Q_TRAIN, _Q_ZONE, _Q_TECH, _Q_CIVIC, _Q_GP = range(1, 9)
 
-    def _seat_quest_phase(self, row: int, active: torch.Tensor) -> None:
-        if self.S == 0:
+    def _qst_era(self, row: int) -> torch.Tensor:
+        """[B] the row's era (`playerEra`): the latest of its techs' and
+        civics'."""
+        return self._civ_era(self.civ_techs[:, row], self.civ_civics[:, row])
+
+    def _qst_obsolete(self, row: int, ut: torch.Tensor) -> torch.Tensor:
+        """`unitObsolete` for unit indices `ut` [B, K] (or [K]): the unit's
+        upgrade's tech and civic held and the upgrade the row's own unit."""
+        B = self.B
+        u = ut if ut.dim() == 2 else ut.unsqueeze(0).expand(B, -1)
+        nxt = self._type_up_to[u.clamp(min=0)]
+        valid = (u >= 0) & (nxt >= 0)
+        n0 = nxt.clamp(min=0)
+        rt, rc = self._type_tech[n0], self._type_civic[n0]
+        has_t = torch.where(rt >= 0, self.civ_techs[:, row].gather(1, rt.clamp(min=0)), torch.ones_like(valid))
+        has_c = torch.where(rc >= 0, self.civ_civics[:, row].gather(1, rc.clamp(min=0)), torch.ones_like(valid))
+        own = self._civ_unit_ok(row).gather(1, n0)
+        return valid & has_t & has_c & own
+
+    def _qst_camps_near(self, s: int) -> torch.Tensor:
+        """[B, K] the camps within `campRadius` of minor `s`'s centre."""
+        c = self.citystate_center[:, s].clamp(min=0)
+        d = self.pair_dist[c.unsqueeze(1), self.camp_tile.clamp(min=0)].to(torch.long)
+        return (self.camp_tile >= 0) & (d <= self._qst_camp_r)
+
+    def _qst_sea_spawn(self, row: int) -> torch.Tensor:
+        """[B] a district of the row's on a land plot beside water — where a
+        Great Admiral arrives (`seaSpawn`)."""
+        alive = self.city_alive[:, row]
+        tiles = torch.cat([torch.where(alive, self.city_center[:, row], torch.full_like(self.city_center[:, row], -1)),
+                           torch.where(alive.unsqueeze(2), self.city_dist_tile[:, row],
+                                       torch.full_like(self.city_dist_tile[:, row], -1)).reshape(self.B, -1)], dim=1)
+        t0 = tiles.clamp(min=0)
+        nb = self.neigh[t0]  # [B, N, 6]
+        wet = (nb >= 0) & self.water.gather(1, nb.clamp(min=0).reshape(self.B, -1)).reshape(nb.shape)
+        land = ~self.water.gather(1, t0)
+        return ((tiles >= 0) & land & wet.any(dim=2)).any(dim=1)
+
+    def _qst_targets(self, s: int, row: int) -> list[tuple[torch.Tensor, torch.Tensor]]:
+        """Each type's targets for the pair (`targets`), in logic order: per
+        type a [B, K] bool of the candidates in the picker's order and the
+        [K] (or [B, K]) codes they store."""
+        B, dev = self.B, self.device
+        none = torch.full((1,), -1, dtype=torch.long, device=dev)
+        pe = self._qst_era(row)
+        out: list[tuple[torch.Tensor, torch.Tensor]] = []
+        # Convert: the row's religion founded, the minor's city not following it
+        follow = self._minor_followed()[:, s]
+        out.append(((self.civ_religion_done[:, row] & (follow != row)).unsqueeze(1),
+                    torch.full((1,), row, dtype=torch.long, device=dev)))
+        # Trade: no route from the row to the minor
+        routed = ((self.seat_routes[:, row, :, 0] >= 0) & (self.seat_routes[:, row, :, 1] == -(2 + s))).any(dim=1)
+        out.append(((~routed).unsqueeze(1), none))
+        # Camp: a camp near the minor
+        out.append((self._qst_camps_near(s).any(dim=1, keepdim=True), none))
+        # Train: the row's own units of its era, not upgraded past
+        u = self._qst_units
+        train = (self._civ_unit_ok(row)[:, u] & ~self._qst_obsolete(row, u)
+                 & (self._qst_unit_era.unsqueeze(0) == pe.unsqueeze(1)))
+        out.append((train, u))
+        # Zone: the row's own districts of its era or before, below their maximum
+        civ = self.row_civ[:, row]
+        uniq = (self._qst_dist_civ.unsqueeze(0) >= 0) & (self._qst_dist_civ.unsqueeze(0) == civ.unsqueeze(1))
+        replaced = (uniq.float() @ self._qst_dist_same.float()) > 0
+        own = torch.where((self._qst_dist_civ >= 0).unsqueeze(0), uniq, ~replaced)
+        era = self._qst_dist_era.unsqueeze(0)
+        d0 = self._qst_dist.clamp(min=0)
+        have = ((self.city_dist_tile[:, row][:, :, d0] >= 0) & self.city_alive[:, row].unsqueeze(2)).sum(dim=1)
+        under = (self._qst_dist_max < 0).unsqueeze(0) | (have < self._qst_dist_max.unsqueeze(0))
+        out.append((own & (era >= 0) & (era <= pe.unsqueeze(1)) & under, self._qst_dist))
+        # Tech / Civic: neither held nor boosted, with a boost, of the row's
+        # era — in the table's order
+        for held, boosted, able, eras, rank in (
+                (self.civ_techs[:, row], self.civ_tech_boosted[:, row], self._tech_boostable, self._tech_era, self._tech_rank),
+                (self.civ_civics[:, row], self.civ_civic_boosted[:, row], self._civic_boostable, self._civic_era, self._civic_rank)):
+            k = min(held.shape[1], boosted.shape[1], able.numel(), eras.numel(), rank.numel())
+            perm = torch.argsort(rank[:k], stable=True)
+            ok = (~held[:, :k] & ~boosted[:, :k] & able[:k].unsqueeze(0) & (eras[:k].unsqueeze(0) == pe.unsqueeze(1)))
+            out.append((ok[:, perm], perm))
+        # Great Person: a class the row can earn, on offer, of its era or the next
+        gp = torch.zeros(B, len(self._qst_gp), dtype=torch.bool, device=dev)
+        for i, cls in enumerate(self._qst_gp):
+            if cls < 0 or cls >= self._gp_nc:
+                continue
+            at = self.gp_offer[:, cls]
+            ok = (at >= 0) & ~self._gp_capped(row, cls)
+            ok = ok & (self._gp_era[cls, at.clamp(min=0, max=self._gp_era.shape[1] - 1)] <= pe + 1)
+            if self._qst_gp_ban[i] >= 0:
+                ok = ok & ~self._row_banned(row, self._qst_gp_ban[i])
+            if self._qst_gp_sea[i]:
+                ok = ok & self._qst_sea_spawn(row)
+            gp[:, i] = ok
+        out.append((gp, torch.tensor(self._qst_gp, dtype=torch.long, device=dev)))
+        return out
+
+    def _qst_alive(self, row: int) -> torch.Tensor:
+        """[B] the major row is still in the game: a city or a unit."""
+        return self.city_alive[:, row].any(dim=1) | (self.major_unit_alive & (self.major_unit_seat == row)).any(dim=1)
+
+    def _qst_clear(self, s: int, row: int, gone: torch.Tensor) -> None:
+        """The pair's quest ends without its envoy."""
+        if not bool(gone.count_nonzero()):
             return
-        B, S, dev = self.B, self.S, self.device
-        rr = self.rules.citystate
-        cooldown = int(rr["questCooldown"])
-        q_env = int(rr["questEnvoys"])
-        csc = self.citystate_center[:, :S].clamp(min=0)
-        met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
-        act = active.unsqueeze(1) & met_live
-        if not bool(act.count_nonzero()):
+        q = self.seat_citystate_quest
+        q[:, row, s] = torch.where(gone, torch.zeros_like(q[:, row, s]), q[:, row, s])
+        t = self.seat_citystate_quest_target
+        t[:, row, s] = torch.where(gone, torch.full_like(t[:, row, s], -1), t[:, row, s])
+
+    def _qst_standing(self, s: int, row: int, mask: torch.Tensor) -> torch.Tensor:
+        """[B] the pair's quest stands (`standing`) in the games of `mask` —
+        failed first where it can no longer be done: the tech or civic
+        researched, the unit upgraded past, the class off offer, no camp left
+        near the minor."""
+        cur = self.seat_citystate_quest[:, row, s]
+        tgt = self.seat_citystate_quest_target[:, row, s]
+        t0 = tgt.clamp(min=0).unsqueeze(1)
+        gone = (cur == self._Q_TECH) & self.civ_techs[:, row].gather(1, t0.clamp(max=self.civ_techs.shape[2] - 1)).squeeze(1)
+        gone = gone | ((cur == self._Q_CIVIC) & self.civ_civics[:, row].gather(1, t0.clamp(max=self.civ_civics.shape[2] - 1)).squeeze(1))
+        gone = gone | ((cur == self._Q_TRAIN) & self._qst_obsolete(row, tgt.unsqueeze(1)).squeeze(1))
+        if self._gp_nc:
+            off = self.gp_offer.gather(1, t0.clamp(max=self._gp_nc - 1)).squeeze(1) < 0
+            gone = gone | ((cur == self._Q_GP) & off)
+        gone = gone | ((cur == self._Q_CAMP) & ~self._qst_camps_near(s).any(dim=1))
+        self._qst_clear(s, row, mask & gone & (cur > 0))
+        return self.seat_citystate_quest[:, row, s] > 0
+
+    def _give_quest(self, mask: torch.Tensor, s: int, row: int) -> None:
+        """`giveQuest` (Game_Quests 0x939980) for minor `s` and major `row` in
+        the games of `mask` [B]: none while one stands; both in the game,
+        met, at peace; the types valid for the pair but its last completed
+        one, ONE draw over their count, then the type's picker over its
+        targets."""
+        if row >= self.n_majors or s >= self.S or not bool(mask.count_nonzero()):
             return
-        # --- seat state used by BOTH resolve and issue (loop-invariant) -----
-        owns_dist = self._quest_owns_dist(row)  # [B, S]
-        # sendTradeRoute: this seat routes to CS s (route dest == -(2+s)).
-        route_dest = self.seat_routes[:, row, :, 1]  # [B, K_routes]
-        s_ar = torch.arange(S, device=dev)
-        has_route = (route_dest.unsqueeze(1) == (-(2 + s_ar)).reshape(1, S, 1)).any(dim=2)  # [B, S]
-        # clearCamp: the NEAREST camp within the quest's radius, ties to the
-        # lowest tile index (key = dist·(T+1)+tile, issueQuest's key).
-        cdist = self.pair_dist[csc.unsqueeze(2), self.camp_tile.clamp(min=0).unsqueeze(1)].to(torch.long)  # [B, S, K]
-        near_c = (self.camp_tile >= 0).unsqueeze(1) & (cdist <= int(rr["questCampRadius"]))  # [B, S, K]
-        span = self.T + 1
-        key_c = torch.where(near_c, cdist * span + self.camp_tile.clamp(min=0).unsqueeze(1), torch.full_like(cdist, 10**18))
-        best_k = key_c.argmin(dim=2)  # [B, S]
-        has_camp = near_c.any(dim=2)  # [B, S]
-        camp_nearest = torch.where(has_camp, self.camp_tile.gather(1, best_k), torch.full((B, S), -1, dtype=torch.long, device=dev))
+        base = mask & self.citystate_alive[:, s]
+        base = base & ~self._qst_standing(s, row, base)
+        base = base & self.seat_citystate_met[:, row, s] & ~self.war[:, row, self.n_majors + s] & self._qst_alive(row)
+        if not bool(base.count_nonzero()):
+            return
+        tg = self._qst_targets(s, row)
+        counts = torch.stack([c.sum(dim=1) for c, _ in tg], dim=1)  # [B, 8]
+        last = self.seat_citystate_quest_last[:, row, s]
+        types = torch.arange(1, 9, device=self.device).unsqueeze(0)
+        kinds = (counts > 0) & (types != last.unsqueeze(1))
+        n = kinds.sum(dim=1)
+        go = base & (n > 0)
+        if not bool(go.count_nonzero()):
+            return
+        v = self._rand_range(go, n)
+        sel = kinds & (kinds.long().cumsum(dim=1) == (v + 1).unsqueeze(1))
+        typ = sel.long().argmax(dim=1) + 1  # [B]
+        pick = (typ == self._Q_TRAIN) | (typ == self._Q_ZONE) | (typ == self._Q_TECH) | (typ == self._Q_CIVIC) | (typ == self._Q_GP)
+        cnt = counts.gather(1, (typ - 1).unsqueeze(1)).squeeze(1)
+        p = self._rand_range(go & pick, cnt)
+        target = torch.full_like(typ, -1)
+        for k, (cand, codes) in enumerate(tg):
+            here = go & (typ == k + 1)
+            if not bool(here.count_nonzero()):
+                continue
+            at = cand & (cand.long().cumsum(dim=1) == (torch.where(pick, p, torch.zeros_like(p)) + 1).unsqueeze(1))
+            j = at.long().argmax(dim=1)
+            cw = codes.unsqueeze(0).expand(self.B, -1) if codes.dim() == 1 else codes
+            code = cw.gather(1, j.clamp(max=cw.shape[1] - 1).unsqueeze(1)).squeeze(1)
+            target = torch.where(here, code, target)
+        q = self.seat_citystate_quest
+        q[:, row, s] = torch.where(go, typ, q[:, row, s])
+        t = self.seat_citystate_quest_target
+        t[:, row, s] = torch.where(go, target, t[:, row, s])
 
-        # --- RESOLVE existing quests (questSatisfied) ------------------------
-        cur = self.seat_citystate_quest[:, row, :S]  # [B, S]
-        camp_gone = ~(
-            (self.camp_tile.unsqueeze(1) == self.seat_citystate_quest_camp[:, row, :S].unsqueeze(2)) & (self.camp_tile >= 0).unsqueeze(1)
-        ).any(dim=2)
-        res_camp = act & (cur == 1) & camp_gone
-        res_trade = act & (cur == 2) & has_route
-        res_dist = act & (cur == 3) & owns_dist
-        resolved = res_camp | res_trade | res_dist
-        if bool(resolved.count_nonzero()):
-            self.seat_citystate_quest[:, row, :S] = torch.where(resolved, torch.zeros_like(cur), cur)
-            # No quest, no target — TS reads campIndex off the LIVE quest
-            # object, so a resolved quest must not leave a stale camp here.
-            self.seat_citystate_quest_camp[:, row, :S] = torch.where(
-                resolved, torch.full_like(cur, -1), self.seat_citystate_quest_camp[:, row, :S])
-            self.seat_citystate_quest_issued[:, row, :S] = torch.where(resolved, torch.full_like(cur, self.turn), self.seat_citystate_quest_issued[:, row, :S])
-            self.seat_citystate_envoys[:, row, :S] = self.seat_citystate_envoys[:, row, :S] + resolved.long() * q_env
-            self._cs_resolve_suzerain()
-            self._minor_envoy_tiles(resolved.any(dim=1))  # the quest's envoys buy ground too (`addEnvoys`)
-            self._eff_version += 1
+    def _give_era_quests(self, adv: torch.Tensor) -> None:
+        """A NEW GAME ERA (0x93ac50): every pair, the minors in order, each
+        with every major row in order (`giveEraQuests`)."""
+        for s in range(self.S):
+            for row in range(self.n_majors):
+                self._give_quest(adv, s, row)
 
-        # --- ISSUE on cooldown (deterministic first-satisfiable) ------------
-        cur2 = self.seat_citystate_quest[:, row, :S]  # resolved ones now 0
-        due = act & (cur2 == 0) & (self.turn - self.seat_citystate_quest_issued[:, row, :S] >= cooldown)  # [B, S]
-        if bool(due.count_nonzero()):
-            want_camp = due & has_camp
-            want_dist = due & ~has_camp & ~owns_dist
-            want_trade = due & ~has_camp & owns_dist & ~has_route
-            new_kind = want_camp.long() * 1 + want_dist.long() * 3 + want_trade.long() * 2
-            issued = new_kind > 0
-            self.seat_citystate_quest[:, row, :S] = torch.where(issued, new_kind, cur2)
-            self.seat_citystate_quest_issued[:, row, :S] = torch.where(issued, torch.full_like(cur2, self.turn), self.seat_citystate_quest_issued[:, row, :S])
-            self.seat_citystate_quest_camp[:, row, :S] = torch.where(
-                want_camp, camp_nearest,
-                torch.where(issued, torch.full_like(cur2, -1), self.seat_citystate_quest_camp[:, row, :S]))
+    def _qst_complete(self, s: int, row: int, hit: torch.Tensor) -> None:
+        """The pair's quest done (`complete`): the type remembered, the envoy
+        sent — the suzerains, then the ground (`addEnvoys`)."""
+        if not bool(hit.count_nonzero()):
+            return
+        last = self.seat_citystate_quest_last
+        last[:, row, s] = torch.where(hit, self.seat_citystate_quest[:, row, s], last[:, row, s])
+        self._qst_clear(s, row, hit)
+        env = self.seat_citystate_envoys
+        env[:, row, s] = env[:, row, s] + hit.to(env.dtype) * self._qst_envoys
+        self._cs_resolve_suzerain()
+        self._minor_envoy_tiles(hit)
+        self._eff_version += 1
+
+    def _qst_settle(self, row: int, typ: int, hit_s) -> None:
+        """Every minor whose quest for `row` is of `typ` and passes
+        `hit_s(s)` [B] done, the minors in order (`settle`)."""
+        if row >= self.n_majors:
+            return
+        for s in range(self.S):
+            cur = self.seat_citystate_quest[:, row, s] == typ
+            if not bool(cur.count_nonzero()):
+                continue
+            self._qst_complete(s, row, cur & hit_s(s))
+
+    def _quest_unit_added(self, row: int, landed: torch.Tensor, type_idx: torch.Tensor) -> None:
+        """`questUnitAdded`: a unit of `type_idx` [B] added to `row` in the
+        games of `landed`; a quest's unit upgraded past ends it first."""
+        if row >= self.n_majors or not bool(landed.count_nonzero()):
+            return
+        for s in range(self.S):
+            cur = landed & (self.seat_citystate_quest[:, row, s] == self._Q_TRAIN)
+            if not bool(cur.count_nonzero()):
+                continue
+            tgt = self.seat_citystate_quest_target[:, row, s]
+            obs = self._qst_obsolete(row, tgt.unsqueeze(1)).squeeze(1)
+            self._qst_clear(s, row, cur & obs)
+            self._qst_complete(s, row, cur & ~obs & (tgt == type_idx))
+
+    def _quest_boosted(self, row: int, want: torch.Tensor, is_civic: bool) -> None:
+        """`questBoosted`: the boosts `want` [B, k] landed on `row`."""
+        if row >= self.n_majors or not bool(want.count_nonzero()):
+            return
+        typ = self._Q_CIVIC if is_civic else self._Q_TECH
+        k = want.shape[1]
+
+        def hit(s: int) -> torch.Tensor:
+            tgt = self.seat_citystate_quest_target[:, row, s]
+            return (tgt >= 0) & (tgt < k) & want.gather(1, tgt.clamp(min=0, max=k - 1).unsqueeze(1)).squeeze(1)
+        self._qst_settle(row, typ, hit)
+
+    def _quest_district_built(self, row: int, made: torch.Tensor, dtype: torch.Tensor) -> None:
+        """`questDistrictBuilt`: a district of type `dtype` [B] of `row`'s
+        completed in the games of `made`."""
+        if not bool(made.count_nonzero()):
+            return
+        self._qst_settle(row, self._Q_ZONE, lambda s: made & (self.seat_citystate_quest_target[:, row, s] == dtype))
+
+    def _quest_recruited(self, row: int, hit: torch.Tensor, cls: int) -> None:
+        """`questRecruited`: a Great Person of class `cls` recruited by `row`."""
+        if not bool(hit.count_nonzero()):
+            return
+        self._qst_settle(row, self._Q_GP, lambda s: hit & (self.seat_citystate_quest_target[:, row, s] == cls))
+
+    def _quest_route(self, row: int, take: torch.Tensor, to_code: torch.Tensor) -> None:
+        """`questRouteStarted`: a route of `row`'s started to the destination
+        `to_code` [B] (a minor's -(2+s))."""
+        if not bool((take & (to_code <= -2)).count_nonzero()):
+            return
+        self._qst_settle(row, self._Q_TRADE, lambda s: take & (to_code == -(2 + s)))
+
+    def _quest_camp_cleared(self, b: int, seat: int, tile: int) -> None:
+        """`questCampCleared`: game `b`'s camp at `tile` cleared by major `seat`."""
+        if not (0 <= seat < self.n_majors):
+            return
+        one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        one[b] = True
+
+        def hit(s: int) -> torch.Tensor:
+            c = self.citystate_center[:, s].clamp(min=0)
+            return one & (self.pair_dist[c, tile].to(torch.long) <= self._qst_camp_r)
+        self._qst_settle(seat, self._Q_CAMP, hit)
+
+    def _quest_religion(self, games: torch.Tensor) -> None:
+        """`questReligion` in the games of `games` [B]: each Convert quest
+        whose minor's city follows its actor's religion done — the minors in
+        order, each with every row."""
+        if self.S == 0 or not bool((games.reshape(-1, 1, 1) & (self.seat_citystate_quest == self._Q_CONVERT)).any()):
+            return
+        follow = self._minor_followed()
+        for s in range(self.S):
+            for row in range(self.n_majors):
+                cur = games & (self.seat_citystate_quest[:, row, s] == self._Q_CONVERT)
+                if bool(cur.count_nonzero()):
+                    self._qst_complete(s, row, cur & (follow[:, s] == self.seat_citystate_quest_target[:, row, s]))
+
+    def _quest_war(self, a: int, b: int, mask: torch.Tensor) -> None:
+        """`questWar`: war between a major row and a minor's row ends the
+        pair's quest."""
+        for row, other in ((a, b), (b, a)):
+            s = other - self.n_majors
+            if row < self.n_majors and 0 <= s < self.S:
+                self._qst_clear(s, row, mask)
 
     def _centre_city_map(self) -> torch.Tensor:
         """[B, T] bool — `centreHasCity`: a LIVING city (any major's, or a
@@ -15873,6 +16087,7 @@ class SimSeats:
         slot = self._free_route_slot(rows, row)
         self.seat_routes[rows, row, slot, 0] = o_id[rows]
         self.seat_routes[rows, row, slot, 1] = to_code[rows]
+        self._quest_route(row, take, to_code)
         self.seat_route_dseat[rows, row, slot] = dseat[rows]
         self.seat_route_dcity[rows, row, slot] = dcity[rows]
         md = self._trade_min_duration()

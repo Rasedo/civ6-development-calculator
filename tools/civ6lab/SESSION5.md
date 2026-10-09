@@ -816,8 +816,8 @@ t257).
 - **Sample.** About 700 quest offers a game (six games pin 8 kinds to ±3
   points); about 100k id-tracked unit-turns; 25–30 new flips and about 100
   cadence grants. About 3.5 h.
-- **Fit.** Quests: a weighted draw over the kinds in `issueQuest` /
-  `_seat_quest_phase`, with the measured cooldown and reward. The walker: one
+- **Fit.** Quests: read from the DLL instead (`giveQuest` / `_give_quest`,
+  dll_readings "H-1: the city-states' quests"). The walker: one
   model for minor and Free City units in `minorPhase` / `_city_state_phase`
   and `freeCitiesPhase` / `_free_cities_phase`. Builders: an improvement pick
   for minors (also unblocks B-24r). Research: confirm or replace

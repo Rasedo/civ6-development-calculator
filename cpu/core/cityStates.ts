@@ -1,12 +1,13 @@
 
-import type { City, CityState, CityStateQuest, CityStateType, GameState, QueueItem, Yields } from './types';
+import type { City, CityState, CityStateType, GameState, QueueItem, Yields } from './types';
+import { giveQuest } from './quests';
 import { NO_SEAT, cityStateOfSeat, isCiv, civsAtWar, emptySeat, isCityStateSeat, markCityCentre, seatOf, seatOfCityState, setTileOwner, setTreatyTurnsWith, setWar, setWarTurnsWith, tileBelongsTo, tileSeat, hiddenResourcesFor, treatyTurnsWith, warTurnsWith, alliedAtLevel, warBanned } from './seats';
 import { cancelRoutes } from './trade';
 import { ATHEISM_PRESSURE_PER_POP } from '../data/religion';
 import { grievanceCityStateWar } from './grievance';
 import { congressSuzBonusBlocked } from './congress';
 import { minorGovernorEffects } from './governors';
-import { tilesWithin, hexDistance } from '../../world/hex';
+import { tilesWithin } from '../../world/hex';
 import { FEATURES } from '../../world/features';
 // the border-growth pick and its claim: a minor's envoy plots are taken by
 // the city rule's OWN next-tile choice, never a second one
@@ -16,7 +17,7 @@ import type { RuleResult } from './rules';
 import { ALLIANCE_ECONOMIC, PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../data/seats';
 import { CIV_LEVELS } from '../data/civLevels';
 import { RESOURCES } from '../../world/resources';
-import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, CITY_STATE_TYPE_DISTRICT, QUEST_CAMP_RADIUS, FIRST_MEET_ENVOYS } from '../data/cityStates';
+import { CITY_STATE_SUZERAIN_BONUS, REGIONAL_REACH_BONUS, type SuzEffect, CITY_STATE_TYPES, CITY_STATE_TYPE_YIELD, CITY_STATE_MAX_HP, CITY_STATE_ENVOY_ROWS, CITY_STATE_ITEM_PROD, GENEVA_SCIENCE_PCT, HONG_KONG_PROJECT_PCT, JOHANNESBURG_LATE_TECH, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, PRESLAV_BUILDING_LOYALTY, SUZERAIN_ENVOYS, FIRST_MEET_ENVOYS } from '../data/cityStates';
 import { REGIONAL_RANGE } from '../data/constants';
 import { warWearinessPeace } from './weariness';
 
@@ -169,6 +170,10 @@ export function meetCityState(state: GameState, cityState: CityState, seat: numb
   if (hasMet(cityState, seat)) return;
   const first = !cityState.met.some((s) => isCiv(s));
   setMet(cityState, seat);
+  // the meeting gives the pair its quest (0x93ae70) before the first
+  // envoy's ground is drawn (runs/h1_duelw1117 t17: the quest's draws, then
+  // Caguana's annex)
+  giveQuest(state, cityState, seat);
   if (first && isCiv(seat)) addEnvoys(state, cityState, seat, FIRST_MEET_ENVOYS);
 }
 
@@ -511,68 +516,6 @@ export function assignEnvoy(state: GameState, cityStateId: number, seat: number)
   s.envoysAvailable -= 1;
   addEnvoys(state, cityState, seat, 1);
   return ok;
-}
-
-export function questSatisfied(
-  state: GameState,
-  cityState: CityState,
-  quest: CityStateQuest,
-  seat: number,
-  owner?: { tradeRoutes?: { toCs?: number }[]; cities: (City | City)[] },
-): boolean {
-  switch (quest.kind) {
-    case 'clearCamp':
-      return quest.campIndex !== undefined && !state.barbSeat.camps.includes(quest.campIndex);
-    case 'sendTradeRoute':
-      return (owner?.tradeRoutes ?? seatOf(state, seat)?.tradeRoutes ?? []).some((r) => r.toCs === cityState.id);
-    case 'buildDistrict':
-      return (owner?.cities ?? seatOf(state, seat)!.cities).some((c) =>
-        c.districts.some(
-          (d) => d.type === quest.district && state.map.tiles[d.tileIndex].districtComplete,
-        ),
-      );
-  }
-}
-
-/**
- * ONE quest issuer for every seat, and it draws NO RNG: the pick is
- * deterministic and keyed to the city-state's OWN type, which is both the
- * closer read of Civ 6 and the one that costs the shared RNG stream nothing.
- * Fixed order: clearCamp -> buildDistrict -> sendTradeRoute. `owner`
- * supplies the asking seat's routes and cities (omitted = `seat`'s own).
- * Null = nothing applies, retry next turn with the questIssuedTurn clock
- * unchanged.
- */
-export function issueQuest(
-  state: GameState,
-  cityState: CityState,
-  seat: number,
-  owner?: { tradeRoutes?: { toCs?: number }[]; cities: (City | City)[] },
-): CityStateQuest | null {
-  const center = state.map.tiles[cityState.centerIndex];
-  const cities = owner?.cities ?? seatOf(state, seat)!.cities;
-  const routes = owner?.tradeRoutes ?? seatOf(state, seat)?.tradeRoutes ?? [];
-  let campIndex: number | undefined;
-  let campKey = Infinity;
-  const span = state.map.tiles.length + 1;
-  for (const i of state.barbSeat.camps) {
-    const t = state.map.tiles[i];
-    const d = hexDistance(state.map, t.col, t.row, center.col, center.row);
-    if (d > QUEST_CAMP_RADIUS) continue;
-    const key = d * span + i;
-    if (key < campKey) {
-      campKey = key;
-      campIndex = i;
-    }
-  }
-  if (campIndex !== undefined) return { kind: 'clearCamp', campIndex };
-  const district = CITY_STATE_TYPE_DISTRICT[cityState.type];
-  const alreadyBuilt = cities.some((c) =>
-    c.districts.some((d) => d.type === district && state.map.tiles[d.tileIndex].districtComplete),
-  );
-  if (!alreadyBuilt) return { kind: 'buildDistrict', district };
-  if (!routes.some((r) => r.toCs === cityState.id)) return { kind: 'sendTradeRoute' };
-  return null;
 }
 
 /**

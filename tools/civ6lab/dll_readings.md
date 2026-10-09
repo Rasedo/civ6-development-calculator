@@ -1842,7 +1842,7 @@ start, `act` its actions, `barb` the barbarians' turn and the congress,
 | Choosing a Citizen Name | 13 / 34 | step (a storm's name), act and start (a Spy's) | rule |
 | NameManager::GetUnitNamePart | 10 / 24 | act, two a unit (118 then 155; 86 then 81) | rule, lacking |
 | tech / civic boosts, free techs | 24 / 27 | act, start, after step | rule |
-| Selecting a random new quest (+ its type pickers) | 12 / 11 (11 / 8) | after step (every 30 turns), act | rule, lacking |
+| Selecting a random new quest (+ its type pickers) | 12 / 11 (11 / 8) | after step (the game era's change), act (a meeting) | rule |
 | Choosing a City Name | 11 / 10 | act (a major's founding past its capital) | rule |
 | Goody Hut Type / Sub Type | 9 / 11 each | act, start | rule |
 | region names (River, Sea, Desert, Volcano, Mountain Range, Ocean, Lake Range) | 20 / 19 | act, set-up | rule, lacking |
@@ -1856,13 +1856,12 @@ city-states' and Free Cities' walk (`walkUnit`), their builds and buys
 (`minorPlan`, `minorPurchases`, ...) and the pantheon pick — the AI's, the
 driver's stand-ins. The labels the engines never draw: the barbarians'
 camp step and ranged roll (as the DLL runs them), the unit and region
-names, the quests, the antiquity sites' eras and the artifacts — AUDIT C-74
-BUILD. Every value is ((state' >> 16) · range16) >> 16 (46,082 of 46,082).
+names, the antiquity sites' eras and the artifacts — AUDIT C-74 BUILD. Every value is ((state' >> 16) · range16) >> 16 (46,082 of 46,082).
 
 What the log settled:
 - The random-event step is the run of step draws holding the gap's last
-  "Random Event Roll" (`loggedStep`): the quests' refresh ("Selecting a
-  random new quest", every 30 turns: t31, t61 ...) and an era's boosts may
+  "Random Event Roll" (`loggedStep`): the game era's quests ("Selecting a
+  random new quest": t31, t61 ...) and an era's boosts may
   follow it before the first player's start, so the step is no tail of
   the gap. On the turn the sea rises the roll is a draw over 1 (1117 t224,
   t244; 1118 t239, t270): the rise is the turn's event by force.
@@ -2388,18 +2387,8 @@ over 24). The engines draw it (`createRelic` / `_create_relic`,
   territory (0xa36ff0: "Random Desert", "Sea", "Ocean", "Mountain Range",
   "Volcano"; 0xa36400 "Random Lake Range") — one draw over the names left.
   The engines name no region (AUDIT C-74 BUILD).
-- Game_Quests 0x939980 (client player edx, minor actor r8d; on a game
-  era's or a player era's change, a meeting, and 0x93ae70) gives the pair
-  1 − (its standing quests, the +0x168 records of state 1) quests: it
-  finds the pair's last quest type in the history (+0x1e0, the record of
-  the highest turn +0x18, its type +0xc), walks the quest logics (+0x200,
-  each 0x8490d0 its type) skipping that type and keeping those whose
-  0x849110 IsValidToStartQuest(client, actor) holds, each weight 1, and
-  draws "Selecting a random new quest" over their count (0x152eb0); the
-  type's own picker follows (0x84d870, a tech boost's). Case: 1117 t17,
-  China meets minor 3: 6 / 1, then the Train Unit picker 4 / 1, the
-  quest's envoy at t24. The logics' validity, pickers and completion are
-  unread; the engines' quest issuer draws nothing (AUDIT C-74 BUILD).
+- Game_Quests 0x939980 gives a city-state's quests: "H-1: the city-states'
+  quests" below.
 - A record read before its player's start of the turn (its event log holds
   rows of the turn but no PlayerTurnActivated of the recorder's player:
   1117 t168, 1118 t101, 1119 t4 and t112, 1120 t95, 1121 t134, 1122 t108,
@@ -2409,6 +2398,101 @@ over 24). The engines draw it (`createRelic` / `_create_relic`,
 - A plot a city gains in its owner's actions, after its start (a unit's
   move: runs/h1_duelw1120 t161, Xi'an's stored 275), is no culture claim:
   the city holds no next plot after it.
+
+## H-1: the city-states' quests — READ
+
+Game_Quests (Quests_Manager.cpp, the logics in GameQuests/Quests_Logic_*.cpp).
+A quest record (stride 0x24): +0 state (1 standing, 2 completed, 3 failed),
++4 the client (the minor), +8 the actor (the major), +0xc the type, +0x10
+its id, +0x14 its start turn, +0x18 its completion turn, +0x1c its target.
+The standing list is +0x110 (data +0x168), the completed one +0x188 (data
++0x1e0; 0x939f70 moves the completed records there and drops the failed).
+Check: `tools/civ6lab/dll_quests.py` replays every quest draw of the 29
+duels from the records (the types' validity and targets at the moment of
+each "Selecting a random new quest" and its picker, against the logged
+range): select 335 of 341 ranges where the log holds a draw at the pair's
+turn, pickers 261 of 264; 18 logged draws the records do not explain and
+12 the reading gives that the log lacks (records a turn apart, a quest's
+completion read off two records).
+
+- The logics, registered in this order (0x93aaa0): Convert Capital to
+  Religion, Send Trade Route, Clear Barbarian Camp, Train Unit Type, Zone
+  District Type, Trigger Tech Boost, Trigger Civic Boost, Recruit Great
+  Person Class — the Quests table's rows. Each logic's vtable: +0x8 its
+  type name, +0x10..+0x20 its texts, +0x38 its signal hooks, +0x40 its
+  validity, +0x48 its picker, +0x50 the reward (0x84a0e0: the actor's
+  Influence gives ONE token to the minor), +0x58 the failure note.
+- Who is given one (0x939980, client edx, actor r8d): 1 − the pair's
+  standing quests; the type of the pair's last COMPLETED quest (its highest
+  completion turn) skipped; each logic kept where IsValidToStartQuest
+  (0x849110) holds: the type known, client != actor, both alive (+0x728),
+  the client a minor and the actor a major (Influence 0x449cc0 / 0x449940),
+  the client has met the actor (0x3daaf0) and is not at war with it
+  (0x3dcec0), then the logic's own test; weight 1 each; one draw "Selecting
+  a random new quest" over their count (0x152eb0), the type's record started
+  (0x849400: state 1, the ids, the turn) and its picker (+0x48) run.
+- When: the game era's change (0x93ac50, registered on GameEras' signal when
+  the game has eras, the player era's 0x93ad80 otherwise): every player as
+  client, in the players' order, with every player as actor; a meeting
+  (0x93ae70): both directions. Nothing else gives a quest: no cooldown, no
+  expiry — a pair whose quest ended waits for the next era or meeting
+  (runs/h1_duelw1117: t13, t17, t31 era + a meeting, t61, t91, t151, t161
+  a meeting, t238).
+- The types, validity (+0x40), target (+0x48) and end (+0x38):
+  - Convert (0x84a120): the actor founded a religion the minor's capital
+    does not follow (+0x1910); target the religion; done
+    when the minor's capital comes to follow it (0x84a200).
+  - Send Trade Route (0x84b520): the actor runs no route to the minor
+    (0x54ff90 == 0); done when the actor starts one to it (0x84b570).
+  - Clear Barbarian Camp (0x849a70): a camp within 5 of the minor's capital
+    (the plots in range 5, 0x6aef0); no target; done when the actor clears
+    a camp within 5 (0x849c00: distance <= 5); a camp another clears fails
+    the quest when none is left in range (0x849d60).
+  - Train Unit Type (0x84be90 / 0x84bdc0): a unit with CanTrain and a
+    Combat, RangedCombat or Bombard, the actor's own (its civilization's
+    table maps the unit to itself), no upgrade the actor has unlocked
+    (0x84bc70: the upgrade's PrereqTech and PrereqCivic held, the upgrade
+    the actor's own), its era (0x93e6c0: the later of its PrereqTech's and
+    PrereqCivic's, none for a unit with neither) the actor's era (0x467eb0:
+    the latest era of its techs and civics); the picker draws "Choosing
+    random unit type for Train Unit quest" over them in the Units table's
+    order (0x84c1e0); done when a unit of the type is added to the actor —
+    an upgrade too (0x84bf90; runs/h1_duelw1117 t24: China's Slinger
+    upgraded to an Archer in its start, the envoy to Caguana annexing 702);
+    failed when the actor unlocks its upgrade (0x84bf00 on a tech or civic).
+  - Zone District Type (0x84e120 / 0x84e030): the actor's own district
+    (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at
+    most the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every
+    one it holds (0x4bdd70); the picker over them in the table's order
+    (0x84e3e0); done when the actor COMPLETES one (0x84e190; the variant
+    done at the district's placement scores worse on the records, 332
+    against 335).
+  - Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor
+    boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; the
+    pickers over them in the tables' order (0x84d870, 0x84ce50); done on the
+    boost (0x84d750, 0x84ccb0), failed when the actor researches it
+    (0x84cd40).
+  - Recruit Great Person Class (0x84ab50): a class the actor can earn
+    (0x2f1ed0: on offer, not barred by its civilization's or leader's trait
+    — ExcludedGreatPersonClasses —, below MaxPlayerInstances, a plot for the
+    person to arrive on: a Great Admiral a non-wonder district beside water,
+    0x2f6500) whose offer's era (0x2f64d0) is at most the actor's or its
+    next; the picker over the classes in the table's order (0x84b130); done
+    when the actor recruits one (0x84ac50), failed when the class has no
+    offer at another's recruit. Another's recruit of the class fails
+    nothing while a replacement stands (the variant failing it scores 320
+    against 335).
+- Every type: war between the pair (0x8492f0) and a player's end (0x849210)
+  fail its quests (runs/h1_duelw1110 t125: the war ends 2->0's and 3->0's,
+  both given again at t181).
+- Completion (0x848d20): state 2, the completion turn, the reward — the
+  envoy lands at once, its ground drawn there.
+
+Shipped: `cpu/core/quests.ts` / its GPU twin (`_give_quest`,
+`_give_era_quests`, `_quest_*` in `gpu/core/sim_seats.py`), the tables in
+`cpu/data/quests.ts`. The engines fail a quest whose end the DLL takes on a
+research or a recruit when the pair is next given one (`standing` /
+`_q_standing`) or its unit is added.
 
 ## H-1: the trade path's search, its score and the Canal — READ
 

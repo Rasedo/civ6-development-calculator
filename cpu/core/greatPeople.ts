@@ -19,6 +19,7 @@ import { offerApostlePromotions } from './game';
 import { suzerainEffect } from './cityStates';
 import { BOLOGNA_GPP_BUILDING, BOLOGNA_DISTRICT_GPP } from '../data/cityStates';
 import { PROPHET_MAX_PLAYER_INSTANCES } from '../data/religion';
+import { questRecruited } from './quests';
 
 export function greatPeopleEarned(state: GameState, cls: GreatPersonClass): number {
   return state.claimedGreatPeople.filter((id) => GREAT_PEOPLE[cls].some((p) => p.id === id)).length;
@@ -288,6 +289,7 @@ function recruit(state: GameState, seat: number, cls: GreatPersonClass,
       u.charges = gpChargesOf(person) + extraCharges(state, seat, cls, state.map.tiles[where]);
     }
   }
+  questRecruited(state, seat, cls);
 
   // CIV6 (Nobel Prize): "+50 Diplomatic Favor when earning a Great Person" —
   // every class, and the PATRONIZED person is earned too (`GP_FAVOR_ROWS`)

@@ -541,13 +541,6 @@ export const CITY_STATE_ENVOY_ROWS: readonly EnvoyRow[] = [
       ['OIL_POWER_PLANT', 'FOSSIL_FUEL_POWER_PLANT', 'REQUIRES_CITY_HAS_FOSSIL_FUEL_POWER_PLANT_ETHIOPIA']]),
 ];
 export const SUZERAIN_ENVOYS = 3;
-export const QUEST_COOLDOWN = 12;
-export const QUEST_ENVOYS = 1;
-/** CIV6 (Quests_Text.xml, LOC_QUEST_CLEAR_BARBARIAN_CAMP_DESCRIPTION):
- *  "Destroy one Barbarian Outpost within 5 tiles of the city." */
-export const QUEST_CAMP_RADIUS = srcConst('cityState.questCampRadius', 5, {
-  pedia: 'Quests_Text.xml LOC_QUEST_CLEAR_BARBARIAN_CAMP_DESCRIPTION: "within 5 tiles of the city"',
-});
 export const CITY_STATE_MAX_HP = 150;
 /** CIV6 (Eras.xml `BonusMinorStartingUnits`, "Additional Starting Units for
  *  Minor Civilizations in addition to their Settler"): an Ancient-era start

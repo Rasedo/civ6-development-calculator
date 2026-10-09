@@ -28,8 +28,8 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, issueQuest, questSatisfied, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
-import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, QUEST_COOLDOWN, QUEST_ENVOYS, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
+import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { landWalker, walkUnit } from './walker';
@@ -127,6 +127,7 @@ import { WONDER_ERA_INDEX } from '../data/builtWonders';
 import { INDUSTRIAL_ERA_INDEX, ERAS } from '../data/techs';
 
 import { gpCityPermOf } from '../data/greatPeople';
+import { questReligion } from './quests';
 
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -2721,35 +2722,6 @@ export function seatPhase(state: GameState): void {
           actor.envoysAvailable = (actor.envoysAvailable ?? 0) + 1;
         }
       }
-
-      // City-state quests — each MET CS keeps ONE quest per seat
-      // (cityState.seatQuest[actor.seat], indexed by seat, the GPU's own
-      // geometry); a satisfied one resolves here (+QUEST_ENVOYS to
-      // THIS seat's envoys — the accrual channel), else a new one issues on
-      // cooldown expiry. The kind is DETERMINISTIC: the FIRST SATISFIABLE
-      // option in the fixed order [clearCamp, buildDistrict, sendTradeRoute]
-      // against this seat's state — no draw. questIssuedTurn clock
-      // defaults to 0 → first issue at turn≥cooldown.
-      for (const cityState of state.cityStates) {
-        if (!hasMet(cityState, actor.seat)) continue;
-        const rq = (cityState.seatQuest ??= []);
-        const rqi = (cityState.seatQuestIssuedTurn ??= []);
-        const cur = rq[actor.seat] ?? null;
-        if (cur) {
-          if (questSatisfied(state, cityState, cur, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities })) {
-            rq[actor.seat] = null;
-            rqi[actor.seat] = state.turn;
-            addEnvoys(state, cityState, actor.seat, QUEST_ENVOYS);
-            state.eventLog.push(`${cityState.name} quest complete for ${actor.name}: +${QUEST_ENVOYS} envoy.`);
-          }
-        } else if (state.turn - (rqi[actor.seat] ?? 0) >= QUEST_COOLDOWN) {
-          const q = issueQuest(state, cityState, actor.seat, { tradeRoutes: actor.tradeRoutes, cities: actor.cities });  // one issuer, every seat
-          if (q) {
-            rq[actor.seat] = q;
-            rqi[actor.seat] = state.turn;
-          }
-        }
-      }
     }
 
     let unitCount = seatUnitList.length;
@@ -3047,6 +3019,7 @@ export function seatPhase(state: GameState): void {
     // runs/h1_duelw1117 t148: a city China's spread converts gives its new
     // citizen to China's religion)
     spreadReligiousPressure(state, actor.seat);
+    questReligion(state);
 
     // THE CITIES, after the economy. CIV6: each city runs its production (the
     // completion, a Settler's citizen), then grows or starves on the city as

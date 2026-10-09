@@ -40,6 +40,7 @@ import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { randRange } from './rand';
 import { claimTile, drawBorderPlot } from './city';
 import { WONDER_FREE_TILES } from '../data/constants';
+import { questDistrictBuilt } from './quests';
 
 /** CIV6 (Oxford University, Bolshoi Theatre): the free technologies and civics
  *  are DRAWN AT RANDOM — the DLL's 0x4caeb0 / 0x39cd90 ("Choosing random tech
@@ -255,6 +256,7 @@ export function completeQueueItem(
     case 'district': {
       const dt = state.map.tiles[item.tileIndex];
       dt.districtComplete = true;
+      if (dt.district) questDistrictBuilt(state, city.seat, dt.district);
       // the type's own price takes the completed count afresh
       if (dt.district) refreshDistrictDiscount(state, city.seat, dt.district);
       // CIV6 (Monumentality, EFFECT_ADJUST_PLAYER_ERA_SCORE_PER_DISTRICT_CONSTRUCTED):

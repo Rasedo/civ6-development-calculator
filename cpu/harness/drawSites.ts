@@ -7,8 +7,8 @@
  *
  * `owner`:
  *  - `rule`: an engine rule both engines draw where the game does;
- *  - `lacking`: an engine rule the engines do not draw (region names, quests,
- *    the dig sites' eras and artifacts, the barbarians' camp step as the DLL
+ *  - `lacking`: an engine rule the engines do not draw (region names, the
+ *    dig sites' eras and artifacts, the barbarians' camp step as the DLL
  *    runs it);
  *  - `ai`: a choice of the game's AI — the driver's, not the engines';
  *  - `setup`: the game's set-up, before the first player's first start.
@@ -82,15 +82,15 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Random Mountain Range': { owner: 'lacking', dll: '0xa36ff0', n: [1, 3] },
   'Random Ocean': { owner: 'lacking', dll: '0xa36ff0', n: [2, 1] },
   'Random Lake Range': { owner: 'lacking', dll: '0xa36400', n: [1, 0] },
-  // a city-state's quest for a major (Game_Quests 0x939980, on an era's
-  // change, a meeting, the refresh): one uniform pick over the quest types
+  // a city-state's quest for a major (Game_Quests 0x939980, on the game
+  // era's change and a meeting): one uniform pick over the quest types
   // valid for the pair, then the type's own picker
-  'Selecting a random new quest': { owner: 'lacking', dll: '0x939980', n: [12, 11] },
-  'Choosing random tech type for Trigger Tech Boost quest': { owner: 'lacking', dll: '0x84d870', n: [4, 2] },
-  'Choosing random civic type for Trigger Civic Boost quest': { owner: 'lacking', n: [3, 2] },
-  'Choosing random unit type for Train Unit quest': { owner: 'lacking', n: [3, 1] },
-  'Choosing random district type for Zone District quest': { owner: 'lacking', n: [1, 1] },
-  'Choosing random class type for Recruit Great Person Class quest': { owner: 'lacking', n: [0, 2] },
+  'Selecting a random new quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x939980', n: [12, 11] },
+  'Choosing random tech type for Trigger Tech Boost quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x84d870', n: [4, 2] },
+  'Choosing random civic type for Trigger Civic Boost quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x84ce50', n: [3, 2] },
+  'Choosing random unit type for Train Unit quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x84c1e0', n: [3, 1] },
+  'Choosing random district type for Zone District quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x84e3e0', n: [1, 1] },
+  'Choosing random class type for Recruit Great Person Class quest': { owner: 'rule', cpu: 'giveQuest', gpu: '_give_quest', dll: '0x84b130', n: [0, 2] },
   'Random Era for Antiquity Site': { owner: 'lacking', dll: '0x280140', n: [3, 0] },
   'Choosing Artifact': { owner: 'lacking', n: [0, 3] },
   // the AI's

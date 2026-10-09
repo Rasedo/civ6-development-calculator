@@ -35,6 +35,7 @@ import { gpCityPermOf, gpPermOf } from '../data/greatPeople';
 import { srcConst, xml } from '../data/provenance';
 import { getModifiers, progressAhead, followerReligionsForCity, followerBeliefForReligion } from './effects';
 import { governorSum } from './governors';
+import { questRouteStarted } from './quests';
 
 /** a living city — any major's, or a city-state — standing at this centre. */
 export function centreHasCity(state: GameState, centerIndex: number): boolean {
@@ -1138,6 +1139,7 @@ function commitRoute(state: GameState, seat: number, originCenter: number, destC
   // the walker lays road on every LAND tile it stands on; the origin is turn 0
   if (!isWater(state.map.tiles[originCenter])) state.map.tiles[originCenter].road = true;
   (seatOf(state, seat)!.tradeRoutes ??= []).push(route);
+  if (route.toCs !== undefined) questRouteStarted(state, seat, route.toCs);
   // CIV6 (Ortoo): "Starting a Trade Route immediately creates a Trading Post
   // in the destination city" — the post the ordinary route only plants when
   // it COMPLETES (`IMMEDIATE_POST_ROWS`)

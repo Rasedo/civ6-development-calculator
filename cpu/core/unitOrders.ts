@@ -1,3 +1,4 @@
+import { questReligion } from './quests';
 import type { GameState, Seat, Tile, Unit } from './types';
 import { disbandUnit } from './units';
 import { neighbors } from '../../world/hex';
@@ -66,6 +67,7 @@ export function spreadFromUnit(state: GameState, unit: Unit, actor: Seat, toTile
     const gold = promoFirstUse(unit, 'INDULGENCE');
     if (gold > 0) actor.treasury = (actor.treasury ?? 0) + gold;
   }
+  if (tcs) questReligion(state);
   unit.movesLeft = 0;
   unit.charges = (unit.charges ?? 1) - 1;
   if (unit.charges <= 0) disbandUnit(state, unit.id);

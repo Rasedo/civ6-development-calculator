@@ -67,6 +67,7 @@ import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
 import { barbarianOps, barbarianRules, barbBattleBoldness, barbHomingCamp, tribeDies } from './barbarians';
+import { questCampCleared } from './quests';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -76,6 +77,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   const camp = state.barbSeat.camps.indexOf(tileIndex);
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
+  questCampCleared(state, unit.seat, tileIndex);
   tribeDies(state, tileIndex);
   campMoment(state, unit.seat, tileIndex);
   // the outpost was the BARBARIANS' — theirs is the civilization buried here

@@ -1,13 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, emptySeat, isCityStateSeat, seatOfCityState, setTileOwner, setWar, tileSeat, unitsOf } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { foundCity } from '../../../cpu/core/game';
-import { initFog } from '../../../cpu/core/fog';
 import { levyGoldCost, seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
-import { envoysOf, isSuzerain, issueQuest, setMet } from '../../../cpu/core/cityStates';
-import { hexDistance, tilesWithin } from '../../../world/hex';
-import { LEVY_TURNS, QUEST_ENVOYS, QUEST_COOLDOWN, QUEST_CAMP_RADIUS, CITY_STATE_TYPE_DISTRICT } from '../../../cpu/data/cityStates';
+import { envoysOf, isSuzerain, meetCityState, setMet } from '../../../cpu/core/cityStates';
+import { giveEraQuests, giveQuest } from '../../../cpu/core/quests';
+import { markBoost } from '../../../cpu/core/boosts';
+import { holdRng } from '../../../cpu/core/rand';
+import { QUEST_ENVOYS } from '../../../cpu/data/quests';
+import { tilesWithin } from '../../../world/hex';
+import { LEVY_TURNS } from '../../../cpu/data/cityStates';
 import type { CityState, CityStateType, GameState, Seat, City } from '../../../cpu/core/types';
 
 // A civ with ONE city; opts out of the belief/settle draws by default so a
@@ -186,123 +188,98 @@ describe('civ levy', () => {
 });
 
 // ---------------------------------------------------------------------------
-describe('civ quests (deterministic)', () => {
-  function scenario(cityStateType: CityStateType = 'scientific'): { state: GameState; civ: Seat; cityState: CityState } {
-    const state = makeState(makeMap(24, 24));
-    state.turn = 20;
-    const civ = addCiv(state, 10, 10);
-    const cityState = addCs(state, 16, 10, { type: cityStateType });
-    cityState.met = [];
-    setMet(cityState, civ.seat);
-    cityState.envoys = {  };
-    cityState.envoys[civ.seat] = 3;
-    return { state, civ, cityState };
-  }
-
-  it('issues buildDistrict when no camp is near and the district is unbuilt', () => {
-    const { state, civ, cityState } = scenario('scientific');
-    seatPhase(state);
-    expect(cityState.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
-    expect(cityState.seatQuest?.[civ.seat]?.district).toBe(CITY_STATE_TYPE_DISTRICT['scientific']);
-  });
-
-  it('prefers clearCamp when a camp is within range (nearest, ties lowest tile)', () => {
-    const { state, civ, cityState } = scenario('scientific');
-    const ct = state.map.tiles[cityState.centerIndex];
-    const near = tilesWithin(state.map, ct.col, ct.row, 2).filter((t) => t.index !== cityState.centerIndex);
-    const far = near[near.length - 1].index;
-    const close = near[0].index;
-    state.barbSeat.camps = [far, close]; // out of array order — nearest must still win
-    seatPhase(state);
-    const q = cityState.seatQuest?.[civ.seat];
-    expect(q?.kind).toBe('clearCamp');
-    // nearest to the CS center
-    const dc = hexDistance(state.map, state.map.tiles[close].col, state.map.tiles[close].row, ct.col, ct.row);
-    const df = hexDistance(state.map, state.map.tiles[far].col, state.map.tiles[far].row, ct.col, ct.row);
-    expect(q?.campIndex).toBe(dc <= df ? close : far);
-  });
-
-  it('asks for a camp within 5 tiles alone (Quests_Text.xml)', () => {
-    const { state, civ, cityState } = scenario('scientific');
-    const ct = state.map.tiles[cityState.centerIndex];
-    const at = (d: number) => state.map.tiles.find((t) => hexDistance(state.map, t.col, t.row, ct.col, ct.row) === d)!.index;
-    expect(QUEST_CAMP_RADIUS).toBe(5);
-    state.barbSeat.camps = [at(6)];
-    expect(issueQuest(state, cityState, civ.seat)?.kind).toBe('buildDistrict');
-    state.barbSeat.camps = [at(5)];
-    expect(issueQuest(state, cityState, civ.seat)).toEqual({ kind: 'clearCamp', campIndex: at(5) });
-  });
-
-  it('resolves a satisfied quest with +QUEST_ENVOYS to the civ', () => {
-    const { state, civ, cityState } = scenario('scientific');
-    // pre-seed a clearCamp quest whose camp is already gone → satisfied
-    cityState.seatQuest = [];
-    cityState.seatQuest[civ.seat] = { kind: 'clearCamp', campIndex: 999 };
-    cityState.seatQuestIssuedTurn = [];
-    cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
-    state.barbSeat.camps = []; // camp 999 gone
-    const env0 = envoysOf(cityState, civ.seat);
-    seatPhase(state);
-    expect(cityState.seatQuest?.[civ.seat]).toBeNull();
-    expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
-  });
-
-  it('does not issue a quest for an UNMET city-state', () => {
-    const { state, civ, cityState } = scenario('scientific');
-    cityState.met = cityState.met.filter((x) => x !== civ.seat);
-    // fog ON (unitsMode is half of fogActive): meeting is by exploration, so
-    // unmet survives only while the centre is dark — a fogless world meets
-    // every CS at the phase top
-    state.unitsMode = true;
-    state.fogOfWar = true;
-    initFog(state);
-    seatPhase(state);
-    expect(cityState.seatQuest?.[civ.seat] ?? null).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-describe('the quest issuer in the seat phase', () => {
-  it('one seat phase resolves a satisfied quest and issues another', () => {
-    // A civ that would issue AND resolve a quest in one seat phase.
+describe('the city-states\' quests (Game_Quests)', () => {
+  function scenario(): { state: GameState; civ: Seat; cityState: CityState; draws: [string, number][] } {
     const state = makeState(makeMap(24, 24));
     state.turn = 20;
     const civ = addCiv(state, 10, 10);
     const cityState = addCs(state, 16, 10, { type: 'scientific' });
-    cityState.met = [];
-    setMet(cityState, civ.seat);
-    cityState.envoys = {  };
-    cityState.envoys[civ.seat] = 3;
-    // a satisfied quest to resolve + an issue on the same phase (second CS)
-    cityState.seatQuest = [];
-    cityState.seatQuest[civ.seat] = { kind: 'clearCamp', campIndex: 999 };
-    cityState.seatQuestIssuedTurn = [];
-    cityState.seatQuestIssuedTurn[civ.seat] = state.turn;
-    const cs2 = addCs(state, 10, 16, { type: 'cultural' });
-    cs2.met = [];
-    setMet(cs2, civ.seat);
-    cs2.envoys = {  };
-    cs2.envoys[civ.seat] = 3;
-    state.barbSeat.camps = [];
-    seatPhase(state);
-    // both a resolve and an issue happened
-    expect(cityState.seatQuest?.[civ.seat]).toBeNull();
-    expect(cs2.seatQuest?.[civ.seat]?.kind).toBe('buildDistrict');
+    const draws: [string, number][] = [];
+    holdRng({ point: () => undefined, draw: (_s, max, label) => { draws.push([label, max]); } });
+    return { state, civ, cityState, draws };
+  }
+  const release = () => holdRng(null);
+
+  it('a meeting gives the pair one quest: one draw over the valid types, then the type\'s picker', () => {
+    const { state, civ, cityState, draws } = scenario();
+    meetCityState(state, cityState, civ.seat);
+    release();
+    const q = cityState.seatQuest?.[civ.seat];
+    expect(q).toBeTruthy();
+    // no religion, no camp near, no Great Person on offer: Trade, Train,
+    // Zone, Tech, Civic
+    expect(draws[0]).toEqual(['Selecting a random new quest', 5]);
+    if (q!.type !== 'TRADE') expect(draws[1][0]).toMatch(/^Choosing random .* quest$/);
   });
 
-  it('the seatPhase loop issues a seat-0 quest — the seats share one issuer', () => {
-    // ONE issuer, and it is deterministic: fixed order, with the district
-    // keyed to the CS's OWN type. Every seat issues quests without touching
-    // the shared PRNG, so quest issuance can never shift a draw count.
-    const state = makeState(makeMap(24, 24));
-    state.turn = 20;
-    foundCity(state, tileAtCoords(state.map, 5, 5).index, 0); // the seat loop skips cityless seats
-    const cityState = addCs(state, 16, 10, { type: 'scientific', met: [0] });
-    cityState.seatQuestIssuedTurn = [state.turn - QUEST_COOLDOWN]; // due to issue
-    state.barbSeat.camps = [];
-    seatPhase(state);
-    expect(cityState.seatQuest?.[0]).not.toBeNull();
-    // scientific -> the type's own district, not a draw from a flat list
-    expect(cityState.seatQuest?.[0]?.kind).toBe('buildDistrict');
+  it('a standing quest gives the pair no other; the last completed type is skipped', () => {
+    const { state, civ, cityState, draws } = scenario();
+    setMet(cityState, civ.seat);
+    cityState.seatQuest = [];
+    cityState.seatQuest[civ.seat] = { type: 'TRADE', target: null };
+    giveQuest(state, cityState, civ.seat);
+    expect(draws).toHaveLength(0);
+    cityState.seatQuest[civ.seat] = null;
+    cityState.seatQuestLast = [];
+    cityState.seatQuestLast[civ.seat] = 'TRADE';
+    giveQuest(state, cityState, civ.seat);
+    release();
+    expect(draws[0]).toEqual(['Selecting a random new quest', 4]);
+    expect(cityState.seatQuest[civ.seat]?.type).not.toBe('TRADE');
+  });
+
+  it('a Train Unit quest completes when its unit is added: the envoy is the actor\'s', () => {
+    const { state, civ, cityState } = scenario();
+    release();
+    setMet(cityState, civ.seat);
+    cityState.seatQuest = [];
+    cityState.seatQuest[civ.seat] = { type: 'TRAIN', target: 'ARCHER' };
+    const env0 = envoysOf(cityState, civ.seat);
+    spawnUnit(state, 'SLINGER', civ.cities[0].centerIndex, civ.seat);
+    expect(cityState.seatQuest[civ.seat]?.type).toBe('TRAIN');
+    spawnUnit(state, 'ARCHER', civ.cities[0].centerIndex, civ.seat);
+    expect(cityState.seatQuest[civ.seat]).toBeNull();
+    expect(cityState.seatQuestLast?.[civ.seat]).toBe('TRAIN');
+    expect(envoysOf(cityState, civ.seat)).toBe(env0 + QUEST_ENVOYS);
+  });
+
+  it('a Tech Boost quest completes on the boost, and ends with the tech researched', () => {
+    const { state, civ, cityState } = scenario();
+    release();
+    setMet(cityState, civ.seat);
+    cityState.seatQuest = [];
+    cityState.seatQuest[civ.seat] = { type: 'TECH', target: 'WRITING' };
+    markBoost(state, civ.seat, 'WRITING');
+    expect(cityState.seatQuest[civ.seat]).toBeNull();
+    expect(envoysOf(cityState, civ.seat)).toBe(QUEST_ENVOYS);
+    cityState.seatQuest[civ.seat] = { type: 'TECH', target: 'ARCHERY' };
+    civ.research.techs.push('ARCHERY');
+    const draws: string[] = [];
+    holdRng({ point: () => undefined, draw: (_s, _m, label) => { draws.push(label); } });
+    giveQuest(state, cityState, civ.seat);
+    release();
+    expect(draws[0]).toBe('Selecting a random new quest');
+  });
+
+  it('war between the pair ends its quest', () => {
+    const { state, civ, cityState } = scenario();
+    release();
+    setMet(cityState, civ.seat);
+    cityState.seatQuest = [];
+    cityState.seatQuest[civ.seat] = { type: 'TRADE', target: null };
+    setWar(state, civ.seat, cityState.seat, true);
+    expect(cityState.seatQuest[civ.seat]).toBeNull();
+  });
+
+  it('a new game era gives every pair met its quest, the city-states in player order', () => {
+    const { state, civ, cityState, draws } = scenario();
+    const cs2 = addCs(state, 4, 18, { type: 'cultural' });
+    setMet(cityState, civ.seat);
+    setMet(cs2, civ.seat);
+    giveEraQuests(state);
+    release();
+    expect(draws.filter(([l]) => l === 'Selecting a random new quest')).toHaveLength(2);
+    expect(cityState.seatQuest?.[civ.seat]).toBeTruthy();
+    expect(cs2.seatQuest?.[civ.seat]).toBeTruthy();
   });
 });

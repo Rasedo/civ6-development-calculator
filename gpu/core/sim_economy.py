@@ -727,6 +727,7 @@ class SimEconomy:
         if not bool(newly.count_nonzero()):
             return newly
         boosted[:, row] |= newly
+        self._quest_boosted(row, newly, is_civic)
         cost_n = self._research_cost(is_civic)[:, :n]
         prog = self.civ_civic_prog if is_civic else self.civ_tech_prog
         retain = self.civ_civic_retain if is_civic else self.civ_tech_retain

@@ -322,8 +322,6 @@ class SimInit:
         # The (seat, city-state) relations live on `seat_citystate_*`
         # [B, n_majors, S] planes allocated below, once self.n_majors is known;
         # every reader addresses one by row, `seat_citystate_met[:, row, s]`.
-        # (the asked-for district is never stored: it is always the CS type's
-        # own — _citystate_didx — so quest resolve/digest both re-derive it)
         # THE LEVY (`CityState.levySeat` / `levyEnds`): the seat row holding
         # each minor's army and the turn it comes home, -1 while no one does
         self.citystate_levy_seat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
@@ -356,6 +354,21 @@ class SimInit:
         self.conquest_turns = torch.zeros(B, self.NS, dtype=torch.long, device=device)
         citystate_yidx = rules.citystate["typeYieldIdx"]  # CS type -> its envoy yield column
         self._cs_type_n = len(citystate_yidx)  # CITY_STATE_TYPES' width
+        # the quests' tables (`questTables`, cpu/core/quests.ts): the rows
+        # each type's picker walks, in the game database's order
+        _q = rules.citystate["quests"]
+        self._qst_envoys = int(_q["envoys"])
+        self._qst_camp_r = int(_q["campRadius"])
+        self._qst_units = torch.tensor(_q["units"], dtype=torch.long, device=device)
+        self._qst_unit_era = torch.tensor(_q["unitEra"], dtype=torch.long, device=device)
+        self._qst_dist = torch.tensor(_q["districts"], dtype=torch.long, device=device)
+        self._qst_dist_civ = torch.tensor(_q["districtCiv"], dtype=torch.long, device=device)
+        self._qst_dist_era = torch.tensor(_q["districtEra"], dtype=torch.long, device=device)
+        self._qst_dist_max = torch.tensor(_q["districtMax"], dtype=torch.long, device=device)
+        self._qst_dist_same = self._qst_dist.unsqueeze(0) == self._qst_dist.unsqueeze(1)
+        self._qst_gp = [int(x) for x in _q["gpClasses"]]
+        self._qst_gp_ban = [int(x) for x in _q["gpBan"]]
+        self._qst_gp_sea = [bool(x) for x in _q["gpSea"]]
         citystate_didx = rules.citystate["typeDistrictIdx"]  # CS type -> district idx (Campus/Theater/CommHub/IZ/Encampment/HolySite)
         self._citystate_didx = torch.tensor(citystate_didx, dtype=torch.long, device=device)[self.citystate_type.clamp(min=0)]  # [B, S] the type's own district
         # each type's row to routes sent to it (`CITY_STATE_ROUTE_TO_OTHERS`)
@@ -4929,9 +4942,11 @@ class SimInit:
     _CS_PAIR_FIELDS = (
         ("met", torch.bool, False),
         ("envoys", torch.long, 0),
+        # the quest standing for the pair (`questCode`: its type + 1, 0 none;
+        # its target's index, -1 none) and the type of its last completed one
         ("quest", torch.long, 0),
-        ("quest_camp", torch.long, -1),
-        ("quest_issued", torch.long, 0),
+        ("quest_target", torch.long, -1),
+        ("quest_last", torch.long, 0),
     )
 
     _CIV_PAIR_FIELDS = (

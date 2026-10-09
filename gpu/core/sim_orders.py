@@ -1536,6 +1536,10 @@ class SimOrders:
                                     _gv > 0, _gu, self.unit_promo_used[pb, sc[pb]])
                                 self.civ_treasury[pb, row] += _gv.to(self.civ_treasury.dtype)
                         landed = pm.reshape(B, -1).any(dim=1)
+                        _mt = torch.zeros(B, dtype=torch.bool, device=self.device)
+                        _mt[pb[pr >= self.n_majors]] = True
+                        if bool(_mt.count_nonzero()):
+                            self._quest_religion(_mt)
                         if bool(landed.count_nonzero()):
                             lr = landed.nonzero(as_tuple=True)[0]
                             self.unit_charges[lr, sc[lr]] -= 1

@@ -78,6 +78,7 @@ import type { ImprovementId } from './types';
 import { gpPermOf } from '../data/greatPeople';
 import { irradiated } from './nuclear';
 import { FALLOUT_DAMAGE } from '../data/nuclear';
+import { questUnitAdded } from './quests';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
 
@@ -1252,6 +1253,7 @@ export function upgradeUnit(state: GameState, unit: Unit, seat: number): RuleRes
   unit.movesLeft = 0;
   unit.movesFull = unitFullMoves(state, unit);
   raiseBestTrained(state, seat, next, unit.formation ?? 0);
+  questUnitAdded(state, seat, next);
   return { ok: true };
 }
 
@@ -1736,6 +1738,7 @@ export function spawnUnit(
     logXpWrite(state, unit, 'fp');
   }
   state.units.push(unit);
+  questUnitAdded(state, seat, unitType);
   revealAround(state, seat, unit.tileIndex, unitSight(unit, state), { seeThrough: unitSeesThrough(unit) });
   // CIV6 (Units.xml, COST_PROGRESSION_PREVIOUS_COPIES): a chassis whose price
   // climbs is priced off every copy the seat has ever acquired, so the tally is

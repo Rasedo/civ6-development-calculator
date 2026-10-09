@@ -65,6 +65,8 @@ const FEAT_IDX_SC = new Map(Object.keys(FEATURES).map((f, i) => [f, i]));
 const TERRAIN_IDX_SC = new Map(Object.keys(TERRAINS).map((k, i) => [k, i]));
 import { EMERGENCY_SLOTS } from '../data/seats';
 import { questFor } from './observe';
+import { questCode } from './quests';
+import { QUEST_TYPES } from '../data/quests';
 import { envoysOf } from './cityStates';
 import { prodLayout, queueItemColumn } from './prodLayout';
 import { PLACEABLE_DISTRICTS } from '../data/districts';
@@ -248,7 +250,6 @@ function queueItemCost(state: GameState, city: City, q: City['queue'][number] | 
   }
 }
 
-const QUEST_KIND: Record<string, number> = { clearCamp: 1, sendTradeRoute: 2, buildDistrict: 3 };
 
 type Extractor = (state: GameState, rows: readonly unknown[]) => Val[];
 
@@ -728,22 +729,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
     return roster.findIndex((g) => g.appointed && g.minorId === cityState.id);
   })),
   met: overCityStates((cityState, st) => perCiv(st, (seat) => (cityState.met.includes(seat) ? 1 : 0))),
-  questKind: overCityStates((cityState, st) =>
-    perCiv(st, (seat) => {
-      const q = questFor(cityState, seat);
-      return q ? QUEST_KIND[q.kind] ?? 0 : 0;
-    }),
-  ),
-  questIssued: overCityStates((cityState, st) =>
-    perCiv(st, (seat) => cityState.seatQuestIssuedTurn?.[seat] ?? 0),
-  ),
-  questCamp: overCityStates((cityState, st) => perCiv(st, (seat) => questFor(cityState, seat)?.campIndex ?? -1)),
-  questDistrict: overCityStates((cityState, st) =>
-    perCiv(st, (seat) => {
-      const d = questFor(cityState, seat)?.district;
-      return d === undefined ? -1 : PLACEABLE_DISTRICTS.indexOf(d);
-    }),
-  ),
+  questType: overCityStates((cityState, st) => perCiv(st, (seat) => questCode(questFor(cityState, seat))[0])),
+  questTarget: overCityStates((cityState, st) => perCiv(st, (seat) => questCode(questFor(cityState, seat))[1])),
+  questLast: overCityStates((cityState, st) => perCiv(st, (seat) => QUEST_TYPES.indexOf(cityState.seatQuestLast?.[seat] as never) + 1)),
   suzerain: overCityStates((cityState) => cityState.suzerain ?? -1),
   techs: overCityStates((cityState) => cityState.research.techs.map((x) => idx(TECH_IDX, x)).sort((a, b) => a - b)),
   civics: overCityStates((cityState) => cityState.research.civics.map((x) => idx(CIVIC_IDX, x)).sort((a, b) => a - b)),

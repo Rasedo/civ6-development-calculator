@@ -16,6 +16,7 @@ import { CIV_LEVELS, type CivLevelDef, type CivLevelId } from '../data/civLevels
 import { NO_SEAT } from './types';
 import { randRange } from './rand';
 import { CITIZEN_NAME_ROWS, CITIZEN_NAME_ROWS_FRANCE } from '../data/seats';
+import { questWar } from './quests';
 export { NO_SEAT };
 const CITY_STATE_SEAT_BASE = 100;
 export const BARB_SEAT = 200;
@@ -417,6 +418,7 @@ export function setWar(state: GameState, a: number, b: number, on: boolean): voi
   };
   put(sa, b);
   put(sb, a);
+  if (on) questWar(state, a, b);
 }
 
 export function warClockKey(a: number, b: number): string {

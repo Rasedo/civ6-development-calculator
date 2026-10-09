@@ -820,12 +820,9 @@ CITY_STATE = {
     "envoys": _csr("seat_citystate_envoys"),
     "governorAtMinor": lambda sim, b, rows: _governor_at_minor(sim, b, rows),
     "met": _csr("seat_citystate_met"),
-    "questKind": _csr("seat_citystate_quest"),
-    "questIssued": _csr("seat_citystate_quest_issued"),
-    "questCamp": _csr("seat_citystate_quest_camp"),
-    "questDistrict": lambda sim, b, rows: [
-        [int(sim._citystate_didx[b, s]) if int(sim.seat_citystate_quest[b, c, s]) == 3 else -1
-         for c in _civ_seats(sim)] for s in rows],
+    "questType": _csr("seat_citystate_quest"),
+    "questTarget": _csr("seat_citystate_quest_target"),
+    "questLast": _csr("seat_citystate_quest_last"),
     "suzerain": lambda sim, b, rows: [int(sim.citystate_suzerain[b, s]) for s in rows],
     "techs": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_techs[b, s].tolist()) if on] for s in rows],
     "civics": lambda sim, b, rows: [[i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on] for s in rows],

@@ -165,23 +165,7 @@ describe('envoys', () => {
   });
 });
 
-describe('quests and trade', () => {
-  it('completing a quest earns an envoy', () => {
-    const state = makeState();
-    const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;
-    const cityState = addCs(state, 9, 9);
-    cityState.seatQuest = [{ kind: 'buildDistrict', district: 'CAMPUS' }];
-    seatPhase(state);
-    expect(envoysOf(cityState, 0)).toBe(0); // not built yet
-    const campus = tileAtCoords(state.map, 6, 5);
-    campus.district = 'CAMPUS';
-    campus.districtComplete = true;
-    city.districts.push({ type: 'CAMPUS', tileIndex: campus.index });
-    seatPhase(state);
-    expect(envoysOf(cityState, 0)).toBe(1);
-    expect(cityState.seatQuest[0]).toBeNull();
-  });
-
+describe('trade', () => {
   it('routes to city-states pay the international column of their districts', () => {
     const state = makeState();
     const city = foundCity(state, tileAtCoords(state.map, 5, 5).index, 0).city!;

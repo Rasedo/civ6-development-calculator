@@ -206,7 +206,6 @@ class SimPhase:
         # same point (the seat's block top).
         self._detect_seat_boosts(row, active)
         self._seat_influence_phase(row, active)
-        self._seat_quest_phase(row, active)
         # ORACLE: TS takes its melee+ranged census at the seat block TOP,
         # BEFORE applySeatActionRecord writes this turn's queue picks — so the
         # buy ladder's quota must read the pre-apply count, not the live one.
@@ -225,6 +224,7 @@ class SimPhase:
         # its religion, if it founded one, spreads with its faith, before its
         # cities (`spreadReligiousPressure`'s place in `seatPhase`)
         self._spread_religious_pressure(row, active)
+        self._quest_religion(active)
 
         # THE CITIES, after the economy (`seatPhase`'s walk). CIV6: each city
         # runs its production, then grows or starves on the city as it stands
@@ -1855,6 +1855,11 @@ class SimPhase:
         dr = made_d.nonzero(as_tuple=True)[0]
         dt = dtile[dr].clamp(min=0)
         self.district_complete[dr, dt] = True
+        _made = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        _made[dr] = True
+        _dtype = torch.full((self.B,), -1, dtype=torch.long, device=self.device)
+        _dtype[dr] = self.district[dr, dt]
+        self._quest_district_built(row, _made, _dtype)
         # the type's own price takes the completed count afresh
         # (`refreshDistrictDiscount`)
         _dty = self.district[dr, dt]
@@ -2812,6 +2817,7 @@ class SimPhase:
         # CIV6 (Sky and Stars): "+1 Era Score each time a Great
         # Person is Earned."
         self._dedication_event(row, self._ded_sky, hit)
+        self._quest_recruited(row, hit, cls)
         # CIV6 (Great Library): "Receive a random tech boost after another
         # player recruits a Great Scientist" — every OTHER holder of a
         # completed carrier draws one, ascending seat order, so the stream is

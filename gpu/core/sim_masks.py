@@ -3107,17 +3107,29 @@ class SimMasks:
         if not bool(newly.count_nonzero()):
             return
         first = newly & ~self.seat_citystate_met[rows, : self.n_majors, :S].any(dim=1)
-        self.seat_citystate_met[rows, sr, :S] = met | newly
-        if not bool(first.count_nonzero()):
-            return
         n = int(self.rules.citystate["firstMeetEnvoys"])
-        env = self.seat_citystate_envoys[rows, sr, :S]
-        self.seat_citystate_envoys[rows, sr, :S] = env + first.to(env.dtype) * n
-        self._cs_resolve_suzerain()
-        games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
-        games[rows] = first.any(dim=1)
-        self._minor_envoy_tiles(games)
-        self._eff_version += 1
+        # each minor in order: met, the pair's quest (0x93ae70), then the first
+        # envoy and its ground (`meetCityState`)
+        for s in range(S):
+            ns = newly[:, s]
+            if not bool(ns.count_nonzero()):
+                continue
+            nr, nsr = rows[ns], sr[ns]
+            self.seat_citystate_met[nr, nsr, s] = True
+            for r in sorted(set(nsr.tolist())):
+                games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                games[nr[nsr == r]] = True
+                self._give_quest(games, s, r)
+            fs = first[:, s]
+            if not bool(fs.count_nonzero()):
+                continue
+            fr, fsr = rows[fs], sr[fs]
+            self.seat_citystate_envoys[fr, fsr, s] = self.seat_citystate_envoys[fr, fsr, s] + n
+            self._cs_resolve_suzerain()
+            games = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+            games[fr] = True
+            self._minor_envoy_tiles(games)
+            self._eff_version += 1
 
     def _explored_at(self, seat_row, tiles: torch.Tensor) -> torch.Tensor:
         if not self.fog_of_war:
@@ -3234,6 +3246,9 @@ class SimMasks:
         self.major_unit_seat[rows, slot] = seat
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
+        # the unit added answers a Train Unit quest (`questUnitAdded`)
+        if not minor:
+            self._quest_unit_added(row, can, type_idx)
         # revealAround: a MAJOR's look lifts its fog ("nothing reads a
         # city-state's fog"); a city-state's unit's look meets the majors it
         # takes in (`minorLookMeets`)
@@ -3772,6 +3787,7 @@ class SimMasks:
             camps[k:-1] = camps[k + 1 :].clone()
             camps[-1] = -1
             self.n_camps[b] -= 1
+            self._quest_camp_cleared(b, int(seat[b]), int(tile[b]))
             # its tribe is dead, kept in the list (`tribeDies`)
             self.tribe_alive[b] &= ~(self.tribe_plot[b] == tile[b])
             self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal

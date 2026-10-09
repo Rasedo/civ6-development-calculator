@@ -41,7 +41,7 @@ function industrialCity() {
 
 const cardiff = () =>
   ({ name: 'Cardiff', type: 'industrial', seat: 100, hp: 200, cityTile: 0, alive: true,
-     envoys: [6, 0, 0], suzerain: 0, met: [true], influence: 0, quest: null, questCooldown: 0,
+     envoys: [6, 0, 0], suzerain: 0, met: [true], influence: 0,
      levyTurn: -99, levySeat: -1, warTurns: [] }) as never;
 
 /** Resolve the grid with fuel to spare — the fuel's own rule has its own

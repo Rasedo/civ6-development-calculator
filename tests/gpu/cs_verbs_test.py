@@ -3,22 +3,22 @@
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/cs_verbs_test.py
 
-Both mechanics run from the civ phase (the `_seat_phase` levy block +
-`_seat_quest_phase`, TS twins `seatPhase`'s levy branch + `issueQuest` /
-`questSatisfied`):
+The levy runs from the civ phase (the `_seat_phase` levy block, TS twin
+`seatPhase`'s levy branch); the quests from their own events
+(`_give_quest` / `_quest_unit_added` / `_quest_war`, TS twins `giveQuest` /
+`questUnitAdded` / `questWar`):
 
   * CIV LEVY — a civ suzerain of a CS takes its whole standing army
     (`levyUnits`), paying the units' summed production cost, once while
     the army is out; it comes home after `levyTurns` or when the suzerain
     changes (`_minor_levy_return`).
-  * CIV QUESTS (zero-draw) — one deterministic quest per (civ, CS):
-    the FIRST SATISFIABLE of [clearCamp, buildDistrict, sendTradeRoute],
-    NO RNG; completion pays +questEnvoys to that civ's civ_only_citystate_envoys.
+  * CIV QUESTS — one quest per (civ, CS): one draw over the types valid
+    for the pair (its last completed type skipped), then the type's picker;
+    completion pays the quest's envoy to the civ; war ends it.
 
 The scripted gate exercises both organically but can't isolate the branch
-logic — each threshold, the shared cooldown, the deterministic order, and the
-ZERO-DRAW guarantee are pinned here on a single-batch CPU sim with the state
-forced by hand.
+logic — each threshold, the draws and the completion are pinned here on a
+single-batch CPU sim with the state forced by hand.
 """
 
 from __future__ import annotations
@@ -244,85 +244,85 @@ def main() -> None:
     print("  L5 already-levied gate OK")
 
     # ============================ CIV QUESTS =========================
-    # -- Q1: ISSUE buildDistrict (deterministic, no camp, not owned) --------
+    # `giveQuest` / `questUnitAdded`'s twins (`_give_quest`,
+    # `_quest_unit_added`): one draw over the pair's valid types, then the
+    # type's picker; a completed quest's envoy to its actor.
+    row = R + 1
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[0] = True
+    q_env = int(sim.rules.citystate["quests"]["envoys"])
+
+    def draws(st0: torch.Tensor) -> int:
+        n, st = 0, int(st0[0])
+        while st != int(sim.rng_state[0]) and n < 8:
+            st = (1103515245 * st + 12345) & 0xFFFFFFFF
+            n += 1
+        return n
+
+    # -- Q1: a met pair at peace with no quest takes one: one or two draws --
     sim.restore(base)
-    make_suzerain_mil(sim, S0, envoys=3)  # met + alive; district-type env irrelevant here
-    sim.seat_citystate_quest[0, R + 1, S0] = 0
-    sim.seat_citystate_quest_issued[0, R + 1, S0] = 0  # cooldown long passed (turn ≥ questCooldown)
-    # no barb camp near this CS → clearCamp not offered; buildDistrict first.
-    sim.camp_tile[:] = -1
-    di = int(sim._citystate_didx[0, S0])
-    # ensure R does NOT already own the CS-type district complete (wipe registry row)
-    sim.city_dist_tile[0, R + 1, :, di] = -1
+    make_suzerain_mil(sim, S0, envoys=3)
+    sim.seat_citystate_quest[0, row, S0] = 0
+    sim.seat_citystate_quest_last[0, row, S0] = 0
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 3, f"Q1: expected buildDistrict (3), got {int(sim.seat_citystate_quest[0, R + 1, S0])}"
-    assert torch.equal(sim.rng_state, rng0), "Q1: the quest phase drew RNG (must be zero-draw)"
-    print("  Q1 ISSUE buildDistrict OK (deterministic, zero-draw)")
+    sim._give_quest(one, S0, row)
+    typ = int(sim.seat_citystate_quest[0, row, S0])
+    assert 1 <= typ <= 8, f"Q1: no quest given (type {typ})"
+    want = 2 if typ in (4, 5, 6, 7, 8) else 1
+    assert draws(rng0) == want, f"Q1: type {typ} took {draws(rng0)} draws, expected {want}"
+    print(f"  Q1 GIVE OK (type {typ}, target {int(sim.seat_citystate_quest_target[0, row, S0])})")
 
-    # -- Q2: ISSUE clearCamp takes precedence when a camp is in range -------
-    sim.restore(base)
-    make_suzerain_mil(sim, S0, envoys=3)
-    sim.seat_citystate_quest[0, R + 1, S0] = 0
-    sim.seat_citystate_quest_issued[0, R + 1, S0] = 0
-    # plant a camp adjacent to the CS center (within range 6)
-    ctr = int(sim.citystate_center[0, S0])
-    near_tile = int(sim.neigh[ctr][0])
-    sim.camp_tile[:] = -1
-    sim.camp_tile[0, 0] = near_tile
+    # -- Q2: a standing quest takes no other, and draws nothing -------------
     rng0 = sim.rng_state.clone()
-    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 1, f"Q2: expected clearCamp (1), got {int(sim.seat_citystate_quest[0, R + 1, S0])}"
-    assert int(sim.seat_citystate_quest_camp[0, R + 1, S0]) == near_tile, "Q2: clearCamp recorded the wrong camp tile"
-    assert torch.equal(sim.rng_state, rng0), "Q2: clearCamp issue drew RNG"
-    print("  Q2 ISSUE clearCamp precedence OK (nearest camp recorded, zero-draw)")
+    sim._give_quest(one, S0, row)
+    assert int(sim.seat_citystate_quest[0, row, S0]) == typ, "Q2: a standing quest was replaced"
+    assert torch.equal(sim.rng_state, rng0), "Q2: a standing quest drew"
+    print("  Q2 STANDING OK (no draw)")
 
-    # -- Q3: RESOLVE clearCamp → +1 envoy, quest cleared --------------------
+    # -- Q3: Train Unit completes on its unit, the envoy to the actor -------
     sim.restore(base)
     make_suzerain_mil(sim, S0, envoys=3)
-    ctr = int(sim.citystate_center[0, S0])
-    near_tile = int(sim.neigh[ctr][0])
-    sim.seat_citystate_quest[0, R + 1, S0] = 1
-    sim.seat_citystate_quest_camp[0, R + 1, S0] = near_tile
-    sim.seat_citystate_quest_issued[0, R + 1, S0] = T  # fresh — resolution is cooldown-independent
-    sim.camp_tile[:] = -1  # the camp is GONE → satisfied
-    env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
-    q_env = int(sim.rules.citystate["questEnvoys"])
-    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q3: satisfied clearCamp not cleared"
-    assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q3: questEnvoys not paid to the civ"
-    # the envoy's plot is a border draw (`_seat_border_draw`), so the
-    # resolution may move the stream
-    print(f"  Q3 RESOLVE clearCamp OK (+{q_env} envoy to R, quest cleared)")
+    u = int(sim._qst_units[0])
+    sim.seat_citystate_quest[0, row, S0] = 4
+    sim.seat_citystate_quest_target[0, row, S0] = u
+    env0 = int(sim.seat_citystate_envoys[0, row, S0])
+    sim._quest_unit_added(row, one, torch.full((sim.B,), u + 1, dtype=torch.long))
+    assert int(sim.seat_citystate_quest[0, row, S0]) == 4, "Q3: another unit completed the quest"
+    sim._quest_unit_added(row, one, torch.full((sim.B,), u, dtype=torch.long))
+    assert int(sim.seat_citystate_quest[0, row, S0]) == 0, "Q3: the quest's unit did not complete it"
+    assert int(sim.seat_citystate_quest_last[0, row, S0]) == 4, "Q3: the completed type not kept"
+    assert int(sim.seat_citystate_envoys[0, row, S0]) == env0 + q_env, "Q3: the envoy not paid"
+    print(f"  Q3 COMPLETE Train Unit OK (+{q_env} envoy)")
 
-    # -- Q4: RESOLVE buildDistrict → +1 envoy when R owns the CS district ---
+    # -- Q4: the last completed type is skipped -------------------------------
     sim.restore(base)
     make_suzerain_mil(sim, S0, envoys=3)
-    di = int(sim._citystate_didx[0, S0])
-    # grant R a COMPLETE district of the CS type in its first alive city
-    j = int(sim.city_alive[0, R + 1].long().argmax())
-    dtile = int(sim.city_center[0, R + 1, j])  # any owned tile; mark complete
-    sim.city_dist_tile[0, R + 1, j, di] = dtile
-    sim.district_complete[0, dtile] = True
-    sim.district_pillaged[0, dtile] = False
-    sim.seat_citystate_quest[0, R + 1, S0] = 3
-    sim.seat_citystate_quest_issued[0, R + 1, S0] = T
-    env0 = int(sim.seat_citystate_envoys[0, R + 1, S0])
-    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.seat_citystate_quest[0, R + 1, S0]) == 0, "Q4: satisfied buildDistrict not cleared"
-    assert int(sim.seat_citystate_envoys[0, R + 1, S0]) == env0 + q_env, "Q4: questEnvoys not paid"
-    print(f"  Q4 RESOLVE buildDistrict OK (+{q_env} envoy on owned district)")
+    sim.seat_citystate_quest[0, row, S0] = 0
+    sim.seat_citystate_quest_last[0, row, S0] = 2
+    for _ in range(6):
+        sim.seat_citystate_quest[0, row, S0] = 0
+        sim._give_quest(one, S0, row)
+        assert int(sim.seat_citystate_quest[0, row, S0]) != 2, "Q4: the last completed type was given again"
+    print("  Q4 LAST TYPE skipped OK")
 
-    # -- Q5: unmet CS never gets a civ quest ------------------------------
+    # -- Q5: an unmet minor gives no quest and draws nothing -----------------
     sim.restore(base)
-    s1 = 0
-    sim.citystate_alive[0, s1] = True
-    sim.seat_citystate_met[0, R + 1, s1] = False  # not met
-    sim.seat_citystate_quest[0, R + 1, s1] = 0
-    sim.seat_citystate_quest_issued[0, R + 1, s1] = 0
-    sim._seat_quest_phase(R + 1, active_mask(sim))  # seat ROW: civ R is row R+1
-    assert int(sim.seat_citystate_quest[0, R + 1, s1]) == 0, "Q5: an unmet CS issued a civ quest"
+    sim.citystate_alive[0, S0] = True
+    sim.seat_citystate_met[0, row, S0] = False
+    sim.seat_citystate_quest[0, row, S0] = 0
+    rng0 = sim.rng_state.clone()
+    sim._give_quest(one, S0, row)
+    assert int(sim.seat_citystate_quest[0, row, S0]) == 0, "Q5: an unmet minor gave a quest"
+    assert torch.equal(sim.rng_state, rng0), "Q5: an unmet minor drew"
     print("  Q5 unmet-CS gate OK (no quest without contact)")
+
+    # -- Q6: war ends the pair's quest ---------------------------------------
+    sim.restore(base)
+    make_suzerain_mil(sim, S0, envoys=3)
+    sim.seat_citystate_quest[0, row, S0] = 2
+    sim._quest_war(row, sim.n_majors + S0, one)
+    assert int(sim.seat_citystate_quest[0, row, S0]) == 0, "Q6: war left the quest standing"
+    print("  Q6 WAR ends the quest OK")
 
     print("CS VERBS (civ levy + quests) OK")
 

@@ -198,7 +198,7 @@ class BatchEnv:
         )  # [B, 15]
         # THIS SEAT'S OWN courtship view: met, envoys and quest are all
         # seat-keyed stores, one row per seat, and every seat can hold a quest
-        # (`_seat_quest_phase` runs on every row). Captured city-states ZERO.
+        # (`_give_quest`). Captured city-states ZERO.
         cs_lo = s.n_majors
         cs = torch.stack(
             [

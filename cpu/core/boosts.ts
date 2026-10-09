@@ -18,6 +18,7 @@ import { researchCost } from './economy';
 import { GREAT_PEOPLE } from '../data/greatPeople';
 import { isCoastalLand, isMountain, naturalWonderAt } from '../../world/query';
 import { neighbors } from '../../world/hex';
+import { questBoosted } from './quests';
 
 /**
  * THE BOOST AMOUNT (the DLL's 0x4cd900 techs / 0x3a3c00 civics, in its 24.8
@@ -74,6 +75,7 @@ export function markBoost(state: GameState, seat: number, id: string): boolean {
   const rsr = s.research;
   if (rsr.boosted.includes(id) || rsr.techs.includes(id) || rsr.civics.includes(id)) return false;
   rsr.boosted.push(id);
+  questBoosted(state, seat, id);
   const civic = !TECHS[id];
   const cost = researchCost(state, id, civic, seat);
   const have = progressOn(rsr, id);

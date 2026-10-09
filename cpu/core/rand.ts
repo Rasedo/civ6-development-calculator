@@ -30,6 +30,9 @@ export type DrawLabel =
   | 'Choosing random tech to grant based on era' | 'Choosing random civic to grant based on era'
   | 'Choosing a Goody Hut Type' | 'Choosing a Sub Type' | 'Choosing a Relic' | 'Choosing a City Name' | 'Choosing a Citizen Name'
   | 'Rolling Espionage Result' | 'Police Exit Covered' | 'Rolling Concert Result' | 'Free Cities Unit Choice'
+  | 'Selecting a random new quest' | 'Choosing random unit type for Train Unit quest'
+  | 'Choosing random district type for Zone District quest' | 'Choosing random tech type for Trigger Tech Boost quest'
+  | 'Choosing random civic type for Trigger Civic Boost quest' | 'Choosing random class type for Recruit Great Person Class quest'
   // the engines' draws at no labelled site of the game's
   | 'Engine: minor walk' | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
   | 'Engine: partisans' | 'Engine: breached dam'

@@ -1782,46 +1782,35 @@
           ]
         },
         {
-          "name": "questKind",
+          "name": "questType",
           "compare": "exact",
           "covers": [
             "CityState.seatQuest",
-            "CityStateQuest.kind"
+            "CityStateQuest.type"
           ],
           "planes": [
             "seat_citystate_quest"
           ]
         },
         {
-          "name": "questIssued",
+          "name": "questTarget",
           "compare": "exact",
           "covers": [
-            "CityState.seatQuestIssuedTurn"
+            "CityStateQuest.target"
           ],
           "planes": [
-            "seat_citystate_quest_issued"
+            "seat_citystate_quest_target"
           ]
         },
         {
-          "name": "questCamp",
+          "name": "questLast",
           "compare": "exact",
           "covers": [
-            "CityStateQuest.campIndex"
+            "CityState.seatQuestLast"
           ],
           "planes": [
-            "seat_citystate_quest_camp"
+            "seat_citystate_quest_last"
           ]
-        },
-        {
-          "name": "questDistrict",
-          "compare": "exact",
-          "covers": [
-            "CityStateQuest.district"
-          ],
-          "planes": [
-            "seat_citystate_quest"
-          ],
-          "gap": "Both engines DERIVE the asked district (a kind-3 quest always asks the CS type's own): TS digests PLACEABLE_DISTRICTS.indexOf(quest.district), the GPU digests _citystate_didx (a districts_cat index). Different lists — the numbers only agree where the orders coincide."
         },
         {
           "name": "suzerain",
