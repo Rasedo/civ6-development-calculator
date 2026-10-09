@@ -6,6 +6,7 @@ from .sim_masks import SimMasks
 from .sim_orders import SimOrders
 from .sim_minors import SimMinors
 from .sim_research import SimResearch
+from .sim_civics import SimCivics
 from .sim_seats import SimSeats
 from .sim_deals import SimDeals
 from .sim_spy import SimSpy
@@ -18,5 +19,5 @@ from .sim_barb import SimBarb
 from .sim_tactics import SimTactics
 
 
-class BatchSim(SimInit, SimEconomy, SimMasks, SimOrders, SimMinors, SimResearch, SimSeats, SimSpy, SimDeals, SimGp, SimGovernors, SimGriev, SimPhase, SimStep, SimBarb, SimTactics):
+class BatchSim(SimInit, SimEconomy, SimMasks, SimOrders, SimMinors, SimResearch, SimCivics, SimSeats, SimSpy, SimDeals, SimGp, SimGovernors, SimGriev, SimPhase, SimStep, SimBarb, SimTactics):
     """One batched simulation over B games — see the mixins for each region."""

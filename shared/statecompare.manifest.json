@@ -1910,6 +1910,22 @@
           "note": "the research AI's analysis of the last turn, per tech in table order [turns, next, base, score, owned]; empty before the first"
         },
         {
+          "name": "minorCivicAi",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.civicAiEntries"
+          ],
+          "planes": [
+            "citystate_cai_turns",
+            "citystate_cai_next",
+            "citystate_cai_base",
+            "citystate_cai_score",
+            "citystate_cai_owned",
+            "citystate_cai_valid"
+          ],
+          "note": "the civics AI's analysis of the last turn, per civic [turns, next, base, score, owned]; empty before the first"
+        },
+        {
           "name": "minorCurrentCivic",
           "compare": "exact",
           "covers": [

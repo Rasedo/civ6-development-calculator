@@ -33,8 +33,11 @@ import { GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP,
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_STRENGTH_PCT, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER, RESEARCH_AI_DISCOUNT_PCT, RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_HORIZON, RESEARCH_AI_TASK_BIAS, RESEARCH_AI_UNLOCK_SHARE } from '../data/aiResearch';
+import { AI_DISCOUNT_PCT, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER } from '../data/aiValue';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
+import { civicUnlocks } from '../core/aiCivics';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
 import { TRADE_ROUTE_DURATION, PLUNDER_ROUTE_GOLD, PLUNDER_ROUTE_TURNS, GOLD_EQUIVALENT_OTHER_YIELDS, TRADER_GUARD_RADIUS, TRADE_WALK_EXPIRY_RAIL, ROUTE_PATH_WATER, ROUTE_PATH_RAIL, ROUTE_PATH_MULTI_DOMAIN, ROUTE_PATH_PORTAL, ROUTE_PATH_MAX_RATIO, ROUTE_PATH_DENOM } from '../core/trade';
 import { TRADE_BASE_RANGE, TRADE_LAND_REFUEL, TRADE_WATER_REFUEL, TRADE_DEST_REFUEL, TRADE_COST_STEP, TRADE_COST_RAIL, TRADE_COST_ROUTE, TRADE_COST_WATER, TRADE_COST_LAND, TRADE_COST_SWITCH, TRADE_EMBARK_DISTRICTS, TRADE_DANGER_FEATURES } from '../core/tradePath';
@@ -976,16 +979,23 @@ export function buildRules() {
       emergencyEnvoyGold: EMERGENCY_ENVOY_GOLD, emergencyCsRouteGold: EMERGENCY_CS_ROUTE_GOLD,
     },
     boosts: boostRows,
-    // the research AI's constants (`aiResearch.ts`)
-    researchAi: {
-      horizon: RESEARCH_AI_HORIZON,
-      discountPct: RESEARCH_AI_DISCOUNT_PCT,
-      taskBias: RESEARCH_AI_TASK_BIAS,
+    // the AI's value tables (`aiValue.ts`), the research AI's and the civics
+    // AI's own constants (`aiResearch.ts`, `aiCivics.ts`)
+    aiValue: {
+      horizon: AI_VALUE_HORIZON,
+      discountPct: AI_DISCOUNT_PCT,
       pyTechnology: PSEUDOYIELD_TECHNOLOGY,
+      pyCivic: PSEUDOYIELD_CIVIC,
       pyWonder: PSEUDOYIELD_WONDER,
       pyDistrict: PSEUDOYIELD_DISTRICT,
+      unlockShare: AI_UNLOCK_SHARE,
+    },
+    researchAi: {
+      taskBias: RESEARCH_AI_TASK_BIAS,
       embarkAll: RESEARCH_AI_EMBARK_ALL,
-      unlockShare: RESEARCH_AI_UNLOCK_SHARE,
+    },
+    civicAi: {
+      policyFloor: CIVIC_AI_POLICY_FLOOR,
     },
     cityState: {
       envoyCost: ENVOY_COST,
@@ -2923,6 +2933,10 @@ export function buildRules() {
       awardTitles: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.titles ?? 0 : 0), 0),
       awardProjectPct: c.effects.reduce((n, e) => n + (e.kind === 'award' ? e.projectPct ?? 0 : 0), 0),
       repeatable: c.repeatable ? 1 : 0,
+      // what the civics AI's value counts of the row (`civicUnlocks`)
+      aiBuildings: civicUnlocks(c.id).buildings,
+      aiDistricts: civicUnlocks(c.id).districts,
+      aiWonders: civicUnlocks(c.id).wonders,
     })),
     // government + policy modifier tables (the belief-table shape).
     // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Every

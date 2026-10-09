@@ -2,7 +2,7 @@
 
   * CIV6 (`Repeatable`): Future Tech and Future Civic stay researchable once
     complete — the seat's research mask offers them over a finished tree,
-    while a minor's research (`cheapestAvailable`) never repeats a row;
+    while the mask without `repeat` never repeats a row;
   * every completion pays the row's award again: Seasteads 1 Diplomatic
     Victory point, Future Tech +5% project production banked, Future Civic
     50 Diplomatic Favor and a Governor title;
@@ -43,7 +43,7 @@ def main() -> int:
     assert sim._seat_tech_mask(row)[0].nonzero(as_tuple=True)[0].tolist() == [ft], "Future Tech repeats"
     assert sim._seat_civic_mask(row)[0].nonzero(as_tuple=True)[0].tolist() == [fc], "Future Civic repeats"
     assert not bool(sim._available_mask(sim.civ_techs[:, row], sim._prereq_t).any()), \
-        "a minor's research never repeats a row"
+        "the mask without repeat never repeats a row"
     print("  1 repeatable rows OK")
 
     # --- 2) every completion pays the award --------------------------------

@@ -20,21 +20,24 @@ function minor(state: GameState): CityState {
 describe('the research value (0x7b3e50)', () => {
   it('is a yield a turn from landing to the horizon, in 24.8 fixed point', () => {
     const st = { gameEra: 0 } as unknown as GameState;
-    // the row's own 5, a building's share, a district's and a wonder's
-    expect(techValue(st, 'POTTERY', 12)).toBe(34037);
-    expect(techValue(st, 'ASTROLOGY', 25)).toBe(27105);
-    expect(techValue(st, 'WRITING', 37)).toBe(13180);
+    // the row's own 5, a building's share, a district's and a wonder's, at
+    // the 4% discount: Pottery at 12 turns 78.3 as every city-state of
+    // runs/h1_duelw1124 logs it at t1, Mining 60.3
+    expect(techValue(st, 'POTTERY', 12)).toBe(20056);
+    expect(techValue(st, 'MINING', 12)).toBe(15424);
+    expect(techValue(st, 'ASTROLOGY', 25)).toBe(11713);
+    expect(techValue(st, 'WRITING', 37)).toBe(4159);
     // EmbarkAll adds 5
-    expect(techValue(st, 'SHIPBUILDING', 4)).toBe(77331);
+    expect(techValue(st, 'SHIPBUILDING', 4)).toBe(48958);
     // at the horizon the value is one discounted turn; past it -9999
-    expect(techValue(st, 'MINING', 50)).toBe(560);
+    expect(techValue(st, 'MINING', 50)).toBe(35);
     expect(techValue(st, 'MINING', 51)).toBe(-9999 * 256);
   });
 
   it("counts an older era's row once per era between, plus one", () => {
     const st = { gameEra: 2 } as unknown as GameState;
-    expect(techValue(st, 'POTTERY', 12)).toBe(86419);
-    expect(techValue(st, 'MINING', 1)).toBe(116972);
+    expect(techValue(st, 'POTTERY', 12)).toBe(50905);
+    expect(techValue(st, 'MINING', 1)).toBe(77233);
   });
 });
 

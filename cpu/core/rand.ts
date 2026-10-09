@@ -33,7 +33,7 @@ export type DrawLabel =
   | 'Selecting a random new quest' | 'Choosing random unit type for Train Unit quest'
   | 'Choosing random district type for Zone District quest' | 'Choosing random tech type for Trigger Tech Boost quest'
   | 'Choosing random civic type for Trigger Civic Boost quest' | 'Choosing random class type for Recruit Great Person Class quest'
-  | 'BT Research Choice'
+  | 'BT Research Choice' | 'Random Civic Choice'
   // the engines' draws at no labelled site of the game's
   | 'Engine: minor walk' | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
   | 'Engine: partisans' | 'Engine: breached dam'

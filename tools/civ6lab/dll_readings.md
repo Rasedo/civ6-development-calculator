@@ -3530,8 +3530,11 @@ Contract %d").
   1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
   the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88
   and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The
-  discount is the GlobalAI's +0x290, 2.0 (its constructor 0x6db0cf); H the
-  value horizon [GlobalAI+0x2f0][1]: 50 on every duel (632,528 rows: past 50
+  discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer
+  (0x6ddb40..0x6ddba3) writes AI_DISCOUNT_RATE (GlobalParameters +0x10, 2.0)
+  through 0x525590 — x 100 / the speed's CostMultiplier ([speed+0x28]) — over
+  the constructor's 0x200 (0x6db0cf): 4.0 at the online speed. H the value
+  horizon [GlobalAI+0x2f0][1]: 50 on every duel (632,528 rows: past 50
   -9999, at or under 50 not, but contracts and Future Tech).
 - THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned
   prerequisites one and two levels up (each level's rows once; a negative
@@ -3558,10 +3561,83 @@ Contract %d").
 - MEASURED on the logs alone (29 duels, a goal change the comparator's best
   over the turn before's or the turn's logged scores): majors 1,654 of 1,805,
   minors 4,244 of 4,980 by one of the timings (1,017 minor changes with every
-  score negative: the random pick). The ported value does not reproduce the
-  logged scores (0 of 18,000 within 0.05; the read terms come out about 1.5x
-  the log's — 1124 t2 Pottery 113.0 at 4 turns, the read terms 172.1); the
-  terms marked unread above, the pseudo-yield weights first, are AUDIT C-96.
+  score negative: the random pick). At the discount of 4.0 the read terms
+  give a root row (no prerequisite logged that turn) of a city-state exactly
+  21,700 of 78,986 times (Mining 60.3 at 12 turns, Pottery 78.3, as every
+  minor of 1124 logs at t1); the rest carries the terms marked unread above
+  (the Tech Contracts' values among them: 1124 t3 minor 2 Masonry 13.0, as
+  its contract row) — AUDIT C-96. The prerequisites walk in the install's
+  order (Education: Mathematics, then Apprenticeship).
+
+## H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)
+
+AI/CultureAi.cpp. The object (the player's +0x1278) keeps one 0x50-byte
+entry per civic in table order at +0x978 (count +0x988): +0 the player, +8
+the row, +0xc owned, +0xe boosted (0x39d190), +0xf repeatable, +0x10 its own
+value, +0x14 its score, +0x18 turns, +0x1c its next step, +0x20 the
+governments it unlocks, +0x38 its policies. Its log is AI_GovtPolicies.csv
+(0x6255f0: "%d, %d, Civic, %s, %3.1f, %d" — the score and the turns of every
+row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
+
+- THE ANALYSIS, the "Civic Tree Analysis" job (0x61fa20 launches the job at
+  +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns :=
+  -1, value := 0, next := row; a non-repeatable row held is owned. Else the
+  research AI's three-level walk: each walked row adds its turns left
+  (0x39c0e0: the cost 0x29a010 less the progress kept on it and the bank
+  [+0xb40] — no max(0, ·) here — through 0x8c4540; -1 with no Culture, then
+  the cost), a row not researchable (0x3932d0) adds its unowned
+  prerequisites (0x29a250, the install's order: the walk's next step, the
+  last added that is not the civic in hand ([+0xad0][0]), takes the install
+  order 3,558 of 3,626 picks, the sorted order 3,130), each level's rows
+  once; rows still added at the third level leave the entry out of reach.
+  Else turns = max(0, sum), value = 0x7a9a10, score = value.
+- THE VALUE, 0x7a9a10 (row, &discount, turns, H, player, policies,
+  governments, ...): at or past H, -9999 (the research value's: past H). The
+  own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid from landing to the
+  horizon (PV(H) - PV(turns), 0x7a16e0); the governments it unlocks, each
+  max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0
+  -> 0x7b26b0, unread); then a civic of an era at or before the game's
+  ([player+0x1358]+0x158 one past the era index) is taken (game - era + 1)
+  times — Craftsmanship 120.6 at 1 turn in era 0, 221.1 in era 1 (x2), 321.7
+  in era 2 — and a later one adds PSEUDOYIELD_GOLDENAGE_POINT of the
+  player's eras record +0x2c (0x2c4110, 0 for a city-state); per unit the
+  player's version, the cities' average City Analysis value (0x5d4cd0) and
+  the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of
+  100 where 0x4f2ac0 names the row; per building the player's version 0.5,
+  a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have
+  (0x406c00) PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the
+  horizon; its policies: the best new policy's value less the weakest
+  slotted one's (0x623b90, the policy AI's), at least 20.0 (0x7aacb1); and
+  the civic's modifiers analysed (0x7a4b20). The discount and H are the
+  research value's (4.0, 50).
+- THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each
+  entry): a row in reach scores its own value and its prerequisites' one and
+  two levels up (owned ones walked through at no value; each level's rows
+  once; a negative value counts 0 — Military Tradition 123.7 at 55 turns,
+  its own -9999 counting nothing), x1.5 if favored ([+0x268], the leader's
+  Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
+- THE CHOICE, 0x626600 (key): the comparator 0x6182e0 over the entries —
+  unowned before owned; a row whose next step is the key loses to one whose
+  is not; the larger turns where their product is not positive; else the
+  higher score, the first on a tie. Its next step, researchable (0x3932d0),
+  is queued; else one draw "Random Civic Choice" over the rows neither held
+  nor unresearchable, in table order.
+- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is
+  in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the
+  government pass 0x625d70, then 0x626600 with the completed civic as the
+  key — over the entries the AI's last turn left, before this turn's
+  analysis (1103 t12 minor 2: Craftsmanship completes, Military Tradition,
+  726.8 at t11, is taken; the t12 log already scores Military Training
+  797.9 first).
+- MEASURED on the logs alone (29 duels): the completion's choice over the
+  logged scores of the turn before takes the record's pick 3,558 of 3,626
+  minor picks and 1,203 of 1,295 majors' (11 "Random Civic Choice" draws in
+  all). The value as ported (the own term, the era count, buildings,
+  wonders, districts, the policy floor) fits every root row the read terms
+  cover — Code of Laws 85.2 at 10 turns, Craftsmanship 38.5 at 30, 51.0 at
+  23 — and takes the record's pick 2,868 of 3,626 on the logged turns; the
+  terms unported (governments, units, the policies' values, the modifiers,
+  the per-player bias of 0x7a60d0's pseudo-yields 0x700810) are AUDIT C-96.
 
 ## C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws
 

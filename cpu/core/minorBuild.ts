@@ -44,6 +44,7 @@ import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from
 import { computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
 import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, type ResearchChoice } from './aiResearch';
+import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
 import { buildingPillaged, cityPower, repairBuilding } from './yields';
@@ -234,10 +235,9 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * THE MINOR'S RESEARCH, each tree as a major's runs: the item in hand banks
  * the turn's yield and the overflow a completion set aside, and completes at
  * its cost, leaving the rest. Its technologies are the research AI's
- * (`aiResearch.ts`): a completion's choice, then the turn's; its civics
- * the cheapest open row with nothing in hand (`minorCivicPick`), which
- * resumes the progress kept on it (`selectResearch`). First the CATCH-UP
- * (`minorCatchUp`). Early Empire is
+ * (`aiResearch.ts`) and its civics the civics AI's (`aiCivics.ts`): a
+ * completion's choice, then the turn's; a pick resumes the progress kept on
+ * it (`selectResearch`). First the CATCH-UP (`minorCatchUp`). Early Empire is
  * the row `borderClosedTo` reads. CIV6 (Urban Defenses): the tech "builds
  * modern fortifications around the City Centers of all current and future
  * cities and their Encampment districts" — a minor's perimeter arrives at
@@ -274,13 +274,11 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
   }
   r.aiEntries = researchAnalysis(state, seat, science);
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
-  // THE CIVICS: with nothing in hand the pick (`minorCivicPick`); the turn's
-  // Culture banks and completes the item at its cost
+  // THE CIVICS: the turn's Culture banks; a completion's choice reads the
+  // civics AI's analysis of the turn before, the completed civic its key
+  // (0x6293e0); then the AI's turn analyses the tree and, with nothing in
+  // hand, chooses (0x620110)
   minorCatchUp(state, r, true, seat);
-  if (!r.civic) {
-    const pick = minorCivicPick(state, cityState);
-    if (pick) selectResearch(r, pick, true);
-  }
   r.civicProgress += culture + (r.civicOverflow ?? 0);
   r.civicOverflow = 0;
   const civ = r.civic;
@@ -288,10 +286,13 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
   if (civ && r.civicProgress >= civCost) {
     gained += 1;
     r.civicProgress -= civCost;
-    r.civics.push(civ);
+    if (!r.civics.includes(civ)) r.civics.push(civ);
     delete r.civicRetained[civ];
     r.civic = null;
+    takeCivic(r, civicChoice(state, seat, r.civicAiEntries ?? civicAnalysis(state, seat, culture), civ, civicDraw(state)));
   }
+  r.civicAiEntries = civicAnalysis(state, seat, culture);
+  if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
   return gained;
 }
 
@@ -336,31 +337,16 @@ export function holdMinorCatchUp(held: Map<number, { techs: readonly string[]; c
   catchUpHold = held;
 }
 
-let civicHold: ((state: GameState, cityState: CityState) => string | undefined) | null = null;
-
-/** The action replay's hold on a minor's civic pick (`cpu/harness/
- *  replay.ts`): the city-state's civics AI picks what it studies, which the
- *  game's record carries; where `fn` answers with a row open to the minor,
- *  the pick is the record's. Null outside a replay. */
-export function holdMinorCivics(fn: ((state: GameState, cityState: CityState) => string | undefined) | null): void {
-  civicHold = fn;
-}
-
-/** THE MINOR'S CIVIC PICK: the cheapest row open to it (table order on a
- *  price tie), the engine standing in for the civics AI — or the record's,
- *  under a replay (`holdMinorCivics`). */
-function minorCivicPick(state: GameState, cityState: CityState): string | null {
-  const have = cityState.research.civics;
-  const held = civicHold?.(state, cityState);
-  if (held && CIVICS[held] && !have.includes(held) && CIVICS[held].prereqs.every((p) => have.includes(p))) return held;
-  return cheapestAvailable(CIVICS, have);
-}
-
 /** the research AI's choice taken: its research and its goal */
 function takeChoice(r: ResearchState, c: ResearchChoice | null): void {
   if (!c) return;
   selectResearch(r, c.tech);
   r.goal = c.goal;
+}
+
+/** the civics AI's choice taken */
+function takeCivic(r: ResearchState, civic: string | null): void {
+  if (civic) selectResearch(r, civic, true);
 }
 
 /**
@@ -572,19 +558,6 @@ function minorWalk(state: GameState, cityState: CityState): void {
     const steps = u.hp < UNIT_HP ? MINOR_WALK_STEPS_DAMAGED : atWar ? MINOR_WALK_STEPS_WAR : MINOR_WALK_STEPS_PEACE;
     walkUnit(state, u, [cityState.centerIndex], steps, weights);
   }
-}
-
-function cheapestAvailable(
-  catalog: Record<string, { cost: number; prereqs: string[] }>,
-  have: string[],
-): string | null {
-  let best: string | null = null;
-  for (const [id, def] of Object.entries(catalog)) {
-    if (have.includes(id)) continue;
-    if (!def.prereqs.every((p) => have.includes(p))) continue;
-    if (!best || def.cost < catalog[best].cost) best = id;
-  }
-  return best;
 }
 
 /**

@@ -30,98 +30,17 @@
  * goal). A completion (0x762d60) adds the prerequisites' values once more to
  * the turn's scores and chooses with the completed row passed over.
  *
- * Arithmetic is the DLL's 24.8 fixed point throughout (`FX`).
+ * Arithmetic is the DLL's 24.8 fixed point throughout (`aiValue.ts`).
  */
 import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import {
-  PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER, RESEARCH_AI_DISCOUNT_PCT, RESEARCH_AI_EMBARK_ALL,
-  RESEARCH_AI_FAVORED, RESEARCH_AI_HORIZON, RESEARCH_AI_TASK_BIAS, RESEARCH_AI_UNLOCK_SHARE,
-} from '../data/aiResearch';
+import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER } from '../data/aiValue';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
+import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
 import type { GameState, ResearchState } from './types';
-
-/** one in 24.8 fixed point */
-const FX = 256;
-
-/** a float constant as the DLL converts it: the floor as the integer part,
- *  the fraction's top 8 bits below it */
-export function fxConst(c: number): number {
-  const fl = Math.floor(c);
-  return fl * FX + Math.trunc((c - fl) * FX);
-}
-
-/** a value already in fixed point's units, rounded to the nearest raw step */
-function fxOf(x: number): number {
-  return Math.round(x * FX);
-}
-
-/** the product of two raws (an arithmetic shift: floor) */
-function fmul(a: number, b: number): number {
-  return Math.floor((a * b) / FX);
-}
-
-/** the quotient of two raws (truncated) */
-function fdiv(a: number, b: number): number {
-  return Math.trunc((a * FX) / b);
-}
-
-/** a raw times a raw over 100 (the DLL's magic-number divide, truncated) */
-function fpct(a: number, b: number): number {
-  return Math.trunc((a * b) / (FX * 100));
-}
-
-const HALF = fxConst(0.5);
-const SIXTH = fxConst(0.16667);
-const NEG_SIXTH = fxConst(-0.16667);
-const CENT = fxConst(0.01);
-const TEN = fxConst(10);
-
-/** 0x7a16e0: the present value of `a` paid each turn for `n` turns at `r`
- *  percent — a(D-1)/(kD), D the cubic expansion of (1+k)^n */
-function presentValue(a: number, r: number, n: number): number {
-  if (n === 0) return a;
-  if (n < 0) return 0;
-  if (r === 0) return fmul(a, n * FX);
-  if (r >= 0x3200 || fmul(fmul(r, n * FX), CENT) >= TEN) return fdiv(a, fmul(r, CENT));
-  n = Math.min(n, 400);
-  const nk = fpct(n * FX, r);
-  const nk2 = fpct(r, nk);
-  const n2k2 = fmul(nk2, (n - 1) * FX);
-  const n2k3 = fpct(r, n2k2);
-  const n3k3 = fmul(n2k3, (n - 2) * FX);
-  const dm1 = fmul(HALF, n2k2) + fmul(SIXTH, n3k3) + nk;
-  const d = dm1 + FX;
-  if (d < FX) return 0;
-  return fdiv(fmul(dm1, a), Math.max(fpct(r, d), CENT));
-}
-
-/** 0x7a1240: `a` discounted `n` turns at `r` percent — a(1-k)^n by the
- *  cubic expansion */
-function discounted(a: number, r: number, n: number): number {
-  if (n === 0) return a;
-  if (n < 0) return 0;
-  const nk = fmul(fmul(r, n * FX), CENT);
-  const n2k2 = fmul(fmul(fmul(nk, r), (n - 1) * FX), CENT);
-  const n3k3 = fmul(fmul(fmul(n2k2, r), (n - 2) * FX), CENT);
-  const e = Math.max(0, fmul(HALF, n2k2) + fmul(NEG_SIXTH, n3k3) - nk + FX);
-  return e > FX ? 0 : fmul(a, e);
-}
-
-/** what a yield `a` a turn is worth from the turn a row `turns` away lands to
- *  the horizon (the value's every term) */
-function fromLanding(a: number, turns: number): number {
-  const r = fxConst(RESEARCH_AI_DISCOUNT_PCT);
-  if (turns === RESEARCH_AI_HORIZON) return discounted(a, r, turns);
-  return presentValue(a, r, RESEARCH_AI_HORIZON) - presentValue(a, r, turns);
-}
-
-/** a pseudo-yield's worth, `amount` of it at its DefaultValue */
-function pseudoYield(def: number, amount: number): number {
-  return fmul(amount, fxConst(def));
-}
 
 /** the seat's prerequisites of `id` in the install's order */
 function prereqs(id: string): readonly string[] {
@@ -159,12 +78,9 @@ export interface ResearchEntry {
  *  whole Science where the seat makes none */
 function turnsLeft(state: GameState, seat: number, r: ResearchState, id: string, rate: number): number {
   const cost = researchCost(state, id, false, seat);
-  if (rate <= 0) return cost;
   const kept = id === r.tech ? r.techProgress : r.techRetained[id] ?? 0;
-  const rem = cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0));
-  if (rem <= 0) return 1;
-  const n = Math.floor(fdiv(rem, rate) / FX);
-  return rem > rate * n ? n + 1 : n;
+  const t = turnsAt(cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0)), rate);
+  return t < 0 ? cost : t;
 }
 
 /** 0x761170's walk: the turns through the prerequisites and the next step;
@@ -199,14 +115,14 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * horizon. Past the horizon -9999.
  */
 export function techValue(state: GameState, id: string, turns: number): number {
-  if (turns > RESEARCH_AI_HORIZON) return fxConst(-9999);
+  if (turns > AI_VALUE_HORIZON) return fxConst(-9999);
   const def = TECHS[id];
   let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX);
   if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
   if (era < game) own = fmul(own, (game - era + 1) * FX);
-  const share = fxConst(RESEARCH_AI_UNLOCK_SHARE);
+  const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);
   return fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share), turns)

@@ -46,15 +46,15 @@ def test_value(rules) -> None:
         turns[0, ti[tid]] = n
         return int(sim._rai_value(turns)[0, ti[tid]])
 
-    assert value("POTTERY", 12) == 34037, "the row's own 5, a building's share, a wonder's"
-    assert value("ASTROLOGY", 25) == 27105, "a district's share at its pseudo-yield"
-    assert value("WRITING", 37) == 13180
-    assert value("SHIPBUILDING", 4) == 77331, "EmbarkAll adds 5"
-    assert value("MINING", 50) == 560, "at the horizon one discounted turn"
+    assert value("POTTERY", 12) == 20056, "the row's own 5, a building's share, a wonder's"
+    assert value("ASTROLOGY", 25) == 11713, "a district's share at its pseudo-yield"
+    assert value("WRITING", 37) == 4159
+    assert value("SHIPBUILDING", 4) == 48958, "EmbarkAll adds 5"
+    assert value("MINING", 50) == 35, "at the horizon one discounted turn"
     assert value("MINING", 51) == -9999 * 256, "past it -9999"
     sim.game_era[0] = 2
-    assert value("POTTERY", 12) == 86419, "an older era's row counts once per era between, plus one"
-    assert value("MINING", 1) == 116972
+    assert value("POTTERY", 12) == 50905, "an older era's row counts once per era between, plus one"
+    assert value("MINING", 1) == 77233
     print("  research value OK")
 
 

@@ -69,87 +69,107 @@ def _discounted(a: torch.Tensor, r: int, n: torch.Tensor) -> torch.Tensor:
     return torch.where(n < 0, torch.zeros_like(a), out)
 
 
+def _walk_slots(pre: list, dev) -> list:
+    """a tree's prerequisite walk slots three levels deep (each row's
+    prerequisites in the install's order, theirs, theirs): per level the
+    slot rows [N, K] (-1 empty) and each slot's parent slot in the level
+    above"""
+    n = len(pre)
+    lv1 = [[p for p in pre[t]] for t in range(n)]
+    lv1_par = [[0 for _ in pre[t]] for t in range(n)]
+    lv2, lv2_par, lv3, lv3_par = [], [], [], []
+    for t in range(n):
+        a, ap = [], []
+        for j, e in enumerate(lv1[t]):
+            for q in pre[e]:
+                a.append(q)
+                ap.append(j)
+        lv2.append(a)
+        lv2_par.append(ap)
+        b, bp = [], []
+        for m, e in enumerate(a):
+            for q in pre[e]:
+                b.append(q)
+                bp.append(m)
+        lv3.append(b)
+        lv3_par.append(bp)
+
+    def pad(rows, fill):
+        k = max([len(x) for x in rows] + [1])
+        return torch.tensor([x + [fill] * (k - len(x)) for x in rows], dtype=torch.long, device=dev)
+
+    return [(pad(lv1, -1), pad(lv1_par, 0)), (pad(lv2, -1), pad(lv2_par, 0)), (pad(lv3, -1), pad(lv3_par, 0))]
+
+
+def _turns_at(rem: torch.Tensor, rate: torch.Tensor) -> torch.Tensor:
+    """`turnsAt` (0x8c4540) elementwise: the turns `rem` raw left needs at
+    `rate` raw a turn — the truncated quotient, one more where a remainder
+    is left; 1 where nothing is left; -1 where the rate is none"""
+    n = torch.div(torch.div(rem * _FX, rate.clamp(min=1), rounding_mode="trunc"), _FX, rounding_mode="floor")
+    t = torch.where(rem > rate * n, n + 1, n)
+    t = torch.where(rem <= 0, torch.ones_like(t), t)
+    return torch.where(rate <= 0, torch.full_like(t, -1), t)
+
+
 class SimResearch:
     def _rai_tables(self) -> dict:
         """the static tables of the research AI, built once: the table order,
-        each row's prerequisite walk slots three levels deep (the row, its
-        prerequisites in the install's order, theirs, theirs), the leaf
-        rows, the value's terms"""
+        each row's prerequisite walk slots three levels deep, the leaf rows,
+        the value's terms"""
         cached = getattr(self, "_rai_cache", None)
         if cached is not None:
             return cached
         rules, dev = self.rules, self.device
         pre = [list(p) for p in rules.t_prereqs]
         nt = len(pre)
-        # per level: the slot techs and each slot's parent slot in the level above
-        lv1 = [[p for p in pre[t]] for t in range(nt)]
-        lv1_par = [[0 for _ in pre[t]] for t in range(nt)]
-        lv2, lv2_par, lv3, lv3_par = [], [], [], []
-        for t in range(nt):
-            a, ap = [], []
-            for j, e in enumerate(lv1[t]):
-                for q in pre[e]:
-                    a.append(q)
-                    ap.append(j)
-            lv2.append(a)
-            lv2_par.append(ap)
-            b, bp = [], []
-            for m, e in enumerate(a):
-                for q in pre[e]:
-                    b.append(q)
-                    bp.append(m)
-            lv3.append(b)
-            lv3_par.append(bp)
-
-        def pad(rows, fill):
-            k = max([len(x) for x in rows] + [1])
-            return torch.tensor([x + [fill] * (k - len(x)) for x in rows], dtype=torch.long, device=dev)
-
         required = torch.zeros(nt, dtype=torch.bool, device=dev)
         for t in range(nt):
             for p in pre[t]:
                 required[p] = True
-        ra = rules.research_ai
+        ra, av = rules.research_ai, rules.ai_value
         cached = {
             "order": torch.argsort(self._tech_rank).tolist(),
-            "lv": [(pad(lv1, -1), pad(lv1_par, 0)), (pad(lv2, -1), pad(lv2_par, 0)), (pad(lv3, -1), pad(lv3_par, 0))],
+            "lv": _walk_slots(pre, dev),
             "leaf": ~required,
             "unlocks": rules.t_ai_unlocks.to(dev),
             "embark": rules.t_embark_all.to(dev),
             "era": rules.t_era.to(dev),
             "repeat": rules.t_repeat.to(dev),
-            "horizon": int(ra["horizon"]),
-            "rate": _fx_const(float(ra["discountPct"])),
+            "horizon": int(av["horizon"]),
+            "rate": _fx_const(float(av["discountPct"])),
             "bias": int(ra["taskBias"]) * 10 * _FX,
-            "own": _imul(_FX, _fx_const(float(ra["pyTechnology"]))),
+            "own": _imul(_FX, _fx_const(float(av["pyTechnology"]))),
             "embark_add": _fx_const(float(ra["embarkAll"])),
-            "share": _fx_const(float(ra["unlockShare"])),
-            "py_district": _fx_const(float(ra["pyDistrict"])),
-            "py_wonder": _fx_const(float(ra["pyWonder"])),
+            "share": _fx_const(float(av["unlockShare"])),
+            "py_district": _fx_const(float(av["pyDistrict"])),
+            "py_wonder": _fx_const(float(av["pyWonder"])),
         }
         self._rai_cache = cached
         return cached
 
     def _rai_from_landing(self, a: torch.Tensor, n: torch.Tensor) -> torch.Tensor:
         """`fromLanding`: a yield a turn from the turn a row `n` away lands to
-        the horizon"""
+        the horizon (the AI's value tables, shared by the civics AI)"""
         T = self._rai_tables()
         h, r = T["horizon"], T["rate"]
         full = _present_value(a, r, torch.full_like(n, h))
         return torch.where(n == h, _discounted(a, r, n), full - _present_value(a, r, n))
 
     def _rai_levels(self, have: torch.Tensor, gate: torch.Tensor | None):
-        """the walk's slots that hold, per level ([B, NT, K] each): a slot
+        """the research walk's slots (`_tree_levels` over the tech tree)"""
+        return self._tree_levels(self._rai_tables()["lv"], have, gate)
+
+    def _tree_levels(self, lv: list, have: torch.Tensor, gate: torch.Tensor | None):
+        """the walk's slots that hold, per level ([B, N, K] each): a slot
         holds where its parent held (the row itself at the first level), is
-        unowned, is the first of its tech in the level, and — with `gate`
-        ([B, NT] the researchable rows, the analysis' walk) — its parent is
+        unowned, is the first of its row in the level, and — with `gate`
+        ([B, N] the researchable rows, the analysis' walk) — its parent is
         not researchable"""
-        T = self._rai_tables()
         B = have.shape[0]
         out = []
         parent_on = None
         parent_tech = None
-        for depth, (slot, par) in enumerate(T["lv"]):
+        for depth, (slot, par) in enumerate(lv):
             K = slot.shape[1]
             tech = slot.unsqueeze(0).expand(B, -1, -1)
             valid = tech >= 0
@@ -192,11 +212,8 @@ class SimResearch:
         kept = torch.where(col == cur.unsqueeze(1), self.citystate_tech_prog[:, s].unsqueeze(1), self.citystate_tech_retain[:, s])
         prog = torch.floor((kept + self.citystate_tech_ovf[:, s].clamp(min=0).unsqueeze(1)) * _FX + 0.5).long()
         rate = torch.floor(sci * _FX + 0.5).long().unsqueeze(1)
-        rem = cost * _FX - prog
-        n = torch.div(torch.div(rem * _FX, rate.clamp(min=1), rounding_mode="trunc"), _FX, rounding_mode="floor")
-        tl = torch.where(rem > rate * n, n + 1, n)
-        tl = torch.where(rem <= 0, torch.ones_like(tl), tl)
-        tl = torch.where(rate <= 0, cost, tl)
+        tl = _turns_at(cost * _FX - prog, rate)
+        tl = torch.where(tl < 0, cost, tl)
         # the walk: turns through levels 0..2, out of reach where level 3 holds
         lv = self._rai_levels(have, res)
         turns = tl.clone()

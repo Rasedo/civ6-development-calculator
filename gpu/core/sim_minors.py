@@ -470,18 +470,18 @@ class SimMinors:
         overflow bank, a completion at the cost leaving the rest, whose
         choice reads the research AI's analysis of the turn before
         (`_rai_completion`); then the AI's turn analyses the tree and makes
-        its turn's choice (`_rai_turn`). Then the CIVICS: the catch-up, with
-        nothing in hand the cheapest row open to it (table order on a price
-        tie), which resumes the progress kept on it while the pool left goes
-        to the overflow (`selectResearch`); the turn's Culture (`cul`) and the
-        overflow bank and complete it at its cost. CIV6 (Urban Defenses): the
+        its turn's choice (`_rai_turn`). Then the CIVICS the same way: the
+        catch-up, the turn's Culture (`cul`) and the overflow bank and
+        complete the civic in hand at its cost, whose choice reads the civics
+        AI's analysis of the turn before (`_cai_completion`); then the AI's
+        turn analyses the tree and, with nothing in hand, chooses
+        (`_cai_turn`). CIV6 (Urban Defenses): the
         tech "builds modern fortifications around the City Centers of all
         current and future cities and their Encampment districts", so the
         minor's perimeter arrives at the urban tier's full pool. Returns [B]
         long, how many trees completed a row — the upgrade trigger's count."""
         alive = self.citystate_alive[:, s]
         gained = torch.zeros(self.B, dtype=torch.long, device=self.device)
-        rdv = self.rules_dev
         live = self._barb_majors_alive()
         need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
 
@@ -529,29 +529,14 @@ class SimMinors:
 
         # THE CIVICS
         have, prog, cur = self.citystate_civics, self.citystate_civic_prog, self.citystate_cur_civic
-        retain, ovf, cost, pre = self.citystate_civic_retain, self.citystate_civic_ovf, rdv.c_cost.to(self.device), self._prereq_c
+        retain, ovf = self.citystate_civic_retain, self.citystate_civic_ovf
         rc = self._research_cost(True)
-        n = cost.numel()
-        col = torch.arange(n, device=self.device).unsqueeze(0)
+        col = torch.arange(rc.shape[1], device=self.device).unsqueeze(0)
         catch_up(have, prog, cur, retain, rc, self.civ_civics)
-        # THE PICK where nothing is in hand
-        avail = self._available_mask(have[:, s], pre)
-        key = torch.where(avail, cost.unsqueeze(0).expand_as(avail),
-                          torch.full((1, 1), float("inf"), dtype=torch.float64, device=self.device).expand_as(avail))
-        key = key + torch.arange(n, device=self.device, dtype=torch.float64) * 1e-6
-        pick = key.argmin(dim=1)
-        go = alive & (cur[:, s] < 0) & avail.any(dim=1)
-        if bool(go.count_nonzero()):
-            ovf[:, s] = torch.where(go, ovf[:, s] + prog[:, s], ovf[:, s])
-            kept = retain[:, s].gather(1, pick.unsqueeze(1)).squeeze(1)
-            prog[:, s] = torch.where(go, kept, prog[:, s])
-            retain[:, s] = torch.where(go.unsqueeze(1) & (col == pick.unsqueeze(1)), torch.zeros_like(retain[:, s]),
-                                       retain[:, s])
-            cur[:, s] = torch.where(go, pick, cur[:, s])
         # the turn's yield and the overflow
         prog[:, s] = torch.where(alive, prog[:, s] + cul + ovf[:, s], prog[:, s])
         ovf[:, s] = torch.where(alive, torch.zeros_like(ovf[:, s]), ovf[:, s])
-        # THE COMPLETION
+        # THE COMPLETION and its choice
         c = cur[:, s]
         cval = rc.gather(1, c.clamp(min=0).unsqueeze(1)).squeeze(1).to(prog.dtype)
         fire = alive & (c >= 0) & (prog[:, s] >= cval)
@@ -562,6 +547,8 @@ class SimMinors:
             retain[:, s] = torch.where(fire.unsqueeze(1) & (col == c.unsqueeze(1)), torch.zeros_like(retain[:, s]), retain[:, s])
             cur[:, s] = torch.where(fire, torch.full_like(c, -1), c)
             self._eff_version += 1
+            self._cai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), cul)
+        self._cai_turn(s, alive, cul)
         return gained
 
     def _minor_urban_fit(self, s: int, hit: torch.Tensor) -> None:

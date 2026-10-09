@@ -666,8 +666,8 @@ class SimEconomy:
     def _available_mask(self, done: torch.Tensor, prereq: torch.Tensor,
                         repeat: torch.Tensor | None = None) -> torch.Tensor:
         """[B, N] — the rows not yet complete, or REPEATABLE (`repeat`, a seat's
-        research: `availableTechsIn`), whose every prereq is complete. A
-        minor's research passes none (`cheapestAvailable`)."""
+        research: `availableTechsIn`), whose every prereq is complete (a
+        minor's research AIs pass it too)."""
         missing = (prereq.unsqueeze(0) & ~done.unsqueeze(1)).any(dim=2)
         fresh = ~done if repeat is None else (~done | repeat.unsqueeze(0))
         return fresh & ~missing

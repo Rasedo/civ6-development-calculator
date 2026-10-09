@@ -203,7 +203,7 @@ const TECH_SRC: Readonly<Record<string, SrcMap>> = {
   EDUCATION: {
     era: xml('Technologies', 'TechnologyType=TECH_EDUCATION', 'EraType', { expect: 'ERA_MEDIEVAL' }),
     cost: xml('Technologies', 'TechnologyType=TECH_EDUCATION', 'Cost', { scale: GAME_SPEED }),
-    prereqs: { derived: 'the TechnologyPrereqs rows of TECH_EDUCATION, read as an AND-list', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_EDUCATION&PrereqTech=TECH_APPRENTICESHIP', 'PrereqTech', { expect: 'TECH_APPRENTICESHIP' }), xml('TechnologyPrereqs', 'Technology=TECH_EDUCATION&PrereqTech=TECH_MATHEMATICS', 'PrereqTech', { expect: 'TECH_MATHEMATICS' })] },
+    prereqs: { derived: 'the TechnologyPrereqs rows of TECH_EDUCATION, read as an AND-list in the install order', inputs: [xml('TechnologyPrereqs', 'Technology=TECH_EDUCATION&PrereqTech=TECH_MATHEMATICS', 'PrereqTech', { expect: 'TECH_MATHEMATICS' }), xml('TechnologyPrereqs', 'Technology=TECH_EDUCATION&PrereqTech=TECH_APPRENTICESHIP', 'PrereqTech', { expect: 'TECH_APPRENTICESHIP' })] },
     'effects.0.building': xml('Buildings', 'BuildingType=BUILDING_UNIVERSITY', 'PrereqTech', { expect: 'TECH_EDUCATION' }),
   },
   BANKING: {
@@ -655,7 +655,7 @@ export const TECHS: Record<string, TechDef> = Object.fromEntries(
     T('MILITARY_ENGINEERING', 'Military Engineering', 'Medieval', 390, ['CONSTRUCTION'], [
       { kind: 'unlockBuilding', building: 'ARMORY' },
     ]),
-    T('EDUCATION', 'Education', 'Medieval', 390, ['APPRENTICESHIP', 'MATHEMATICS'], [
+    T('EDUCATION', 'Education', 'Medieval', 390, ['MATHEMATICS', 'APPRENTICESHIP'], [
       { kind: 'unlockBuilding', building: 'UNIVERSITY' },
       { kind: 'unlockImprovement', improvement: 'MISSION' }, // CIV6 (Mission): PrereqTech
     ]),

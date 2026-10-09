@@ -1,5 +1,6 @@
 export * from '../../world/types';
 import type { ResearchEntry } from './aiResearch';
+import type { CivicEntry } from './aiCivics';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
@@ -210,6 +211,9 @@ export interface ResearchState {
   /** the research AI's analysis of its last turn, which a completion's
    *  choice reads (`researchCompletionChoice`); absent before its first */
   aiEntries?: ResearchEntry[];
+  /** the civics AI's analysis of its last turn, which a completion's choice
+   *  reads (`civicChoice`); absent before its first */
+  civicAiEntries?: CivicEntry[];
 }
 
 export interface GovernmentState {

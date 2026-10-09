@@ -287,7 +287,7 @@ const CIVIC_SRC: Readonly<Record<string, SrcMap>> = {
   DEFENSIVE_TACTICS: {
     era: xml('Civics', 'CivicType=CIVIC_DEFENSIVE_TACTICS', 'EraType', { expect: 'ERA_CLASSICAL' }),
     cost: xml('Civics', 'CivicType=CIVIC_DEFENSIVE_TACTICS', 'Cost', { scale: GAME_SPEED }),
-    prereqs: xml('CivicPrereqs', 'Civic=CIVIC_DEFENSIVE_TACTICS&PrereqCivic=CIVIC_GAMES_RECREATION', 'PrereqCivic', { expect: 'CIVIC_GAMES_RECREATION' }),
+    prereqs: { derived: 'the CivicPrereqs rows of CIVIC_DEFENSIVE_TACTICS, read as an AND-list', inputs: [xml('CivicPrereqs', 'Civic=CIVIC_DEFENSIVE_TACTICS&PrereqCivic=CIVIC_GAMES_RECREATION', 'PrereqCivic', { expect: 'CIVIC_GAMES_RECREATION' }), xml('CivicPrereqs', 'Civic=CIVIC_DEFENSIVE_TACTICS&PrereqCivic=CIVIC_POLITICAL_PHILOSOPHY', 'PrereqCivic', { expect: 'CIVIC_POLITICAL_PHILOSOPHY' })] },
     'effects.0.policy': xml('Policies', 'PolicyType=POLICY_BASTIONS', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
     'effects.1.policy': xml('Policies', 'PolicyType=POLICY_LIMES', 'PrereqCivic', { expect: 'CIVIC_DEFENSIVE_TACTICS' }),
   },
@@ -676,7 +676,7 @@ export const CIVICS: Record<string, CivicDef> = Object.fromEntries(
       { kind: 'unlockPolicy', policy: 'VETERANCY' },
       { kind: 'unlockPolicy', policy: 'EQUESTRIAN_ORDERS' },
     ]),
-    C('DEFENSIVE_TACTICS', 'Defensive Tactics', 'Classical', 175, ['GAMES_AND_RECREATION'], [
+    C('DEFENSIVE_TACTICS', 'Defensive Tactics', 'Classical', 175, ['GAMES_AND_RECREATION', 'POLITICAL_PHILOSOPHY'], [
       { kind: 'unlockPolicy', policy: 'BASTIONS' },
       { kind: 'unlockPolicy', policy: 'LIMES' },
     ]),

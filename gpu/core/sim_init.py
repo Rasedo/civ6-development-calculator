@@ -276,6 +276,16 @@ class SimInit:
         self.citystate_ai_score = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
         self.citystate_ai_owned = torch.zeros(B, s_pad, nt_ai, dtype=torch.bool, device=device)
         self.citystate_ai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the civics AI's analysis of the minor's last turn, which a
+        # completion's choice reads (`ResearchState.civicAiEntries`): per row
+        # its turns, next step, own value and score (raw 24.8) and owned flag
+        nc_ai = len(rules.c_cost)
+        self.citystate_cai_turns = torch.full((B, s_pad, nc_ai), -1, dtype=torch.long, device=device)
+        self.citystate_cai_next = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_base = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_score = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_owned = torch.zeros(B, s_pad, nc_ai, dtype=torch.bool, device=device)
+        self.citystate_cai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
         # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
         # spent down the fitted build table. The built results live on the
         # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)
