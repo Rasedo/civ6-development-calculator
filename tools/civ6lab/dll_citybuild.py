@@ -1,23 +1,26 @@
-"""C-96 / C-97: the city build AI's present value as GameCore_XP2_Release.dll
-codes it (0x7a16e0; FinalRelease 0x528310), against the Default
+"""C-96 / C-97: the city build AI's present value as the game DLL codes it
+(Release 0x7a16e0, FinalRelease 0x528310; `dll_emu.py pv` runs the shipped
+routine and agrees with `pv_fixed` bit for bit), against the Default
 Specialization values the game logs (AI_CityBuild.csv beside every H-1
 recording).
 
-    python tools/civ6lab/dll_citybuild.py [--item BUILDING_MONUMENT --cost 60 --v 1.0] [--rows]
+    python tools/civ6lab/dll_citybuild.py [--rows]
 
-A building's value is PV(v, rate, H) - PV(v, rate, T) (0x7a7590): v its
-per-turn value, rate the global AI's 2.0 (GlobalAI +0x290), H the value
-horizon (valueHorizons[1]), T the turns until it stands. The routine as read:
+A building's value is PV(v, rate, H) - PV(v, rate, T) (0x7a7590) plus terms
+added after it: v its per-turn value, rate the global AI's 2.0 (GlobalAI
++0x290), H the value horizon (valueHorizons[1]), T the turns until it stands.
+The routine:
   n = 0 -> v; n < 0 -> 0; rate 0 -> v n;
   rate >= 50.0 or rate n fx(0.01) >= 10.0 -> v / (rate fx(0.01));
   else n <= 400, s = a + c/2 + e fx(1/6) with a = n r, c = n(n-1) r^2,
   e = n(n-1)(n-2) r^3 (each product truncated in 24.8, r x = rate x / 25600),
   PV = (s v) / max(r (1 + s), fx(0.01)).
-Scored on the Monument (+1 Culture, no maintenance, cost 60): every Default
-Specialization pick of it whose city's production reads the same in the
-records t-1, t and t+1, so T = ceil(60 / production) is certain. Both the
-routine as read and the exact annuity v (1 - 1.02^-n) / 0.02 are printed;
-a hit is within 0.05 of the logged value.
+Scored on every Default Specialization Monument pick of a city-state (+1
+Culture, no maintenance; a city-state's Culture weight is 0, so v = 1.0):
+the city's production from the record of the pick's turn (t + 1 for a city
+founded that turn); T at Online's cost 30 or the Standard cost 60, H 50 or
+100, the shipped routine or the exact annuity (1 - 1.02^-n) / 0.02; a hit
+prints the logged value at its one decimal.
 """
 from __future__ import annotations
 
@@ -60,20 +63,24 @@ def pv_fixed(v: int, rate: int, n: int) -> int:
 
 
 def pv_exact(v: float, r: float, n: int) -> float:
-    return v * (1 - (1 + r) ** -n) / r
+    return v * (1 - (1 + r) ** -n) / r if n > 0 else (v if n == 0 else 0.0)
+
+
+MODELS = {
+    "dll   H 50  T at cost 30": (lambda n: pv_fixed(256, RATE, n) / 256, 50, 30),
+    "dll   H 100 T at cost 60": (lambda n: pv_fixed(256, RATE, n) / 256, 100, 60),
+    "exact H 50  T at cost 30": (lambda n: pv_exact(1.0, 0.02, n), 50, 30),
+    "exact H 100 T at cost 60": (lambda n: pv_exact(1.0, 0.02, n), 100, 60),
+}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--item", default="BUILDING_MONUMENT")
-    ap.add_argument("--cost", type=float, default=60)
-    ap.add_argument("--v", type=float, default=1.0)
-    ap.add_argument("--h", type=int, default=100)
     ap.add_argument("--rows", action="store_true")
     ap.add_argument("--runs", default=str(RUNS))
     a = ap.parse_args()
-    vf = round(a.v * 256)
-    n = hit_fixed = hit_exact = 0
+    hits = dict.fromkeys(MODELS, 0)
+    n = 0
     for log in sorted(pathlib.Path(a.runs).glob("h1_duelw*_20261007T232459Z.logs/AI_CityBuild.csv")):
         stem = str(log.parent)[:-len(".logs")]
         recs = {}
@@ -81,30 +88,35 @@ def main() -> int:
             d = json.loads(line)
             recs[d["turn"]] = d
         for row in csv.reader(open(log, encoding="utf-8", errors="replace")):
-            if not row or not row[0].strip().isdigit():
-                continue
             row = [c.strip() for c in row]
-            if len(row) < 7 or row[5] != a.item or row[6] != "Default Specialization":
+            if len(row) < 7 or not row[0].isdigit() or row[5] != "BUILDING_MONUMENT" \
+                    or row[6] != "Default Specialization" or int(row[1]) < 2:
                 continue
-            turn, player = int(row[0]), int(row[1])
-            prods = []
-            for t in (turn - 1, turn, turn + 1):
-                r = recs.get(t)
-                c = next((c for c in r["cities"] if c["owner"] == player and c["name"] == row[2]), None) if r else None
-                prods.append(c["yields"][1] if c else None)
-            if prods[0] is None or len(set(prods)) != 1:
-                continue
-            got = float(row[-1].split()[-1])
-            T = math.ceil(a.cost / prods[0])
-            fixed = (pv_fixed(vf, RATE, a.h) - pv_fixed(vf, RATE, T)) / 256
-            exact = pv_exact(a.v, 0.02, a.h) - pv_exact(a.v, 0.02, T)
+            turn, player, logged = int(row[0]), int(row[1]), row[-1].split()[-1]
             n += 1
-            hit_fixed += abs(fixed - got) <= 0.05
-            hit_exact += abs(exact - got) <= 0.05
+            city = None
+            for t in (turn, turn + 1):
+                rec = recs.get(t)
+                city = next((c for c in rec["cities"] if c["owner"] == player and c["name"] == row[2]), None) \
+                    if rec else None
+                if city:
+                    break
+            prod = city["yields"][1] if city else 0
+            if prod <= 0:
+                continue
+            out = []
+            for name, (pv, horizon, cost) in MODELS.items():
+                turns = math.ceil(cost / prod)
+                value = pv(horizon) - pv(turns) if turns < horizon else None
+                hit = value is not None and f"{value:.1f}" == logged
+                hits[name] += hit
+                out.append(f"{'-' if value is None else f'{value:.2f}':>6}{'*' if hit else ' '}")
             if a.rows:
-                print(f"{log.parent.name[8:12]} t{turn} p{player} {row[2][14:]:<14} prod {prods[0]:<6} T {T:<3} "
-                      f"logged {got:6.1f}  as read {fixed:6.2f}  exact {exact:6.2f}")
-    print(f"{a.item}: {n} picks with the production steady; within 0.05: as read {hit_fixed}, exact annuity {hit_exact}")
+                print(f"{log.parent.name[8:12]} t{turn:<3} p{player} {row[2][14:]:<14} prod {prod:<7.3f} "
+                      f"logged {logged:>5}  " + " ".join(out))
+    print(f"city-state Monument picks: {n}")
+    for name, h in hits.items():
+        print(f"  {name}: {h}")
     return 0
 
 

@@ -316,7 +316,9 @@ fire's birth draws as "C-74: the fire" reads.
 `dll_hash.py` names a 32-bit type hash (the game's hash is CRC32 without its
 final inversion: TERRAIN_GRASS 0x83e7c630 as the game reports).
 `dll_rowmap.py` maps a database row struct's fields to their columns (from
-the table's loader). `dll_luabind.py` lists a Lua registrar's bindings with
+the table's loader). `dll_emu.py` runs a leaf routine of the shipped DLL
+under the unicorn emulator (`pv`: the AI's present value) to check a port's
+arithmetic against the code itself. `dll_luabind.py` lists a Lua registrar's bindings with
 the virtual slots each one calls. The plot's virtual slots: +0x18 the
 movement cost, +0x30 the plot's district/ownership info (+0x1c the owner,
 +0x10 the district id), byte +0x3a bit 3 IsImpassable, word +0x2c the
@@ -3424,14 +3426,25 @@ low byte / 256 plus the rest). Check: `dll_citybuild.py`.
   +0x1288 +0x528, the AI yields' +0x638, +0x7a8, the +0x6b0 list or +0x6c8);
   per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT
   from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 for a prerequisite
-  of era 5 or later); then a second yields pass (0x18e570), the great person
-  points (+0x1b0, each class's pseudo-yield), PSEUDOYIELD_WONDER for a wonder,
-  the era moment (0x93e4e0, 0x3002f0), the defence terms (+0x54 with city
-  +0x1a60, +0x5e8, +0x588), Housing (+0x44) as raw value, the great work
-  slots (+0x1c8), the prerequisite chain (+0x1f8: x(1 + 2 depth)), less
-  Maintenance (+0x38) as Gold; the sum v becomes PV(v, rate, H) - PV(v,
-  rate, T) (0x7a16e0 twice); a regional building (+0x2c) adds 0x79f7c0 over
-  the player's cities in its range, capped at 50.0.
+  of era 5 or later); then a second yields pass (0x18e570), a whole number
+  (player +0x1358 +0xf8) when CanConstruct's three reason fields are all -1,
+  the great person points (+0x1b0, each class's pseudo-yield),
+  PSEUDOYIELD_WONDER for a wonder, the era moment (0x93e4e0, 0x3002f0), the
+  defence terms (OuterDefenseHitPoints +0x54/+0x58 present: city +0x1a60,
+  +0x5e8, +0x588 / 5 + 1, CityBuildAI +0x1b8, the war terms, x4 for a
+  damaged own copy, x2 against a later-era enemy), OuterDefenseStrength
+  (+0x44) as a whole number, the great work slots (+0x1c8), the prerequisite
+  chain (+0x1f8: x(1 + 2 depth)), less Maintenance (+0x38) as Gold; the sum
+  v becomes PV(v, rate, H) - PV(v, rate, T) (0x7a16e0 twice). After it,
+  already discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this city
+  (RegionalRange +0x48 <= 1) or over the player's cities in range, capped at
+  50.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0,
+  +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing
+  (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588,
+  T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a
+  Gold value per plot of a walk); the modifiers through 0x7a4b20 ("the AI's
+  yield weights and the modifier evaluator" below). Column offsets from the
+  Buildings loader 0xabaaf0 (`dll_rowmap.py a59ee0`).
 - The present value 0x7a16e0 (FinalRelease 0x528310, the same code): n 0 ->
   v; n < 0 -> 0; rate 0 -> v n; rate >= 50.0 or rate n fx(0.01) >= 10.0 ->
   v / (rate fx(0.01)); else n <= 400 and (1 + r)^n - 1 by its binomial to
@@ -3447,22 +3460,26 @@ low byte / 256 plus the rest). Check: `dll_citybuild.py`.
   pseudo-yield, less its Gold maintenance below handicap 3 (player +0x908),
   then the PV difference; a Trader 0x7a7110 (PSEUDOYIELD_UNIT_TRADE);
   religious units by their charges and spread.
-- OPEN (the routine as read against the log): the Monument (+1 Culture, no
-  maintenance, cost 60) picked with the city's production steady over the
-  records t-1..t+1 (29 picks), T = ceil(60 / production): with v 1.0 the
-  horizon that fits is 100 (valueHorizons[1] at an unresolved speed, 100%,
-  not Online's 50; H 50 and 200 fit 2 at most). The routine as read hits 6
-  within 0.05 (T 18 28.04 and T 24 24.20 to the tenth; T 20 reads 25.04
-  where 1107 Brussels t5 and 1120 Kandy t5 log 26.7), the exact annuity v (1
-  - 1.02^-n) / 0.02 hits 11 (T 20 26.75); T 30 logs 20.6 x5 and 18.9 x4
-  (read 20.10, exact 20.70), T 40 14.6 (15.05 / 15.74), T 50 10.4 (10.86 /
-  11.67). v is 1 + w[Culture] and w is unread, so the picks spread v over
-  0.94..1.07 under the routine as read and 0.89..1.00 under the exact
-  annuity: they do not tell the two apart until w is read.
-- Unread: the military unit value (0x79ca90), the writers of w[y]'s five
-  arrays (the per-city weights logged on the advantage lines are CityBuildAI
-  +0x908, not among them), the modifier evaluator (0x79f7c0, 0x7a67f0,
-  0x7a3d70, 0x7b1320, 0x7a21e0), the events (0x5cd150, 0x5cc910, 0x5ccc10,
+- LAB (the routine against the log): `dll_emu.py pv` runs the shipped
+  routine (FinalRelease 0x528310, Release 0x7a16e0) under unicorn and it
+  agrees with `dll_citybuild.pv_fixed` bit for bit (n 0..1000). A
+  city-state's Culture weight is 0 (the next section), so its Monument's v
+  is 1.0. Over all 139 Default Specialization Monument picks of a city-state
+  (`dll_citybuild.py`, the production from the pick turn's record): the
+  routine with H 50 and T at Online's cost 30 prints 0 of them, with H 100
+  and T at the Standard cost 60 prints 12 (every one T 24, 24.2); the exact
+  annuity (1 - 1.02^-n) / 0.02 with H 100 and T at cost 60 prints 50 (T 18
+  28.1 x9, T 20 26.7 x29, T 24 24.2 x12), with H 50 at cost 30 none. No
+  fixed v makes the routine print the four values 28.1 / 26.7 / 24.2 / 20.6
+  (production 3.5 / 3 / 2.5 / 2) at a horizon 20..400 with T = k ceil(30 /
+  production) + d (k 1, 2; d 0..11) at rate 2.0, nor at rates 1.0..4.0
+  with d 0; the exact annuity needs v 1.000 / 0.998 / 1.001 / 0.995 for
+  them — so the table's horizon is 100 and its T counts Standard-speed
+  turns (as if 0x5254d0's speed lookup answered 100% in the job: unread
+  why), and its discounting is not this routine as called. 89 picks fit neither: t1 picks of a city
+  founded that turn (24.0 x33 at production 2.5, 18.1 x18 at 2.0, 30.2 at
+  3.5) and late picks; their T is not the record's.
+- Unread: the military unit value (0x79ca90), the events (0x5cd150, 0x5cc910, 0x5ccc10,
   0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp:
   the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40,
   FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 ("Canceling current
@@ -3658,6 +3675,76 @@ the records do not show it.
   can attack this turn, else the nearest it can reach — through 0x771670;
   with none, toward the nearest of the player's cities its tribe waited to
   raid or assault (0x1479e0) ("Chasing target", 0x775c60).
+
+## C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)
+
+The weight w[y] (0x702ad0, `this` the player's AI::GrandStrategic at player
++0x1290, its members named by the constructor 0x6f6e10) is the sum of five
+24.8 parts; the yield value 0x7a6690 is amount x Yields.DefaultValue (Gold
+0.5, the rest 1.0) x (1 + min(w, 9.0)), with no floor on w. A named member's
+data sits at its descriptor + 0x58.
+
+- AI::Religious m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per
+  player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a
+  religious unit is wanted, -0.25 once the faith balance (player +0x1340
+  +0x100) passes its faith cost and -0.25 more once the faith per turn
+  (0x496fd0) passes half of it.
+- AI::Economic m_yieldPriorityBoost (player +0x1288, data +0x528): Gold
+  only. 0x687bf0 each turn: 0, or fx(-0.2) x the gold per turn (player
+  +0x13a0 +0x1b8) while that is negative.
+- The victory manager's Yields (GrandStrategic +0x508, inner +0xd8 = +0x638;
+  0x7c05e0 dumps it as "Yields:"): a followed strategy's
+  Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on,
+  0x7bb870 off). The install has no such row: 0.
+- GrandStrategic +0x7a8 (rebuilt, not saved): the Yields list system
+  (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 ->
+  +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the
+  civilization's trait lists (AiLists LeaderType = one of their traits, a row
+  kept when the player's handicap, player +0x908, is within its
+  MinDifficulty..MaxDifficulty); 0x7bf160 -> 0x7ba440 adds a followed
+  strategy's Strategy_Priorities lists to the same array, 0x7bb870 takes
+  them off. A row adds fx(Value x 0.01) (0x6dd1b0; Favored false
+  subtracts). A major: DefaultYieldBias (TRAIT_LEADER_MAJOR_CIV) Production
+  +25, Gold +20, Science +10, Culture +10, Faith -25 (fx 64, 51, 25, 25,
+  -64), the era strategies' lists (ClassicalYields ...), the victory
+  strategies' (CultureVictoryYields ...). No city-state trait has a Yields
+  list: 0.
+- GrandStrategic m_yieldSensitivityBoost (data +0x6b0, default +0x6c8),
+  each turn in 0x6fafc0 (0x6fbdf1..0x6fc771): for a yield whose sensitivity
+  s = +0x788[y] (the YieldSensitivities system, GlobalAI +0x2508, over the
+  same leader, civilization and strategy lists: ClassicalSensitivity Science
+  10 ...) is > 0, over the player and every major it has met (0x483b50's
+  list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330):
+  n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and the
+  player's x < max -> s x (max - x) / sd, else 0.
+- So a city-state's w is 0 for every yield but Gold (the Economic part) and
+  Faith (the Religious part); the 50 city-state Monument picks the exact
+  annuity prints at v 1.0 ("C-96 / C-97: the city build AI" LAB) agree.
+- The agendas' Yields lists (AiLists AgendaType rows: CultureLover...,
+  MoneyGrubber...; the duels' majors draw hidden agendas, RandCalls "Choose
+  random agenda") reach the arrays by a path unread.
+
+The modifier evaluator: a building's BuildingModifiers are analysed once,
+at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]):
+each entry holds an effect analyzer and a collection iterator found by the
+EffectType / CollectionType hash in the registry 0x6c9640
+(EFFECT_ADJUST_CITY_YIELD_CHANGE -> object 0xf03d80, vtable 0xd63400;
+COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0 runs
+one over at most 51 subjects: a subject whose requirements hold (0x6cf3c0)
+goes to the analyzer's slot 1, none to slot 2; nesting stops at depth 4.
+The context (0x6ccd50, filled in 0x7a7590) carries T (+0xb4), H (+0xb8),
+the rate as a float (+0xbc), the city and the player; 0x7a4b20 adds, per
+modifier, the analyzer's whole-number sum (+0xc0, clamped to +-0x7fffff),
+or that count x Yields.DefaultValue when the analysis named a yield (+0x64).
+An EffectType the registry lacks adds nothing — EFFECT_ADJUST_CITY_IDENTITY_PER_TURN
+(the Monument's MONUMENT_LOYALTY). EFFECT_ADJUST_CITY_YIELD_CHANGE (0x6b8ba0):
+per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140;
+0x7a1240 when T = H). The Monument's MONUMENT_CULTURE_AT_FULL_LOYALTY
+(REQUIREMENT_CITY_HAS_FULL_LOYALTY, COLLECTION_OWNER) would add about the
+building's own term again; the city-state picks at v 1.0 leave no room for
+it, so its requirement fails in the analysis (0x6cf3c0's evaluation of it
+unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490
+...) are unread.
 
 ## DLL rules the engines contradict
 
