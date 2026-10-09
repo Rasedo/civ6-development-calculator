@@ -85,6 +85,19 @@ def trio(sim):
     raise AssertionError("no bare trio of plots")
 
 
+def clear_hostiles_near(sim, tile, radius):
+    """the barbarians' and Free Cities' units within `radius` of `tile` gone,
+    so a scene's strike has only the scene's units to choose from"""
+    lo = sim.POOL_LO["barb"]
+    for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist():
+        t = int(sim.barb_unit_tile[0, s])
+        if int(sim.pair_dist[tile, t]) > radius:
+            continue
+        sim._occ_clear(torch.tensor([0]), torch.tensor([t]), torch.tensor([s + lo]))
+        sim.barb_unit_alive[0, s] = False
+    sim._gen_ver += 1
+
+
 def type_id(sim, name):
     return next(i for i, u in enumerate(sim.rules.units) if u["id"] == name)
 
@@ -120,6 +133,7 @@ def main() -> None:
     d1 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 1 and bare(sim, t)]
     d2 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 2 and bare(sim, t)]
     assert d1 and d2, "the foe centre has no bare ring"
+    clear_hostiles_near(sim, ctr, 2)
     bld = spawn(sim, ROW, sim._builder_idx, d1[0])
     miss = spawn(sim, ROW, sim._missionary_idx, d1[1] if len(d1) > 1 else d2[1])
     war = spawn(sim, ROW, sim._warrior_idx, d2[0])
@@ -230,6 +244,7 @@ def main() -> None:
     ctr = int(sim.city_center[0, FOE, j])
     d1 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 1 and bare(sim, t)]
     d2 = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 2 and bare(sim, t)]
+    clear_hostiles_near(sim, ctr, 2)
     med = spawn(sim, ROW, type_id(sim, "MEDIC"), d1[0])
     war = spawn(sim, ROW, sim._warrior_idx, d2[0])
     col = torch.full((sim.B,), j, dtype=torch.long)

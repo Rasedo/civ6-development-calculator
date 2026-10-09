@@ -6,7 +6,8 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantCivics, orderUnit } fr
 import { endTurn, foundCity, serialize, deserialize } from '../../../cpu/core/game';
 import { healCities, seatPhase } from '../../../cpu/core/phase';
 import { spawnUnit } from '../../../cpu/core/units';
-import { meleeAttack, rangedAttack, attackTargets, terrainDefense, barbarianPhase, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
+import { meleeAttack, rangedAttack, attackTargets, terrainDefense, FLANKING_CS, SUPPORT_CS, awardDefenseXp, trainXpPct, flankCount, supportCount, flankSupportLive, FLANK_SUPPORT_CIVIC, classMatchupCS, CLASS_MELEE_VS_ANTICAV, CLASS_ANTICAV_VS_CAV } from '../../../cpu/core/combat';
+import { barbarianPhase } from '../../../cpu/core/tactical';
 import {
   XP_PER_LEVEL, MAX_LEVEL, PROMOTE_HEAL, XP_BATTLE_CAP, XP_CITY_DEFEND,
   XP_BARB_VETERAN, battleXp, cityXp, bankXp, xpToNextLevel, unitLevel,

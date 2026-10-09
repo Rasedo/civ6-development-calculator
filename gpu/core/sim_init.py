@@ -3944,6 +3944,17 @@ class SimInit:
         self.tribe_op_rec = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
         self.barb_unit_op = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.barb_unit_fresh = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        # THE BARBARIANS' UNIT POOL (`BarbPool`, `barbSlots`): each unit's
+        # place in the player's unit list (-1 none yet), the slots ever used,
+        # the freed ones (a stack, the last pushed on top) and those whose
+        # unit was gone when the barbarians' last turn ended; each tribe's
+        # camp defender (a local pool slot, -1 none)
+        self.barb_unit_slotno = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
+        self.barb_pool_size = torch.zeros(B, dtype=torch.long, device=device)
+        self.barb_pool_free = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.long, device=device)
+        self.barb_pool_nfree = torch.zeros(B, dtype=torch.long, device=device)
+        self.barb_pool_dying = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.tribe_defender = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order
         # (`ringPlots`, 0x69010), -1 past the map's edge

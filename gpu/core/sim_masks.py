@@ -2768,6 +2768,10 @@ class SimMasks:
         self.barb_unit_fresh[rows, slot] = False
         _hs = self.tribe_home_slot[rows]
         self.tribe_home_slot[rows] = torch.where(_hs == slot.unsqueeze(1), torch.full_like(_hs, -2), _hs)
+        # a reclaimed slot is no camp's defender and holds no pool place yet
+        _ds = self.tribe_defender[rows]
+        self.tribe_defender[rows] = torch.where(_ds == slot.unsqueeze(1), torch.full_like(_ds, -1), _ds)
+        self.barb_unit_slotno[rows, slot] = -1
         self.barb_unit_tile[rows, slot] = spot[rows]
         self.barb_unit_hp[rows, slot] = self.rules.combat["unitHp"]
         self.barb_unit_fortify[rows, slot] = 0  # a fresh (possibly reclaimed) slot starts undug

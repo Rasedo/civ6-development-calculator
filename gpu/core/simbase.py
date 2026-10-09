@@ -1068,6 +1068,8 @@ _MUTABLE = [
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",
     "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_turns", "tribe_op_rec", "barb_unit_op", "barb_unit_fresh",
     "barb_spot_next",
+    # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
+    "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
     "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
     "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)

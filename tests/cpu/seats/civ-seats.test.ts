@@ -159,7 +159,7 @@ describe('civ district/tile registry coherence', () => {
     const civCity = civ.cities[0];
     setTileOwner(state.map.tiles[civCity.centerIndex], civ.seat, civCity.id + 999);
     expect(() => assertCityRegistryCoherent(state)).toThrow(/registry incoherence/);
-  });
+  }, 20_000); // eighty whole turns, the barbarians' AI in each
 
   it('the scan catches a district tile registered to a SIBLING civCity', () => {
     const state = makeState();

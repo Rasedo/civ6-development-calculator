@@ -94,7 +94,9 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Random Era for Antiquity Site': { owner: 'lacking', dll: '0x280140', n: [3, 0] },
   'Choosing Artifact': { owner: 'lacking', n: [0, 3] },
   // the AI's
-  'Random Direction': { owner: 'ai', n: [12754, 10982] },
+  // the barbarians' Wander Near Camp draws it in both engines; a
+  // city-state's units' moves are the driver's
+  'Random Direction': { owner: 'ai', cpu: 'wanderNearCamp', gpu: '_tac_pass', dll: '0x77b9a0', n: [12754, 10982] },
   'City Build District Choice': { owner: 'ai', n: [105, 171] },
   'BT Research Choice': { owner: 'ai', cpu: 'researchChoice', gpu: '_research_choice', dll: '0x763020', n: [108, 121] },
   'Random Civic Choice': { owner: 'ai', dll: '0x626600', n: [1, 0] },

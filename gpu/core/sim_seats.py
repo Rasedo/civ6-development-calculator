@@ -13796,6 +13796,11 @@ class SimSeats:
             self.barb_unit_scout[rows, nslot] = False
             self.barb_unit_op[rows, nslot] = False
             self.barb_unit_fresh[rows, nslot] = False
+            # a new unit to the barbarians' pool, its place taken at their
+            # next turn (`barbSlots`), and no camp's defender
+            self.barb_unit_slotno[rows, nslot] = -1
+            _ds = self.tribe_defender[rows]
+            self.tribe_defender[rows] = torch.where(_ds == nslot.unsqueeze(1), torch.full_like(_ds, -1), _ds)
         # `_carry_capture` brings `unit_emb` across, so the class the captive
         # files under is known by the time `_occ_set` asks.
         self._occ_clear(rows, tile, src)

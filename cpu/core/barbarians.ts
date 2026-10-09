@@ -299,7 +299,7 @@ export function raiseCamp(state: GameState, plot: number): void {
   const names = freeNames(state, def);
   const name = names.length ? names[randRange(state, names.length, 'Barb Tribe Roll')] : 0;
   const tribe = foundTribe(state, plot, name);
-  raise(state, tribe, def.defenderTag, 0, 1);
+  tribe.defender = raise(state, tribe, def.defenderTag, 0, 1)[0];
   tribe.scouts.push(...raise(state, tribe, def.scoutTag, 3, BARB_MAX_SCOUTS));
 }
 
@@ -622,6 +622,38 @@ export function barbHomingCamp(state: GameState, unit: Unit): number | undefined
 /** the camp is gone: its tribe is dead, kept in the list */
 export function tribeDies(state: GameState, plot: number): void {
   for (const tr of tribesOf(state)) if (tr.plot === plot && tr.alive) tr.alive = false;
+}
+
+/** the tribe that raised a unit (its defender, its units or its scouts) */
+export function tribeOf(state: GameState, id: number): BarbTribe | undefined {
+  return tribesOf(state).find((tr) => tr.defender === id || tr.units.includes(id) || tr.scouts.includes(id));
+}
+
+/**
+ * THE BARBARIANS' UNIT POOL (`BarbPool`): the slots of the units that were
+ * gone when their last turn ended go free, pushed in ascending order, and
+ * every barbarian unit without a slot takes one in the order it was made —
+ * the slot pushed last, else a new one. Run at the start of their turn and
+ * again after their camps raised their units.
+ */
+export function barbSlots(state: GameState): void {
+  const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
+  pool.free.push(...[...pool.dying].sort((a, b) => a - b));
+  pool.dying = [];
+  for (const u of state.units) {
+    if (!isBarbSeat(u.seat) || u.slot !== undefined) continue;
+    u.slot = pool.free.length ? pool.free.pop()! : pool.size++;
+  }
+}
+
+/** the barbarians' turn ends: the slots whose unit is gone wait for the
+ *  next turn to go free */
+export function barbSlotsDying(state: GameState): void {
+  const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
+  const held = new Set<number>();
+  for (const u of state.units) if (isBarbSeat(u.seat) && u.slot !== undefined) held.add(u.slot);
+  const free = new Set(pool.free);
+  for (let s = 0; s < pool.size; s++) if (!held.has(s) && !free.has(s)) pool.dying.push(s);
 }
 
 /**

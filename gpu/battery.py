@@ -824,6 +824,7 @@ def _main() -> int:
                 ("emergency", [py, "tests/gpu/emergency_test.py"], 2),  # the special session above the trigger: sponsorship, quiet window, forced war, both outcomes
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # the relic rides the MARTYR promotion, and the death draws nothing
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
+                ("barb_tactics", [py, "tests/gpu/barb_tactics_test.py"], 2),  # the pathfinder's order, the pool, defend, pillage, wander
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the seven suz-coded perks, strict-suzerain-only
                 ("minor_record", [py, "tests/gpu/minor_record_test.py"], 2),  # the resolved suzerain, the minor's research, its border, Containment, conversion
                 ("research_ai", [py, "tests/gpu/research_ai_test.py"], 2),  # the research AI: its value, its walk, its choice

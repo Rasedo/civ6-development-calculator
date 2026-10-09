@@ -301,7 +301,21 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
     row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
     techs = sim.barb_techs[b].nonzero().flatten().tolist()
     civics = sim.barb_civics[b].nonzero().flatten().tolist()
-    return row + [len(techs), *techs, len(civics), *civics]
+    row += [len(techs), *techs, len(civics), *civics]
+    # the unit pool (`barbSlots`): its size, its free slots, those waiting to
+    # go free, each unit's slot in unit order; each tribe's camp defender alive
+    nf = int(sim.barb_pool_nfree[b])
+    free = [int(x) for x in sim.barb_pool_free[b, :nf].tolist()]
+    dying = sim.barb_pool_dying[b].nonzero().flatten().tolist()
+    seat = sim.barb_unit_seat[b].tolist()
+    slotno = sim.barb_unit_slotno[b].tolist()
+    barb = int(sim._ROW_SEAT[sim.BARB_ROW])
+    slots = [int(n) for a, s, n in zip(alive, seat, slotno) if a and s == barb]
+    defs = []
+    for k in range(int(sim.n_tribes[b])):
+        d = int(sim.tribe_defender[b, k])
+        defs.append(1 if d >= 0 and alive[d] and seat[d] == barb else 0)
+    return row + [int(sim.barb_pool_size[b]), nf, *free, len(dying), *dying, len(slots), *slots, *defs]
 
 
 GAME = {

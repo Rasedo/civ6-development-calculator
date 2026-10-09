@@ -38,7 +38,9 @@ export type DrawLabel =
   | 'Engine: minor walk' | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
   | 'Engine: partisans' | 'Engine: breached dam'
   // the barbarians' turn
-  | 'Barbarian camp region placement' | 'Barbarian camp location' | 'Barb Tribe Roll' | 'Barbarian Ranged unit roll';
+  | 'Barbarian camp region placement' | 'Barbarian camp location' | 'Barb Tribe Roll' | 'Barbarian Ranged unit roll'
+  // a player's units' AI
+  | 'Random Direction';
 
 function step(state: GameState): number {
   const s = (Math.imul(LCG_MUL, state.rngState) + LCG_ADD) >>> 0;
@@ -65,6 +67,11 @@ let hooks: RngHooks | null = null;
  *  run free (null): outside a replay every hold is a no-op. */
 export function holdRng(h: RngHooks | null): void {
   hooks = h;
+}
+
+/** the hold in force (`holdRng`), null where the generator runs free */
+export function rngHold(): RngHooks | null {
+  return hooks;
 }
 
 /** the game's draw in [0, max): the new state's top 16 bits times max read

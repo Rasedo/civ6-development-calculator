@@ -254,10 +254,10 @@ def main() -> None:
 
     # THE CAMP STEP'S SIGHT counts the barbarians' own units
     clear_barbs(sim)
-    assert not bool(sim._barb_seen(False)[0, tile]), "the empty camp plot is in some player's sight"
+    assert not bool(sim._barb_seen("all")[0, tile]), "the empty camp plot is in some player's sight"
     camp(sim, tile)
-    assert bool(sim._barb_seen(False)[0, tile]), "the camp's own units do not see their plot"
-    assert not bool(sim._barb_seen(True)[0, tile]), "the majors' sight took the barbarians' units"
+    assert bool(sim._barb_seen("all")[0, tile]), "the camp's own units do not see their plot"
+    assert not bool(sim._barb_seen("majors")[0, tile]), "the majors' sight took the barbarians' units"
     print("  the camp step's sight takes the barbarians' own units")
 
     print("BARB CAMPS OK — the tribe's kind is its ground, it raises its units on its clock, it raids")

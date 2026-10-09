@@ -447,6 +447,8 @@ const GAME: Record<string, Extractor> = {
     const techs = r.techs.map((t) => idx(TECH_IDX, t)).sort((a, b) => a - b);
     const civics = r.civics.map((c) => idx(CIVIC_IDX, c)).sort((a, b) => a - b);
     const uidx = (id: string) => UNIT_INDEX[id] ?? -1;
+    const pool = s.barbPool ?? { size: 0, free: [], dying: [] };
+    const slots = s.units.filter((u) => u.seat === BARB_SEAT).map((u) => u.slot ?? -1);
     return [[s.barbCampsBegun ? 1 : 0, tribes.length, ...tribes.flatMap((t) => [t.plot, t.alive ? 1 : 0,
       BARB_TRIBES.findIndex((d) => d.kind === t.kind), t.name, t.spawnTurns, t.scoutTurns,
       t.units.filter((id) => live.has(id)).length, t.scouts.filter((id) => live.has(id)).length,
@@ -460,7 +462,11 @@ const GAME: Record<string, Extractor> = {
       t.op ? (t.op.assault ? 2 : 1) : 0, t.op?.target.seat ?? -1, t.op?.turns ?? 0, t.op?.recruited ? 1 : 0,
       t.op ? t.op.units.filter((id) => live.has(id)).length : 0]),
     ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0),
-    techs.length, ...techs, civics.length, ...civics]];
+    techs.length, ...techs, civics.length, ...civics,
+    // the unit pool (`barbSlots`): its size, its free slots, those waiting to
+    // go free, each unit's slot in unit order; each tribe's camp defender alive
+    pool.size, pool.free.length, ...pool.free, pool.dying.length, ...pool.dying, slots.length, ...slots,
+    ...tribes.map((t) => (t.defender !== undefined && live.has(t.defender) ? 1 : 0))]];
   },
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],

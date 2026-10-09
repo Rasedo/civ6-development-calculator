@@ -3546,6 +3546,119 @@ Contract %d").
   the log's — 1124 t2 Pottery 113.0 at 4 turns, the read terms 172.1); the
   terms marked unread above, the pseudo-yield weights first, are AUDIT C-96.
 
+## C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws
+
+`reachPlots` / `pathTo` in cpu/core/tactical.ts.
+
+- The pathfinder (Pathfinder_Instance; GeneratePath 0x77d10, one step
+  0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic
+  (the +0x30/+0x38 pair is null), so a node's key is its cost. The open list
+  (+0xf0 head, +0xf8 tail, doubly linked) is sorted by (f, g) (0x775a0): a
+  key below the head's goes first, above the tail's last; otherwise the
+  insertion scans from whichever end the key lies nearer in float (|key -
+  head| <= |key - tail| scans from the head and goes BEFORE its first equal,
+  else from the tail AFTER its last equal). A node re-keyed while open walks
+  toward the head past strictly greater keys (0x79560). The step pops the
+  head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in
+  DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1)
+  in the game's (x - y//2, y) — NE, E, SE, SW, W, NW), each the valid
+  callback admits (LinkChild 0x78750).
+- A step's turns and Movement (0x26e920, in 24.8 fixed point): a parent with
+  no Movement starts the next turn at the domain's full Movement; the step's
+  cost (Rules_Movement 0x531660..0x530240: the terrain's MovementCost, the
+  feature's and the improvement's MovementChange, MOVEMENT_RIVER_COST 2 over
+  a river, MOVEMENT_EMBARK_COST 2 over a shore, a route's own cost as a cap,
+  CITY_MOVEMENT_COST 1 into a city) above the Movement left waits for the
+  next turn (turns + 1, Movement 0), unless the parent is the unit's own plot
+  and the unit has not moved (flag 0x100: the step spends everything this
+  turn) or the parent began a turn (it spends everything); a zone of control
+  spends everything (0x26f980) — save under flag 0x800. Between two plots
+  the player never revealed (node +0x51 bit 0, 0x154c0) the step costs the
+  parent's or 1 and no rule runs.
+- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800
+  constant); where the step leaves no Movement +4, and on a revealed plot
+  then the 1e6 penalties (mountain, impassable) and +3 off the player's
+  territory; then +2 on a revealed plot, +3 on an unrevealed one. The
+  engines (`search`) read every plot as revealed: +2 a step, and where it
+  leaves no Movement +4 and +3 more off the unit's own territory; the
+  impassable plots never link.
+- The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the
+  breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100
+  where the unit has not moved; the valid wrapper 0x26e570 refuses a node
+  past the turn limit): the list at planning +0x30 (16-byte entries x, y,
+  turns, Movement) is filled by the NotifyList callback 0x26d890 when a node
+  CLOSES (code 3), so it holds the plots in the order Dijkstra closes them,
+  the unit's own plot first; a plot met again keeps its place and takes the
+  fewer turns, or at equal turns the more Movement (0x790c60). The planning
+  runs once for every unit at the start of the AI's turn. Flag 0x800 skips
+  the zone of control: the reach walks through it.
+
+Confirmed on the game's Wander draws (below): the order of the plots the
+draw indexes, over 29 duels, reproduces the logged pick on 98% of the rows
+whose state the records pin (`.claude` analysis `wander.ts`); the misses
+are rows whose unit acted earlier in its turn (a pillage) or stood where
+the records do not show it.
+
+## C-95: the tactical pass — READ (the barbarians' moves; the minors share it)
+
+- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240,
+  0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the
+  moves (0x770ce0) in the order of the player's AiFavoredItems tactical list
+  (Tactics.xml "Default Barbarian": Barbarian Rampage, Attack High
+  Priority, Defend Camps, Attack Civilians, Plunder Trader, Coastal Raid,
+  Pillage District, Pillage Improvement, Attack Medium Priority, Move to
+  Safety, Attack Low Priority, Chase Target, Wander Near Camp); each move
+  walks the units left, and the units a move used (+0x258) leave the list
+  after it. The homeland list ("Default Barbarian HL": Plunder Trader, Move
+  to Safety, Explore Land, End Turn) takes what is left. The moves' globals
+  (0x5bbf80, AllowedMoves hashes): f2e0f4 Move to Safety, f2e100/104/108
+  Attack High/Medium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT),
+  f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010),
+  f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then
+  0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement /
+  District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near
+  Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage
+  (0x778b40).
+- The unit list's order is the player's unit pool's: a unit's ID is its
+  serial << 16 | its slot, and a turn's rows of one move run in ascending
+  slot (every Wander row of 1117, 1124 and 1128). The pool is a free list:
+  a unit gone frees its slot at the next turn, the slots freed in a turn
+  pushed in ascending order, and a new unit takes the slot last pushed, else
+  a new one past the end (every barbarian unit added in 1105, 1117, 1121,
+  1124, 1127, 1128 to turn 250).
+- A unit's AI type (+0x1c0, UnitAiTypes: 2 EXPLORE, 3 COMBAT, 4 DEFENDER):
+  a tribe's camp defender DEFENDER, its scouts EXPLORE, the rest COMBAT; a
+  camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
+- Wander Near Camp (0x77b9a0): each unit of AI type above EXPLORE with a
+  tribe (+0x11d0) whose camp stands (0x771250): from its planning reach, the
+  plots of turns 1 with no unit at war with it (0x5862e0) and none of its
+  own stacking with it (0x585eb0, the unit itself counted: its own plot is
+  never one), within 5 of the camp and, where the camp plot belongs to a
+  city, of that city's; one "Random Direction" draw over their COUNT — the
+  weights the loop builds (influence and revealed) are never read — and the
+  unit moves to the plot drawn ("Wander"); with none, it moves toward its
+  camp ("Wander Back to Camp", mission flag 0x1000). The unit's turn ends
+  (0x56d6f0, 0x570b40).
+- Defend Camps (0x779010): each TARGET_BARBARIAN_CAMP target, the units of
+  AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp
+  ("Barb. Camp Defense", AT the camp). The engines take the first by pool
+  slot: a camp keeps one DEFENDER, the unit it raised first.
+- Pillage District / Pillage Improvement (0x77a810): each target of the
+  kind in the tactical target list (0x783980, PARTLY READ: the visible plots
+  in index order; the engines take the plots the barbarians see, in plot
+  order) on the ground of a player at war with them — a complete district
+  but a city centre or an Encampment, else an unpillaged improvement — the
+  units of AI type EXPLORE or above whose planning reaches it this turn
+  (0x775340, 1 turn) in pool order, none standing on a plot of the kind
+  itself (0x774380), go to it until one stands on it and pillages it.
+- Barbarian Rampage (0x778b40): the tribes whose camp was destroyed
+  (0x152df0: tribe +0x18 clear, +0x1c the player whose unit took the camp,
+  set by the camp's removal 0x154830); each of their units goes after that
+  player's targets in the tactical target list — the nearest its planning
+  can attack this turn, else the nearest it can reach — through 0x771670;
+  with none, toward the nearest of the player's cities its tribe waited to
+  raid or assault (0x1479e0) ("Chasing target", 0x775c60).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

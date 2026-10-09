@@ -42,7 +42,7 @@ import { cityLook, isExplored } from './fog';
 import { wipeConstruction } from './production';
 import {
   XP_BARB_VETERAN, XP_CITY_ATTACK, XP_CITY_DEFEND, XP_CITY_FELLED,
-  attacksLeftOf, attacksPerTurn,
+  attacksLeftOf,
   bankXp, battleXp, cityXp, holdTheLineCS, promoCS, promoFlag,
   promoStackMult, promoValue, unitLevel, unitXpPct, type PromoCtx,
   promoClassOf,
@@ -66,7 +66,7 @@ import { unitKillEvent, campMoment } from './eras';
 import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
-import { barbarianOps, barbarianRules, barbBattleBoldness, barbHomingCamp, tribeDies } from './barbarians';
+import { barbBattleBoldness, barbHomingCamp, tribeDies } from './barbarians';
 import { questCampCleared } from './quests';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -2989,10 +2989,6 @@ export function captureCityStateFor(state: GameState, actor: Seat, cityState: Ci
   state.eventLog.push(`${cityState.name} has been conquered by ${actor.name}!`);
 }
 
-function barbUnits(state: GameState): Unit[] {
-  return state.units.filter((u) => isBarbSeat(u.seat));
-}
-
 export function hostileUnitAct(state: GameState, unit: Unit): void {
   // a civilian the barbarians took holds where it stands
   if (unitDomain(unit.type) !== 'military') return;
@@ -3162,61 +3158,4 @@ function marchOn(state: GameState, unit: Unit, target: Tile, marchOnto: boolean)
     // _in_enemy_zoc_barb, so both engines stay symmetric. No new draws.
     if (stepUnit(state, unit, step) !== 'moved') return;
   }
-}
-
-/** THE ACTION REPLAY'S HOLD on the barbarians' turn: the replay lands the
- *  other players' actions of the turn after the engine's turn, and the
- *  barbarians close the turn after those actions, so the replay runs their
- *  rules there (`barbarianRules`) and their units' moves and battles are
- *  the record's; the hold takes the engine's barbarian turn. Null outside a
- *  replay. */
-let barbHold: ((state: GameState) => void) | null = null;
-let barbRelease: ((state: GameState) => void) | null = null;
-export function holdBarbarians(fn: ((state: GameState) => void) | null, release: ((state: GameState) => void) | null = null): void {
-  barbHold = fn;
-  barbRelease = release;
-}
-
-/** the hold's second half, once the turn's end (its random events, its
- *  climate) has struck the map the barbarians' turn left: what the hold
- *  keeps of their units leaves the engine's turn there. Nothing outside a
- *  replay. */
-export function releaseBarbarians(state: GameState): void {
-  barbRelease?.(state);
-}
-
-/**
- * THE BARBARIANS' TURN: the game's rules for them (`barbarianRules`: their
- * techs, the camp step, each tribe's turn), then their units' AI — the
- * driver's stand-in: one guard stays on each camp, every other unit with
- * moves acts (`hostileUnitAct`).
- */
-export function barbarianPhase(state: GameState): void {
-  if (barbHold) {
-    barbHold(state);
-    return;
-  }
-  barbarianRules(state, state.turn);
-  const map = state.map;
-  for (const u of state.units) {
-    if (!isBarbSeat(u.seat)) continue;
-    u.movesLeft = unitFullMoves(state, u) + generalAuraMP(state, u);
-    u.movesFull = u.movesLeft;
-    u.attacksLeft = attacksPerTurn(u);
-  }
-  const guards = new Set<number>();
-  for (const campIdx of state.barbSeat.camps) {
-    const camp = map.tiles[campIdx];
-    const guard = barbUnits(state).find(
-      (u) =>
-        !guards.has(u.id) && unitDomain(u.type) === 'military' &&
-        hexDistance(state.map, map.tiles[u.tileIndex].col, map.tiles[u.tileIndex].row, camp.col, camp.row) <= 1,
-    );
-    if (guard) guards.add(guard.id);
-  }
-  for (const unit of barbUnits(state)) {
-    if (guards.has(unit.id) || unit.movesLeft <= 0) continue;
-    hostileUnitAct(state, unit);
-  }
-  barbarianOps(state);
 }

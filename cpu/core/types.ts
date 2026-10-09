@@ -556,6 +556,8 @@ export interface GameState {
   /** the barbarian tribes, one a camp ever raised, the dead ones kept
    *  (`cpu/core/barbarians.ts`) */
   barbTribes?: BarbTribe[];
+  /** the barbarians' unit pool (`barbSlots`) */
+  barbPool?: BarbPool;
   /** the camp step has added camps once: every later step adds one */
   barbCampsBegun?: boolean;
   /** per player (seat), the first turn a barbarian scout may report one of
@@ -586,6 +588,9 @@ export interface BarbTribe {
   /** the ids of the units and scouts it raised */
   units: number[];
   scouts: number[];
+  /** the camp's defender it raised first (the AI's DEFENDER while the camp
+   *  stands, which keeps the camp) */
+  defender?: number;
   /** the units it raised in its last turn, which its operation cannot take
    *  in the same turn */
   fresh?: number[];
@@ -740,6 +745,22 @@ export interface Unit {
    * at EMBARK_MOVES, cannot fortify/exert ZOC, and defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */
   embarked?: boolean;
+  /** a barbarian unit's place in its player's unit pool (`BarbPool`): the
+   *  order the AI walks the barbarians' units in */
+  slot?: number;
+}
+
+/** THE BARBARIANS' UNIT POOL (the player's unit list, a free list): a unit
+ *  gone frees its slot at the next barbarian turn, the slots freed together
+ *  pushed in ascending order; a new unit takes the slot pushed last, else a
+ *  new slot past the end (`barbSlots`). */
+export interface BarbPool {
+  /** slots ever used */
+  size: number;
+  /** freed slots, the last pushed last */
+  free: number[];
+  /** slots whose unit was gone when the barbarians' last turn ended */
+  dying: number[];
 }
 
 export interface Seat {

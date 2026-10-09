@@ -3118,7 +3118,7 @@ class SimPhase:
                    if n.startswith(f"{prefix}_unit_") and n not in fields and n != f"{prefix}_unit_alive"
                    and getattr(self, n).dim() >= 2 and tuple(getattr(self, n).shape[:2]) == (B, U)]
         # the planes that hold one of this pool's slot numbers, remapped by value
-        maps: list = ["tribe_home_slot"] if prefix == "barb" else []
+        maps: list = ["tribe_home_slot", "tribe_defender"] if prefix == "barb" else []
         perm = torch.argsort((~alive).long(), dim=1, stable=True)
         inv = torch.empty_like(perm)
         inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))

@@ -248,6 +248,8 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   else if (tile.feature === 'GOBUSTAN') cost += MP_SCALE;
   // CIV6 (Expansion1_Features_Major.xml): FEATURE_UBSUNUR_HOLLOW MovementChange 1
   else if (tile.feature === 'UBSUNUR_HOLLOW') cost += MP_SCALE;
+  // CIV6 (Features.xml): FEATURE_PANTANAL MovementChange 1
+  else if (tile.feature === 'PANTANAL') cost += MP_SCALE;
   return cost;
 }
 
@@ -416,6 +418,8 @@ export function reseatUnit(state: GameState, unit: Unit, seat: number): void {
   unit.seat = seat;
   unit.movesLeft = 0;
   unit.fortifyTurns = 0;
+  // a new owner's pool takes it as a new unit (`barbSlots`)
+  delete unit.slot;
   state.units = state.units.filter((u) => u.id !== unit.id);
   state.units.push(unit);
 }
@@ -924,6 +928,21 @@ export function embarkTechMoves(state: GameState, seat: number): number {
  * differ — candidate sets, occupancy tests, stop conditions — and those stay
  * injected at the call site rather than flagged in here.
  */
+/** What one step from `from` into its neighbour `to` costs this unit, in
+ *  MP_SCALE units: the tile's own cost plus a river crossing, or, crossing
+ *  the shore, the embark penalty in place of the river. */
+export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number }, from: Tile, to: Tile): number {
+  const naval = !!UNITS[unit.type]?.naval;
+  const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
+  if (!transition) return moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
+  const wEnd = isWater(to) ? to : from;
+  const lEnd = isWater(to) ? from : to;
+  const easyDock = wEnd.district === 'HARBOR'
+    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
+    || ignoresShores(state, unit);
+  return moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP);
+}
+
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;
   // a formed civilian has no step of its own: the formation moves as one, and
@@ -938,14 +957,7 @@ export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const full = unit.movesFull ?? unitFullMoves(state, unit);
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
   if (cliffBlocksStep(state, from, to, unit)) return 'blocked';
-  const wEnd = isWater(to) ? to : from;
-  const lEnd = isWater(to) ? from : to;
-  const easyDock = wEnd.district === 'HARBOR'
-    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
-    || ignoresShores(state, unit);
-  const cost = transition
-    ? moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP)
-    : moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit); // roads
+  const cost = stepCost(state, unit, from, to);
   if (unit.movesLeft < cost && unit.movesLeft < full) return 'cantAfford';
   // THE FORMATION MOVES AS ONE — and no further than its slowest member,
   // unless the escort carries Escort Mobility.

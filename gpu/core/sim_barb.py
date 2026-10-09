@@ -35,17 +35,20 @@ class SimBarb:
 
     # ------------------------------------------------------------- the sight
 
-    def _barb_seen(self, majors_only: bool) -> torch.Tensor:
-        """[B, T] bool — `plotsSeenNow`: what the majors (`majors_only`), or
-        every living player, the barbarians included (`allSeers`), see now —
-        each unit's sight across the plots its line reaches, each city centre
-        two plots round, each owned plot with its ring."""
+    def _barb_seen(self, who: str) -> torch.Tensor:
+        """[B, T] bool — `plotsSeenNow`: what the majors (`who` "majors"),
+        every living player, the barbarians included ("all", `allSeers`), or
+        the barbarians alone ("barbarians") see now — each unit's sight across
+        the plots its line reaches, each city centre two plots round, each
+        owned plot with its ring."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
         def seer(seat: torch.Tensor) -> torch.Tensor:
-            if majors_only:
+            if who == "majors":
                 return (seat >= 0) & (seat < self.n_majors)
+            if who == "barbarians":
+                return seat == BARB_SEAT
             return seat >= 0
 
         live = self.unit_alive & seer(self.unit_seat)
@@ -185,6 +188,7 @@ class SimBarb:
         self.tribe_raidq[rows, k[rows]] = -1
         self.tribe_assq[rows, k[rows]] = -1
         self.tribe_home_slot[rows, k[rows]] = -1
+        self.tribe_defender[rows, k[rows]] = -1
         self.tribe_home_seat[rows, k[rows]] = -1
         self.tribe_saw[rows, k[rows]] = False
         self.tribe_op[rows, k[rows]] = 0
@@ -203,7 +207,8 @@ class SimBarb:
     def _barb_raise_camp(self, mask: torch.Tensor, plot: torch.Tensor) -> None:
         """`raiseCamp`: the camp's tribe, named by "Barb Tribe Roll" over the
         kind's names no tribe took (else those only dead tribes took), raises
-        its defender on the camp and its scouts within three plots."""
+        its defender on the camp (`tribe_defender`) and its scouts within
+        three plots."""
         if not bool(mask.count_nonzero()):
             return
         kind = self._barb_tribe_kind(plot)
@@ -225,7 +230,10 @@ class SimBarb:
         tr = self._bb["tribes"]
         dtag = torch.tensor([r[8] for r in tr], dtype=torch.long, device=self.device).take(kind)
         stag = torch.tensor([r[5] for r in tr], dtype=torch.long, device=self.device).take(kind)
+        before = self.next_slot.clone()
         self._barb_raise(mask, k, dtag, 0, 1, scout=False, track=False)
+        got = (self.next_slot > before).nonzero(as_tuple=True)[0]
+        self.tribe_defender[got, k[got]] = before[got]
         self._barb_raise(mask, k, stag, 3, int(self._bb["maxScouts"]), scout=True)
 
     def _barb_camp_step(self) -> None:
@@ -239,7 +247,7 @@ class SimBarb:
         go = self.n_camps < mx
         if not bool(go.count_nonzero()):
             return
-        seen_maj = self._barb_seen(True)
+        seen_maj = self._barb_seen("majors")
         land = ~self.water
         nland = land.sum(dim=1)
         dark = (land & ~seen_maj).sum(dim=1)
@@ -250,7 +258,7 @@ class SimBarb:
         go = go & (add > 0)
         if not bool(go.count_nonzero()):
             return
-        seen = self._barb_seen(False)
+        seen = self._barb_seen("all")
         # the camp's ground: open land of its terrains, bare or under its
         # features, no resource, nothing built
         terr_ok = torch.zeros_like(land)

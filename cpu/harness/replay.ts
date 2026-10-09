@@ -28,14 +28,15 @@
  * from its player's witness, the random-event step and each labelled draw
  * from the game's draw log where the recording kept it.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type { BarbTribe, City, CityState, DistrictId, GameState, QueueItem, Seat, SeatActionRecord, Unit } from '../core/types';
 import { hexDistance, neighbors } from '../../world/hex';
 import { isWater } from '../../world/query';
 import { NO_SEAT, type Governor } from '../core/types';
 import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, unitStepCost, unitsAcquired, buildingPurchaseCost,
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
-  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs } from '../core/game';
+  purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
+  serialize, deserialize } from '../core/game';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
   placeSeatDistrict, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
@@ -52,8 +53,9 @@ import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '.
 import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
-import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, holdBarbarians, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
+import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
+import { barbarianTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
+import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -81,7 +83,7 @@ import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, ne
 import { replayEvents } from './eventReplay';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
-import { holdRng } from '../core/rand';
+import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash } from './aliases';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
@@ -146,6 +148,11 @@ interface Ctx {
   /** the record's new barbarian units of this pair, which the barbarians'
    *  rules close it with (`barbarianTurn`) */
   barbNew: string[];
+  /** the game's tactical log: per turn, per barbarian unit ID, the first
+   *  move it took, and the turn's Wander rows (`loadTactical`) */
+  tactical?: Tactical;
+  /** the barbarians' moves against the game's, by the game's move */
+  barbTally: Record<string, BarbTally>;
   /** the players' envoys of this pair that land after its moves (`settleEnvoys`) */
   lateEnvoys: EnvoyDecision[];
   /** the game's draw log, where the recording kept it */
@@ -329,7 +336,7 @@ function spawnRecorded(ctx: Ctx, rec: TurnRecord, key: string): Unit | undefined
 function adoptByTribe(state: GameState, u: Unit): void {
   const def = UNITS[u.type];
   const tribes = state.barbTribes ?? [];
-  if (!def || tribes.some((tr) => tr.alive && (tr.scouts.includes(u.id) || tr.units.includes(u.id)))) return;
+  if (!def || tribes.some((tr) => tr.alive && (tr.defender === u.id || tr.scouts.includes(u.id) || tr.units.includes(u.id)))) return;
   const scout = !!def.recon || (!!def.naval && !def.ranged);
   const at = state.map.tiles[u.tileIndex];
   let best: BarbTribe | undefined;
@@ -341,6 +348,11 @@ function adoptByTribe(state: GameState, u: Unit): void {
     if (d < bd) [bd, best] = [d, tr];
   }
   if (!best) return;
+  // the unit standing on a camp that keeps no defender is its defender
+  if (!scout && u.tileIndex === best.plot && best.defender === undefined) {
+    best.defender = u.id;
+    return;
+  }
   // a galley is a naval tribe's scout where it lacks one, else its unit
   if (scout && (def.recon || !best.scouts.some((id) => state.units.some((x) => x.id === id)))) best.scouts.push(u.id);
   else {
@@ -351,13 +363,21 @@ function adoptByTribe(state: GameState, u: Unit): void {
 
 /**
  * THE BARBARIANS CLOSE THE PAIR: after every player's actions of the turn
- * (the record's, landed), their rules run (`barbarianRules`: their techs,
- * the camp step, each tribe's turn, on the barbarian player's own stream);
- * the units their tribes raise are the record's new barbarian units where
- * they match by type, nearest first. A record unit no tribe raised is the
- * record's, and a unit a tribe raised that the game did not is unmade. Their
- * operations then take their turn (`barbarianOps`: the scouts' reports, the
- * raids' recruits).
+ * (the record's, landed), their unit pool takes the game's slots (each unit
+ * the replay maps in its ID's low 16 bits, `barbSlots`) and their rules run
+ * (`barbarianRules`: their techs, the camp step, each tribe's turn, on the
+ * barbarian player's own stream); the units their tribes raise are the
+ * record's new barbarian units where they match by type, nearest first. A
+ * record unit no tribe raised is the record's, and a unit a tribe raised that
+ * the game did not is unmade. Their units' AI then takes its turn from where
+ * the pair's first record holds them (`barbarianTactics`), and each unit's
+ * move is set beside the game's tactical log and record t+1 (`tallyTactics`):
+ * a unit that ends where the record holds it took the game's move, one that
+ * does not stands where the record holds it (`barb:move`, imposed). The AI
+ * runs on a copy of the state, so a move it took that the game did not (a
+ * blow, a pillage) leaves no trace: the record's battles and pillages are the
+ * pair's. Their operations then take their turn (`barbarianOps`: the scouts'
+ * reports, the raids' recruits).
  */
 function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   const { state } = ctx;
@@ -374,7 +394,17 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     moved.set(u, u.tileIndex);
     u.tileIndex = at;
   }
+  const slotOfKey = (key: string) => Number(key.split(':')[1]) & 0xffff;
+  const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
+  for (const [key, u] of ctx.units) {
+    if (!isBarbSeat(u.seat) || !state.units.includes(u)) continue;
+    u.slot = slotOfKey(key);
+    pool.size = Math.max(pool.size, u.slot + 1);
+  }
+  barbSlots(state);
   barbarianRules(state, closing);
+  // where the pair's first record holds each unit its moves took off
+  const from = new Map([...moved.keys()].map((u) => [u, u.tileIndex] as const));
   for (const [u, at] of moved) u.tileIndex = at;
   matchNewUnits(ctx, b);
   for (const key of ctx.barbNew) {
@@ -389,7 +419,112 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
     disbandUnit(state, u.id);
     count(ctx, 'barb:unit', 'fallback', ctx.playerOfSeat.get(BARB_SEAT));
   }
+  for (const [key, u] of ctx.units) {
+    if (isBarbSeat(u.seat) && !before.has(u) && state.units.includes(u)) u.slot = slotOfKey(key);
+  }
+  barbSlots(state);
+  barbarianAi(ctx, b, closing, before, from);
   barbarianOps(state);
+  barbSlotsDying(state);
+}
+
+/** THE BARBARIANS' UNIT AI on a copy of the state, the units that stood
+ *  before their camps raised this turn's back where the pair's first record
+ *  holds them (`from`, else where they stand): its moves tallied
+ *  (`tallyTactics`) */
+function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlySet<Unit>, from: ReadonlyMap<Unit, number>): void {
+  const { state } = ctx;
+  const copy = deserialize(serialize(state));
+  const twin = new Map<Unit, Unit>();
+  state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  for (const [c, u] of twin) {
+    const at = from.get(u);
+    if (at !== undefined) c.tileIndex = at;
+  }
+  refreshBarbarians(copy);
+  // the AI's "Random Direction" draws are the game's: the barbarians take the
+  // turn's last ones, one a Wander row of the game's tactical log in its
+  // order; a unit the game wandered draws its own, one it did not runs free
+  const log = ctx.log;
+  const rd: number[] = [];
+  if (log) log.draws.forEach((d, i) => { if (d.turn === closing && d.label === 'Random Direction') rd.push(i); });
+  const ids = ctx.tactical?.wanders.get(closing) ?? [];
+  const theirs = rd.slice(Math.max(0, rd.length - ids.length));
+  const drawOf = new Map<number, number>();
+  ids.slice(ids.length - theirs.length).forEach((id, k) => drawOf.set(id, theirs[k]));
+  const idOf = new Map<Unit, number>();
+  for (const [key, u] of ctx.units) if (isBarbSeat(u.seat)) idOf.set(u, Number(key.split(':')[1]));
+  const held = rngHold();
+  holdRng({
+    point: (st, point) => (st === copy ? undefined : held?.point(st, point)),
+    draw: (st, max, label) => {
+      if (st !== copy) { held?.draw(st, max, label); return; }
+      const c = tacticsDrawing();
+      const u = c ? twin.get(c) : undefined;
+      const j = u ? drawOf.get(idOf.get(u) ?? -1) : undefined;
+      if (log && label === 'Random Direction' && j !== undefined) st.rngState = log.stateAt(j);
+    },
+  });
+  const moves = new Map<Unit, { move: string; plot: number }>();
+  traceTactics((c, move, plot) => {
+    const u = twin.get(c);
+    if (u) moves.set(u, { move, plot });
+  });
+  try {
+    barbarianTactics(copy, new Set([...before].map((u) => u.id)));
+  } finally {
+    traceTactics(null);
+    holdRng(held);
+  }
+  const ended = new Map<Unit, number>();
+  for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
+  tallyTactics(ctx, b, closing, moves, ended);
+}
+
+/** the game's tactical log's category for a barbarian unit's move, the
+ *  homeland's several Explore rows as one */
+function tacticalCategory(cat: string): string {
+  return cat.startsWith('HL: Explore') ? 'HL: Explore' : cat;
+}
+
+/**
+ * THE BARBARIANS' MOVES against the game's: per unit the AI moved, its move
+ * beside the first row the game's tactical log (`AI_Tactical.csv`, the
+ * barbarian player's rows of the turn) holds for it — an operation's units
+ * hold none — and the plot it ended on (`ended`) beside record t+1's: the
+ * game's move taken (`barb:move` applied), or the record's imposed. Tallied
+ * by the game's move, with the first turn the engine's differed.
+ */
+function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
+  ended: ReadonlyMap<Unit, number>): void {
+  const keyOf = new Map<Unit, string>();
+  for (const [key, u] of ctx.units) keyOf.set(u, key);
+  const rows = ctx.tactical?.first.get(turn);
+  const at = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  for (const [u, m] of moves) {
+    const key = keyOf.get(u);
+    if (!key) continue;
+    const id = Number(key.split(':')[1]);
+    const game = rows ? tacticalCategory(rows.get(id) ?? 'Operation') : undefined;
+    const t = (ctx.barbTally[game ?? m.move] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
+    t.units += 1;
+    const same = game === undefined || game === tacticalCategory(m.move);
+    if (same) t.move += 1;
+    if (!same && t.firstMove === undefined) t.firstMove = turn;
+    const want = at.get(key);
+    const end = ended.get(u);
+    if (want === undefined || end === undefined) continue;
+    t.plotOf += 1;
+    if (end === want) {
+      t.plot += 1;
+      count(ctx, 'barb:move', 'applied');
+    } else {
+      if (t.firstPlot === undefined) t.firstPlot = turn;
+      count(ctx, 'barb:move', 'fallback', ctx.playerOfSeat.get(BARB_SEAT), `${game ?? m.move}: the AI's ${end}, the game's ${want}`);
+    }
+    // REPLAY_TRACE=tactics: each barbarian's move beside the game's
+    if (TRACE.has('tactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
+  }
 }
 
 /** A battle's unit set on the plot the log's steps had it: another unit of
@@ -2106,7 +2241,7 @@ const IMPOSES_ON: Record<string, readonly string[]> = {
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
   'draw:camps': ['plots.improvement', 'barb.camps'],
-  'barb:unit': UNITS_SUBS, 'barb:unitNew': UNITS_SUBS,
+  'barb:unit': UNITS_SUBS, 'barb:unitNew': UNITS_SUBS, 'barb:move': UNITS_SUBS,
   'draw:floodRiver': [...UNITS_SUBS, 'plots.feature', 'read.plot.yields'],
   // a village paid as the record paid it: its Gold, Faith, boosts, citizen,
   // the unit's price climb, its moment and the hut's plot
@@ -2157,6 +2292,9 @@ export interface ReplayReport {
    *  inference's, and how many of the log's the inference named alike */
   settled: Record<string, LogTally>;
   perTurn: ReplayTurn[];
+  /** the barbarians' moves against the game's tactical log, by the game's
+   *  move (`tallyTactics`) */
+  barbTactics: Record<string, BarbTally>;
   /** where the replay stopped short of the last record, and why */
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
@@ -2165,6 +2303,46 @@ export interface ReplayReport {
   researchAi: Record<'major' | 'minor', ResearchAiTally>;
   /** the research AI's analysis against the game's AI log (`ResearchScoreTally`) */
   researchScores: Record<'major' | 'minor', ResearchScoreTally>;
+}
+
+/** one game move's tally (`tallyTactics`): the unit-turns, those the AI
+ *  moved by the same move, those whose end plot the record holds and those
+ *  it matched, the first turn each differed */
+export interface BarbTally {
+  units: number;
+  move: number;
+  plotOf: number;
+  plot: number;
+  firstMove?: number;
+  firstPlot?: number;
+}
+
+/** the game's tactical log of the barbarians: per turn, per unit ID, its
+ *  first row's move; per turn, the units of its Wander rows in their order */
+interface Tactical {
+  first: Map<number, Map<number, string>>;
+  wanders: Map<number, number[]>;
+}
+
+/** the game's tactical log beside a dump (`<dump>.logs/AI_Tactical.csv`) */
+function loadTactical(dumpPath: string): Tactical | undefined {
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Tactical.csv');
+  if (!existsSync(path)) return undefined;
+  const out = new Map<number, Map<number, string>>();
+  const wanders = new Map<number, number[]>();
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const f = line.split(', ');
+    if (f.length < 6 || f[1] !== '63') continue;
+    const m = /\((\d+)\)/.exec(f[5]);
+    if (!m) continue;
+    const turn = Number(f[0]);
+    const id = Number(m[1]);
+    if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
+    let t = out.get(turn);
+    if (!t) out.set(turn, (t = new Map()));
+    if (!t.has(id)) t.set(id, f[2]);
+  }
+  return { first: out, wanders };
 }
 
 /** the per-turn step check that reads each state subsystem */
@@ -2210,7 +2388,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const combat = loadCombatLog(dumpPath, recs.flatMap((r) => (r.witness ?? []).flatMap((w) => (typeof w.seed === 'number' ? [w.seed] : []))));
   if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
-    researchAi: { major: newResearchTally(), minor: newResearchTally() }, researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } } };
+    researchAi: { major: newResearchTally(), minor: newResearchTally() }, researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } }, barbTactics: {} };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
@@ -2243,6 +2421,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
+    tactical: loadTactical(dumpPath), barbTally: report.barbTactics,
   };
   // the record's units in the importer's order
   let k = 0;
@@ -2638,6 +2817,15 @@ export function replayMarkdown(r: ReplayReport): string {
   for (const [k, x] of Object.entries(r.researchScores ?? {})) {
     const f = x.first;
     out.push(`| ${k} | ${x.rows} | ${x.turns} | ${x.score} | ${f ? `t${f.turn} p${f.player} ${f.tech} ${JSON.stringify(f.log)} / ${JSON.stringify(f.ours)}` : '-'} |`);
+  }
+  if (Object.keys(r.barbTactics).length) {
+    out.push('', '## The barbarians\' moves', '', 'Per move of the game\'s tactical log (`AI_Tactical.csv`, an operation\'s units "Operation"):',
+      'the unit-turns the engine\'s AI moved from the pair\'s first record, those it moved by the same move, the end plots',
+      'record t+1 holds and those it matched (`barb:move`), and the first turn each differed.', '',
+      '| game move | unit-turns | same move | first other | end plots | matched | first off |', '|---|---:|---:|---:|---:|---:|---:|');
+    for (const [k, t] of Object.entries(r.barbTactics).sort(([, x], [, y]) => y.units - x.units)) {
+      out.push(`| ${k} | ${t.units} | ${t.move} | ${t.firstMove ?? '-'} | ${t.plotOf} | ${t.plot} | ${t.firstPlot ?? '-'} |`);
+    }
   }
   out.push('', '## Decisions', '',
     '| kind | applied | imposed (fell back to the record) | refused |', '|---|---:|---:|---:|');
