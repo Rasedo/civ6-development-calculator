@@ -17,9 +17,17 @@ by one scripted decision server (`policy/`), verified against each other by
   read from the install and the DLL and ported, so a free run plays as the
   real game does and fidelity is compared end to end. In training the
   majors are RL agents in symmetric play and everything else is the ported
-  Civ 6 environment; our scripted driver (`policy/`) goes once the port
-  drives every party. What must survive is the interface RL agents act and
-  observe through.
+  Civ 6 environment. Where each part lives (owner 2026-10-09): the
+  barbarians', city-states' and Free Cities' AI runs in BOTH twins (it
+  runs inside training on the GPU state); the majors' AI is ONE TS
+  implementation (`ai/major/`, against the engine's query interface),
+  never ported to the GPU — in training the RL agents replace it. The plug
+  point is the per-seat ACTION format: the majors' AI and an RL agent emit
+  the same actions and the engine applies either, so a seat swaps between
+  them by setup alone; the battery relays the majors' AI actions to the
+  GPU lane through that path. Our scripted driver (`policy/`) and the
+  neutral observation it reads go once the port drives every party; the
+  RL observation and masks are built at RL prep.
 - **Delete, don't preserve.** No shims, aliases, re-exports, fallbacks,
   "legacy" paths or historical names. When two paths disagree, keep the one
   that deletes code. Tests written for one whim are disposable.
