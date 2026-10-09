@@ -75,7 +75,7 @@ import { riverReach, riverShield } from '../core/disasters';
 import { AGE_GOLDEN, DED_COINAGE, DED_FREE_INQUIRY, DED_MONUMENTALITY, DED_PEN_BRUSH_AND_VOICE, goldShortfall } from '../data/seats';
 import { SRC_REGISTRY } from '../data/provenance';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
-import { engineId, gameHash } from './aliases';
+import { engineId, gameHash } from '../data/aliases';
 import { GOODY_SUBTYPES, type GoodySubType } from '../data/goodyHuts';
 import { unitPromoRows } from '../core/promotions';
 import { GOVERNMENTS, POLICIES } from '../data/policies';

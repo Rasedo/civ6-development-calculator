@@ -21,7 +21,7 @@
  */
 import { hexDistance } from '../../world/hex';
 import { UNITS } from '../data/units';
-import { gameHash } from './aliases';
+import { gameHash } from '../data/aliases';
 import { bool, num, plotAt, P, type Catalog, type DumpCity, type DumpPlayer, type DumpQueueEntry, type TurnRecord } from './record';
 import type { CombatRow } from './randLog';
 

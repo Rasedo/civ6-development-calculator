@@ -3746,6 +3746,147 @@ it, so its requirement fails in the analysis (0x6cf3c0's evaluation of it
 unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490
 ...) are unread.
 
+## C-97: the government and policy choice — the choice READ, the values PARTLY READ
+
+The policy AI (the player AI's civics part, the object 0x620110 runs on;
+its log AI_GovtPolicies.csv). Check: `dll_govtpolicies.py` (the choice on
+the logged scores), the action replay's majors' AI section
+(`cpu/harness/majorAi.ts`). Port: `ai/major/` (TS only).
+
+- The lists. Civics at +0x978 (0x50 each: +0x14 score, +0x18 turns; the
+  "Civic" lines, logged while turns >= 0); policies at +0x9e8 in DATABASE
+  ORDER (0x50 each, filled by 0x624060: +0x28 the policy, +0x2c its slot
+  type, +0x30 / +0x31 Policies_XP1 RequiresDarkAge / RequiresGoldenAge,
+  +0x34 / +0x38 the era bounds, +0x48 the score); 0x6255f0 logs every
+  score above 0 ("Policies"). Every logged list of the 29 duels runs in the
+  install's row order (`tools/install/ai_tables.py`: 515,913 lines, 0 out of
+  order).
+- The policy job (0x621eb0): score -1.0; a card that is not a Dark Age
+  card needs its PrereqCivic held (0x39d1f0) or on the civic list with a
+  score above 0 (+0x978 [civic] +0x14); a Dark Age / Golden Age card needs
+  the age (0x412880 / 0x412910); the game era (the player's era object
+  +0x158 -> Eras +0x1c) inside the window; then the value 0x7b26b0(policy,
+  the rate 0x6fec30 = GlobalAI +0x290, start 0, horizon `m_valueHorizons[0]`
+  via 0x5d2bc0, the player, the card's modifier list +0xb80 [policy]).
+- The value (0x7b26b0): FX_MIN when start >= horizon or the card is
+  obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is
+  unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no
+  person left, 0x2f1ed0); 250.0 for a Dark Age card in a Dark Age or a
+  Golden Age card in a Golden Age; plus the modifiers' sum 0x7a4b20.
+- The modifiers' sum (0x7a4b20): per modifier (0x40 bytes: the effect's
+  analyzer, the collection, the requirement set's key +0x10, the parsed
+  arguments +0x38) the analysis 0x6cede0 into a context (0x142650 copies
+  the evaluation's: +0xb4 start, +0xb8 horizon, +0xbc rate, +0x70 the city
+  subject, +0x80 the player AI, +0x90 the unit; +0xc0 the whole-number
+  value); a context whose +0x64 names a yield adds value x
+  Yields.DefaultValue, any other min(value, 0x7fffff) << 8.
+- The analysis (0x6cede0): a fourth nested analysis refused ("Nested
+  attach modifiers. AI will not analyze"); the collection's iterator (vt [0]
+  first, +8 next) over at most 51 subjects; a subject passes when its
+  requirement set is not in GlobalAI +0x4d0 or 0x6cf3c0 admits it; the
+  effect's analyzer (vt +8) per subject; none passing calls vt +0x10; an
+  entry with no analyzer or no collection is skipped, worth 0. The
+  analyzers are registered by name in 0x6c9640 (238 effects; collections;
+  66 requirements), each a static object (0xf03xxx) whose vtable holds
+  them: the policies and governments name 65 registered effects (396
+  modifiers) and 26 that are not (75 modifiers, Expansion2's
+  EFFECT_ADJUST_CITY_ALL_YIELDS_CHANGE and the trade route modifiers among
+  them), worth 0 to the AI. Read (each adds the whole part, `sar 8`):
+  EFFECT_ADJUST_CITY_YIELD_CHANGE 0x6b8ba0 (a city subject; the yield at the
+  player's weight, 0x7a6690; PV(horizon) - PV(start), 0x7a2140);
+  EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0,
+  100) x the percent x 0.01f, weighted, the same span);
+  EFFECT_ADJUST_PLAYER_YIELD_CHANGE 0x6a7d70 (unweighted, no player passed);
+  EFFECT_ADJUST_GREAT_PERSON_POINTS 0x6a0b10 (the class's pseudo-yield,
+  PV(horizon) alone); EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN 0x6ae510
+  (PSEUDOYIELD_INFLUENCE, PV(horizon) - PV(start));
+  EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may
+  take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x
+  Player_Influence +0x270 x the amount as PSEUDOYIELD_INFLUENCE, 0x7a1240
+  from the start; +0x270 is the government's InfluencePointsThreshold at
+  the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a
+  combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0
+  over the barbarian list, against its own: the amount from the start to
+  the horizon when they outnumber), the unit-tag production 0x6bc9e0 (the
+  military AI's unit of the class 0x4bcd30, CityBuildAI's production
+  0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and
+  housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant
+  0x6b5b30 (the ability's own modifiers analyzed in a copy of the context,
+  their values summed).
+- The yield's value (0x7a6690) carries the player's weight w[y] (0x702ad0;
+  its five parts in "C-96 / C-97: the AI's yield weights and the modifier
+  evaluator"); the port reads every weight 0 until those parts are ported.
+- The pseudo-yield's value (0x7a60d0): amount x PseudoYields.DefaultValue x
+  ((1 + w) + q): w = 0x700810 (GrandStrategic +0x7e8, written by 0x6fff90's
+  handlers; PlayerAI +0x620; the +0x748 / +0x760 and +0x768 / +0x780 lists;
+  at least -1.0, @0xd136f4; a Great Person class adds the golden-age points
+  its person earns, 0x2c4230, valued as PSEUDOYIELD_GOLDENAGE_POINT; the
+  DISTRICT one a term of the player's districts), q = 0x655840 (0 but for
+  PSEUDOYIELD_DIPLOMATIC_BONUS toward a named player: +0x2f58 [player]
+  +0x14); when q and 1 + w differ in sign and |q| > |1 + w|, the factor is
+  +-0.1 (@0xd2f320).
+- The choice (0x625d70; on the completed-civic event 0x6293e0 with the
+  civic, and from the AI turn 0x620110 with -1 when +0x758 is set): on a
+  civic, logged "Completed Civic", and when no card scores 0 or more it
+  requests the next turn (+0x700 -> +0x758) and returns. The government:
+  every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not
+  the current) and the current, in order, valued by 0x7b0330 to
+  valueHorizons[0]; the first strictly highest; a different one is
+  commanded (civics command 1, 0x44bb0; the slot rebuild follows, "C-94:
+  the slot rebuild") and logged. Then each slot of the government in order
+  (0x399690 the count, 0x399ab0 the card): the bar is its card's score
+  (-1.0 with none, or for an obsolete card, dropped); each policy in order
+  scoring above the bar that CanSlot admits (0x393400: not banned +0x890,
+  not slotted +0x820, valid under the government 0x3930a0 — the exclusive
+  cards of Policy_GovernmentExclusives_XP2 only in theirs —, the slot's type
+  or AllowsAnyPolicy) and is not obsolete raises the bar; a best other than
+  the card is commanded (type 0); every slot is logged "Slot Policy" with
+  its card and its score's whole part.
+- The best score per slot type (0x620110, the array +0x5b8 / +0x610): over
+  the policy list, the first strictly highest of the type (any card for an
+  AllowsAnyPolicy type); a card of another type stands while none of the
+  type has come.
+- The government's value (0x7b0330): FX_MIN when start >= horizon, or for
+  one held before (PlayerCulture +0x350 [government] != 0, 0x399260) that
+  is not the current; per Government_SlotCounts row, the type's best / 10
+  (x 0x6666666666666667 >> 74) divided by the slot's place (i + 1; an
+  AllowsAnyPolicy type 1, 1, 2, 3, 3...); plus Governments_XP2 Favor as
+  PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); plus a golden-age
+  term of amount 0; plus its modifiers (+0xb68 [government]) by 0x7a4b20.
+  No government is ever returned to in the 29 duels (142 changes).
+- THE HORIZON (LAB): the scores fit 19 turns, the filler as read
+  (0x6dd9a0 -> 0x5254d0 -> 0x525400, GameSpeeds +0x28 CostMultiplier) gives
+  speed(50) = 25 at Online. Diplomatic League's 75 / 112 / 150 / 187 is 3 x
+  the token (50 / 75 / 100 / 125: the governments' 100 / 150 / 200 / 250 at
+  the speed) x 0.5 exactly, so the Influence factor is 1; then Charismatic
+  Leader's 14 and Literary Tradition's 15 (+2 Writer points, player 0) hold
+  at 19 alone, and a city-state's Urban Planning 14 / God King 21 are its
+  weight-0 values at 19 (the 29 duels' city-states: 11,038 of 11,038 and
+  5,862 of 6,102 lines, the rest above it, a weight above 0), by the
+  shipped routine (0x7a16e0; the exact annuity would print God King 22). Open:
+  some players read Diplomatic League 93 / 140 / 234 (an Influence factor
+  about 1.245 on the same tokens; player 0 of runs/h1_duelw1110, 1112 and
+  1115 throughout) beside Charismatic Leader 18, where the routine at 19
+  prints 17 (the exact annuity 18): no one horizon and routine fits both.
+- Confirming cases: the choice on the game's own scores (`dll_govtpolicies.py`,
+  29 duels): on the scores the AI's turn before logged, 1,170 of 1,284
+  completed civics whole (on the event turn's own 647), 6,589 / 6,734 slot lines
+  (81 more set aside: a slot count the government's rows do not give, a
+  wonder's); the misses are nearly all the log's military card (Levee en
+  Masse 29, Logistics 16, Force Modernization 12) where the check fills a
+  Wildcard, the wonders' slots the check lays as the government's rows.
+  The port in the action replay (29 duels, the AI major's 1,114 completed
+  civics, the engine's state): on the game's logged scores the government
+  as the log's 803 (the government's modifiers' analyzers unread), its cards
+  4,202 / 5,919, whole 350; on its own scores (weights 0, six analyzers) the
+  government 997, the cards 1,262, whole 76; score lines equal 12,393 /
+  209,166 (Diplomatic League 4,066 / 5,543, Charismatic Leader 2,887 /
+  5,329).
+- Unread: 0x700810's arrays' writers, 59 of the 65 registered analyzers the
+  policies and governments name, the requirement set map GlobalAI +0x4d0 and
+  0x6cf3c0, the civic list's jobs (0x61ee30), 0x3930a0 itself; not ported:
+  the yield weight's parts.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

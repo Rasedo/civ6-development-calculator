@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { InferredActions, RecordedActions, activePlayer, headCompleted, type Decision } from '../../../cpu/harness/replayActions';
 import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../../cpu/harness/record';
-import { gameHash } from '../../../cpu/harness/aliases';
+import { gameHash } from '../../../cpu/data/aliases';
 
 const CAT: Catalog = {
   terrains: ['TERRAIN_GRASS'], features: ['FEATURE_FOREST'], resources: ['RESOURCE_WHEAT'],

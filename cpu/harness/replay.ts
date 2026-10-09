@@ -85,7 +85,8 @@ import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
-import { engineId, gameHash } from './aliases';
+import { engineId, gameHash } from '../data/aliases';
+import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -2303,6 +2304,8 @@ export interface ReplayReport {
   researchAi: Record<'major' | 'minor', ResearchAiTally>;
   /** the research AI's analysis against the game's AI log (`ResearchScoreTally`) */
   researchScores: Record<'major' | 'minor', ResearchScoreTally>;
+  /** the majors' AI's government and card choices beside the record's */
+  majorAi?: MajorAiTally;
 }
 
 /** one game move's tally (`tallyTactics`): the unit-turns, those the AI
@@ -2416,6 +2419,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (bool(p.human) && seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HUMAN_HANDICAP;
   }
   seedMoments(state, first, history);
+  // the AI majors: every major the record's first turn names no human
+  const aiSeats = new Map<number, number>();
+  for (const p of recs[0].players) {
+    const seat = first.seatOfPlayer.get(p.id);
+    if (seat !== undefined && seat < state.seats.length && !bool(p.human)) aiSeats.set(seat, p.id);
+  }
+  const majorAi = new MajorAiProbe(dumpPath, aiSeats);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2473,6 +2483,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
+    majorAi.preTurn(state);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
@@ -2598,6 +2609,12 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
+    majorAi.postTurn(state, (seat) => {
+      const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
+      if (!d) return null;
+      const { gid, ids } = policyIds(ctx, d);
+      return { government: gid, policies: ids };
+    });
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
     // that the record's players did not: their decision, undone
@@ -2748,6 +2765,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdCityStrikes(false);
   holdLevies(false);
   holdBarbarians(null);
+  if (majorAi.active) report.majorAi = majorAi.tally;
   return report;
 }
 
@@ -2838,5 +2856,6 @@ export function replayMarkdown(r: ReplayReport): string {
     out.push('', '## Recorded events no reader takes', '');
     for (const [k, n] of Object.entries(r.unread)) out.push(`- ${k}: ${n}`);
   }
+  if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   return out.join('\n') + '\n';
 }

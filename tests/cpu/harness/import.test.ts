@@ -8,7 +8,7 @@ import type { Catalog, DumpCity, DumpPlayer, DumpUnit, TurnRecord } from '../../
 import { seatOfCityState } from '../../../cpu/core/seats';
 import { envoysHere } from '../../../cpu/core/cityStates';
 import { GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX } from '../../../cpu/data/governors';
-import { gameHash } from '../../../cpu/harness/aliases';
+import { gameHash } from '../../../cpu/data/aliases';
 import { eraEvents, transitionChecks } from '../../../cpu/harness/checks';
 import { GW_HOLDERS, GWO_RELIC, GWO_WRITING, holderSlots } from '../../../cpu/data/greatWorks';
 import { GP_CITY_PERM, GREAT_PEOPLE } from '../../../cpu/data/greatPeople';

@@ -2276,8 +2276,9 @@ export function baseYieldCtx(state: GameState): YieldCtx {
   return { map: state.map, mods: defaultModifiers(), camps: campTiles(state) };
 }
 
-export function governmentSlots(state: GameState, seat: number): SlotKind[] {
-  const govId = seatGovernment(state, seat);
+/** The slots seat `seat` holds under `govId` (by default the government it is
+ *  in): the government's rows, then the wonders' extra slots. */
+export function governmentSlots(state: GameState, seat: number, govId: string | null = seatGovernment(state, seat)): SlotKind[] {
   const gov = govId ? GOVERNMENTS[govId] : null;
   if (!gov) return [];
   const slots = [...gov.slots];

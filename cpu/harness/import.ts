@@ -87,7 +87,7 @@ import { ERA_BEGINS, eraCountdownStep } from '../core/eras';
 import { standingRemovable } from '../core/climate';
 import { districtSiteCost } from '../core/phase';
 import { P, bool, num, plotAt, revealedPlots, type Catalog, type DumpCity, type DumpPlayer, type DumpResolution, type TurnRecord } from './record';
-import { aliases, engineId, gameHash } from './aliases';
+import { aliases, engineId, gameHash } from '../data/aliases';
 import type { RandLog } from './randLog';
 
 /** A city's closing-pick ties as a record left them (`History.startTies`). */

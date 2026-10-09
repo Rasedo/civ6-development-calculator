@@ -7,20 +7,20 @@
  * cites it most. A row with no such tag is reached by its id with the game's
  * prefix (`BUILDING_` + id), which is how most ids are spelled.
  */
-import type { Src } from '../data/provenance';
-import { BUILDINGS } from '../data/buildings';
-import { BUILT_WONDERS } from '../data/builtWonders';
-import { CIVICS } from '../data/civics';
-import { TECHS } from '../data/techs';
-import { UNITS } from '../data/units';
-import { DISTRICTS } from '../data/districts';
-import { IMPROVEMENTS } from '../data/improvements';
-import { GOVERNMENTS, POLICIES } from '../data/policies';
-import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from '../data/religion';
-import { GOVERNORS, GOVERNOR_PROMOTIONS } from '../data/governors';
-import { GREAT_PEOPLE } from '../data/greatPeople';
-import { CONGRESS_RESOLUTIONS } from '../data/seats';
-import { PROJECTS } from '../data/projects';
+import type { Src } from './provenance';
+import { BUILDINGS } from './buildings';
+import { BUILT_WONDERS } from './builtWonders';
+import { CIVICS } from './civics';
+import { TECHS } from './techs';
+import { UNITS } from './units';
+import { DISTRICTS } from './districts';
+import { IMPROVEMENTS } from './improvements';
+import { GOVERNMENTS, POLICIES } from './policies';
+import { ENHANCER_BELIEFS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, PANTHEONS, WORSHIP_BELIEFS } from './religion';
+import { GOVERNORS, GOVERNOR_PROMOTIONS } from './governors';
+import { GREAT_PEOPLE } from './greatPeople';
+import { CONGRESS_RESOLUTIONS } from './seats';
+import { PROJECTS } from './projects';
 
 type Rows = Readonly<Record<string, { src?: Readonly<Record<string, Src>> }>>;
 
@@ -105,4 +105,13 @@ export function engineId(kind: string, gameType: string, prefix: string, known: 
   if (tagged !== undefined && tagged in known) return tagged;
   const bare = gameType.startsWith(prefix) ? gameType.slice(prefix.length) : gameType;
   return bare in known ? bare : null;
+}
+
+const reverse: Record<string, Map<string, string>> = {};
+
+/** The game type an engine id of one kind stands for: the type whose catalog
+ *  tag names the id, else the id with the game's prefix. */
+export function gameTypeOf(kind: string, id: string, prefix: string): string {
+  const rev = (reverse[kind] ??= new Map([...(aliases()[kind] ?? new Map())].map(([type, eid]) => [eid, type] as const)));
+  return rev.get(id) ?? prefix + id;
 }
