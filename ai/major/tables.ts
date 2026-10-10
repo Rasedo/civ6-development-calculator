@@ -3,7 +3,7 @@
  * layered install (`--check` reports a stale file). Policies and governments
  * run in DATABASE ORDER, the index the game's AI loops walk.
  */
-import type { AiGovernment, AiPolicy, AiSlotType } from './types';
+import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType } from './types';
 
 export const AI_POLICIES: readonly AiPolicy[] = [
  {
@@ -8117,3 +8117,908 @@ export const AI_ERAS: readonly string[] = [
  "ERA_INFORMATION",
  "ERA_FUTURE"
 ];
+export const AI_PLOT_EVAL_CONDITIONS: readonly string[] = [
+ "Nearest Enemy City",
+ "Nearest Friendly City",
+ "New Resources",
+ "Inner Ring Yield",
+ "Total Yield",
+ "Coastal",
+ "Fresh Water",
+ "Specific Resource",
+ "Specific Feature",
+ "Resource Class",
+ "Foreign Continent",
+ "Cultural Pressure"
+];
+export const AI_PLOT_EVAL_LISTS: Readonly<Record<string, readonly AiPlotEvalItem[]>> = {
+ "CavalryLoverCitySettlement": [
+  {
+   "condition": "Specific Resource",
+   "favored": true,
+   "value": 12,
+   "stringVal": "RESOURCE_HORSES"
+  }
+ ],
+ "CompactEmpire": [
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": -5,
+   "stringVal": null
+  }
+ ],
+ "DidoCoastalSettlements": [
+  {
+   "condition": "Coastal",
+   "favored": false,
+   "value": 35,
+   "stringVal": null
+  }
+ ],
+ "ExpansionSettlementPreferences": [
+  {
+   "condition": "Foreign Continent",
+   "favored": false,
+   "value": 4,
+   "stringVal": null
+  },
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": 6,
+   "stringVal": null
+  }
+ ],
+ "JoaoCoastalSettlements": [
+  {
+   "condition": "Coastal",
+   "favored": false,
+   "value": 35,
+   "stringVal": null
+  }
+ ],
+ "LastVikingKingCoastSettlement": [
+  {
+   "condition": "Coastal",
+   "favored": false,
+   "value": 30,
+   "stringVal": null
+  }
+ ],
+ "MaoriSettlePreferences": [
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": 8,
+   "stringVal": null
+  }
+ ],
+ "MayanEmpire": [
+  {
+   "condition": "Fresh Water",
+   "favored": false,
+   "value": -20,
+   "stringVal": null
+  },
+  {
+   "condition": "Resource Class",
+   "favored": false,
+   "value": 3,
+   "stringVal": "RESOURCECLASS_LUXURY"
+  }
+ ],
+ "NavalSettlementPreferences": [
+  {
+   "condition": "Coastal",
+   "favored": false,
+   "value": 10,
+   "stringVal": null
+  },
+  {
+   "condition": "Specific Resource",
+   "favored": false,
+   "value": -3,
+   "stringVal": "RESOURCE_HORSES"
+  },
+  {
+   "condition": "Specific Resource",
+   "favored": false,
+   "value": -5,
+   "stringVal": "RESOURCE_IRON"
+  },
+  {
+   "condition": "Foreign Continent",
+   "favored": true,
+   "value": 4,
+   "stringVal": null
+  },
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": 4,
+   "stringVal": null
+  }
+ ],
+ "PhilipForeignSettlement": [
+  {
+   "condition": "Foreign Continent",
+   "favored": false,
+   "value": 60,
+   "stringVal": null
+  }
+ ],
+ "PreferHills": [
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_PRODUCTION"
+  }
+ ],
+ "SettleAllContinents": [
+  {
+   "condition": "Foreign Continent",
+   "favored": true,
+   "value": 120,
+   "stringVal": null
+  }
+ ],
+ "SettleOneContinent": [
+  {
+   "condition": "Foreign Continent",
+   "favored": false,
+   "value": -50,
+   "stringVal": null
+  }
+ ],
+ "StandardSettlePlot": [
+  {
+   "condition": "Total Yield",
+   "favored": false,
+   "value": 2,
+   "stringVal": "YIELD_PRODUCTION"
+  },
+  {
+   "condition": "Total Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_FOOD"
+  },
+  {
+   "condition": "Total Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_SCIENCE"
+  },
+  {
+   "condition": "Total Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_CULTURE"
+  },
+  {
+   "condition": "Total Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_FAITH"
+  },
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 2,
+   "stringVal": "YIELD_FOOD"
+  },
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 2,
+   "stringVal": "YIELD_PRODUCTION"
+  },
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_SCIENCE"
+  },
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_CULTURE"
+  },
+  {
+   "condition": "Inner Ring Yield",
+   "favored": false,
+   "value": 1,
+   "stringVal": "YIELD_FAITH"
+  },
+  {
+   "condition": "Fresh Water",
+   "favored": false,
+   "value": 20,
+   "stringVal": null
+  },
+  {
+   "condition": "New Resources",
+   "favored": false,
+   "value": 4,
+   "stringVal": null
+  },
+  {
+   "condition": "Coastal",
+   "favored": false,
+   "value": 12,
+   "stringVal": null
+  },
+  {
+   "condition": "Specific Resource",
+   "favored": false,
+   "value": 3,
+   "stringVal": "RESOURCE_HORSES"
+  },
+  {
+   "condition": "Specific Resource",
+   "favored": false,
+   "value": 5,
+   "stringVal": "RESOURCE_IRON"
+  },
+  {
+   "condition": "Specific Resource",
+   "favored": false,
+   "value": 2,
+   "stringVal": "RESOURCE_NITER"
+  },
+  {
+   "condition": "Resource Class",
+   "favored": false,
+   "value": 2,
+   "stringVal": "RESOURCECLASS_LUXURY"
+  },
+  {
+   "condition": "Resource Class",
+   "favored": false,
+   "value": 2,
+   "stringVal": "RESOURCECLASS_STRATEGIC"
+  },
+  {
+   "condition": "Specific Feature",
+   "favored": false,
+   "value": -3,
+   "stringVal": "FEATURE_ICE"
+  },
+  {
+   "condition": "Specific Feature",
+   "favored": false,
+   "value": 6,
+   "stringVal": "FEATURE_DEAD_SEA"
+  },
+  {
+   "condition": "Foreign Continent",
+   "favored": true,
+   "value": -2,
+   "stringVal": null
+  },
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": -10,
+   "stringVal": null
+  },
+  {
+   "condition": "Cultural Pressure",
+   "favored": false,
+   "value": 1,
+   "stringVal": null
+  },
+  {
+   "condition": "Cultural Pressure",
+   "favored": true,
+   "value": -6,
+   "stringVal": null
+  }
+ ],
+ "TucapelSettlingChanges": [
+  {
+   "condition": "Nearest Friendly City",
+   "favored": false,
+   "value": -5,
+   "stringVal": null
+  }
+ ],
+ "VietnamSettlePreferences": [
+  {
+   "condition": "Specific Feature",
+   "favored": false,
+   "value": 2,
+   "stringVal": "FEATURE_FOREST"
+  },
+  {
+   "condition": "Specific Feature",
+   "favored": false,
+   "value": 2,
+   "stringVal": "FEATURE_JUNGLE"
+  },
+  {
+   "condition": "Specific Feature",
+   "favored": false,
+   "value": 2,
+   "stringVal": "FEATURE_MARSH"
+  }
+ ]
+};
+export const AI_PLOT_EVAL_BY_LEADER: Readonly<Record<string, readonly string[]>> = {
+ "LEADER_DEFAULT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_BARBAROSSA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_CLEOPATRA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_GANDHI": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_GILGAMESH": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_GORGO": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_HARDRADA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_HOJO": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_MVEMBA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_PEDRO": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_PERICLES": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_PETER_GREAT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_PHILIP_II": [
+  "StandardSettlePlot",
+  "PhilipForeignSettlement"
+ ],
+ "LEADER_QIN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SALADIN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_TOMYRIS": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_TRAJAN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_T_ROOSEVELT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_VICTORIA": [
+  "StandardSettlePlot",
+  "SettleAllContinents"
+ ],
+ "LEADER_CHANDRAGUPTA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_GENGHIS_KHAN": [
+  "StandardSettlePlot",
+  "CavalryLoverCitySettlement"
+ ],
+ "LEADER_LAUTARO": [
+  "StandardSettlePlot",
+  "TucapelSettlingChanges"
+ ],
+ "LEADER_POUNDMAKER": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_ROBERT_THE_BRUCE": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SEONDEOK": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SHAKA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_TAMAR": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_WILHELMINA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_DIDO": [
+  "StandardSettlePlot",
+  "DidoCoastalSettlements"
+ ],
+ "LEADER_ELEANOR_ENGLAND": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_ELEANOR_FRANCE": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_KRISTINA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_KUPE": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_LAURIER": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_MANSA_MUSA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_MATTHIAS_CORVINUS": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_PACHACUTI": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SULEIMAN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_JOHN_CURTIN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_MONTEZUMA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_HAMMURABI": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_AMBIORIX": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_BASIL": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_MENELIK": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SIMON_BOLIVAR": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_LADY_SIX_SKY": [
+  "StandardSettlePlot",
+  "CompactEmpire"
+ ],
+ "LEADER_LUDWIG": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_THEODORA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SEJONG": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_ABRAHAM_LINCOLN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_NZINGA_MBANDE": [
+  "StandardSettlePlot",
+  "SettleOneContinent"
+ ],
+ "LEADER_SALADIN_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_TOKUGAWA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_NADER_SHAH": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SULEIMAN_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_GITARJA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_JAYAVARMAN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_JULIUS_CAESAR": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_KUBLAI_KHAN_CHINA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_LADY_TRIEU": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_KUBLAI_KHAN_MONGOLIA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_ALEXANDER": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_CYRUS": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_AMANITORE": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_JADWIGA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_JOAO_III": [
+  "StandardSettlePlot",
+  "JoaoCoastalSettlements"
+ ],
+ "LEADER_YONGLE": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_WU_ZETIAN": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_QIN_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_ELIZABETH": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_HARALD_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_VICTORIA_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_RAMSES": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_CLEOPATRA_ALT": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_SUNDIATA_KEITA": [
+  "StandardSettlePlot"
+ ],
+ "LEADER_T_ROOSEVELT_ROUGHRIDER": [
+  "StandardSettlePlot"
+ ]
+};
+export const AI_PLOT_EVAL_BY_CIV: Readonly<Record<string, readonly string[]>> = {
+ "CIVILIZATION_MAORI": [
+  "MaoriSettlePreferences"
+ ],
+ "CIVILIZATION_MAYA": [
+  "MayanEmpire"
+ ],
+ "CIVILIZATION_VIETNAM": [
+  "VietnamSettlePreferences"
+ ]
+};
+export const AI_PLOT_EVAL_BY_STRATEGY: Readonly<Record<string, readonly string[]>> = {
+ "STRATEGY_NAVAL": [
+  "NavalSettlementPreferences"
+ ],
+ "STRATEGY_RAPID_EXPANSION": [
+  "ExpansionSettlementPreferences"
+ ]
+};
+export const AI_FEATURES: readonly AiFeature[] = [
+ {
+  "type": "FEATURE_FLOODPLAINS",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_ICE",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_JUNGLE",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_FOREST",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_OASIS",
+  "settlement": false,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_MARSH",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_BARRIER_REEF",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_CLIFFS_DOVER",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_CRATER_LAKE",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_DEAD_SEA",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_EVEREST",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_GALAPAGOS",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_KILIMANJARO",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_PANTANAL",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_PIOPIOTAHI",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_TORRES_DEL_PAINE",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_TSINGY",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_YOSEMITE",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_DELICATE_ARCH",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_EYE_OF_THE_SAHARA",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_LAKE_RETBA",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_MATTERHORN",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_RORAIMA",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_UBSUNUR_HOLLOW",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_ZHANGYE_DANXIA",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_REEF",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_FLOODPLAINS_GRASSLAND",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_FLOODPLAINS_PLAINS",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_GEOTHERMAL_FISSURE",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_VOLCANO",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_VOLCANIC_SOIL",
+  "settlement": true,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_CHOCOLATEHILLS",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_DEVILSTOWER",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_GOBUSTAN",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_IKKIL",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_PAMUKKALE",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_VESUVIUS",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_WHITEDESERT",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_ULURU",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_BERMUDA_TRIANGLE",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_FOUNTAIN_OF_YOUTH",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_PAITITI",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_BURNING_FOREST",
+  "settlement": false,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_BURNT_FOREST",
+  "settlement": false,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_BURNING_JUNGLE",
+  "settlement": false,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_BURNT_JUNGLE",
+  "settlement": false,
+  "naturalWonder": false
+ },
+ {
+  "type": "FEATURE_HA_LONG_BAY",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_EYJAFJALLAJOKULL",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_LYSEFJORDEN",
+  "settlement": false,
+  "naturalWonder": true
+ },
+ {
+  "type": "FEATURE_GIANTS_CAUSEWAY",
+  "settlement": false,
+  "naturalWonder": true
+ }
+];
+export const AI_RESOURCE_CLASS: Readonly<Record<string, string>> = {
+ "RESOURCE_BANANAS": "RESOURCECLASS_BONUS",
+ "RESOURCE_CATTLE": "RESOURCECLASS_BONUS",
+ "RESOURCE_COPPER": "RESOURCECLASS_BONUS",
+ "RESOURCE_CRABS": "RESOURCECLASS_BONUS",
+ "RESOURCE_DEER": "RESOURCECLASS_BONUS",
+ "RESOURCE_FISH": "RESOURCECLASS_BONUS",
+ "RESOURCE_RICE": "RESOURCECLASS_BONUS",
+ "RESOURCE_SHEEP": "RESOURCECLASS_BONUS",
+ "RESOURCE_STONE": "RESOURCECLASS_BONUS",
+ "RESOURCE_WHEAT": "RESOURCECLASS_BONUS",
+ "RESOURCE_CITRUS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_COCOA": "RESOURCECLASS_LUXURY",
+ "RESOURCE_COFFEE": "RESOURCECLASS_LUXURY",
+ "RESOURCE_COTTON": "RESOURCECLASS_LUXURY",
+ "RESOURCE_DIAMONDS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_DYES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_FURS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_GYPSUM": "RESOURCECLASS_LUXURY",
+ "RESOURCE_INCENSE": "RESOURCECLASS_LUXURY",
+ "RESOURCE_IVORY": "RESOURCECLASS_LUXURY",
+ "RESOURCE_JADE": "RESOURCECLASS_LUXURY",
+ "RESOURCE_MARBLE": "RESOURCECLASS_LUXURY",
+ "RESOURCE_MERCURY": "RESOURCECLASS_LUXURY",
+ "RESOURCE_PEARLS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_SALT": "RESOURCECLASS_LUXURY",
+ "RESOURCE_SILK": "RESOURCECLASS_LUXURY",
+ "RESOURCE_SILVER": "RESOURCECLASS_LUXURY",
+ "RESOURCE_SPICES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_SUGAR": "RESOURCECLASS_LUXURY",
+ "RESOURCE_TEA": "RESOURCECLASS_LUXURY",
+ "RESOURCE_TOBACCO": "RESOURCECLASS_LUXURY",
+ "RESOURCE_TRUFFLES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_WHALES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_WINE": "RESOURCECLASS_LUXURY",
+ "RESOURCE_JEANS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_PERFUME": "RESOURCECLASS_LUXURY",
+ "RESOURCE_COSMETICS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_TOYS": "RESOURCECLASS_LUXURY",
+ "RESOURCE_CINNAMON": "RESOURCECLASS_LUXURY",
+ "RESOURCE_CLOVES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_ALUMINUM": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_COAL": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_HORSES": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_IRON": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_NITER": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_OIL": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_URANIUM": "RESOURCECLASS_STRATEGIC",
+ "RESOURCE_ANTIQUITY_SITE": "RESOURCECLASS_ARTIFACT",
+ "RESOURCE_SHIPWRECK": "RESOURCECLASS_ARTIFACT",
+ "RESOURCE_AMBER": "RESOURCECLASS_LUXURY",
+ "RESOURCE_OLIVES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_TURTLES": "RESOURCECLASS_LUXURY",
+ "RESOURCE_MAIZE": "RESOURCECLASS_BONUS",
+ "RESOURCE_HONEY": "RESOURCECLASS_LUXURY"
+};
+export const AI_GLOBALS: Readonly<Record<string, number>> = {
+ "CITY_MIN_RANGE": 3,
+ "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER": 17
+};

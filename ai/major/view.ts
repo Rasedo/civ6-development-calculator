@@ -16,7 +16,116 @@ export interface MajorSlotView {
   policy: string | null;
 }
 
+/** a map plot as the AI reads it (Plot), in the game's type names */
+export interface MajorPlotView {
+  index: number;
+  x: number;
+  y: number;
+  water: boolean;
+  /** Plot +0x3a bit 3: a mountain, an impassable feature */
+  impassable: boolean;
+  /** FeatureType, null for none */
+  feature: string | null;
+  /** ResourceType, null for none */
+  resource: string | null;
+  /** the seat whose territory holds it, -1 for none */
+  owner: number;
+  /** a district stands on it, a city centre included */
+  district: boolean;
+  /** a city centre stands on it, any seat's */
+  city: boolean;
+  /** the plot's area (AreaBuilder), region (Map_Region, -1 off passable
+   *  land) and continent (-1 for the sea) */
+  area: number;
+  region: number;
+  continent: number;
+  coastal: boolean;
+  freshWater: boolean;
+}
+
+/** one plot of a unit's planning reach (UnitPlanning): the turn it is
+ *  reached in, 1 for this turn, and the Movement left there */
+export interface MajorReachView {
+  plot: number;
+  turns: number;
+  moves: number;
+}
+
+export interface MajorUnitView {
+  /** the engine's unit id */
+  id: number;
+  /** UnitType */
+  type: string;
+  plot: number;
+  /** Units.FoundCity */
+  founder: boolean;
+}
+
+/** a unit of a player at war with the seat, as its danger map reads it:
+ *  its combat, ranged and bombard strengths and its attack range */
+export interface MajorHostileUnitView {
+  id: number;
+  plot: number;
+  melee: number;
+  ranged: number;
+  bombard: number;
+  range: number;
+  air: boolean;
+}
+
+/** a city's defence: its combat strength, its ranged strike's strength (0
+ *  where it has none) and reach */
+export interface MajorCityDefenceView {
+  plot: number;
+  strength: number;
+  ranged: number;
+  range: number;
+}
+
 export interface MajorView extends AiValueView {
+  /** the map's plots by index */
+  plots(): readonly MajorPlotView[];
+  /** the plots within `radius` of a plot, the plot included */
+  plotsWithin(plot: number, radius: number): readonly number[];
+  plotDistance(a: number, b: number): number;
+  /** the seat has revealed the plot */
+  revealed(seat: number, plot: number): boolean;
+  /** a plot's yield of a YieldType as the seat sees it */
+  plotYield(seat: number, plot: number, yieldType: string): number;
+  /** the seat sees the ResourceType (its PrereqTech) */
+  resourceVisible(seat: number, resource: string): boolean;
+  /** the improved plots of the ResourceType in the seat's territory */
+  resourceHeld(seat: number, resource: string): number;
+  /** the plots of the seat's city centres */
+  cityPlots(seat: number): readonly number[];
+  /** the continent of the seat's original capital, -1 before it has one */
+  homeContinent(seat: number): number;
+  /** the citizens' Loyalty pressure on a plot from the seat's side (the own
+   *  against the foreign term), whole points */
+  pressureAt(seat: number, plot: number): number;
+  /** the strategies (StrategyType) the seat's AI follows (the value layer's
+   *  `followedStrategies`) */
+  strategies(seat: number): ReadonlySet<string>;
+  leaderType(seat: number): string | null;
+  civilizationType(seat: number): string | null;
+  units(seat: number): readonly MajorUnitView[];
+  /** a unit's planning reach within `turns` on the Movement it has left, in
+   *  the pathfinder's order */
+  unitReach(unitId: number, turns: number): readonly MajorReachView[];
+  /** the plots of a unit's path to `plot`, its own left out, empty for none */
+  unitPath(unitId: number, plot: number): readonly number[];
+  /** the direction (DirectionTypes) from a plot to its neighbour, -1 for none */
+  stepDirection(from: number, to: number): number;
+  /** the action record's unit column of a verb (MOVE_0..5, FOUND_CITY), -1
+   *  for one the engine does not carry */
+  unitActionColumn(name: string): number;
+  /** the units of the players at war with the seat (the barbarians always)
+   *  that the seat sees now and that carry a combat strength */
+  hostileUnits(seat: number): readonly MajorHostileUnitView[];
+  /** the cities of the players at war with the seat whose centres it sees now */
+  hostileCities(seat: number): readonly MajorCityDefenceView[];
+  /** the seat's own cities */
+  cityDefences(seat: number): readonly MajorCityDefenceView[];
   readonly turn: number;
   /** the game era, an index into AI_ERAS */
   readonly gameEra: number;

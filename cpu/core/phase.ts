@@ -464,22 +464,28 @@ export function pressureTerm(own: number, foreign: number): number {
   return (o > f ? mag : -mag) / FIXED_ONE;
 }
 
-export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
-  const here = state.map.tiles[city.centerIndex];
+/** The citizens' pressure term on a plot from `seat`'s side: the seat's own
+ *  cities against every other seat's and the Free Cities' (the term
+ *  `loyaltyDelta` takes for a city, no city of its own needed on the plot) */
+export function plotPressure(state: GameState, seat: number, here: Tile): number {
   let own = 0;
   let foreign = 0;
   for (const s of state.seats) {
-    const sub = citizenPressure(state, here, s.cities, s.culturallyDominant?.[city.seat] ? CITIZEN_PRESSURE_DOMINANCE_PCT : 0);
-    if (s.seat === city.seat) own += sub;
+    const sub = citizenPressure(state, here, s.cities, s.culturallyDominant?.[seat] ? CITIZEN_PRESSURE_DOMINANCE_PCT : 0);
+    if (s.seat === seat) own += sub;
     // CIV6 (Cultural alliance 1): "Allies do not exert Loyalty pressure on
     // each other."
-    else if (!alliedAtLevel(state, city.seat, s.seat, ALLIANCE_CULTURAL, 1)) foreign += sub;
+    else if (!alliedAtLevel(state, seat, s.seat, ALLIANCE_CULTURAL, 1)) foreign += sub;
   }
   // CIV6: a Free City's citizens press on their neighbours like any other
   // city's. The Free Cities player has no age, so they press at the base.
   if (state.freeSeat) foreign += citizenPressure(state, here, state.freeSeat.cities);
-  return pressureTerm(own, foreign) + (LOYALTY_AMENITY[amenityTierName] ?? 0) + standingLoyalty(state, city)
-    + greatWorkLoyalty(state, city);
+  return pressureTerm(own, foreign);
+}
+
+export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {
+  return plotPressure(state, city.seat, state.map.tiles[city.centerIndex]) + (LOYALTY_AMENITY[amenityTierName] ?? 0)
+    + standingLoyalty(state, city) + greatWorkLoyalty(state, city);
 }
 
 /** A FREE CITY's loyalty per turn. CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES):
@@ -2283,6 +2289,9 @@ export function holdCityStrikes(on: boolean): void {
  * fights at. The target is the nearest unit hostile to the city's seat at
  * range 1-2, the lowest tile index on a tie (`cityStrikeAt`).
  */
+/** a city strike's reach: the plots within 2 of its centre */
+export const CITY_STRIKE_RANGE = 2;
+
 export function cityStrikes(state: GameState, city: City, strikeCS: number): void {
   if (strikeHold) return;
   const striker = { seat: city.seat };
@@ -2299,7 +2308,7 @@ export function cityStrikes(state: GameState, city: City, strikeCS: number): voi
     let bestDist = 99;
     for (const t of state.map.tiles) {
       const d = hexDistance(state.map, origin.col, origin.row, t.col, t.row);
-      if (d < 1 || d > 2) continue;
+      if (d < 1 || d > CITY_STRIKE_RANGE) continue;
       // ANY unit hostile to the city's seat that a shot may take (`shootable`:
       // a military one): a city's strike picks its target by distance, never
       // by which enemy the unit belongs to.

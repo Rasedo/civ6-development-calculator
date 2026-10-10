@@ -144,7 +144,7 @@ export class MajorAiProbe {
   }
 
   /** what the yield weights read of the logs, per seat, at the AI turn `turn` */
-  private weightInputs(turn: number): Map<number, AiWeightInputs> {
+  weightInputs(turn: number): Map<number, AiWeightInputs> {
     const out = new Map<number, AiWeightInputs>();
     for (const [player, seat] of this.majors) {
       const on = new Set<string>(this.ported.get(seat) ?? []);

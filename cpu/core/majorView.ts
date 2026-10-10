@@ -4,19 +4,29 @@
  * writes the state; the slot rebuild a government change would make is laid
  * on copies (`carryLayout`).
  */
-import type { MajorSlotView, MajorView } from '../../ai/major/view';
+import type { MajorCityDefenceView, MajorPlotView, MajorSlotView, MajorView } from '../../ai/major/view';
+import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
+import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import type { AiCityView, AiDistrictView } from './aiValue';
-import { pseudoYieldWeights, yieldWeights, type AiWeightInputs } from './aiWeights';
+import { followedStrategies, pseudoYieldWeights, yieldWeights, type AiWeightInputs } from './aiWeights';
 import { engineId, gameTypeOf } from '../data/aliases';
+import { isExplored } from './fog';
+import { CITY_STRIKE_RANGE, plotPressure } from './phase';
+import { borderTurnsFrom, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
+import { pathTo, reachPlots } from './tactical';
+import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
+import { plotsSeenNow } from './barbarians';
+import { cityDefenseStrength, cityStrikeStrength, unitAttackRange } from './combat';
+import { outerPool } from './rules';
+import { unitDomain, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { COST_MULTIPLIER_PCT } from '../data/constants';
 import { GP_CLASSES } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
 import { congressPolicyBlocked } from './congress';
-import { carryLayout, darkAgeEra, fitPoliciesLoose, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment,
+import { carryLayout, darkAgeEra, fitPoliciesLoose, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
 import { gpOffer } from './greatPeople';
-import { borderTurnsFrom, citiesOf, civsAtWar, delegationWith, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
@@ -25,7 +35,7 @@ import { EMBASSY_CIVIC } from '../data/seats';
 import { envoysOf, hasMet, suzerainOf } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
-import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency } from './yields';
+import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency, tileYields } from './yields';
 import { computeCityStats } from './city';
 
 /** What the view takes from AI parts this engine does not run: the civic AI's
@@ -74,6 +84,14 @@ const govType = (id: string): string => gameTypeOf('government', id, 'GOVERNMENT
 const policyType = (id: string): string => gameTypeOf('policy', id, 'POLICY_');
 const govId = (type: string): string | null => engineId('government', type, 'GOVERNMENT_', GOVERNMENTS);
 
+const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
+
+/** a city's strength, its strike (walls standing) and the strike's reach */
+const cityDefence = (state: GameState, c: City): MajorCityDefenceView => ({
+  plot: c.centerIndex, strength: cityDefenseStrength(state, c),
+  ranged: outerPool(state, c) > 0 ? cityStrikeStrength(state, c) : 0, range: CITY_STRIKE_RANGE,
+});
+
 export function majorView(state: GameState, inputs: MajorViewInputs = {}): MajorView {
   const seat = (i: number) => {
     const s = seatOf(state, i);
@@ -114,7 +132,89 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     if (!w) pseudo.set(i, (w = pseudoYieldWeights(state, i, inputs.weights?.get(i))));
     return w;
   };
+  const { map } = state;
+  let plots: MajorPlotView[] | null = null;
+  const yctx = new Map<number, YieldCtx>();
+  const hidden = new Map<number, ReadonlySet<string>>();
+  const hiddenOf = (i: number) => {
+    let h = hidden.get(i);
+    if (!h) hidden.set(i, (h = hiddenResourcesFor(state, i)));
+    return h;
+  };
+  const centres = new Set([...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]
+    .flatMap((s) => s.cities.map((c) => c.centerIndex)));
+  for (const cs of state.cityStates) if (cs.centerIndex >= 0) centres.add(cs.centerIndex);
   return {
+    plots: () => (plots ??= map.tiles.map((t): MajorPlotView => ({
+      index: t.index, x: t.col, y: t.row, water: isWater(t), impassable: isImpassable(t),
+      feature: t.feature ? `FEATURE_${t.feature}` : null, resource: t.resource ? `RESOURCE_${t.resource}` : null,
+      owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
+      area: t.area ?? -1, region: t.region ?? -1, continent: t.continent ?? -1,
+      coastal: isCoastalLand(map, t), freshWater: hasFreshWater(map, t),
+    }))),
+    plotsWithin: (p, r) => {
+      const t = map.tiles[p];
+      return tilesWithin(map, t.col, t.row, r).map((x) => x.index);
+    },
+    plotDistance: (a, b) => {
+      const ta = map.tiles[a];
+      const tb = map.tiles[b];
+      return hexDistance(map, ta.col, ta.row, tb.col, tb.row);
+    },
+    revealed: (i, p) => isExplored(state, i, p),
+    plotYield: (i, p, type) => {
+      let ctx = yctx.get(i);
+      if (!ctx) yctx.set(i, (ctx = makeYieldCtx(state, i)));
+      const key = YIELD_KEY[type];
+      return key ? tileYields(ctx, map.tiles[p])[key] : 0;
+    },
+    resourceVisible: (i, r) => !hiddenOf(i).has(r.replace(/^RESOURCE_/, '')),
+    resourceHeld: (i, r) => {
+      const id = r.replace(/^RESOURCE_/, '');
+      return map.tiles.filter((t) => t.resource === id && tileSeat(t) === i && t.improvement && !t.pillaged).length;
+    },
+    cityPlots: (i) => citiesOf(state, i).map((c) => c.centerIndex),
+    homeContinent: (i) => homeContinent(state, i),
+    pressureAt: (i, p) => plotPressure(state, i, map.tiles[p]),
+    strategies: (i) => new Set(followedStrategies(state, i, inputs.weights?.get(i))),
+    leaderType: (i) => {
+      const l = leaderOf(state, i);
+      return l ? gameTypeOf('leader', l, 'LEADER_') : null;
+    },
+    civilizationType: (i) => {
+      const c = civOf(state, i);
+      return c ? gameTypeOf('civilization', c, 'CIVILIZATION_') : null;
+    },
+    units: (i) => unitsOf(state, i).map((u) => ({ id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex,
+      founder: !!UNITS[u.type]?.settler })),
+    unitReach: (id, turns) => {
+      const u = state.units.find((x) => x.id === id);
+      return u ? reachPlots(state, u, turns).map((r) => ({ plot: r.tile, turns: r.turns, moves: r.moves })) : [];
+    },
+    unitPath: (id, p) => {
+      const u = state.units.find((x) => x.id === id);
+      return u ? pathTo(state, u, p) : [];
+    },
+    stepDirection: (a, b) => directionTo(map, map.tiles[a], map.tiles[b]),
+    unitActionColumn: (name) => UNIT_ACTION[name] ?? -1,
+    hostileUnits: (i) => {
+      const seen = plotsSeenNow(state, new Set([i]));
+      return state.units.filter((u) => unitsHostile(state, { seat: i }, u) && seen[u.tileIndex] && unitVisibleTo(state, u, i))
+        .flatMap((u) => {
+          const d = UNITS[u.type];
+          const bombard = d?.bombard ?? 0;
+          const melee = d?.combat ?? 0;
+          const ranged = bombard > 0 ? 0 : d?.ranged?.strength ?? 0;
+          if (melee <= 0 && ranged <= 0 && bombard <= 0) return [];
+          return [{ id: u.id, plot: u.tileIndex, melee, ranged, bombard, range: unitAttackRange(u), air: unitDomain(u.type) === 'air' }];
+        });
+    },
+    hostileCities: (i) => {
+      const seen = plotsSeenNow(state, new Set([i]));
+      return cityHolders(state).filter((s) => unitsHostile(state, { seat: i }, s))
+        .flatMap((s) => s.cities.filter((c) => seen[c.centerIndex]).map((c) => cityDefence(state, c)));
+    },
+    cityDefences: (i) => citiesOf(state, i).map((c) => cityDefence(state, c)),
     turn: state.turn,
     costMultiplierPct: COST_MULTIPLIER_PCT,
     gameEra: state.gameEra ?? 0,

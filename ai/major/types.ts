@@ -30,6 +30,23 @@ export interface AiGovernment {
   modifiers: readonly AiModifier[];
 }
 
+/** an AiFavoredItems row of a PlotEvaluations list: Item is a
+ *  PlotEvalConditions ConditionType */
+export interface AiPlotEvalItem {
+  condition: string;
+  favored: boolean;
+  value: number;
+  /** the yield, resource, feature or resource class the row keys */
+  stringVal: string | null;
+}
+
+export interface AiFeature {
+  type: string;
+  /** Features.Settlement: a city may stand on it */
+  settlement: boolean;
+  naturalWonder: boolean;
+}
+
 export interface AiSlotType {
   type: string;
   /** AllowsAnyPolicy: the Wildcard */

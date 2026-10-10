@@ -59,6 +59,10 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     grievances: () => 0,
     militaryUnits: () => 0,
     envoys: () => 0,
+    plots: () => [], plotsWithin: () => [], plotDistance: () => 0, revealed: () => false, plotYield: () => 0,
+    resourceVisible: () => false, resourceHeld: () => 0, cityPlots: () => [], homeContinent: () => -1, pressureAt: () => 0,
+    strategies: () => new Set(), leaderType: () => null, civilizationType: () => null, units: () => [], unitReach: () => [], hostileUnits: () => [],
+    hostileCities: () => [], cityDefences: () => [], unitPath: () => [], stepDirection: () => -1, unitActionColumn: () => -1,
     ...over,
   };
 }

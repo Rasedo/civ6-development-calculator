@@ -10,7 +10,10 @@ order checked against every AI_GovtPolicies.csv beside the H-1 recordings,
 whose score lines run in it), each policy's slot, civic, Policies_XP1 terms,
 government exclusivity, obsolescence and its modifiers as DynamicModifiers
 resolve them (collection, effect, arguments, requirement sets); each
-government's slot rows, Favor and modifiers; the slot types; the eras' order.
+government's slot rows, Favor and modifiers; the slot types; the eras' order;
+the settle site evaluation's conditions, its PlotEvaluations lists by leader,
+civilization and strategy, the features' Settlement and NaturalWonder flags,
+the resources' classes, the GlobalParameters the settle and danger code reads.
 cpu/data/aiTables.ts (the value layer every party reads, cpu/core/aiValue.ts):
 the Yields' and PseudoYields' DefaultValue, the great person classes' pseudo
 yields, each government's InfluencePointsThreshold, and the AI lists the
@@ -202,6 +205,48 @@ def build() -> str:
     wanted = {x["list"] for v in trait_lists.values() for x in v} | {x["list"] for v in strat_lists.values() for x in v}
     difficulties = [c["DifficultyType"] for c in keyed(rows("Difficulties"), "DifficultyType").values()]
 
+    # the settle site evaluation: PlotEvalConditions by their index (Value),
+    # the PlotEvaluations lists' items, the lists each leader and
+    # civilization carries (AiLists LeaderType: a trait of the leader's chain
+    # through InheritFrom, of its civilization; AgendaType: a trait of the
+    # leader's historical agenda; Strategy_Priorities: a strategy's), the
+    # features' Settlement and NaturalWonder
+    # flags and the resources' classes
+    conds = sorted(((int(c["Value"]), c["ConditionType"]) for c in rows("PlotEvalConditions")))
+    lists = keyed(rows("AiLists"), "ListType")
+    pe_lists = {k for k, c in lists.items() if c.get("System") == "PlotEvaluations"}
+    pe_items: dict[str, list] = collections.defaultdict(list)
+    for c in rows("AiFavoredItems"):
+        if c.get("ListType") in pe_lists:
+            pe_items[c["ListType"]].append({"condition": c["Item"], "favored": c.get("Favored") == "true",
+                                            "value": int(c.get("Value", 0) or 0), "stringVal": c.get("StringVal")})
+    atraits: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("AgendaTraits"):
+        if "AgendaType" in c:
+            atraits[c["AgendaType"]].append(c["TraitType"])
+    hist = {c["LeaderType"]: c["AgendaType"] for c in rows("HistoricalAgendas") if "LeaderType" in c}
+
+    def bound(col, traits):
+        ts = set(traits)
+        return [k for k in sorted(pe_lists, key=list(lists).index) if lists[k].get(col) in ts and pe_items.get(k)]
+
+    by_leader = {}
+    for lt in inherit:
+        got = bound("LeaderType", leader_traits(lt)) + bound("AgendaType", atraits.get(hist.get(lt, ""), []))
+        if got:
+            by_leader[lt] = got
+    by_civ = {cv: bound("LeaderType", ts) for cv, ts in ctraits.items() if bound("LeaderType", ts)}
+    by_strategy: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("Strategy_Priorities"):
+        if c.get("ListType") in pe_items:
+            by_strategy[c["StrategyType"]].append(c["ListType"])
+    features = [{"type": k, "settlement": c.get("Settlement", "true") != "false",
+                 "naturalWonder": c.get("NaturalWonder") == "true"}
+                for k, c in keyed(rows("Features"), "FeatureType").items()]
+    res_class = {k: c.get("ResourceClassType") for k, c in keyed(rows("Resources"), "ResourceType").items()}
+    gps = keyed(rows("GlobalParameters"), "Name")
+    globals_ = {k: int(float(gps[k]["Value"])) for k in ("CITY_MIN_RANGE", "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER")}
+
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1)};\n"
 
@@ -209,11 +254,19 @@ def build() -> str:
         "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
         " * layered install (`--check` reports a stale file). Policies and governments\n"
         " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type { AiGovernment, AiPolicy, AiSlotType } from './types';\n\n"
+        "import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType } from './types';\n\n"
         + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
         + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
         + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
         + lit("AI_ERAS", [e["EraType"] for e in eras], "readonly string[]")
+        + lit("AI_PLOT_EVAL_CONDITIONS", [t for _, t in conds], "readonly string[]")
+        + lit("AI_PLOT_EVAL_LISTS", {k: pe_items[k] for k in sorted(pe_items)}, "Readonly<Record<string, readonly AiPlotEvalItem[]>>")
+        + lit("AI_PLOT_EVAL_BY_LEADER", by_leader, "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_PLOT_EVAL_BY_CIV", by_civ, "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_PLOT_EVAL_BY_STRATEGY", dict(by_strategy), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_FEATURES", features, "readonly AiFeature[]")
+        + lit("AI_RESOURCE_CLASS", res_class, "Readonly<Record<string, string>>")
+        + lit("AI_GLOBALS", globals_, "Readonly<Record<string, number>>")
     )
     core = (
         "/**\n * THE AI VALUE LAYER'S TABLES (cpu/core/aiValue.ts), written by\n"

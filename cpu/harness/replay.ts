@@ -89,6 +89,7 @@ import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './
 import { engineId, gameHash } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
+import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -2421,6 +2422,7 @@ export interface ReplayReport {
   majorAi?: MajorAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
+  settleAi?: SettleTallies;
 }
 
 /** one game move's tally (`tallyTactics`): the unit-turns, those the AI
@@ -2546,6 +2548,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const majorAi = new MajorAiProbe(dumpPath, aiSeats, majorSeats);
   const diplomacy = new DiplomacyProbe(dumpPath, first.playerOfSeat, first.seatOfPlayer);
   diplomacy.setup(state, history.randLog, recs[0].players.map((p) => p.id).sort((x, y) => x - y));
+  const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => majorAi.weightInputs(turn));
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2570,6 +2573,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // every check the per-turn harness fails, by subject, on the records so far
   const baseFails = new Map<string, Set<string>>();
   let prev: TurnRecord | undefined;
+  // record t as the importer reads it (the settle probe's second source)
+  let recordState: GameState | null = null;
   for (let i = 0; i + 1 < recs.length; i++) {
     const a = recs[i];
     const b = recs[i + 1];
@@ -2608,6 +2613,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const staged = stagePolicies(ctx, ds);
     majorAi.preTurn(state);
     diplomacy.preTurn(state, recordA.state, read.state, b);
+    settleAi.preTurn(state, recordState);
+    recordState = read.state;
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
@@ -2733,6 +2740,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     for (const [u, hp] of struckHp) u.hp = Math.min(u.hp, hp);
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
+    settleAi.postTurn(b);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
       if (!d) return null;
@@ -2917,6 +2925,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdBarbarians(null);
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
+  if (settleAi.active) report.settleAi = settleAi.tally;
   return report;
 }
 
@@ -3007,5 +3016,6 @@ export function replayMarkdown(r: ReplayReport): string {
   }
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
+  if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
   return out.join('\n') + '\n';
 }

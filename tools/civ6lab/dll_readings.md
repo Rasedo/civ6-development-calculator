@@ -4359,6 +4359,130 @@ the port on the record's state and on the replayed engine's).
   side (the receiver's evaluator) and the retry spacing are unread.
 - Open (AUDIT C-97 BUILD): FORCE_INCURSION's count and thresholds, NEAR_CULTURE_BORDER, SETTLED_CITIES' ledger, GOVERNMENTS, PEACEFUL, the third-party, pledge, espionage, archaeology and one-sided-trade modifiers, the other agendas' own effects (Last Viking King, Zealot, Turtler, Lord of Mines, Kaitiakitanga, Exploitative, Flat Earther, Paranoid), the event triggers of requirement-driven modifiers, a meeting between two players' turns (1104 t76), the diplomatic state's Allow band, threat and trust, the action evaluator's T and G terms, the receiver's acceptance and the retry spacing, and the decisions themselves as per-seat actions (delegation, embassy, open borders, friendship, denouncement, war, peace, deals). Not engine facts: the majors' meeting, the Delegation and Embassy as two missions (the replay takes both from the logs), the game's grievances (absent from the records). ASK: the agenda pool's default GameLimit (read as every major).
 
+## C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)
+
+AI::GrandStrategic (GrandStrategic.cpp, the player AI's +0x1290) and
+SiteEvaluator. Ported in `ai/major/settle.ts` and `ai/major/danger.ts`;
+measured by the replay's settle probe (`cpu/harness/settleAi.ts`) against
+AI_Operation.csv, AI_Planning.csv and, on the verbose re-recording
+runs/h1_duelv1124 (`h1_duelv1124_20261010T215402Z`), AI_SiteEval.csv: every
+region's plots with their scores, per turn and player.
+
+- The lists (the generic list loader 0x6d6c80, system "PlotEvaluations",
+  its item handler 0x6dd310): the AiFavoredItems rows of the lists AiLists
+  binds to a trait of the leader's chain (LeaderTraits through
+  Leaders.InheritFrom: StandardSettlePlot on TRAIT_LEADER_MAJOR_CIV), of its
+  civilization, of its historical agenda, and of each strategy the AI
+  follows (Strategy_Priorities: STRATEGY_NAVAL's NavalSettlementPreferences,
+  STRATEGY_RAPID_EXPANSION's ExpansionSettlementPreferences). One entry per
+  PlotEvalConditions row (by its Value; Expansion2 adds 11 Cultural
+  Pressure); a row's Value adds to the entry's threshold where Favored, else
+  to its value, and a keyed row (StringVal) also to its yield, resource,
+  feature or resource class weight (0x76cee0). A natural wonder row adds its
+  value to ITS OWN feature once per natural wonder in the database (the loop
+  over the features indexes the row's feature, [r15+0x14], not the loop's):
+  FEATURE_DEAD_SEA weighs 6 x the natural wonders, the other wonders nothing
+  — the install's "HACK NOTE" does not happen (runs/h1_duelv1124 t40: the
+  plots within 2 of the Matterhorn score as without it).
+- The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots
+  within 5, 0x6b000): invalid where the player has not revealed the plot or
+  may not found there (0x1eaa30: not impassable (+0x3a bit 3), a feature
+  with Settlement (Features +0xc2 bit 2), no district, unowned or the
+  player's own, no city within CITY_MIN_RANGE 3 on the plot's area nor
+  closer than 3 off it — Rules_Cities 0x515910), or within
+  CITY_MIN_DISTANCE_FOR_INCURSION of a known promise's plot
+  (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),
+  coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,
+  0 with none); the danger (the influence map below, 0x716a90); the Loyalty
+  pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another
+  player is skipped (a city there sets "enemy" to the min of 0 and its
+  distance, always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's
+  yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the
+  inner ring; a feature within 2 counted; a resource the player sees
+  (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player
+  holds none of (0x4aa790, ownership 0) and not a bonus (0xadd080) is a new
+  resource.
+- The score (0x702380): per entry with a threshold or a value, the
+  evaluator the table at 0xf2e740 holds for its condition (0x6f3420..
+  0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Nearest Enemy /
+  Friendly City and New Resources — with a threshold above 0 a gate (at
+  least it, else invalid), else count x value; Inner Ring / Total Yield
+  Sum(weight x yield) over the keyed yields; Coastal — gate, else the value
+  where coastal and not fresh water; Fresh Water — gate, else the value;
+  Specific Resource / Feature Sum(weight x count); Resource Class
+  Sum(count x the class's weight); Foreign Continent — the threshold where
+  the player has no city on the plot's continent, plus the value off its
+  home continent; Cultural Pressure — a threshold below 0 a gate (pressure
+  above it), else pressure x value. A failed gate (-9999) is skipped for a
+  human (0x469d70: the slot status 3) and otherwise adds -100% to the stack:
+  the score 0. Less the danger << 8. AI_SiteEval.csv logs no score below 0:
+  the port clamps there.
+- The regions (0x6fafc0, the "Settle City Evaluation" jobs, one per map
+  region of the regions list, run and waited): each job scores every plot
+  of its region in plot order (0x6fd510) and sorts them best first, a
+  stable merge sort (0x6f5fb0); a region holds a site where one scores above
+  0. The best region top other than a given plot (0x6fe2b0) is the "Settle
+  New City" operation's target (the target list 0x747230, TARGET_SETTLE_
+  LOCATION); its "Operation Change Target" takes the best top other than
+  the old target. With no city the operation names none ("TARGET
+  -9999:-9999", "INVALID, No backup": the log, not read).
+- The first turn settler (0x70d250, the player with no city): of the
+  settler's planning reach (unit +0x1fc0, AI_Planning.csv) the plots of
+  this turn (turns <= 1), the one whose region list scores best above 0
+  (0x6fec50), the first in the reach's order on a tie; the settler moves
+  there and founds ("HL: First turn settler"). With none, it founds where
+  it stands if it may, else the weighted draw "First Turn Settler Fallback"
+  (the plots of this turn weighted by distance, x5 unowned; later ones 100 /
+  turns where it may found).
+- The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at
+  war with the player (0x469cd0), each unit it sees now (0x5033a0) with a
+  combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its
+  strength (0x716400: bombard > 0 — the combat strength where it tops the
+  bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER 17, else that less;
+  otherwise the larger of combat and ranged) onto the plots of its 1-turn
+  planning reach (0x7921e0 -> 0x26df90) and every plot within its range
+  (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots
+  beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its
+  own list). An air unit (+0x650 == 1, taken as the air domain) onto the
+  plots within its range. Each such city whose centre the player sees: its
+  strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach
+  (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the
+  player's own cities: the centre 0, each plot their strike covers down by
+  its strength to 1 at least (0x716080). Features' DangerValue last (none in
+  the install).
+- PARTLY READ: the unit flag +0x18bd (taken as a unit with no ranged or
+  bombard strength: a fit), the units' strengths (the install's base, the
+  routines' modifiers unread), the plot yield 0x538a60 (the engine's
+  `tileYields` for the seat), ownership type 0 (taken as the improved plots
+  of the resource in the player's territory: the +4 new resources at
+  runs/h1_duelv1124 t3 0:13 then agree).
+  The Loyalty pressure is the engine's citizens' term (`plotPressure`):
+  the -6 gate agrees with the log on all but 532 of its plots.
+- MEASURED (runs/h1_duelv1124, China, AI_SiteEval.csv against record t,
+  `.claude/scratchpad`'s sitecmp and the replay's settle probe): 84,606 of
+  90,387 plot scores equal over turns 1-249, every one of turns 1-9 (the
+  lists, the gates, the ring, the clamp, STRATEGY_NAVAL from turn 72, the
+  Dead Sea row); the region lists hold the game's plots but for the map's x
+  seam (the game splits our region 4 into its 4, 7 and 10). The unequal
+  lines: a yield of 1 to 6 on the plots near China's improved land (the
+  plot yield as the engine reads it), the danger's reach and strengths
+  (h1_duelv1124 t100: an Archer's range 2 off its reach covers 10:5 where
+  the game's covers 9:6 alone), the pressure gate. The verbose
+  re-recordings of 1117 / 1121 / 1127 / 1128 (`h1_duelv*_20261010T220644Z`):
+  80,028 of 84,909, 77,049 of 83,166, 90,060 of 92,628, 64,786 of 69,905
+  equal; each first turn whole; a +4 the commonest there (a new resource
+  the game does not count: ownership 0 is more than the improved plots).
+- The choices (the replay's settle probe on record t, 1117 / 1121 / 1124 /
+  1127 / 1128): the first turn settler's pick founds or stands where record
+  t+1 shows it every time (the reach as AI_Planning.csv's line once the
+  seat's units stand on their full Movement, as at its turn's start); the
+  operation's target where it starts is our best region top 85 of 99 times
+  (19/22, 15/18, 15/18, 19/21, 17/20); the changes' backups 42 of 88 (the
+  backup's rule unread: the log alternates two plots of one region).
+  The first turn settlers' orders (`firstTurnSettlerOrders`: the path's
+  steps, then FOUND_CITY, as `SeatActionRecord.units` rows) carry each
+  settler to its pick on a copy of the state (7 of 7 on the replayed engine).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
