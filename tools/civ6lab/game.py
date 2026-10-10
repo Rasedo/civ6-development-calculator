@@ -162,6 +162,13 @@ LAB_PROFILE: dict[str, dict[str, str]] = {
                         "AutoSaveFrequency": "50"},
 }
 
+# THE AI'S VERBOSE LOGS (`profile apply --ai-verbose`): the city build AI's
+# plot analysis (every district, improvement, building, unit and project
+# value of each evaluated plot, %4.2f; 0x3e75e0), the settlement evaluation
+# (AI_SiteEval.csv), the diplomatic actions and the operation evaluation.
+AI_VERBOSE = {"AI_MasterLogging": "1", "AICityBuildPlotLog": "1", "AISettlementEvaluationLog": "1",
+              "AiDiplomaticActionLog": "1", "AIOperationEvalLog": "1"}
+
 # THE STARTUP PATCH: what no mod reaches, because the engine plays it before
 # the mod system loads — the two logo movies (a missing movie is skipped) and
 # the copyright screen's 5 s legal delay (IntroScreen.lua ACCEPT_DELAY).
@@ -257,6 +264,8 @@ def cmd_profile(a) -> int:
         f, b = USER_DIR / name, USER_DIR / (name + ".lab-backup")
         if not b.exists():
             b.write_bytes(f.read_bytes())
+        if name == "UserOptions.txt":
+            keys = {**keys, **(AI_VERBOSE if a.ai_verbose else {k: "0" for k in AI_VERBOSE if k != "AI_MasterLogging"})}
         miss = _set_keys(f, keys)
         print("lab profile", name, "- not found:" if miss else "", *miss)
     return 0
@@ -798,6 +807,7 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_load)
     s = sub.add_parser("profile", help="apply / restore the lean lab profile in the owner's option files")
     s.add_argument("action", choices=("apply", "restore"))
+    s.add_argument("--ai-verbose", action="store_true", help="also turn on the AI's verbose logs (AI_VERBOSE)")
     s.set_defaults(fn=cmd_profile)
     s = sub.add_parser("patch", help="apply / revert the startup patch (logo movies off, copyright delay 0)"
                                      " and the replay patch (the AI's job spawn waits)")
