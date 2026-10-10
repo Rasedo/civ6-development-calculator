@@ -214,6 +214,12 @@ export interface ResearchState {
   /** the civics AI's analysis of its last turn, which a completion's choice
    *  reads (`civicChoice`); absent before its first */
   civicAiEntries?: CivicEntry[];
+  /** the research AI's turns left on its research as its last choice set
+   *  them (research AI +0x528: its turn 0x760980 and a completion's choice
+   *  0x762d60 write it), and the value its city build analysis of this turn
+   *  reads — the one before this turn's choice (`aiCityBuild.ts`) */
+  aiLeft?: number;
+  aiLeftSeen?: number;
 }
 
 export interface GovernmentState {

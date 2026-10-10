@@ -276,6 +276,11 @@ class SimInit:
         self.citystate_ai_score = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
         self.citystate_ai_owned = torch.zeros(B, s_pad, nt_ai, dtype=torch.bool, device=device)
         self.citystate_ai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the research AI's turns left on its research as its last choice set
+        # them, and the value the city build analysis of the turn reads
+        # (`ResearchState.aiLeft`, `aiLeftSeen`)
+        self.citystate_ai_left = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self.citystate_ai_left_seen = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the civics AI's analysis of the minor's last turn, which a
         # completion's choice reads (`ResearchState.civicAiEntries`): per row
         # its turns, next step, own value and score (raw 24.8) and owned flag

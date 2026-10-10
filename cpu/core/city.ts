@@ -61,6 +61,10 @@ export interface CityStats {
   /** the Production with nothing at the queue's head: `total.production`
    *  without the city-states' flat toward the head */
   plainProduction: number;
+  /** each yield's percent sum as a fraction (the amenity tier's, the cards', the
+   *  wonders', a city-state's -50% Production): the one modifier every
+   *  percent on the city's yield sums into */
+  yieldPct: Yields;
   foodSurplus: number;
   effectiveFoodSurplus: number;
   growthNeeded: number;
@@ -1924,6 +1928,7 @@ export function computeCityStats(
     breakdown: { tiles, districts, buildings, citizens, bonuses, trade },
     total,
     plainProduction,
+    yieldPct: pct,
     foodSurplus,
     effectiveFoodSurplus: effective,
     growthNeeded,

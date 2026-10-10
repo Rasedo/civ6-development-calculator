@@ -76,11 +76,13 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
+import { loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
+import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
@@ -182,6 +184,12 @@ interface Ctx {
   aiCivicLog: Map<string, Map<string, { score: number; turns: number }>>;
   civicScores: Record<'major' | 'minor', ResearchScoreTally>;
   majorCivicEntries: Map<number, CivicEntry[]>;
+  /** the game's city build value tables (`<dump>.logs/AI_CityBuild.csv`'s
+   *  PLOT ANALYSIS LOG, the verbose recordings) and the city-states' tables
+   *  of the engine's analysis against them, in all and per building */
+  cityBuildLog: Map<string, number[]>;
+  cityBuild: CityBuildTally;
+  cityBuildPer: Map<string, CityBuildTally>;
 }
 
 /** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
@@ -2418,6 +2426,10 @@ export interface ReplayReport {
    *  the game's AI log */
   civicAi: Record<'major' | 'minor', ResearchAiTally>;
   civicScores: Record<'major' | 'minor', ResearchScoreTally>;
+  /** the city-states' city build value tables against the game's AI log
+   *  (`CityBuildTally`), in all and per building */
+  cityBuild?: CityBuildTally;
+  cityBuildPer?: Record<string, CityBuildTally>;
   /** the majors' AI's government and card choices beside the record's */
   majorAi?: MajorAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
@@ -2556,6 +2568,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
+    cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
   };
   // the record's units in the importer's order
   let k = 0;
@@ -2818,6 +2831,16 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const pid = ctx.playerOfSeat.get(cs.seat);
       if (pid !== undefined && cs.research.aiEntries) scoreAgainstLog(ctx, 'minor', a.turn, pid, cs.research.aiEntries);
     }
+    // the city build AI's tables of each city-state's turn, after its step,
+    // against the game's (AI_CityBuild.csv, the verbose recordings)
+    if (ctx.cityBuildLog.size) {
+      for (const cs of state.cityStates) {
+        const pid = ctx.playerOfSeat.get(cs.seat);
+        const name = pid === undefined ? undefined : a.cities.find((c) => c.owner === pid)?.name;
+        const logged = name === undefined ? undefined : ctx.cityBuildLog.get(`${a.turn}:${pid}:${name}`);
+        if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs)), ctx.cityBuildPer);
+      }
+    }
     // the city-states' research AI: each choice its turn made, against the
     // research record t+1 shows
     const recTech = (rec: TurnRecord, pid: number) => {
@@ -2926,6 +2949,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
+  if (ctx.cityBuildLog.size) {
+    report.cityBuild = ctx.cityBuild;
+    report.cityBuildPer = Object.fromEntries(ctx.cityBuildPer);
+  }
   return report;
 }
 
@@ -2990,6 +3017,15 @@ export function replayMarkdown(r: ReplayReport): string {
     for (const [k, t] of Object.entries(r.barbTactics).sort(([, x], [, y]) => y.units - x.units)) {
       out.push(`| ${k} | ${t.units} | ${t.move} | ${t.firstMove ?? '-'} | ${t.plotOf} | ${t.plot} | ${t.firstPlot ?? '-'} |`);
     }
+  }
+  if (r.cityBuild) {
+    const c = r.cityBuild;
+    out.push('', '## The city build AI\'s tables', '', 'Each city-state\'s city-centre BUILDINGS table of its turn against the game\'s PLOT ANALYSIS LOG',
+      '(AI_CityBuild.csv): the items the log values, those both value, within 0.005, the log only, ours only.', '',
+      '| building | log | both | exact | log only | ours only | first miss (turn player log / ours) |', '|---|---:|---:|---:|---:|---:|---|');
+    const row = (k: string, x: CityBuildTally) => `| ${k} | ${x.log} | ${x.both} | ${x.exact} | ${x.onlyLog} | ${x.onlyOurs} | ${x.first ? `t${x.first.turn} p${x.first.player} ${x.first.log} / ${x.first.ours}` : '-'} |`;
+    out.push(row('all', c));
+    for (const [k, x] of Object.entries(r.cityBuildPer ?? {}).sort(([, a], [, b]) => b.log - a.log).slice(0, 40)) out.push(row(k, x));
   }
   out.push('', '## The civics AI', '', 'A city-state\'s choices its turn made (or the record changed), a major\'s at each civic decision of the record, against the record\'s civic:', '',
     '| party | choices | as the record | first differing (turn player ours / record) |', '|---|---:|---:|---|');

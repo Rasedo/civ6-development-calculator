@@ -3363,7 +3363,9 @@ beside each other on the scheduler's two threads.
 
 AI::CityBuild, one per city (city +0x31d0, `m_pCityBuildAI`); its log is
 AI_CityBuild.csv. Values are 24.8 fixed point throughout (the log prints the
-low byte / 256 plus the rest). Check: `dll_citybuild.py`.
+low byte / 256 plus the rest). Check: `dll_citybuild.py` (the present value
+on every logged city-state Monument), `cpu/harness/cityBuildLab.ts` (the
+building tables).
 
 - Fixed point (CivTech Math_FixedPointT): fx(f) = floor(f) << 8 | trunc(frac
   x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0),
@@ -3413,11 +3415,11 @@ low byte / 256 plus the rest). Check: `dll_citybuild.py`.
   a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the
   horizon values FX(-9999).
 - The rate and the horizons: GlobalAI (game +0x408) +0x290 is the discount
-  rate, 0x200 (2.0) from the constructor (0x6db0cf; no other writer);
-  `m_valueHorizons` (+0x298, data +0x2f0) is filled by 0x6dd9a0 as
-  [speed(50), speed(100), speed(200), 50], speed(x) = x x
-  GameSpeeds.CostMultiplier / 100 (0x5254d0 -> 0x525400; 100 when the speed
-  row is unresolved).
+  rate, AI_DISCOUNT_RATE x 100 / the speed's CostMultiplier (the initializer
+  0x6ddb40; 4.0 online, `cpu/data/aiValue.ts`); `m_valueHorizons` (+0x298,
+  data +0x2f0) is filled by 0x6dd9a0 as [speed(50), speed(100), speed(200),
+  50], speed(x) = x x GameSpeeds.CostMultiplier / 100 (0x5254d0 -> 0x525400):
+  the tables' valueHorizons[1] is 50 online.
 - A building's or project's value 0x7a7590: per Building_YieldChanges row
   (Buildings +0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct
   0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value
@@ -3460,26 +3462,102 @@ low byte / 256 plus the rest). Check: `dll_citybuild.py`.
   pseudo-yield, less its Gold maintenance below handicap 3 (player +0x908),
   then the PV difference; a Trader 0x7a7110 (PSEUDOYIELD_UNIT_TRADE);
   religious units by their charges and spread.
-- LAB (the routine against the log): `dll_emu.py pv` runs the shipped
-  routine (FinalRelease 0x528310, Release 0x7a16e0) under unicorn and it
-  agrees with `dll_citybuild.pv_fixed` bit for bit (n 0..1000). A
-  city-state's Culture weight is 0 (the next section), so its Monument's v
-  is 1.0. Over all 139 Default Specialization Monument picks of a city-state
-  (`dll_citybuild.py`, the production from the pick turn's record): the
-  routine with H 50 and T at Online's cost 30 prints 0 of them, with H 100
-  and T at the Standard cost 60 prints 12 (every one T 24, 24.2); the exact
-  annuity (1 - 1.02^-n) / 0.02 with H 100 and T at cost 60 prints 50 (T 18
-  28.1 x9, T 20 26.7 x29, T 24 24.2 x12), with H 50 at cost 30 none. No
-  fixed v makes the routine print the four values 28.1 / 26.7 / 24.2 / 20.6
-  (production 3.5 / 3 / 2.5 / 2) at a horizon 20..400 with T = k ceil(30 /
-  production) + d (k 1, 2; d 0..11) at rate 2.0, nor at rates 1.0..4.0
-  with d 0; the exact annuity needs v 1.000 / 0.998 / 1.001 / 0.995 for
-  them — so the table's horizon is 100 and its T counts Standard-speed
-  turns (as if 0x5254d0's speed lookup answered 100% in the job: unread
-  why), and its discounting is not this routine as called. 89 picks fit neither: t1 picks of a city
-  founded that turn (24.0 x33 at production 2.5, 18.1 x18 at 2.0, 30.2 at
-  3.5) and late picks; their T is not the record's.
-- Unread: the military unit value (0x79ca90), the events (0x5cd150, 0x5cc910, 0x5ccc10,
+- SETTLED (the present value, on the PLOT ANALYSIS LOG tables of the verbose
+  recordings, every building at every T): the shipped routine at rate 4.0 to
+  the horizon 50, as called. A city-state's Monument logs X + trunc(X), X =
+  PV(1.0, 50) - PV(1.0, T): its +1 Culture (a city-state's Culture weight 0)
+  and MONUMENT_CULTURE_AT_FULL_LOYALTY's whole number (COLLECTION_OWNER is the
+  building's city in its analysis; REQUIREMENT_CITY_HAS_FULL_LOYALTY is not
+  registered, so its set holds). runs/h1_duelv1124 Cardiff t2..t12 logs
+  24.25 26.04 26.68 28.11 30.19 30.61 32.53 34.38 36.29 38.29 40.11 at T 11
+  down to 1 — the uneven steps (30.61 -> 30.19 at T 7 -> 6) the routine's
+  truncations; Bologna's values run on the same ladder turn for turn.
+  `dll_citybuild.py`: 254 of the 255 city-state Monument values the five
+  verbose duels log are X + trunc(X) at a whole T below 50 (the one other,
+  1127 t41 Cardiff's 60.22, unread); the exact annuity prints none. The earlier fits (H 100
+  at the Standard cost) read the T a turn late and the Monument without its
+  modifier.
+- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,
+  measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,
+  the research turns from AI_Research.csv): the analysis runs after the
+  turn's production — its progress is the record of the turn after's, the
+  record keeping only the whole part; the build turns 0x17b1e0 are
+  0x8c4540's ceil((cost - progress) / Production toward the item) — the
+  progress kept on the item plus the store an idle step or a completion
+  left (Cardiff idle t60..t75: its Library a turn sooner each turn); +10
+  while any other item is in hand (a unit, a district, a project too; an
+  item the step completed leaves nothing in hand: Granada t6 values its
+  Granary at T 13 after its Builder); the district's turns +10 unless it is
+  the item in hand, a district under construction not held (Bologna's
+  Campus t16: T 24 = 2 + 12 + 10). The technology's turns (0x7610e0): the
+  research AI's entry turns (+0x1c; 500 at 0 or below), plus the research
+  AI's +0x528 where the entry's walk does not lead through the research in
+  hand — a tracked int (+0x4d0, data +0x58) written only by its turn
+  (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the
+  turns left on the research in hand; the analysis reads the value before
+  its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the
+  Pottery's turns left as the turn before logged them; t6 after a
+  completion: 21 + Astrology's 10 the choice set). The civic's (0x621920):
+  the civics AI's entry turns plus the turns left on the civic in hand,
+  live (0x39c1f0; -1 with none).
+- The terms measured (the same lab): a row's amount through the city's
+  percent (a city-state's -50% Production: the Water Mill's v 1.5); the
+  great person points at their class's pseudo-yield (a Shrine 2.0 = 2 Faith
+  + 0.5 Prophet - 0.5 Gold); the era's whole number only where CanConstruct
+  holds now — the technology and the civic held, the district standing, a
+  prerequisite held (the Grove 0 with no Preserve); the outer defences: +1
+  for a city of two districts or more (city +0x1a60, the districts'
+  count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1
+  with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the
+  city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player
+  has its +0x1b8 above -1; the Walls' v 6.0 at population 1..4; the
+  entertainment term passes ONE Amenity whatever the Entertainment
+  (0x7a8dcd: r9d 1): PSEUDOYIELD_HAPPINESS of 1 where the happiness level
+  holds, else of the levels climbed plus per yield but Food the level's
+  NonFoodYieldModifier change on the city's yield, at least 1.0, from T to
+  the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts
+  its city's Gold (the Economic boost; a Library's Gold maintenance otherwise
+  reads 1.72). CanConstruct refuses outright: a building held or one
+  MutuallyExclusiveBuildings names, a Capital row off the capital, a
+  government building above the tier (a city-state none), a worship
+  building the city's religion does not offer, RequiresAdjacentRiver off a
+  river, a Flood Barrier with no coastal lowland — not a district no plot can
+  hold yet (the Harbor's buildings are valued).
+- READ, the unit value's exits (0x7b62c0): T at the horizon; a unit not the
+  player's version; a domain the city cannot build (0x17d660); a religious
+  unit (Units +0x1ba bit 2) for a player not CIVILIZATION_LEVEL_FULL_CIV
+  (0x469db0, hash 0x253718b0) -> FX(-9999). A building's free units
+  (Unit_BuildingPrereqs; an Archaeologist skipped) add their value — a
+  city-state's Shrine logs FX(-9999) plus its own value at times. The
+  Trader (0x7a7110): 0 once the player's Traders fill its capacity (+ the
+  extra the caller adds); else the trade AI's expected route value (its
+  knowledge base +0x6d8, unread) over min(T + 30, H), plus the golden-age
+  points of a route (0x2c4470) as PSEUDOYIELD_GOLDENAGE_POINT, x4. The
+  military AI's unit table is built by 0x78e0a0 (entries 0x168 bytes, the
+  value at +0x160, sorted by 0x796070); 0x79ca90 reads it.
+- PARTLY: Housing 0x7a3d70 walks the CityBuildAI growth forecast (+0x720
+  populations, +0x790 turns, +0x800, 0x5d2c50) with the housing growth
+  factor 0x527ca0; the GlobalParameters +0x6b4 term of a negative Amenity
+  balance (PSEUDOYIELD_GOLDENAGE_POINT); a city-state's Barracks and
+  Stable log v 0 (1 Production at -50%, 1 Great General point, 1 Gold) —
+  the General's 0.5 does not count for it (its source among 0x700810's
+  parts unread; the Military AI's +0x7e8 array is written by its turn
+  0x71fb80).
+- Measured (`cpu/harness/cityBuildLab.ts --logtech` over runs/h1_duelv1117 /
+  1121 / 1124 / 1127 / 1128, every city-state's centre BUILDINGS row, a value
+  at or below -9000 counted as none): 24,438 logged values, 22,997 valued by
+  both, 6,463 within 0.005 at the reconstructed T, 9,852 at some T below the
+  horizon; 1,441 the log's alone, 3,041 ours alone. The Monument 255 of 255
+  at some T (167 at the reconstructed T: the lab's in-hand item and progress
+  are rebuilt from whole-number records), the Grove 1161 / 1161, the Walls
+  91%, the Castle 89%, the Star Fort 83%, the Water Mill 79%; the heaviest
+  residuals the Barracks (1,888) and Stable (1,470) — the General's points —,
+  the Lighthouse (1,817) and Shipyard (851) — Housing and the plot-yield
+  analyzers —, the Market (1,161) — the trade route capacity, the Trader's
+  value —, the Temple (455) and the Shrine's late rows — a religious free
+  unit's FX(-9999). The city's percent on a yield (city +0xbc0) is the
+  modifiers' alone, not the happiness level's (1127: 477 -> 801 within 0.005).
+- Unread: the military unit table (0x78e0a0), the events (0x5cd150, 0x5cc910, 0x5ccc10,
   0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp:
   the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40,
   FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 ("Canceling current

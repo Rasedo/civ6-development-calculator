@@ -1165,7 +1165,7 @@ _MUTABLE = [
     "citystate_cur_tech", "citystate_cur_civic", "citystate_tech_retain", "citystate_civic_retain",  # the minor's research in hand and kept
     "citystate_tech_ovf", "citystate_civic_ovf",
     "citystate_tech_goal", "citystate_ai_turns", "citystate_ai_next", "citystate_ai_base", "citystate_ai_score", "citystate_ai_owned",
-    "citystate_ai_valid",  # the research AI's goal and its last turn's analysis
+    "citystate_ai_valid", "citystate_ai_left", "citystate_ai_left_seen",  # the research AI's goal, its last turn's analysis, its turns left
     "citystate_cai_turns", "citystate_cai_next", "citystate_cai_base", "citystate_cai_score", "citystate_cai_owned",
     "citystate_cai_valid",  # the civics AI's last turn's analysis
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress

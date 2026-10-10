@@ -1,37 +1,37 @@
 """C-96 / C-97: the city build AI's present value as the game DLL codes it
 (Release 0x7a16e0, FinalRelease 0x528310; `dll_emu.py pv` runs the shipped
-routine and agrees with `pv_fixed` bit for bit), against the Default
-Specialization values the game logs (AI_CityBuild.csv beside every H-1
-recording).
+routine and agrees with `pv_fixed` bit for bit), against the value tables
+the game logs with its verbose AI logs (AI_CityBuild.csv's PLOT ANALYSIS LOG
+beside the runs/h1_duelv* recordings).
 
-    python tools/civ6lab/dll_citybuild.py [--rows]
+    python tools/civ6lab/dll_citybuild.py
 
 A building's value is PV(v, rate, H) - PV(v, rate, T) (0x7a7590) plus terms
-added after it: v its per-turn value, rate the global AI's 2.0 (GlobalAI
-+0x290), H the value horizon (valueHorizons[1]), T the turns until it stands.
+added after it: v its per-turn value, rate the GlobalAI's 4.0 online, H the
+value horizon (valueHorizons[1], 50 online), T the turns until it stands.
 The routine:
   n = 0 -> v; n < 0 -> 0; rate 0 -> v n;
   rate >= 50.0 or rate n fx(0.01) >= 10.0 -> v / (rate fx(0.01));
   else n <= 400, s = a + c/2 + e fx(1/6) with a = n r, c = n(n-1) r^2,
   e = n(n-1)(n-2) r^3 (each product truncated in 24.8, r x = rate x / 25600),
   PV = (s v) / max(r (1 + s), fx(0.01)).
-Scored on every Default Specialization Monument pick of a city-state (+1
-Culture, no maintenance; a city-state's Culture weight is 0, so v = 1.0):
-the city's production from the record of the pick's turn (t + 1 for a city
-founded that turn); T at Online's cost 30 or the Standard cost 60, H 50 or
-100, the shipped routine or the exact annuity (1 - 1.02^-n) / 0.02; a hit
-prints the logged value at its one decimal.
+The check: a city-state's Monument is +1 Culture at its weight 0 (v 1.0) and
+MONUMENT_CULTURE_AT_FULL_LOYALTY's whole number, so every value the tables
+log for it is X + trunc(X), X = PV(1.0, H) - PV(1.0, T), at some whole T
+below the horizon. Printed: the logged values, those the routine prints at
+some T, those the exact annuity (1 - 1.04^-n) / 0.04 prints at some T.
 """
 from __future__ import annotations
 
-import argparse
-import csv
-import json
-import math
 import pathlib
 
-RUNS = pathlib.Path(__file__).parent / "runs"
-RATE = 0x200
+HERE = pathlib.Path(__file__).resolve().parent
+# the recordings live in the checkout (a worktree under .claude/worktrees reads its parent's)
+RUNS = next((p / "runs" for p in (HERE, HERE.parents[4] / "tools" / "civ6lab") if any((p / "runs").glob("h1_duelv*.logs"))),
+            HERE / "runs")
+RATE = 0x400
+HORIZON = 50
+MONUMENT = 0  # Buildings rowid order: BUILDING_MONUMENT first
 
 
 def _pct(x: int) -> int:
@@ -62,61 +62,45 @@ def pv_fixed(v: int, rate: int, n: int) -> int:
     return int((((s * v) >> 8) << 8) / den)
 
 
-def pv_exact(v: float, r: float, n: int) -> float:
-    return v * (1 - (1 + r) ** -n) / r if n > 0 else (v if n == 0 else 0.0)
+def _routine(t: int) -> float:
+    x = pv_fixed(256, RATE, HORIZON) - pv_fixed(256, RATE, t)
+    return (x + (x >> 8 << 8)) / 256
 
 
-MODELS = {
-    "dll   H 50  T at cost 30": (lambda n: pv_fixed(256, RATE, n) / 256, 50, 30),
-    "dll   H 100 T at cost 60": (lambda n: pv_fixed(256, RATE, n) / 256, 100, 60),
-    "exact H 50  T at cost 30": (lambda n: pv_exact(1.0, 0.02, n), 50, 30),
-    "exact H 100 T at cost 60": (lambda n: pv_exact(1.0, 0.02, n), 100, 60),
-}
+def _annuity(t: int) -> float:
+    a = lambda n: (1 - 1.04 ** -n) / 0.04  # noqa: E731
+    x = a(HORIZON) - a(t)
+    return x + int(x)
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--rows", action="store_true")
-    ap.add_argument("--runs", default=str(RUNS))
-    a = ap.parse_args()
-    hits = dict.fromkeys(MODELS, 0)
+    ladders = {"routine": {f"{_routine(t):.2f}" for t in range(HORIZON)},
+               "exact annuity": {f"{_annuity(t):.2f}" for t in range(HORIZON)}}
     n = 0
-    for log in sorted(pathlib.Path(a.runs).glob("h1_duelw*_20261007T232459Z.logs/AI_CityBuild.csv")):
-        stem = str(log.parent)[:-len(".logs")]
-        recs = {}
-        for line in open(stem + ".jsonl", encoding="utf-8"):
-            d = json.loads(line)
-            recs[d["turn"]] = d
-        for row in csv.reader(open(log, encoding="utf-8", errors="replace")):
-            row = [c.strip() for c in row]
-            if len(row) < 7 or not row[0].isdigit() or row[5] != "BUILDING_MONUMENT" \
-                    or row[6] != "Default Specialization" or int(row[1]) < 2:
+    hits = dict.fromkeys(ladders, 0)
+    for log in sorted(RUNS.glob("h1_duelv*.logs/AI_CityBuild.csv")):
+        player, state = None, ""
+        for line in open(log, encoding="utf-8", errors="replace"):
+            if line.startswith(",,,BUILDINGS,"):
+                if state == "centre" and player is not None and 2 <= player < 63:
+                    v = line.split(",")[4 + MONUMENT].strip()
+                    if v != "-9999.00":
+                        n += 1
+                        for k, lad in ladders.items():
+                            hits[k] += v in lad
                 continue
-            turn, player, logged = int(row[0]), int(row[1]), row[-1].split()[-1]
-            n += 1
-            city = None
-            for t in (turn, turn + 1):
-                rec = recs.get(t)
-                city = next((c for c in rec["cities"] if c["owner"] == player and c["name"] == row[2]), None) \
-                    if rec else None
-                if city:
-                    break
-            prod = city["yields"][1] if city else 0
-            if prod <= 0:
+            if line.startswith(",,,"):
                 continue
-            out = []
-            for name, (pv, horizon, cost) in MODELS.items():
-                turns = math.ceil(cost / prod)
-                value = pv(horizon) - pv(turns) if turns < horizon else None
-                hit = value is not None and f"{value:.1f}" == logged
-                hits[name] += hit
-                out.append(f"{'-' if value is None else f'{value:.2f}':>6}{'*' if hit else ' '}")
-            if a.rows:
-                print(f"{log.parent.name[8:12]} t{turn:<3} p{player} {row[2][14:]:<14} prod {prod:<7.3f} "
-                      f"logged {logged:>5}  " + " ".join(out))
-    print(f"city-state Monument picks: {n}")
-    for name, h in hits.items():
-        print(f"  {name}: {h}")
+            p = [x.strip() for x in line.split(",")]
+            if len(p) > 3 and p[3] == "PLOT ANALYSIS LOG":
+                player, state = int(p[1]), "header"
+            elif len(p) > 3 and p[0].isdigit() and p[2] == "":
+                state = "centre" if state == "header" else "plot"
+            else:
+                state = ""
+    print(f"city-state Monument values logged: {n}")
+    for k, h in hits.items():
+        print(f"  printed by the {k} at some T: {h}")
     return 0
 
 

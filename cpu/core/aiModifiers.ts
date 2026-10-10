@@ -55,6 +55,9 @@ export interface ValueTerms {
   start: number;
   horizon: number;
   rate: number;
+  /** the city that owns the modifiers in a building's analysis (context
+   *  +0x10): COLLECTION_OWNER is that city; absent, the player */
+  owner?: { cityId: number; capital: boolean };
 }
 
 /** an analysis subject: the player, a city (context +0x70), a district
@@ -68,7 +71,7 @@ type Subject =
  *  null for a collection not read */
 function subjects(t: ValueTerms, collection: string): Subject[] | null {
   switch (collection) {
-    case 'COLLECTION_OWNER': return [{ kind: 'player' }];
+    case 'COLLECTION_OWNER': return t.owner ? [{ kind: 'city', id: t.owner.cityId, capital: t.owner.capital }] : [{ kind: 'player' }];
     case 'COLLECTION_PLAYER_CITIES': return t.view.cities(t.seat).map((c) => ({ kind: 'city', id: c.id, capital: c.capital }));
     case 'COLLECTION_PLAYER_CAPITAL_CITY': return t.view.cities(t.seat).filter((c) => c.capital).map((c) => ({ kind: 'city', id: c.id, capital: true }));
     case 'COLLECTION_PLAYER_DISTRICTS': return t.view.districts(t.seat).map((d) => ({ kind: 'district', cityId: d.cityId, type: d.type }));

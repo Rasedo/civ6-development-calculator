@@ -51,6 +51,7 @@ import { civEraIndex, computeCityStats, luxuryAmenities } from './city';
 import { getModifiers, inDarkAge, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
 import { isCiv, seatOf } from './seats';
+import { minorCity } from './cityStates';
 import type { GameState, Seat } from './types';
 
 /** the yields in YieldTypes order */
@@ -122,7 +123,7 @@ function listSum(seat: number, s: Seat, strategies: readonly string[], system: s
   return out;
 }
 
-/** the seat's gold per turn: its cities' net Gold less its units' and its
+/** the seat's gold per turn: its cities' net Gold (a city-state's one city's) less its units' and its
  *  devices' upkeep */
 export function goldPerTurn(state: GameState, seat: number): number {
   const s = seatOf(state, seat);
@@ -131,6 +132,9 @@ export function goldPerTurn(state: GameState, seat: number): number {
   const mods = getModifiers(state, seat);
   let g = 0;
   for (const c of s.cities) g += computeCityStats(state, c, lux, mods).total.gold;
+  // a city-state's one city
+  const cs = state.cityStates.find((x) => x.seat === seat);
+  if (cs) g += computeCityStats(state, minorCity(cs)).total.gold;
   for (const u of state.units) if (u.seat === seat) g -= unitUpkeep(mods, u);
   return g - wmdUpkeep(state, seat);
 }

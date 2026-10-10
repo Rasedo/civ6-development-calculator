@@ -77,7 +77,7 @@ export interface ResearchEntry {
 /** 0x4ca000 / 0x8c4540: the turns a row needs at `rate` (raw Science a turn) —
  *  ceil of what is left over the rate, 1 where nothing is left; its cost in
  *  whole Science where the seat makes none */
-function turnsLeft(state: GameState, seat: number, r: ResearchState, id: string, rate: number): number {
+export function researchTurnsLeft(state: GameState, seat: number, r: ResearchState, id: string, rate: number): number {
   const cost = researchCost(state, id, false, seat);
   const kept = id === r.tech ? r.techProgress : r.techRetained[id] ?? 0;
   const t = turnsAt(cost * FX - fxOf(kept + Math.max(0, r.techOverflow ?? 0)), rate);
@@ -93,7 +93,7 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
   for (let level = 0; level < 3 && front.length; level++) {
     const added: string[] = [];
     for (const e of front) {
-      turns += turnsLeft(state, seat, r, e, rate);
+      turns += researchTurnsLeft(state, seat, r, e, rate);
       if (researchable(r, e)) continue;
       for (const p of prereqs(e)) {
         if (r.techs.includes(p) || added.includes(p)) continue;

@@ -29,7 +29,9 @@ from __future__ import annotations
 import collections
 import glob
 import json
+import os
 import pathlib
+import sqlite3
 import sys
 
 from xml_check import Install
@@ -38,6 +40,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 OUT = ROOT / "ai" / "major" / "tables.ts"
 # the value layer's tables every AI party reads (cpu/core/aiValue.ts)
 OUT_CORE = ROOT / "cpu" / "data" / "aiTables.ts"
+# the city build AI's tables (cpu/core/aiCityBuild.ts)
+OUT_CITY = ROOT / "cpu" / "data" / "aiBuildTables.ts"
+# the game's own database, as it last loaded the ruleset: its row order
+GAME_DB = pathlib.Path(os.path.expandvars(r"%LOCALAPPDATA%/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"))
 # the systems the yield weight reads by trait and by strategy, and the one the
 # pseudo-yield weight reads by strategy alone
 WEIGHT_SYSTEMS = ("Yields", "YieldSensitivities")
@@ -290,7 +296,91 @@ def build() -> str:
               "readonly { strategy: string; yield: string; pct: number }[]")
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
     )
-    return major, core
+    city = build_city(rows, modifier)
+    return major, core, city
+
+
+def in_game_order(table: str, key: str, rows: dict[str, dict]) -> list[tuple[str, dict]]:
+    """the install's rows in the game's DATABASE ORDER: the rowid order of the
+    game's own database (DebugGameplay.sqlite in the game's cache, written as
+    it loads its packs — the DLC civilizations' rows before Expansion1's, the
+    later packs' after Expansion2's, an order the packs' .modinfo files do not
+    state). A row the install has and the database lacks, or the reverse, is
+    an error."""
+    db = sqlite3.connect(GAME_DB)
+    order = [r[0] for r in db.execute(f"select {key} from {table} order by rowid")]
+    if set(order) != set(rows):
+        raise SystemExit(f"{table}: the install and {GAME_DB.name} differ: "
+                         f"{sorted(set(order) ^ set(rows))}")
+    return [(k, rows[k]) for k in order]
+
+
+def build_city(rows, modifier) -> str:
+    """the city build AI's tables: the Buildings in DATABASE ORDER (the
+    index its value tables run in, AI_CityBuild.csv's BUILDINGS rows), each
+    with the columns and child rows its value reads"""
+
+    def num(c, k, d=0):
+        v = c.get(k)
+        return d if v in (None, "", "NULL") else int(float(v))
+
+    def multi(table, key):
+        out: dict[str, list] = collections.defaultdict(list)
+        for c in rows(table):
+            if c.get(key):
+                out[c[key]].append(c)
+        return out
+
+    by_yield = multi("Building_YieldChanges", "BuildingType")
+    prereq = multi("BuildingPrereqs", "Building")
+    gworks = multi("Building_GreatWorks", "BuildingType")
+    gpp = multi("Building_GreatPersonPoints", "BuildingType")
+    bmods = multi("BuildingModifiers", "BuildingType")
+    copies = multi("Building_YieldDistrictCopies", "BuildingType")
+    unit_pre = multi("Unit_BuildingPrereqs", "PrereqBuilding")
+    exclusive = multi("MutuallyExclusiveBuildings", "Building")
+    replaces = {c["CivUniqueBuildingType"]: c["ReplacesBuildingType"] for c in rows("BuildingReplaces")
+                if c.get("CivUniqueBuildingType")}
+    xp2 = keyed(rows("Buildings_XP2"), "BuildingType")
+    subtypes = multi("GreatWork_ValidSubTypes", "GreatWorkSlotType")
+    gw_pseudo = {k: c.get("PseudoYieldType") for k, c in keyed(rows("GreatWorkObjectTypes"), "GreatWorkObjectType").items()}
+    gpc = {k: c.get("PseudoYieldType") for k, c in keyed(rows("GreatPersonClasses"), "GreatPersonClassType").items()}
+    out = []
+    for b, c in in_game_order("Buildings", "BuildingType", keyed(rows("Buildings"), "BuildingType")):
+        x = xp2.get(b, {})
+        out.append({
+            "type": b, "cost": num(c, "Cost"), "maintenance": num(c, "Maintenance"), "housing": num(c, "Housing"),
+            "entertainment": num(c, "Entertainment"), "regionalRange": num(c, "RegionalRange"),
+            "outerDefenseHitPoints": c.get("OuterDefenseHitPoints") not in (None, "", "NULL"),
+            "outerDefenseStrength": num(c, "OuterDefenseStrength"),
+            "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
+            "wonder": c.get("IsWonder") == "true", "placement": c.get("RequiresPlacement") == "true",
+            "maxPlayerInstances": num(c, "MaxPlayerInstances", -1), "maxWorldInstances": num(c, "MaxWorldInstances", -1),
+            "trait": c.get("TraitType"), "replaces": replaces.get(b),
+            "capital": c.get("Capital") == "true", "religion": c.get("EnabledByReligion") == "true",
+            "adjacentRiver": c.get("RequiresAdjacentRiver") == "true",
+            "governmentTier": int((c.get("GovernmentTierRequirement") or "Tier0")[4:] or 0),
+            "exclusive": [r["MutuallyExclusiveBuilding"] for r in exclusive[b]],
+            "yields": [[r["YieldType"], num(r, "YieldChange")] for r in by_yield[b]],
+            "prereqs": [r["PrereqBuilding"] for r in prereq[b]],
+            "greatWorks": [{"n": num(r, "NumSlots", 1),
+                            "pseudo": [gw_pseudo.get(s["GreatWorkObjectType"]) for s in subtypes[r["GreatWorkSlotType"]]]}
+                           for r in gworks[b]],
+            "gpp": [[gpc.get(r["GreatPersonClassType"]), num(r, "PointsPerTurn")] for r in gpp[b]],
+            "copies": [[r["OldYieldType"], r["NewYieldType"]] for r in copies[b]],
+            "units": [r["Unit"] for r in unit_pre[b]],
+            "entertainmentWithPower": num(x, "EntertainmentBonusWithPower"),
+            "modifiers": [modifier(r["ModifierId"]) for r in bmods[b]],
+        })
+    return (
+        "/**\n * THE CITY BUILD AI'S TABLES (cpu/core/aiCityBuild.ts), written by\n"
+        " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
+        " * stale file): the Buildings in DATABASE ORDER — the index the AI's value\n"
+        " * tables run in — with the columns and child rows the building value\n"
+        " * reads.\n */\n"
+        "import type { AiBuildingRow } from '../core/aiCityBuild';\n\n"
+        f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n"
+    )
 
 
 def order_check(policies: list[str]) -> tuple[int, int]:
@@ -315,10 +405,10 @@ def order_check(policies: list[str]) -> tuple[int, int]:
 
 
 def main() -> int:
-    text, core = build()
+    text, core, city = build()
     if "--check" in sys.argv:
         bad = 0
-        for path, want in ((OUT, text), (OUT_CORE, core)):
+        for path, want in ((OUT, text), (OUT_CORE, core), (OUT_CITY, city)):
             stale = not path.exists() or path.read_text(encoding="utf-8") != want
             print(path.relative_to(ROOT).as_posix(), "STALE" if stale else "OK")
             bad |= stale
@@ -326,6 +416,7 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(text, encoding="utf-8", newline="\n")
     OUT_CORE.write_text(core, encoding="utf-8", newline="\n")
+    OUT_CITY.write_text(city, encoding="utf-8", newline="\n")
     names = [line.split('"')[3] for line in text.splitlines() if line.startswith('  "type": "POLICY_')]
     seen, bad = order_check(names)
     print(f"wrote {OUT} ({len(text)} bytes); logged score lines {seen}, out of database order {bad}")

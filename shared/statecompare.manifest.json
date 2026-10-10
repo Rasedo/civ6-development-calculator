@@ -1939,6 +1939,19 @@
           ]
         },
         {
+          "name": "minorResearchLeft",
+          "compare": "exact",
+          "covers": [
+            "ResearchState.aiLeft",
+            "ResearchState.aiLeftSeen"
+          ],
+          "planes": [
+            "citystate_ai_left",
+            "citystate_ai_left_seen"
+          ],
+          "note": "the research AI's tracked turns left on the current research (+0x528, the city build AI's tech-turn term) and the value as the analysis read it before this turn's research rewrote it, per city-state"
+        },
+        {
           "name": "minorTechOverflow",
           "compare": "milli",
           "covers": [

@@ -355,6 +355,17 @@ class SimResearch:
         self.citystate_cur_tech[:, s] = torch.where(sw, pick, cur)
         self.citystate_tech_goal[:, s] = torch.where(go, goal, self.citystate_tech_goal[:, s])
 
+    def _rai_left(self, s: int, sci: torch.Tensor) -> torch.Tensor:
+        """`researchTurnsLeft` of the research in hand ([B], 0 with none): its
+        cost less the progress (and the overflow) over the Science rate,
+        rounded up; its cost where the minor makes no Science"""
+        cur = self.citystate_cur_tech[:, s]
+        cost = self._research_cost(False).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1)
+        prog = torch.floor((self.citystate_tech_prog[:, s] + self.citystate_tech_ovf[:, s].clamp(min=0)) * _FX + 0.5).long()
+        tl = _turns_at(cost * _FX - prog, torch.floor(sci * _FX + 0.5).long())
+        tl = torch.where(tl < 0, cost, tl)
+        return torch.where(cur >= 0, tl, torch.zeros_like(tl))
+
     def _rai_store(self, s: int, mask: torch.Tensor, ent) -> None:
         """the turn's analysis kept for the next completion (`aiEntries`)"""
         turns, nxt, base, score, owned = ent
@@ -380,6 +391,7 @@ class SimResearch:
         score = score + self._rai_upstream(self.citystate_techs[:, s], base, turns)
         pick, goal = self._rai_choice(s, fire, (turns, nxt, base, score, owned), done)
         self._rai_take(s, pick, goal)
+        self.citystate_ai_left[:, s] = torch.where(fire, self._rai_left(s, sci), self.citystate_ai_left[:, s])
 
     def _rai_turn(self, s: int, alive: torch.Tensor, sci: torch.Tensor) -> None:
         """the turn's analysis (kept) and its choice (`researchTurnChoice`):
@@ -388,6 +400,7 @@ class SimResearch:
         T = self._rai_tables()
         ent = self._rai_analysis(s, sci)
         self._rai_store(s, alive, ent)
+        self.citystate_ai_left_seen[:, s] = torch.where(alive, self.citystate_ai_left[:, s], self.citystate_ai_left_seen[:, s])
         turns, nxt, _base, score, owned = ent
         cur = self.citystate_cur_tech[:, s]
         goal = self.citystate_tech_goal[:, s]
@@ -406,3 +419,4 @@ class SimResearch:
         if bool(go.count_nonzero()):
             pick, g = self._rai_choice(s, go, ent, torch.full_like(cur, -1))
             self._rai_take(s, pick, g)
+        self.citystate_ai_left[:, s] = torch.where(alive, self._rai_left(s, sci), self.citystate_ai_left[:, s])

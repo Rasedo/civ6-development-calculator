@@ -856,6 +856,7 @@ CITY_STATE = {
             int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
             int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
         if bool(sim.citystate_cai_valid[b, s]) else [] for s in rows],
+    "minorResearchLeft": lambda sim, b, rows: [[int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s])] for s in rows],
     "minorTechOverflow": lambda sim, b, rows: [float(sim.citystate_tech_ovf[b, s]) for s in rows],
     "minorCivicOverflow": lambda sim, b, rows: [float(sim.citystate_civic_ovf[b, s]) for s in rows],
     "minorTechRetained": lambda sim, b, rows: [sim.citystate_tech_retain[b, s].tolist() for s in rows],

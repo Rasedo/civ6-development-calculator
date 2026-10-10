@@ -16,7 +16,7 @@
  * higher wall, a free tile beside the centre for a unit — is the same rule a
  * major pays.
  */
-import type { City, CityState, DistrictId, GameState, ResearchState, Tile, Unit } from './types';
+import type { City, CityState, DistrictId, GameState, ResearchState, Tile, Unit, YieldKey } from './types';
 import { BUILDINGS } from '../data/buildings';
 import { ERAS, TECHS, type Era } from '../data/techs';
 import { CIVICS } from '../data/civics';
@@ -41,9 +41,9 @@ import { lumpFood, seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
 import { applyTrainingGrants, cityStrikeStrength } from './combat';
 import { districtScaledBase, goldAffordable, projectCost, repairAvailable } from './game';
-import { computeCityStats } from './city';
+import { civEraIndex, computeCityStats } from './city';
 import { researchCost, selectResearch } from './economy';
-import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, type ResearchChoice } from './aiResearch';
+import { researchAnalysis, researchCompletionChoice, researchDraw, researchTurnChoice, researchTurnsLeft, type ResearchChoice } from './aiResearch';
 import { civicAnalysis, civicChoice, civicDraw } from './aiCivics';
 import { minorCity, suzerainOf } from './cityStates';
 import { computeUnlocksIn, purchaseStep, unitMaintenance, type Unlocks } from './effects';
@@ -60,6 +60,12 @@ import { landWalker, walkUnit } from './walker';
 import { worldEraIndex } from './eras';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
+import { engineId, gameTypeOf } from '../data/aliases';
+import { DISTRICTS } from '../data/districts';
+import { AI_BUILDINGS } from '../data/aiBuildTables';
+import { AI_BUILDING_INDEX, type CityBuildFacts } from './aiCityBuild';
+import { FX, fxOf, turnsAt } from './aiValue';
+import { majorView } from './majorView';
 
 /** The first legal plot in TILE-INDEX order — the GPU pick is the argmax of
  *  the eligibility plane, which is this same tile. -1 = no plot (also how a
@@ -264,6 +270,7 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
     delete r.techRetained[cur];
     r.tech = null;
     takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science), cur, researchDraw(state)));
+    r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
     if (cur === URBAN_DEFENSES_TECH) {
       cityState.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
       for (const d of cityState.districts ?? []) {
@@ -273,7 +280,9 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
     }
   }
   r.aiEntries = researchAnalysis(state, seat, science);
+  r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
+  r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
   // THE CIVICS: the turn's Culture banks; a completion's choice reads the
   // civics AI's analysis of the turn before, the completed civic its key
   // (0x6293e0); then the AI's turn analyses the tree and, with nothing in
@@ -902,14 +911,7 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
     cityState.prodOverflow = (cityState.prodOverflow ?? 0) + made;
     return;
   }
-  const military = state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type)).length;
-  const pct = 'unit' in item
-    ? (item.unit === 'BUILDER' ? MINOR_BUILDER_PROD_PCT
-      : unitIsMilitary(item.unit) && military < MINOR_SMALL_MILITARY ? MINOR_MILITARY_PROD_PCT : 0)
-    : 'building' in item ? (BUILDINGS[item.building].walls ? MINOR_WALLS_PROD_PCT : 0)
-      : 'district' in item ? (item.district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
-        : item.district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0)
-        : 0;
+  const pct = minorItemPct(state, cityState, item);
   const cost = minorItemCost(state, cityState, item);
   const before = cityState.prodProgress ?? 0;
   const paid = made + (cityState.prodOverflow ?? 0);
@@ -937,10 +939,159 @@ function minorBuild(state: GameState, cityState: CityState, production: number):
   cityState.prodOverflow = Math.max(0, made - Math.max(0, cost - before));
 }
 
+/** An install item type as the minor's item in hand: BUILDING_X, DISTRICT_X
+ *  (at no site), UNIT_X, PROJECT_X */
+function minorItemOf(type: string): MinorItem | null {
+  if (type.startsWith('BUILDING_')) {
+    const b = engineId('building', type, 'BUILDING_', BUILDINGS);
+    return b ? { building: b } : null;
+  }
+  if (type.startsWith('DISTRICT_')) {
+    const d = engineId('district', type, 'DISTRICT_', DISTRICTS) as DistrictId | null;
+    return d ? { district: d, site: -1 } : null;
+  }
+  if (type.startsWith('UNIT_')) {
+    const u = engineId('unit', type, 'UNIT_', UNITS);
+    return u ? { unit: u } : null;
+  }
+  const p = engineId('project', type, 'PROJECT_', PROJECTS);
+  return p ? { project: p } : null;
+}
+
+/** The install type of an engine row: its own type where that names it
+ *  (a civilization's unique row maps onto the row it replaces, never the
+ *  reverse), else the type its catalog tag names */
+function installType(kind: string, id: string, prefix: string, known: object): string {
+  return engineId(kind, prefix + id, prefix, known) === id ? prefix + id : gameTypeOf(kind, id, prefix);
+}
+
+/** The install type of the minor's item in hand, null with none */
+function minorItemType(cityState: CityState): string | null {
+  const k = cityState.prodItem;
+  if (!k) return null;
+  const [kind, id] = k.split(':');
+  return kind === 'building' ? installType('building', id, 'BUILDING_', BUILDINGS)
+    : kind === 'district' ? installType('district', id, 'DISTRICT_', DISTRICTS)
+      : kind === 'unit' ? installType('unit', id, 'UNIT_', UNITS)
+        : kind === 'project' ? installType('project', id, 'PROJECT_', PROJECTS) : null;
+}
+
+/** The turns the research AI's analysis gives a technology or the civics
+ *  AI's a civic (0x7610e0 / 0x621920): 0 for none or one held; else its
+ *  entry's turns (500 out of reach), plus the turns left on the item in
+ *  hand where its walk does not lead through it (runs/h1_duelv1124: a
+ *  city-state's Walls at t3 lands at Masonry's 21 turns plus the 4 left on
+ *  its Pottery as its turn before set them) */
+function analysedTurns(entries: readonly { id: string; next: string; turns: number; owned: boolean }[],
+  id: string | null, held: readonly string[], current: string | null, currentLeft: number): number {
+  if (!id || held.includes(id)) return 0;
+  const e = entries.find((x) => x.id === id);
+  if (!e || e.owned) return 0;
+  const t = e.turns > 0 ? e.turns : 500;
+  return t < 500 && current !== e.next && current !== id ? t + currentLeft : t;
+}
+
+/** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`) */
+export function minorBuildFacts(state: GameState, cityState: CityState): CityBuildFacts {
+  const city = minorCity(cityState);
+  const stats = computeCityStats(state, city);
+  const r = cityState.research;
+  const view = majorView(state);
+  const current = minorItemType(cityState);
+  const key: Record<string, YieldKey> = {
+    YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
+  };
+  // the research AI's turns left on its research as its last choice set
+  // them; the civics AI's read live (-1 with nothing in hand, 0x39c1f0)
+  const techLeft = r.aiLeftSeen ?? 0;
+  const civicLeft = r.civic
+    ? turnsAt(researchCost(state, r.civic, true, cityState.seat) * FX - fxOf(r.civicProgress), fxOf(stats.total.culture)) : -1;
+  const has = new Set(city.buildings);
+  const centre = state.map.tiles[cityState.centerIndex];
+  const worship = minorWorship(state, cityState);
+  const amenity = {
+    balance: stats.amenities.have - stats.amenities.needed,
+    yields: Object.fromEntries(Object.entries(key).map(([y, k]) => [y, stats.total[k]])),
+  };
+  const techEntries = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
+  const civicEntries = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
+  return {
+    view,
+    seat: cityState.seat,
+    cityId: city.id,
+    population: cityState.population,
+    capital: true,
+    districtCount: 1 + (cityState.districts?.length ?? 0),
+    // a city-state builds no wonder
+    hasWonder: false,
+    atWar: (seatOf(state, cityState.seat)?.wars.length ?? 0) > 0,
+    era: civEraIndex(r.techs, r.civics),
+    // the city's modifier percent on the yield (city +0xbc0): the happiness
+    // level's NonFoodYieldModifier is not among them (runs/h1_duelv1127:
+    // every city-state Monument it logs reads its +1 Culture whole, whatever
+    // the city's happiness level)
+    yieldPct: (y) => Math.round(((stats.yieldPct[key[y]] ?? 0) - (y === 'YIELD_FOOD' ? 0 : stats.amenities.tier.yieldFactor - 1)) * 100),
+    version: (b) => (AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]?.trait ? null : b),
+    hasBuilding: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      return !!id && has.has(id);
+    },
+    hasDistrict: (d) => {
+      const id = engineId('district', d, 'DISTRICT_', DISTRICTS);
+      return id === 'CITY_CENTER' || (!!id && (cityState.districts ?? []).some((x) => x.type === id && state.map.tiles[x.tileIndex].districtComplete));
+    },
+    governmentTier: 0,
+    worship: worship ? installType('building', worship, 'BUILDING_', BUILDINGS) : null,
+    riverside: hasRiver(centre),
+    groundRefuses: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      if (!id) return true;
+      return !!BUILDINGS[id].floodBarrier && cityLowlands(state, city).length === 0;
+    },
+    amenity,
+    // a city-state holds one city
+    regionalAmenities: () => [amenity],
+    current,
+    techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
+    civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
+    buildTurns: (type) => {
+      const item = minorItemOf(type);
+      if (!item) return 500;
+      const k = minorItemKey(item);
+      // the progress kept on the item, and the store an idle step or a
+      // completion left, which the next item takes (runs/h1_duelv1124: idle
+      // Cardiff's Library valued a turn sooner each turn from t60 to t75)
+      const progress = (cityState.prodItem === k ? cityState.prodProgress ?? 0 : cityState.prodRetained?.[k] ?? 0) + (cityState.prodOverflow ?? 0);
+      const cost = minorItemCost(state, cityState, item as Exclude<MinorItem, { none: true }>);
+      const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100));
+      return turnsAt(cost * FX - fxOf(progress), rate);
+    },
+  };
+}
+
+/** The percent a minor's step pays toward the item on top of its Production:
+ *  a Builder +200%, a military unit +200% while the minor holds fewer than
+ *  ten, walls +200%, the Harbor and the type's own district +500% (the
+ *  install's MINOR_CIV_PRODUCTION_* and MINOR_CIV_<TYPE>_TRAIT rows). */
+export function minorItemPct(state: GameState, cityState: CityState, item: MinorItem): number {
+  if ('unit' in item) {
+    if (item.unit === 'BUILDER') return MINOR_BUILDER_PROD_PCT;
+    if (!unitIsMilitary(item.unit)) return 0;
+    const military = state.units.filter((u) => u.seat === cityState.seat && unitIsMilitary(u.type)).length;
+    return military < MINOR_SMALL_MILITARY ? MINOR_MILITARY_PROD_PCT : 0;
+  }
+  if ('building' in item) return BUILDINGS[item.building].walls ? MINOR_WALLS_PROD_PCT : 0;
+  if ('district' in item) {
+    return item.district === 'HARBOR' ? MINOR_HARBOR_PROD_PCT
+      : item.district === CITY_STATE_TYPE_DISTRICT[cityState.type] ? MINOR_TYPE_DISTRICT_PROD_PCT[cityState.type] : 0;
+  }
+  return 0;
+}
+
 /** A minor's item's price: a unit's Production cost (a Builder's and a
  *  Trader's climbing), a building's (`minorBuildingCost`), a district's own
  *  base, a project's, a repair's rest past `MINOR_REPAIR_RESUME_PCT`. */
-function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
+export function minorItemCost(state: GameState, cityState: CityState, item: Exclude<MinorItem, { none: true }>): number {
   return 'unit' in item
     ? (item.unit === 'BUILDER' ? builderCost(state, cityState.seat)
       : item.unit === 'TRADER' ? traderCost(state, cityState.seat) : UNITS[item.unit].cost)

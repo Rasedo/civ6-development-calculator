@@ -764,6 +764,7 @@ const CITY_STATE_G: Record<string, Extractor> = {
       return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
     });
   }),
+  minorResearchLeft: overCityStates((cityState) => [cityState.research.aiLeft ?? 0, cityState.research.aiLeftSeen ?? 0]),
   minorTechOverflow: overCityStates((cityState) => cityState.research.techOverflow ?? 0),
   minorCivicOverflow: overCityStates((cityState) => cityState.research.civicOverflow ?? 0),
   minorTechRetained: overCityStates((cityState) => [...TECH_IDX.keys()].map((id) => cityState.research.techRetained[id] ?? 0)),
