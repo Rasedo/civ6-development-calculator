@@ -200,6 +200,9 @@ def cmd_run(a) -> int:
             try:
                 seed = jobs.get_nowait()
             except queue.Empty:
+                # no seed left for this host: its instance closes now, not when the last host is done
+                if not a.keep_open:
+                    print(f"[{host}] queue empty, closed {game.close_instance(host)}", flush=True)
                 return
             rec = play_game(host, seed, a, stamp, lock)
             with mlock, open(manifest, "a", encoding="utf-8", newline="\n") as fh:
@@ -241,6 +244,7 @@ def main(argv=None) -> int:
     s.add_argument("--tag", default="duel")
     s.add_argument("--chunk", type=float, default=170.0, help="wall seconds per game call")
     s.add_argument("--report-timeout", type=float, default=1800.0)
+    s.add_argument("--keep-open", action="store_true", help="leave each instance running when its queue empties")
     s.set_defaults(fn=cmd_run)
     s = sub.add_parser("summary")
     s.add_argument("manifest")
