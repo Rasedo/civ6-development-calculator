@@ -16,12 +16,14 @@ import { congressPolicyBlocked } from './congress';
 import { carryLayout, darkAgeEra, fitPoliciesLoose, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment,
   unlockedPolicyIds } from './effects';
 import { gpOffer } from './greatPeople';
-import { citiesOf, seatOf } from './seats';
-import type { City, DistrictId, GameState, GreatPersonClass, YieldKey } from './types';
+import { borderTurnsFrom, citiesOf, civsAtWar, delegationWith, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
+import type { City, CityState, DistrictId, GameState, GreatPersonClass, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
-import { envoysOf, suzerainOf } from './cityStates';
+import { EMBASSY_CIVIC } from '../data/seats';
+import { envoysOf, hasMet, suzerainOf } from './cityStates';
+import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
 import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency } from './yields';
 import { computeCityStats } from './city';
@@ -29,10 +31,20 @@ import { computeCityStats } from './city';
 /** What the view takes from AI parts this engine does not run: the civic AI's
  *  research list per seat (CivicTypes), empty where none is given; per seat
  *  the strategies it follows and the majors it has met, which its weights
- *  read (`aiWeights.ts`, `AiWeightInputs`). */
+ *  read (`aiWeights.ts`, `AiWeightInputs`); and the diplomatic facts the
+ *  engine does not keep — the turn two majors met, the turn a pair's last war
+ *  ended, a Delegation and a Resident Embassy as two missions. Where none is
+ *  given: majors know each other from the first turn, a pair's peace runs from
+ *  its meeting, and the engine's one mission is a Delegation before its sender
+ *  holds Diplomatic Service, an Embassy after. */
 export interface MajorViewInputs {
   civicList?: ReadonlyMap<number, ReadonlySet<string>>;
   weights?: ReadonlyMap<number, AiWeightInputs>;
+  /** the civics a seat holds, where the caller's state is not the moment the AI reads */
+  civicsHeld?: (seat: number) => ReadonlySet<string>;
+  metTurn?: (seat: number, other: number) => number | null;
+  peaceSince?: (seat: number, other: number) => number | null;
+  mission?: (sender: number, receiver: number, kind: 'delegation' | 'embassy') => boolean;
 }
 
 const slotType = (k: SlotKind): string => `SLOT_${k.toUpperCase()}`;
@@ -73,6 +85,19 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     if (!gov) return new Set();
     return unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, i), s.government.held, gov);
   };
+  const metTurn = (i: number, j: number): number | null => {
+    if (inputs.metTurn) return inputs.metTurn(i, j);
+    if (isCityStateSeat(j)) {
+      const cs = seatOf(state, j) as CityState | undefined;
+      return cs && hasMet(cs, i) ? 1 : null;
+    }
+    if (isCityStateSeat(i)) {
+      const cs = seatOf(state, i) as CityState | undefined;
+      return cs && hasMet(cs, j) ? 1 : null;
+    }
+    return isCiv(i) && isCiv(j) && i !== j ? 1 : null;
+  };
+  const embassyCivic = (i: number): boolean => seat(i).research.civics.includes(EMBASSY_CIVIC);
   const slotsOf = (i: number): MajorSlotView[] => {
     const cards = seat(i).government.policies;
     return governmentSlots(state, i).map((k, j) => ({ slot: slotType(k), policy: cards[j] ? policyType(cards[j]!) : null }));
@@ -94,7 +119,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     costMultiplierPct: COST_MULTIPLIER_PCT,
     gameEra: state.gameEra ?? 0,
     cityStates: state.cityStates.length,
-    civicsHeld: (i) => new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
+    civicsHeld: (i) => inputs.civicsHeld?.(i) ?? new Set(seat(i).research.civics.filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))),
     civicList: (i) => inputs.civicList?.get(i) ?? new Set(),
     government: (i) => {
       const g = seatGovernment(state, i);
@@ -168,5 +193,49 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const id = govId(type);
       return id ? GOVERNMENT_LIST.findIndex((g) => g.id === id) : -1;
     },
+    majors: () => state.seats.filter((s) => isCiv(s.seat) && (s.cities.length > 0 || unitsOf(state, s.seat).length > 0)).map((s) => s.seat),
+    leader: (i) => {
+      const l = leaderOf(state, i);
+      return l ? gameTypeOf('leader', l, 'LEADER_') : null;
+    },
+    metTurn,
+    atWar: (i, j) => civsAtWar(state, i, j),
+    peaceTurns: (i, j) => {
+      const since = inputs.peaceSince ? inputs.peaceSince(i, j) : metTurn(i, j);
+      return since === null ? 0 : state.turn - since;
+    },
+    hasDelegation: (i, j) => (inputs.mission ? inputs.mission(i, j, 'delegation') : delegationWith(state, i, j) > 0 && !embassyCivic(i)),
+    hasEmbassy: (i, j) => (inputs.mission ? inputs.mission(i, j, 'embassy') : delegationWith(state, i, j) > 0 && embassyCivic(i)),
+    hasOpenBorders: (i, j) => borderTurnsFrom(state, i, j) > 0,
+    playerYield: (i, type) => {
+      const key = YIELD_KEY[type];
+      return key ? citiesOf(state, i).reduce((a, c) => a + computeCityStats(state, c).total[key], 0) : 0;
+    },
+    population: (i) => citiesOf(state, i).reduce((a, c) => a + c.population, 0),
+    wondersBuilt: (i) => citiesOf(state, i).reduce((a, c) => a + c.wonders.length, 0),
+    greatPeopleEarned: (i) => seat(i).gpEarned.length,
+    plotsOwned: (i) => state.map.tiles.reduce((a, t) => a + (tileSeat(t) === i ? 1 : 0), 0),
+    religionFounded: (i) => (seat(i).religion.founded ? i : null),
+    majorityReligion: (i) => {
+      const r = majorityReligionOf(state, i);
+      return r >= 0 ? r : null;
+    },
+    tradeRoutesBetween: (i, j) => {
+      const runs = (a: number, b: number) => (seatOf(state, a)?.tradeRoutes ?? []).filter((r) => r.toSeat === b).length;
+      return runs(i, j) + runs(j, i);
+    },
+    cityStateSeats: () => state.cityStates.map((c) => c.seat),
+    envoys: (cs, i) => {
+      const c = seatOf(state, cs) as CityState | undefined;
+      return c?.envoys?.[i] ?? 0;
+    },
+    grievances: (i, j) => Math.max(0, grievanceWith(state, i, j)),
+    militaryUnits: (i, domain) => unitsOf(state, i).filter((u) => {
+      const d = UNITS[u.type];
+      if (!d || d.combat <= 0) return false;
+      if (domain === 'DOMAIN_AIR') return !!d.air;
+      if (domain === 'DOMAIN_SEA') return !!d.naval;
+      return !d.air && !d.naval;
+    }).length,
   };
 }

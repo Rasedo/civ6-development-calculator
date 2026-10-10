@@ -88,6 +88,7 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
+import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -2418,6 +2419,8 @@ export interface ReplayReport {
   civicScores: Record<'major' | 'minor', ResearchScoreTally>;
   /** the majors' AI's government and card choices beside the record's */
   majorAi?: MajorAiTally;
+  /** the majors' opinion of each other beside the game's diplomacy log */
+  diplomacy?: DiplomacyTally;
 }
 
 /** one game move's tally (`tallyTactics`): the unit-turns, those the AI
@@ -2541,6 +2544,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (!bool(p.human)) aiSeats.set(seat, p.id);
   }
   const majorAi = new MajorAiProbe(dumpPath, aiSeats, majorSeats);
+  const diplomacy = new DiplomacyProbe(dumpPath, first.playerOfSeat, first.seatOfPlayer);
+  diplomacy.setup(state, history.randLog, recs[0].players.map((p) => p.id).sort((x, y) => x - y));
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2578,6 +2583,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     const baseStep = transitionChecks(a, b, cat, history, prev);
     advanceHistory(history, b, cat);
+    const recordA = ctx.next;
     const read = importTurn(b, cat, history);
     ctx.next = read;
     ctx.prev = a;
@@ -2601,6 +2607,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     majorAi.preTurn(state);
+    diplomacy.preTurn(state, recordA.state, read.state, b);
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
     const standing = new Set(state.units);
@@ -2909,6 +2916,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdLevies(false);
   holdBarbarians(null);
   if (majorAi.active) report.majorAi = majorAi.tally;
+  if (diplomacy.active) report.diplomacy = diplomacy.tally;
   return report;
 }
 
@@ -2998,5 +3006,6 @@ export function replayMarkdown(r: ReplayReport): string {
     for (const [k, n] of Object.entries(r.unread)) out.push(`- ${k}: ${n}`);
   }
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
+  if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   return out.join('\n') + '\n';
 }

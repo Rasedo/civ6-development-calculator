@@ -4239,6 +4239,126 @@ the logged scores), the action replay's majors' AI section
   availability 0x2f1ed0 (Strategos scores in the port where the game logs
   none: 4,739 lines).
 
+## C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ
+
+The opinion one major holds of another is its diplomatic modifiers' values
+summed (24.8 fixed point, the log's number the sum >> 8): AI_Diplomacy.csv
+(the writer 0x652bb0: per player and per player it has met, in player
+order, "opinion:state" from +0x330 / +0x2f58 of the player's diplomacy, and
+"Threat and Trust" as threat:n:trust from +0x6560 / 0x650550 / +0x6480,
+24.8). Port: `ai/major/diplomacy.ts` (tables `tools/install/ai_diplomacy_tables.py`);
+check: the action replay's diplomacy section (`cpu/harness/majorDiplomacy.ts`,
+the port on the record's state and on the replayed engine's).
+
+- The set-up draws ("Random Diplomatic Value", the diplomacy object's
+  constructor 0x3ffdd0): every player slot in use, in player order, draws
+  one value over 100 toward each of the 64 slots, twice — the second pass
+  (the object rebuilt) is the one kept (+0x7bc[slot]). 896 draws = 7 slots
+  x 2 x 64 in every duel; player 0's value toward 1 is draw 65, player 1's
+  toward 0 draw 192 (both monotone with the logged first impression over
+  all 26 meetings of each).
+- The first impression (MODIFIER_PLAYER_DIPLOMACY_RANDOM, init 0xb8edb0:
+  RandomRange 3, DifficultyOffset 0): floor(v x (2R + 1) / 100) - R at the
+  meeting (v 13 -> -3, 15 -> -2, 33 -> -1, 58 -> 1, 72 -> 2, 86 -> 3; 0
+  makes none), decaying 1 per ReductionTurns (10) of the owner's turn
+  starts. The clock counts the owner's first start after the meeting: a
+  meeting made in an earlier player's turn reduces at m + 9 (runs/h1_duelw1110
+  Qin: met in Rome's turn 45, -1 -> 0 at 54), one in the owner's own or a
+  later player's turn at m + 10 (1110 Rome 46 -> 55; 1117: met in a
+  city-state's turn 161, both at 171). Every requirement-driven modifier with
+  ReductionTurns decays on the same clock from its failure (STANDARD_
+  DIPLOMATIC_NEAR_BORDER_WARNING: the AI's own -1 at d + 9, the human
+  slot's at d + 10, every case of the 29 duels).
+- The agendas (Game_Initializer 0x31d3c0; the civic's 0x31f7f0 / 0x427bf0):
+  each major's HistoricalAgendas, then RandomAgendasInEra's Ancient draw at
+  set-up, then RandomAgendasForCivic's at Nationalism. The pool walks the
+  draw's tags in their table's order (EARLY then ANY at set-up, LATE then
+  ANY at Nationalism) and within a tag the Agendas table's order; one
+  uniform draw over it ("Choose random agenda"); an agenda exclusive with
+  one the major holds is drawn again over the same pool. Read off the 29
+  duels' 63 draws: every logged range (20 at set-up, 29 or 28 at the civic)
+  and every agenda the modifiers reveal agree (the set-up pool's index 1
+  Civilized, 2 Devout, 3 Explorer, 5 Exploitative ... 19 Great White Fleet;
+  the civic pool's 3 Environmentalist, 4 Ideologue, 5 Nuke Lover ... 28
+  Great White Fleet). The civic pool leaves out an agenda every major holds
+  (28: runs/h1_duelw1112 and 1121, both majors on one agenda); the port
+  reads that as a default GameLimit of the majors' count — ASK.
+- Optimus Princeps (EFFECT_DIPLOMACY_AGENDA_OPTIMUS_PRINCEPS: compute
+  0xb4d2b0, arguments 0xb50250): the subject's plots (0x4be720, the plots it
+  owns) against the owner's beyond EquivalentTerritoryPercentage (20) either
+  way, BetterTerritoryBonus (5) up or down; its rank by plots among the
+  majors (0x469db0: FULL_CIV), TopTerritoryBonus (8) inside the top
+  TopTerritoryPercentage (25) and against it from 1 - 25 % of the count.
+  Two majors: +5, 0, -8, -13 (1114 Trajan of Qin: -8 at 27, 0 at 32, +5 at
+  36).
+- TRADE_RELATIONS (0xbb1a20, arguments 0xbb40f0): TradeBonus (2) for a
+  route either way, BonusPerRoute and OnlyInboundTrade off, NoTradePenalty 0.
+- The Delegation's +3 (STANDARD_DIPLOMATIC_DELEGATION) ends when the same
+  sender's Resident Embassy (+5) arrives (runs/h1_duelw1110: Rome's opinion
+  of Qin 20 -> 4 at 99, Qin's Delegation of 56 and Embassy of 98).
+- The requirements read: PLAYER_YIELD_LEAD (0xb6ff10: both values at or
+  below 0 fail; |owner - subject| >> 8 at least MinimumDelta; a positive
+  ratio asks subject >= owner x ratio, a negative one owner >= subject x
+  |ratio|, the ratio truncated to 1/256), the population, wonder and great
+  person leads read as the same test; COMPETING_MINORS (0xb61120: a
+  city-state with the owner's envoys and more of the subject's than
+  PercentCompeting of them), NOT_COMPETING_MINORS (0xb32500: no city-state
+  holding envoys of both).
+- MILITARY_STRENGTH_LEAD (0xb548f0): the same lead test on the player
+  stats' per-domain strength (0x4bd0d0: LAND +0x330, SEA +0x270, AIR
+  +0x2d0), the ratio a float; the field's writer is unread — the port counts
+  the seat's military units of the domain (runs/h1_duelw1104: Rome 43+ land
+  units to Qin's 8, Trajan's Standing Army -6 at 106 = the meeting + 30).
+- NEW_WARMONGER (0xb7eee0, arguments 0xb81dd0): the owner's grievances
+  against the subject (0x3d8d20), -PercentOfGrievances (20) % of them, no
+  lower than LowerLimit (-60): the logged -30 after each surprise war, -60 in
+  runs/h1_duelw1110. The records carry no grievances: the record lane holds 0.
+- SETTLED_CITIES (0xb96bf0, arguments 0xb986e0 Penalty / IncludesCapital):
+  -Penalty times the owner's ledger count of the subject's incidents of kind
+  0xfadf5055 (0x3d8da0) — the logged -3 / -6 / 0; the ledger's writer and
+  expiry are unread.
+- FORCE_INCURSION (0xc00500): the owner's military AI's two thresholds
+  (+0x1280's slots +0x40 / +0x48) against its count for the subject
+  (+0x12a0 +0x588): 0 below half the first, -1, -2, then -4 / -3 — the
+  count and the thresholds unread.
+- When the game evaluates a requirement-driven modifier is not a turn
+  start: runs/h1_duelw1110 Rome's City-State Ally holds +12 (not competing)
+  from 55 to 66 although both hold envoys in Caguana from 58; it flips with
+  Qin's envoys of 66 (the subject's influence event). The port evaluates at
+  each owner's turn start — the trigger list is unread.
+- The diplomatic state (the row's DIPLO_STATE): DiplomaticStateTransitions'
+  Require bounds force a change, the Allow band leaves it to the AI. Over
+  the 29 duels the autoplayed slot turns Friendly at 15 and back to Neutral
+  at 5 (oscillating at 5 against Unfriendly every turn), while Qin turns
+  Friendly from Neutral at opinions down to -2 (30 times) — the AI's pick in
+  the band, unread.
+- THE VERBOSE LOG (runs/h1_duelv1124, the same game as h1_duelw1124 with
+  the AI's diplomatic action log on): AI_Diplomacy.csv adds, per turn,
+  player and DiplomaticActionType, "desire:cost" toward each player met
+  (0x676510's evaluator: +0x48 the desires, +0x68 the costs; beside them
+  Alliance +0x18, War +0x1c, War Penalty +0x20). Qin toward Rome: each is
+  the state's DiplomaticStateActions Worth / Cost plus T on the desire and
+  minus T on the cost, plus one shift G on both: T 0 at the meeting (89), 10
+  from 90, 20 once Friendly (108); G per action (Embassy -23.7 / -13.7 /
+  -36.8, Delegation -9.5 / 0.5 / -8.7 as the game runs). The Embassy went at
+  106 (Diplomatic Service at 103) with desire 11.3 over cost -18.7; the
+  Delegation stood at 15.5 over -9.5 from 99 and was never sent — the pick
+  is not the margin alone. T, G and the pick are unread.
+- THE ATTEMPTS (the five verbose duels, runs/h1_duelv1124 and h1_duelv1117 /
+  1121 / 1127 / 1128): an action's entry reads 0.0:0.0 on the turns the AI
+  takes it, and DiplomacySummary.csv names only the ones the other side
+  accepted. Qin proposes and the autoplayed slot turns it down until it
+  does not: the Embassy 171, 181, 190, 197 (1117, accepted 197), 117, 127,
+  132 ... 186, 191 (1127, 13 tries, accepted 191); the Delegation 61, 68, 79
+  (1127), 83, 89, 97 (1128). Retries come 5 to 11 turns apart. So a
+  recorded mission's turn is the receiver's acceptance, and the proposer's
+  choice is measured by the attempt turns: the Delegation tried at once
+  after the meeting (1127 t61), the Embassy once Diplomatic Service is held
+  (1127: held from 118, first try 117 at the civic's completion; 1124: 106,
+  held from 103; 1117: held from 95, met 161, first try 171). The accept
+  side (the receiver's evaluator) and the retry spacing are unread.
+- Open (AUDIT C-97 BUILD): FORCE_INCURSION's count and thresholds, NEAR_CULTURE_BORDER, SETTLED_CITIES' ledger, GOVERNMENTS, PEACEFUL, the third-party, pledge, espionage, archaeology and one-sided-trade modifiers, the other agendas' own effects (Last Viking King, Zealot, Turtler, Lord of Mines, Kaitiakitanga, Exploitative, Flat Earther, Paranoid), the event triggers of requirement-driven modifiers, a meeting between two players' turns (1104 t76), the diplomatic state's Allow band, threat and trust, the action evaluator's T and G terms, the receiver's acceptance and the retry spacing, and the decisions themselves as per-seat actions (delegation, embassy, open borders, friendship, denouncement, war, peace, deals). Not engine facts: the majors' meeting, the Delegation and Embassy as two missions (the replay takes both from the logs), the game's grievances (absent from the records). ASK: the agenda pool's default GameLimit (read as every major).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'
