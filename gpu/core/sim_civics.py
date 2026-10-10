@@ -45,7 +45,6 @@ class SimCivics:
             "horizon": int(av["horizon"]),
             "own": _imul(_FX, _fx_const(float(av["pyCivic"]))),
             "share": share,
-            "district": _imul(share, _fx_const(float(av["pyDistrict"]))),
             "wonder": _imul(share, _fx_const(float(av["pyWonder"]))),
             "floor": _fx_const(float(ca["policyFloor"])),
         }
@@ -84,7 +83,7 @@ class SimCivics:
         far = lv[2][1].any(dim=2)
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
-        val = self._cai_value(turns)
+        val = self._cai_value(s, turns)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         # the propagation (0x61ee30): a row in reach scores its lineage's own
         # values, a negative one counting nothing
@@ -95,12 +94,13 @@ class SimCivics:
         score = torch.where(turns >= 0, g.sum(dim=2), base)
         return turns, nxt, base, score, spent
 
-    def _cai_value(self, turns: torch.Tensor) -> torch.Tensor:
-        """`civicValue` [B, NC]: landing each row in `turns` turns — its own
+    def _cai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
+        """`civicValue` [B, NC] for minor `s`: landing each row in `turns` turns — its own
         pseudo-yield from landing to the horizon, once per era between its
         era and the game's plus one; a share per building, a wonder's and a
-        district's at their pseudo-yields, each from landing to the horizon;
-        the policy floor. At the horizon or past it -9999"""
+        district's at their pseudo-yields (the district's at the minor's
+        weight, `_ai_district_share`), each from landing to the horizon; the
+        policy floor. At the horizon or past it -9999"""
         T = self._cai_tables()
         B, NC = turns.shape
         nn = turns.clamp(min=0)
@@ -113,7 +113,8 @@ class SimCivics:
         def land(a: int) -> torch.Tensor:
             return self._rai_from_landing(torch.full((B, NC), a, dtype=torch.long, device=self.device), nn)
 
-        val = own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * land(T["district"]) + T["floor"]
+        district = self._rai_from_landing(self._ai_district_share(s).unsqueeze(1).expand(B, NC), nn)
+        val = own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district + T["floor"]
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_best(self, ent, key: torch.Tensor) -> torch.Tensor:

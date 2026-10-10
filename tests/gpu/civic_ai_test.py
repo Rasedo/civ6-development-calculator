@@ -44,7 +44,7 @@ def test_value(rules) -> None:
     def value(cid: str, n: int) -> int:
         turns = torch.zeros(sim.B, nc, dtype=torch.long, device=sim.device)
         turns[0, ci[cid]] = n
-        return int(sim._cai_value(turns)[0, ci[cid]])
+        return int(sim._cai_value(0, turns)[0, ci[cid]])
 
     assert value("CODE_OF_LAWS", 10) == 21819, "the own 5 and the policy floor"
     assert value("CRAFTSMANSHIP", 30) == 9848

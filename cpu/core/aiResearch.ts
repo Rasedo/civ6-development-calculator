@@ -40,6 +40,7 @@ import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
 import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
+import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 /** the seat's prerequisites of `id` in the install's order */
@@ -112,12 +113,14 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
  * before the game's counts once per era between, plus one), and per
  * building it unlocks a share (a wonder's at PSEUDOYIELD_WONDER), per district
  * a share at PSEUDOYIELD_DISTRICT — each a yield a turn from landing to the
- * horizon. Past the horizon -9999.
+ * horizon, each pseudo-yield at the seat's weight `pw` (`aiWeights.ts`).
+ * Past the horizon -9999.
  */
-export function techValue(state: GameState, id: string, turns: number): number {
+export function techValue(state: GameState, id: string, turns: number, pw: ReadonlyMap<string, number>): number {
   if (turns > AI_VALUE_HORIZON) return fxConst(-9999);
   const def = TECHS[id];
-  let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX);
+  const w = (p: string): number => pw.get(p) ?? 0;
+  let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX, w('PSEUDOYIELD_TECHNOLOGY'));
   if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
@@ -125,8 +128,8 @@ export function techValue(state: GameState, id: string, turns: number): number {
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);
   return fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
-    + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share), turns)
-    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share), turns);
+    + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
+    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns);
 }
 
 /** what a technology unlocks that its value counts: buildings, districts,
@@ -181,11 +184,12 @@ function researchOf(state: GameState, seat: number): ResearchState {
 export function researchAnalysis(state: GameState, seat: number, science: number): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
+  const pw = pseudoYieldWeights(state, seat);
   const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, id, turns);
+    const base = turns < 0 ? 0 : techValue(state, id, turns, pw);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   const leader = leaderOf(state, seat);

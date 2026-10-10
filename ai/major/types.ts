@@ -1,26 +1,6 @@
 /** The install rows the majors' AI reads (tables.ts), as the game's database
  *  holds them: type names, not the engine's ids. */
-
-export interface AiRequirement {
-  type: string;
-  inverse: boolean;
-  args: Readonly<Record<string, string>>;
-}
-
-export interface AiRequirementSet {
-  /** REQUIREMENTSET_TEST_ANY; otherwise every requirement must hold */
-  any: boolean;
-  reqs: readonly AiRequirement[];
-}
-
-export interface AiModifier {
-  id: string;
-  collection: string;
-  effect: string;
-  args: Readonly<Record<string, string>>;
-  subjectReqs?: AiRequirementSet;
-  ownerReqs?: AiRequirementSet;
-}
+import type { AiModifier } from '../../cpu/core/aiModifiers';
 
 export interface AiPolicy {
   type: string;

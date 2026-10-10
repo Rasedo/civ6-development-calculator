@@ -56,7 +56,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES",
@@ -626,7 +626,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -910,7 +910,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -944,7 +944,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -983,7 +983,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -1176,7 +1176,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
@@ -1214,7 +1214,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GARRISON_UNIT",
@@ -1335,7 +1335,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -1373,7 +1373,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -1412,7 +1412,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -1451,7 +1451,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -1826,7 +1826,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "15"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
@@ -1844,7 +1844,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "3"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
@@ -1881,7 +1881,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -1938,7 +1938,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -1980,7 +1980,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "ReductionPercent": "25"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
@@ -2013,7 +2013,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "ModifierId": "WARS_OF_RELIGION_COMBAT_MODIFIER"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TAG_MATCHES",
@@ -2069,7 +2069,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT",
@@ -2093,7 +2093,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_POPULATION",
@@ -2185,7 +2185,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT",
@@ -2209,7 +2209,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_POPULATION",
@@ -2244,7 +2244,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT",
@@ -2268,7 +2268,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_POPULATION",
@@ -2301,7 +2301,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -2358,7 +2358,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "25"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
@@ -2377,7 +2377,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "10"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_IS_OWNER_CAPITAL_CONTINENT",
@@ -2475,7 +2475,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
@@ -2743,7 +2743,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_HIGH_ADJACENCY_DISTRICT",
@@ -2767,7 +2767,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_POPULATION",
@@ -2815,7 +2815,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -2862,7 +2862,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -2883,7 +2883,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "3"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
@@ -2911,7 +2911,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
@@ -2939,7 +2939,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
@@ -2967,7 +2967,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
@@ -3080,7 +3080,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3101,7 +3101,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3121,7 +3121,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "AbilityType": "ABILITY_MILITARYORGANIZATION_MOVEMENT"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
@@ -3282,7 +3282,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3303,7 +3303,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3324,7 +3324,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3345,7 +3345,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3428,7 +3428,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3449,7 +3449,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3470,7 +3470,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3491,7 +3491,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -3560,7 +3560,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -3581,7 +3581,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -3635,7 +3635,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -3655,7 +3655,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "4"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -3983,7 +3983,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GARRISON_UNIT",
@@ -4012,7 +4012,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_ADJUST_PLAYER_OPEN_BORDERS_FROM_INFLUENCE",
     "args": {},
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_PLAYER_IS_MINOR",
@@ -4052,7 +4052,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -4073,7 +4073,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -4553,7 +4553,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "100"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
@@ -4573,7 +4573,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -4871,7 +4871,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "15"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5060,7 +5060,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5080,7 +5080,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5114,7 +5114,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5148,7 +5148,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5182,7 +5182,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5202,7 +5202,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5222,7 +5222,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5242,7 +5242,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5296,7 +5296,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -5316,7 +5316,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -5349,7 +5349,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5369,7 +5369,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5389,7 +5389,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5409,7 +5409,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -5451,7 +5451,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "YieldType": "YIELD_FAITH"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -5483,7 +5483,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "10"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -5545,7 +5545,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "YieldType": "YIELD_PRODUCTION"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -5669,7 +5669,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GARRISON_UNIT",
@@ -5705,7 +5705,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -5738,7 +5738,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES",
@@ -5759,7 +5759,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR_WITH_X_TITLES",
@@ -5950,7 +5950,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "75"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
@@ -6198,7 +6198,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_PROMOTION_CLASS_MATCHES",
@@ -6360,7 +6360,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "25"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -6381,7 +6381,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -6554,7 +6554,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "ModifierId": "FUTURE_VICTORY_SCIENCE_SPACEPORT_POWER_IN_CITY"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
@@ -6574,7 +6574,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "ModifierId": "FUTURE_VICTORY_SCIENCE_SPACEPORT_ALUMINUM_IN_CITY"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
@@ -6898,7 +6898,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "-1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_POPULATION",
@@ -6958,7 +6958,7 @@ export const AI_POLICIES: readonly AiPolicy[] = [
      "Amount": "50"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
@@ -7129,7 +7129,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7149,7 +7149,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7183,7 +7183,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7217,7 +7217,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": true,
+     "test": "ANY",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7260,7 +7260,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7280,7 +7280,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7300,7 +7300,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7320,7 +7320,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7401,7 +7401,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -7421,7 +7421,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
@@ -7476,7 +7476,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7496,7 +7496,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7516,7 +7516,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "1"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7545,7 +7545,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "2"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_BUILDING",
@@ -7600,7 +7600,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "YieldType": "YIELD_FAITH"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -7654,7 +7654,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "10"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -7760,7 +7760,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "YieldType": "YIELD_PRODUCTION"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_GOVERNOR",
@@ -7937,7 +7937,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "10"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
@@ -7958,7 +7958,7 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
      "Amount": "10"
     },
     "subjectReqs": {
-     "any": false,
+     "test": "ALL",
      "reqs": [
       {
        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
@@ -8106,81 +8106,6 @@ export const AI_SLOT_TYPES: readonly AiSlotType[] = [
   "any": true
  }
 ];
-export const AI_YIELD_DEFAULT: Readonly<Record<string, number>> = {
- "YIELD_FOOD": 1.0,
- "YIELD_PRODUCTION": 1.0,
- "YIELD_GOLD": 0.5,
- "YIELD_SCIENCE": 1.0,
- "YIELD_CULTURE": 1.0,
- "YIELD_FAITH": 1.0
-};
-export const AI_PSEUDOYIELD_DEFAULT: Readonly<Record<string, number>> = {
- "PSEUDOYIELD_CLEAR_BANDIT_CAMPS": 0.5,
- "PSEUDOYIELD_ENVIRONMENT": 0.5,
- "PSEUDOYIELD_GPP_GENERAL": 0.5,
- "PSEUDOYIELD_GPP_ADMIRAL": 0.5,
- "PSEUDOYIELD_GPP_ENGINEER": 0.5,
- "PSEUDOYIELD_GPP_MERCHANT": 0.5,
- "PSEUDOYIELD_GPP_PROPHET": 0.5,
- "PSEUDOYIELD_GPP_SCIENTIST": 0.5,
- "PSEUDOYIELD_GPP_WRITER": 0.5,
- "PSEUDOYIELD_GPP_ARTIST": 0.5,
- "PSEUDOYIELD_GPP_MUSICIAN": 0.5,
- "PSEUDOYIELD_IMPROVEMENT": 3.0,
- "PSEUDOYIELD_INFLUENCE": 0.5,
- "PSEUDOYIELD_UNIT_ARCHAEOLOGIST": 4.0,
- "PSEUDOYIELD_UNIT_COMBAT": 1.0,
- "PSEUDOYIELD_UNIT_NAVAL_COMBAT": 1.0,
- "PSEUDOYIELD_UNIT_AIR_COMBAT": 3.0,
- "PSEUDOYIELD_UNIT_EXPLORER": 1.0,
- "PSEUDOYIELD_UNIT_SETTLER": 1.0,
- "PSEUDOYIELD_UNIT_RELIGIOUS": 1.0,
- "PSEUDOYIELD_UNIT_TRADE": 1.0,
- "PSEUDOYIELD_UNIT_SPY": 20.0,
- "PSEUDOYIELD_DISTRICT": 4.0,
- "PSEUDOYIELD_WONDER": 2.0,
- "PSEUDOYIELD_GREATWORK_SCULPTURE": 10.0,
- "PSEUDOYIELD_GREATWORK_PORTRAIT": 10.0,
- "PSEUDOYIELD_GREATWORK_LANDSCAPE": 10.0,
- "PSEUDOYIELD_GREATWORK_RELIGIOUS": 10.0,
- "PSEUDOYIELD_GREATWORK_ARTIFACT": 10.0,
- "PSEUDOYIELD_GREATWORK_WRITING": 10.0,
- "PSEUDOYIELD_GREATWORK_MUSIC": 10.0,
- "PSEUDOYIELD_GREATWORK_RELIC": 10.0,
- "PSEUDOYIELD_DIPLOMATIC_BONUS": 0.25,
- "PSEUDOYIELD_NUCLEAR_WEAPON": 25.0,
- "PSEUDOYIELD_RESOURCE_LUXURY": 1.5,
- "PSEUDOYIELD_SPACE_RACE": 100.0,
- "PSEUDOYIELD_CIVIC": 5.0,
- "PSEUDOYIELD_TECHNOLOGY": 5.0,
- "PSEUDOYIELD_TOURISM": 1.0,
- "PSEUDOYIELD_HAPPINESS": 1.0,
- "PSEUDOYIELD_STANDING_ARMY_NUMBER": 1.0,
- "PSEUDOYIELD_STANDING_ARMY_VALUE": 0.1,
- "PSEUDOYIELD_CITY_BASE": 450.0,
- "PSEUDOYIELD_CITY_DEFENSES": 200.0,
- "PSEUDOYIELD_CITY_DEFENDING_UNITS": 80.0,
- "PSEUDOYIELD_CITY_ORIGINAL_CAPITAL": 200.0,
- "PSEUDOYIELD_CITY_POPULATION": 50.0,
- "PSEUDOYIELD_GOLDENAGE_POINT": 1.0,
- "PSEUDOYIELD_GOVERNOR": 2.0,
- "PSEUDOYIELD_DIPLOMATIC_FAVOR": 0.7,
- "PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT": 100.0,
- "PSEUDOYIELD_DIPLOMATIC_GRIEVANCE": -0.5,
- "PSEUDOYIELD_RELIGIOUS_CONVERT_EMPIRE": 1.0
-};
-export const AI_GP_CLASS_PSEUDOYIELD: Readonly<Record<string, string>> = {
- "GREAT_PERSON_CLASS_GENERAL": "PSEUDOYIELD_GPP_GENERAL",
- "GREAT_PERSON_CLASS_ADMIRAL": "PSEUDOYIELD_GPP_ADMIRAL",
- "GREAT_PERSON_CLASS_ENGINEER": "PSEUDOYIELD_GPP_ENGINEER",
- "GREAT_PERSON_CLASS_MERCHANT": "PSEUDOYIELD_GPP_MERCHANT",
- "GREAT_PERSON_CLASS_PROPHET": "PSEUDOYIELD_GPP_PROPHET",
- "GREAT_PERSON_CLASS_SCIENTIST": "PSEUDOYIELD_GPP_SCIENTIST",
- "GREAT_PERSON_CLASS_WRITER": "PSEUDOYIELD_GPP_WRITER",
- "GREAT_PERSON_CLASS_ARTIST": "PSEUDOYIELD_GPP_ARTIST",
- "GREAT_PERSON_CLASS_MUSICIAN": "PSEUDOYIELD_GPP_MUSICIAN",
- "GREAT_PERSON_CLASS_COMANDANTE_GENERAL": "PSEUDOYIELD_GPP_GENERAL"
-};
 export const AI_ERAS: readonly string[] = [
  "ERA_ANCIENT",
  "ERA_CLASSICAL",

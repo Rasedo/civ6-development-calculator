@@ -2,7 +2,7 @@
 // stub view: the present value as the game codes it, the logged scores the
 // analyzers reproduce, and the choice's order, ties, bar and deferral.
 import { describe, expect, it } from 'vitest';
-import { FX_MIN, presentValue } from '../../../ai/major/fixed';
+import { FX_MIN, presentValue } from '../../../cpu/core/aiValue';
 import { NO_SCORE, choosePolicies, governmentValue, policyScore, policyScores, slotTypeBest } from '../../../ai/major/policies';
 import { AI_POLICIES } from '../../../ai/major/tables';
 import type { MajorSlotView, MajorView } from '../../../ai/major/view';
@@ -26,6 +26,17 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     greatPersonClassAvailable: () => true,
     cities: () => [{ id: 1, capital: true }],
     cityYield: () => 0,
+    yieldWeight: () => 0,
+    pseudoYieldWeight: () => 0,
+    districts: () => [],
+    districtYield: () => 0,
+    cityHasBuilding: () => false,
+    tradeRouteCapacity: () => 0,
+    influenceTokensUsed: () => 0,
+    tributaries: () => 0,
+    unitMaintenances: () => [],
+    cityHasDistrict: () => false,
+    districtBuildingYields: () => [],
     policyColumn: () => -1,
     governmentColumn: () => -1,
     ...over,
@@ -34,7 +45,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
 
 describe('the AI present value (0x7a16e0)', () => {
   it('takes the binomial to the third power, each product truncated', () => {
-    // the routine dll_citybuild.py ports, at the global AI's 2.0 percent
+    // the routine dll_citybuild.py ports, at 2.0 percent
     expect(presentValue(256, 0x200, 19)).toBe(3876);
     expect(presentValue(256, 0x200, 25)).toBe(4864);
     expect(presentValue(128, 0x200, 50)).toBe(4017);

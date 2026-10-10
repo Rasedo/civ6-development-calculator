@@ -3886,7 +3886,7 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   however hurt; a whole one where the danger exceeds its strength + 20 — and
   moves them (0x774190, unread).
 
-## C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)
+## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 
 The weight w[y] (0x702ad0, `this` the player's AI::GrandStrategic at player
 +0x1290, its members named by the constructor 0x6f6e10) is the sum of five
@@ -3930,9 +3930,144 @@ data sits at its descriptor + 0x58.
 - So a city-state's w is 0 for every yield but Gold (the Economic part) and
   Faith (the Religious part); the 50 city-state Monument picks the exact
   annuity prints at v 1.0 ("C-96 / C-97: the city build AI" LAB) agree.
-- The agendas' Yields lists (AiLists AgendaType rows: CultureLover...,
-  MoneyGrubber...; the duels' majors draw hidden agendas, RandCalls "Choose
-  random agenda") reach the arrays by a path unread.
+- The strategies (AI_Victories.csv logs each change): the era strategies
+  (Strategies STRATEGY_<ERA>_CHANGES, condition "Is <Era>", "Is Not Major"
+  disqualifying) start the AI turn the major first holds a technology or a
+  civic of that era (every one of the 29 duels' majors: the turn the AI
+  log's OWNED rows or Completed Civic first show the era) and none is ever
+  stopped, so a major follows every era's up to its own; STRATEGY_DARKAGE
+  ("Is In Dark Age"). The AI turn scores its policies before it updates its
+  strategies: a strategy logged at turn t moves the scores from t + 1
+  (1124 player 1: VICTORY_STRATEGY_SCIENCE_VICTORY at 6, its Great Scientist
+  points card from 7; stopped at 26, back at 27).
+- Measured on the logged scores (AI_GovtPolicies.csv): DefaultYieldBias and
+  LowReligiousPreferenceYields (Faith -50) give 1124 Rome's (Trajan)
+  Urban Planning 18 and God King 11 at 25 turns; China's (Qin, the same
+  lists) God King 13 asks +0.2 Gold more — its hidden agenda's Yields list
+  (MoneyGrubber), whose path into the array is unread.
+
+THE PSEUDO-YIELD WEIGHT (0x700810, `this` the GrandStrategic too): the sum
+of [player +0x12a0] +0x7e8 [p], +0x620 [p], the PseudoYields list system's
+array (GlobalAI +0x2010, retrieval 0x6e3e20 -> +0x748, default +0x760) and
+the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); then a Great
+Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds
+0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player
+vector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and
+PSEUDOYIELD_DISTRICT (@0xf2e274) adds 0.5 x Eras.ChronologyIndex (+0x1c,
+`dll_rowmap.py a5f3b0`) of the player's era (0x467eb0: player +0x1358
++0xf8). The value 0x7a60d0: f = 1 + w, q = 0x655840; f q >= 0 -> f + q, else
++-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (f x
+DefaultValue). A followed strategy's lists go to the list system through
+0x7bf160 -> 0x7ba440 (the list's SQL rows, each item's own
+MinDifficulty / MaxDifficulty columns 6 / 7 against the handicap).
+- Measured on the great person cards' logged scores (EFFECT_ADJUST_GREAT_PERSON_POINTS:
+  PV(25) of the class's pseudo-yield): a strategy's PseudoYields row moves w
+  by twice its Value x 0.01 — 1124 player 1's Great Scientist points +0.5
+  under ScienceVictoryPseudoYields' +25, +1.2 under the Medieval and
+  Renaissance +30 each with it, +3.1 with the Industrial rows (+20 and
+  Expansion2's +50) as well, the Merchant's +0.4 under ClassicalPseudoYields'
+  +20 — within a residue of about +0.015 (the golden-age term's share,
+  unread). No trait's PseudoYields list moves them: China's Great Prophet
+  points read 1.0 against LowReligiousPreferencePseudoYields' -75. An
+  agenda's list moves them once: player 0 of runs/h1_duelw1110, 1112, 1115
+  (CityStateAllyInfluencePreference, PSEUDOYIELD_INFLUENCE +25) reads
+  Diplomatic League and Charismatic Leader at 1.25 (93 / 140 / 234, 18).
+- PSEUDOYIELD_DISTRICT's era term: runs/h1_duelw1124 t2 minor 3's Astrology
+  124.0 at 10 turns is its own 5, the Shrine's share, Stonehenge's at
+  PSEUDOYIELD_WONDER and the Holy Site's at 1.5 x PSEUDOYIELD_DISTRICT (the
+  Ancient era's ChronologyIndex 1); the research AI's minor rows within
+  0.05 on 1124 247 -> 474.
+
+THE REQUIREMENT SET of a modifier the AI analyses (0x6cef90 -> 0x6ccec0,
+into the map at registry +0xc0, i.e. GlobalAI +0x4d0): RequirementSetType
+TEST_ANY -> 1, TEST_NONE -> 2, else 0; per requirement its RequirementType
+hash looked up in the registry's requirement list (+0x80, 66 names: the
+`REGISTERED_REQUIREMENTS` of cpu/core/aiModifiers.ts) — a type the
+registry lacks is left out of the set — the entry {evaluator object, its
+parsed arguments (slot 0), Inverse (the requirement's vt +0x40)}. 0x6cf3c0:
+per entry the evaluator's slot 1 on (subject, context), negated by Inverse;
+type 0 fails on the first false, type 1 holds on the first true, type 2
+fails on the first true; at the end type 1 fails, the others hold. Every
+set a policy or a government names is in the map, so a subject passes only
+by 0x6cf3c0. Read evaluators: REQUIREMENT_DISTRICT_TYPE_MATCHES 0x6d08c0 (the
+district subject's type, context +0x78; else the district type the
+evaluation is of, +0x1c), REQUIREMENT_CITY_HAS_BUILDING 0x6d3830 (a city
+subject holding it; a wonder (Buildings +0x158 & 0x40) only when the
+evaluation is of that city, context +0x10..+0x14). The Monument's
+MONUMENT_CULTURE_AT_FULL_LOYALTY's set (REQUIREMENT_CITY_HAS_FULL_LOYALTY, not
+registered) is therefore empty and holds: what keeps it out of the city
+build AI's v 1.0 is not its requirement (its COLLECTION_OWNER subject in a
+building's analysis, unread).
+
+THE ANALYZERS READ (the registry's slot 1; each adds its whole part to
+context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
+"between" 0x7a2140; "weighted" a yield through 0x7a6690 with the player,
+"bare" without):
+- COLLECTION_PLAYER_DISTRICTS holds a district under construction
+  (runs/h1_duelw1124 player 1's Natural Philosophy 58 at t54, its one Campus
+  not yet built).
+- EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its
+  yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100;
+  0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural
+  Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40).
+- EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount
+  bare, span.
+- EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8,
+  YieldType +0xc, Amount +0x10): a city subject; Amount weighted, x0.5 where
+  the city lacks the building (0x18e9f0), span.
+- EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT 0x6a1b80 (parser
+  0x6a1700: Amount stored as fx(Amount x 0.01f)): a city subject with the
+  district (context +0x78, else 0x1ae530 by DistrictType); per building of
+  the district type (Districts +0x130 list, the first replacing district's
+  where +0x200 names one) that is the player's version (player +0x12f0
+  +0x230 [b] == b), the sum of its Building_YieldChanges of the yield x the
+  amount, weighted, between, x0.5 where the city lacks it, each whole part
+  added.
+- EFFECT_ADJUST_TRADE_ROUTE_YIELD 0x6a3160 (parser 0x6a2f70: AffectOrigin
+  default true +0x10, AffectDestination default false +0x11): the trade
+  route capacity (PlayerTrade +0xf0, 0x4d9320; the CanTrain capacity test)
+  x Amount, weighted; AffectOrigin: between; else AffectDestination with a
+  named player (+0x40) half of it; with a named player the sum / the met
+  list's count.
+- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL and _FOR_DOMESTIC
+  0x6a49e0: the capacity x Amount, weighted, span.
+- EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN 0x6a9550 (a
+  yield filter, context +0x64, -1 or the YieldType): the envoys placed
+  (0x44a440) x Amount, weighted, between.
+- EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter):
+  the city-states it is suzerain of (0x44a5a0) x Amount, weighted, span.
+- EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT 0x6b0840: over the player's units,
+  min(Amount, Units.Maintenance +0x5c), bare Gold, span.
+- EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR
+  (@0xf2e204) of Amount with the player, span.
+- The trees' modifiers (CivicModifiers, the civics AI's 0x7a4b20 term, not
+  wired): EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 READ (Amount x the player's
+  points a token, Player_Influence +0x270, 30 without a player AI, as
+  PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start
+  0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x
+  the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as
+  PSEUDOYIELD_GOVERNOR @0xf2e214, discounted from the start);
+  EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value
+  0x7a7110 of Amount, start to horizon).
+- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per
+  city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's
+  expected count 0x5d4750 x its Production [+0x1008], bare, from the start to
+  start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0:
+  the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and
+  each yield's percent change x CityBuildAI's yields +0x1080),
+  EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the
+  city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
+  0x6b8930 (per resource, or the named one, the player's count of it 0x4aa790
+  x Amount through the resource value 0x7a21e0),
+  EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's
+  yield per turn 0x4bf7c0 x Amount x the tributaries, weighted, between; the
+  parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work
+  type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM,
+  between).
+- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66
+  requirements; the effects the policies and governments name, ranked by the
+  score lines they miss, with their analyzers and whether they reach
+  CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`.
 
 The modifier evaluator: a building's BuildingModifiers are analysed once,
 at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]):
@@ -4024,8 +4159,9 @@ the logged scores), the action replay's majors' AI section
   0x6b5b30 (the ability's own modifiers analyzed in a copy of the context,
   their values summed).
 - The yield's value (0x7a6690) carries the player's weight w[y] (0x702ad0;
-  its five parts in "C-96 / C-97: the AI's yield weights and the modifier
-  evaluator"); the port reads every weight 0 until those parts are ported.
+  its five parts in "C-96 / C-97: the AI's weights and the modifier
+  evaluator"); the pseudo-yield's (0x7a60d0) the pseudo-yield weight
+  (0x700810, the same section).
 - The pseudo-yield's value (0x7a60d0): amount x PseudoYields.DefaultValue x
   ((1 + w) + q): w = 0x700810 (GrandStrategic +0x7e8, written by 0x6fff90's
   handlers; PlayerAI +0x620; the +0x748 / +0x760 and +0x768 / +0x780 lists;
@@ -4064,20 +4200,19 @@ the logged scores), the action replay's majors' AI section
   PSEUDOYIELD_DIPLOMATIC_FAVOR, PV(horizon) - PV(start); plus a golden-age
   term of amount 0; plus its modifiers (+0xb68 [government]) by 0x7a4b20.
   No government is ever returned to in the 29 duels (142 changes).
-- THE HORIZON (LAB): the scores fit 19 turns, the filler as read
-  (0x6dd9a0 -> 0x5254d0 -> 0x525400, GameSpeeds +0x28 CostMultiplier) gives
-  speed(50) = 25 at Online. Diplomatic League's 75 / 112 / 150 / 187 is 3 x
-  the token (50 / 75 / 100 / 125: the governments' 100 / 150 / 200 / 250 at
-  the speed) x 0.5 exactly, so the Influence factor is 1; then Charismatic
-  Leader's 14 and Literary Tradition's 15 (+2 Writer points, player 0) hold
-  at 19 alone, and a city-state's Urban Planning 14 / God King 21 are its
-  weight-0 values at 19 (the 29 duels' city-states: 11,038 of 11,038 and
-  5,862 of 6,102 lines, the rest above it, a weight above 0), by the
-  shipped routine (0x7a16e0; the exact annuity would print God King 22). Open:
-  some players read Diplomatic League 93 / 140 / 234 (an Influence factor
-  about 1.245 on the same tokens; player 0 of runs/h1_duelw1110, 1112 and
-  1115 throughout) beside Charismatic Leader 18, where the routine at 19
-  prints 17 (the exact annuity 18): no one horizon and routine fits both.
+- THE HORIZON AND THE RATE: valueHorizons[0] as the filler writes it
+  (0x6dd9a0 -> 0x5254d0 -> 0x525400, GameSpeeds +0x28 CostMultiplier):
+  speed(50) = 25 at Online, at the GlobalAI's rate 4.0 (AI_DISCOUNT_RATE x
+  100 / CostMultiplier, "H-1: the civics AI"). Diplomatic League's 75 / 112
+  / 150 / 187 is 3 x the token (50 / 75 / 100 / 125: the governments' 100 /
+  150 / 200 / 250 at the speed) x 0.5 exactly, so the Influence factor is 1;
+  Charismatic Leader's 14, Literary Tradition's 15 (+2 Writer points), a
+  city-state's Urban Planning 14 and God King 21 are their weight-0 values
+  at 25 turns and 4.0 (the 29 duels' city-states: 11,038 of 11,038 and 5,862
+  of 6,102 lines, the rest above it, a weight above 0). Player 0 of
+  runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234
+  and Charismatic Leader 18: its agenda's Influence row at 1.25 (the
+  pseudo-yield weight above).
 - Confirming cases: the choice on the game's own scores (`dll_govtpolicies.py`,
   29 duels): on the scores the AI's turn before logged, 1,170 of 1,284
   completed civics whole (on the event turn's own 647), 6,589 / 6,734 slot lines
@@ -4088,14 +4223,21 @@ the logged scores), the action replay's majors' AI section
   The port in the action replay (29 duels, the AI major's 1,114 completed
   civics, the engine's state): on the game's logged scores the government
   as the log's 803 (the government's modifiers' analyzers unread), its cards
-  4,202 / 5,919, whole 350; on its own scores (weights 0, six analyzers) the
-  government 997, the cards 1,262, whole 76; score lines equal 12,393 /
-  209,166 (Diplomatic League 4,066 / 5,543, Charismatic Leader 2,887 /
-  5,329).
-- Unread: 0x700810's arrays' writers, 59 of the 65 registered analyzers the
-  policies and governments name, the requirement set map GlobalAI +0x4d0 and
-  0x6cf3c0, the civic list's jobs (0x61ee30), 0x3930a0 itself; not ported:
-  the yield weight's parts.
+  4,202 / 5,919, whole 350; on its own scores (the weights, the pseudo-yield
+  weight, the requirement sets and the analyzers of "C-96 / C-97: the AI's
+  weights") the government 919, the cards 1,221, whole 86; score lines equal
+  35,229 / 215,850 (with every weight 0 and six analyzers: 12,393 / 209,166,
+  the government 997, the cards 1,262, whole 76). The choices fall where the
+  values are partial: the unread analyzers (the military production cards,
+  the amenity and housing cards) score 0 beside cards now valued in full.
+- Unread: the agendas' path into the weights (and the agenda draw, RandCalls
+  "Choose random agenda"), the golden-age term of a Great Person class's
+  pseudo-yield weight, the writers of 0x700810's +0x7e8 / +0x620 arrays, the
+  analyzers the section above leaves out or PARTLY reads, the requirement
+  evaluators but DISTRICT_TYPE_MATCHES and CITY_HAS_BUILDING, the civic
+  list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class
+  availability 0x2f1ed0 (Strategos scores in the port where the game logs
+  none: 4,739 lines).
 
 ## DLL rules the engines contradict
 

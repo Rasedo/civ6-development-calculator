@@ -22,16 +22,16 @@ describe('the civic value (0x7a9a10)', () => {
     const st = { gameEra: 0 } as unknown as GameState;
     // runs/h1_duelw1124 t1, every player: Code of Laws 85.2 at 10 turns,
     // Craftsmanship 123.7 at 30 = its own 38.5 and Code of Laws'
-    expect(civicValue(st, 'CODE_OF_LAWS', 10)).toBe(21819);
-    expect(civicValue(st, 'CRAFTSMANSHIP', 30)).toBe(9848);
+    expect(civicValue(st, 'CODE_OF_LAWS', 10, new Map())).toBe(21819);
+    expect(civicValue(st, 'CRAFTSMANSHIP', 30, new Map())).toBe(9848);
     // at the horizon or past it -9999
-    expect(civicValue(st, 'CODE_OF_LAWS', 49)).toBe(5411);
-    expect(civicValue(st, 'CODE_OF_LAWS', 50)).toBe(-9999 * 256);
+    expect(civicValue(st, 'CODE_OF_LAWS', 49, new Map())).toBe(5411);
+    expect(civicValue(st, 'CODE_OF_LAWS', 50, new Map())).toBe(-9999 * 256);
   });
 
   it("counts an older era's civic once per era between, plus one", () => {
     // runs/h1_duelw1124 t61 Rome: Craftsmanship at 1 turn 331.7, favored x1.5
-    expect(civicValue({ gameEra: 1 } as unknown as GameState, 'CRAFTSMANSHIP', 1)).toBe(56608);
+    expect(civicValue({ gameEra: 1 } as unknown as GameState, 'CRAFTSMANSHIP', 1, new Map())).toBe(56608);
   });
 });
 

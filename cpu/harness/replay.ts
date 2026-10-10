@@ -306,6 +306,7 @@ function scoreAgainstLog(ctx: Ctx, kind: 'major' | 'minor', turn: number, player
     if (e.turns === g.turns) t.turns += 1;
     if (Math.abs(sc - g.score) <= 0.051) t.score += 1;
     else if (!t.first) t.first = { turn, player, tech, log: [g.score, g.turns], ours: [Math.round(sc * 10) / 10, e.turns] };
+    if (TRACE.has('researchScores')) console.error(`t${turn} research score ${kind} p${player} ${tech} log ${g.score}@${g.turns} ours ${sc.toFixed(1)}@${e.turns}`);
   }
 }
 
@@ -2532,11 +2533,14 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   seedMoments(state, first, history);
   // the AI majors: every major the record's first turn names no human
   const aiSeats = new Map<number, number>();
+  const majorSeats = new Map<number, number>();
   for (const p of recs[0].players) {
     const seat = first.seatOfPlayer.get(p.id);
-    if (seat !== undefined && seat < state.seats.length && !bool(p.human)) aiSeats.set(seat, p.id);
+    if (seat === undefined || seat >= state.seats.length) continue;
+    majorSeats.set(p.id, seat);
+    if (!bool(p.human)) aiSeats.set(seat, p.id);
   }
-  const majorAi = new MajorAiProbe(dumpPath, aiSeats);
+  const majorAi = new MajorAiProbe(dumpPath, aiSeats, majorSeats);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),

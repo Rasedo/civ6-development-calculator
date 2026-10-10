@@ -228,17 +228,27 @@ class SimResearch:
         far = lv[2][1].any(dim=2)
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
-        val = self._rai_value(turns)
+        val = self._rai_value(s, turns)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         score = base + self._rai_upstream(have, base, turns)
         return turns, nxt, base, score, spent
 
-    def _rai_value(self, turns: torch.Tensor) -> torch.Tensor:
-        """`techValue` [B, NT]: landing each row in `turns` turns — its own
-        pseudo-yield (EmbarkAll adds; a row of an era before the game's counts
-        once per era between, plus one), a share per building, a district's
-        and a wonder's at their pseudo-yields, each from landing to the
-        horizon; past the horizon -9999"""
+    def _ai_district_share(self, s: int) -> torch.Tensor:
+        """[B] a district's share at minor `s`'s pseudo-yield weight
+        (`pseudoYieldWeights`): PSEUDOYIELD_DISTRICT's factor 1 + 0.5 x the
+        ChronologyIndex of the minor's era (the latest of its techs' and
+        civics'), the trees' only weighted pseudo-yield for a city-state"""
+        T = self._rai_tables()
+        w = (self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]) + 1) * (_FX // 2)
+        return _fmul(torch.full_like(w, T["share"]), _fmul(_FX + w, torch.full_like(w, T["py_district"])))
+
+    def _rai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
+        """`techValue` [B, NT] for minor `s`: landing each row in `turns`
+        turns — its own pseudo-yield (EmbarkAll adds; a row of an era before
+        the game's counts once per era between, plus one), a share per
+        building, a district's and a wonder's at their pseudo-yields (the
+        district's at the minor's weight), each from landing to the horizon;
+        past the horizon -9999"""
         T = self._rai_tables()
         B, NT = turns.shape
         era = T["era"].unsqueeze(0)
@@ -249,7 +259,7 @@ class SimResearch:
         nn = turns.clamp(min=0)
         u = T["unlocks"].unsqueeze(0)
         val = (self._rai_from_landing(own, nn) + u[:, :, 0] * self._rai_from_landing(torch.full_like(own, T["share"]), nn)
-               + u[:, :, 1] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_district"])), nn)
+               + u[:, :, 1] * self._rai_from_landing(self._ai_district_share(s).unsqueeze(1).expand(B, NT), nn)
                + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn))
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 

@@ -4,12 +4,19 @@
  * AI"): the DLL's 24.8 fixed point, the present value of a yield paid each
  * turn (0x7a16e0), a yield discounted some turns (0x7a1240), and what a
  * yield a turn is worth from the turn a row lands to the value horizon — the
- * research AI's and the civics AI's every term.
+ * research AI's and the civics AI's every term — and a yield's and a
+ * pseudo-yield's value to a player (0x7a6690, 0x7a60d0) over the view every
+ * AI party's value reads (`AiValueView`). The yield weight is `aiWeights.ts`,
+ * the modifier evaluator `aiModifiers.ts`; every AI party (the city-states'
+ * research and civics, the majors' AI in ai/major) values through these.
  */
 import { AI_DISCOUNT_PCT, AI_VALUE_HORIZON } from '../data/aiValue';
+import { AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
 
 /** one in 24.8 fixed point */
 export const FX = 256;
+/** FX(-9999): the AI's "never" (the data word at 0xf04cb0) */
+export const FX_MIN = -9999 * FX;
 
 /** a float constant as the DLL converts it: the floor as the integer part,
  *  the fraction's top 8 bits below it */
@@ -46,7 +53,7 @@ const TEN = fxConst(10);
 
 /** 0x7a16e0: the present value of `a` paid each turn for `n` turns at `r`
  *  percent — a(D-1)/(kD), D the cubic expansion of (1+k)^n */
-function presentValue(a: number, r: number, n: number): number {
+export function presentValue(a: number, r: number, n: number): number {
   if (n === 0) return a;
   if (n < 0) return 0;
   if (r === 0) return fmul(a, n * FX);
@@ -65,7 +72,7 @@ function presentValue(a: number, r: number, n: number): number {
 
 /** 0x7a1240: `a` discounted `n` turns at `r` percent — a(1-k)^n by the
  *  cubic expansion */
-function discounted(a: number, r: number, n: number): number {
+export function discounted(a: number, r: number, n: number): number {
   if (n === 0) return a;
   if (n < 0) return 0;
   const nk = fmul(fmul(r, n * FX), CENT);
@@ -75,18 +82,124 @@ function discounted(a: number, r: number, n: number): number {
   return e > FX ? 0 : fmul(a, e);
 }
 
-/** what a yield `a` a turn is worth from the turn a row `turns` away lands
- *  to the horizon: PV(horizon) - PV(turns), one discounted turn at the
- *  horizon itself */
-export function fromLanding(a: number, turns: number): number {
-  const r = fxConst(AI_DISCOUNT_PCT);
-  if (turns === AI_VALUE_HORIZON) return discounted(a, r, turns);
-  return presentValue(a, r, AI_VALUE_HORIZON) - presentValue(a, r, turns);
+/** the GlobalAI's discount rate (+0x290), raw percent */
+export const AI_RATE = fxConst(AI_DISCOUNT_PCT);
+
+/** 0x7a2140: a yield `a` a turn from turn `from` to turn `to` — PV(to) -
+ *  PV(from), one discounted turn where the two meet */
+export function valueBetween(a: number, from: number, to: number, r = AI_RATE): number {
+  if (from === to) return discounted(a, r, from);
+  return presentValue(a, r, to) - presentValue(a, r, from);
 }
 
-/** 0x7a60d0: a pseudo-yield's worth, `amount` of it at its DefaultValue */
-export function pseudoYield(def: number, amount: number): number {
-  return fmul(amount, fxConst(def));
+/** what a yield `a` a turn is worth from the turn a row `turns` away lands
+ *  to the tree values' horizon */
+export function fromLanding(a: number, turns: number): number {
+  return valueBetween(a, turns, AI_VALUE_HORIZON);
+}
+
+/** 0x7a60d0: a pseudo-yield's worth, `amount` of it at its DefaultValue
+ *  `def` times the player's factor 1 + `w` (its pseudo-yield weight, raw) */
+export function pseudoYield(def: number, amount: number, w: number): number {
+  return fmul(amount, fmul(FX + w, fxConst(def)));
+}
+
+/** the whole part of a raw, as the analyzers add it (`sar 8`) */
+export const whole = (v: number): number => v >> 8;
+
+/** one AiLists row a trait or a strategy carries (System Yields,
+ *  YieldSensitivities or PseudoYields), with its difficulty bounds */
+export interface AiListRef {
+  list: string;
+  system: string;
+  minDifficulty?: string | null;
+  maxDifficulty?: string | null;
+}
+
+/** one AiFavoredItems row */
+export interface AiListItem {
+  item: string;
+  value: number;
+  favored: boolean;
+  minDifficulty?: string | null;
+  maxDifficulty?: string | null;
+}
+
+/** A city as the AI's value reads it */
+export interface AiCityView {
+  /** the engine's city id */
+  id: number;
+  capital: boolean;
+}
+
+/**
+ * THE STATE AS THE AI'S VALUE READS IT, in the game's type names: what the
+ * modifier analyzers and the yield value take from a player. The engine
+ * implements it (cpu/core/majorView.ts); the majors' AI view extends it.
+ */
+export interface AiValueView {
+  /** the game speed's CostMultiplier, a percent */
+  readonly costMultiplierPct: number;
+  /** the city-states the game holds */
+  readonly cityStates: number;
+  /** the government the seat is in, null in Anarchy */
+  government(seat: number): string | null;
+  cities(seat: number): readonly AiCityView[];
+  /** a city's yield of a YieldType as the city totals it (City::GetYield) */
+  cityYield(seat: number, cityId: number, yieldType: string): number;
+  /** the seat's yield weight w (0x702ad0), raw (`aiWeights.ts`) */
+  yieldWeight(seat: number, yieldType: string): number;
+  /** the seat's pseudo-yield weight w (0x700810), raw (`aiWeights.ts`) */
+  pseudoYieldWeight(seat: number, pseudo: string): number;
+  /** the seat's districts, built or building (the PLAYER_DISTRICTS collection:
+   *  runs/h1_duelw1124 player 1 values a Campus under construction at t54) */
+  districts(seat: number): readonly AiDistrictView[];
+  /** a district's yield of a YieldType as the district totals it (0x24b5a0:
+   *  its own yields with its modifiers, and its buildings') */
+  districtYield(seat: number, cityId: number, district: string, yieldType: string): number;
+  /** a city has the building (City_Buildings 0x18e9f0) */
+  cityHasBuilding(seat: number, cityId: number, building: string): boolean;
+  /** a city has a district of the type, built or building (0x1ae530) */
+  cityHasDistrict(seat: number, cityId: number, district: string): boolean;
+  /** the buildings of a district type in the seat's version (its
+   *  civilization's unique building in place of the one it replaces), in
+   *  table order, each with its Building_YieldChanges amount of the yield */
+  districtBuildingYields(seat: number, district: string, yieldType: string): readonly { building: string; amount: number }[];
+  /** the seat's trade route capacity (PlayerTrade +0xf0) */
+  tradeRouteCapacity(seat: number): number;
+  /** the envoys the seat has placed (0x44a440) */
+  influenceTokensUsed(seat: number): number;
+  /** the city-states the seat is suzerain of (0x44a5a0) */
+  tributaries(seat: number): number;
+  /** each of the seat's units' Units.Maintenance */
+  unitMaintenances(seat: number): readonly number[];
+}
+
+/** A district as the AI's value reads it */
+export interface AiDistrictView {
+  /** the engine's city id */
+  cityId: number;
+  /** the DistrictType */
+  type: string;
+}
+
+/** 0x7a6690: a yield's value to the player — amount x Yields.DefaultValue x
+ *  (1 + min(w, 9.0)), w the player's yield weight; `seat` null is an
+ *  analyzer that passes no player (the bare DefaultValue) */
+export function yieldValue(view: AiValueView | null, seat: number | null, amount: number, yieldType: string): number {
+  const v = fmul(amount, fxConst(AI_YIELD_DEFAULT[yieldType] ?? 1));
+  if (!view || seat === null) return v;
+  const w = view.yieldWeight(seat, yieldType);
+  return fmul(v, Math.min(w, 9 * FX) + FX);
+}
+
+/** 0x7a60d0 by name: amount x (the player's factor x
+ *  PseudoYields.DefaultValue), the factor (1 + w) + q — w the pseudo-yield
+ *  weight (0x700810, at least -1.0), q 0 but for PSEUDOYIELD_DIPLOMATIC_BONUS
+ *  toward a named player (0x655840), which no value here names; `seat` null
+ *  is a caller that passes no player (factor 1) */
+export function pseudoYieldValue(view: AiValueView | null, seat: number | null, amount: number, pseudo: string): number {
+  return pseudoYield(AI_PSEUDOYIELD_DEFAULT[pseudo] ?? 1, amount, view && seat !== null ? view.pseudoYieldWeight(seat, pseudo) : 0);
 }
 
 /** 0x8c4540: the turns `rem` raw left needs at `rate` raw a turn — the

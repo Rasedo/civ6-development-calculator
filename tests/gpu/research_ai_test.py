@@ -44,11 +44,11 @@ def test_value(rules) -> None:
     def value(tid: str, n: int) -> int:
         turns = torch.zeros(sim.B, nt, dtype=torch.long, device=sim.device)
         turns[0, ti[tid]] = n
-        return int(sim._rai_value(turns)[0, ti[tid]])
+        return int(sim._rai_value(0, turns)[0, ti[tid]])
 
     assert value("POTTERY", 12) == 20056, "the row's own 5, a building's share, a wonder's"
-    assert value("ASTROLOGY", 25) == 11713, "a district's share at its pseudo-yield"
-    assert value("WRITING", 37) == 4159
+    assert value("ASTROLOGY", 25) == 13091, "a district's share at its pseudo-yield, weighted 1 + 0.5 x the Ancient ChronologyIndex"
+    assert value("WRITING", 37) == 4649
     assert value("SHIPBUILDING", 4) == 48958, "EmbarkAll adds 5"
     assert value("MINING", 50) == 35, "at the horizon one discounted turn"
     assert value("MINING", 51) == -9999 * 256, "past it -9999"

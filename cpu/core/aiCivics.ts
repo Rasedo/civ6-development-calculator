@@ -37,6 +37,7 @@ import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
 import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
+import { pseudoYieldWeights } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 export interface CivicEntry {
@@ -119,18 +120,19 @@ const UNLOCKS = new Map(Object.values(CIVICS).map((c) => [c.id, {
  * PSEUDOYIELD_DISTRICT, each from landing to the horizon; its policies at
  * least `CIVIC_AI_POLICY_FLOOR`. At the horizon or past it -9999.
  */
-export function civicValue(state: GameState, id: string, turns: number): number {
+export function civicValue(state: GameState, id: string, turns: number, pw: ReadonlyMap<string, number>): number {
   if (turns >= AI_VALUE_HORIZON) return fxConst(-9999);
   const def = CIVICS[id];
-  let v = fromLanding(pseudoYield(PSEUDOYIELD_CIVIC, FX), turns);
+  const w = (p: string): number => pw.get(p) ?? 0;
+  let v = fromLanding(pseudoYield(PSEUDOYIELD_CIVIC, FX, w('PSEUDOYIELD_CIVIC')), turns);
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
   if (era <= game) v = fmul(v, (game - era + 1) * FX);
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = civicUnlocks(id);
   return v + n.buildings * fromLanding(share, turns)
-    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share), turns)
-    + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share), turns)
+    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
+    + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
     + fxConst(CIVIC_AI_POLICY_FLOOR);
 }
 
@@ -174,10 +176,11 @@ function researchOf(state: GameState, seat: number): ResearchState {
 export function civicAnalysis(state: GameState, seat: number, culture: number): CivicEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(culture);
+  const pw = pseudoYieldWeights(state, seat);
   const entries: CivicEntry[] = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id]).map((id) => {
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : civicValue(state, id, turns);
+    const base = turns < 0 ? 0 : civicValue(state, id, turns, pw);
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);

@@ -11,8 +11,9 @@ import type { SeatActionRecord } from '../../cpu/core/types';
 import { AI_GOVERNMENTS, AI_POLICIES, AI_SLOT_TYPES } from './tables';
 import type { AiPolicy } from './types';
 import type { MajorSlotView, MajorView } from './view';
-import { FX_MIN, presentValue, tdiv } from './fixed';
-import { AI_DISCOUNT_RATE, AI_POLICY_HORIZON, modifiersValue, pseudoYieldValue, type ValueTerms } from './value';
+import { AI_POLICY_HORIZON } from '../../cpu/data/aiValue';
+import { AI_RATE, FX_MIN, fdiv, presentValue, pseudoYieldValue } from '../../cpu/core/aiValue';
+import { modifiersValue, type ValueTerms } from '../../cpu/core/aiModifiers';
 
 /** a job that never ran, or whose card the player cannot reach: -1.0 */
 export const NO_SCORE = -256;
@@ -40,7 +41,7 @@ export function policyObsolete(view: MajorView, seat: number, p: AiPolicy): bool
 }
 
 function terms(view: MajorView, seat: number, horizon: number): ValueTerms {
-  return { view, seat, start: 0, horizon, rate: AI_DISCOUNT_RATE };
+  return { view, seat, start: 0, horizon, rate: AI_RATE };
 }
 
 /**
@@ -116,15 +117,15 @@ export function governmentValue(view: MajorView, seat: number, gov: string, best
   if (!g) return FX_MIN;
   let v = 0;
   for (const row of g.slots) {
-    const base = tdiv((best.get(row.slot) ?? 0) * 256, 2560);
+    const base = fdiv(best.get(row.slot) ?? 0, 2560);
     const any = SLOT_ANY.get(row.slot) ?? false;
     for (let i = 0; i < row.n; i++) {
       const d = any ? Math.min(Math.max(i, 1), 3) : i + 1;
-      v += tdiv(base * 256, d * 256);
+      v += fdiv(base, d * 256);
     }
   }
   if (g.favor) {
-    const f = pseudoYieldValue(g.favor << 8, 'PSEUDOYIELD_DIPLOMATIC_FAVOR');
+    const f = pseudoYieldValue(view, seat, g.favor << 8, 'PSEUDOYIELD_DIPLOMATIC_FAVOR');
     v += presentValue(f, t.rate, t.horizon) - presentValue(f, t.rate, t.start);
   }
   return v + modifiersValue(t, g.modifiers);
