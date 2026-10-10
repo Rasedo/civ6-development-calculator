@@ -3965,6 +3965,12 @@ class SimInit:
         self.barb_pool_nfree = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_pool_dying = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.tribe_defender = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        # the player whose unit took each dead tribe's camp (-1 none): its units
+        # rampage against it; the city each raid waits for and the homing
+        # scout's, by their centres (-1 none)
+        self.tribe_ramp = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_raidp = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
+        self.tribe_home_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order
         # (`ringPlots`, 0x69010), -1 past the map's edge

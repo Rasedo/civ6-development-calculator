@@ -3758,13 +3758,133 @@ the records do not show it.
   units of AI type EXPLORE or above whose planning reaches it this turn
   (0x775340, 1 turn) in pool order, none standing on a plot of the kind
   itself (0x774380), go to it until one stands on it and pillages it.
-- Barbarian Rampage (0x778b40): the tribes whose camp was destroyed
-  (0x152df0: tribe +0x18 clear, +0x1c the player whose unit took the camp,
-  set by the camp's removal 0x154830); each of their units goes after that
-  player's targets in the tactical target list — the nearest its planning
-  can attack this turn, else the nearest it can reach — through 0x771670;
-  with none, toward the nearest of the player's cities its tribe waited to
-  raid or assault (0x1479e0) ("Chasing target", 0x775c60).
+- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians,
+  Plunder Trader, Chase Target, Attack Units and Move to Safety: the section
+  "C-95: the attack plots in the reach, the target list, the rampage, ...".
+
+## C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ
+
+`tacticalTargets`, `planTargets`, `rampage`, `attackCivilians`,
+`plunderTraders`, `chaseTarget` in cpu/core/tactical.ts (twins in
+gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,attack}.ts`
+(bt2's worktree) read each family against AI_Tactical.csv / AI_Planning.csv.
+
+- The reach holds the plots the unit attacks into: the planning's
+  breadth-first search links a plot a unit of a player at war holds (or a
+  hostile city centre, an Encampment) as a node whose step spends the
+  Movement left (the valid wrapper 0x26e570: the attack's cost adds the
+  Movement left, 0x1d0 += 0x1d4) and links nothing from it (a parent with
+  node flag +0x51 & 0x40 is refused). AI_Planning.csv lists them (1124 t9:
+  the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);
+  a Slinger's reach holds them too (combat > 0, the range aside). With them
+  the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->
+  758 of 1,241, the game's plots within ours 862 -> 1,192.
+- The reach leaves out the plots the player never revealed (the game's
+  lists drop them; a camp reveals three plots round it: 1124 t1, the camp at
+  40:21 lists 38:19 at distance 3 and not 38:18 at 4). The engines track no
+  barbarian revealed plots (`revealAround` writes majors only): every plot
+  reads as revealed — the AUDIT C-95 line.
+- THE TARGET LIST (0x783980): the plots in index order, a plot the player
+  sees (the word plane +0x290 > 0) giving, by its district (0x810d0): the
+  player's own a FRIENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT
+  where the district defends (0x24c2f0: a City Center, an Encampment) — and
+  then nothing else of the plot — and a PASSIVE_DISTRICT where its type
+  counts toward the city's limit (0x527e30: Districts.RequiresPopulation; a
+  Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the
+  Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not
+  pillaged (0x24c3a0); else its defender against the player (0x208b80) as
+  LOW (an aircraft AIR_UNIT); else the first of a barbarian camp
+  (CAMP), a goody hut, a Trader at war (one entry per Trader), the one
+  civilian of the plot's civilian layer (CIVILIAN at war, else
+  NEUTRAL_CIVILIAN; a fighter in that layer LOW), its religious unit
+  (RELIGIOUS), an unpillaged improvement of a player at war (IMPROVEMENT, no
+  owner in the entry). A plot only revealed gives its camp, goody hut,
+  improvement and districts. The knowledge base's enemy units on plots not
+  seen follow (LOW, CIVILIAN where the unit cannot fight): unported (AUDIT).
+  Then 0x786d50: a LOW unit sharing its plot with one that cannot fight is
+  MEDIUM; the barbarians' prioritization (0x786e70, the member at +0xa8 for
+  a barbarian player 0x469ce0) makes HIGH every LOW or MEDIUM unit within
+  BARBARIAN_DEFENSE_ALL_UNITS 4 of a CAMP of the list, a ranged one within
+  its range + BARBARIAN_DEFENSE_RANGED_UNITS 1 (GlobalParameters +0xb0 /
+  +0xb4). The type ids: f2e198 FRIENDLY_CITY, 19c COMBAT_DISTRICT, 1a0
+  PASSIVE_DISTRICT, 1a4 NEUTRAL_CITY, 1a8 BARBARIAN_CAMP, 1ac
+  NEUTRAL_CIVILIAN, 1b0 RELIGIOUS, 1b4 TRADER, 1b8 CIVILIAN, 1bc LOW, 1c0
+  MEDIUM, 1c4 HIGH, 1c8 IMPROVEMENT (0x5bcb80's table, each global the id of
+  the string loaded before it).
+- THE PLANNING'S TARGETS (0x792f90): every target within its Movement x 2 +
+  its range of the unit; the spots (0x790c60 on each link the search makes,
+  at most 6): a unit target or a COMBAT_DISTRICT only — in melee the plot
+  the target stands on reached (the spot its parent), at range a plot within
+  range (LoS beyond 1, 0x58a6d0). Count > 0 = the unit can strike it within
+  the planning's two turns.
+- BARBARIAN RAMPAGE (0x778b40): the tribes whose camp a unit took (0x152df0:
+  tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal
+  0x154830); each of their units, in pool order, takes of the planning's
+  targets of that player the nearest with a spot, else the nearest (strictly
+  nearer replaces; the list's first of equals), and strikes it (0x771670: a
+  civilian, Trader or religious unit it moves onto; a ranged unit at a
+  fighter or COMBAT_DISTRICT strikes, first moving to the first plot of its
+  reach of this turn with Movement left within range and none of its own
+  stacking; else MOVE_TO the target's plot with the attack flag 0x10). With
+  no target (0x1479e0): of the cities its raid (+0x48) then its assault
+  (+0x60) wait for that the player holds, the nearest its camp within 16,
+  else the player's nearest within 16 (0x93d570); it moves to the first plot
+  of its reach of this turn within its range (1 at least) of the city with
+  none of its own stacking (0x775c60) and logs no row. Shadow check over
+  1124: of 446 rows the logged target is in the list for 423 (the rest the
+  knowledge base's), the pick matches 415 of them; the replay's end plots
+  (5 seeds) 1,583 -> 2,282 of 2,616 (below).
+- ATTACK CIVILIANS (0x779240): each CIVILIAN target, the units whose
+  planning holds its plot within two turns (0x775340: pool order, a strength
+  to fight with, a DEFENDER held until another unit goes in; the sort
+  0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270):
+  each that can act (0x56c690) takes the move order onto it (0x962190, flag
+  0x10), a unit with no ranged or bombard strength then done (0x56d6f0,
+  0x570b40, 0x77d180); the civilian taken ends the target; then each ranged
+  one within range strikes it (0x964a40).
+- PLUNDER TRADER (0x77aa20): each TRADER target, the units whose planning
+  holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that
+  can act moves onto it (0x773fb0, its Movement kept) and plunders
+  (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until one stands on it.
+- CHASE TARGET (0x775670 then 0x773030): each land unit (+0x650 == 2) left,
+  in pool order, takes (0x775170, 8) the LOW target standing on its plot,
+  else the LAST of the list within 8 whose plot its planning holds within two
+  turns, and moves to the first plot of its reach of this turn within its
+  range (1 at least) of the target with none of its own stacking (0x775c60);
+  the row's "Move To" is the target's plot.
+- ATTACK UNITS (0x7784b0) — READ, unported: per target of the move's type
+  (LOW also takes RELIGIOUS at war), the units whose planning holds its plot
+  within two turns (0x775340; for MEDIUM / LOW a ranged unit's spot at
+  exactly its range with Movement left, 0x78fa10), the targets of that type
+  within 5 of it (0x76eb50), each unit's spots per target from its planning
+  (turns, the planning's combat simulation 0x791470: the damage dealt
+  +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); for
+  MEDIUM / LOW a spot whose received exceeds the dealt, or whose received
+  would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0,
+  MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the
+  spots: per spot each unit's gain (λ 0x7702b0: the best of its entries
+  there, dealt / turns, a kill +100 where the target's damage reaches its
+  health, an overkill (health - damage) + 100; minus its value where it
+  stands assigned), the knapsack 0x61ddb0 at capacity 1 takes the first
+  largest positive gain, and the move (λ 0x770710) re-assigns it, the
+  spot's occupant unassigned. Each assigned unit's row: Move = its spot,
+  Attack = the target where the spot's turns are 1 (else -9999); the
+  "Expected Damage" field is never written (0 on all 7,241 rows). The
+  damages need the engines' combat strengths as a prediction (no such
+  function in either twin): the AUDIT C-95 line.
+- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported:
+  per player at war, each of its fighting units the player sees adds its
+  strength (the larger of melee and ranged; bombard less GlobalParameters
+  +0x188) to every plot of its one-turn reach (the search 0x26df90, flags
+  0x311) and to each plot within its range of those; an aircraft a disk of
+  its range; each city at war on a seen plot its defence at its centre and
+  its ranged strength on its strike disk; the player's own city centres
+  zeroed; each plot's feature's danger added. Move to Safety takes each unit
+  on a plot of danger > 0 (logged "Current Danger"): one with no strength,
+  or in a formation (0x8be30); a hurt one at half its health or worse whose
+  planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds
+  however hurt; a whole one where the danger exceeds its strength + 20 — and
+  moves them (0x774190, unread).
 
 ## C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)
 

@@ -78,7 +78,7 @@ export function clearCampFor(state: GameState, unit: Unit, tileIndex: number): v
   if (camp < 0) return;
   state.barbSeat.camps.splice(camp, 1);
   questCampCleared(state, unit.seat, tileIndex);
-  tribeDies(state, tileIndex);
+  tribeDies(state, tileIndex, unit.seat);
   campMoment(state, unit.seat, tileIndex);
   // the outpost was the BARBARIANS' — theirs is the civilization buried here
   markAntiquitySite(state, tileIndex, BARB_SEAT);

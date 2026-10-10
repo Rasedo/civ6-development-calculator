@@ -56,7 +56,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { barbarianTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeKindAt } from '../core/barbarians';
+import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -421,6 +421,37 @@ function adoptByTribe(state: GameState, u: Unit): void {
   else {
     best.units.push(u.id);
     (best.fresh ??= []).push(u.id);
+  }
+}
+
+/**
+ * THE CAMPS THE OTHER PLAYERS' UNITS TOOK in the turn, before the barbarians
+ * close it: a camp the record's log removes after a unit of another player
+ * stepped onto its plot is gone, its tribe dead and rampaging against that
+ * unit's player (`tribeDies`), and a major's take answers its Clear
+ * Barbarian Camp quests (runs/h1_duelw1127 t50: China's Warrior takes the
+ * naval camp at (33,22) and dies to its Quadrireme in the barbarians' turn,
+ * whose units rampage that turn).
+ */
+function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
+  const { state } = ctx;
+  const W = ctx.W;
+  const stepped = new Map<number, number>();
+  for (const a of ((b as { actions?: unknown[][] }).actions ?? [])) {
+    if (a[1] !== turn) continue;
+    if (a[2] === 'UnitMoved') {
+      const seat = seatOfP(ctx, a[3] as number);
+      if (seat !== NO_SEAT && !isBarbSeat(seat)) stepped.set((a[6] as number) * W + (a[5] as number), seat);
+      continue;
+    }
+    if (a[2] !== 'ImprovementRemovedFromMap') continue;
+    const p = (a[4] as number) * W + (a[3] as number);
+    const k = state.barbSeat.camps.indexOf(p);
+    const seat = stepped.get(p);
+    if (k < 0 || seat === undefined) continue;
+    state.barbSeat.camps.splice(k, 1);
+    if (isCiv(seat)) questCampCleared(state, seat, p);
+    tribeDies(state, p, seat);
   }
 }
 
@@ -2034,9 +2065,14 @@ function syncDraws(ctx: Ctx, b: TurnRecord, tribesBefore: number): boolean {
       // which answers its Clear Barbarian Camp quests
       const clearer = b.units.find((x) => x.y * ctx.W + x.x === c && isCiv(seatOfP(ctx, x.owner)));
       if (clearer) questCampCleared(state, seatOfP(ctx, clearer.owner), c);
+      // the unit that took it, any player's: its tribe rampages against it
+      const taker = b.units.find((x) => x.y * ctx.W + x.x === c && seatOfP(ctx, x.owner) !== NO_SEAT && !isBarbSeat(seatOfP(ctx, x.owner)));
       const k = tribes.findIndex((tr) => tr.plot === c && tr.alive);
       if (k >= tribesBefore) tribes.splice(k, 1);
-      else if (k >= 0) tribes[k].alive = false;
+      else if (k >= 0) {
+        tribes[k].alive = false;
+        if (taker) tribes[k].rampage = seatOfP(ctx, taker.owner);
+      }
     }
     for (const c of camps) {
       if (state.barbSeat.camps.includes(c)) continue;
@@ -2725,6 +2761,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       u.hp = rest.hp;
     }
     syncUnits(ctx, b);
+    campsTaken(ctx, b, a.turn);
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     syncUnits(ctx, b);

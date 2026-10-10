@@ -1076,6 +1076,8 @@ _MUTABLE = [
     "barb_spot_next",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
     "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
+    # the player each dead tribe rampages against, the cities its raids wait for (`BarbTribe.rampage`, `raidTargets`)
+    "tribe_ramp", "tribe_raidp", "tribe_home_plot",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
     "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
     "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)

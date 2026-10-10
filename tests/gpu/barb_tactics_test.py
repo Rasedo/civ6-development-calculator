@@ -41,6 +41,9 @@ def scalar_search(sim, b, slot, max_turns, zoc, dest=-1):
     ut = int(sim.barb_unit_type[b, slot])
     naval = bool(sim.unit_naval[ut])
     ent = (wat if naval else land)[b].tolist()
+    a_land, a_nav = sim._tac_attack_planes(BARB_SEAT)
+    fights = int(sim._type_combat[ut]) > 0
+    atk = [bool(x) and fights and not e for x, e in zip((a_nav if naval else a_land)[b].tolist(), ent)]
     zign = bool(sim._tac_zoc_ignored(torch.tensor([ut]))[0])
     scale = sim._mp_scale
     mp = int(sim.barb_unit_mp[b, slot])
@@ -66,27 +69,33 @@ def scalar_search(sim, b, slot, max_turns, zoc, dest=-1):
         order.append((best, n["turns"]))
         if best == dest:
             break
+        # an attack's plot is the path's end
+        if atk[best]:
+            continue
         for c in cols:
             to = neigh[best][c]
-            if to < 0 or not ent[to]:
+            if to < 0 or not (ent[to] or atk[to]):
                 continue
             pm, turns = n["moves"], n["turns"]
             if pm <= 0:
                 turns += 1
                 pm = full
-            cst = (scale if naval else cost[best][c]) * FIX // scale
-            moves = pm - cst
-            if moves < 0:
-                moves = 0
-                if best == start and unmoved:
+            if atk[to]:
+                cst, moves = pm, 0
+            else:
+                cst = (scale if naval else cost[best][c]) * FIX // scale
+                moves = pm - cst
+                if moves < 0:
+                    moves = 0
+                    if best == start and unmoved:
+                        cst = pm
+                    elif n["turns"] == turns:
+                        turns += 1
+                    else:
+                        cst = pm if pm > 0 else FIX
+                if zp is not None and moves > 0 and zp[to] and not zign:
                     cst = pm
-                elif n["turns"] == turns:
-                    turns += 1
-                else:
-                    cst = pm if pm > 0 else FIX
-            if zp is not None and moves > 0 and zp[to] and not zign:
-                cst = pm
-                moves = 0
+                    moves = 0
             if turns > max_turns:
                 continue
             ends = 4 + (3 if tseat[to] != BARB_SEAT else 0) if moves <= 0 else 0
@@ -272,7 +281,93 @@ def main() -> None:
     assert int(sim.barb_unit_tile[0, pick]) == want, (
         f"the unit wandered to {int(sim.barb_unit_tile[0, pick])}, the draw names {want}")
     print(f"  5 a unit near its camp wanders on one draw over its {len(cands)} plots of this turn")
-    print("BARB TACTICS OK — the pathfinder's order, the pool, the camp's defender, the pillage, the wander")
+    # -- 6: a rampaging tribe's unit strikes the taker's unit beside it -------
+    sim = fresh(rules, path)
+    sim._barb_slots()
+    ai, utribe = sim._tac_ai()
+    lo = sim.POOL_LO["barb"]
+    land, _ = sim._tac_enter(BARB_SEAT)
+    ctr = sim._centre_plane()[0]
+    majors = [m for m in sim.military_at[0].tolist()
+              if m >= 0 and int(sim.unit_seat[0, m]) < sim.n_majors and not bool(sim.water[0, int(sim.unit_tile[0, m])])]
+    assert majors, "no major's land unit stands"
+    m = majors[0]
+    found = None
+    for s in barb_units(sim):
+        k = int(utribe[0, s])
+        if (int(ai[0, s]) != 3 or k < 0 or bool(sim.barb_unit_op[0, s])
+                or bool(sim.unit_naval[int(sim.barb_unit_type[0, s])])):
+            continue
+        bt = int(sim.barb_unit_tile[0, s])
+        spot = [n for n in sim.neigh[bt].tolist()
+                if n >= 0 and bool(land[0, n]) and int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0
+                and not bool(ctr[n]) and int(sim.district[0, n]) < 0 and int(sim.tile_seat[0, n]) != BARB_SEAT]
+        if spot:
+            found = (s, k, spot[0])
+            break
+    assert found, "no barbarian fighter with an open plot beside it"
+    s, k, mt = found
+    sim._occ_clear(torch.tensor([0]), torch.tensor([int(sim.unit_tile[0, m])]), torch.tensor([m]))
+    sim.unit_tile[0, m] = mt
+    sim._occ_set(torch.tensor([0]), torch.tensor([mt]), torch.tensor([m]))
+    sim.tribe_alive[0, k] = False
+    sim.tribe_ramp[0, k] = int(sim.unit_seat[0, m])
+    tg = sim._tac_targets()
+    assert int(tg["os"][0, mt]) == int(sim.unit_seat[0, m]) and 1 <= int(tg["ok"][0, mt]) <= 3, (
+        f"the unit is no target: ok {int(tg['ok'][0, mt])} os {int(tg['os'][0, mt])} seen {bool(sim._barb_seen('barbarians')[0, mt])}")
+    sim._barb_reset_mp()
+    hp0 = int(sim.unit_hp[0, m])
+    acting = torch.zeros_like(sim.barb_unit_alive)
+    acting[0, s] = True
+    sim._barbarian_tactics(acting)
+    assert not bool(sim.unit_alive[0, m]) or int(sim.unit_hp[0, m]) < hp0, (
+        f"the rampaging unit at {int(sim.barb_unit_tile[0, s])} left the taker's unit at {mt} whole ({hp0})")
+    print("  6 a rampaging tribe's unit strikes the taker's unit beside it")
+    # -- 7: a fighter whose reach takes a civilian at war goes and takes it ----
+    sim = fresh(rules, path)
+    sim._barb_slots()
+    ai, utribe = sim._tac_ai()
+    land, _ = sim._tac_enter(BARB_SEAT)
+    ctr = sim._centre_plane()[0]
+    # a major's land unit made a Builder
+    majors = [m for m in sim.military_at[0].tolist()
+              if m >= 0 and int(sim.unit_seat[0, m]) < sim.n_majors and not bool(sim.water[0, int(sim.unit_tile[0, m])])]
+    assert majors, "no major's land unit stands"
+    c = majors[0]
+
+    def open_plot(n):
+        return (n >= 0 and bool(land[0, n]) and int(sim.military_at[0, n]) < 0 and int(sim.civilian_at[0, n]) < 0
+                and not bool(ctr[n]) and int(sim.district[0, n]) < 0)
+
+    found = None
+    for s in barb_units(sim):
+        if (int(ai[0, s]) < 3 or bool(sim.barb_unit_op[0, s]) or bool(sim.unit_naval[int(sim.barb_unit_type[0, s])])
+                or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0):
+            continue
+        bt = int(sim.barb_unit_tile[0, s])
+        spot = [n for n in sim.neigh[bt].tolist() if open_plot(n) and int(sim.tmove[0, n]) == 0]
+        if spot:
+            found = (s, spot[0])
+            break
+    assert found, "no barbarian fighter with an open plot beside it"
+    s, ct = found
+    sim._occ_clear(torch.tensor([0]), torch.tensor([int(sim.unit_tile[0, c])]), torch.tensor([c]))
+    sim.unit_type[0, c] = sim._builder_idx
+    sim.unit_tile[0, c] = ct
+    sim._occ_set(torch.tensor([0]), torch.tensor([ct]), torch.tensor([c]))
+    assert int(sim.civilian_at[0, ct]) == c, "the Builder stands in no civilian plane"
+    seat0 = int(sim.unit_seat[0, c])
+    assert int(sim._tac_targets()["ok"][0, ct]) == 7, "the Builder is no CIVILIAN target"
+    sim._barb_reset_mp()
+    acting = torch.zeros_like(sim.barb_unit_alive)
+    acting[0, s] = True
+    sim._barbarian_tactics(acting)
+    assert int(sim.barb_unit_tile[0, s]) == ct, (
+        f"the fighter stands on {int(sim.barb_unit_tile[0, s])}, not the civilian's plot {ct}")
+    assert not bool(sim.unit_alive[0, c]) or int(sim.unit_seat[0, c]) != seat0, "the civilian stands untaken"
+    print("  7 a fighter whose reach takes a civilian at war takes it")
+    print("BARB TACTICS OK — the pathfinder's order, the pool, the camp's defender, the pillage, the wander, the rampage,"
+          " the civilians")
 
 
 if __name__ == "__main__":

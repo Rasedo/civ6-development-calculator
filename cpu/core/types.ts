@@ -583,6 +583,9 @@ export interface BarbTribe {
   plot: number;
   /** the camp stands; a cleared camp's tribe stays in the list, dead */
   alive: boolean;
+  /** the player whose unit took its camp: its units rampage against it
+   *  (Barbarian Rampage) */
+  rampage?: number;
   kind: 'NAVAL' | 'CAVALRY' | 'MELEE';
   /** its BarbarianTribeNames row within its kind */
   name: number;

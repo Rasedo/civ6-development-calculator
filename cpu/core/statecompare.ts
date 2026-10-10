@@ -456,11 +456,13 @@ const GAME: Record<string, Extractor> = {
       // asked for, the cities waited for (their owners), the homing scout's
       // city owner, the operation (kind, owner, turns, force taken, its units)
       t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(uidx),
-      (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat),
+      (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat), ...(t.raidTargets ?? []).map((x) => x.plot),
       (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat),
       t.homing ? t.homing.target.seat : -1,
       t.op ? (t.op.assault ? 2 : 1) : 0, t.op?.target.seat ?? -1, t.op?.turns ?? 0, t.op?.recruited ? 1 : 0,
-      t.op ? t.op.units.filter((id) => live.has(id)).length : 0]),
+      t.op ? t.op.units.filter((id) => live.has(id)).length : 0,
+      // the player its units rampage against, its camp taken
+      t.rampage ?? -1]),
     ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0),
     techs.length, ...techs, civics.length, ...civics,
     // the unit pool (`barbSlots`): its size, its free slots, those waiting to

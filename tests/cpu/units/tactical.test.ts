@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
-import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeOf } from '../../../cpu/core/barbarians';
-import { barbarianTactics, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt } from '../../../cpu/core/tactical';
+import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeDies, tribeOf } from '../../../cpu/core/barbarians';
+import { barbarianTactics, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets } from '../../../cpu/core/tactical';
 import { DIRECTION_TYPES, neighborTile } from '../../../world/hex';
 import { LCG_ADD, LCG_MUL } from '../../../cpu/core/rand';
 import type { GameState, Unit } from '../../../cpu/core/types';
@@ -93,6 +93,59 @@ describe("the barbarians' tactical pass", () => {
     barbarianTactics(state, acting);
     expect(raider.tileIndex).toBe(farm.index);
     expect(farm.pillaged).toBe(true);
+  });
+
+  it("a tribe whose camp a player's unit took rampages: its unit strikes that player's unit it reaches", () => {
+    const state = land();
+    const camp = tileAtCoords(state.map, 10, 10);
+    raiseCamp(state, camp.index);
+    const tr = state.barbTribes![0];
+    const start = tileAtCoords(state.map, 4, 4);
+    const u = spawnUnit(state, 'WARRIOR', start.index, BARB_SEAT)!;
+    tr.units.push(u.id);
+    // the camp taken by seat 0's unit
+    state.barbSeat.camps.splice(state.barbSeat.camps.indexOf(camp.index), 1);
+    tribeDies(state, camp.index, 0);
+    expect(tr.rampage).toBe(0);
+    const near = tileAtCoords(state.map, 5, 4);
+    const foe = spawnUnit(state, 'WARRIOR', near.index, 0)!;
+    const hp = foe.hp;
+    turnStart(state);
+    barbarianTactics(state, new Set([u.id]));
+    expect(plotDistance(state, u.tileIndex, near.index) <= 1).toBe(true);
+    expect(!state.units.includes(foe) || foe.hp < hp).toBe(true);
+  });
+
+  it('a fighter whose reach takes a civilian at war goes and takes it (Attack Civilians)', () => {
+    const state = land();
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, BARB_SEAT)!;
+    const builder = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 6, 4).index, 0)!;
+    turnStart(state);
+    barbarianTactics(state, new Set([u.id]));
+    expect(u.tileIndex).toBe(tileAtCoords(state.map, 6, 4).index);
+    expect(!state.units.includes(builder) || builder.seat === BARB_SEAT).toBe(true);
+  });
+
+  it('a fighter left with a LOW target in its reach chases it to its side (Chase Target)', () => {
+    const state = land();
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, BARB_SEAT)!;
+    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 6, 4).index, 0)!;
+    turnStart(state);
+    barbarianTactics(state, new Set([u.id]));
+    expect(plotDistance(state, u.tileIndex, foe.tileIndex)).toBe(1);
+  });
+
+  it('the target list types a fighter near a barbarian camp HIGH, one far LOW', () => {
+    const state = land();
+    const camp = tileAtCoords(state.map, 10, 10);
+    raiseCamp(state, camp.index);
+    const near = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 10).index, 0)!;
+    const far = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 17, 10).index, 0)!;
+    const seen = new Uint8Array(state.map.tiles.length).fill(1);
+    const list = tacticalTargets(state, BARB_SEAT, seen, null);
+    expect(list.find((e) => e.unit === near)?.type).toBe('HIGH');
+    expect(list.find((e) => e.unit === far)?.type).toBe('LOW');
+    expect(list.find((e) => e.tile === camp.index)?.type).toBe('CAMP');
   });
 
   it('a unit near its standing camp wanders on ONE "Random Direction" draw over its plots of this turn', () => {

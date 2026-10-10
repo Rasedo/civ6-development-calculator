@@ -190,6 +190,9 @@ class SimBarb:
         self.tribe_home_slot[rows, k[rows]] = -1
         self.tribe_defender[rows, k[rows]] = -1
         self.tribe_home_seat[rows, k[rows]] = -1
+        self.tribe_home_plot[rows, k[rows]] = -1
+        self.tribe_raidp[rows, k[rows]] = -1
+        self.tribe_ramp[rows, k[rows]] = -1
         self.tribe_saw[rows, k[rows]] = False
         self.tribe_op[rows, k[rows]] = 0
         self.tribe_op_seat[rows, k[rows]] = -1
@@ -454,6 +457,7 @@ class SimBarb:
         if bool(start_r.count_nonzero()):
             self._barb_start_op(start_r, k, False, self.tribe_raidq[:, k, 0])
             self._barb_pop(self.tribe_raidq, start_r.nonzero(as_tuple=True)[0], k)
+            self._barb_pop(self.tribe_raidp, start_r.nonzero(as_tuple=True)[0], k)
 
     # ------------------------------------------------------- the operations
 
@@ -494,6 +498,13 @@ class SimBarb:
         r2 = rows[go]
         self.tribe_home_slot[r2, k] = slot[go]
         self.tribe_home_seat[r2, k] = best_g[go]
+        # the city the plot seen belongs to (`cityCentreOf`)
+        bt = best[go]
+        cid = self.tile_city[r2, bt]
+        g2 = best_g[go]
+        hit = (self.city_id[r2, g2] == cid.unsqueeze(1)) & self.city_alive[r2, g2]
+        cen = torch.where(hit, self.city_center[r2, g2], torch.full_like(self.city_center[r2, g2], self.T)).min(dim=1).values
+        self.tribe_home_plot[r2, k] = torch.where(cen < self.T, cen, torch.full_like(cen, -1))
 
     def _barb_scout_report(self, on: torch.Tensor, k: int) -> None:
         """`scoutReports`: tribe `k`'s homing scout within its home range of
@@ -519,12 +530,14 @@ class SimBarb:
             near = self.pair_dist[self.unit_tile.clamp(min=0), at.unsqueeze(1)].to(torch.long) <= reach
             rep = rep & ~(hurt & (foe & near).any(dim=1))
         seat = self.tribe_home_seat[:, k].clone()
+        plot = self.tribe_home_plot[:, k].clone()
         done = lost | rep
         self.tribe_home_slot[:, k] = torch.where(done, torch.full_like(hs, -1), hs)
         op = self.tribe_op[:, k]
         start = rep & (op == 0) & (self.tribe_bold[:, k] >= self._barb_raid_boldness(k))
         self._barb_start_op(start, k, False, seat)
         self._barb_push(self.tribe_raidq, rep & ~start, k, seat)
+        self._barb_push(self.tribe_raidp, rep & ~start, k, plot)
 
     def _barb_op_turn(self, act: torch.Tensor, k: int) -> None:
         """`opTurn` for tribe `k`'s operation recruiting: its first turn sets

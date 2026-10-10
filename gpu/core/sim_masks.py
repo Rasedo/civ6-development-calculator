@@ -3793,6 +3793,9 @@ class SimMasks:
             self.n_camps[b] -= 1
             self._quest_camp_cleared(b, int(seat[b]), int(tile[b]))
             # its tribe is dead, kept in the list (`tribeDies`)
+            # where a unit took it, its tribe rampages against the unit's player
+            dies = self.tribe_alive[b] & (self.tribe_plot[b] == tile[b])
+            self.tribe_ramp[b] = torch.where(dies, torch.full_like(self.tribe_ramp[b], int(seat[b])), self.tribe_ramp[b])
             self.tribe_alive[b] &= ~(self.tribe_plot[b] == tile[b])
             self._eff_version += 1  # a cleared outpost lifts its neighbours' appeal
             _s = int(seat[b])

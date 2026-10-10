@@ -619,9 +619,15 @@ export function barbHomingCamp(state: GameState, unit: Unit): number | undefined
   return tr?.plot;
 }
 
-/** the camp is gone: its tribe is dead, kept in the list */
-export function tribeDies(state: GameState, plot: number): void {
-  for (const tr of tribesOf(state)) if (tr.plot === plot && tr.alive) tr.alive = false;
+/** the camp is gone: its tribe is dead, kept in the list, and where a unit
+ *  took it its tribe rampages against that unit's player (the camp's
+ *  removal 0x154830 writes the player to the tribe, +0x1c) */
+export function tribeDies(state: GameState, plot: number, by: number = NO_SEAT): void {
+  for (const tr of tribesOf(state)) {
+    if (tr.plot !== plot || !tr.alive) continue;
+    tr.alive = false;
+    if (by !== NO_SEAT) tr.rampage = by;
+  }
 }
 
 /** the tribe that raised a unit (its defender, its units or its scouts) */
