@@ -2281,7 +2281,7 @@ class SimMasks:
                 out[b, j] = torch.tensor(ok, dtype=torch.bool, device=self.device)
         return out
 
-    def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river3: torch.Tensor,
+    def _road_terms(self, frm: torch.Tensor, dest: torch.Tensor, river_mp: torch.Tensor,
                     utype: torch.Tensor | None = None, promos: torch.Tensor | None = None,
                     useat: torch.Tensor | None = None):
         """The (terrain, river) MP terms a step pays, route-aware —
@@ -2340,7 +2340,7 @@ class SimMasks:
                            self._road_tier_mp.take(self.road_tier))
         terr = torch.where(rd, step - self._mp_scale, tm)
         bridged = self._road_tier_bridges.take(self.road_tier)
-        riv = torch.where(rd & bridged, torch.zeros_like(river3), river3)
+        riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
         return terr, riv

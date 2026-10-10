@@ -97,9 +97,9 @@ class SimTactics:
         step = torch.where(rr_f & rr_t, torch.full_like(tm, self._railroad_mp), tier.expand_as(tm))
         terr = torch.where(rd, step - self._mp_scale, tm)
         bits = torch.arange(6, device=self.device).view(1, 1, 6)
-        river3 = (3 * self._mp_scale) * ((self.river_mask.unsqueeze(2) >> bits) & 1)
+        river_mp = (2 * self._mp_scale) * ((self.river_mask.unsqueeze(2) >> bits) & 1)
         bridged = self._road_tier_bridges.take(self.road_tier).view(-1, 1, 1)
-        riv = torch.where(rd & bridged, torch.zeros_like(river3), river3)
+        riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
         return self._mp_scale + terr + riv
 
     def _tac_foreign(self, seat: int) -> torch.Tensor:

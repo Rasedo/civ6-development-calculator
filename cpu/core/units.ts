@@ -318,9 +318,10 @@ export function tradeWaterLevel(state: GameState, seat: number): number {
   return techs?.includes('CELESTIAL_NAVIGATION') || techs?.includes('SHIPBUILDING') ? TRADE_WATER_OPEN : TRADE_WATER_NONE;
 }
 
-/** The MP a river crossing costs (real Civ 6 ends movement; this model charges
- *  a flat 3 points). */
-export const RIVER_CROSS_MP = 3 * MP_SCALE;
+/** The MP a river crossing adds to the step (GlobalParameters
+ *  MOVEMENT_RIVER_COST 2; the movement cost's river term 0x5301e0 adds it
+ *  to the step's cost). */
+export const RIVER_CROSS_MP = 2 * MP_SCALE;
 
 export function crossesRiver(map: GameMap, from: Tile, to: Tile): boolean {
   if (from.riverMask === 0) return false;

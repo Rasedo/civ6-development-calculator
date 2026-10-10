@@ -3639,6 +3639,20 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   terms unported (governments, units, the policies' values, the modifiers,
   the per-player bias of 0x7a60d0's pseudo-yields 0x700810) are AUDIT C-96.
 
+## C-95: a river crossing's Movement — READ
+
+- GlobalParameters MOVEMENT_RIVER_COST (Base GlobalParameters.xml 2, no
+  expansion row) is loaded by the parameter reader 0x2d58f0 into the
+  parameter block +0x50c (default 2, beside MOVEMENT_EMBARK_COST +0x504 and
+  MOVEMENT_PORTAL_COST +0x508).
+- Its one reader is the movement cost's river term 0x5301e0, called from
+  the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when
+  the step crosses a river (0x531510 on the from / to plots) and the unit
+  is not exempt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the
+  step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A
+  crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`, the GPU's
+  `river_mp`).
+
 ## C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws
 
 `reachPlots` / `pathTo` in cpu/core/tactical.ts.

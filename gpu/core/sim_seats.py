@@ -13113,8 +13113,8 @@ class SimSeats:
         gs1 = gslot.unsqueeze(1)
         u_type = self.unit_type.gather(1, gs1).squeeze(1)
         u_promos = self.unit_promos.gather(1, gs1).squeeze(1)
-        river3 = (3 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
-        terr, riv = self._road_terms(here, dest, river3, u_type, u_promos,
+        river_mp = (2 * self._mp_scale) * ((self.river_mask.gather(1, hc.unsqueeze(1)).squeeze(1) >> dir_i) & 1)
+        terr, riv = self._road_terms(here, dest, river_mp, u_type, u_promos,
                                      self.unit_seat.gather(1, gs1).squeeze(1))
         land_cost = self._mp_scale + terr + riv
         mp = self.unit_mp.gather(1, gs1).squeeze(1)
