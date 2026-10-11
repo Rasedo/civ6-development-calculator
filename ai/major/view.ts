@@ -105,6 +105,10 @@ export interface MajorCityDefenceView {
 export interface MajorCityView {
   plot: number;
   owner: number;
+  /** the engine's city id (a city-state's one city -1) and whether it is its
+   *  owner's capital */
+  id: number;
+  capital: boolean;
   /** its yields in YieldTypes order (the city's own totals) */
   yields: readonly number[];
   /** its majority religion (the founder's seat), -1 for none */
@@ -117,8 +121,6 @@ export interface MajorCityView {
 export interface MajorView extends AiValueView {
   /** the map's plots by index */
   plots(): readonly MajorPlotView[];
-  /** the plots within `radius` of a plot, the plot included */
-  plotsWithin(plot: number, radius: number): readonly number[];
   /** the same plots in the game's ring walk order (0x69010): the plot, then
    *  each ring from its six corners, each corner walked along its side */
   plotsRing(plot: number, radius: number): readonly number[];
@@ -219,10 +221,13 @@ export interface MajorView extends AiValueView {
   greatPeopleEarned(seat: number): number;
   /** the plots the seat owns */
   plotsOwned(seat: number): number;
-  /** the religion the seat founded (its seat stands for it), null for none */
-  religionFounded(seat: number): number | null;
   /** the religion most of the seat's cities follow, null for none */
   majorityReligion(seat: number): number | null;
+  /** every belief a pantheon or a religion holds (BeliefTypes) */
+  beliefsHeld(): ReadonlySet<string>;
+  /** the beliefs of the religion the seat founded (BeliefTypes), none
+   *  before it founds one */
+  religionBeliefs(seat: number): readonly string[];
   /** the trade routes running between the two seats' cities, either way */
   tradeRoutesBetween(a: number, b: number): number;
   /** the city-states' seats */
@@ -244,9 +249,6 @@ export interface MajorView extends AiValueView {
   startPlots(): readonly { plot: number; seat: number }[];
   /** the seat's handicap, a Difficulties index */
   handicap(seat: number): number;
-  /** the seat's era (player +0x1358): the latest era of a technology or a
-   *  civic it holds, an index into AI_ERAS */
-  playerEra(seat: number): number;
   techCount(seat: number): number;
   /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
   militaryStrength(seat: number): number;
@@ -273,8 +275,6 @@ export interface MajorView extends AiValueView {
   bestCombatStrength(seat: number): number;
   /** the player's units the seat sees now (its own: all of them) */
   knownUnits(seat: number, player: number): readonly MajorUnitView[];
-  /** the barbarian camps on plots the seat has revealed, in plot order */
-  barbarianCamps(seat: number): readonly number[];
   /** the barbarians' seat */
   barbarianSeat(): number;
   /** the units on the plot of the players not at war with the seat, its own

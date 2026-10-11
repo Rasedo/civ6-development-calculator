@@ -3882,6 +3882,27 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "args": {
      "ModifierId": "CHICHEN_ITZA_JUNGLE_CULTURE_MODIFIER"
     },
+    "attach": {
+     "id": "CHICHEN_ITZA_JUNGLE_CULTURE_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_JUNGLE"
+        }
+       }
+      ]
+     }
+    },
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -3901,6 +3922,27 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "CHICHEN_ITZA_JUNGLE_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "CHICHEN_ITZA_JUNGLE_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_JUNGLE"
+        }
+       }
+      ]
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -4993,6 +5035,25 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "args": {
      "ModifierId": "HUEY_LAKE_FOOD_MODIFIER"
     },
+    "attach": {
+     "id": "HUEY_LAKE_FOOD_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FOOD",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IS_LAKE",
+        "inverse": false,
+        "args": {}
+       }
+      ]
+     }
+    },
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -5010,6 +5071,25 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "HUEY_LAKE_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "HUEY_LAKE_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IS_LAKE",
+        "inverse": false,
+        "args": {}
+       }
+      ]
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -5413,6 +5493,14 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "APADANA_AWARD_TWO_INFLUENCE_TOKEN_MODIFIER"
+    },
+    "attach": {
+     "id": "APADANA_AWARD_TWO_INFLUENCE_TOKEN_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_GRANT_CITY_OWNER_INFLUENCE_TOKEN_WONDER",
+     "args": {
+      "Amount": "2"
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -6273,6 +6361,34 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "args": {
      "ModifierId": "STBASILS_ADDFOOD_MODIFIER"
     },
+    "attach": {
+     "id": "STBASILS_ADDFOOD_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FOOD",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA_HILLS"
+        }
+       }
+      ]
+     }
+    },
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -6293,6 +6409,34 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "args": {
      "ModifierId": "STBASILS_ADDPRODUCTION_MODIFIER"
     },
+    "attach": {
+     "id": "STBASILS_ADDPRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA_HILLS"
+        }
+       }
+      ]
+     }
+    },
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -6312,6 +6456,34 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "STBASILS_ADDCULTURE_MODIFIER"
+    },
+    "attach": {
+     "id": "STBASILS_ADDCULTURE_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "TerrainType": "TERRAIN_TUNDRA_HILLS"
+        }
+       }
+      ]
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -6984,6 +7156,14 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "GOV_CITYSTATES_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "GOV_CITYSTATES_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "4"
+     }
     }
    },
    {
@@ -6992,6 +7172,14 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "GOV_CITYSTATES_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "GOV_CITYSTATES_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "4"
+     }
     },
     "subjectReqs": {
      "test": "ALL",

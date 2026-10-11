@@ -35,7 +35,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     influenceTokensUsed: () => 0,
     tributaries: () => 0,
     unitMaintenances: () => [], cityOwnedPlots: () => [], traders: () => 0, tradeKnowledge: () => null,
-    cityHasDistrict: () => false,
+    cityHasDistrict: () => false, cityReligion: () => -1, plotTerrain: () => 'TERRAIN_GRASS', plotFeature: () => null, plotsWithinReadAsAxial: () => [], cityDistricts: () => [], cityPlot: () => -1, districtPlot: () => null, cityFoodSurplus: () => 0, unitCost: () => 0, beliefsHeld: () => new Set(), religionBeliefs: () => [],
     districtBuildingYields: () => [],
     policyColumn: () => -1,
     governmentColumn: () => -1,

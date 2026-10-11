@@ -161,6 +161,41 @@ export interface AiValueView {
   cityHasBuilding(seat: number, cityId: number, building: string): boolean;
   /** a city has a district of the type, built or building (0x1ae530) */
   cityHasDistrict(seat: number, cityId: number, district: string): boolean;
+  /** a city's religion (City +0x1910: the religion its majority follows),
+   *  -1 for none */
+  cityReligion(seat: number, cityId: number): number;
+  /** the religion the seat founded (its seat stands for it), null for none */
+  religionFounded(seat: number): number | null;
+  /** the plots within `radius` of a plot, the plot included */
+  plotsWithin(plot: number, radius: number): readonly number[];
+  /** a plot's TerrainType (hills and mountains their own types) and
+   *  FeatureType */
+  plotTerrain(plot: number): string;
+  plotFeature(plot: number): string | null;
+  /** the plots an AI hex walk of `radius` visits when it takes a plot's
+   *  offset coordinates (+0x158, +0x15c) as axial ones (0x6c7690 and its
+   *  kin): those on the map within `radius` of column x + floor(y / 2) of the
+   *  row, that column on the map or not */
+  plotsWithinReadAsAxial(plot: number, radius: number): readonly number[];
+  /** a city's districts, built or building, its centre's included
+   *  (DistrictTypes) */
+  cityDistricts(seat: number, cityId: number): readonly string[];
+  /** a city's centre plot */
+  cityPlot(seat: number, cityId: number): number;
+  /** the plot of a city's district of the type, built or building
+   *  (0x1ae530), null for none */
+  districtPlot(seat: number, cityId: number, district: string): number | null;
+  /** a city's Food surplus less its citizens' (its growth object's
+   *  0x1b5620), raw */
+  cityFoodSurplus(seat: number, cityId: number): number;
+  /** the seat's era (player +0x1358): the latest era of a technology or a
+   *  civic it holds, an index into AI_ERAS */
+  playerEra(seat: number): number;
+  /** the Production a unit costs the seat now (its unit manager's current
+   *  cost, 0x4f2b20), whole */
+  unitCost(seat: number, unitType: string): number;
+  /** the barbarian camps on plots the seat has revealed, in plot order */
+  barbarianCamps(seat: number): readonly number[];
   /** the buildings of a district type in the seat's version (its
    *  civilization's unique building in place of the one it replaces), in
    *  table order, each with its Building_YieldChanges amount of the yield */
@@ -209,6 +244,12 @@ export interface AiPlotView {
   resourceVisible: boolean;
   improvement: string | null;
   impassable: boolean;
+  /** the resource's ResourceClassType, null for none */
+  resourceClass: string | null;
+  /** the improvement is the one that improves the resource */
+  improved: boolean;
+  /** the plot's Appeal */
+  appeal: number;
 }
 
 /** A district as the AI's value reads it */

@@ -5305,6 +5305,135 @@ DiplomacySummary.csv).
   the war declarations, Propose Trade and the deals), CanDoAction
   (0x3dd9a0), and the checks CanDenounce / CanGoToWar / CanOfferAlliance.
 
+## C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ
+
+AI::Religious (the player AI's, constructor 0x74af30; members m_isInitialized,
+m_priority, m_favoredReligion +0x168 (data +0x1c0), m_mustFoundPantheon
++0x1c8 (+0x220), m_isReligionComplete +0x228 (+0x280), m_onlyConvertOwnCities
++0x288 (+0x2e0), m_yieldPriorityBoost +0x2e8 (+0x340), m_beliefAnalyzers,
+m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv
+(header 0x750500, writer 0x750e30: "%d, %d, %s, %3.1f" per entry). Port:
+`ai/major/religion.ts`; measure: the action replay's religion section
+(`cpu/harness/religionAi.ts`).
+
+- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0,
+  the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start
+  0x74ea60 (registered for a full civilization only, 0x469db0), 0x751830,
+  0x74e390, the game's 0x7513f0.
+- THE BELIEF LIST (+0x3b0, count +0x3c0, 0x30 each): +8 the belief, +0xc its
+  class (Beliefs +0x40 -> +0x14: Pantheon 0, Follower 1, Worship 2, Founder 3,
+  Enhancer 4), +0x10 taken, +0x14 the score (24.8), +0x18 the belief's
+  analysed modifiers (0x750350, 0x6cef90). The job "Belief Analysis"
+  (pushed by 0x74ea60 once every city's CityBuildAI analysis stands,
+  spawned) scores each entry (0x750230 -> 0x7500d0): taken and -1.0 where a
+  pantheon holds it (0x3408d0) or a religion does (0x340950), or where the
+  player's own religion holds a belief of its class; else 0x7a7400(belief,
+  the rate, start 0, `m_valueHorizons`[2] = speed(200) = 100 online). A
+  player the job never runs for logs -1.0 throughout (every city-state,
+  Free Cities and barbarian line of the 29 duels).
+- THE VALUE (0x7a7400): FX(-9999) where start >= horizon; else the modifiers'
+  sum 0x7a4b20 in a context of the player (+0x40 its id, +0x80 it) and a
+  religion (+0x48): the one it founded (0x497520), else its majority
+  religion (0x497240).
+- THE ANALYSIS (0x6cede0) CLEARS the context's whole number (+0xc0) as it
+  starts; each subject's analyzer adds to it. EFFECT_ATTACH_MODIFIER 0x6ab630
+  analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of
+  the context (0x142650) on the subject and SETS +0xc0 to that analysis's
+  total — an attach over many subjects is worth its last admitted subject's
+  (runs/h1_duelw1124 t2 Rome: Feed the World 68 = Shrine 34 + Temple 34, one
+  city's whatever the cities known; Choral Music 75 = 25 + 50).
+  EFFECT_GRANT_ABILITY 0x6b5b30 adds each ability modifier's analysis. Where
+  no subject passes, the analyzer's slot 2 (0xbe4aa0, nothing, but for
+  EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
+- The collections: COLLECTION_ALL_CITIES 0x69f320 / 0x69f340 walks the
+  player's KNOWLEDGE BASE's cities (player +0x12b8, its entries, setting
+  +0x70); COLLECTION_ALL_PLAYERS 0x69f6c0 / 0x69f6e0 stands once on the
+  context as it is (the evaluating player); COLLECTION_OWNER 0x69fc90 /
+  0x69e790 once, the context's city (+0x70) where one is set;
+  COLLECTION_CITY_DISTRICTS 0x69fdf0 the city's districts (+0x78, plot +0x88);
+  COLLECTION_PLAYER_UNITS 0x69ec70 (+0x90).
+- The requirements: CITY_FOLLOWS_PANTHEON 0x6cfbf0 (the city's owner +0x1b8
+  is the context's player); CITY_FOLLOWS_RELIGION 0x6cfcb0 (any city with no
+  religion in the context, else its religion +0x1910 is it);
+  PLAYER_HAS_PANTHEON 0x6cfbd0 (the context's player is +0x40's — the
+  evaluating player); PLAYER_IS_RELIGION_FOUNDER 0x6d27a0 (no religion: held;
+  else 0x497cc0). A requirement the registry lacks
+  (PLAYER_HAS_AT_LEAST_NUMBER_CITIES) is left out of the set.
+- The analyzers read (args in the parser's order; "span" PV(H) - PV(T),
+  "between" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and
+  EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType,
+  DistrictType): a city with the district counts the district's plot and its
+  six neighbours of the terrain (plot +0x2c) or feature (+0x3c), without one
+  the plots within 3 of the centre (0x6c7690 / 0x6c78a0); BOTH WALKS TAKE THE
+  PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of
+  the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within
+  3 of it, four within 3 of (8,10) — Desert Folklore logs 22 = whole(4 x
+  0.25 x 22.89); three Jungle there, Sacred Path 17); the feature's is gated
+  on the city AI's plot evaluations holding the feature (0x5d2df0, +0xcf8
+  0x78 each); Amount x the count at the player's weight, span.
+  EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x
+  0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20),
+  span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth
+  object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare
+  Food, between. EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION 0x6b5d50
+  (Amount, StartEra, EndEra): the player's era (0x467eb0) in the window, the
+  city's Production x fx(Amount x 0.01), weighted, between, halved (sar 9).
+  EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL 0x6bdd40: min(the knowledge
+  base's camps +0x648, 5) x Amount, Faith weighted, discounted from the start
+  (0x7a1240); EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL 0x6a6d20: the camps
+  x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same.
+  EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the
+  class +8, its pseudo-yield +0xc, Amount +0x10 kept whole): the Amount read
+  raw as the pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx.
+  EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost
+  (0x4f2b20) and its value 0x7b62c0, x Amount, added whole.
+  EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0: the greatest over the player's
+  cities of the building's value 0x7a7590 from the start to the horizon.
+  EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING
+  0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBuildAI's).
+  Unregistered, worth 0: EFFECT_ADD_RELIGIOUS_BELIEF_YIELD (every Founder
+  belief logs 0), the religious spread / combat / healing effects, the unit
+  purchase cost, the culture bomb.
+- THE PICKS. The pantheon (0x74e2b0, from the AI turn while
+  m_mustFoundPantheon holds, then 0x33fb70): the first strictly highest
+  pantheon entry not taken. A belief for the religion (0x751430): entries not
+  taken of class 1..4 whose class the religion has room for (0x3409a0 ->
+  0x340740: MaxInReligion); a higher score, or any while none stands,
+  replaces the best; a Follower replaces a best of another class whatever it
+  scores, and once one stands only a better Follower does. The founding
+  (0x750fe0, after waiting for the job): the leader's FavoredReligions, then
+  the civilization's, the first not founded (0x340490), else "Random
+  Religion Choice" over the religions not founded but the pantheon's row and
+  the one flagged +0x40 bit 1; then the beliefs, 0x751430 per belief the
+  founding grants.
+- THE FAITH BOOST (0x74f5a0, m_yieldPriorityBoost [Faith]): 0 each turn; for
+  a full civilization's AI with a favored religion, the religious unit it
+  wants (the Units with a Faith purchase yield, by CityBuildAI's unit value
+  0x5d4cd0 in a city that may buy it, 0x172820, worth more than its Faith
+  cost valued or with twice the cost in hand; then the heroes) gets a
+  contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its
+  cost, -0.25 more once the Faith per turn (0x496fd0) passes half of it.
+- Measured (the action replay, runs/h1_duelw1117, 1121, 1124, 1127, 1128):
+  the picks on the log's own scores — pantheons 5 of 5, the religions'
+  beliefs 17 of 17 (the founding's Follower then a Worship belief, the
+  Enhancer and Founder after); on the port's own scores the pantheons 5 of
+  5, the beliefs 8 of 17 (the Follower: Choral Music over the log's Feed the
+  World, whose Shrine housing — 0x7a3d70 — the port leaves at 0). Score
+  lines 60,837 of 70,741 equal, 2,427 of the 11,214 the log scores above 0;
+  the pantheon beliefs whose analyzers stand (Fertility Rites, God of the
+  Forge, Desert Folklore, Sacred Path, Divine Spark) equal to the turn the
+  knowledge base takes a second city.
+- Unread: the unit value 0x7b62c0's tail (the Settler's: GOLDENAGE_POINT of
+  0x2c43b0 + 1.0, the copies, the promotion weight, PSEUDOYIELD_UNIT_SETTLER,
+  the maintenance, then the settle AI's 0x6fe2b0 and 0x17a600 for a founder
+  — Religious Settlements 198 at t3 against the cost's 40), the building
+  value 0x7a7590 for a major's city (the Worship beliefs), the military AI's
+  value (Warrior Monks), the ability analyzers (Missionary Zeal), the
+  amenity and housing evaluators, the knowledge base's camp list (the port
+  reads the camps revealed), the signal that sets m_mustFoundPantheon, the
+  faith boost's unit choice, the religious units' targets (0x74ea60's list
+  +0x4a0, 0x74cf50 / 0x74d320) and moves, the faith purchases.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

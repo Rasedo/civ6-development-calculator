@@ -90,6 +90,7 @@ import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
+import { ReligionProbe, religionAiMarkdown, type ReligionAiTally } from './religionAi';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
 import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
@@ -2680,6 +2681,7 @@ export interface ReplayReport {
   strategies?: { engine: StrategyTally; record: StrategyTally };
   contacts?: ContactTally;
   majorAi?: MajorAiTally;
+  religionAi?: ReligionAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   settleAi?: SettleTallies;
@@ -2841,6 +2843,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     (seat) => diplomacy.agendasOf(seat));
   const majorAi = new MajorAiProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
   const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
+  const religionAi = new ReligionProbe(dumpPath, aiSeats, (seat) => strategies.knownCities(seat));
   const missions = readMissions(dumpPath);
   const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, (turn) => strategies.followedBefore(turn));
   const ctx: Ctx = {
@@ -3047,6 +3050,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       const { gid, ids } = policyIds(ctx, d);
       return { government: gid, policies: ids };
     });
+    religionAi.postTurn(state);
     matchNewUnits(ctx, b);
     // a unit the engine's own city-state, Free City or barbarian scripts made
     // that the record's players did not: their decision, undone
@@ -3242,6 +3246,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     report.contacts = strategies.contacts(state);
   }
   if (majorAi.active) report.majorAi = majorAi.tally;
+  if (religionAi.active) report.religionAi = religionAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
   if (operationsAi.active) report.operationsAi = operationsAi.tally;
@@ -3360,6 +3365,7 @@ export function replayMarkdown(r: ReplayReport): string {
   }
   if (r.strategies) out.push(...strategyMarkdown(r.strategies, r.contacts));
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
+  if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
   if (r.operationsAi) out.push(...operationsMarkdown(r.operationsAi));

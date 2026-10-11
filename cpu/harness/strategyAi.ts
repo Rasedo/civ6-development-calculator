@@ -15,7 +15,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { militaryStrengths, newStrategyMemory, strategyTurn, type StrategyChange, type StrategyGaps, type StrategyMemory } from '../../ai/major/strategies';
-import { knowledgeStats } from '../../ai/major/knowledge';
+import { knowledgeStats, type KnownCity } from '../../ai/major/knowledge';
 import { majorView } from '../core/majorView';
 import { civEraIndex } from '../core/city';
 import type { MajorView } from '../../ai/major/view';
@@ -139,6 +139,12 @@ export class StrategyProbe {
    *  scores read them; the update follows) */
   followedBefore(turn: number): ReadonlyMap<number, ReadonlySet<string>> {
     return this.before.get(turn) ?? new Map();
+  }
+
+  /** the cities a major's knowledge base holds on the engine's lane, in its
+   *  order */
+  knownCities(seat: number): readonly KnownCity[] {
+    return this.lanes.engine.mem.seats.get(seat)?.knowledge.cities ?? [];
   }
 
   /**

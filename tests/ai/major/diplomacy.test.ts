@@ -13,7 +13,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     policiesSlottableUnder: () => new Set(), darkAge: () => false, goldenAge: () => false,
     greatPersonClassAvailable: () => true, cities: () => [], cityYield: () => 0, policyColumn: () => -1, governmentColumn: () => -1,
     yieldWeight: () => 0, pseudoYieldWeight: () => 0, districts: () => [], districtYield: () => 0, cityHasBuilding: () => false,
-    tradeRouteCapacity: () => 0, influenceTokensUsed: () => 0, tributaries: () => 0, unitMaintenances: () => [], cityOwnedPlots: () => [], traders: () => 0, tradeKnowledge: () => null, cityHasDistrict: () => false,
+    tradeRouteCapacity: () => 0, influenceTokensUsed: () => 0, tributaries: () => 0, unitMaintenances: () => [], cityOwnedPlots: () => [], traders: () => 0, tradeKnowledge: () => null, cityHasDistrict: () => false, cityReligion: () => -1, plotTerrain: () => 'TERRAIN_GRASS', plotFeature: () => null, plotsWithinReadAsAxial: () => [], cityDistricts: () => [], cityPlot: () => -1, districtPlot: () => null, cityFoodSurplus: () => 0, unitCost: () => 0, beliefsHeld: () => new Set(), religionBeliefs: () => [],
     districtBuildingYields: () => [],
     majors: () => [0, 1], leader: (s) => (s === 0 ? 'LEADER_TRAJAN' : 'LEADER_QIN'), metTurn: () => null, atWar: () => false,
     peaceTurns: () => 0, hasDelegation: () => false, hasEmbassy: () => false, hasOpenBorders: () => false,

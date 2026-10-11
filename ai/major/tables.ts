@@ -3,7 +3,7 @@
  * layered install (`--check` reports a stale file). Policies and governments
  * run in DATABASE ORDER, the index the game's AI loops walk.
  */
-import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType, AiStrategy, AiStrategyBias } from './types';
+import type { AiBelief, AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy, AiStrategyBias } from './types';
 
 export const AI_POLICIES: readonly AiPolicy[] = [
  {
@@ -2011,6 +2011,24 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "WARS_OF_RELIGION_COMBAT_MODIFIER"
+    },
+    "attach": {
+     "id": "WARS_OF_RELIGION_COMBAT_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "4"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_OPPONENT_IS_OTHER_RELIGION",
+        "inverse": false,
+        "args": {}
+       }
+      ]
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -6564,6 +6582,27 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "COLLECTIVISM_FARM_FOOD_MODIFIER"
+    },
+    "attach": {
+     "id": "COLLECTIVISM_FARM_FOOD_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FOOD",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_FARM"
+        }
+       }
+      ]
+     }
     }
    },
    {
@@ -6668,6 +6707,15 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "args": {
      "ModifierId": "FUTURE_VICTORY_SCIENCE_SPACEPORT_POWER_IN_CITY"
     },
+    "attach": {
+     "id": "FUTURE_VICTORY_SCIENCE_SPACEPORT_POWER_IN_CITY",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_FREE_POWER",
+     "args": {
+      "Amount": "3",
+      "SourceType": "FREE_POWER_SOURCE_MISC"
+     }
+    },
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -6687,6 +6735,15 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_ATTACH_MODIFIER",
     "args": {
      "ModifierId": "FUTURE_VICTORY_SCIENCE_SPACEPORT_ALUMINUM_IN_CITY"
+    },
+    "attach": {
+     "id": "FUTURE_VICTORY_SCIENCE_SPACEPORT_ALUMINUM_IN_CITY",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_GRANT_FREE_RESOURCE_EXTRACTED",
+     "args": {
+      "Amount": "3",
+      "ResourceType": "RESOURCE_ALUMINUM"
+     }
     },
     "subjectReqs": {
      "test": "ALL",
@@ -10160,3 +10217,3178 @@ export const AI_STRATEGY_BIAS_BY_LEADER: Readonly<Record<string, readonly AiStra
  ]
 };
 export const AI_STRATEGY_BIAS_BY_CIV: Readonly<Record<string, readonly AiStrategyBias[]>> = {};
+export const AI_BELIEFS: readonly AiBelief[] = [
+ {
+  "type": "BELIEF_DANCE_OF_THE_AURORA",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "DANCE_OF_THE_AURORA_FAITHTUNDRAADJACENCY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_TERRAIN_ADJACENCY",
+    "args": {
+     "DistrictType": "DISTRICT_HOLY_SITE",
+     "TerrainType": "TERRAIN_TUNDRA",
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1",
+     "Description": "LOC_DISTRICT_TUNDRA_FAITH"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "DANCE_OF_THE_AURORA_FAITHTUNDRAHILLSADJACENCY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_TERRAIN_ADJACENCY",
+    "args": {
+     "DistrictType": "DISTRICT_HOLY_SITE",
+     "TerrainType": "TERRAIN_TUNDRA_HILLS",
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1",
+     "Description": "LOC_DISTRICT_TUNDRA_FAITH"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_DESERT_FOLKLORE",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "DESERT_FOLKLORE_FAITHDESERTADJACENCY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_TERRAIN_ADJACENCY",
+    "args": {
+     "DistrictType": "DISTRICT_HOLY_SITE",
+     "TerrainType": "TERRAIN_DESERT",
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1",
+     "Description": "LOC_DISTRICT_DESERT_FAITH"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "DESERT_FOLKLORE_FAITHDESERTHILLSADJACENCY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_TERRAIN_ADJACENCY",
+    "args": {
+     "DistrictType": "DISTRICT_HOLY_SITE",
+     "TerrainType": "TERRAIN_DESERT_HILLS",
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1",
+     "Description": "LOC_DISTRICT_DESERT_FAITH"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_SACRED_PATH",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "SACRED_PATH_FAITHFEATUREADJACENCY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_FEATURE_ADJACENCY",
+    "args": {
+     "DistrictType": "DISTRICT_HOLY_SITE",
+     "FeatureType": "FEATURE_JUNGLE",
+     "YieldType": "YIELD_FAITH",
+     "Amount": "1",
+     "Description": "LOC_DISTRICT_JUNGLE_FAITH"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RIVER_GODDESS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "RIVER_GODDESS_HOLY_SITE_AMENITIES",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RIVER_GODDESS_HOLY_SITE_AMENITIES_MODIFIER"
+    },
+    "attach": {
+     "id": "RIVER_GODDESS_HOLY_SITE_AMENITIES_MODIFIER",
+     "collection": "COLLECTION_CITY_DISTRICTS",
+     "effect": "EFFECT_ADJUST_DISTRICT_AMENITY",
+     "args": {
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_DISTRICT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_ADJACENT_TO_RIVER",
+        "inverse": false,
+        "args": {}
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RIVER_GODDESS_HOLY_SITE_HOUSING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER"
+    },
+    "attach": {
+     "id": "RIVER_GODDESS_HOLY_SITE_HOUSING_MODIFIER",
+     "collection": "COLLECTION_CITY_DISTRICTS",
+     "effect": "EFFECT_ADJUST_DISTRICT_HOUSING",
+     "args": {
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_DISTRICT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_ADJACENT_TO_RIVER",
+        "inverse": false,
+        "args": {}
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_MONUMENT_TO_THE_GODS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "MONUMENT_TO_THE_GODS_ANCIENTCLASSICALWONDER",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "MONUMENT_TO_THE_GODS_ANCIENTCLASSICALWONDER_MODIFIER"
+    },
+    "attach": {
+     "id": "MONUMENT_TO_THE_GODS_ANCIENTCLASSICALWONDER_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CITIES",
+     "effect": "EFFECT_ADJUST_WONDER_ERA_PRODUCTION",
+     "args": {
+      "Amount": "15",
+      "IsWonder": "true",
+      "StartEra": "ERA_ANCIENT",
+      "EndEra": "ERA_CLASSICAL"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_DIVINE_SPARK",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "DIVINE_SPARK_HOLY_SITE",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "DIVINE_SPARK_HOLY_SITE_MODIFIER"
+    },
+    "attach": {
+     "id": "DIVINE_SPARK_HOLY_SITE_MODIFIER",
+     "collection": "COLLECTION_CITY_DISTRICTS",
+     "effect": "EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS",
+     "args": {
+      "GreatPersonClassType": "GREAT_PERSON_CLASS_PROPHET",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "DIVINE_SPARK_SCIENTIST",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "DIVINE_SPARK_SCIENTIST_MODIFIER"
+    },
+    "attach": {
+     "id": "DIVINE_SPARK_SCIENTIST_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_GREAT_PERSON_POINTS",
+     "args": {
+      "GreatPersonClassType": "GREAT_PERSON_CLASS_SCIENTIST",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_LIBRARY"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "DIVINE_SPARK_WRITER",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "DIVINE_SPARK_WRITER_MODIFIER"
+    },
+    "attach": {
+     "id": "DIVINE_SPARK_WRITER_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_GREAT_PERSON_POINTS",
+     "args": {
+      "GreatPersonClassType": "GREAT_PERSON_CLASS_WRITER",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_AMPHITHEATER"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_LADY_OF_THE_REEDS_AND_MARSHES",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "LADY_OF_THE_REEDS_PRODUCTION2",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "LADY_OF_THE_REEDS_PRODUCTION2_MODIFIER"
+    },
+    "attach": {
+     "id": "LADY_OF_THE_REEDS_PRODUCTION2_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_MARSH"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_OASIS"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_FLOODPLAINS"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_THE_SEA",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_THE_SEA_FISHINGBOATS_PRODUCTION",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_THE_SEA_FISHINGBOATS_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_THE_SEA_FISHINGBOATS_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_FISHING_BOATS"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_THE_OPEN_SKY",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_THE_OPEN_SKY_PASTURE_CULTURE",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_THE_OPEN_SKY_PASTURE_CULTURE_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_THE_OPEN_SKY_PASTURE_CULTURE_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_PASTURE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GODDESS_OF_THE_HUNT",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GODDESS_OF_THE_HUNT_CAMP_FOOD",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GODDESS_OF_THE_HUNT_CAMP_FOOD_MODIFIER"
+    },
+    "attach": {
+     "id": "GODDESS_OF_THE_HUNT_CAMP_FOOD_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FOOD",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_CAMP"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "GODDESS_OF_THE_HUNT_CAMP_PRODUCTION",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GODDESS_OF_THE_HUNT_CAMP_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "GODDESS_OF_THE_HUNT_CAMP_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_CAMP"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_STONE_CIRCLES",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "STONE_CIRCLES_QUARRY_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "STONE_CIRCLES_QUARRY_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "STONE_CIRCLES_QUARRY_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_QUARRY"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIGIOUS_IDOLS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "RELIGIOUS_IDOLS_BONUS_MINE_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_IDOLS_BONUS_MINE_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_IDOLS_BONUS_MINE_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_RESOURCE_CLASS_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ResourceClassType": "RESOURCECLASS_BONUS"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_MINE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIGIOUS_IDOLS_LUXURY_MINE_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_IDOLS_LUXURY_MINE_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_IDOLS_LUXURY_MINE_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_RESOURCE_CLASS_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ResourceClassType": "RESOURCECLASS_LUXURY"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_MINE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_CRAFTSMEN",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_PRODUCTION",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVED_RESOURCE_CLASS_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ResourceClassType": "RESOURCECLASS_STRATEGIC"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_CRAFTSMEN_STRATEGIC_IMPROVED_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVED_RESOURCE_CLASS_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ResourceClassType": "RESOURCECLASS_STRATEGIC"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GODDESS_OF_FESTIVALS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GODDESS_OF_FESTIVALS_PLANTATION_CULTURE",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GODDESS_OF_FESTIVALS_PLANTATION_CULTURE_MODIFIER"
+    },
+    "attach": {
+     "id": "GODDESS_OF_FESTIVALS_PLANTATION_CULTURE_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "ImprovementType": "IMPROVEMENT_PLANTATION"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_THE_FORGE",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_THE_FORGE_UNIT_ANCIENT_CLASSICAL_PRODUCTION",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_THE_FORGE_UNIT_ANCIENT_CLASSICAL_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_THE_FORGE_UNIT_ANCIENT_CLASSICAL_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CITIES",
+     "effect": "EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION",
+     "args": {
+      "Amount": "25",
+      "StartEra": "ERA_ANCIENT",
+      "EndEra": "ERA_CLASSICAL"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_INITIATION_RITES",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "INITIATION_RITES_FAITH_DISPERSAL",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "INITIATION_RITES_FAITH_DISPERSAL_MODIFIER"
+    },
+    "attach": {
+     "id": "INITIATION_RITES_FAITH_DISPERSAL_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL",
+     "args": {
+      "Amount": "50"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "INITIATION_RITES_HEALING_DISPERSAL",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "INITIATION_RITES_HEALING_DISPERSAL_MODIFIER"
+    },
+    "attach": {
+     "id": "INITIATION_RITES_HEALING_DISPERSAL_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL",
+     "args": {
+      "Amount": "100"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_HEALING",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_HEALING_UNIT_HEALING",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_HEALING_UNIT_HEALING_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_HEALING_UNIT_HEALING_MODIFIER",
+     "collection": "COLLECTION_PLAYER_UNITS",
+     "effect": "EFFECT_ADJUST_UNIT_HEALING_MODIFIERS",
+     "args": {
+      "Amount": "30",
+      "Type": "ALL"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_ADJACENT_DISTRICT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE",
+         "MinRange": "0"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GOD_OF_WAR",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GOD_OF_WAR_FAITH_KILLS",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GOD_OF_WAR_FAITH_KILLS_MODIFIER"
+    },
+    "attach": {
+     "id": "GOD_OF_WAR_FAITH_KILLS_MODIFIER",
+     "collection": "COLLECTION_PLAYER_COMBAT",
+     "effect": "EFFECT_ADJUST_UNIT_POST_COMBAT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "PercentDefeatedStrength": "50"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_ADJACENT_DISTRICT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE",
+         "MinRange": "0",
+         "MaxRange": "8"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_FERTILITY_RITES",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "FERTILITY_RITES_GROWTH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ADJUST_CITY_GROWTH",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "FERTILITY_RITES_BUILDER",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "FERTILITY_RITES_BUILDER_MODIFIER"
+    },
+    "attach": {
+     "id": "FERTILITY_RITES_BUILDER_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CAPITAL_CITY",
+     "effect": "EFFECT_GRANT_UNIT_IN_CITY",
+     "args": {
+      "UnitType": "UNIT_BUILDER",
+      "Amount": "1",
+      "AllowUniqueOverride": "false"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLAYER_HAS_AT_LEAST_NUMBER_CITIES",
+        "inverse": false,
+        "args": {
+         "Amount": "1"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIGIOUS_SETTLEMENTS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "RELIGIOUS_SETTLEMENTS_CULTUREBORDER",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION",
+    "args": {
+     "Amount": "15"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIGIOUS_SETTLEMENTS_SETTLER",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_SETTLEMENTS_SETTLER_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_SETTLEMENTS_SETTLER_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CAPITAL_CITY",
+     "effect": "EFFECT_GRANT_UNIT_IN_CITY",
+     "args": {
+      "UnitType": "UNIT_SETTLER",
+      "Amount": "1",
+      "AllowUniqueOverride": "false"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLAYER_HAS_AT_LEAST_NUMBER_CITIES",
+        "inverse": false,
+        "args": {
+         "Amount": "1"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_HAS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_CITY_PATRON_GODDESS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "CITY_PATRON_GODDESS_DISTRICT_PRODUCTION",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "CITY_PATRON_GODDESS_DISTRICT_PRODUCTION_MODIFIER"
+    },
+    "attach": {
+     "id": "CITY_PATRON_GODDESS_DISTRICT_PRODUCTION_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_ALL_DISTRICT_PRODUCTION_MODIFIER",
+     "args": {
+      "Amount": "25"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
+        "inverse": true,
+        "args": {
+         "Amount": "1",
+         "MustBeFunctioning": "false"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_EARTH_GODDESS",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "EARTH_GODDESS_APPEAL_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "EARTH_GODDESS_APPEAL_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "EARTH_GODDESS_APPEAL_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_IS_APPEAL_BETWEEN",
+        "inverse": false,
+        "args": {
+         "MinimumAppeal": "4"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_DIVINE_INSPIRATION",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "DIVINE_INSPIRATION_WONDER_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "DIVINE_INSPIRATION_WONDER_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "DIVINE_INSPIRATION_WONDER_FAITH_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_WONDER_YIELD_CHANGE",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "4"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_FEED_THE_WORLD",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "FEED_THE_WORLD_SHRINE_FOOD3",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER"
+    },
+    "attach": {
+     "id": "FEED_THE_WORLD_SHRINE_FOOD3_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+     "args": {
+      "BuildingType": "BUILDING_SHRINE",
+      "YieldType": "YIELD_FOOD",
+      "Amount": "3"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "FEED_THE_WORLD_TEMPLE_FOOD3",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER"
+    },
+    "attach": {
+     "id": "FEED_THE_WORLD_TEMPLE_FOOD3_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+     "args": {
+      "BuildingType": "BUILDING_TEMPLE",
+      "YieldType": "YIELD_FOOD",
+      "Amount": "3"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "FEED_THE_WORLD_SHRINE_HOUSING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "FEED_THE_WORLD_SHRINE_HOUSING_MODIFIER"
+    },
+    "attach": {
+     "id": "FEED_THE_WORLD_SHRINE_HOUSING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_HOUSING",
+     "args": {
+      "Amount": "2"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_CITY_HAS_BUILDING",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_SHRINE"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "FEED_THE_WORLD_TEMPLE_HOUSING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "FEED_THE_WORLD_TEMPLE_HOUSING_MODIFIER"
+    },
+    "attach": {
+     "id": "FEED_THE_WORLD_TEMPLE_HOUSING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_HOUSING",
+     "args": {
+      "Amount": "2"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_CITY_HAS_BUILDING",
+       "inverse": false,
+       "args": {
+        "BuildingType": "BUILDING_TEMPLE"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_JESUIT_EDUCATION",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "JESUIT_EDUCATION_SCIENCE_BUILDINGS",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "JESUIT_EDUCATION_SCIENCE_BUILDINGS_MODIFIER"
+    },
+    "attach": {
+     "id": "JESUIT_EDUCATION_SCIENCE_BUILDINGS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ENABLE_BUILDING_FAITH_PURCHASE",
+     "args": {
+      "DistrictType": "DISTRICT_CAMPUS"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "JESUIT_EDUCATION_CULTURE_BUILDINGS",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "JESUIT_EDUCATION_CULTURE_BUILDINGS_MODIFIER"
+    },
+    "attach": {
+     "id": "JESUIT_EDUCATION_CULTURE_BUILDINGS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ENABLE_BUILDING_FAITH_PURCHASE",
+     "args": {
+      "DistrictType": "DISTRICT_THEATER"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIQUARIES",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "RELIQUARIES_RELIC_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIQUARIES_RELIC_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIQUARIES_RELIC_FAITH_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_GREATWORK_YIELD",
+     "args": {
+      "GreatWorkObjectType": "GREATWORKOBJECT_RELIC",
+      "YieldType": "YIELD_FAITH",
+      "ScalingFactor": "300"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIQUARIES_RELIC_TOURISM",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIQUARIES_RELIC_TOURISM_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIQUARIES_RELIC_TOURISM_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_TOURISM",
+     "args": {
+      "GreatWorkObjectType": "GREATWORKOBJECT_RELIC",
+      "ScalingFactor": "300"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIGIOUS_COMMUNITY",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "RELIGIOUS_COMMUNITY_HOLY_SITE_TRADING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_COMMUNITY_HOLY_SITE_TRADING_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_COMMUNITY_HOLY_SITE_TRADING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
+     "args": {
+      "YieldType": "YIELD_GOLD",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_DISTRICT",
+        "inverse": false,
+        "args": {
+         "DistrictType": "DISTRICT_HOLY_SITE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIGIOUS_COMMUNITY_SHRINE_TRADING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_COMMUNITY_SHRINE_TRADING_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_COMMUNITY_SHRINE_TRADING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
+     "args": {
+      "YieldType": "YIELD_GOLD",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_SHRINE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIGIOUS_COMMUNITY_TEMPLE_TRADING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_COMMUNITY_TEMPLE_TRADING_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_COMMUNITY_TEMPLE_TRADING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
+     "args": {
+      "YieldType": "YIELD_GOLD",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_TEMPLE"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "RELIGIOUS_COMMUNITY_TIER3_TRADING",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "RELIGIOUS_COMMUNITY_TIER3_TRADING_MODIFIER"
+    },
+    "attach": {
+     "id": "RELIGIOUS_COMMUNITY_TIER3_TRADING_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL",
+     "args": {
+      "YieldType": "YIELD_GOLD",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_CATHEDRAL"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_DAR_E_MEHR"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_GURDWARA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_MEETING_HOUSE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_MOSQUE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_PAGODA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_STUPA"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_SYNAGOGUE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_CITY_HAS_BUILDING",
+        "inverse": false,
+        "args": {
+         "BuildingType": "BUILDING_WAT"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_WORK_ETHIC",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "WORK_ETHIC_ADJACENCY_PRODUCTION_2",
+    "collection": "COLLECTION_ALL_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_YIELD_BASED_ON_ADJACENCY_BONUS",
+    "args": {
+     "YieldTypeToMirror": "YIELD_FAITH",
+     "YieldTypeToGrant": "YIELD_PRODUCTION"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_HOLY_SITE"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_ZEN_MEDITATION",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "ZEN_MEDITATION_AMENITY",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "ZEN_MEDITATION_AMENITY_MODIFIER"
+    },
+    "attach": {
+     "id": "ZEN_MEDITATION_AMENITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_CITY_AMENITIES_FROM_RELIGION",
+     "args": {
+      "Amount": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_CITY_HAS_X_SPECIALTY_DISTRICTS",
+       "inverse": false,
+       "args": {
+        "Amount": "2"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_CHORAL_MUSIC",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "CHORAL_MUSIC_SHRINE_CULTURE",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "CHORAL_MUSIC_SHRINE_CULTURE_MODIFIER"
+    },
+    "attach": {
+     "id": "CHORAL_MUSIC_SHRINE_CULTURE_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+     "args": {
+      "BuildingType": "BUILDING_SHRINE",
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "2"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "CHORAL_MUSIC_TEMPLE_CULTURE",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "CHORAL_MUSIC_TEMPLE_CULTURE_MODIFIER"
+    },
+    "attach": {
+     "id": "CHORAL_MUSIC_TEMPLE_CULTURE_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+     "args": {
+      "BuildingType": "BUILDING_TEMPLE",
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "4"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_WARRIOR_MONKS",
+  "class": "BELIEF_CLASS_FOLLOWER",
+  "modifiers": [
+   {
+    "id": "ALLOW_WARRIOR_MONKS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_UNIT",
+    "args": {
+     "UnitType": "UNIT_WARRIOR_MONK"
+    }
+   },
+   {
+    "id": "WARRIOR_MONKS_CULTURE_BOMB_TRIGGER_HOLY_SITE",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "WARRIOR_MONKS_CULTURE_BOMB_TRIGGER_HOLY_SITE_MODIFIER"
+    },
+    "attach": {
+     "id": "WARRIOR_MONKS_CULTURE_BOMB_TRIGGER_HOLY_SITE_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_CULTURE_BOMB_TRIGGER",
+     "args": {
+      "DistrictType": "DISTRICT_HOLY_SITE"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_CATHEDRAL",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_CATHEDRAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_CATHEDRAL"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GURDWARA",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_GURDWARA",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_GURDWARA"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_MEETING_HOUSE",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_MEETING_HOUSE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_MEETING_HOUSE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_MOSQUE",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_MOSQUE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_MOSQUE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_PAGODA",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_PAGODA",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_PAGODA"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_SYNAGOGUE",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_SYNAGOGUE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_SYNAGOGUE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_WAT",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_WAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_WAT"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_STUPA",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_STUPA",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_STUPA"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_DAR_E_MEHR",
+  "class": "BELIEF_CLASS_WORSHIP",
+  "modifiers": [
+   {
+    "id": "ALLOW_DAR_E_MEHR",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_RELIGIOUS_BUILDING",
+    "args": {
+     "BuildingType": "BUILDING_DAR_E_MEHR"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_LAY_MINISTRY",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "LAY_MINISTRY_CULTURE_DISTRICTS",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "LAY_MINISTRY_CULTURE_DISTRICTS_MODIFIER"
+    },
+    "attach": {
+     "id": "LAY_MINISTRY_CULTURE_DISTRICTS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_DISTRICT",
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "1",
+      "PerXItems": "1",
+      "DistrictType": "DISTRICT_THEATER"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "LAY_MINISTRY_FAITH_DISTRICTS",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "LAY_MINISTRY_FAITH_DISTRICTS_MODIFIER"
+    },
+    "attach": {
+     "id": "LAY_MINISTRY_FAITH_DISTRICTS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_DISTRICT",
+      "YieldType": "YIELD_FAITH",
+      "Amount": "1",
+      "PerXItems": "1",
+      "DistrictType": "DISTRICT_HOLY_SITE"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_PAPAL_PRIMACY",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "PAPAL_PRIMACY_PRESSURE_ON_ADOPTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ENABLE_RELIGION_AWARDS_ENVOY_RELIGIOUS_PRESSURE",
+    "args": {
+     "Amount": "200"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_PILGRIMAGE",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "PILGRIMAGE_FAITH_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "PILGRIMAGE_FAITH_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "PILGRIMAGE_FAITH_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY",
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_STEWARDSHIP",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "STEWARDSHIP_SCIENCE_DISTRICTS",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "STEWARDSHIP_SCIENCE_DISTRICTS_MODIFIER"
+    },
+    "attach": {
+     "id": "STEWARDSHIP_SCIENCE_DISTRICTS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_DISTRICT",
+      "YieldType": "YIELD_SCIENCE",
+      "Amount": "1",
+      "PerXItems": "1",
+      "DistrictType": "DISTRICT_CAMPUS"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "STEWARDSHIP_GOLD_DISTRICTS",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "STEWARDSHIP_GOLD_DISTRICTS_MODIFIER"
+    },
+    "attach": {
+     "id": "STEWARDSHIP_GOLD_DISTRICTS_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_DISTRICT",
+      "YieldType": "YIELD_GOLD",
+      "Amount": "1",
+      "PerXItems": "1",
+      "DistrictType": "DISTRICT_COMMERCIAL_HUB"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_TITHE",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "TITHE_GOLD_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "TITHE_GOLD_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "TITHE_GOLD_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY",
+      "YieldType": "YIELD_GOLD",
+      "Amount": "3",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_WORLD_CHURCH",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "WORLD_CHURCH_CULTURE_FOLLOWER",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER"
+    },
+    "attach": {
+     "id": "WORLD_CHURCH_CULTURE_FOLLOWER_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_FOLLOWER",
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "1",
+      "PerXItems": "4"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_CROSS_CULTURAL_DIALOGUE",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER"
+    },
+    "attach": {
+     "id": "CROSS_CULTURAL_DIALOGUE_SCIENCE_FOLLOWER_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_FOLLOWER",
+      "YieldType": "YIELD_SCIENCE",
+      "Amount": "1",
+      "PerXItems": "4"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIGIOUS_UNITY",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "RELIGIOUS_UNITY_ENVOY_ON_ADOPTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ENABLE_RELIGION_AWARDS_ENVOY",
+    "args": {
+     "Enable": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_DEFENDER_OF_FAITH",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "DEFENDER_OF_FAITH_COMBAT_BONUS",
+    "collection": "COLLECTION_ALL_UNITS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "DEFENDER_OF_FAITH_COMBAT_BONUS_MODIFIER"
+    },
+    "attach": {
+     "id": "DEFENDER_OF_FAITH_COMBAT_BONUS_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "5"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_NEAR_RELIGIOUS_CITY",
+       "inverse": false,
+       "args": {
+        "FriendlyCity": "true"
+       }
+      },
+      {
+       "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+       "inverse": true,
+       "args": {
+        "Tag": "CLASS_RELIGIOUS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+       "inverse": true,
+       "args": {
+        "Tag": "CLASS_SUPPORT"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_HOLY_ORDER",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "HOLY_ORDER_MISSIONARY_DISCOUNT",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER"
+    },
+    "attach": {
+     "id": "HOLY_ORDER_MISSIONARY_DISCOUNT_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CITIES",
+     "effect": "EFFECT_ADJUST_UNIT_PURCHASE_COST",
+     "args": {
+      "UnitType": "UNIT_MISSIONARY",
+      "Amount": "30"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "HOLY_ORDER_APOSTLE_DISCOUNT",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "HOLY_ORDER_APOSTLE_DISCOUNT_MODIFIER"
+    },
+    "attach": {
+     "id": "HOLY_ORDER_APOSTLE_DISCOUNT_MODIFIER",
+     "collection": "COLLECTION_PLAYER_CITIES",
+     "effect": "EFFECT_ADJUST_UNIT_PURCHASE_COST",
+     "args": {
+      "UnitType": "UNIT_APOSTLE",
+      "Amount": "30"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_ITINERANT_PREACHERS",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "ITINERANT_PREACHERS_SPREAD_DISTANCE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_RELIGIOUS_SPREAD_DISTANCE",
+    "args": {
+     "DistanceChange": "3"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_JUST_WAR",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "JUST_WAR_COMBAT_BONUS",
+    "collection": "COLLECTION_ALL_UNITS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "JUST_WAR_COMBAT_BONUS_MODIFIER"
+    },
+    "attach": {
+     "id": "JUST_WAR_COMBAT_BONUS_MODIFIER",
+     "collection": "COLLECTION_UNIT_COMBAT",
+     "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+     "args": {
+      "Amount": "10"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_NEAR_RELIGIOUS_CITY",
+       "inverse": false,
+       "args": {
+        "FriendlyCity": "false"
+       }
+      },
+      {
+       "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+       "inverse": true,
+       "args": {
+        "Tag": "CLASS_RELIGIOUS"
+       }
+      },
+      {
+       "type": "REQUIREMENT_UNIT_TAG_MATCHES",
+       "inverse": true,
+       "args": {
+        "Tag": "CLASS_SUPPORT"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_MISSIONARY_ZEAL",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "MISSIONARY_ZEAL_IGNORE_TERRAIN",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "MISSIONARY_ZEAL_IGNORE_TERRAIN_MODIFIER"
+    },
+    "attach": {
+     "id": "MISSIONARY_ZEAL_IGNORE_TERRAIN_MODIFIER",
+     "collection": "COLLECTION_PLAYER_UNITS",
+     "effect": "EFFECT_GRANT_ABILITY",
+     "args": {
+      "AbilityType": "ABILITY_RELIGIOUS_IGNORE_TERRAIN_COST"
+     },
+     "ability": [
+      {
+       "id": "MOD_IGNORE_TERRAIN_COST",
+       "collection": "COLLECTION_OWNER",
+       "effect": "EFFECT_ADJUST_UNIT_IGNORE_TERRAIN_COST",
+       "args": {
+        "Ignore": "true",
+        "Type": "ALL"
+       }
+      },
+      {
+       "id": "MOD_IGNORE_CROSSING_RIVERS_COST",
+       "collection": "COLLECTION_OWNER",
+       "effect": "EFFECT_ADJUST_UNIT_IGNORE_RIVERS",
+       "args": {
+        "Ignore": "true"
+       }
+      }
+     ]
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_MONASTIC_ISOLATION",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "MONASTIC_ISOLATION_REDUCE_COMBAT_LOSS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_RELIGIOUS_COMBAT_LOSS",
+    "args": {
+     "ReductionPercent": "100"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_SCRIPTURE",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "SCRIPTURE_SPEAD_STRENGTH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_RELIGIOUS_SPREAD_STRENGTH",
+    "args": {
+     "SpreadMultiplier": "25",
+     "EnhancingTechType": "TECH_PRINTING",
+     "TechEnabledSpreadMultiplier": "25"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_RELIGIOUS_COLONIZATION",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "RELIGIOUS_COLONIZATION_AUTO_SPREAD",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ENABLE_RELIGION_AUTO_SPREAD",
+    "args": {
+     "Enable": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_GODDESS_OF_FIRE",
+  "class": "BELIEF_CLASS_PANTHEON",
+  "modifiers": [
+   {
+    "id": "GODDESS_OF_FIRE_FEATURES_FAITH",
+    "collection": "COLLECTION_ALL_CITIES",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GODDESS_OF_FIRE_FEATURES_FAITH_MODIFIER"
+    },
+    "attach": {
+     "id": "GODDESS_OF_FIRE_FEATURES_FAITH_MODIFIER",
+     "collection": "COLLECTION_CITY_PLOT_YIELDS",
+     "effect": "EFFECT_ADJUST_PLOT_YIELD",
+     "args": {
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2"
+     },
+     "subjectReqs": {
+      "test": "ANY",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_GEOTHERMAL_FISSURE"
+        }
+       },
+       {
+        "type": "REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "FeatureType": "FEATURE_VOLCANIC_SOIL"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_PANTHEON",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_SACRED_PLACES",
+  "class": "BELIEF_CLASS_FOUNDER",
+  "modifiers": [
+   {
+    "id": "SACRED_PLACES_FAITH_WONDER_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "SACRED_PLACES_FAITH_WONDER_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "SACRED_PLACES_FAITH_WONDER_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY_WITH_WONDER",
+      "YieldType": "YIELD_FAITH",
+      "Amount": "2",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "SACRED_PLACES_CULTURE_WONDER_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "SACRED_PLACES_CULTURE_WONDER_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "SACRED_PLACES_CULTURE_WONDER_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY_WITH_WONDER",
+      "YieldType": "YIELD_CULTURE",
+      "Amount": "2",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "SACRED_PLACES_SCIENCE_WONDER_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "SACRED_PLACES_SCIENCE_WONDER_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "SACRED_PLACES_SCIENCE_WONDER_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY_WITH_WONDER",
+      "YieldType": "YIELD_SCIENCE",
+      "Amount": "2",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "SACRED_PLACES_GOLD_WONDER_CITY",
+    "collection": "COLLECTION_ALL_PLAYERS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "SACRED_PLACES_GOLD_WONDER_CITY_MODIFIER"
+    },
+    "attach": {
+     "id": "SACRED_PLACES_GOLD_WONDER_CITY_MODIFIER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADD_RELIGIOUS_BELIEF_YIELD",
+     "args": {
+      "BeliefYieldType": "BELIEF_YIELD_PER_CITY_WITH_WONDER",
+      "YieldType": "YIELD_GOLD",
+      "Amount": "2",
+      "PerXItems": "1"
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "BELIEF_HOLY_WATERS",
+  "class": "BELIEF_CLASS_ENHANCER",
+  "modifiers": [
+   {
+    "id": "HOLY_WATERS_HEALING",
+    "collection": "COLLECTION_ALL_DISTRICTS",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "HOLY_WATERS_HEALING_MODIFIER"
+    },
+    "attach": {
+     "id": "HOLY_WATERS_HEALING_MODIFIER",
+     "collection": "COLLECTION_ALL_UNITS",
+     "effect": "EFFECT_ADJUST_UNIT_HEALING_RELIGION_MODIFIERS",
+     "args": {
+      "Amount": "10",
+      "Type": "ALL"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+        "inverse": false,
+        "args": {
+         "MinDistance": "0"
+        }
+       }
+      ]
+     }
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_FOLLOWS_RELIGION",
+       "inverse": false,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_HOLY_SITE"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ }
+];
+export const AI_RELIGIONS: readonly AiReligion[] = [
+ {
+  "type": "RELIGION_PANTHEON",
+  "pantheon": true,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_BUDDHISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_CATHOLICISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_CONFUCIANISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_HINDUISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_ISLAM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_JUDAISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_ORTHODOXY",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_PROTESTANTISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_SHINTO",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_SIKHISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_TAOISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_ZOROASTRIANISM",
+  "pantheon": false,
+  "customName": false
+ },
+ {
+  "type": "RELIGION_CUSTOM_1",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_2",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_3",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_4",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_5",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_6",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_7",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_8",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_9",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_10",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_11",
+  "pantheon": false,
+  "customName": true
+ },
+ {
+  "type": "RELIGION_CUSTOM_12",
+  "pantheon": false,
+  "customName": true
+ }
+];
+export const AI_FAVORED_RELIGIONS_BY_LEADER: Readonly<Record<string, readonly string[]>> = {
+ "LEADER_ABRAHAM_LINCOLN": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_BARBAROSSA": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_BASIL": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_CATHERINE_DE_MEDICI_ALT": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_CHANDRAGUPTA": [
+  "RELIGION_HINDUISM"
+ ],
+ "LEADER_CYRUS": [
+  "RELIGION_ZOROASTRIANISM"
+ ],
+ "LEADER_DIDO": [
+  "RELIGION_JUDAISM"
+ ],
+ "LEADER_ELEANOR_ENGLAND": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_ELEANOR_FRANCE": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_ELIZABETH": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_GANDHI": [
+  "RELIGION_HINDUISM"
+ ],
+ "LEADER_GITARJA": [
+  "RELIGION_HINDUISM"
+ ],
+ "LEADER_HARALD_ALT": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_HARDRADA": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_HOJO": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_JADWIGA": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_JAYAVARMAN": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_JOAO_III": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_KRISTINA": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_KUBLAI_KHAN_CHINA": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_KUBLAI_KHAN_MONGOLIA": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_LAURIER": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_LUDWIG": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_MANSA_MUSA": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_MATTHIAS_CORVINUS": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_MENELIK": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_MVEMBA": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_NADER_SHAH": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_PEDRO": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_PETER_GREAT": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_PHILIP_II": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_QIN": [
+  "RELIGION_TAOISM"
+ ],
+ "LEADER_QIN_ALT": [
+  "RELIGION_TAOISM"
+ ],
+ "LEADER_ROBERT_THE_BRUCE": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_SALADIN": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_SALADIN_ALT": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_SEJONG": [
+  "RELIGION_CONFUCIANISM"
+ ],
+ "LEADER_SEONDEOK": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_SIMON_BOLIVAR": [
+  "RELIGION_CATHOLICISM"
+ ],
+ "LEADER_SULEIMAN": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_SULEIMAN_ALT": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_SUNDIATA_KEITA": [
+  "RELIGION_ISLAM"
+ ],
+ "LEADER_TAMAR": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_THEODORA": [
+  "RELIGION_ORTHODOXY"
+ ],
+ "LEADER_TOKUGAWA": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_T_ROOSEVELT": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_T_ROOSEVELT_ROUGHRIDER": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_VICTORIA": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_VICTORIA_ALT": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_WILHELMINA": [
+  "RELIGION_PROTESTANTISM"
+ ],
+ "LEADER_WU_ZETIAN": [
+  "RELIGION_BUDDHISM"
+ ],
+ "LEADER_YONGLE": [
+  "RELIGION_CONFUCIANISM"
+ ]
+};
+export const AI_FAVORED_RELIGIONS_BY_CIV: Readonly<Record<string, readonly string[]>> = {};

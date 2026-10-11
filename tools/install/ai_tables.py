@@ -115,6 +115,9 @@ def build() -> str:
         if out["effect"] == "EFFECT_GRANT_ABILITY":
             # the ability's own modifiers, which its analyzer runs
             out["ability"] = [modifier(x) for x in amods[out["args"].get("AbilityType", "")]]
+        if out["effect"] == "EFFECT_ATTACH_MODIFIER" and out["args"].get("ModifierId") in mods:
+            # the modifier it attaches, which its analyzer runs on each subject
+            out["attach"] = modifier(out["args"]["ModifierId"])
         sub = reqset(m.get("SubjectRequirementSetId"))
         own = reqset(m.get("OwnerRequirementSetId"))
         if sub:
@@ -294,6 +297,26 @@ def build() -> str:
     globals_ = {k: int(float(gps[k]["Value"])) for k in ("CITY_MIN_RANGE", "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER",
                                                          "AI_ISLAND_COAST_PERCENTAGE")}
 
+    # the religion AI: the beliefs in database order (the AI's belief list,
+    # AI_Religious.csv's lines, run in it) with their class and modifiers;
+    # the religions in database order with the Pantheon and
+    # RequiresCustomName flags; FavoredReligions by leader and civilization
+    bmods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("BeliefModifiers"):
+        if c.get("BeliefType"):
+            bmods[c["BeliefType"]].append(c.get("ModifierID") or c.get("ModifierId"))
+    beliefs = [{"type": b, "class": c.get("BeliefClassType"), "modifiers": [modifier(m) for m in bmods[b]]}
+               for b, c in in_game_order("Beliefs", "BeliefType", keyed(rows("Beliefs"), "BeliefType"))]
+    religions = [{"type": r, "pantheon": c.get("Pantheon") == "true", "customName": c.get("RequiresCustomName") == "true"}
+                 for r, c in in_game_order("Religions", "ReligionType", keyed(rows("Religions"), "ReligionType"))]
+    fav_leader: dict[str, list[str]] = collections.defaultdict(list)
+    fav_civ: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("FavoredReligions"):
+        if c.get("LeaderType"):
+            fav_leader[c["LeaderType"]].append(c["ReligionType"])
+        if c.get("CivilizationType"):
+            fav_civ[c["CivilizationType"]].append(c["ReligionType"])
+
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1)};\n"
 
@@ -301,7 +324,7 @@ def build() -> str:
         "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
         " * layered install (`--check` reports a stale file). Policies and governments\n"
         " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType, AiStrategy, AiStrategyBias } from './types';\n\n"
+        "import type { AiBelief, AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy, AiStrategyBias } from './types';\n\n"
         + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
         + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
         + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
@@ -319,6 +342,10 @@ def build() -> str:
               "Readonly<Record<string, readonly AiStrategyBias[]>>")
         + lit("AI_STRATEGY_BIAS_BY_CIV", {k: v for k, v in bias_civ.items() if v},
               "Readonly<Record<string, readonly AiStrategyBias[]>>")
+        + lit("AI_BELIEFS", beliefs, "readonly AiBelief[]")
+        + lit("AI_RELIGIONS", religions, "readonly AiReligion[]")
+        + lit("AI_FAVORED_RELIGIONS_BY_LEADER", dict(sorted(fav_leader.items())), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_FAVORED_RELIGIONS_BY_CIV", dict(sorted(fav_civ.items())), "Readonly<Record<string, readonly string[]>>")
     )
     core = (
         "/**\n * THE AI VALUE LAYER'S TABLES (cpu/core/aiValue.ts), written by\n"

@@ -7,7 +7,7 @@
 import type { MajorCityDefenceView, MajorCityView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
 import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
-import type { AiCityView, AiDistrictView, AiPlotView } from './aiValue';
+import { fxOf, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 import { isExplored } from './fog';
@@ -18,7 +18,7 @@ import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, unitAttackRange } from './combat';
 import { outerPool } from './rules';
-import { unitDomain, unitsHostile, unitVisibleTo } from './units';
+import { builderCost, traderCost, unitDomain, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
@@ -40,8 +40,11 @@ import { civEraIndex, computeCityStats } from './city';
 import { scoreLines } from './score';
 import { domesticTourists, touristsDrawn } from './seatTurn';
 import { PROJECTS } from '../data/projects';
+import { BELIEF_SLOTS } from '../data/religion';
+import { RESOURCES } from '../../world/resources';
+import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { itemCost } from './game';
+import { itemCost, settlerCost, unitProdCost } from './game';
 
 /** What the view takes from the majors' AI itself: per major the strategies
  *  it follows (ai/major/strategies.ts), which its weights and its civic list
@@ -140,6 +143,15 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     let h = hidden.get(i);
     if (!h) hidden.set(i, (h = hiddenResourcesFor(state, i)));
     return h;
+  };
+  // a seat's city by id; a city-state's one city is its own view
+  // (`minorCity`, id -1)
+  const cityOf = (i: number, id: number): City | undefined => {
+    if (isCityStateSeat(i)) {
+      const cs = seatOf(state, i) as CityState | undefined;
+      return cs && cs.centerIndex >= 0 ? minorCity(cs) : undefined;
+    }
+    return citiesOf(state, i).find((c) => c.id === id);
   };
   const centres = new Set([...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]
     .flatMap((s) => s.cities.map((c) => c.centerIndex)));
@@ -266,6 +278,9 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
           resourceVisible: !!t.resource && !hiddenOf(i).has(t.resource),
           improvement: t.improvement,
           impassable: isImpassable(t),
+          resourceClass: t.resource && RESOURCES[t.resource] ? `RESOURCECLASS_${RESOURCES[t.resource].category.toUpperCase()}` : null,
+          improved: !!t.resource && !!t.improvement && RESOURCES[t.resource]?.improvement === t.improvement,
+          appeal: tileAppeal(map, t),
         }));
     },
     cityYield: (i, id, type) => {
@@ -287,12 +302,45 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return city && d && key ? districtYieldOf(state, i, city, d, key) : 0;
     },
     cityHasBuilding: (i, id, building) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      const city = cityOf(i, id);
       return !!city && city.buildings.includes(building.replace(/^BUILDING_/, ''));
     },
     cityHasDistrict: (i, id, type) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      const city = cityOf(i, id);
       return !!city && city.districts.some((d) => districtType(d.type) === type);
+    },
+    cityReligion: (i, id) => {
+      if (isCityStateSeat(i)) return majorityReligionOf(state, i);
+      return cityOf(i, id)?.followedReligion ?? -1;
+    },
+    plotTerrain: (p) => installTerrain(map.tiles[p].terrain, map.tiles[p].elevation),
+    plotFeature: (p) => (map.tiles[p].feature ? installFeature(map.tiles[p].feature!) : null),
+    plotsWithinReadAsAxial: (p, r) => {
+      const t = map.tiles[p];
+      const col = t.col + (t.row >> 1);
+      const out: number[] = [];
+      for (let row = Math.max(0, t.row - r); row <= Math.min(map.height - 1, t.row + r); row++) {
+        for (let c = 0; c < map.width; c++) if (hexDistance(map, col, t.row, c, row) <= r) out.push(row * map.width + c);
+      }
+      return out;
+    },
+    cityDistricts: (i, id) => cityOf(i, id)?.districts.map((d) => districtType(d.type)) ?? [],
+    cityPlot: (i, id) => cityOf(i, id)?.centerIndex ?? -1,
+    districtPlot: (i, id, type) => {
+      const c = cityOf(i, id);
+      return c?.districts.find((d) => districtType(d.type) === type)?.tileIndex ?? null;
+    },
+    cityFoodSurplus: (i, id) => {
+      const c = cityOf(i, id);
+      return c ? fxOf(computeCityStats(state, c).foodSurplus) : 0;
+    },
+    unitCost: (i, type) => {
+      const id = engineId('unit', type, 'UNIT_', UNITS);
+      if (!id) return 0;
+      if (UNITS[id].settler) return settlerCost(state, i);
+      if (id === 'BUILDER') return builderCost(state, i);
+      if (UNITS[id].trader) return traderCost(state, i);
+      return Math.trunc(unitProdCost(state, i, id, UNITS[id].cost));
     },
     districtBuildingYields: (i, type, yieldType) => {
       const key = YIELD_KEY[yieldType];
@@ -343,6 +391,11 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     majorityReligion: (i) => {
       const r = majorityReligionOf(state, i);
       return r >= 0 ? r : null;
+    },
+    beliefsHeld: () => new Set([...state.claimedPantheons, ...state.claimedBeliefs].map((b) => `BELIEF_${b}`)),
+    religionBeliefs: (i) => {
+      const r = seat(i).religion;
+      return r.founded ? BELIEF_SLOTS.flatMap((k) => (r[k] ? [`BELIEF_${r[k]}`] : [])) : [];
     },
     tradeRoutesBetween: (i, j) => {
       const runs = (a: number, b: number) => (seatOf(state, a)?.tradeRoutes ?? []).filter((r) => r.toSeat === b).length;
@@ -419,12 +472,12 @@ function allCities(state: GameState): MajorCityView[] {
   const out: MajorCityView[] = [];
   const add = (c: City, religion: number) => {
     const t = computeCityStats(state, c).total;
-    out.push({ plot: c.centerIndex, owner: c.seat, yields: AI_YIELD_KEYS.map((k) => t[k]), religion,
+    out.push({ plot: c.centerIndex, owner: c.seat, id: c.id, capital: c.isCapital, yields: AI_YIELD_KEYS.map((k) => t[k]), religion,
       originalCapital: (c.origCapitalSeat ?? -1) >= 0, originalOwner: c.founderSeat ?? c.seat });
   };
   for (const h of cityHolders(state)) for (const c of h.cities) add(c, c.followedReligion ?? -1);
   for (const cs of state.cityStates) {
-    if (cs.centerIndex >= 0) add({ ...minorCity(cs), origCapitalSeat: cs.seat, founderSeat: cs.seat }, majorityReligionOf(state, cs.seat));
+    if (cs.centerIndex >= 0) add({ ...minorCity(cs), isCapital: true, origCapitalSeat: cs.seat, founderSeat: cs.seat }, majorityReligionOf(state, cs.seat));
   }
   return out;
 }

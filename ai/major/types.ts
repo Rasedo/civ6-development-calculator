@@ -77,6 +77,21 @@ export interface AiStrategyBias {
   maxDifficulty: string | null;
 }
 
+/** a Beliefs row: its BeliefClassType and its BeliefModifiers */
+export interface AiBelief {
+  type: string;
+  class: string;
+  modifiers: readonly AiModifier[];
+}
+
+/** a Religions row: Pantheon (the pantheon's own row) and
+ *  RequiresCustomName (the custom religion) */
+export interface AiReligion {
+  type: string;
+  pantheon: boolean;
+  customName: boolean;
+}
+
 export interface AiSlotType {
   type: string;
   /** AllowsAnyPolicy: the Wildcard */

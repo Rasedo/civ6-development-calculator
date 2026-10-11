@@ -20,6 +20,7 @@
  */
 import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
+import { ERAS } from '../data/techs';
 import {
   FX, discounted, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
@@ -46,6 +47,8 @@ export interface AiModifier {
   ownerReqs?: AiRequirementSet;
   /** an EFFECT_GRANT_ABILITY's ability's own modifiers (UnitAbilityModifiers) */
   ability?: readonly AiModifier[];
+  /** an EFFECT_ATTACH_MODIFIER's attached modifier (its ModifierId) */
+  attach?: AiModifier;
 }
 
 /** One evaluation's terms (the analysis context 0x6ccd50 the analyzers
@@ -58,30 +61,64 @@ export interface ValueTerms {
   horizon: number;
   rate: number;
   /** the city that owns the modifiers in a building's analysis (context
-   *  +0x10): COLLECTION_OWNER is that city; absent, the player */
-  owner?: { cityId: number; capital: boolean };
+   *  +0x10), or the city an attached modifier's analysis is of (+0x70, the
+   *  subject its attaching modifier stood on): COLLECTION_OWNER is that city,
+   *  of `seat` (the evaluating seat where absent); absent, the player */
+  owner?: { cityId: number; capital: boolean; seat?: number };
+  /** the religion the evaluation is of (context +0x48), -1 for none: a
+   *  belief's (0x7a7400) is the player's own religion, else its majority
+   *  religion */
+  religion?: number;
+  /** the cities COLLECTION_ALL_CITIES walks (0x69f340): the evaluating
+   *  player's knowledge base, its entries in order; absent where the
+   *  evaluation reads none */
+  known?: readonly AiCitySubject[];
+}
+
+/** a city an analysis may stand on: its owner's seat, the engine's city id
+ *  (a city-state's one city -1), whether it is its owner's capital */
+export interface AiCitySubject {
+  seat: number;
+  id: number;
+  capital: boolean;
 }
 
 /** an analysis subject: the player, a city (context +0x70), a district
  *  (+0x78) */
 type Subject =
   | { kind: 'player' }
-  | { kind: 'city'; id: number; capital: boolean }
+  | { kind: 'city'; seat: number; id: number; capital: boolean }
   | { kind: 'district'; cityId: number; type: string }
   | { kind: 'plot'; plot: AiPlotView };
+
+const ownerCity = (t: ValueTerms): Subject | null =>
+  t.owner ? { kind: 'city', seat: t.owner.seat ?? t.seat, id: t.owner.cityId, capital: t.owner.capital } : null;
 
 /** a collection's subjects for the seat (the collection objects' iterators);
  *  null for a collection not read */
 function subjects(t: ValueTerms, collection: string): Subject[] | null {
   switch (collection) {
-    case 'COLLECTION_OWNER': return t.owner ? [{ kind: 'city', id: t.owner.cityId, capital: t.owner.capital }] : [{ kind: 'player' }];
-    case 'COLLECTION_PLAYER_CITIES': return t.view.cities(t.seat).map((c) => ({ kind: 'city', id: c.id, capital: c.capital }));
-    case 'COLLECTION_PLAYER_CAPITAL_CITY': return t.view.cities(t.seat).filter((c) => c.capital).map((c) => ({ kind: 'city', id: c.id, capital: true }));
+    case 'COLLECTION_OWNER': return [ownerCity(t) ?? { kind: 'player' }];
+    case 'COLLECTION_PLAYER_CITIES': return t.view.cities(t.seat).map((c) => ({ kind: 'city', seat: t.seat, id: c.id, capital: c.capital }));
+    case 'COLLECTION_PLAYER_CAPITAL_CITY': return t.view.cities(t.seat).filter((c) => c.capital).map((c) => ({ kind: 'city', seat: t.seat, id: c.id, capital: true }));
     case 'COLLECTION_PLAYER_DISTRICTS': return t.view.districts(t.seat).map((d) => ({ kind: 'district', cityId: d.cityId, type: d.type }));
+    // 0x69fdf0: the evaluation city's districts (+0x70), its centre's among
+    // them
+    case 'COLLECTION_CITY_DISTRICTS': return t.owner
+      ? t.view.cityDistricts(t.owner.seat ?? t.seat, t.owner.cityId).map((type) => ({ kind: 'district', cityId: t.owner!.cityId, type }))
+      : [];
     // 0x69ffa0: once, the evaluation's city (context +0x70)
-    case 'COLLECTION_CITY_TRAINED_UNITS': return t.owner ? [{ kind: 'city', id: t.owner.cityId, capital: t.owner.capital }] : [];
+    case 'COLLECTION_CITY_TRAINED_UNITS': {
+      const c = ownerCity(t);
+      return c ? [c] : [];
+    }
     // 0x69feb0: the evaluation city's plots of its three rings that it owns
-    case 'COLLECTION_CITY_PLOT_YIELDS': return t.owner ? t.view.cityOwnedPlots(t.seat, t.owner.cityId).map((plot) => ({ kind: 'plot', plot })) : [];
+    case 'COLLECTION_CITY_PLOT_YIELDS': return t.owner ? t.view.cityOwnedPlots(t.owner.seat ?? t.seat, t.owner.cityId).map((plot) => ({ kind: 'plot', plot })) : [];
+    // 0x69f320 / 0x69f340: the player's knowledge base's cities, in its order
+    case 'COLLECTION_ALL_CITIES': return t.known ? t.known.map((c) => ({ kind: 'city', seat: c.seat, id: c.id, capital: c.capital })) : null;
+    // 0x69f6c0 / 0x69f6e0: with a player in the context, that player once
+    // (the first step stands on the context as it is and ends the walk)
+    case 'COLLECTION_ALL_PLAYERS': return [{ kind: 'player' }];
     default: return null;
   }
 }
@@ -124,6 +161,18 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && !!s.plot.resource && s.plot.resource === args.ResourceType,
   REQUIREMENT_PLOT_RESOURCE_VISIBLE: (_t, _args, s) => s.kind === 'plot' && s.plot.resourceVisible,
   REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT: (_t, _args, s) => s.kind === 'plot' && !!s.plot.improvement,
+  // by their names (their bodies 0x6d03d0, 0x6d0af0, 0x6d1140, 0x6d0670
+  // unread): the plot subject's improvement of the type
+  REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES: (_t, args, s) =>
+    s.kind === 'plot' && !!s.plot.improvement && `IMPROVEMENT_${s.plot.improvement}` === args.ImprovementType,
+  // the plot subject's resource of the class; improved: the improvement on
+  // it is the resource's own
+  REQUIREMENT_PLOT_RESOURCE_CLASS_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.resourceClass === args.ResourceClassType,
+  REQUIREMENT_PLOT_IMPROVED_RESOURCE_CLASS_TYPE_MATCHES: (_t, args, s) =>
+    s.kind === 'plot' && s.plot.improved && s.plot.resourceClass === args.ResourceClassType,
+  // the plot subject's Appeal at least MinimumAppeal
+  REQUIREMENT_PLOT_IS_APPEAL_BETWEEN: (_t, args, s) =>
+    s.kind === 'plot' && s.plot.appeal >= Number(args.MinimumAppeal ?? -1e9) && s.plot.appeal <= Number(args.MaximumAppeal ?? 1e9),
   // 0x6d08c0: a district subject of the type (with none, the district type
   // the evaluation is of, context +0x1c — none in a policy's analysis)
   REQUIREMENT_DISTRICT_TYPE_MATCHES: (_t, args, s) => s.kind === 'district' && s.type === args.DistrictType,
@@ -133,8 +182,20 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
     if (s.kind !== 'city') return false;
     const b = args.BuildingType ?? '';
     if (b.replace(/^BUILDING_/, '') in BUILT_WONDERS) return false;
-    return t.view.cityHasBuilding(t.seat, s.id, b);
+    return t.view.cityHasBuilding(s.seat, s.id, b);
   },
+  // 0x6cfbf0: a city subject whose owner (+0x1b8) is the context's player
+  REQUIREMENT_CITY_FOLLOWS_PANTHEON: (t, _args, s) => s.kind === 'city' && s.seat === t.seat,
+  // 0x6cfcb0: a city subject; any with no religion in the context (+0x48),
+  // else one whose religion (+0x1910) is it
+  REQUIREMENT_CITY_FOLLOWS_RELIGION: (t, _args, s) =>
+    s.kind === 'city' && ((t.religion ?? -1) < 0 || t.view.cityReligion(s.seat, s.id) === t.religion),
+  // 0x6cfbd0: the context's player is the player the evaluation is for
+  // (+0x80's id against +0x40) — the evaluating player
+  REQUIREMENT_PLAYER_HAS_PANTHEON: () => true,
+  // 0x6d27a0: with no religion in the context, held; else the context's
+  // player founded it (0x497cc0)
+  REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER: (t) => (t.religion ?? -1) < 0 || t.view.religionFounded(t.seat) === t.religion,
 };
 
 /** 0x6cf3c0 over the set as 0x6ccec0 builds it: null where a kept
@@ -158,6 +219,31 @@ function admits(t: ValueTerms, set: AiRequirementSet | undefined, s: Subject): b
 type Analyzer = (t: ValueTerms, args: Readonly<Record<string, string>>, s: Subject) => number;
 
 const amountOf = (args: Readonly<Record<string, string>>): number => (Number(args.Amount ?? 0) | 0) * FX;
+/** an Amount the analyzer's parser stores as fx(Amount x 0.01f) */
+const pctOf = (args: Readonly<Record<string, string>>): number =>
+  fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01)));
+/** an era argument as the parser reads it (0x6c7f00: the Eras row's index,
+ *  -1 for none) */
+const eraOf = (name: string | undefined): number => (name ? ERAS.findIndex((e) => `ERA_${e.toUpperCase()}` === name) : -1);
+/** the barbarian camps the player's knowledge base holds (its +0x638 list,
+ *  AI_Knowledge.csv's CAMP lines), at most 5 */
+const campsKnown = (t: ValueTerms): number => Math.min(t.view.barbarianCamps(t.seat).length, 5);
+
+/** 0x6b76f0 / 0x6aee30: a city subject; with a district of the type
+ *  (0x1ae530), the district's plot and its six neighbours that match; without
+ *  one, the plots within 3 of the centre that match (0x6c7690 / 0x6c78a0);
+ *  Amount each, at the player's weight, PV(horizon) - PV(start). Both walks
+ *  take the plot's offset coordinates as axial ones, so they stand on the
+ *  plots `plotsWithinReadAsAxial` names (runs/h1_duelw1124 t3: China's
+ *  Desert Folklore 22, the four Desert plots of that walk, none within 3 of
+ *  its capital) */
+function adjacencyValue(t: ValueTerms, args: Readonly<Record<string, string>>, s: Subject, match: (plot: number) => boolean): number {
+  if (s.kind !== 'city') return 0;
+  const site = t.view.districtPlot(s.seat, s.id, args.DistrictType ?? '');
+  const plots = t.view.plotsWithinReadAsAxial(site ?? t.view.cityPlot(s.seat, s.id), site === null ? 3 : 1);
+  const n = plots.filter(match).length;
+  return whole(span(t, yieldValue(t.view, t.seat, n * amountOf(args), args.YieldType ?? '')));
+}
 /** PV(horizon) - PV(start), the two 0x7a16e0 calls most analyzers make */
 const span = (t: ValueTerms, v: number): number => presentValue(v, t.rate, t.horizon) - presentValue(v, t.rate, t.start);
 /** a bool argument as the analyzer's parser reads it (0xc7a1c0), with its
@@ -179,7 +265,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   EFFECT_ADJUST_CITY_YIELD_MODIFIER: (t, args, s) => {
     if (s.kind !== 'city') return 0;
     const type = args.YieldType ?? '';
-    const have = Math.min(Math.floor(t.view.cityYield(t.seat, s.id, type)), 100);
+    const have = Math.min(Math.floor(t.view.cityYield(s.seat, s.id, type)), 100);
     const amount = fxConst(Math.fround(Math.fround(have * (Number(args.Amount ?? 0) | 0)) * Math.fround(0.01)));
     return whole(valueBetween(yieldValue(t.view, t.seat, amount, type), t.start, t.horizon, t.rate));
   },
@@ -224,7 +310,7 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   EFFECT_ADJUST_BUILDING_YIELD_CHANGE: (t, args, s) => {
     if (s.kind !== 'city') return 0;
     let v = yieldValue(t.view, t.seat, amountOf(args), args.YieldType ?? '');
-    if (!t.view.cityHasBuilding(t.seat, s.id, args.BuildingType ?? '')) v = fmul(v, fxConst(0.5));
+    if (!t.view.cityHasBuilding(s.seat, s.id, args.BuildingType ?? '')) v = fmul(v, fxConst(0.5));
     return whole(span(t, v));
   },
   // 0x6a1b80: a city subject holding a district of the type (0x1ae530);
@@ -233,13 +319,13 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // valued from the start to the horizon, halved where the city lacks it,
   // each building's whole part added
   EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT: (t, args, s) => {
-    if (s.kind !== 'city' || !t.view.cityHasDistrict(t.seat, s.id, args.DistrictType ?? '')) return 0;
+    if (s.kind !== 'city' || !t.view.cityHasDistrict(s.seat, s.id, args.DistrictType ?? '')) return 0;
     const type = args.YieldType ?? '';
     const pct = fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01)));
     let sum = 0;
     for (const b of t.view.districtBuildingYields(t.seat, args.DistrictType ?? '', type)) {
       let v = valueBetween(yieldValue(t.view, t.seat, fmul(pct, b.amount * FX), type), t.start, t.horizon, t.rate);
-      if (!t.view.cityHasBuilding(t.seat, s.id, b.building)) v = fmul(v, fxConst(0.5));
+      if (!t.view.cityHasBuilding(s.seat, s.id, b.building)) v = fmul(v, fxConst(0.5));
       sum += whole(v);
     }
     return sum;
@@ -293,30 +379,144 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER: (t, args, s) => {
     if (s.kind !== 'city') return 0;
     const per = yieldValue(null, null, fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), 'YIELD_GOLD');
-    const production = fxOf(t.view.cityYield(t.seat, s.id, 'YIELD_PRODUCTION'));
+    const production = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION'));
     return whole(valueBetween(fmul(per, production), t.start, t.horizon, t.rate));
+  },
+  // 0x6b76f0 (Amount, YieldType, TerrainType, DistrictType): the plots of
+  // the terrain (plot +0x2c, hills their own type)
+  EFFECT_TERRAIN_ADJACENCY: (t, args, s) => adjacencyValue(t, args, s, (p) => t.view.plotTerrain(p) === args.TerrainType),
+  // 0x6aee30: as the terrain's on the feature (plot +0x3c), where the city
+  // AI's plot evaluations hold a plot of it (0x5d2df0) — the city's own
+  // plots within its three rings here
+  EFFECT_FEATURE_ADJACENCY: (t, args, s) => {
+    if (s.kind !== 'city' || !t.view.cityOwnedPlots(s.seat, s.id).some((p) => p.feature === args.FeatureType)) return 0;
+    return adjacencyValue(t, args, s, (p) => t.view.plotFeature(p) === args.FeatureType);
+  },
+  // 0x6abc40: a city subject with a player; the city's Culture (City::GetYield)
+  // x fx(Amount x 0.01), at the player's weight, plus 0.5 (0x16eb20),
+  // PV(horizon) - PV(start)
+  EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const culture = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_CULTURE'));
+    const v = yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE') + fxConst(0.5);
+    return whole(span(t, v));
+  },
+  // 0x6beb00: a city subject's Food surplus (its growth object's 0x1b5620),
+  // with none 2.0, x fx(Amount x 0.01), as bare Food from the start to the
+  // horizon (0x7a2140)
+  EFFECT_ADJUST_CITY_GROWTH: (t, args, s) => {
+    const food = s.kind === 'city' ? t.view.cityFoodSurplus(s.seat, s.id) : 2 * FX;
+    return whole(valueBetween(yieldValue(null, null, fmul(food, pctOf(args)), 'YIELD_FOOD'), t.start, t.horizon, t.rate));
+  },
+  // 0x6b5d50 (Amount, StartEra, EndEra): a city subject while the player's
+  // era lies in the window (an end of -1 none); the city's Production x
+  // fx(Amount x 0.01), at the player's weight, from the start to the
+  // horizon, halved (sar 9)
+  EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const era = t.view.playerEra(t.seat);
+    const from = eraOf(args.StartEra);
+    const to = eraOf(args.EndEra);
+    if ((era < from && from !== -1) || (era > to && to !== -1)) return 0;
+    const production = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION'));
+    const v = yieldValue(t.view, t.seat, fmul(production, pctOf(args)), 'YIELD_PRODUCTION');
+    return valueBetween(v, t.start, t.horizon, t.rate) >> 9;
+  },
+  // 0x6bdd40: with a player, the camps its knowledge base holds (at most 5)
+  // x Amount, Faith at its weight, discounted from the start (0x7a1240)
+  EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL: (t, args) =>
+    whole(discounted(yieldValue(t.view, t.seat, campsKnown(t) * amountOf(args), 'YIELD_FAITH'), t.rate, t.start)),
+  // 0x6a6d20: with a player, the camps (at most 5) x Amount / 10 rounded up,
+  // as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254) at its weight, discounted from the
+  // start
+  EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL: (t, args) => {
+    const per = Math.ceil((Number(args.Amount ?? 0) | 0) / 10);
+    return whole(discounted(pseudoYieldValue(t.view, t.seat, campsKnown(t) * per * FX, 'PSEUDOYIELD_UNIT_COMBAT'), t.rate, t.start));
+  },
+  // 0x6a4680 (GreatPersonClassType +8, its pseudo-yield +0xc, Amount +0x10
+  // kept whole): the Amount read raw as the class's pseudo-yield at the
+  // player's weight, from the start to the horizon
+  EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS: (t, args) => {
+    const pseudo = AI_GP_CLASS_PSEUDOYIELD[args.GreatPersonClassType ?? ''];
+    if (!pseudo) return 0;
+    return whole(valueBetween(pseudoYieldValue(t.view, t.seat, Number(args.Amount ?? 0) | 0, pseudo), t.start, t.horizon, t.rate));
+  },
+  // 0x6abe40 (Amount, UnitType): a city subject; the greater of the unit's
+  // cost to the player (0x4f2b20) and its value (0x7b62c0, not read here:
+  // the cost stands) x Amount
+  EFFECT_GRANT_UNIT_IN_CITY: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    return t.view.unitCost(t.seat, args.UnitType ?? '') * (Number(args.Amount ?? 0) | 0);
   },
 };
 
-/** One modifier's value (0x6cede0 over its subjects, each analyzer's whole
- *  number added): 0 where its collection, a requirement evaluator or its
- *  effect's analyzer is not read. */
-export function modifierValue(t: ValueTerms, m: AiModifier, depth = 1): number {
-  // 0x6b5b30, EFFECT_GRANT_ABILITY: per subject, the ability's own
-  // modifiers analysed in a copy of the context, their sums added; a fourth
-  // nested analysis is refused
-  const an = m.effect === 'EFFECT_GRANT_ABILITY'
-    ? (depth >= 4 ? undefined : (tt: ValueTerms) => (m.ability ?? []).reduce((a, x) => a + modifierValue(tt, x, depth + 1), 0))
-    : ANALYZERS[m.effect];
+/** the analyzers' slot 2, which the analysis calls where no subject passed
+ *  (the rest are a no-op, 0xbe4aa0) */
+const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Record<string, string>>) => number>> = {
+  // 0x6a4750: half the Amount as the class's pseudo-yield at the player's
+  // weight, from the start to the horizon
+  EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS: (t, args) => {
+    const pseudo = AI_GP_CLASS_PSEUDOYIELD[args.GreatPersonClassType ?? ''];
+    if (!pseudo) return 0;
+    const amount = fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * 0.5));
+    return whole(valueBetween(pseudoYieldValue(t.view, t.seat, amount, pseudo), t.start, t.horizon, t.rate));
+  },
+};
+
+/** the context a subject leaves for an analysis nested on it (0x142650's
+ *  copy): a city subject is the city the nested analysis is of (+0x70); any
+ *  other leaves the city as it stood */
+const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
+  s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } } : t;
+
+/** One modifier's analysis (0x6cede0): null where it is refused — no
+ *  analyzer or collection, or a fourth nested analysis — else the whole
+ *  number its subjects leave in the context (+0xc0, cleared as it starts):
+ *  each subject (at most 51) its requirement set admits goes to the
+ *  analyzer, which adds its whole part, or for EFFECT_ATTACH_MODIFIER
+ *  (0x6ab630) sets the total its attached modifier's own analysis on that
+ *  subject leaves, where that analysis is not refused. 0 where its
+ *  collection, a requirement evaluator or its effect's analyzer is not read
+ *  here. */
+function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
+  if (depth >= 4) return null;
   const subs = subjects(t, m.collection);
+  if (m.effect === 'EFFECT_ATTACH_MODIFIER') {
+    const inner = m.attach;
+    if (!inner || !subs) return inner ? 0 : null;
+    let acc = 0;
+    for (const s of subs.slice(0, 51)) {
+      const ok = admits(t, m.subjectReqs, s);
+      if (ok === null) return 0;
+      if (!ok) continue;
+      const v = analysis(onSubject(t, s), inner, depth + 1);
+      if (v !== null) acc = v;
+    }
+    return acc;
+  }
+  // 0x6b5b30, EFFECT_GRANT_ABILITY: per subject, the ability's own
+  // modifiers analysed in a copy of the context, their sums added
+  const an = m.effect === 'EFFECT_GRANT_ABILITY'
+    ? (tt: ValueTerms) => (m.ability ?? []).reduce((a, x) => a + (analysis(tt, x, depth + 1) ?? 0), 0)
+    : ANALYZERS[m.effect];
   if (!an || !subs) return 0;
   let sum = 0;
+  let passed = false;
   for (const s of subs.slice(0, 51)) {
     const ok = admits(t, m.subjectReqs, s);
     if (ok === null) return 0;
-    if (ok) sum += an(t, m.args, s);
+    if (!ok) continue;
+    passed = true;
+    sum += an(t, m.args, s);
   }
+  // no subject passed: the analyzer's slot 2
+  if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;
   return sum;
+}
+
+/** One modifier's value: its analysis's whole number, 0 where refused */
+export function modifierValue(t: ValueTerms, m: AiModifier): number {
+  return analysis(t, m, 1) ?? 0;
 }
 
 /** THE MODIFIERS' SUM (0x7a4b20): each modifier's whole value, held to
