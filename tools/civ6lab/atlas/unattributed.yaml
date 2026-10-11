@@ -457,6 +457,13 @@
   context:
     - "- A city's yield (Lua City:GetYield 0x981dd0 -> 0xaa060 -> GameAttribute value 0xaa740): ONE fixed-point modifier per attribute, clamped to (..."
   review: imported
+- addr: 0x140510
+  final: 0xd6160
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:CityTreeTrigger]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x142650
   final: 0xd8170
   kind: function
@@ -542,6 +549,18 @@
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
   context:
     - "...a8a30 — a wonder's free tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot..."
+  review: imported
+- addr: 0x1b1cb0
+  final: 0x121170
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...bour within 3 of the city another owns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighb..."
   review: imported
 - addr: 0x1eaa30
   final: 0x144810
@@ -1420,33 +1439,80 @@
 - addr: 0x5c9a00
   final: 0x3dec40
   kind: function
-  status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  name: the improvement pick
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 70
+      value: Bologna picks the Lumber Mill on t70's table
+  impl: [cpu/core/aiCityTrees.ts:CityTreeCity, cpu/core/aiCityTrees.ts:pickImprovement]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - ...D_FOOD] / adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analy...
-  review: imported
+  review: reviewed
 - addr: 0x5d7e00
   final: 0x3ea990
   kind: function
-  status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  name: the in-hand contract check
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 84
+      value: Granada's Harbor contract CANCELLED
+  impl: [cpu/core/aiContracts.ts:inHandCheck]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - "...turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantages and weights; logged by 0x5cdd70: Food Adv. /..."
+  review: reviewed
+- addr: 0x5f35d0
+  final: 0x3f81d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:contractBuilt]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...by vt +0x38 0x5f3710 (IN PROGRESS, bound to the city, the completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's refusal FAILED, no line). The in-hand check 0x5d7e00:...
+  review: imported
+- addr: 0x5f3610
+  final: 0x3f8210
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:contractBuilt]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x5f3710 (IN PROGRESS, bound to the city, the completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's refusal FAILED, no line). The in-hand check 0x5d7e00: not eligib..."
   review: imported
 - addr: 0x5f3710
   final: 0x3f8310
   kind: function
-  status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  name: the contract queue
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 2
+      value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
+  impl: [cpu/core/aiContracts.ts:queueContract, cpu/harness/cityBuildLog.ts:BuildLine]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD f2f97c GOLD f2f980 SCI f2f984 CULT f2f988 FAITH (loader 0x8..."
   context:
     - "...ees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 (\"Canceling cur..."
-  review: imported
+  review: reviewed
 - addr: 0x5f3c40
   final: 0x3f8850
   kind: function
   status: PARTLY
+  impl: [cpu/harness/cityBuildLog.ts:BuildLine]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD..."
@@ -1462,6 +1528,48 @@
     - ".claude/scratchpad/cb/notes.txt: ...yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f974 FOOD f2f978 PROD f2f97c GOLD f2f980 SCI f..."
   context:
     - "...the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches f..."
+  review: imported
+- addr: 0x5f5d50
+  final: 0x3fa5e0
+  kind: function
+  name: the contract evaluation
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 84
+      value: Granada's Harbor 2476.0 when submitted, 2542.8 on its CANCELLED line
+  impl: [cpu/core/aiContracts.ts:contractEvaluate]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t ACCEPTED. 0x5d4d70's head: an ACCEPTED contract the city may take is valued (vt +0x68 0x5f5d50: the higher of its value and the city's analysis value; districts always \"producing\") a..."
+  review: reviewed
+- addr: 0x5f6050
+  final: 0x3fa8e0
+  kind: function
+  name: the contract eligibility
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 51
+      value: Muscat's Walls contract printed ACCEPTED once its Walls stood
+  impl: [cpu/core/aiContracts.ts:contractEligible]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
+  review: reviewed
+- addr: 0x600b00
+  final: 0x3fda30
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ugh the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head skips an emptied one wit...
   review: imported
 - addr: 0x611140
   final: 0x406a40
@@ -2116,6 +2224,16 @@
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."
   review: imported
+- addr: 0x731d10
+  final: 0x64a6d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ct Manager's check 0x7f2220 sets FAILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8...
+  review: imported
 - addr: 0x7353d0
   final: 0x4d9610
   kind: function
@@ -2310,6 +2428,17 @@
   context:
     - ...nance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the player's counts (...
   review: imported
+- addr: 0x79e140
+  final: 0x526040
+  kind: function
+  name: the housing district neighbour functor
+  status: PARTLY
+  impl: [cpu/core/aiPlotValue.ts:PlotValueFacts, cpu/core/aiPlotValue.ts:featureRemovalValue]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...t DefaultValue (Appeal x 0.5 Food more where a neighbour holds a district with Housing, 0x79e140; Districts +0x40 Housing) from T to H. 0x7a37d0: Resource_Harvests at DefaultValue disc..."
+  review: reviewed
 - addr: 0x79ea80
   final: 0x526900
   kind: function
@@ -2320,6 +2449,19 @@
   context:
     - ...end), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) (the last for a negative count) each one Amenity mor...
     - "...abe0 less the stockpile 0x4aa790 at T = H, +50.0 for a resource with a +0xd0 list — and 0x79ea80's sort order; a city-state's held / have read as its owned plots that hand the resource..."
+  review: reviewed
+- addr: 0x79f0c0
+  final: 0x526e70
+  kind: function
+  name: the claimed plot functor
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...ns, without a wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T, 0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours' improvements and districts r..."
   review: reviewed
 - addr: 0x7b7760
   kind: function
@@ -2470,20 +2612,60 @@
   context:
     - ...09e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit 0x7c7580; Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner 0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd7...
   review: imported
+- addr: 0x7cb230
+  final: 0x53feb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x5cd4e0; then 0x5d4d70 where the queue is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event, never ticked there: no city-tree contract of the five logs is SUBMITTED..."
+  review: imported
 - addr: 0x7db850
   final: 0x547380
   kind: function
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...RS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th id stored the k-th name, @d5b198 one unnamed): Operation Move update..."
   review: imported
+- addr: 0x7e7200
+  final: 0x54f6b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:addGoalTech]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the turn limit, reset when every contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reserv..."
+  review: imported
+- addr: 0x7e8ef0
+  final: 0x551360
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:buildImprovement]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x7e9670
+  final: 0x551a80
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:buildImprovement]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...4980; Protect Unit 0x7f07c0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+  review: imported
 - addr: 0x7eb0f0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:concurrentChild]
+  impl: [cpu/core/behaviorTree.ts:concurrentChild, cpu/core/behaviorTree.ts:concurrentChild]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ..., Sequence 0x7f3e80 (a child not SUCCESS ends it; RUNNING keeps the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its update 0x7eb210 clears failures and the last good c...
@@ -2492,7 +2674,7 @@
   final: 0x5534a0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:i]
+  impl: [cpu/core/behaviorTree.ts:i, cpu/core/behaviorTree.ts:i]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...ING keeps the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Lim...
@@ -2500,8 +2682,10 @@
 - addr: 0x7f1500
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:contractManager]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  impl: [ai/major/operations/nodes.ts:contractManager, cpu/core/aiCityTrees.ts:contractManager]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - ...ter 0x7f1620 (update 0x7f21c0; the limit at the game speed, 0x5254d0), Contract Manager 0x7f1500 (update 0x7f17a0, each contract's check 0x7f2220).
   review: imported
@@ -2509,7 +2693,7 @@
   final: 0x559460
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:passChild]
+  impl: [cpu/core/behaviorTree.ts:passChild, cpu/core/behaviorTree.ts:passChild]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Limiter 0x7f1620 (update 0x7f21c0; the limit at the game speed, 0x5254d0), Contra...
@@ -2518,7 +2702,7 @@
   final: 0x5594b0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:notChild]
+  impl: [cpu/core/behaviorTree.ts:notChild, cpu/core/behaviorTree.ts:notChild]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...res, Exit on Success; its update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Limiter 0x7f1620 (update 0x7f21c0; the limit at the game...
@@ -2550,6 +2734,17 @@
     - ...Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner 0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f00...
     - "- IN DIFFICULTY RANGE (0x7f1d70): the opponent's handicap (Apply to opponent) below Low or above High: the child skippe..."
   review: reviewed
+- addr: 0x7f1fa0
+  final: 0x559e40
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:hasPlayerAbility]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+  review: imported
 - addr: 0x7f21c0
   kind: function
   status: PARTLY
@@ -2561,17 +2756,24 @@
 - addr: 0x7f2220
   final: 0x55a030
   kind: function
-  status: PARTLY
-  impl: [ai/major/operations/nodes.ts:over]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: the contract check
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 93
+      value: Granada's contract 236 gone past its limit with no FAILED line
+  impl: [ai/major/operations/nodes.ts:over, cpu/core/aiCityTrees.ts:checkContract]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - ...ame speed, 0x5254d0), Contract Manager 0x7f1500 (update 0x7f17a0, each contract's check 0x7f2220).
-  review: imported
+  review: reviewed
 - addr: 0x7f2390
   final: 0x55a1a0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:priorityChild]
+  impl: [cpu/core/behaviorTree.ts:priorityChild, cpu/core/behaviorTree.ts:priorityChild]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "- Parent functions: Priority 0x7f2390 (first SUCCESS or RUNNING child ends it), Sequence 0x7f3e80 (a child not SUCCESS ends i..."
@@ -2588,10 +2790,43 @@
   final: 0x55b880
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:sequenceChild]
+  impl: [cpu/core/behaviorTree.ts:sequenceChild, cpu/core/behaviorTree.ts:sequenceChild]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...Parent functions: Priority 0x7f2390 (first SUCCESS or RUNNING child ends it), Sequence 0x7f3e80 (a child not SUCCESS ends it; RUNNING keeps the resume), Concurrent 0x7eb0f0 (Max Failu..."
+  review: imported
+- addr: 0x7f4240
+  final: 0x55ba40
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:buildUnit]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...y contract it holds is alive); Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 a..."
+  review: imported
+- addr: 0x7f4980
+  final: 0x55c160
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:cancelContract]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...bove it); Check Plot 0x7f6ea0; Find Available Unit 0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e...
+  review: imported
+- addr: 0x7f5200
+  final: 0x559440
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:cancelContract]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...alue 20.0 above it); Check Plot 0x7f6ea0; Find Available Unit 0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Impro...
   review: imported
 - addr: 0x7f5240
   final: 0x55c8e0
@@ -2601,6 +2836,44 @@
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...: the free units, then the units of the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a1..."
+  review: imported
+- addr: 0x7f6820
+  final: 0x55db70
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:purchasePlot]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...nit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+  review: imported
+- addr: 0x7ffdd0
+  final: 0x5639b0
+  kind: function
+  name: the tree manager tick
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 9
+      value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
+  impl: [cpu/core/aiCityTrees.ts:tickCityTrees]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  context:
+    - "...is empty, then TryPurchaseUnits 0x68be60 over the city's units; the tree manager's tick 0x7ffdd0; tactical). A city founded during the turn exists for C only: the Default Specializatio..."
+    - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or who..."
+  review: reviewed
+- addr: 0x800590
+  final: 0x564020
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:freeSlots]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...680: the in-hand contract's check 0x5d7e00, the slots freed of trees no longer running (0x800590), the analysis the turn's job wrote (0x5ce910 -> 0x5ce970 per plot; no direct caller) r..."
   review: imported
 - addr: 0x800c60
   final: 0x564650
@@ -3384,6 +3657,16 @@
   context:
     - "...(+0x2e0) and its district (0x810d0) has DistrictInfo +0x58 set — the HitPoints column (0xabfc20, Districts column 0x16; the install: CITY_CENTER 200, ENCAMPMENT 100, IKANDA 100). Ag..."
   review: imported
+- addr: 0xac6bb0
+  final: 0x7c1ee0
+  kind: function
+  name: the Improvements row loader
+  status: PARTLY
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...), the value 0x7a58f0(impr, rate, T, horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34, Dispe..."
+  review: reviewed
 - addr: 0xad5010
   final: 0x7d04a0
   kind: function

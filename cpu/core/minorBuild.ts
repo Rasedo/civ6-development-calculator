@@ -1311,6 +1311,11 @@ export function minorPickFacts(state: GameState, cityState: CityState, facts: Ci
       return inHand === b || (!!id && held.includes(id));
     },
     canConstruct: (b) => constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]),
+    reasonsClear: (b) => {
+      const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!];
+      if (row.district && !facts.hasDistrict(row.district)) return false;
+      return !row.prereqs.length || row.prereqs.some((p) => facts.hasBuilding(p));
+    },
     canTrain: (u) => {
       const id = engineId('unit', u, 'UNIT_', UNITS);
       const d = id ? UNITS[id] : undefined;

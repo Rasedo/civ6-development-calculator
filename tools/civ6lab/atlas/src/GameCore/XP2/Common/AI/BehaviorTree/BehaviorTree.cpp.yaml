@@ -3,14 +3,36 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7cb2e0
+  final: 0x53ff60
+  kind: function
+  name: the finished tree destroy
+  status: PARTLY
+  cases:
+    - recording: 1121
+      turn: 9
+      value: "A tree one of whose units its own orders   spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the   next Builder contract t10;"
+  impl: [cpu/core/aiCityTrees.ts:tickCityTrees]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  context:
+    - "- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a loop destroys a tree whose +0x368 is set or whose +0x308 is set with its root ne..."
+  review: reviewed
 - addr: 0x7cb3d0
   final: 0x53ffe0
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:BT_OK]
+  impl: [cpu/core/tactical.ts:BT_OK, cpu/core/behaviorTree.ts:AiTreeNode]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
+  review: imported
+- addr: 0x7cb8b0
+  final: 0x5401d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:treeContract]
+  notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7cbca0
   final: 0x5405c0
@@ -18,6 +40,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th..."
@@ -26,16 +49,30 @@
   final: 0x543210
   kind: function
   status: PARTLY
+  impl: [cpu/core/behaviorTree.ts:AiTreeNode]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7d1750
   final: 0x5432a0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:propagate]
+  impl:
+    - cpu/core/behaviorTree.ts:propagate
+    - cpu/core/behaviorTree.ts:AiTreeNode
+    - cpu/core/behaviorTree.ts:propagate
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...val / Naval Choose Target: the index their update stored) and the parent propagation's (0x7d1750: a finished child tells its parent's function, @f2ed70, which may finish the parent and..."
+  review: imported
+- addr: 0x7d22f0
+  final: 0x543b70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ILED past the turn limit through the holder +0xa8 (0x731d10), removes it from the tree (0x7d22f0) and releases it (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's he...
   review: imported
 - addr: 0x7d3a00
   final: 0x544360
@@ -51,9 +88,11 @@
     - cpu/core/tactical.ts:raidTick
     - gpu/core/sim_tactics.py:_barb_op_trees
     - cpu/core/tactical.ts:BT_OK
+    - cpu/core/behaviorTree.ts:AiTreeNode
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - "- The tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKI..."
   review: reviewed
@@ -61,6 +100,7 @@
   final: 0x544530
   kind: function
   status: PARTLY
+  impl: [cpu/core/behaviorTree.ts:AiTreeNode]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...e tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKIPPED parent skips it), the walk's next node the larger of its own next (Sequence..."

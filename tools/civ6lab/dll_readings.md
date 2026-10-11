@@ -3915,6 +3915,154 @@ AI's PROJECTS table (0x5ce970) and the research value's projects.
   district projects 0..148 moving with the city's yields (Industrial Zone
   50.86..87.0); Manhattan 337.7..8884.5; the nuclear device 134..379.
 
+## C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread
+
+Ported in `cpu/core/aiCityTrees.ts` (the events, the trees' nodes, the
+tick), `cpu/core/aiContracts.ts` (the contracts) and the interpreter
+`cpu/core/behaviorTree.ts` (shared with the majors' operations); the trees
+generated into `cpu/data/aiCityTrees.ts` by
+`tools/install/ai_operation_tables.py`. Measured by
+`cpu/harness/cityContractLab.ts` against AI_CityBuild.csv's contract and
+queue lines of the five verbose duels (runs/h1_duelv11{17,21,24,27,28}):
+SUBMITTED 259 exact, 8 at another value, 75 a turn or two apart of 434
+logged; queue lines 133 of 179; COMPLETED 127 of 156 (the rest: the
+operations' contracts, the improvement values below, the purchases).
+
+- The turn (the Control Manager 0x6096c0): per player list B (governors,
+  research 0x760980, the Economic AI 0x687bf0 with its purchases,
+  military), then A (the cities 0x5c2650 -> 0x5ce680), then C (the second
+  city hook 0x5c2610 -> 0x5ce5b0: the Default Specialization where the
+  queue is empty, then TryPurchaseUnits 0x68be60 over the city's units;
+  the tree manager's tick 0x7ffdd0; tactical). A city founded during the
+  turn exists for C only: the Default Specialization, no events.
+- The city's update 0x5ce680: the in-hand contract's check 0x5d7e00, the
+  slots freed of trees no longer running (0x800590), the analysis the
+  turn's job wrote (0x5ce910 -> 0x5ce970 per plot; no direct caller) read by
+  the improvement pick 0x5c9a00 (CityBuildAI +0x648; the log 0x5d4030
+  prints the same evaluations), the events: defence 0x5cced0 (slot 5),
+  building or unit 0x5cd150 (slot 1), district 0x5cc910 (slot 2),
+  improvement 0x5ccc10 (slot 3), 0x5cd4e0; then 0x5d4d70 where the queue
+  is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event,
+  never ticked there: no city-tree contract of the five logs is SUBMITTED
+  and queued in one turn.
+- The district choice 0x5d0c20 ("City Build District Choice"): over the
+  evaluations with +0x55 and +0x5a or +0x57 (an adjacent plot of the
+  player's, 0x5ceb67), the district valued above the plot's reservation;
+  an equal value draws 2 and a 1 takes it. The majors' cities draw first:
+  a turn's last draws are the city-states' (1127 t2: three draws, Hattusa's
+  tie the second).
+- The tree manager's tick 0x7ffdd0: each tree 0x7d3a00, then 0x7cb2e0 in a
+  loop destroys a tree whose +0x368 is set or whose +0x308 is set with its
+  root neither RUNNING nor FRESH. A tree one of whose units its own orders
+  spent ends that tick (1121 t9 Hunza's last charge on a Rainforest: the
+  next Builder contract t10; the abort's writer unread).
+- A contract (vtable 0xd5b948; progress +0x100: 1 CLAIMED, 2 SUBMITTED, 3
+  ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCELLED, 7 COMPLETED) lives while
+  a tree holds it or a city has it in hand: the Contract Manager's check
+  0x7f2220 sets FAILED past the turn limit through the holder +0xa8
+  (0x731d10), removes it from the tree (0x7d22f0) and releases it
+  (0x600b00); a city's list +0x3a8 holds weak handles, and 0x5d4d70's head
+  skips an emptied one without a line (the five logs print 8 FAILED lines).
+- The submission 0x60bb50: SUBMITTED, then the player's signal +0x270
+  runs each city's listener 0x5d6050 in city order: a city that may take
+  it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and
+  clears its production (0x175d10) where the value passes CityBuildAI
+  +0xa48 and the production was set this turn or the last (city +0x2600);
+  any taker makes it ACCEPTED. 0x5d4d70's head: an ACCEPTED contract the
+  city may take is valued (vt +0x68 0x5f5d50: the higher of its value and
+  the city's analysis value; districts always "producing") and held in hand
+  (+0x398) where higher; any other logs its line (vt +0xa8 0x5f4cd0) and
+  leaves; the hand takes the turn where its value is at least the best
+  unit's less 1.0 and the best project's (the defensive pick's project 0),
+  queued by vt +0x38 0x5f3710 (IN PROGRESS, bound to the city, the
+  completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's
+  refusal FAILED, no line). The in-hand check 0x5d7e00: not eligible
+  CANCELLED and the production cleared, not producing FAILED.
+- The nodes (registration 0x7cbca0, names 0x7db850): Decode Trigger
+  0x7f2970; Contract Manager 0x7f17a0 (parent 0x7f1500; a counter +0x50
+  over the turn limit, reset when every contract it holds is alive);
+  Add Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240;
+  Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a
+  value 20.0 above it); Check Plot 0x7f6ea0; Find Available Unit
+  0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0;
+  Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670;
+  Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+- A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
+  research (AI_Research.csv prints it alive while RESEARCHING), CLAIMED
+  off it, COMPLETED when held. The AI's view at turn T: the record of T,
+  plus what the player's turn start completes (the research's tech or
+  civic, the buildings built, the units trained and bought); the districts
+  placed as the record of T has them, refused for good only complete.
+
+## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired
+
+Ported in `cpu/core/aiPlotValue.ts`; measured by
+`cpu/harness/plotValueLab.ts` on every IMPROVEMENTS row the five verbose
+duels print (a plot whose row is all 0 the analysis skipped): 66,566 of
+140,000 within 0.01 (Lumber Mill 9,401 of 9,634, Quarry 2,174 of 2,484,
+Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
+49,067; Fort, Airstrip and the uniques far).
+
+- The analysis (0x5ce970): per improvement in database order, FX(-9999)
+  where 0x35ede0 refuses the player or 0x35fd60 the plot; else T = max(the
+  research AI's turns 0x7610e0 to PrereqTech +0x160, the civics AI's
+  0x621920 to PrereqCivic +0x158), the value 0x7a58f0(impr, rate, T,
+  horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT
+  alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34,
+  DispersalGold +0x38, GrantFortification +0x3c, Housing +0x40,
+  MovementChange +0x44, YieldFromAppealPercent +0x60; lists Adjacencies
+  +0x110, Tourism +0x168, ValidBuildUnits +0x1b8 (ConsumesCharge +0x28
+  bit 0), ValidFeatures +0x1d0, ValidResources +0x1e8 (MustRemoveFeature
+  +0x28 bit 0), YieldChanges +0x218, YieldFromAppeal +0x230.
+- 0x7a58f0: T at or past the horizon FX(-9999); the build unit 0x7a2e20
+  (ValidBuildUnits: the player's own version, the cheapest by its current
+  cost 0x4f2b20, 0 for one spending no charge; none FX(-9999)); the charge
+  = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue
+  with no player, discounted T (1127 t2: a 25 Builder's 8). The plot's own
+  improvement: 0 unpillaged, its repair pillaged. Another improvement: its
+  resource value and 0x7b1320 off. A resource the improvement does not
+  list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0;
+  one it lists keeps the feature where MustRemoveFeature is false. A
+  feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable.
+  Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (1 copy; a
+  stockpiled resource's count by 0x7a2140, unread).
+- 0x7a3010: Feature_Removes' rows escalated x + (10x - x) n / 100, n the
+  larger of the civics and techs held (0x5267a0 type 1, GlobalParameters
+  +0x37c), at the speed (0x5254d0), at DefaultValue, discounted T; less a
+  Builder's charge (the unit by hash 0x11d57532) and Feature_YieldChanges
+  at DefaultValue (Appeal x 0.5 Food more where a neighbour holds a
+  district with Housing, 0x79e140; Districts +0x40 Housing) from T to H.
+  0x7a37d0: Resource_Harvests at DefaultValue discounted T, less a charge
+  and Resource_YieldChanges from T to H.
+- 0x7b1320: T >= H FX(-9999); a drought hitting it 0; the XP2 river manager
+  (0xa2cbf0 / 0xa2af70: 100 over the summed flood chances of the rivers
+  whose floodplains hold the plot) and the feature manager (0xa1cc70, its
+  +0x28 / +0x98: a volcano beside the plot) cut H to their turns, H <= T
+  0 (LAB: the logs fit a flood in 1 turn on an unrevealed flood river's
+  floodplains and an eruption in 31 beside a volcano; the computations
+  unread). A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges
+  and, per adjacency row, its yield's whole adjacency (0x365ae0; a Farm's
+  three Food rows count it three times), YieldFromAppeal at the plot's
+  Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0);
+  Improvement_Tourism at PSEUDOYIELD_TOURISM x the era factor;
+  min(max(n, 1), DefenseModifier) + min(n, GrantFortification), n by
+  0x3dfae0 (unread); the Barbarian Clans traps' properties
+  (PLOT_DAMAGE_TO_WALKING_INTO / _ADJACENT, hashes 0x7d27db83 /
+  0x8634aa0f); x3 where a build unit spends no charge. PV(H) - PV(T); the
+  Housing over TilesRequired at the housing value 0x7a3d70; where the
+  civics' list +0x1380 holds the improvement (0x39de20) the claimed plots
+  0x7a10c0 (each neighbour within 3 of the city another owns, without a
+  wonder or district: its purchase cost 0x1b1cb0 x 0.5 Gold discounted T,
+  0x79f0c0); its modifiers 0x7a4b20; at the top level its neighbours'
+  improvements and districts revalued with it (0x79ed40). Unported: the
+  tourism, defence, claims, modifiers and neighbours terms; the 1127 Farm
+  misses are mostly a constant +10 to +16 over turns 10..25 the housing or
+  modifiers term owes.
+- The research AI's turns (0x7610e0): the entry's turns plus its +0x528,
+  the turns left on the research as its last turn wrote them; a city
+  founded the turn before reads -1 (1127 t2: the minors' Mines at T 4 of
+  Mining's 5).
+
 ## H-1: the research AI — READ (the choice), PARTLY READ (the value)
 
 AI/Research.cpp. The object (the player's +0x12a8) keeps one 0x50-byte entry
@@ -5509,7 +5657,7 @@ moves in the turn they were made.
 
 The majors' operations run AiOperationDefs.BehaviorTree trees
 (BehaviorTreeNodes / TreeData, the game DB's order) through
-BehaviorTree.cpp; ported in `ai/major/operations/bt.ts` (the interpreter)
+BehaviorTree.cpp; ported in `cpu/core/behaviorTree.ts` (the interpreter)
 and `nodes.ts` (the nodes); the tables generated by
 `tools/install/ai_operation_tables.py` (checked against
 DebugGameplay.sqlite).

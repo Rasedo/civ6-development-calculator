@@ -27,7 +27,10 @@
     - cpu/core/yields.ts:districtAdjacency
     - gpu/core/sim_economy.py:_adj_district_count
     - gpu/core/sim_seats.py:_imp_adjacency
-  readings: ["H-1: the district adjacency — READ"]
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - ...ia 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "...plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER..."

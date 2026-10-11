@@ -62,17 +62,6 @@ export interface AiTeamReq {
   dependence: string | null;
 }
 
-export interface AiTreeNode {
-  id: number;
-  type: string;
-  /** NodeDefinitions.ShapeId: 0 selector, 1 action, 2 decision, 3 decorator */
-  shape: number;
-  /** the node after this one's subtree, -1 for a leaf */
-  jumpTo: number;
-  /** TreeData by DataName: its default and its blackboard tag */
-  data: Readonly<Record<string, { defn: number; value?: string; tag?: string }>>;
-}
-
 export interface AiTriggeredTree {
   trigger: string;
   tree: string;

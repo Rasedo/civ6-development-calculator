@@ -6,9 +6,16 @@
 - addr: 0x7f2970
   final: 0x55a680
   kind: function
-  status: PARTLY
-  impl: [ai/major/operations/nodes.ts:decodeTrigger]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: Decode Trigger
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 2
+      value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
+  impl: [ai/major/operations/nodes.ts:decodeTrigger, cpu/core/aiCityTrees.ts:decodeTrigger]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - "- Leaves READ: Decode Trigger 0x7f2970; Operation Change Target 0x8196d0 (INVALID -> the backup of the same kind, else \"No bac..."
-  review: imported
+  review: reviewed

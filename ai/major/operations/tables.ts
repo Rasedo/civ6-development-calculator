@@ -5,7 +5,8 @@
  * trees the operations run, the unit AI types and the triggered trees, each
  * in the order the game's loader queries read them. Do not edit.
  */
-import type { AiOpDef, AiOpLimitList, AiOpList, AiOpTeam, AiTeamReq, AiTreeNode, AiTriggeredTree } from './types';
+import type { AiOpDef, AiOpLimitList, AiOpList, AiOpTeam, AiTeamReq, AiTriggeredTree } from './types';
+import type { AiTreeNode } from '../../../cpu/core/behaviorTree';
 
 export const AI_OP_DEFS: Readonly<Record<string, AiOpDef>> = {
  "Attack Barb Camp": {

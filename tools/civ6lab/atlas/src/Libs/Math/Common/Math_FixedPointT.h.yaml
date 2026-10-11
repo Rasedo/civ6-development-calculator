@@ -320,6 +320,18 @@
   context:
     - ...turn before logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T). 0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x52...
   review: imported
+- addr: 0x79ed40
+  final: 0x526bc0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...0x7a4b20; at the top level its neighbours' improvements and districts revalued with it (0x79ed40). Unported: the tourism, defence, claims, modifiers and neighbours terms; the 1127 Farm..."
+  review: imported
 - addr: 0x79f7c0
   final: 0x5272a0
   kind: function

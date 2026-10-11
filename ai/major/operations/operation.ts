@@ -10,7 +10,7 @@
  */
 import { AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from './tables';
 import type { AiOpDef, AiOpTeam, AiTeamReq } from './types';
-import type { BtRun } from './bt';
+import type { BtRun } from '../../../cpu/core/behaviorTree';
 import type { MajorUnitView, MajorView } from '../view';
 
 export const NO_PLOT = -1;

@@ -5,7 +5,7 @@
  * index the AI's value tables run in — with the columns and child rows
  * the values and the Default Specialization pick read.
  */
-import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';
+import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiUnitRow } from '../core/aiCityBuild';
 import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';
 
 export const AI_BUILDINGS: readonly AiBuildingRow[] = [
@@ -15143,280 +15143,604 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_CATTLE",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_COPPER",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_GOLD",
+    40
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_CRABS",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_GOLD",
+    40
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_DEER",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_PRODUCTION",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_FISH",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_RICE",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SHEEP",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_STONE",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_PRODUCTION",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_WHEAT",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_CITRUS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_COCOA",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ]
  },
  {
   "type": "RESOURCE_COFFEE",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_COTTON",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ]
  },
  {
   "type": "RESOURCE_DIAMONDS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ]
  },
  {
   "type": "RESOURCE_DYES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_FURS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_GYPSUM",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_INCENSE",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_IVORY",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_JADE",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_MARBLE",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_MERCURY",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_PEARLS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SALT",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SILK",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SILVER",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SPICES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_SUGAR",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_TEA",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_TOBACCO",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_TRUFFLES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ]
  },
  {
   "type": "RESOURCE_WHALES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_WINE",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_JEANS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_PERFUME",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 6,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_COSMETICS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_TOYS",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_CINNAMON",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 6,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_CLOVES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 6,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_ALUMINUM",
@@ -15430,6 +15754,13 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_HELICOPTER",
    "UNIT_JET_FIGHTER",
    "UNIT_JET_BOMBER"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
   ]
  },
  {
@@ -15441,6 +15772,13 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_IRONCLAD",
    "UNIT_BATTLESHIP",
    "UNIT_BRAZILIAN_MINAS_GERAES"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
   ]
  },
  {
@@ -15459,6 +15797,17 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_HUNGARY_HUSZAR",
    "UNIT_COLOMBIAN_LLANERO",
    "UNIT_ETHIOPIAN_OROMO_CAVALRY"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
   ]
  },
  {
@@ -15482,6 +15831,13 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_CUIRASSIER",
    "UNIT_MALI_MANDEKALU_CAVALRY",
    "UNIT_BYZANTINE_TAGMA"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
   ]
  },
  {
@@ -15499,6 +15855,17 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_LINE_INFANTRY",
    "UNIT_DE_ZEVEN_PROVINCIEN",
    "UNIT_SULEIMAN_JANISSARY"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
   ]
  },
  {
@@ -15517,6 +15884,13 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
    "UNIT_ROCKET_ARTILLERY",
    "UNIT_MISSILE_CRUISER",
    "UNIT_MODERN_ARMOR"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    3
+   ]
   ]
  },
  {
@@ -15526,6 +15900,13 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "peakEra": null,
   "units": [
    "UNIT_GIANT_DEATH_ROBOT"
+  ],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
   ]
  },
  {
@@ -15533,49 +15914,97 @@ export const AI_RESOURCES: readonly AiResourceRow[] = [
   "class": "RESOURCECLASS_ARTIFACT",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_SHIPWRECK",
   "class": "RESOURCECLASS_ARTIFACT",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": []
  },
  {
   "type": "RESOURCE_AMBER",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_OLIVES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_TURTLES",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ]
  },
  {
   "type": "RESOURCE_MAIZE",
   "class": "RESOURCECLASS_BONUS",
   "happiness": 0,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [
+   [
+    "YIELD_GOLD",
+    40
+   ]
+  ],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ]
  },
  {
   "type": "RESOURCE_HONEY",
   "class": "RESOURCECLASS_LUXURY",
   "happiness": 4,
   "peakEra": null,
-  "units": []
+  "units": [],
+  "harvests": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ]
  }
 ];
 
@@ -15586,7 +16015,26 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_BARBARIAN",
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FOREST",
+   "FEATURE_JUNGLE",
+   "FEATURE_MARSH",
+   "FEATURE_VOLCANIC_SOIL",
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_FARM",
@@ -15598,6 +16046,43 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_RICE",
    "RESOURCE_WHEAT",
    "RESOURCE_MAIZE"
+  ],
+  "keepsFeature": [
+   "RESOURCE_RICE"
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS",
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_PRODUCTION"
   ]
  },
  {
@@ -15619,6 +16104,42 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_NITER",
    "RESOURCE_URANIUM",
    "RESOURCE_AMBER"
+  ],
+  "keepsFeature": [
+   "RESOURCE_DIAMONDS",
+   "RESOURCE_ALUMINUM",
+   "RESOURCE_COAL",
+   "RESOURCE_NITER",
+   "RESOURCE_URANIUM",
+   "RESOURCE_AMBER"
+  ],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ],
+   [
+    "YIELD_SCIENCE",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_SCIENCE"
   ]
  },
  {
@@ -15631,7 +16152,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_GYPSUM",
    "RESOURCE_MARBLE",
    "RESOURCE_STONE"
-  ]
+  ],
+  "keepsFeature": [
+   "RESOURCE_GYPSUM",
+   "RESOURCE_MARBLE",
+   "RESOURCE_STONE"
+  ],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_FISHING_BOATS",
@@ -15646,6 +16196,40 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_WHALES",
    "RESOURCE_AMBER",
    "RESOURCE_TURTLES"
+  ],
+  "keepsFeature": [
+   "RESOURCE_FISH",
+   "RESOURCE_TURTLES"
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_PRODUCTION"
   ]
  },
  {
@@ -15658,6 +16242,37 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_CATTLE",
    "RESOURCE_SHEEP",
    "RESOURCE_HORSES"
+  ],
+  "keepsFeature": [
+   "RESOURCE_CATTLE",
+   "RESOURCE_SHEEP",
+   "RESOURCE_HORSES"
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_PRODUCTION"
   ]
  },
  {
@@ -15681,6 +16296,53 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_TOBACCO",
    "RESOURCE_WINE",
    "RESOURCE_OLIVES"
+  ],
+  "keepsFeature": [
+   "RESOURCE_BANANAS",
+   "RESOURCE_CITRUS",
+   "RESOURCE_COCOA",
+   "RESOURCE_COFFEE",
+   "RESOURCE_COTTON",
+   "RESOURCE_DYES",
+   "RESOURCE_INCENSE",
+   "RESOURCE_SILK",
+   "RESOURCE_SPICES",
+   "RESOURCE_SUGAR",
+   "RESOURCE_TEA",
+   "RESOURCE_TOBACCO",
+   "RESOURCE_WINE",
+   "RESOURCE_OLIVES"
+  ],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_PRODUCTION",
+   "YIELD_PRODUCTION"
   ]
  },
  {
@@ -15695,7 +16357,42 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
    "RESOURCE_IVORY",
    "RESOURCE_TRUFFLES",
    "RESOURCE_HONEY"
-  ]
+  ],
+  "keepsFeature": [
+   "RESOURCE_DEER",
+   "RESOURCE_FURS",
+   "RESOURCE_IVORY",
+   "RESOURCE_TRUFFLES",
+   "RESOURCE_HONEY"
+  ],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_LUMBER_MILL",
@@ -15703,7 +16400,31 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FOREST",
+   "FEATURE_JUNGLE"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_GOODY_HUT",
@@ -15711,7 +16432,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FOREST",
+   "FEATURE_JUNGLE",
+   "FEATURE_MARSH",
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_OIL_WELL",
@@ -15721,7 +16460,30 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "buildable": false,
   "resources": [
    "RESOURCE_OIL"
-  ]
+  ],
+  "keepsFeature": [
+   "RESOURCE_OIL"
+  ],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_OFFSHORE_OIL_RIG",
@@ -15731,7 +16493,30 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "buildable": false,
   "resources": [
    "RESOURCE_OIL"
-  ]
+  ],
+  "keepsFeature": [
+   "RESOURCE_OIL"
+  ],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_FORT",
@@ -15739,7 +16524,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 4,
+  "grantFortification": 2,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_MILITARY_ENGINEER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_AIRSTRIP",
@@ -15747,7 +16550,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_MILITARY_ENGINEER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_BEACH_RESORT",
@@ -15755,7 +16576,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": "YIELD_GOLD",
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_MISSILE_SILO",
@@ -15763,7 +16602,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_MILITARY_ENGINEER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_CHATEAU",
@@ -15771,7 +16628,40 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_HUMANISM",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_CHATEAU",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    2
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_CULTURE",
+   "YIELD_CULTURE",
+   "YIELD_GOLD"
+  ]
  },
  {
   "type": "IMPROVEMENT_COLOSSAL_HEAD",
@@ -15779,7 +16669,39 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_LA_VENTA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    2
+   ],
+   [
+    "YIELD_CULTURE",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH"
+  ]
  },
  {
   "type": "IMPROVEMENT_GREAT_WALL",
@@ -15787,7 +16709,37 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_GREAT_WALL",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_CULTURE",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 4,
+  "grantFortification": 2,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_GOLD",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_KURGAN",
@@ -15795,7 +16747,35 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_KURGAN",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    3
+   ],
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FAITH",
+   "YIELD_FAITH"
+  ]
  },
  {
   "type": "IMPROVEMENT_MISSION",
@@ -15803,7 +16783,43 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MISSION",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    2
+   ],
+   [
+    "YIELD_SCIENCE",
+    0
+   ],
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_SCIENCE",
+   "YIELD_SCIENCE"
+  ]
  },
  {
   "type": "IMPROVEMENT_ROMAN_FORT",
@@ -15811,7 +16827,25 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 4,
+  "grantFortification": 2,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_ROMAN_LEGION",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_SPHINX",
@@ -15819,7 +16853,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_CRAFTSMANSHIP",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_SPHINX",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ],
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_STEPWELL",
@@ -15827,7 +16890,32 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_STEPWELL",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_FAITH",
+    0
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_ZIGGURAT",
@@ -15835,7 +16923,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ZIGGURAT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    0
+   ],
+   [
+    "YIELD_SCIENCE",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_KAMPUNG",
@@ -15843,7 +16960,34 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_KAMPUNG",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD"
+  ]
  },
  {
   "type": "IMPROVEMENT_ALCAZAR",
@@ -15851,7 +16995,28 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_GRANADA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": "YIELD_SCIENCE",
+  "appealPct": 50,
+  "defenseModifier": 4,
+  "grantFortification": 2,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_MONASTERY",
@@ -15859,7 +17024,30 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_ARMAGH_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    2
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FAITH"
+  ]
  },
  {
   "type": "IMPROVEMENT_PYRAMID",
@@ -15867,7 +17055,58 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_PYRAMID",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    2
+   ],
+   [
+    "YIELD_FOOD",
+    2
+   ],
+   [
+    "YIELD_SCIENCE",
+    0
+   ],
+   [
+    "YIELD_CULTURE",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_SCIENCE",
+   "YIELD_GOLD",
+   "YIELD_GOLD",
+   "YIELD_FAITH",
+   "YIELD_PRODUCTION",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_PAIRIDAEZA",
@@ -15875,7 +17114,37 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_EARLY_EMPIRE",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_PAIRIDAEZA",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_GOLD",
+   "YIELD_GOLD",
+   "YIELD_CULTURE",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_OUTBACK_STATION",
@@ -15883,7 +17152,36 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_GUILDS",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_OUTBACK_STATION",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ],
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_PRODUCTION",
+   "YIELD_FOOD"
+  ]
  },
  {
   "type": "IMPROVEMENT_CHEMAMULL",
@@ -15891,7 +17189,28 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_CRAFTSMANSHIP",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_CHEMAMULL",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": "YIELD_CULTURE",
+  "appealPct": 75,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_GOLF_COURSE",
@@ -15899,7 +17218,35 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_REFORMED_CHURCH",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_GOLF_COURSE",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_CULTURE",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_MEKEWAP",
@@ -15907,7 +17254,40 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MEKEWAP",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ],
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    0
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_GOLD"
+  ]
  },
  {
   "type": "IMPROVEMENT_POLDER",
@@ -15915,7 +17295,40 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_GUILDS",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_POLDER",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_PRODUCTION"
+  ]
  },
  {
   "type": "IMPROVEMENT_FISHERY",
@@ -15923,7 +17336,34 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_NO_PLAYER",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD"
+  ]
  },
  {
   "type": "IMPROVEMENT_CITY_PARK",
@@ -15931,7 +17371,28 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_GAMES_RECREATION",
   "trait": "TRAIT_CIVILIZATION_NO_PLAYER",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_GEOTHERMAL_PLANT",
@@ -15939,7 +17400,34 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ],
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_GEOTHERMAL_FISSURE"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_SOLAR_FARM",
@@ -15947,7 +17435,32 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_WIND_FARM",
@@ -15955,7 +17468,32 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_OFFSHORE_WIND_FARM",
@@ -15963,7 +17501,28 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_SEASTEAD",
@@ -15971,7 +17530,39 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    0
+   ],
+   [
+    "YIELD_FOOD",
+    2
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 4,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_PRODUCTION",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_MOAI",
@@ -15979,7 +17570,33 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_RAPA_NUI_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_CULTURE",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_MOUND",
@@ -15987,7 +17604,39 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_CAHOKIA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    3
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FLOODPLAINS",
+   "FEATURE_FLOODPLAINS_GRASSLAND",
+   "FEATURE_FLOODPLAINS_PLAINS"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD"
+  ]
  },
  {
   "type": "IMPROVEMENT_NAZCA_LINE",
@@ -15995,7 +17644,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_NAZCA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_SKI_RESORT",
@@ -16003,7 +17668,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_PROFESSIONAL_SPORTS",
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_MOUNTAIN_TUNNEL",
@@ -16011,7 +17692,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_MILITARY_ENGINEER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_OPEN_AIR_MUSEUM",
@@ -16019,7 +17716,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_NATIONALISM",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_OPEN_AIR_MUSEUM",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_ICE_HOCKEY_RINK",
@@ -16027,7 +17740,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_COLONIALISM",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ICE_HOCKEY_RINK",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    0
+   ],
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_CULTURE",
+   "YIELD_CULTURE",
+   "YIELD_CULTURE",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_TERRACE_FARM",
@@ -16035,7 +17782,43 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_TERRACE_FARM",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    0
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_PRODUCTION"
+  ]
  },
  {
   "type": "IMPROVEMENT_MAORI_PA",
@@ -16043,7 +17826,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MAORI_PA",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 4,
+  "grantFortification": 2,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_MAORI_TOA",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_MOUNTAIN_ROAD",
@@ -16051,7 +17850,23 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_FOREIGN_TRADE",
   "trait": "TRAIT_LEADER_PACHACUTI_IMPROVEMENT_MOUNTAIN_ROAD",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_BATEY",
@@ -16059,7 +17874,33 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_CAGUANA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_CULTURE",
+   "YIELD_CULTURE",
+   "YIELD_CULTURE",
+   "YIELD_CULTURE"
+  ]
  },
  {
   "type": "IMPROVEMENT_HACIENDA",
@@ -16067,7 +17908,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_MERCANTILISM",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_HACIENDA",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FOOD",
+    0
+   ],
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 1,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FOOD",
+   "YIELD_FOOD",
+   "YIELD_PRODUCTION",
+   "YIELD_PRODUCTION"
+  ]
  },
  {
   "type": "IMPROVEMENT_METEOR_GOODY",
@@ -16075,7 +17950,22 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": null,
   "buildable": false,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_FOREST",
+   "FEATURE_JUNGLE",
+   "FEATURE_MARSH"
+  ],
+  "buildUnits": [],
+  "adjacency": []
  },
  {
   "type": "IMPROVEMENT_ROCK_HEWN_CHURCH",
@@ -16083,7 +17973,41 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": "CIVIC_DRAMA_POETRY",
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ROCK_HEWN_CHURCH",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_FAITH",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [
+   "FEATURE_VOLCANIC_SOIL"
+  ],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH",
+   "YIELD_FAITH"
+  ]
  },
  {
   "type": "IMPROVEMENT_MAHAVIHARA",
@@ -16091,7 +18015,37 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_NALANDA_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    2
+   ],
+   [
+    "YIELD_FAITH",
+    0
+   ]
+  ],
+  "housing": 2,
+  "tilesRequired": 2,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_SCIENCE",
+   "YIELD_SCIENCE",
+   "YIELD_FAITH",
+   "YIELD_FAITH"
+  ]
  },
  {
   "type": "IMPROVEMENT_TRADING_DOME",
@@ -16099,7 +18053,30 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "MINOR_CIV_SAMARKAND_TRAIT",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    2
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_BUILDER",
+    true
+   ]
+  ],
+  "adjacency": [
+   "YIELD_GOLD"
+  ]
  },
  {
   "type": "IMPROVEMENT_FEITORIA",
@@ -16107,7 +18084,857 @@ export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
   "civic": null,
   "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_FEITORIA",
   "buildable": true,
-  "resources": []
+  "resources": [],
+  "keepsFeature": [],
+  "yields": [
+   [
+    "YIELD_GOLD",
+    4
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "housing": 0,
+  "tilesRequired": 1,
+  "appealYield": null,
+  "appealPct": 100,
+  "defenseModifier": 0,
+  "grantFortification": 0,
+  "features": [],
+  "buildUnits": [
+   [
+    "UNIT_PORTUGUESE_NAU",
+    true
+   ]
+  ],
+  "adjacency": []
+ }
+];
+
+export const AI_DISTRICTS: readonly AiDistrictRow[] = [
+ {
+  "type": "DISTRICT_CITY_CENTER",
+  "tech": null,
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_HOLY_SITE",
+  "tech": "TECH_ASTROLOGY",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_CAMPUS",
+  "tech": "TECH_WRITING",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_ENCAMPMENT",
+  "tech": "TECH_BRONZE_WORKING",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_HARBOR",
+  "tech": "TECH_CELESTIAL_NAVIGATION",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_AERODROME",
+  "tech": "TECH_FLIGHT",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_COMMERCIAL_HUB",
+  "tech": "TECH_CURRENCY",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_ENTERTAINMENT_COMPLEX",
+  "tech": null,
+  "civic": "CIVIC_GAMES_RECREATION",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_THEATER",
+  "tech": null,
+  "civic": "CIVIC_DRAMA_POETRY",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_INDUSTRIAL_ZONE",
+  "tech": "TECH_APPRENTICESHIP",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_NEIGHBORHOOD",
+  "tech": null,
+  "civic": "CIVIC_URBANIZATION",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_AQUEDUCT",
+  "tech": "TECH_ENGINEERING",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_SPACEPORT",
+  "tech": "TECH_ROCKETRY",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_WONDER",
+  "tech": null,
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_ACROPOLIS",
+  "tech": null,
+  "civic": "CIVIC_DRAMA_POETRY",
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_ACROPOLIS"
+ },
+ {
+  "type": "DISTRICT_BATH",
+  "tech": "TECH_ENGINEERING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_BATH"
+ },
+ {
+  "type": "DISTRICT_HANSA",
+  "tech": "TECH_APPRENTICESHIP",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_HANSA"
+ },
+ {
+  "type": "DISTRICT_LAVRA",
+  "tech": "TECH_ASTROLOGY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_LAVRA"
+ },
+ {
+  "type": "DISTRICT_MBANZA",
+  "tech": null,
+  "civic": "CIVIC_GUILDS",
+  "trait": "TRAIT_CIVILIZATION_MBANZA"
+ },
+ {
+  "type": "DISTRICT_STREET_CARNIVAL",
+  "tech": null,
+  "civic": "CIVIC_GAMES_RECREATION",
+  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL"
+ },
+ {
+  "type": "DISTRICT_ROYAL_NAVY_DOCKYARD",
+  "tech": "TECH_CELESTIAL_NAVIGATION",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_ROYAL_NAVY_DOCKYARD"
+ },
+ {
+  "type": "DISTRICT_IKANDA",
+  "tech": "TECH_BRONZE_WORKING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_IKANDA"
+ },
+ {
+  "type": "DISTRICT_SEOWON",
+  "tech": "TECH_WRITING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_SEOWON"
+ },
+ {
+  "type": "DISTRICT_GOVERNMENT",
+  "tech": null,
+  "civic": "CIVIC_STATE_WORKFORCE",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
+  "tech": null,
+  "civic": "CIVIC_NATURAL_HISTORY",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_WATER_STREET_CARNIVAL",
+  "tech": null,
+  "civic": "CIVIC_NATURAL_HISTORY",
+  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL"
+ },
+ {
+  "type": "DISTRICT_CANAL",
+  "tech": "TECH_STEAM_POWER",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_DAM",
+  "tech": "TECH_BUTTRESS",
+  "civic": null,
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_COTHON",
+  "tech": "TECH_CELESTIAL_NAVIGATION",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_COTHON"
+ },
+ {
+  "type": "DISTRICT_SUGUBA",
+  "tech": "TECH_CURRENCY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_SUGUBA"
+ },
+ {
+  "type": "DISTRICT_OBSERVATORY",
+  "tech": "TECH_WRITING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_OBSERVATORY"
+ },
+ {
+  "type": "DISTRICT_HIPPODROME",
+  "tech": null,
+  "civic": "CIVIC_GAMES_RECREATION",
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_HIPPODROME"
+ },
+ {
+  "type": "DISTRICT_OPPIDUM",
+  "tech": "TECH_IRON_WORKING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_OPPIDUM"
+ },
+ {
+  "type": "DISTRICT_THANH",
+  "tech": "TECH_BRONZE_WORKING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_THANH"
+ },
+ {
+  "type": "DISTRICT_PRESERVE",
+  "tech": null,
+  "civic": "CIVIC_MYSTICISM",
+  "trait": null
+ },
+ {
+  "type": "DISTRICT_DIPLOMATIC_QUARTER",
+  "tech": "TECH_MATHEMATICS",
+  "civic": null,
+  "trait": null
+ }
+];
+
+export const AI_FEATURES: readonly AiFeatureRow[] = [
+ {
+  "type": "FEATURE_FLOODPLAINS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_ICE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 0,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_JUNGLE",
+  "removable": true,
+  "removeTech": "TECH_BRONZE_WORKING",
+  "appeal": -1,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ],
+  "removes": [
+   [
+    "YIELD_PRODUCTION",
+    10
+   ],
+   [
+    "YIELD_FOOD",
+    10
+   ]
+  ]
+ },
+ {
+  "type": "FEATURE_FOREST",
+  "removable": true,
+  "removeTech": "TECH_MINING",
+  "appeal": 1,
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": [
+   [
+    "YIELD_PRODUCTION",
+    20
+   ]
+  ]
+ },
+ {
+  "type": "FEATURE_OASIS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 1,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    3
+   ],
+   [
+    "YIELD_GOLD",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_MARSH",
+  "removable": true,
+  "removeTech": "TECH_IRRIGATION",
+  "appeal": -1,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ]
+  ],
+  "removes": [
+   [
+    "YIELD_FOOD",
+    20
+   ]
+  ]
+ },
+ {
+  "type": "FEATURE_BARRIER_REEF",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    3
+   ],
+   [
+    "YIELD_SCIENCE",
+    2
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_CLIFFS_DOVER",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 4,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    3
+   ],
+   [
+    "YIELD_GOLD",
+    3
+   ],
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_CRATER_LAKE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_FAITH",
+    5
+   ],
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_DEAD_SEA",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    2
+   ],
+   [
+    "YIELD_FAITH",
+    2
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_EVEREST",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_GALAPAGOS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_KILIMANJARO",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_PANTANAL",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    2
+   ],
+   [
+    "YIELD_FOOD",
+    2
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_PIOPIOTAHI",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_TORRES_DEL_PAINE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_TSINGY",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_YOSEMITE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_HA_LONG_BAY",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    3
+   ],
+   [
+    "YIELD_CULTURE",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_EYJAFJALLAJOKULL",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_LYSEFJORDEN",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_GIANTS_CAUSEWAY",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_ULURU",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 4,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_DELICATE_ARCH",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_EYE_OF_THE_SAHARA",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_PRODUCTION",
+    2
+   ],
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_LAKE_RETBA",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    2
+   ],
+   [
+    "YIELD_GOLD",
+    2
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_MATTERHORN",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_RORAIMA",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_UBSUNUR_HOLLOW",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_FAITH",
+    2
+   ],
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_ZHANGYE_DANXIA",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_REEF",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 0,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_FLOODPLAINS_GRASSLAND",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_FLOODPLAINS_PLAINS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_GEOTHERMAL_FISSURE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 0,
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_VOLCANO",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 0,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_VOLCANIC_SOIL",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 0,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_CHOCOLATEHILLS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_FOOD",
+    1
+   ],
+   [
+    "YIELD_PRODUCTION",
+    2
+   ],
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_DEVILSTOWER",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_GOBUSTAN",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    3
+   ],
+   [
+    "YIELD_PRODUCTION",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_IKKIL",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_PAMUKKALE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_VESUVIUS",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_WHITEDESERT",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_CULTURE",
+    1
+   ],
+   [
+    "YIELD_GOLD",
+    4
+   ],
+   [
+    "YIELD_SCIENCE",
+    1
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_BERMUDA_TRIANGLE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_FOUNTAIN_OF_YOUTH",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [
+   [
+    "YIELD_SCIENCE",
+    4
+   ],
+   [
+    "YIELD_FAITH",
+    4
+   ]
+  ],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_PAITITI",
+  "removable": false,
+  "removeTech": null,
+  "appeal": 2,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_BURNING_FOREST",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_BURNT_FOREST",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_BURNING_JUNGLE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
+ },
+ {
+  "type": "FEATURE_BURNT_JUNGLE",
+  "removable": false,
+  "removeTech": null,
+  "appeal": -1,
+  "yields": [],
+  "removes": []
  }
 ];
 

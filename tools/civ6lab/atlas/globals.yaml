@@ -105,6 +105,15 @@
   impl: [cpu/core/tactical.ts:ATTACK_KILL]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0xd5b948
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- A contract (vtable 0xd5b948; progress +0x100: 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCEL..."
+  review: imported
 - addr: 0xd5d420
   kind: global
   status: PARTLY
@@ -322,6 +331,11 @@
   context:
     - "...pe 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
     - "...16), a2 = clamp(T − 5, 5, 15), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured), a2..a3−1 (fail,..."
+  review: imported
+- addr: 0xf03650
+  kind: global
+  status: PARTLY
+  notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0xf03d80
   kind: global
@@ -1269,7 +1283,7 @@
 - addr: 0xf2ed70
   kind: global
   status: PARTLY
-  impl: [ai/major/operations/bt.ts:priorityChild]
+  impl: [cpu/core/behaviorTree.ts:priorityChild]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0xf2f978

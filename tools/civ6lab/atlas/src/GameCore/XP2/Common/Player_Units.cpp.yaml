@@ -86,11 +86,15 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
   readings:
     - "H-1: the upgrade's gold — READ"
     - "H-1: a unit's Production cost in the queue — READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
     - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
@@ -111,7 +115,7 @@
   cases:
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
-  impl: [cpu/core/aiUnitProduction.ts:UnitProductionFacts]
+  impl: [cpu/core/aiUnitProduction.ts:UnitProductionFacts, cpu/core/aiPlotValue.ts:PlotValueFacts]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:

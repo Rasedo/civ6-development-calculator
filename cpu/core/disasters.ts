@@ -631,7 +631,7 @@ export function volcanoOrder(map: GameMap): Tile[] {
  * -> 0xa29730 -> "Random River" 0xa292a0). With no fog every river is
  * revealed.
  */
-function riverRevealed(state: GameState, river: FloodRiver): boolean {
+export function riverRevealed(state: GameState, river: FloodRiver): boolean {
   if (!fogActive(state)) return true;
   return state.seats.some((s) => isCiv(s.seat) && river.plots.some((t) => isExplored(state, s.seat, t.index)));
 }

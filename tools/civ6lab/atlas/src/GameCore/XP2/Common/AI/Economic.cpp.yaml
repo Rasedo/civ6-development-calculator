@@ -36,6 +36,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."
@@ -70,7 +71,9 @@
   final: 0x459320
   kind: function
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - ...pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's items through 0x68be60.
   review: imported

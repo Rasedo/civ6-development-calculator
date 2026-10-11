@@ -441,6 +441,18 @@
   context:
     - "...tyBuildAI, city +0x1788, population +0x588, T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"t..."
   review: imported
+- addr: 0x39de20
+  final: 0x281e60
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - ...ed at the housing value 0x7a3d70; where the civics' list +0x1380 holds the improvement (0x39de20) the claimed plots 0x7a10c0 (each neighbour within 3 of the city another owns, without...
+  review: imported
 - addr: 0x39df60
   final: 0x281f60
   kind: function

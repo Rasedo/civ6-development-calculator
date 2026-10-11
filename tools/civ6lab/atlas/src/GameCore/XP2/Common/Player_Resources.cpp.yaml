@@ -320,7 +320,7 @@
     - recording: h1_duelw1117
       turn: 85
       value: "runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95: the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts from the turn China (their suzerain) holds Military Eng"
-  impl: [cpu/core/minorBuild.ts:minorResourceCounts]
+  impl: [cpu/core/minorBuild.ts:minorResourceCounts, cpu/core/aiPlotValue.ts:PlotValueFacts]
   readings:
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: a city-state sees its suzerain's resources — READ"

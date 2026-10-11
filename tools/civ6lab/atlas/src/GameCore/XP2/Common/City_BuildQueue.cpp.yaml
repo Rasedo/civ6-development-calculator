@@ -131,7 +131,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  impl: [cpu/core/aiCityBuild.ts:PickFacts, cpu/core/aiContracts.ts:ContractCity]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes: ["label: CanConstruct(city.buildQueue,...)"]
   context:
@@ -148,7 +148,7 @@
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
-  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  impl: [cpu/core/aiCityBuild.ts:PickFacts, cpu/core/aiContracts.ts:ContractCity]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -158,6 +158,24 @@
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
     - "...(0x5ce970's unit loop, 0x5cf360..0x5cf6ac): FX(-9999) where the CityBuildAI's CanTrain 0x172820 (the player AI +0x12a0 +0xba8 flag set) refuses; else T = max(the research AI's turns 0..."
     - ...a Faith purchase yield, by CityBuildAI's unit value 0x5d4cd0 in a city that may buy it, 0x172820, worth more than its Faith cost valued or with twice the cost in hand; then the heroes)...
+  review: imported
+- addr: 0x173940
+  final: 0xf97b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiContracts.ts:ContractCity]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x175d10
+  final: 0xfb9b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where the value passes CityBuildAI +0xa48 and the production was set this turn or the...
   review: imported
 - addr: 0x177d10
   kind: function
@@ -312,6 +330,7 @@
     - recording: 1124
       turn: 3
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+  impl: [cpu/core/aiContracts.ts:ContractCity]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
@@ -324,6 +343,7 @@
   kind: function
   name: turnsToBuildDistrict
   status: PARTLY
+  impl: [cpu/core/aiContracts.ts:ContractCity]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
@@ -344,6 +364,7 @@
   cases:
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+  impl: [cpu/core/aiContracts.ts:ContractCity]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

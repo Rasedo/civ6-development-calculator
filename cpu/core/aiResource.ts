@@ -37,6 +37,9 @@ export interface AiResourceRow {
   peakEra: string | null;
   /** the units whose StrategicResource it is, in the Units' order */
   units: readonly string[];
+  /** Resource_Harvests and Resource_YieldChanges: [YieldType, amount] */
+  harvests: readonly (readonly [string, number])[];
+  yields: readonly (readonly [string, number])[];
 }
 
 export interface AiImprovementRow {
@@ -45,7 +48,25 @@ export interface AiImprovementRow {
   civic: string | null;
   trait: string | null;
   buildable: boolean;
+  /** Improvement_ValidResources' resources, and those of them whose row
+   *  keeps the plot's feature (MustRemoveFeature false) */
   resources: readonly string[];
+  keepsFeature: readonly string[];
+  /** Improvement_YieldChanges: [YieldType, amount] */
+  yields: readonly (readonly [string, number])[];
+  housing: number;
+  tilesRequired: number;
+  /** YieldFromAppeal and its percent */
+  appealYield: string | null;
+  appealPct: number;
+  defenseModifier: number;
+  grantFortification: number;
+  /** Improvement_ValidFeatures' features */
+  features: readonly string[];
+  /** Improvement_ValidBuildUnits: [UnitType, ConsumesCharge] */
+  buildUnits: readonly (readonly [string, boolean])[];
+  /** each Improvement_Adjacencies row's YieldType */
+  adjacency: readonly string[];
 }
 
 /** what the value reads of its player */

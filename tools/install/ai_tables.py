@@ -611,15 +611,49 @@ def build_city(rows, modifier) -> str:
     for u in units:
         if u["resource"]:
             strat_units[u["resource"]].append(u["type"])
+    # (the improvement value's: a resource's Resource_Harvests and
+    # Resource_YieldChanges; an improvement's Improvement_YieldChanges,
+    # Housing / TilesRequired, YieldFromAppeal, its valid features and build
+    # units, the resources it works and whether it clears their feature)
+    harvests = multi("Resource_Harvests", "ResourceType")
+    res_yields = multi("Resource_YieldChanges", "ResourceType")
     resources = [{"type": r, "class": c.get("ResourceClassType"), "happiness": num(c, "Happiness"),
                   "peakEra": c.get("PeakEra") if c.get("PeakEra") not in (None, "", "NO_ERA") else None,
-                  "units": strat_units[r]}
+                  "units": strat_units[r],
+                  "harvests": [[h["YieldType"], num(h, "Amount")] for h in harvests[r]],
+                  "yields": [[y["YieldType"], num(y, "YieldChange")] for y in res_yields[r]]}
                  for r, c in in_game_order("Resources", "ResourceType", keyed(rows("Resources"), "ResourceType"))]
     valid = multi("Improvement_ValidResources", "ImprovementType")
+    imp_yields = multi("Improvement_YieldChanges", "ImprovementType")
+    imp_features = multi("Improvement_ValidFeatures", "ImprovementType")
+    imp_units = multi("Improvement_ValidBuildUnits", "ImprovementType")
+    imp_adj = multi("Improvement_Adjacencies", "ImprovementType")
+    adj_yield = {k: c.get("YieldType") for k, c in keyed(rows("Adjacency_YieldChanges"), "ID").items()}
     improvements = [{"type": i, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType"),
                      "buildable": c.get("Buildable") == "true",
-                     "resources": [r["ResourceType"] for r in valid[i]]}
+                     "resources": [r["ResourceType"] for r in valid[i]],
+                     "keepsFeature": [r["ResourceType"] for r in valid[i] if r.get("MustRemoveFeature") == "false"],
+                     "yields": [[y["YieldType"], num(y, "YieldChange")] for y in imp_yields[i]],
+                     "housing": num(c, "Housing"), "tilesRequired": num(c, "TilesRequired", 1),
+                     "appealYield": c.get("YieldFromAppeal") or None, "appealPct": num(c, "YieldFromAppealPercent", 100),
+                     "defenseModifier": num(c, "DefenseModifier"), "grantFortification": num(c, "GrantFortification"),
+                     "features": [f["FeatureType"] for f in imp_features[i]],
+                     "buildUnits": [[u["UnitType"], u.get("ConsumesCharge") != "false"] for u in imp_units[i]],
+                     "adjacency": [adj_yield[a["YieldChangeId"]] for a in imp_adj[i] if adj_yield.get(a["YieldChangeId"])]}
                     for i, c in in_game_order("Improvements", "ImprovementType", keyed(rows("Improvements"), "ImprovementType"))]
+    # the districts (the district choice's and the trees' rows: PrereqTech /
+    # PrereqCivic, the civilization trait), in DATABASE ORDER
+    districts = [{"type": d, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType")}
+                 for d, c in in_game_order("Districts", "DistrictType", keyed(rows("Districts"), "DistrictType"))]
+    # the features (a feature a Builder clears for an improvement: Removable,
+    # RemoveTech), in DATABASE ORDER
+    feat_yields = multi("Feature_YieldChanges", "FeatureType")
+    feat_removes = multi("Feature_Removes", "FeatureType")
+    features = [{"type": f, "removable": c.get("Removable") == "true", "removeTech": c.get("RemoveTech") or None,
+                 "appeal": num(c, "Appeal"),
+                 "yields": [[y["YieldType"], num(y, "YieldChange")] for y in feat_yields[f]],
+                 "removes": [[y["YieldType"], num(y, "Yield")] for y in feat_removes[f]]}
+                for f, c in in_game_order("Features", "FeatureType", keyed(rows("Features"), "FeatureType"))]
     eff_units, eff = efficiency_table()
     if eff_units != [u["type"] for u in units]:
         raise SystemExit("AI_UnitEfficiency.csv's units differ from the Units rows")
@@ -633,13 +667,15 @@ def build_city(rows, modifier) -> str:
         " * stale file): the Buildings, Units and Projects in DATABASE ORDER — the\n"
         " * index the AI's value tables run in — with the columns and child rows\n"
         " * the values and the Default Specialization pick read.\n */\n"
-        "import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';\n"
+        "import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiUnitRow } from '../core/aiCityBuild';\n"
         "import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';\n\n"
         f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n\n"
         f"export const AI_UNITS: readonly AiUnitRow[] = {json.dumps(units, indent=1)};\n\n"
         f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n\n"
         f"export const AI_RESOURCES: readonly AiResourceRow[] = {json.dumps(resources, indent=1)};\n\n"
         f"export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = {json.dumps(improvements, indent=1)};\n\n"
+        f"export const AI_DISTRICTS: readonly AiDistrictRow[] = {json.dumps(districts, indent=1)};\n\n"
+        f"export const AI_FEATURES: readonly AiFeatureRow[] = {json.dumps(features, indent=1)};\n\n"
         "/** the promotion class lists by leader trait (AiFavoredItems of the\n"
         " *  AiLists of System UnitPromotionClasses): class -> Value */\n"
         "export const AI_PROMOTION_CLASS_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "

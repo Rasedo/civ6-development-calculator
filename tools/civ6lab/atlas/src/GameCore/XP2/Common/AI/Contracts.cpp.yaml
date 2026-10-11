@@ -18,9 +18,28 @@
   final: 0x3f97e0
   kind: function
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiContracts.ts:contractLine, cpu/harness/cityBuildLog.ts:BuildLine]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...od Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f9..."
   context:
     - "...ced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellatio..."
   review: imported
+- addr: 0x5f5650
+  final: 0x3f9fa0
+  kind: function
+  name: the unit contract completion
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 2
+      value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
+  impl: [cpu/core/aiContracts.ts:contractBuilt]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., queued by vt +0x38 0x5f3710 (IN PROGRESS, bound to the city, the completion signals 0x5f5650 / 0x5f35d0 / 0x5f3610 connected; the queue's refusal FAILED, no line). The in-hand chec...
+  review: reviewed

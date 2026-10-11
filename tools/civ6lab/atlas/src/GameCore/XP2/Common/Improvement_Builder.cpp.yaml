@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x35ede0
+  final: 0x259ff0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "- The analysis (0x5ce970): per improvement in database order, FX(-9999) where 0x35ede0 refuses the player or 0x35fd60 the plot; else T = max(the research AI's turns 0x7610e0..."
+  review: imported
 - addr: 0x35f100
   final: 0x25a230
   kind: function
@@ -13,6 +22,13 @@
   context:
     - "...st (row +0xd0..+0xd8, the improvements it unlocks in table order) the player may build (0x35f100: the improvement's trait against the player's civilization and leader), per resource..."
   review: reviewed
+- addr: 0x35f2d0
+  final: 0x25a360
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x35fd60
   final: 0x25acf0
   kind: function
@@ -24,8 +40,10 @@
     - recording: 1126
       turn: 3
       value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
-  impl: [cpu/core/barbarians.ts:campGround]
-  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  impl: [cpu/core/barbarians.ts:campGround, cpu/core/aiCityTrees.ts:CityTreeWorld]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...ager's +0x4a0 list, every living player), camp terrain and feature, no resource at all (0x35fd60 is asked for player -1, and 0x5112f0 hands player -1 every resource: 1118, 1119, 1123 a..."
   review: imported

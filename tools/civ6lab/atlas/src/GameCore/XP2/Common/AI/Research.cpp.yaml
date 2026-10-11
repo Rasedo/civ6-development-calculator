@@ -48,6 +48,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   context:
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."
@@ -56,7 +57,7 @@
   final: 0x4f8f60
   kind: function
   name: turnsToResearchTech
-  status: PARTLY
+  status: READ
   cases:
     - recording: AI_Research.csv
       value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
@@ -65,17 +66,21 @@
       value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+    - recording: h1_duelv1127
+      turn: 2
+      value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
   impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/minorBuild.ts:analysedTurns]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...8 projects, +0x40 units.  building (non-wonder) only at city centre plot; turns r12 = max(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [r..."
   context:
     - "...). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not th..."
     - "...nstruction not held (Bologna's Campus t16: T 24 = 2 + 12 + 10). The technology's turns (0x7610e0): the research AI's entry turns (+0x1c; 500 at 0 or below), plus the research AI's +0..."
     - "...0 (the player AI +0x12a0 +0xba8 flag set) refuses; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5, the civics AI's 0x621920 to PrereqCivic + 5) — the +5 (`lea ebx, [ra..."
-  review: imported
+  review: reviewed
 - addr: 0x761170
   final: 0x4f8ff0
   kind: function

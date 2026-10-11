@@ -79,6 +79,25 @@ export interface AiBuildingRow {
 
 export const AI_BUILDING_INDEX: ReadonlyMap<string, number> = new Map(AI_BUILDINGS.map((b, i) => [b.type, i]));
 
+/** One Features row as the city build AI reads it (ai_tables.py) */
+export interface AiFeatureRow {
+  type: string;
+  removable: boolean;
+  removeTech: string | null;
+  appeal: number;
+  /** Feature_YieldChanges and Feature_Removes: [YieldType, amount] */
+  yields: readonly (readonly [string, number])[];
+  removes: readonly (readonly [string, number])[];
+}
+
+/** One Districts row as the city build AI reads it (ai_tables.py) */
+export interface AiDistrictRow {
+  type: string;
+  tech: string | null;
+  civic: string | null;
+  trait: string | null;
+}
+
 /** What the city build AI reads of one city and its owner: the engine
  *  implements it per kind of city (a major's, a city-state's). Item keys are
  *  the install's types (BUILDING_MONUMENT, DISTRICT_CAMPUS). */
@@ -531,6 +550,10 @@ export interface PickFacts {
   buildingHeld(building: string): boolean;
   /** CanConstruct (0x170450) with its reasons clear */
   canConstruct(building: string): boolean;
+  /** CanConstruct's reasons clear (its result aside): the building's
+   *  district stands in the city and, where it has prerequisites, one of
+   *  them is held */
+  reasonsClear(building: string): boolean;
   /** CanTrain (0x172820) */
   canTrain(unit: string): boolean;
   /** the project the city may produce (0x179650) */
@@ -558,11 +581,25 @@ export interface Pick {
  *  the defensive pick only a combat unit that is not CLASS_RECON) and, but
  *  in the defensive pick, the best project (0x5d1f10) — each best starting
  *  at FX(-9999) and taking a strictly higher value, the first in database
- *  order on a tie. The building wins at least the unit's and the project's
- *  value, else the unit at least the project's, else the project; null
- *  where none is valued (the log's "NO BUILDS AT ALL" for a player that is
- *  not a full civilization). */
+ *  order on a tie; the defensive pick's project value 0. The building wins
+ *  at least the unit's and the project's value, else the unit at least the
+ *  project's, else the project; null where none is valued (the log's "NO
+ *  BUILDS AT ALL" for a player that is not a full civilization). The
+ *  contract in hand goes before it (`aiContracts.ts` `takesTurn`). */
 export function defaultSpecialization(t: CityBuildTables, f: PickFacts): Pick | null {
+  const { building, unit, project } = specializationBests(t, f);
+  if (building.index >= 0 && building.value >= unit.value && building.value >= project.value) {
+    return { kind: 'building', type: AI_BUILDINGS[building.index].type, value: building.value };
+  }
+  if (unit.index >= 0 && unit.value >= project.value) return { kind: 'unit', type: AI_UNITS[unit.index].type, value: unit.value };
+  if (project.index >= 0) return { kind: 'project', type: AI_PROJECTS[project.index], value: project.value };
+  return null;
+}
+
+/** the Default Specialization's three bests (0x5d0860, 0x5d2600, 0x5d1f10),
+ *  each a database index (-1 none) and its value (FX(-9999) with none; the
+ *  defensive pick values no project: 0) */
+export function specializationBests(t: CityBuildTables, f: PickFacts): Record<'building' | 'unit' | 'project', { index: number; value: number }> {
   let bIdx = -1;
   let bVal = FX_MIN;
   AI_BUILDINGS.forEach((b, k) => {
@@ -590,7 +627,7 @@ export function defaultSpecialization(t: CityBuildTables, f: PickFacts): Pick | 
     }
   });
   let pIdx = -1;
-  let pVal = FX_MIN;
+  let pVal = f.defense ? 0 : FX_MIN;
   if (!f.defense) {
     AI_PROJECTS.forEach((p, k) => {
       if (f.canProduce(p) && t.projects[k] > pVal) {
@@ -599,10 +636,7 @@ export function defaultSpecialization(t: CityBuildTables, f: PickFacts): Pick | 
       }
     });
   }
-  if (bIdx >= 0 && bVal >= uVal && bVal >= pVal) return { kind: 'building', type: AI_BUILDINGS[bIdx].type, value: bVal };
-  if (uIdx >= 0 && uVal >= pVal) return { kind: 'unit', type: AI_UNITS[uIdx].type, value: uVal };
-  if (pIdx >= 0) return { kind: 'project', type: AI_PROJECTS[pIdx], value: pVal };
-  return null;
+  return { building: { index: bIdx, value: bVal }, unit: { index: uIdx, value: uVal }, project: { index: pIdx, value: pVal } };
 }
 
 /** THE BUILDINGS TABLE of the city centre (0x5ce970's building loop): a raw

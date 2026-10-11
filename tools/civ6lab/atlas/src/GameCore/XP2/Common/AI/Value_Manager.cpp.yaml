@@ -17,11 +17,14 @@
 - addr: 0x7a10c0
   final: 0x527fd0
   kind: function
+  name: the claimed plots value
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...x1788, population +0x588, T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield we..."
-  review: imported
+  review: reviewed
 - addr: 0x7a1240
   final: 0x528140
   kind: function
@@ -89,6 +92,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
@@ -99,13 +103,17 @@
   kind: function
   name: resourceValue
   status: PARTLY
-  impl: [cpu/core/aiResearch.ts:researchAnalysis, cpu/core/aiResource.ts:resourceValue]
+  impl:
+    - cpu/core/aiResearch.ts:researchAnalysis
+    - cpu/core/aiResource.ts:resourceValue
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
@@ -116,6 +124,22 @@
     - "...0² or NUCLEAR_WEAPON of 1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3d..."
     - ...or the named one, the player's count of it 0x4aa790 x Amount through the resource value 0x7a21e0), EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per...
   review: reviewed
+- addr: 0x7a2e20
+  final: 0x528f20
+  kind: function
+  name: the improvement build unit
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 2
+      value: "the charge   = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue   with no player, discounted T (1127 t2: a 25 Builder's 8)."
+  impl: [cpu/core/aiPlotValue.ts:buildUnit]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - ...f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers...
+    - "- 0x7a58f0: T at or past the horizon FX(-9999); the build unit 0x7a2e20 (ValidBuildUnits: the player's own version, the cheapest by its current cost 0x4f2b20..."
+  review: reviewed
 - addr: 0x7a2fa0
   kind: function
   name: cityArrBC0[yield]
@@ -124,6 +148,49 @@
   context:
     - ...+0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x...
   review: imported
+- addr: 0x7a3010
+  final: 0x529020
+  kind: function
+  name: the feature removal value
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 2
+      value: "the charge   = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue   with no player, discounted T (1127 t2: a 25 Builder's 8)."
+    - recording: h1_duelv1127
+      turn: 2
+      value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
+  impl:
+    - cpu/core/aiPlotValue.ts:BASE_CHARGES
+    - cpu/core/aiPlotValue.ts:BUILDER
+    - cpu/core/aiPlotValue.ts:featureRemovalValue
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b132..."
+    - "...eps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (..."
+    - "- 0x7a3010: Feature_Removes' rows escalated x + (10x - x) n / 100, n the larger of the civics and..."
+  review: reviewed
+- addr: 0x7a37d0
+  final: 0x529530
+  kind: function
+  name: the harvest value
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 2
+      value: "the charge   = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue   with no player, discounted T (1127 t2: a 25 Builder's 8)."
+  impl:
+    - cpu/core/aiPlotValue.ts:BASE_CHARGES
+    - cpu/core/aiPlotValue.ts:BUILDER
+    - cpu/core/aiPlotValue.ts:harvestValue
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...ment value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence,..."
+    - "...resource value and 0x7b1320 off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0; one it lists keeps the feature where MustRemo..."
+    - "...ghbour holds a district with Housing, 0x79e140; Districts +0x40 Housing) from T to H. 0x7a37d0: Resource_Harvests at DefaultValue discounted T, less a charge and Resource_YieldChange..."
+  review: reviewed
 - addr: 0x7a3d70
   final: 0x5298e0
   kind: function
@@ -137,13 +204,14 @@
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
     - recording: h1_duelw1117
       value: "- Measured (the action replay, runs/h1_duelw1117, 1121, 1124, 1127, 1128):   the picks on the log's own scores — pantheons 5 of 5, the religions'   beliefs 17 of 17 (the founding's Follower then a Wor"
-  impl: [cpu/core/aiCityBuild.ts:housingValue]
+  impl: [cpu/core/aiCityBuild.ts:housingValue, cpu/core/aiPlotValue.ts:PlotValueFacts]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
     - ".claude/scratchpad/cb3/NOTES.md: ...whole number only if constructible now. OPEN: GPP general (Barracks/Stable v 0, unsourced), housing 0x7a3d70 forecast, free units FX_MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Ligh..."
@@ -203,6 +271,7 @@
     - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -230,9 +299,16 @@
   final: 0x52a8c0
   kind: function
   name: valueImprovementAtPlot
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
+  impl: [cpu/core/aiPlotValue.ts:BASE_CHARGES, cpu/core/aiPlotValue.ts:improvementValue]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
-  review: imported
+  review: reviewed
 - addr: 0x7a60d0
   final: 0x52af40
   kind: function
@@ -254,6 +330,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
   context:
     - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
@@ -274,6 +351,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"
@@ -433,6 +511,30 @@
   context:
     - "...leader holds; a secret society's governor its society's). Slot 0 (no city): the value 0x7b0e40(city none) divided by the secret society's level (1.0 for every other governor, 0x16e94..."
     - "- THE VALUE IN A SLOT (0x7b0e40(governor, rate, start 0, horizon 100 — the literal `push 0x64` —, the player, the city,..."
+  review: reviewed
+- addr: 0x7b1320
+  final: 0x530690
+  kind: function
+  name: the improvement yields value
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 2
+      value: "the charge   = current cost / (+0x7b0[u] + 3), whole, at the Production DefaultValue   with no player, discounted T (1127 t2: a 25 Builder's 8)."
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+    - recording: h1_duelv1127
+      turn: 2
+      value: Farm 72.45, Mine 62.51 at T 4, 48.44 beside a volcano, Farm on Woods 54.34
+  impl: [cpu/core/aiPlotValue.ts:improvementYieldsValue]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
+  context:
+    - "## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), P..."
+    - "...ovement: 0 unpillaged, its repair pillaged. Another improvement: its resource value and 0x7b1320 off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harv..."
+    - "- 0x7b1320: T >= H FX(-9999); a drought hitting it 0; the XP2 river manager (0xa2cbf0 / 0xa2af70:..."
   review: reviewed
 - addr: 0x7b26b0
   final: 0x5310d0

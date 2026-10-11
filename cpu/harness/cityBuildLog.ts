@@ -46,6 +46,101 @@ export function loadCityBuildCentre(dumpPath: string): Map<string, Record<string
   return out;
 }
 
+/** One plot evaluation as the log prints it: the plot, OWNED, and its
+ *  DISTRICTS and IMPROVEMENTS rows (the log's values, -9999 unvalued) */
+export interface LoggedPlot {
+  x: number;
+  y: number;
+  owned: boolean;
+  districts: number[];
+  improvements: number[];
+}
+
+/** every plot evaluation of the city's first block of the turn, in the
+ *  order printed (the city centre first), by `${turn}:${player}:${city}` */
+export function loadCityBuildPlots(dumpPath: string): Map<string, LoggedPlot[]> {
+  const out = new Map<string, LoggedPlot[]>();
+  const db = openLogStore(dumpPath);
+  if (!db || !hasLog(db, 'AI_CityBuild_plot')) return out;
+  const family = new Map(db.prepare('SELECT id, name FROM AI_CityBuild_family').all().map((f) => [Number(f.id), String(f.name)]));
+  const first = `WITH c AS (SELECT p.id, p.turn, p.player, p.city, p.x, p.y, p.seq, p.info FROM AI_CityBuild_plot p
+    JOIN (SELECT min(block) AS b FROM AI_CityBuild_plot GROUP BY turn, player, city) m ON p.block = m.b)`;
+  const byId = new Map<number, LoggedPlot>();
+  for (const r of db.prepare(`${first} SELECT * FROM c ORDER BY id`).all()) {
+    const key = `${r.turn}:${r.player}:${r.city}`;
+    const p: LoggedPlot = { x: Number(r.x), y: Number(r.y), owned: String(r.info).startsWith('OWNED'), districts: [], improvements: [] };
+    (out.get(key) ?? (out.set(key, []), out.get(key)!)).push(p);
+    byId.set(Number(r.id), p);
+  }
+  for (const r of db.prepare(`${first} SELECT r.plot, r.family, r.n FROM c JOIN AI_CityBuild_plot_row r ON r.plot = c.id`).all()) {
+    const p = byId.get(Number(r.plot))!;
+    const f = family.get(Number(r.family));
+    if (f === 'DISTRICTS') p.districts = new Array<number>(Number(r.n)).fill(UNVALUED);
+    if (f === 'IMPROVEMENTS') p.improvements = new Array<number>(Number(r.n)).fill(UNVALUED);
+  }
+  for (const v of db.prepare(`${first} SELECT v.plot, v.family, v.item, v.value FROM c JOIN AI_CityBuild_plot_value v ON v.plot = c.id`).all()) {
+    const p = byId.get(Number(v.plot))!;
+    const f = family.get(Number(v.family));
+    if (f === 'DISTRICTS') p.districts[Number(v.item)] = Number(v.value);
+    if (f === 'IMPROVEMENTS') p.improvements[Number(v.item)] = Number(v.value);
+  }
+  db.close();
+  return out;
+}
+
+/** A line of the city build log about a city's production: a contract's
+ *  state line (0x5f4cd0), a contract queued (0x5f3710) or purchased
+ *  (0x5f3c40), a Default Specialization pick or NO BUILDS */
+export interface BuildLine {
+  turn: number;
+  player: number;
+  city: string;
+  kind: 'contract' | 'queued' | 'purchase' | 'pick' | 'none';
+  /** the contract's id and state (a state line) */
+  contract?: number;
+  state?: string;
+  /** the item (UNIT_ / BUILDING_ / DISTRICT_ / PROJECT_) */
+  item: string;
+  value?: number;
+  /** the contract's tree (the tree's name) */
+  tree?: string;
+}
+
+/** the city build log's production lines in log order */
+export function loadBuildLines(dumpPath: string): BuildLine[] {
+  const out: BuildLine[] = [];
+  const db = openLogStore(dumpPath);
+  if (!db || !hasLog(db, 'AI_CityBuild')) return out;
+  for (const r of db.prepare(`SELECT turn, player, city, prod_adv, construct, order_source, rest FROM AI_CityBuild ORDER BY line`).all()) {
+    const turn = Number(r.turn);
+    const player = Number(r.player);
+    const city = String(r.city);
+    const pa = r.prod_adv === null ? '' : String(r.prod_adv);
+    const rest = r.rest === null ? '' : String(r.rest);
+    if (pa.startsWith('CONTRACT ')) {
+      // CONTRACT n, STATE, unit, building, district, VALUE v, tree
+      const cells = rest.split(',').map((x) => x.trim());
+      const unit = String(r.order_source);
+      const item = unit !== 'NO_UNIT' ? unit : cells[0] !== 'NO_BUILDING' ? cells[0] : cells[1];
+      out.push({ turn, player, city, kind: 'contract', contract: Number(pa.slice(9)), state: String(r.construct), item,
+        value: Number(cells[2].replace('VALUE ', '')), tree: cells.slice(3).join(',') });
+      continue;
+    }
+    if (rest.trim().startsWith('CONTRACT ')) {
+      out.push({ turn, player, city: city === 'PURCHASE' ? '' : city, kind: city === 'PURCHASE' ? 'purchase' : 'queued',
+        contract: Number(rest.trim().slice(9)), item: String(r.construct), tree: String(r.order_source) });
+      continue;
+    }
+    if (r.order_source === 'Default Specialization') {
+      out.push({ turn, player, city, kind: 'pick', item: String(r.construct), value: Number(rest.split(',')[2].trim().replace('Value ', '')) });
+      continue;
+    }
+    if (String(r.construct ?? '').startsWith('NO BUILDS AT ALL')) out.push({ turn, player, city, kind: 'none', item: '' });
+  }
+  db.close();
+  return out;
+}
+
 /** the Default Specialization lines (0x5d4d70): `${turn}:${player}:${city}`
  *  -> the item and its value, or null for "NO BUILDS AT ALL" */
 export function loadCityBuildPicks(dumpPath: string): Map<string, { item: string; value: number } | null> {

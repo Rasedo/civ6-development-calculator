@@ -148,6 +148,19 @@
     - "...dplains — the count FertilityAdded. The plots: the river's Floodplains list (0xa2aa30 → 0xa2aca0): the river's plot list as its edges were laid from the source (the source edge its own..."
     - "0xa2aca0 (GenerateFloodplains' per-river pass): the river's plot list as its edges were laid, read..."
   review: imported
+- addr: 0xa2af70
+  kind: function
+  name: the river flood turns
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  impl: [cpu/core/aiPlotValue.ts:PlotValueFacts]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "- 0x7b1320: T >= H FX(-9999); a drought hitting it 0; the XP2 river manager (0xa2cbf0 / 0xa2af70: 100 over the summed flood chances of the rivers whose floodplains hold the plot) and t..."
+  review: reviewed
 - addr: 0xa2b200
   final: 0x72e0b0
   kind: function
@@ -270,6 +283,17 @@
     - "...xa2f200: unless mitigated (a complete unpillaged Dam on one of the river's Floodplains, 0xa2c280; the Great Bath on one, 0xa2b280), each RandomEvent_Damages row (XML order) over the pl..."
     - "...80: the first building flagged +0x28 & 8) stands on a plot of the LIST (0x810d0), or when 0xa2c280 finds a Dam (0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose cit..."
     - ...te (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, else the Great Bath's (0xa2c280); a mitigating player fires the game signal (+0xbd0) whose handler 0x3060b0 records the...
+  review: imported
+- addr: 0xa2cbf0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "- 0x7b1320: T >= H FX(-9999); a drought hitting it 0; the XP2 river manager (0xa2cbf0 / 0xa2af70: 100 over the summed flood chances of the rivers whose floodplains hold the..."
   review: imported
 - addr: 0xa2cfc0
   final: 0x72fb10

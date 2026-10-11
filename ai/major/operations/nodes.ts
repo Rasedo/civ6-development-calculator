@@ -7,7 +7,7 @@
  * rows through the context's `act`, the view then read anew.
  */
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
-  type BtHandler, type BtRun } from './bt';
+  type BtHandler, type BtRun } from '../../../cpu/core/behaviorTree';
 import { NO_PLOT, addMember, hasAiType, memberStrength, teamReady, type Operation } from './operation';
 import { desiredStrength, recruitOperation } from './recruit';
 import { canFoundAt } from '../settle';

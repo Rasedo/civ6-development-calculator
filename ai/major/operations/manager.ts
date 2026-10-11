@@ -19,7 +19,7 @@
  * slot order.
  */
 import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from './tables';
-import { compileTree, newRun, tick, type BtNode } from './bt';
+import { compileTree, newRun, tick, type BtNode } from '../../../cpu/core/behaviorTree';
 import { NO_PLOT, addMember, newTeams, type Operation } from './operation';
 import { OP_NODES, opUnits, refreshStrengths, switchToBackup, type Contract, type OpsContext } from './nodes';
 import { evaluate, type Candidate } from './evaluate';
