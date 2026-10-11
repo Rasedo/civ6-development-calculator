@@ -55,7 +55,7 @@ import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { barbarianTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
+import { barbarianTactics, cityStateTactics, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -63,7 +63,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeD
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { civsAtWar, cityStateOfSeat, isBarbSeat, isCiv, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
+import { FREE_SEAT, civsAtWar, cityStateOfSeat, isBarbSeat, isCiv, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -74,7 +74,7 @@ import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/pol
 import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
-import { PROMOTE_HEAL, takePromotion, unitPromoRows } from '../core/promotions';
+import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
 import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
@@ -159,6 +159,10 @@ interface Ctx {
   tactical?: Tactical;
   /** the barbarians' moves against the game's, by the game's move */
   barbTally: Record<string, BarbTally>;
+  /** the city-states' and the Free Cities' moves against the game's, by the
+   *  game's move, and their "Random Direction" draws (`minorAi`) */
+  minorTally: Record<string, BarbTally>;
+  minorDraws: MinorDrawTally;
   /** the players' envoys of this pair that land after its moves (`settleEnvoys`) */
   lateEnvoys: EnvoyDecision[];
   /** the game's draw log, where the recording kept it */
@@ -629,6 +633,166 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
     }
     // REPLAY_TRACE=tactics: each barbarian's move beside the game's
     if (TRACE.has('tactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
+  }
+}
+
+/** a city-state's or the Free Cities' seat */
+const minorAiSeat = (seat: number) => isCityStateSeat(seat) || seat === FREE_SEAT;
+
+/**
+ * THE CITY-STATES' AND THE FREE CITIES' UNIT AI (`cityStateTactics`,
+ * `freeCityTactics`) on a copy of the state, in the game's player order,
+ * after the majors' actions of the pair and before the barbarians' turn:
+ * their units back where the pair's first record holds them, each in the
+ * pool slot its ID names, with its Movement whole; the barbarians' units
+ * where the first record holds them, those it lacks not yet raised; the
+ * ground (owners, features, improvements, districts, roads) and every
+ * player's research as record t+1 holds them. A
+ * unit's "Random Direction" draw is the log's own where the turn's draws
+ * pair one to one with its Wander and Garrison rows (every player's, in
+ * order); a unit the game did not wander draws its own. Each unit's move is
+ * set beside the game's tactical log and record t+1 (`tallyMinorTactics`):
+ * the record's moves and battles stay the pair's.
+ */
+function minorAi(ctx: Ctx, b: TurnRecord, turn: number): void {
+  const { state } = ctx;
+  const copy = deserialize(serialize(state));
+  const twin = new Map<Unit, Unit>();
+  state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  const keyOf = new Map<Unit, string>();
+  for (const [key, u] of ctx.units) keyOf.set(u, key);
+  const was = new Map(ctx.prev.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  const gone = new Set<Unit>();
+  for (const [c, u] of twin) {
+    if (!minorAiSeat(c.seat) && !isBarbSeat(c.seat)) continue;
+    const key = keyOf.get(u);
+    const at = key ? was.get(key) : undefined;
+    // a unit the first record lacks was made after (a purchase at the
+    // player's next start, a barbarian camp's raise)
+    if (at === undefined) {
+      gone.add(c);
+      continue;
+    }
+    c.tileIndex = at;
+    if (!minorAiSeat(c.seat) || !key) continue;
+    c.slot = Number(key.split(':')[1]) & 0xffff;
+    c.movesLeft = grantedMoves(copy, c);
+    c.movesFull = c.movesLeft;
+    c.attacksLeft = attacksPerTurn(c);
+  }
+  copy.units = copy.units.filter((c) => !gone.has(c));
+  // a city-state's research in its actions is its start's, which record
+  // t+1 holds (its embarking), and the majors' as their actions left it
+  // (the open-borders civic that closes their ground)
+  for (const s of [...copy.cityStates, ...copy.seats]) {
+    const r = seatOf(ctx.next.state, s.seat)?.research;
+    if (r) s.research = { ...s.research, techs: [...r.techs], civics: [...r.civics] };
+  }
+  // ...and the ground as record t+1 holds it: its owners, features,
+  // improvements, districts and roads, which the planning's steps read
+  copy.map.tiles.forEach((t, i) => {
+    const r = ctx.next.state.map.tiles[i];
+    t.ownerSeat = r.ownerSeat;
+    t.ownerCity = r.ownerCity;
+    t.feature = r.feature;
+    t.improvement = r.improvement;
+    t.pillaged = r.pillaged;
+    t.district = r.district;
+    t.districtComplete = r.districtComplete;
+    t.districtPillaged = r.districtPillaged;
+    t.road = r.road;
+  });
+  for (const s of [...copy.cityStates, ...(copy.freeSeat ? [copy.freeSeat] : [])]) {
+    const slots = copy.units.filter((c) => c.seat === s.seat).map((c) => c.slot ?? -1);
+    s.unitPool = { size: Math.max(s === copy.freeSeat ? 0 : 1, ...slots.map((x) => x + 1)), free: [], dying: [] };
+  }
+  const log = ctx.log;
+  const rows = ctx.tactical?.drawRows.get(turn) ?? [];
+  const rd: number[] = [];
+  if (log) log.draws.forEach((d, i) => { if (d.turn === turn && d.label === 'Random Direction') rd.push(i); });
+  const drawOf = new Map<string, number>();
+  ctx.minorDraws.turns += 1;
+  if (rd.length === rows.length) {
+    ctx.minorDraws.paired += 1;
+    rows.forEach((key, k) => { if (!drawOf.has(key)) drawOf.set(key, rd[k]); });
+  }
+  const held = rngHold();
+  holdRng({
+    point: (st, point) => (st === copy ? undefined : held?.point(st, point)),
+    draw: (st, max, label) => {
+      if (st !== copy) { held?.draw(st, max, label); return; }
+      const c = tacticsDrawing();
+      const u = c ? twin.get(c) : undefined;
+      const key = u ? keyOf.get(u) : undefined;
+      const j = key ? drawOf.get(key) : undefined;
+      if (!log || label !== 'Random Direction' || j === undefined) return;
+      st.rngState = log.stateAt(j);
+      ctx.minorDraws.draws += 1;
+      if (log.draws[j].range === max) ctx.minorDraws.sameRange += 1;
+      else ctx.minorDraws.firstOff ??= turn;
+      // REPLAY_TRACE=minorTactics: each draw beside the game's
+      if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} draw over ${max} | game ${log.draws[j].range} v ${log.draws[j].value}`);
+    },
+  });
+  const moves = new Map<Unit, { move: string; plot: number }>();
+  traceTactics((c, move, plot) => {
+    const u = twin.get(c);
+    if (u) moves.set(u, { move, plot });
+  });
+  const playerOf = (seat: number) => ctx.playerOfSeat.get(seat) ?? seat;
+  // a city-state its first record holds no city of founds it in its
+  // homeland pass, after its tactical moves, which find none (0x77bf50)
+  const founded = new Set(ctx.prev.cities.map((c) => c.owner));
+  try {
+    for (const cs of [...copy.cityStates].sort((x, y) => playerOf(x.seat) - playerOf(y.seat))) {
+      if (cs.centerIndex >= 0 && founded.has(playerOf(cs.seat))) cityStateTactics(copy, cs);
+    }
+    freeCityTactics(copy);
+  } finally {
+    traceTactics(null);
+    holdRng(held);
+  }
+  const ended = new Map<Unit, number>();
+  for (const [c, u] of twin) if (copy.units.includes(c) && minorAiSeat(c.seat)) ended.set(u, c.tileIndex);
+  tallyMinorTactics(ctx, b, turn, moves, ended);
+}
+
+/**
+ * THE CITY-STATES' AND THE FREE CITIES' MOVES against the game's: per unit
+ * the AI moved, its move beside the first row the game's tactical log holds
+ * for it in the turn, and the plot it ended on beside record t+1's — the
+ * game's move taken (`minorAi:move` applied), or the record's imposed.
+ */
+function tallyMinorTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
+  ended: ReadonlyMap<Unit, number>): void {
+  const keyOf = new Map<Unit, string>();
+  for (const [key, u] of ctx.units) keyOf.set(u, key);
+  const rows = ctx.tactical?.others.get(turn);
+  const at = new Map(b.units.map((r) => [`${r.owner}:${r.id}`, r.y * ctx.W + r.x]));
+  for (const [u, m] of moves) {
+    const key = keyOf.get(u);
+    if (!key) continue;
+    const game = rows ? tacticalCategory(rows.get(key) ?? '(no row)') : undefined;
+    // the Free Cities' moves apart
+    const label = `${u.seat === FREE_SEAT ? 'Free Cities: ' : ''}${game ?? m.move}`;
+    const t = (ctx.minorTally[label] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
+    t.units += 1;
+    const same = game === undefined || game === tacticalCategory(m.move);
+    if (same) t.move += 1;
+    if (!same && t.firstMove === undefined) t.firstMove = turn;
+    const want = at.get(key);
+    const end = ended.get(u);
+    if (want === undefined || end === undefined) continue;
+    t.plotOf += 1;
+    if (end === want) {
+      t.plot += 1;
+      count(ctx, 'minorAi:move', 'applied');
+    } else {
+      if (t.firstPlot === undefined) t.firstPlot = turn;
+      count(ctx, 'minorAi:move', 'fallback', ctx.playerOfSeat.get(u.seat), `${game ?? m.move}: the AI's ${end}, the game's ${want}`);
+    }
+    // REPLAY_TRACE=minorTactics: each unit's move beside the game's
+    if (TRACE.has('minorTactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
   }
 }
 
@@ -2356,7 +2520,7 @@ const PLOT_SUBS = ['plots.improvement', 'plots.feature', 'plots.resource', 'read
  *  a seat's purse, research, government, or a city's state flows into all */
 const IMPOSES_ON: Record<string, readonly string[]> = {
   combat: UNITS_SUBS, hit: UNITS_SUBS, seize: UNITS_SUBS, levyEnd: UNITS_SUBS, gpActivate: UNITS_SUBS, kill: UNITS_SUBS, unitGone: UNITS_SUBS, unitNew: UNITS_SUBS, upgrade: UNITS_SUBS,
-  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:buy': UNITS_SUBS,
+  promote: UNITS_SUBS, 'minorAi:unit': UNITS_SUBS, 'minorAi:unitNew': UNITS_SUBS, 'minorAi:buy': UNITS_SUBS, 'minorAi:move': UNITS_SUBS,
   'minorAi:improve': PLOT_SUBS, pillage: PLOT_SUBS, repair: PLOT_SUBS, improve: PLOT_SUBS, clear: PLOT_SUBS,
   'draw:eventSoil': ['plots.feature', 'read.plot.yields'],
   'draw:camps': ['plots.improvement', 'barb.camps'],
@@ -2414,6 +2578,9 @@ export interface ReplayReport {
   /** the barbarians' moves against the game's tactical log, by the game's
    *  move (`tallyTactics`) */
   barbTactics: Record<string, BarbTally>;
+  /** the city-states' and the Free Cities' moves (`minorAi`) */
+  minorTactics: Record<string, BarbTally>;
+  minorDraws: MinorDrawTally;
   /** where the replay stopped short of the last record, and why */
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
@@ -2449,11 +2616,28 @@ export interface BarbTally {
   firstPlot?: number;
 }
 
-/** the game's tactical log of the barbarians: per turn, per unit ID, its
- *  first row's move; per turn, the units of its Wander rows in their order */
+/** the city-states' "Random Direction" draws: the turns whose draws pair
+ *  one to one with the log's Wander and Garrison rows, the draws the AI
+ *  took on the log's own, those over the log's range, the first turn one
+ *  was not */
+export interface MinorDrawTally {
+  turns: number;
+  paired: number;
+  draws: number;
+  sameRange: number;
+  firstOff?: number;
+}
+
+/** the game's tactical log: per turn, per barbarian unit ID, its first
+ *  row's move; per turn, the barbarian units of its Wander rows in their
+ *  order; per turn, per other player's unit (`player:ID`), its first row's
+ *  move; per turn, the unit (`player:ID`) of each row whose move takes a
+ *  "Random Direction" draw (Wander, Garrison), every player's, in order */
 interface Tactical {
   first: Map<number, Map<number, string>>;
   wanders: Map<number, number[]>;
+  others: Map<number, Map<string, string>>;
+  drawRows: Map<number, string[]>;
 }
 
 /** the game's tactical log beside a dump (`<dump>.logs/AI_Tactical.csv`) */
@@ -2462,19 +2646,29 @@ function loadTactical(dumpPath: string): Tactical | undefined {
   if (!existsSync(path)) return undefined;
   const out = new Map<number, Map<number, string>>();
   const wanders = new Map<number, number[]>();
+  const others = new Map<number, Map<string, string>>();
+  const drawRows = new Map<number, string[]>();
   for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
     const f = line.split(', ');
-    if (f.length < 6 || f[1] !== '63') continue;
+    if (f.length < 6) continue;
     const m = /\((\d+)\)/.exec(f[5]);
     if (!m) continue;
     const turn = Number(f[0]);
     const id = Number(m[1]);
+    const key = `${f[1]}:${id}`;
+    if (f[2] === 'Wander' || f[2] === 'Garrison') drawRows.set(turn, [...(drawRows.get(turn) ?? []), key]);
+    if (f[1] !== '63') {
+      let o = others.get(turn);
+      if (!o) others.set(turn, (o = new Map()));
+      if (!o.has(key)) o.set(key, f[2]);
+      continue;
+    }
     if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
     let t = out.get(turn);
     if (!t) out.set(turn, (t = new Map()));
     if (!t.has(id)) t.set(id, f[2]);
   }
-  return { first: out, wanders };
+  return { first: out, wanders, others, drawRows };
 }
 
 /** the per-turn step check that reads each state subsystem */
@@ -2521,7 +2715,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (combat) for (const r of recs) r.combatLog = combat.filter((x) => x.turn === r.turn - 1 || x.turn === r.turn);
   const report: ReplayReport = { dump: dumpPath, source: source.constructor.name, turns: [], subsystems: {}, cleanEvery: 0, decisions: {}, unread: {}, settled: {}, perTurn: [], refusals: {},
     researchAi: { major: newResearchTally(), minor: newResearchTally() }, researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } },
-    civicAi: { major: newResearchTally(), minor: newResearchTally() }, civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } } , barbTactics: {} };
+    civicAi: { major: newResearchTally(), minor: newResearchTally() }, civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 } } , barbTactics: {},
+    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 } };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
@@ -2531,8 +2726,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   // a city-state's army moves and fights as the record's moves and battles
   // say (`syncUnits`, `battle`), its Builders lay what the record's
   // improvements carry (`improve`), it buys what the log's purchases name
-  // (`buyUnit`) and its Trader goes where the record's routes run (`routes`):
-  // the engine's stand-ins for those are its AI's
+  // (`buyUnit`) and its Trader goes where the record's routes run (`routes`);
+  // its units' tactical turn runs on a copy beside the record (`minorAi`)
   holdMinorOrders(true);
   holdCityStrikes(true);
   holdLevies(true);
@@ -2566,7 +2761,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
     engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
-    tactical: loadTactical(dumpPath), barbTally: report.barbTactics,
+    tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
   };
@@ -2794,6 +2989,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     }
     syncUnits(ctx, b);
     campsTaken(ctx, b, a.turn);
+    minorAi(ctx, b, a.turn);
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
     syncUnits(ctx, b);
@@ -3026,6 +3222,18 @@ export function replayMarkdown(r: ReplayReport): string {
     const row = (k: string, x: CityBuildTally) => `| ${k} | ${x.log} | ${x.both} | ${x.exact} | ${x.onlyLog} | ${x.onlyOurs} | ${x.first ? `t${x.first.turn} p${x.first.player} ${x.first.log} / ${x.first.ours}` : '-'} |`;
     out.push(row('all', c));
     for (const [k, x] of Object.entries(r.cityBuildPer ?? {}).sort(([, a], [, b]) => b.log - a.log).slice(0, 40)) out.push(row(k, x));
+  }
+  if (Object.keys(r.minorTactics ?? {}).length) {
+    const d = r.minorDraws;
+    out.push('', '## The city-states\' moves', '', 'Per move of the game\'s tactical log (a unit with no row of the turn "(no row)"): the',
+      'unit-turns the engine\'s AI moved from the pair\'s first record, those it moved by the same move, the end plots record',
+      't+1 holds and those it matched (`minorAi:move`), and the first turn each differed.', '',
+      '| game move | unit-turns | same move | first other | end plots | matched | first off |', '|---|---:|---:|---:|---:|---:|---:|');
+    for (const [k, t] of Object.entries(r.minorTactics).sort(([, x], [, y]) => y.units - x.units)) {
+      out.push(`| ${k} | ${t.units} | ${t.move} | ${t.firstMove ?? '-'} | ${t.plotOf} | ${t.plot} | ${t.firstPlot ?? '-'} |`);
+    }
+    out.push('', `"Random Direction": ${d.paired} of ${d.turns} turns pair the log's draws with its rows; ${d.draws} draws taken on the log's own, `
+      + `${d.sameRange} over the log's range (first other t${d.firstOff ?? '-'}).`);
   }
   out.push('', '## The civics AI', '', 'A city-state\'s choices its turn made (or the record changed), a major\'s at each civic decision of the record, against the record\'s civic:', '',
     '| party | choices | as the record | first differing (turn player ours / record) |', '|---|---:|---:|---|');

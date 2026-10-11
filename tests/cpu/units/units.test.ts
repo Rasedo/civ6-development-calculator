@@ -67,10 +67,10 @@ describe('movement', () => {
     expect(moveCostInto(state, from, t)).toBe(RAILROAD_MP);
   });
 
-  it('river crossings end the turn; mountains are impassable', () => {
+  it('river crossings end the turn, out of a city none; mountains are impassable', () => {
     const { state } = unitsState();
-    const from = tileAtCoords(state.map, 8, 8);
-    const to = tileAtCoords(state.map, 9, 8);
+    const from = tileAtCoords(state.map, 5, 5);
+    const to = tileAtCoords(state.map, 6, 5);
     from.riverMask = 1 << DIR_E;
     expect(crossesRiver(state.map, from, to)).toBe(true);
 
@@ -79,6 +79,14 @@ describe('movement', () => {
     stepUnit(state, unit, to);
     expect(unit.tileIndex).toBe(to.index);
     expect(unit.movesLeft).toBe(0); // river ate all MP
+
+    // the river term's test (0x531510): no crossing out of a city
+    const capital = tileAtCoords(state.map, 8, 8);
+    capital.riverMask = 1 << DIR_E;
+    const out = spawnUnit(state, 'BUILDER', capital.index, 0)!;
+    out.tileIndex = capital.index;
+    stepUnit(state, out, tileAtCoords(state.map, 9, 8));
+    expect(out.movesLeft).toBeGreaterThan(0);
 
     const blocked = tileAtCoords(state.map, 11, 8);
     blocked.elevation = 'MOUNTAIN';

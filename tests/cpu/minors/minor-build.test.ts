@@ -384,9 +384,10 @@ describe("the minor's training", () => {
     minorPhase(state);
     const army = state.units.filter((u) => u.seat === cs.seat && u.type === 'WARRIOR');
     expect(army).toHaveLength(3);
-    // the new unit lands beside the centre, under the minor's seat
+    // the new unit lands beside the centre, under the minor's seat, and
+    // wanders within its turn's reach (`cityStateTactics`)
     expect(hexDistance(state.map, state.map.tiles[army[2].tileIndex].col, state.map.tiles[army[2].tileIndex].row, 12, 12))
-      .toBeLessThanOrEqual(1);
+      .toBeLessThanOrEqual(3);
     // three stand: the row wants no fourth, and the store fills
     const store = cs.prodOverflow!;
     minorPhase(state);

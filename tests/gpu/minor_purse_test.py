@@ -1,4 +1,4 @@
-"""THE MINOR'S PURSE, ITS WALKER, AND THE FREE CITY'S OWN PLAY — the GPU half.
+"""THE MINOR'S PURSE, ITS UNITS' WANDER, AND THE FREE CITY'S OWN PLAY — the GPU half.
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/minor_purse_test.py
@@ -13,9 +13,9 @@ tests/cpu/city/free-city-build.test.ts. Fitted to C-38's and C-60's census
      three times it after a loss, never at eight or more
   5. a Warrior Monk is bought with Faith where the majority religion allows
   6. one upgrade per research completion, first in slot order, flat price
-  7. the walker takes its drawn step toward the weighted ring
+  7. a city-state's unit wanders on one draw over its reach near its city
   8. the Free City banks its Production and trains, raises and repairs down
-     its build table; its units walk
+     its build table; its units wander near it
 """
 
 from __future__ import annotations
@@ -289,31 +289,38 @@ def test_upgrades(rules, path) -> None:
     print("  6 upgrades OK — one per completion, first in slot order, the flat price")
 
 
-def test_walker(rules, path) -> None:
+def test_wander(rules, path) -> None:
+    """a city-state's tactical turn (`_minor_tactics`, `cityStateTactics`):
+    its unit wanders on ONE "Random Direction" draw over the plots its reach
+    takes this turn within 5 of its city, none its own stacking, in the
+    order the pathfinder closed them, and moves to the one drawn"""
     sim = build(rules, path)
     s = a_minor(sim)
+    seat = 100 + s
     clear_army(sim, s)
+    # no barbarian about to chase
+    lo = sim.POOL_LO["barb"]
+    for i in (sim.barb_unit_alive[B0] & (sim.barb_unit_seat[B0] != FREE_SEAT)).nonzero(as_tuple=True)[0].tolist():
+        sim._occ_clear(torch.tensor([B0]), torch.tensor([int(sim.barb_unit_tile[B0, i])]), torch.tensor([i + lo]))
+        sim.barb_unit_alive[B0, i] = False
+    sim._gen_ver += 1
     u = give(sim, s, "WARRIOR")
-    ctr = int(sim.citystate_center[B0, s])
-    assert int(sim.major_unit_tile[B0, u]) == ctr
-    act = torch.zeros(sim.B, dtype=torch.bool)
-    act[B0] = True
-    home = sim.pair_dist[sim.citystate_center[:, s].clamp(min=0)].long()
-    one_step = torch.tensor([0, 1000, 0, 0])
-    ring_w = sim._walk_weight_plane(home, act, torch.tensor([0, 1000]), torch.tensor([0, 1000]))
-    sim._walk_units("major", 100 + s, act, lambda hp: one_step.unsqueeze(0).expand(sim.B, -1), ring_w)
-    assert int(sim.pair_dist[ctr, int(sim.major_unit_tile[B0, u])]) == 1, "the step did not reach the ring"
     sim.major_unit_mp[B0, u] = sim.major_unit_mp_full[B0, u]
-    home_w = sim._walk_weight_plane(home, act, torch.tensor([1000]), torch.tensor([1000]))
-    sim._walk_units("major", 100 + s, act, lambda hp: one_step.unsqueeze(0).expand(sim.B, -1), home_w)
-    assert int(sim.major_unit_tile[B0, u]) == ctr, "the walk did not come home"
-    # a step of 0 is one draw and no move
-    still = torch.tensor([1000, 0, 0, 0])
+    ctr = int(sim.citystate_center[B0, s])
+    res = sim._tac_search(torch.tensor([B0]), torch.tensor([u]), seat, 2, False, pre="major")
+    turns, rank = res["turns"][0].tolist(), res["rank"][0].tolist()
+    own = sim._tac_own_mil(seat)[B0].tolist()
+    cand = sorted((rank[t], t) for t in range(sim.T)
+                  if turns[t] == 1 and not own[t] and int(sim.pair_dist[ctr, t]) <= 5)
+    tiles = [t for _r, t in cand]
+    assert len(tiles) > 1, tiles
     st = int(sim.rng_state[B0])
-    sim._walk_units("major", 100 + s, act, lambda hp: still.unsqueeze(0).expand(sim.B, -1), home_w)
-    assert int(sim.major_unit_tile[B0, u]) == ctr
-    assert int(sim.rng_state[B0]) == (st * 1103515245 + 12345) & M32
-    print("  7 walker OK — the drawn step toward the weighted ring, home again, a still turn one draw")
+    sim._minor_tactics(s)
+    s1 = (st * 1103515245 + 12345) & M32
+    assert int(sim.rng_state[B0]) == s1, "not one draw"
+    assert int(sim.major_unit_tile[B0, u]) == tiles[((s1 >> 16) * (len(tiles) & 0xFFFF)) >> 16]
+    assert int(sim.unit_pslot[B0, u + sim.POOL_LO["major"]]) >= 0, "no pool slot"
+    print("  7 wander OK — one draw over the reach's plots near the city, the one drawn")
 
 
 def test_free_city(rules, path) -> None:
@@ -354,16 +361,16 @@ def test_free_city(rules, path) -> None:
     assert int(sim.city_outer_hp[B0, F, j]) == mx - 30
     sim._free_city_build(j, act, torch.full_like(prod, 1.0), techs, civics, train)
     assert int(sim.city_outer_hp[B0, F, j]) == mx and float(sim.city_free_pot[B0, F, j]) == 0.0
-    # its units walk in its own phase
+    # its units wander near it in its own phase
     before = [t for _s, _u, t in fct.free_units(sim)]
     for k in range(6):
         sim.turn = int(sim.turn) + 1
         sim._free_cities_phase()
     after = fct.free_units(sim)
-    assert any(t != b for (_s, _u, t), b in zip(after, before)), "no Free Cities unit walked"
+    assert any(t != b for (_s, _u, t), b in zip(after, before)), "no Free Cities unit wandered"
     assert all(int(sim.pair_dist[centre, t]) <= 6 for _s, _u, t in after)
     assert all(int(sim.unit_seat[B0, s_]) == FREE_SEAT for s_, _u, _t in after)
-    print("  8 Free City OK — the pot, the ranged class, Monument and Granary, walls and their repair, the walk")
+    print("  8 Free City OK — the pot, the ranged class, Monument and Granary, walls and their repair, the wander")
 
 
 def main() -> int:
@@ -375,7 +382,7 @@ def main() -> int:
     test_military_buy(rules, path)
     test_monk_buy(rules, path)
     test_upgrades(rules, path)
-    test_walker(rules, path)
+    test_wander(rules, path)
     test_free_city(rules, path)
     print("BATTERY OK minor_purse")
     return 0

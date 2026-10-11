@@ -2343,6 +2343,9 @@ class SimMasks:
         riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
         if zeal is not None:
             riv = torch.where(zeal, torch.zeros_like(riv), riv)
+        # the river term's test (0x531510): no crossing where either plot is
+        # a city's
+        riv = torch.where(self._centre_plane().gather(1, ends).any(dim=1), torch.zeros_like(riv), riv)
         return terr, riv
 
     def _religious_zeal(self, utype: torch.Tensor, useat: torch.Tensor) -> torch.Tensor:
@@ -2758,6 +2761,7 @@ class SimMasks:
         self.barb_unit_type[rows, slot] = (
             unit_type[rows] if isinstance(unit_type, torch.Tensor) else unit_type)
         self.barb_unit_free_city[rows, slot] = -1 if home is None else home[rows]
+        self.barb_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
         # no tribe's until the raise that made it says so (`_barb_raise`)
         self.barb_unit_tribe[rows, slot] = -1
         self.barb_unit_scout[rows, slot] = False
@@ -3248,6 +3252,7 @@ class SimMasks:
         assert int(slot.max()) < simbase.MAJOR_POOL_MAX, "major slot pool exhausted — raise simbase.MAJOR_POOL_MAX"
         getattr(self, f"{pre}_unit_alive")[rows, slot] = True
         self.major_unit_seat[rows, slot] = seat
+        self.major_unit_pslot[rows, slot] = -1  # no pool slot until its player's pass (`poolSlots`)
         getattr(self, f"{pre}_unit_type")[rows, slot] = type_idx.take(rows)
         getattr(self, f"{pre}_unit_tile")[rows, slot] = spot.take(rows)
         # the unit added answers a Train Unit quest (`questUnitAdded`)

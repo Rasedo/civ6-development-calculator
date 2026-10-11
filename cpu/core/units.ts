@@ -253,8 +253,11 @@ export function terrainMp(tile: Tile, mover?: { promos?: number; type: string })
   return cost;
 }
 
+/** a river crossing's Movement (the river term 0x5301e0): none where either
+ *  plot is water or a city's (its test 0x531510) */
 export function riverCharge(state: GameState, from: Tile, to: Tile, mover?: { type: string; seat?: number }): number {
-  if (isWater(to)) return 0;
+  if (isWater(to) || isWater(from)) return 0;
+  if (from.district === 'CITY_CENTER' || to.district === 'CITY_CENTER') return 0;
   if (roadStep(from, to) && roadBridges(state)) return 0;
   if (mover && religiousIgnoresTerrain(state, mover)) return 0;
   return crossesRiver(state.map, from, to) ? RIVER_CROSS_MP : 0;
@@ -857,7 +860,7 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
   const promo = promoValue(unit, 'MOVES');
   const atSea = seaMoveBonus(state, unit.seat);
   if (unit.embarked && !def?.naval) {
-    return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + atSea + promo + rosterEmbarkMoves(state, unit));
+    return MP_SCALE * (EMBARK_MOVES + embarkTechMoves(state, unit.seat) + promo + rosterEmbarkMoves(state, unit));
   }
   // CIV6 (Letters of Marque): "Naval Raiders: +100% Production, +2 Movement."
   const raider = def?.raider ? getModifiers(state, unit.seat).navalRaiderMoves : 0;
@@ -885,7 +888,10 @@ export function unitFullMoves(state: GameState, unit: { type: string; seat: numb
         unit.tileIndex === undefined ? NO_SEAT : tileSeat(state.map.tiles[unit.tileIndex])));
 }
 
-/** the Mathematics rung every hull and every passenger reads. */
+/** the Mathematics rung (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT): a hull's
+ *  alone — an embarked unit keeps its embarked pool (runs/h1_duelw1117 t78:
+ *  city-state 2's embarked Swordsman plans on 2 Movement with Mathematics,
+ *  AI_Planning.csv) */
 export function seaMoveBonus(state: GameState, seat: number): number {
   return seatOf(state, seat)?.research.techs.includes(SEA_MOVE_TECH) ? SEA_MOVE_TECH_BONUS : 0;
 }
@@ -935,14 +941,24 @@ export function embarkTechMoves(state: GameState, seat: number): number {
 export function stepCost(state: GameState, unit: { type: string; seat: number; promos?: number }, from: Tile, to: Tile): number {
   const naval = !!UNITS[unit.type]?.naval;
   const transition = !naval && !waterWalks(unit.type) && isWater(from) !== isWater(to);
-  if (!transition) return moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
-  const wEnd = isWater(to) ? to : from;
-  const lEnd = isWater(to) ? from : to;
-  const easyDock = wEnd.district === 'HARBOR'
-    || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
-    || ignoresShores(state, unit);
-  return moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP);
+  let cost: number;
+  if (!transition) cost = moveCostInto(state, from, to, unit) + riverCharge(state, from, to, unit);
+  else {
+    const wEnd = isWater(to) ? to : from;
+    const lEnd = isWater(to) ? from : to;
+    const easyDock = wEnd.district === 'HARBOR'
+      || (lEnd.district === 'CITY_CENTER' && isCoastalLand(state.map, lEnd))
+      || ignoresShores(state, unit);
+    cost = moveCostInto(state, from, to, unit) + (easyDock ? 0 : EMBARK_TRANSITION_MP);
+  }
+  // CIV6 (GlobalParameters CITY_MOVEMENT_COST 1; the movement cost's city
+  // term 0x531660 caps the step's whole cost where it enters a city)
+  return to.district === 'CITY_CENTER' ? Math.min(cost, CITY_MOVEMENT_MP) : cost;
 }
+
+/** CITY_MOVEMENT_COST (GlobalParameters), in MP_SCALE units */
+const CITY_MOVEMENT_MP = MP_SCALE;
+
 
 export function stepUnit(state: GameState, unit: Unit, to: Tile): StepOutcome {
   const seat = unit.seat;

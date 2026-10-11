@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { BARB_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, isBarbSeat, markCityCentre, seatOfCityState, setTileOwner } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { disbandUnit, spawnUnit } from '../../../cpu/core/units';
+import { disbandUnit, grantedMoves, spawnUnit } from '../../../cpu/core/units';
 import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeDies, tribeOf } from '../../../cpu/core/barbarians';
-import { barbarianTactics, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets } from '../../../cpu/core/tactical';
-import { DIRECTION_TYPES, neighborTile } from '../../../world/hex';
+import { barbarianTactics, cityStateTactics, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets } from '../../../cpu/core/tactical';
+import { DIRECTION_TYPES, neighborTile, tilesWithin } from '../../../world/hex';
 import { LCG_ADD, LCG_MUL } from '../../../cpu/core/rand';
-import type { GameState, Unit } from '../../../cpu/core/types';
+import type { CityState, GameState, Unit } from '../../../cpu/core/types';
 
 function land(): GameState {
   const state = makeState(makeMap(20, 20));
@@ -165,5 +165,98 @@ describe("the barbarians' tactical pass", () => {
     const s1 = (Math.imul(LCG_MUL, s0) + LCG_ADD) >>> 0;
     expect(state.rngState).toBe(s1);
     expect(u.tileIndex).toBe(cands[((s1 >>> 16) * (cands.length & 0xffff)) >>> 16]);
+  });
+});
+
+/** a city-state at (col, row), its plots within 2 */
+function addMinor(state: GameState, col: number, row: number): CityState {
+  const center = tileAtCoords(state.map, col, row);
+  const cs: CityState = {
+    ...emptySeat(seatOfCityState(state.cityStates.length)),
+    id: state.cityStates.length, name: `CS${state.cityStates.length}`, type: 'militaristic',
+    centerIndex: center.index, population: 3, envoys: {}, met: [],
+  };
+  for (const t of tilesWithin(state.map, col, row, 2)) setTileOwner(t, cs.seat);
+  markCityCentre(center);
+  state.cityStates.push(cs);
+  state.cityStateMax = Math.max(state.cityStateMax ?? 0, cs.id + 1);
+  return cs;
+}
+
+/** a city-state's units' Movement at their turn's start */
+function minorStart(state: GameState, cs: CityState): void {
+  for (const u of state.units) {
+    if (u.seat !== cs.seat) continue;
+    u.movesLeft = grantedMoves(state, u);
+    u.movesFull = u.movesLeft;
+  }
+}
+
+describe("a city-state's tactical pass", () => {
+  it('wanders a unit on ONE "Random Direction" draw over its plots of this turn within 5 of its city', () => {
+    const state = land();
+    const cs = addMinor(state, 10, 10);
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 10).index, cs.seat)!;
+    minorStart(state, cs);
+    const cands = reachPlots(state, u, 2).filter((e) => e.turns === 1 && !enemyAt(state, u, e.tile)
+      && !stackedAt(state, u, e.tile) && plotDistance(state, cs.centerIndex, e.tile) <= 5).map((e) => e.tile);
+    expect(cands.length).toBeGreaterThan(1);
+    const s0 = state.rngState;
+    cityStateTactics(state, cs);
+    const s1 = (Math.imul(LCG_MUL, s0) + LCG_ADD) >>> 0;
+    expect(state.rngState).toBe(s1);
+    expect(u.tileIndex).toBe(cands[((s1 >>> 16) * (cands.length & 0xffff)) >>> 16]);
+  });
+
+  it('a hurt unit heals where it stands, drawing nothing', () => {
+    const state = land();
+    const cs = addMinor(state, 10, 10);
+    const at = tileAtCoords(state.map, 11, 10).index;
+    const u = spawnUnit(state, 'WARRIOR', at, cs.seat)!;
+    u.hp = 60;
+    minorStart(state, cs);
+    const s0 = state.rngState;
+    cityStateTactics(state, cs);
+    expect(u.tileIndex).toBe(at);
+    expect(state.rngState).toBe(s0);
+  });
+
+  it("its pool's slot 0 is the founding Settler's: the first unit made after it takes that slot", () => {
+    const state = land();
+    const cs = addMinor(state, 10, 10);
+    const a = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 11, 10).index, cs.seat)!;
+    const b = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 10).index, cs.seat)!;
+    minorStart(state, cs);
+    cityStateTactics(state, cs);
+    expect([a.slot, b.slot]).toEqual([1, 2]);
+    expect(cs.unitPool!.dying).toEqual([0]);
+    const c = spawnUnit(state, 'SLINGER', tileAtCoords(state.map, 10, 11).index, cs.seat)!;
+    minorStart(state, cs);
+    cityStateTactics(state, cs);
+    expect(c.slot).toBe(0);
+  });
+
+  it('types HIGH a foe nearer its district than twice its Movement, LOW one farther', () => {
+    const state = land();
+    const cs = addMinor(state, 10, 10);
+    const near = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 10).index, BARB_SEAT)!;
+    const far = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 14, 10).index, BARB_SEAT)!;
+    const seen = new Uint8Array(state.map.tiles.length).fill(1);
+    const list = tacticalTargets(state, cs.seat, seen, null);
+    expect(list.find((e) => e.tile === cs.centerIndex)?.type).toBe('FRIENDLY_CITY');
+    expect(list.find((e) => e.unit === near)?.type).toBe('HIGH');
+    expect(list.find((e) => e.unit === far)?.type).toBe('LOW');
+  });
+
+  it('a unit with no plot near its city goes back beside it (Wander Back to City)', () => {
+    const state = land();
+    const cs = addMinor(state, 4, 4);
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 14, 4).index, cs.seat)!;
+    minorStart(state, cs);
+    const s0 = state.rngState;
+    cityStateTactics(state, cs);
+    expect(state.rngState).toBe(s0);
+    expect(plotDistance(state, u.tileIndex, tileAtCoords(state.map, 14, 4).index)).toBeGreaterThan(0);
+    expect(plotDistance(state, u.tileIndex, cs.centerIndex)).toBeLessThan(10);
   });
 });

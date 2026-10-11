@@ -1,15 +1,14 @@
 /**
- * THE MINOR'S PURSE AND ITS WALKER (C-38's census): its units' upkeep, the
+ * THE MINOR'S PURSE (C-38's census): its units' upkeep, the
  * Builder and military purchases at the fitted rates, the Warrior Monk bought
- * with Faith, the upgrade a research completion triggers, and the walk of its
- * land military. The GPU twin is tests/gpu/minor_purse_test.py.
+ * with Faith and the upgrade a research completion triggers. The GPU twin is
+ * tests/gpu/minor_purse_test.py.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
 import { minorBuilderWork, minorEconomy, minorPlan, minorPurchases, minorUpgrades } from '../../../cpu/core/minorBuild';
-import { walkUnit } from '../../../cpu/core/walker';
 import { computeCityStats } from '../../../cpu/core/city';
 import { builderCost, spawnUnit } from '../../../cpu/core/units';
 import { purchaseStep } from '../../../cpu/core/effects';
@@ -246,44 +245,5 @@ describe("a city-state's upgrades", () => {
     a.tileIndex = off.index;
     minorUpgrades(state, cs, 1);
     expect(a.type).toBe('WARRIOR');
-  });
-});
-
-describe('the walker', () => {
-  it('walks one step to the ring the weights ask for, on two draws', () => {
-    const { state, cs } = scene();
-    const u = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    expect(u.tileIndex).toBe(cs.centerIndex);
-    const ctr = state.map.tiles[cs.centerIndex];
-    walkUnit(state, u, [cs.centerIndex], [0, 1000, 0, 0], [0, 1000]);
-    const at = state.map.tiles[u.tileIndex];
-    expect(hexDistance(state.map, at.col, at.row, ctr.col, ctr.row)).toBe(1);
-    // and back home when only home weighs anything
-    u.movesLeft = u.movesFull ?? 2;
-    walkUnit(state, u, [cs.centerIndex], [0, 1000, 0, 0], [1000]);
-    expect(u.tileIndex).toBe(cs.centerIndex);
-  });
-
-  it('stands still on a step of 0, with one draw', () => {
-    const { state, cs } = scene();
-    const u = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    const s0 = state.rngState;
-    walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);
-    expect(u.tileIndex).toBe(cs.centerIndex);
-    state.rngState = s0;
-    randRange(state, 1, 'Engine: minor buy');
-    const s1 = state.rngState;
-    state.rngState = s0;
-    walkUnit(state, u, [cs.centerIndex], [1000, 0, 0, 0], [1000]);
-    expect(state.rngState).toBe(s1);
-  });
-
-  it("never steps onto a tile a foreign unit holds, nor into another's city centre", () => {
-    const { state, cs } = scene();
-    const u = spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat)!;
-    const ring = neighbors(state.map, state.map.tiles[cs.centerIndex]);
-    for (const t of ring) spawnUnit(state, 'WARRIOR', t.index, 0);
-    walkUnit(state, u, [cs.centerIndex], [0, 1000, 0, 0], [0, 1000]);
-    expect(u.tileIndex).toBe(cs.centerIndex);
   });
 });

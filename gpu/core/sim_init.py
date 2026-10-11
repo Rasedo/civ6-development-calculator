@@ -1357,6 +1357,9 @@ class SimInit:
             # a METEOR SITE's grant (`Unit.noResourceUpkeep`): it burns no
             # fuel and is never short of it, through any upgrade
             ("no_res_upkeep", torch.bool),
+            # its place in a city-state's or the Free Cities' unit pool (`poolSlots`,
+            # the order their tactical AI walks their units in), -1 none yet
+            ("pslot", torch.long),
         ):
             _base = torch.zeros(B, self.UNIT_MAX, dtype=_dt, device=device)
             setattr(self, f"unit_{_pl}", _base)
@@ -1374,6 +1377,7 @@ class SimInit:
         self.unit_revealed_turn.fill_(-1)
         self.unit_patrol.fill_(-1)
         self.unit_free_city.fill_(-1)
+        self.unit_pslot.fill_(-1)
         self.unit_levy_src.fill_(-1)
         self.unit_spy_mission.fill_(self._spy_idle)
         self.unit_spy_target.fill_(-1)
@@ -3970,6 +3974,17 @@ class SimInit:
         self.barb_pool_nfree = torch.zeros(B, dtype=torch.long, device=device)
         self.barb_pool_dying = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
         self.tribe_defender = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        # each city-state's unit pool (row s), then the Free Cities' (row S)
+        # (`UnitPool`, `poolSlots`): the slots ever used — a city-state's slot 0
+        # its founding Settler's — the freed ones (a stack, the last pushed on
+        # top) and those whose unit was gone when its last tactical turn ended;
+        # each unit's slot is `unit_pslot`
+        _np = self.S + 1
+        self.seat_pool_size = torch.ones(B, _np, dtype=torch.long, device=device)
+        self.seat_pool_size[:, self.S] = 0
+        self.seat_pool_free = torch.zeros(B, _np, simbase.SEAT_POOL_MAX, dtype=torch.long, device=device)
+        self.seat_pool_nfree = torch.zeros(B, _np, dtype=torch.long, device=device)
+        self.seat_pool_dying = torch.zeros(B, _np, simbase.SEAT_POOL_MAX, dtype=torch.bool, device=device)
         # the player whose unit took each dead tribe's camp (-1 none): its units
         # rampage against it; the city each raid waits for and the homing
         # scout's, by their centres (-1 none)

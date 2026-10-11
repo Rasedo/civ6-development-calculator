@@ -844,6 +844,8 @@ MAJOR_POOL_MAX = 512
 #: them, at most two apiece, so the row can never fill in a real game.
 GP_LUX_MAX = 8
 BARB_POOL_MAX = 256
+#: the slots a city-state's or the Free Cities' unit pool may number
+SEAT_POOL_MAX = 64
 UNIT_SLOTS = 256
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
@@ -1076,6 +1078,8 @@ _MUTABLE = [
     "barb_spot_next",
     # their unit pool and each tribe's camp defender (`barbSlots`, `cpu/core/tactical.ts`)
     "barb_unit_slotno", "barb_pool_size", "barb_pool_free", "barb_pool_nfree", "barb_pool_dying", "tribe_defender",
+    # each city-state's unit pool, then the Free Cities' (`poolSlots`, `cpu/core/tactical.ts`)
+    "seat_pool_size", "seat_pool_free", "seat_pool_nfree", "seat_pool_dying",
     # the player each dead tribe rampages against, the cities its raids wait for (`BarbTribe.rampage`, `raidTargets`)
     "tribe_ramp", "tribe_raidp", "tribe_home_plot",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
@@ -1155,7 +1159,7 @@ _MUTABLE = [
     # The merged unit pool. The BASES are registered, never the `major_`/`barb_`
     # RANGE VIEWS into them — snapshot/restore round-trips one tensor per plane
     # instead of three, and a view can never be half-restored.
-    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep",
+    "unit_alive", "unit_type", "unit_tile", "unit_hp", "unit_fortify", "unit_xp", "unit_level", "unit_promos", "unit_promo_offer", "unit_promo_used", "unit_promo_bonus", "unit_xp_pct", "unit_mp_bonus", "unit_charges", "unit_aura_mp", "unit_mp", "unit_mp_full", "unit_attacks", "unit_emb", "unit_seat", "unit_spy_mission", "unit_spy_turns", "unit_spy_target", "unit_spy_level", "unit_band_level", "unit_band_album", "unit_gp_at", "unit_revealed_turn", "unit_formation", "unit_levied", "unit_levy_src", "unit_patrol", "unit_free_city", "unit_no_res_upkeep", "unit_pslot",
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",

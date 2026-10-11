@@ -25,6 +25,10 @@ _BARB_DEFENSE_RANGED = 1
 _CHASE_RANGE = 16
 # CHASE TARGET's reach of a target (0x775170)
 _CHASE_SIGHT = 8
+# WANDER NEAR CITY's radius (0x77bf50) and the one FindAlternateLocation searches
+# round the city (0x585940)
+_WANDER_CITY_RANGE = 5
+_WANDER_BACK_RANGE = 3
 
 
 class SimTactics:
@@ -84,19 +88,27 @@ class SimTactics:
 
     # ------------------------------------------------------ the pathfinder
 
+    def _tac_entry(self) -> torch.Tensor:
+        """[B, T] long — `moveCostInto` of each land plot off no route, in
+        `mp_scale` units: its terrain's cost, an improvement's Movement in its
+        place."""
+        tm = self.tmove
+        if self._imp_move_cost_any:
+            mi = self.improvement
+            mc = self._imp_move_cost.take(mi.clamp(min=0)) * ((mi >= 0) & ~self.pillaged).long()
+            tm = torch.where(mc > 0, (mc - 1) * self._mp_scale, tm)
+        return self._mp_scale + tm
+
     def _tac_step_cost(self) -> torch.Tensor:
         """[B, T, 6] long — `stepCost` for a step off each plot along each
         neighbour column onto LAND, in `mp_scale` units: the plot's own cost
         (an improvement's Movement in its place), a route at both ends its
-        tier's instead, and the river crossing a bridging tier drops. A
-        barbarian's chassis waives no terrain, and its steps never cross the
-        shore."""
+        tier's instead, the river crossing a bridging tier drops and none
+        where either plot is a city's (0x531510); a step into a city costs
+        one Movement at most (CITY_MOVEMENT_COST, 0x531660). No chassis here
+        waives terrain."""
         nb = self.neigh.clamp(min=0)  # [T, 6]
-        tm = self.tmove[:, nb]
-        if self._imp_move_cost_any:
-            mi = self.improvement[:, nb]
-            mc = self._imp_move_cost.take(mi.clamp(min=0)) * ((mi >= 0) & ~self.pillaged[:, nb]).long()
-            tm = torch.where(mc > 0, (mc - 1) * self._mp_scale, tm)
+        tm = self._tac_entry()[:, nb] - self._mp_scale
         rr_f = self.railroad.unsqueeze(2)
         rr_t = self.railroad[:, nb]
         rd = (self.road.unsqueeze(2) | rr_f) & (self.road[:, nb] | rr_t)
@@ -107,7 +119,11 @@ class SimTactics:
         river_mp = (2 * self._mp_scale) * ((self.river_mask.unsqueeze(2) >> bits) & 1)
         bridged = self._road_tier_bridges.take(self.road_tier).view(-1, 1, 1)
         riv = torch.where(rd & bridged, torch.zeros_like(river_mp), river_mp)
-        return self._mp_scale + terr + riv
+        ctr = self._centre_plane()
+        ctr_to = ctr[:, nb]
+        riv = torch.where(ctr.unsqueeze(2) | ctr_to, torch.zeros_like(riv), riv)
+        cost = self._mp_scale + terr + riv
+        return torch.where(ctr_to, cost.clamp(max=self._mp_scale), cost)
 
     def _tac_foreign(self, seat: int) -> torch.Tensor:
         """[B, T] bool — a unit of another player than `seat` holds the plot
@@ -118,11 +134,39 @@ class SimTactics:
             out |= s != seat
         return out
 
+    def _tac_hostile(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — a unit of a player at war with `seat` holds the plot
+        (an aircraft or a spy holds none)."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
+            s = torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), torch.full_like(pl, -1))
+            out |= (pl >= 0) & self._seats_hostile(seat, s)
+        return out
+
+    def _tac_closed(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — `majorClosedToMinor`: for a city-state's `seat`, a
+        major's territory where the major holds the open-borders civic and is
+        not at war with it; nothing for any other seat."""
+        zero = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        if not (100 <= seat < 100 + self.S) or self._open_borders_civic < 0 or self.n_majors == 0:
+            return zero
+        R = self.n_majors
+        own = self.tile_seat
+        maj = (own >= 0) & (own < R)
+        oc = own.clamp(min=0, max=R - 1)
+        civic = self.civ_civics[:, :R, self._open_borders_civic].gather(1, oc)
+        war = self.war[:, self._CITY_MINOR0 + seat - 100, :R].gather(1, oc)
+        return maj & civic & ~war
+
     def _tac_enter(self, seat: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat` may
-        enter (`enterable`): its domain's ground, no unit of another player, no
-        city centre, no live enemy Encampment."""
-        block = self._tac_foreign(seat) | self._centre_plane()
+        enter (`enterable`): its domain's ground, no unit of a player at war
+        with it (another player's unit it passes), no city centre but its
+        own, no live enemy Encampment, no major's ground closed to a
+        city-state (`_tac_closed`). The NAVAL plane is the water an embarking
+        land unit takes too."""
+        block = (self._tac_hostile(seat) | (self._centre_plane() & (self.tile_seat != seat))
+                 | self._tac_closed(seat))
         if self._encamp_didx >= 0:
             block = block | self._encamp_block_plane(seat)
         cart = self._ocean_open(torch.full((self.B,), seat, dtype=torch.long, device=self.device))
@@ -132,11 +176,11 @@ class SimTactics:
 
     def _tac_attack_planes(self, seat: int) -> tuple[torch.Tensor, torch.Tensor]:
         """[B, T] bool twice — the plots a LAND and a NAVAL unit of `seat`
-        attacks into (`groundOf`'s attack): a unit of another player on ground
-        of the mover's domain, a city centre not its own, an Encampment
-        that blocks a land mover."""
-        foe = self._tac_foreign(seat)
-        ctr = self._centre_plane()
+        attacks into (`groundOf`'s attack): a unit of a player at war with it
+        on ground of the mover's domain, a city centre of such a player, an
+        Encampment that blocks a land mover."""
+        foe = self._tac_hostile(seat)
+        ctr = self._centre_plane() & (self.tile_seat != seat) & self._seats_hostile(seat, self.tile_seat)
         land = self.passable & ((foe & ~self.water) | ctr)
         if self._encamp_didx >= 0:
             land = land | (self.passable & self._encamp_block_plane(seat))
@@ -180,40 +224,104 @@ class SimTactics:
             self._tac_cost_held = self._tac_step_cost()
         return self._tac_cost_held
 
-    def _tac_full(self) -> torch.Tensor:
-        """[B, P] — each barbarian's full Movement (`unitFullMoves`, no
-        aura), held through a tactical pass"""
-        if self._tac_in_pass and self._tac_full_held is not None:
-            return self._tac_full_held
-        f = self._full_mp("barb") - self.barb_unit_aura_mp
+    def _tac_full(self, pre: str = "barb") -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, P] twice — each unit of pool `pre`'s full Movement
+        (`unitFullMoves`, no aura) ashore and embarked, held through a
+        tactical pass"""
+        held = self._tac_full_held if self._tac_in_pass else None
+        if held is not None and pre in held:
+            return held[pre]
+        emb = getattr(self, f"{pre}_unit_emb")
+        aura = getattr(self, f"{pre}_unit_aura_mp")
+        f = (self._full_mp(pre, torch.zeros_like(emb)) - aura, self._full_mp(pre, torch.ones_like(emb)) - aura)
         if self._tac_in_pass:
-            self._tac_full_held = f
+            if self._tac_full_held is None:
+                self._tac_full_held = {}
+            self._tac_full_held[pre] = f
         return f
 
+    def _tac_full_now(self, pre: str = "barb") -> torch.Tensor:
+        """[B, P] — `unitFullMoves` of each unit of pool `pre` as it stands,
+        embarked or ashore"""
+        f_land, f_sea = self._tac_full(pre)
+        return torch.where(getattr(self, f"{pre}_unit_emb"), f_sea, f_land)
+
+    def _tac_tech(self, seat: int, tech: int) -> torch.Tensor:
+        """[B] bool — `seat` holds `tech`: a major's research, a city-state's,
+        the barbarians'; the Free Cities hold none here."""
+        if tech < 0:
+            return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+        if 0 <= seat < self.n_majors:
+            return self.civ_techs[:, seat, tech]
+        if 100 <= seat < 100 + self.S:
+            return self.citystate_techs[:, seat - 100, tech]
+        if seat == BARB_SEAT:
+            return self.barb_techs[:, tech]
+        return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+
+    def _tac_embarks(self, rows: torch.Tensor, utype: torch.Tensor, seat: int) -> torch.Tensor:
+        """[N] bool — `canEmbark` for land units of `utype` [N] of `seat` in
+        the games `rows`: Sailing for a civilian, Shipbuilding for any other;
+        the barbarians' planning takes no water (`groundOf`)."""
+        if seat == BARB_SEAT:
+            return torch.zeros_like(utype, dtype=torch.bool)
+        civ = self._type_civilian.take(utype) | self._type_support.take(utype)
+        ok = torch.where(civ, self._tac_tech(seat, self._sailing_tech)[rows],
+                         self._tac_tech(seat, self._shipbuilding_tech)[rows])
+        return ok & ~self.unit_naval.take(utype) & ~self.unit_water_walk.take(utype)
+
+    def _tac_cliffs(self, seat: int) -> torch.Tensor:
+        """[B, T, 6] bool, neighbour columns — `cliffBlocks` on a land/water
+        step off each plot: the cliff bit of the land plot toward the water,
+        none at a city centre or at a Harbor of `seat`'s own."""
+        B, T, dev = self.B, self.T, self.device
+        if not self._has_cliffs:
+            return torch.zeros(B, T, 6, dtype=torch.bool, device=dev)
+        nb = self.neigh.clamp(min=0)  # [T, 6]
+        w_f = self.water.unsqueeze(2)
+        w_t = self.water[:, nb]
+        trans = (w_f != w_t) & (self.neigh >= 0).unsqueeze(0)
+        dirs = torch.arange(6, device=dev).view(1, 1, 6)
+        land = torch.where(w_f, nb.unsqueeze(0).expand(B, -1, -1), torch.arange(T, device=dev).view(1, T, 1).expand(B, T, 6))
+        dl = torch.where(w_f, (dirs + 3) % 6, dirs.expand(B, T, 6))
+        lf = land.reshape(B, -1)
+        bit = ((self.cliff_mask.gather(1, lf) >> dl.reshape(B, -1)) & 1).bool().reshape(B, T, 6)
+        free = self._centre_plane().gather(1, lf).reshape(B, T, 6)
+        if self._harbor_idx >= 0:
+            free = free | ((self.district.gather(1, lf) == self._harbor_idx)
+                           & (self.tile_seat.gather(1, lf) == seat)).reshape(B, T, 6)
+        return trans & bit & ~free
+
     def _tac_search(self, rows: torch.Tensor, slots: torch.Tensor, seat: int, max_turns: int, zoc: bool,
-                    dest: torch.Tensor | None = None) -> dict:
-        """THE PATHFINDER (`search`) for the units at local `slots` of the
-        barbarian pool in the games `rows` [N]: Dijkstra from each unit's
-        plot over the open nodes by (cost, tie) — a node inserted where its
-        cost lies nearer the cheapest open node goes before its equals, else
-        after them; a node made cheaper goes after its new equals; each closed
-        node links its neighbours in DirectionTypes order. Returns the closing
-        rank and turns of each plot ([N, T], -1 never closed) and each node's
-        parent; with `dest` [N] each row stops once its plot closes."""
+                    dest: torch.Tensor | None = None, pre: str = "barb") -> dict:
+        """THE PATHFINDER (`search`) for the units at local `slots` of pool
+        `pre` in the games `rows` [N]: Dijkstra from each unit's plot over
+        the open nodes by (cost, tie) — a node inserted where its cost lies
+        nearer the cheapest open node goes before its equals, else after them;
+        a node made cheaper goes after its new equals; each closed node links
+        its neighbours in DirectionTypes order. A land unit whose player may
+        embark it takes water too, a turn starting on the Movement of the
+        domain its plot holds it in. Returns the closing rank and turns of each
+        plot it may end on ([N, T], -1 never closed or only passed: another
+        player's unit holds it) and each node's parent; with `dest` [N] each
+        row stops once its plot closes."""
         dev = self.device
         N, T = rows.shape[0], self.T
         NONE = _KEY_NONE
         ar = torch.arange(N, device=dev)
-        utype = self.barb_unit_type[rows, slots].clamp(min=0, max=self.NU - 1)
+        utype = getattr(self, f"{pre}_unit_type")[rows, slots].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(utype)
-        start = self.barb_unit_tile[rows, slots].clamp(min=0)
-        mp = self.barb_unit_mp[rows, slots]
-        granted = self.barb_unit_mp_full[rows, slots]
-        full_mp = self._tac_full()[rows, slots]
-        full = torch.div(full_mp * _FIX, self._mp_scale, rounding_mode="floor")
+        start = getattr(self, f"{pre}_unit_tile")[rows, slots].clamp(min=0)
+        mp = getattr(self, f"{pre}_unit_mp")[rows, slots]
+        granted = getattr(self, f"{pre}_unit_mp_full")[rows, slots]
+        f_land, f_sea = self._tac_full(pre)
+        full_l = torch.div(f_land[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
+        full_s = torch.div(f_sea[rows, slots] * _FIX, self._mp_scale, rounding_mode="floor")
         unmoved = mp >= granted
         land, wat = self._tac_enter(seat)
-        ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows])  # [N, T]
+        embarks = self._tac_embarks(rows, utype, seat)
+        ent_n = torch.where(naval.unsqueeze(1), wat[rows], land[rows] | (wat[rows] & embarks.unsqueeze(1)))  # [N, T]
+        water_n = self.water[rows]
         # the plots each unit attacks into (`groundOf`'s attack): an enemy
         # unit's of its own domain, a hostile city centre, an Encampment for a
         # land unit — the path's end, the attack spending the Movement left
@@ -221,6 +329,15 @@ class SimTactics:
         fights = self._type_combat.take(utype) > 0
         atk_n = torch.where(naval.unsqueeze(1), a_nav[rows], a_land[rows]) & fights.unsqueeze(1) & ~ent_n
         cost_b = self._tac_cost()  # [B, T, 6]
+        any_embark = bool(embarks.count_nonzero())
+        if any_embark:
+            entry_n = self._tac_entry()[rows]
+            ctr_n = self._centre_plane()[rows]
+            coastal_n = self.coastal_land[rows]
+            ut_pool = getattr(self, f"{pre}_unit_type")
+            ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, slots]
+            cliffs_b = self._tac_cliffs(seat)
+            waive_cliff = self._promo_flag(utype, getattr(self, f"{pre}_unit_promos")[rows, slots], "CLIFFS")
         zp = (self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(utype).unsqueeze(1)) if zoc else None
         tseat = self.tile_seat
         g = torch.full((N, T), NONE, dtype=torch.long, device=dev)
@@ -279,10 +396,29 @@ class SimTactics:
             nb = neigh[best]  # [N, 6]
             nbc = nb.clamp(min=0)
             cst = cost_b[rows, best][:, cols]
+            fw = water_n.gather(1, b1)  # [N, 1]
+            cliff6 = None
+            if any_embark:
+                # an embarked step costs one Movement; a land/water step
+                # (`stepCost`'s transition) the plot's own cost and the
+                # embarking's, waived at a Harbor or a coastal city centre,
+                # one Movement at most into a city
+                tw = water_n.gather(1, nbc)
+                tr = (fw != tw) & (nb >= 0)
+                w_end = torch.where(tw, nbc, best.unsqueeze(1).expand(-1, 6))
+                l_end = torch.where(tw, best.unsqueeze(1).expand(-1, 6), nbc)
+                dock = (self.district[rows].gather(1, w_end) == self._harbor_didx) | (
+                    ctr_n.gather(1, l_end) & coastal_n.gather(1, l_end))
+                tcost = torch.where(tw, torch.full_like(cst, self._mp_scale), entry_n.gather(1, nbc))
+                tcost = tcost + torch.where(dock | ign_shore.unsqueeze(1), 0, self._embark_transition_mp)
+                tcost = torch.where(ctr_n.gather(1, nbc), tcost.clamp(max=self._mp_scale), tcost)
+                cst = torch.where(fw & tw, self._mp_scale, torch.where(tr, tcost, cst))
+                cliff6 = cliffs_b[rows, best][:, cols] & tr & ~waive_cliff.unsqueeze(1)
             cst = torch.where(naval.unsqueeze(1), self._mp_scale, cst)
             cst = torch.div(cst * _FIX, self._mp_scale, rounding_mode="floor")
             fresh = bm <= 0
-            pm = torch.where(fresh, full.unsqueeze(1), bm).expand(-1, 6)
+            full_here = torch.where(fw.squeeze(1) & ~naval, full_s, full_l)
+            pm = torch.where(fresh, full_here.unsqueeze(1), bm).expand(-1, 6)
             turns = (bt + fresh.long()).expand(-1, 6)
             moves = pm - cst
             short = moves < 0
@@ -301,6 +437,8 @@ class SimTactics:
             moves = torch.where(a6, 0, moves)
             turns = torch.where(a6, (bt + fresh.long()).expand(-1, 6), turns)
             ok = act.unsqueeze(1) & (nb >= 0) & (ent_n.gather(1, nbc) | a6) & (turns <= max_turns)
+            if cliff6 is not None:
+                ok = ok & ~cliff6
             ends = torch.where(moves <= 0, (tseat[rows.unsqueeze(1), nbc] != seat).long() * 3 + 4, 0)
             gn = bg + cst * 1000 + (ends + 2) * _FIX
             s0 = st.gather(1, nbc)
@@ -380,15 +518,47 @@ class SimTactics:
             put(tie, tie6)
             put(st, torch.ones_like(s0), new6)
             put(key, nk6, ins6)
+        # the planning's list keeps the plots the unit may end on (0x586900):
+        # none another player's unit holds, but where it attacks
+        stand = ~self._tac_foreign(seat)[rows] | atk_n
+        rank = torch.where(stand, rank, torch.full_like(rank, -1))
+        rturn = torch.where(stand, rturn, torch.full_like(rturn, -1))
         return {"rank": rank, "turns": rturn, "parent": par, "found": found, "start": start, "attack": atk_n,
                 "moves": mv}
 
-    def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor) -> None:
-        """`moveTo` for the barbarian at local slot `us` [B] in the games of
-        `mask`: the pathfinder's path to `dest` with zones of control, walked
-        as far as its Movement carries it this turn (a zone of control ends
-        it); it walks through its own units but stops short of a plot of its
-        own unit that stacks with it."""
+    def _tac_step(self, rows: torch.Tensor, frm: torch.Tensor, to: torch.Tensor, dcol: torch.Tensor,
+                  utype: torch.Tensor, ign_shore: torch.Tensor) -> torch.Tensor:
+        """[R] long — `stepCost` of one step `frm` -> `to` (neighbour column
+        `dcol`) for units of `utype` in the games `rows`, in `mp_scale`
+        units: a hull's and an embarked unit's one Movement, a land/water
+        step its plot's own cost and the embarking's (waived at a Harbor, a
+        coastal city centre or by `ign_shore`), a land step the held plane's;
+        one Movement at most into a city."""
+        naval = self.unit_naval.take(utype)
+        fw = self.water[rows, frm]
+        tw = self.water[rows, to]
+        mp1 = torch.full_like(frm, self._mp_scale)
+        land = self._tac_cost()[rows, frm, dcol]
+        w_end = torch.where(tw, to, frm)
+        l_end = torch.where(tw, frm, to)
+        ctr = self._centre_plane()
+        dock = (self.district[rows, w_end] == self._harbor_didx) | (ctr[rows, l_end] & self.coastal_land[rows, l_end])
+        trans = torch.where(tw, mp1, self._tac_entry()[rows, to])
+        trans = trans + torch.where(dock | ign_shore, torch.zeros_like(trans),
+                                    torch.full_like(trans, self._embark_transition_mp))
+        trans = torch.where(ctr[rows, to], trans.clamp(max=self._mp_scale), trans)
+        cost = torch.where(fw & tw, mp1, torch.where(fw != tw, trans, land))
+        return torch.where(naval, mp1, cost)
+
+    def _tac_move_to(self, mask: torch.Tensor, us: torch.Tensor, dest: torch.Tensor, pre: str = "barb",
+                     seat: int = BARB_SEAT, strike: bool = True) -> None:
+        """`moveTo` for the unit at local slot `us` [B] of pool `pre` (its
+        player `seat`) in the games of `mask`: the pathfinder's path to `dest`
+        with zones of control, walked as far as its Movement carries it this
+        turn (a zone of control ends it); it walks through its own units and
+        other players' but never ends on another player's unit or its own
+        that stacks with it. A path ending on a plot it attacks into stops at
+        its side, and with `strike` (the barbarians') it strikes there."""
         if not bool(mask.count_nonzero()):
             return
         dev = self.device
@@ -396,7 +566,7 @@ class SimTactics:
         rows = mask.nonzero(as_tuple=True)[0]
         sr = us[rows]
         dr = dest[rows].clamp(min=0)
-        res = self._tac_search(rows, sr, BARB_SEAT, 1 << 30, True, dr)
+        res = self._tac_search(rows, sr, seat, 1 << 30, True, dr, pre=pre)
         par = res["parent"]
         start = res["start"]
         R = rows.shape[0]
@@ -420,18 +590,26 @@ class SimTactics:
         path = torch.where(idx < L, path.gather(1, idx.clamp(max=L - 1)), torch.full_like(path, -1))
         plen = L - lead
         # a path ending on a plot it attacks into: it walks to its side
-        strike = res["found"] & res["attack"][ar, dr] & (plen > 0)
-        plen = plen - strike.long()
+        into = res["found"] & res["attack"][ar, dr] & (plen > 0)
+        plen = plen - into.long()
         path = torch.where(torch.arange(L, device=dev).unsqueeze(0) < plen.unsqueeze(1), path, torch.full_like(path, -1))
-        cost_land = self._tac_cost()
-        ut = self.barb_unit_type[rows, sr].clamp(min=0, max=self.NU - 1)
+        tile_p = getattr(self, f"{pre}_unit_tile")
+        mp_p = getattr(self, f"{pre}_unit_mp")
+        ut_pool = getattr(self, f"{pre}_unit_type")
+        ut = ut_pool[rows, sr].clamp(min=0, max=self.NU - 1)
         naval = self.unit_naval.take(ut)
-        halts = self._tac_zoc(BARB_SEAT)[rows] & ~self._tac_zoc_ignored(ut).unsqueeze(1)
-        mil_all = self.military_at[rows]
-        own = (mil_all >= 0) & (self.unit_seat[rows].gather(1, mil_all.clamp(min=0)) == BARB_SEAT)
+        ign_shore = self._ignore_shores(torch.full_like(ut_pool, seat), ut_pool)[rows, sr]
+        halts = self._tac_zoc(seat)[rows] & ~self._tac_zoc_ignored(ut).unsqueeze(1)
+
+        def own_at(pl: torch.Tensor) -> torch.Tensor:
+            return (pl >= 0) & (self.unit_seat[rows].gather(1, pl.clamp(min=0)) == seat)
+
+        # where it may not end: its own military-domain unit (ashore, afloat
+        # or embarked), any other player's unit
+        no_end = own_at(self.military_at[rows]) | own_at(self.embarked_at[rows]) | self._tac_foreign(seat)[rows]
         # how far its Movement carries it
-        mp = self.barb_unit_mp[rows, sr].clone()
-        full = self.barb_unit_mp_full[rows, sr]
+        mp = mp_p[rows, sr].clone()
+        full = getattr(self, f"{pre}_unit_mp_full")[rows, sr]
         frm = start.clone()
         stop = torch.zeros(R, dtype=torch.long, device=dev)
         on = torch.ones(R, dtype=torch.bool, device=dev)
@@ -442,34 +620,35 @@ class SimTactics:
                 break
             pc = p.clamp(min=0)
             dcol = (self.neigh[frm] == pc.unsqueeze(1)).long().argmax(dim=1)
-            c = torch.where(naval, torch.full_like(dcol, self._mp_scale), cost_land[rows, frm, dcol])
+            c = self._tac_step(rows, frm, pc, dcol, ut, ign_shore)
             on = on & ~((mp < c) & (mp < full))
             mp = torch.where(on, (mp - c).clamp(min=0), mp)
             stop = torch.where(on, torch.full_like(stop, i + 1), stop)
             frm = torch.where(on, pc, frm)
             on = on & (mp > 0) & ~halts[ar, pc]
-        # never a turn's end on its own stacking unit
         for _ in range(L):
-            back_off = (stop > 0) & own[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
+            back_off = (stop > 0) & no_end[ar, path.gather(1, (stop - 1).clamp(min=0).unsqueeze(1)).squeeze(1).clamp(min=0)]
             if not bool(back_off.count_nonzero()):
                 break
             stop = stop - back_off.long()
         gslot = torch.zeros(B, dtype=torch.long, device=dev)
-        gslot[rows] = sr + self.POOL_LO["barb"]
+        gslot[rows] = sr + self.POOL_LO[pre]
         going = stop > 0
-        # the own unit the walker passes over on its plot (a merged slot, -1
-        # none): the occupancy plane holds one unit, so it goes back once the
-        # walker steps on
+        # the unit the walker passes over in the occupancy plane it enters
+        # (the military plane, or the embarked one at sea: a merged slot, -1
+        # none): the plane holds one unit, so it goes back once the walker
+        # steps on
         under = torch.full((R,), -1, dtype=torch.long, device=dev)
+        under_emb = torch.zeros(R, dtype=torch.bool, device=dev)
         for i in range(L):
             go = going & (i < stop)
             if not bool(go.count_nonzero()):
                 break
-            here = self.barb_unit_tile[rows, sr].clamp(min=0)
+            here = tile_p[rows, sr].clamp(min=0)
             nxc = path[:, i].clamp(min=0)
             dcol = (self.neigh[here] == nxc.unsqueeze(1)).long().argmax(dim=1)
-            mil = self.military_at[rows, nxc]
-            stacked = own[ar, nxc]
+            emb_to = self.water[rows, nxc] & ~naval
+            occ = torch.where(emb_to, self.embarked_at[rows, nxc], self.military_at[rows, nxc])
             okB = torch.zeros(B, dtype=torch.bool, device=dev)
             okB[rows] = go
             hereB = torch.zeros(B, dtype=torch.long, device=dev)
@@ -478,18 +657,25 @@ class SimTactics:
             nxtB[rows] = nxc
             dirB = torch.zeros(B, dtype=torch.long, device=dev)
             dirB[rows] = dcol
-            mvB = self._step_verb(okB, gslot, hereB, nxtB, dirB, BARB_SEAT, torch.zeros_like(okB), clear_camp=False)
+            mvB = self._step_verb(okB, gslot, hereB, nxtB, dirB, seat, torch.zeros_like(okB),
+                                  clear_camp=seat != BARB_SEAT)
             moved = mvB[rows]
             back_on = moved & (under >= 0)
             if bool(back_on.count_nonzero()):
-                self.military_at[rows[back_on], here[back_on]] = under[back_on]
-            under = torch.where(moved, torch.where(stacked, mil, torch.full_like(mil, -1)), under)
-            going = moved & (self.barb_unit_mp[rows, sr] > 0)
+                bm = back_on & ~under_emb
+                if bool(bm.count_nonzero()):
+                    self.military_at[rows[bm], here[bm]] = under[bm]
+                be = back_on & under_emb
+                if bool(be.count_nonzero()):
+                    self.embarked_at[rows[be], here[be]] = under[be]
+            under = torch.where(moved, torch.where(occ >= 0, occ, torch.full_like(occ, -1)), under)
+            under_emb = torch.where(moved, emb_to, under_emb)
+            going = moved & (mp_p[rows, sr] > 0)
         # the strike, where its Movement and attacks last beside the plot
-        if bool(strike.count_nonzero()):
-            here = self.barb_unit_tile[rows, sr].clamp(min=0)
-            hit = (strike & self.barb_unit_alive[rows, sr] & (self.barb_unit_mp[rows, sr] > 0)
-                   & (self.barb_unit_attacks[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1))
+        if strike and bool(into.count_nonzero()):
+            here = tile_p[rows, sr].clamp(min=0)
+            hit = (into & getattr(self, f"{pre}_unit_alive")[rows, sr] & (mp_p[rows, sr] > 0)
+                   & (getattr(self, f"{pre}_unit_attacks")[rows, sr] > 0) & (self.pair_dist[here, dr].to(torch.long) == 1))
             for u in torch.unique(sr[hit]).tolist():
                 m = torch.zeros(B, dtype=torch.bool, device=dev)
                 m[rows[hit & (sr == u)]] = True
@@ -499,39 +685,45 @@ class SimTactics:
 
     # --------------------------------------------------- the target list
 
-    def _tac_targets(self) -> dict:
-        """THE BARBARIANS' TACTICAL TARGET LIST (`tacticalTargets`) as plot
-        planes, the plots in index order and each plot's district entry
-        before its other: `dk` [B, T] the district entry (0 none, 1
-        COMBAT_DISTRICT, 2 PASSIVE_DISTRICT) and `ds` its player; `ok` the
-        other entry (0 none, 1 LOW, 2 MEDIUM, 3 HIGH, 4 CAMP, 5 GOODY, 6
-        TRADER, 7 CIVILIAN, 8 RELIGIOUS, 9 IMPROVEMENT) and `os` its player
-        (-1 for a camp, a goody hut or an improvement); `unit` [B, T] the
-        global slot of a unit entry's defender (-1 none)."""
-        seen = self._barb_seen("barbarians")
+    def _tac_targets(self, seat: int = BARB_SEAT) -> dict:
+        """THE TACTICAL TARGET LIST of `seat` (`tacticalTargets`) as plot
+        planes over the plots it sees, the plots in index order and each
+        plot's district entry before its other: `dk` [B, T] the district
+        entry (0 none, 1 COMBAT_DISTRICT, 2 PASSIVE_DISTRICT) and `ds` its
+        player; `ok` the other entry (0 none, 1 LOW, 2 MEDIUM, 3 HIGH, 4 CAMP,
+        5 GOODY, 6 TRADER, 7 CIVILIAN, 8 RELIGIOUS, 9 IMPROVEMENT) and `os` its
+        player (-1 for a camp, a goody hut or an improvement); `unit` [B, T]
+        the global slot of a unit entry's defender (-1 none). The barbarians'
+        prioritization makes HIGH a unit near one of their camps; any other
+        player's a unit that threatens one of its districts (FRIENDLY_CITY)."""
+        seen = self._barb_seen("barbarians" if seat == BARB_SEAT else seat)
         ts = self.tile_seat
-        hostile = (ts >= 0) & (ts != BARB_SEAT)
+
+        def hostile(s: torch.Tensor) -> torch.Tensor:
+            return (s >= 0) & (s != seat) & self._seats_hostile(seat, s)
+
         ctr = self._centre_plane()
         enc = (self.district == self._encamp_didx) if self._encamp_didx >= 0 else torch.zeros_like(ctr)
         dd = self.district
         spec = self._is_specialty.take(dd.clamp(min=0)) & (dd >= 0)
         combat = ctr | enc
         passive = (dd >= 0) & ~enc & ~ctr & self.district_complete & ~self.district_pillaged & spec
+        h_own = hostile(ts)
         dk = torch.zeros_like(ts)
-        dk = torch.where(seen & hostile & combat, 1, torch.where(seen & hostile & passive, 2, dk))
+        dk = torch.where(seen & h_own & combat, 1, torch.where(seen & h_own & passive, 2, dk))
         ds = torch.where(dk > 0, ts, torch.full_like(ts, -1))
         none = torch.full_like(ts, -1)
 
         def seat_of(pl: torch.Tensor) -> torch.Tensor:
             return torch.where(pl >= 0, self.unit_seat.gather(1, pl.clamp(min=0)), none)
 
-        mil = self._visible_military_at(BARB_SEAT)
+        mil = self._visible_military_at(seat)
         ms = seat_of(mil)
         emb = self.embarked_at
         es = seat_of(emb)
         et = self.unit_type.gather(1, emb.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-        efight = (emb >= 0) & self._type_dom_mil.take(et) & (es >= 0) & (es != BARB_SEAT)
-        mfight = (mil >= 0) & (ms >= 0) & (ms != BARB_SEAT)
+        efight = (emb >= 0) & self._type_dom_mil.take(et) & hostile(es)
+        mfight = (mil >= 0) & hostile(ms)
         fight = (mfight | efight) & seen & ~combat
         dslot = torch.where(mfight, mil, torch.where(efight, emb, none))
         dseat = torch.where(mfight, ms, torch.where(efight, es, none))
@@ -557,39 +749,56 @@ class SimTactics:
         oss = none.clone()
         # the first of the chain, each plot taking the first that holds
         taken = ~rest
-        for kind, cond, seat in (
+        for kind, cond, who in (
             (4, camp, none), (5, goody, none),
-            (6, trader & (cs_ != BARB_SEAT), cs_),
+            (6, trader & hostile(cs_), cs_),
             (7, n_civ == 1, civ_seat),
-            (8, relig & (cs_ != BARB_SEAT), cs_),
-            (9, (self.improvement >= 0) & ~self.pillaged & hostile & ~goody, none),
+            (8, relig & hostile(cs_), cs_),
+            (9, (self.improvement >= 0) & ~self.pillaged & h_own & ~goody, none),
         ):
             hit = cond & ~taken
             okk = torch.where(hit, kind, okk)
-            oss = torch.where(hit, seat, oss)
+            oss = torch.where(hit, who, oss)
             taken = taken | hit
             if kind in (6, 7):
                 # a Trader or a lone civilian ends the plot's chain, ours or not
                 taken = taken | (cond & ~taken)
-        # a CIVILIAN or a RELIGIOUS entry only of another player's unit
-        okk = torch.where(((okk == 7) | (okk == 8)) & ((oss < 0) | (oss == BARB_SEAT)), 0, okk)
+        # a CIVILIAN or a RELIGIOUS entry only of a player at war with `seat`
+        okk = torch.where(((okk == 7) | (okk == 8)) & ~hostile(oss), 0, okk)
         # LOW, MEDIUM where a unit that cannot fight shares the plot
         lowk = torch.ones_like(ts)
         nonc = (civ >= 0) | (sup >= 0)
         lowk = torch.where(fight & nonc, 2, lowk)
-        # HIGH within BARBARIAN_DEFENSE_ALL_UNITS of a camp of the list, or a
-        # ranged one within its range + BARBARIAN_DEFENSE_RANGED_UNITS
-        lcamp = rest & camp
-        if bool(lcamp.count_nonzero()):
-            # the list's camps: each camp plot seen with no foe on it
-            cl = (cp >= 0) & lcamp.gather(1, cp.clamp(min=0))  # [B, K]
-            dk_ = self.pair_dist[cp.clamp(min=0)].to(torch.long)  # [B, K, T]
-            dmin = torch.where(cl.unsqueeze(2), dk_, torch.full_like(dk_, 1 << 20)).min(dim=1).values  # [B, T]
-            dt = self.unit_type.gather(1, dslot.clamp(min=0)).clamp(min=0, max=self.NU - 1)
-            rs = self._type_ranged_strength.take(dt)
-            rng = self._type_ranged_range.take(dt) + self._promo_val(dt, self.unit_promos.gather(1, dslot.clamp(min=0)), "RANGE")
-            high = (dmin <= _BARB_DEFENSE_ALL) | ((rs > 0) & (dmin <= rng + _BARB_DEFENSE_RANGED))
-            lowk = torch.where(fight & high, 3, lowk)
+        dt = self.unit_type.gather(1, dslot.clamp(min=0)).clamp(min=0, max=self.NU - 1)
+        rs = self._type_ranged_strength.take(dt)
+        rng = self._type_ranged_range.take(dt) + self._promo_val(dt, self.unit_promos.gather(1, dslot.clamp(min=0)), "RANGE")
+        if seat == BARB_SEAT:
+            # HIGH within BARBARIAN_DEFENSE_ALL_UNITS of a camp of the list, or
+            # a ranged one within its range + BARBARIAN_DEFENSE_RANGED_UNITS
+            lcamp = rest & camp
+            if bool(lcamp.count_nonzero()):
+                # the list's camps: each camp plot seen with no foe on it
+                cl = (cp >= 0) & lcamp.gather(1, cp.clamp(min=0))  # [B, K]
+                dk_ = self.pair_dist[cp.clamp(min=0)].to(torch.long)  # [B, K, T]
+                dmin = torch.where(cl.unsqueeze(2), dk_, torch.full_like(dk_, 1 << 20)).min(dim=1).values  # [B, T]
+                high = (dmin <= _BARB_DEFENSE_ALL) | ((rs > 0) & (dmin <= rng + _BARB_DEFENSE_RANGED))
+                lowk = torch.where(fight & high, 3, lowk)
+        else:
+            # HIGH where it threatens a district of `seat`'s it sees: a ranged
+            # or bombard unit within its range, any other nearer than twice
+            # its Movement
+            own = seen & (ts == seat) & ((dd >= 0) | ctr)
+            if bool((own.any(dim=1) & fight.any(dim=1)).count_nonzero()):
+                b_i, q_i = own.nonzero(as_tuple=True)
+                dmin = torch.full((self.B, self.T), 1 << 20, dtype=torch.long, device=self.device)
+                dmin.index_reduce_(0, b_i, self.pair_dist[q_i].to(torch.long), "amin")  # [B, T]
+                full_all = torch.cat((self._full_mp("major") - self.major_unit_aura_mp,
+                                      self._full_mp("barb") - self.barb_unit_aura_mp), dim=1)
+                moves = torch.div(full_all.gather(1, dslot.clamp(min=0)), self._mp_scale, rounding_mode="floor")
+                shoots = (rs > 0) | (self._type_bombard.take(dt) > 0)
+                reach = torch.where(rs > 0, rng, torch.ones_like(rng))
+                high = torch.where(shoots, dmin <= reach, dmin < 2 * moves)
+                lowk = torch.where(fight & high, 3, lowk)
         okk = torch.where(fight, lowk, okk)
         oss = torch.where(fight, dseat, oss)
         unit = torch.where(fight, dslot, torch.where(okk == 7, civ_slot, none))
@@ -636,19 +845,22 @@ class SimTactics:
             self._tac_cost_held = None
             self._tac_full_held = None
 
-    def _tac_range(self, b: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
-        """`rangeOf` for the barbarians at local slots `s` of the games `b`:
-        a ranged unit's range with its promotions, 0 in melee."""
-        ut = self.barb_unit_type[b, s].clamp(min=0, max=self.NU - 1)
-        rng = self._type_ranged_range.take(ut) + self._promo_val(ut, self.barb_unit_promos[b, s], "RANGE")
+    def _tac_range(self, b: torch.Tensor, s: torch.Tensor, pre: str = "barb") -> torch.Tensor:
+        """`rangeOf` for the units at local slots `s` of pool `pre` in the
+        games `b`: a ranged unit's range with its promotions, 0 in melee."""
+        ut = getattr(self, f"{pre}_unit_type")[b, s].clamp(min=0, max=self.NU - 1)
+        rng = self._type_ranged_range.take(ut) + self._promo_val(ut, getattr(self, f"{pre}_unit_promos")[b, s], "RANGE")
         return torch.where(self._type_ranged_strength.take(ut) > 0, rng, torch.zeros_like(rng))
 
-    def _tac_stacked_other(self, us: torch.Tensor) -> torch.Tensor:
-        """[B, T] — a barbarian military unit other than the one at local slot
-        `us` [B] holds the plot (`stackedOther`)."""
-        mil = self.military_at
-        own = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0)) == BARB_SEAT)
-        return own & (mil != (us + self.POOL_LO["barb"]).unsqueeze(1))
+    def _tac_stacked_other(self, us: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT) -> torch.Tensor:
+        """[B, T] — a military unit of `seat` (ashore, afloat or embarked)
+        other than the one at local slot `us` [B] of pool `pre` holds the
+        plot (`stackedOther`)."""
+        g = (us + self.POOL_LO[pre]).unsqueeze(1)
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.embarked_at):
+            out |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat) & (pl != g)
+        return out
 
     def _tac_rampage(self, live, done: torch.Tensor, utribe: torch.Tensor, rowof: torch.Tensor, res: dict,
                      tg: dict, order: torch.Tensor, npass: torch.Tensor) -> None:
@@ -676,7 +888,7 @@ class SimTactics:
         Pk = rp[b_k, s_k]
         here = self.barb_unit_tile[b_k, s_k].clamp(min=0)
         rng = self._tac_range(b_k, s_k)
-        lim = torch.div(self._tac_full()[b_k, s_k], self._mp_scale, rounding_mode="floor") * _PLAN_TURNS + rng
+        lim = torch.div(self._tac_full_now()[b_k, s_k], self._mp_scale, rounding_mode="floor") * _PLAN_TURNS + rng
         d = self.pair_dist[here].to(torch.long)  # [K, T]
         inplan = d <= lim.unsqueeze(1)
         rt = res["turns"][rsel]
@@ -906,12 +1118,15 @@ class SimTactics:
                 stood |= go & self.barb_unit_alive[bidx, u_b] & (self.barb_unit_tile[bidx, u_b] == t)
 
     def _tac_chase(self, live, done: torch.Tensor, rowof: torch.Tensor, res: dict, tg: dict,
-                   order: torch.Tensor, npass: torch.Tensor) -> None:
+                   order: torch.Tensor, npass: torch.Tensor, pre: str = "barb", seat: int = BARB_SEAT,
+                   strike: bool = True) -> None:
         """CHASE TARGET (`chaseTarget`): each land unit left, in pool order,
         takes the LOW target standing where it does, else the last of the list
         within 8 of it whose plot its reach takes within two turns, and moves
         to the first plot of its reach of this turn within its range (1 at
-        least) of the target with none of its own stacking there."""
+        least) of the target with none of its own stacking there — the
+        units of pool `pre`, the player `seat`, the move striking with
+        `strike`."""
         dev = self.device
         B = self.B
         bidx = torch.arange(B, device=dev)
@@ -919,7 +1134,7 @@ class SimTactics:
         if not bool(low.count_nonzero()):
             return
         npos = int(npass.max()) if B else 0
-        land = ~self.unit_naval.take(self.barb_unit_type.clamp(min=0, max=self.NU - 1))
+        land = ~self.unit_naval.take(getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1))
         rank, turns = res["rank"], res["turns"]
         BIG = 1 << 40
         for j in range(npos):
@@ -929,7 +1144,7 @@ class SimTactics:
             if not bool(on.count_nonzero()):
                 continue
             rr = row.clamp(min=0)
-            at = self.barb_unit_tile[bidx, u_b].clamp(min=0)
+            at = getattr(self, f"{pre}_unit_tile")[bidx, u_b].clamp(min=0)
             d = self.pair_dist[at].to(torch.long)  # [B, T]
             rt = turns[rr]
             here = low & (d == 0)
@@ -940,14 +1155,14 @@ class SimTactics:
             if not bool(on.count_nonzero()):
                 continue
             tc = tgt.clamp(min=0)
-            r = self._tac_range(bidx, u_b).clamp(min=1)
+            r = self._tac_range(bidx, u_b, pre).clamp(min=1)
             ok = ((rt == 1) & (self.pair_dist[tc].to(torch.long) <= r.unsqueeze(1))
-                  & ~self._tac_stacked_other(u_b) & on.unsqueeze(1))
+                  & ~self._tac_stacked_other(u_b, pre, seat) & on.unsqueeze(1))
             rk_ = rank[rr]
             key = torch.where(ok & (rk_ >= 0), rk_, torch.full_like(rk_, BIG))
             m, spot = key.min(dim=1)
             mv = on & (m < BIG)
-            self._tac_move_to(mv, u_b, spot)
+            self._tac_move_to(mv, u_b, spot, pre, seat, strike)
             done[bidx[mv], u_b[mv]] = True
 
     def _tac_chase_city(self, on: torch.Tensor, k: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
@@ -1124,8 +1339,7 @@ class SimTactics:
             row = rowof[bidx, u_b]
             rtu = torch.where((row >= 0).unsqueeze(1), rturn[row.clamp(min=0)], torch.full((B, T), -1, dtype=torch.long, device=dev))
             rku = rank[row.clamp(min=0)]
-            mil = self.military_at
-            stacked = (mil >= 0) & (self.unit_seat.gather(1, mil.clamp(min=0)) == BARB_SEAT)
+            stacked = self._tac_own_mil(BARB_SEAT)
             cseat = self.tile_seat[bidx, camp]
             ccity = self.tile_city[bidx, camp]
             bound = (cseat != NO_SEAT) & (ccity != -1)
@@ -1142,3 +1356,319 @@ class SimTactics:
 
         # Explore Land (the homeland list); the rest end their turn
         self._barb_stand_in(live, lambda u, tgt: ai[:, u] == _AI_EXPLORE)
+
+    # ------------------------------------- the city-states' and Free Cities' pass
+
+    def _tac_own_mil(self, seat: int) -> torch.Tensor:
+        """[B, T] — a military unit of `seat` (ashore, afloat or embarked)
+        holds the plot (`stackedAt` for a military unit, itself counted)."""
+        out = torch.zeros(self.B, self.T, dtype=torch.bool, device=self.device)
+        for pl in (self.military_at, self.embarked_at):
+            out |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat)
+        return out
+
+    def _seat_pool_slots(self, k: int, pre: str, seat: int, act: torch.Tensor) -> None:
+        """`poolSlots` for pool row `k` (a city-state's, or the Free Cities'
+        at row S) in the games of `act`: the slots whose unit was gone when
+        the player's last tactical turn ended go free, pushed in ascending
+        order; each unit of `seat` in pool `pre` without a slot takes one in
+        pool order — the slot pushed last, else a new one past the end."""
+        P = simbase.SEAT_POOL_MAX
+        dy = self.seat_pool_dying[:, k] & act.unsqueeze(1)
+        if bool(dy.count_nonzero()):
+            nf0 = self.seat_pool_nfree[:, k]
+            pos = nf0.unsqueeze(1) + dy.long().cumsum(dim=1) - 1
+            b_i, s_i = dy.nonzero(as_tuple=True)
+            self.seat_pool_free[b_i, k, pos[b_i, s_i]] = s_i
+            self.seat_pool_nfree[:, k] = nf0 + dy.sum(dim=1)
+            self.seat_pool_dying[:, k] = self.seat_pool_dying[:, k] & ~act.unsqueeze(1)
+        slot = getattr(self, f"{pre}_unit_pslot")
+        need = (act.unsqueeze(1) & getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == seat)
+                & (slot < 0))
+        if not bool(need.count_nonzero()):
+            return
+        r = need.long().cumsum(dim=1) - 1
+        nf = self.seat_pool_nfree[:, k].unsqueeze(1)
+        s_free = self.seat_pool_free[:, k].gather(1, (nf - 1 - r).clamp(min=0, max=P - 1))
+        s_new = self.seat_pool_size[:, k].unsqueeze(1) + (r - nf)
+        slot.copy_(torch.where(need, torch.where(r < nf, s_free, s_new), slot))
+        n = need.sum(dim=1)
+        used = torch.minimum(n, self.seat_pool_nfree[:, k])
+        self.seat_pool_nfree[:, k] -= used
+        self.seat_pool_size[:, k] += n - used
+        assert int(self.seat_pool_size[:, k].max()) <= P, "a seat's pool slots exhausted — raise simbase.SEAT_POOL_MAX"
+
+    def _seat_pool_dying(self, k: int, pre: str, seat: int, act: torch.Tensor) -> None:
+        """`poolDying` for pool row `k` in the games of `act`: the slots none
+        of `seat`'s units holds wait for its next turn to go free."""
+        P = simbase.SEAT_POOL_MAX
+        dev = self.device
+        ar = torch.arange(P, device=dev).unsqueeze(0)
+        slot = getattr(self, f"{pre}_unit_pslot")
+        hm = getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == seat) & (slot >= 0)
+        held = torch.zeros(self.B, P + 1, dtype=torch.bool, device=dev)
+        held.scatter_(1, torch.where(hm, slot, P), True)
+        infree = torch.zeros(self.B, P + 1, dtype=torch.bool, device=dev)
+        infree.scatter_(1, torch.where(ar < self.seat_pool_nfree[:, k].unsqueeze(1), self.seat_pool_free[:, k], P), True)
+        dying = (ar < self.seat_pool_size[:, k].unsqueeze(1)) & ~held[:, :P] & ~infree[:, :P]
+        self.seat_pool_dying[:, k] = torch.where(act.unsqueeze(1), self.seat_pool_dying[:, k] | dying,
+                                                 self.seat_pool_dying[:, k])
+
+    def _tac_alt_table(self) -> torch.Tensor:
+        """[T, K] long — FindAlternateLocation's plots round each plot
+        (0x585940 -> 0x1e000), in its order: the game's axial steps (dx, dy)
+        over -3..3, dx the outer, within 3; -1 off the map."""
+        tab = getattr(self, "_tac_alt_cache", None)
+        if tab is not None:
+            return tab
+        W, H = self.W, self.H
+        rng = _WANDER_BACK_RANGE
+        steps = [(dx, dy) for dx in range(-rng, rng + 1) for dy in range(-rng, rng + 1)
+                 if (max(abs(dx), abs(dy)) if (dx < 0) != (dy < 0) and dx != 0 and dy != 0 else abs(dx) + abs(dy)) <= rng]
+        rows = []
+        for t in range(W * H):
+            col, row = t % W, t // W
+            q = col - ((row - (row & 1)) >> 1)
+            out = []
+            for dx, dy in steps:
+                r = row + dy
+                c = q + dx + ((r - (r & 1)) >> 1)
+                if self.wrap_x:
+                    c %= W
+                out.append(r * W + c if 0 <= r < H and 0 <= c < W else -1)
+            rows.append(out)
+        tab = torch.tensor(rows, dtype=torch.long, device=self.device)
+        self._tac_alt_cache = tab
+        return tab
+
+    def _tac_alternate(self, mask: torch.Tensor, us: torch.Tensor, home: torch.Tensor, pre: str, seat: int,
+                       ent: torch.Tensor) -> torch.Tensor:
+        """[B] — `alternateLocation` for the unit at local slot `us` of pool
+        `pre` round `home` [B] in the games of `mask`: of the plots within 3 in
+        the table's order that its ground takes (`ent` [B, T]) with no other
+        player's unit and none of its own stacking with it, the nearest
+        `home`, a plot of another area counted three times as far, the first
+        of equals; -1 none."""
+        B, T, dev = self.B, self.T, self.device
+        bidx = torch.arange(B, device=dev)
+        cand = self._tac_alt_table()[home.clamp(min=0)]  # [B, K]
+        cc = cand.clamp(min=0)
+        g = (us + self.POOL_LO[pre]).unsqueeze(1)
+        own_other = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        for pl in (self.military_at, self.embarked_at):
+            own_other |= (pl >= 0) & (self.unit_seat.gather(1, pl.clamp(min=0)) == seat) & (pl != g)
+        ok = (cand >= 0) & ent.gather(1, cc) & ~self._tac_foreign(seat).gather(1, cc) & ~own_other.gather(1, cc)
+        d = self.pair_dist[home.clamp(min=0).unsqueeze(1), cc].to(torch.long)
+        area = self.tile_area
+        d = torch.where(area.gather(1, cc) != area[bidx, home.clamp(min=0)].unsqueeze(1), d * 3, d)
+        K = cand.shape[1]
+        key = torch.where(ok & mask.unsqueeze(1), d * (K + 1) + torch.arange(K, device=dev), torch.full_like(d, 1 << 40))
+        m, i = key.min(dim=1)
+        return torch.where(m < (1 << 40), cc.gather(1, i.unsqueeze(1)).squeeze(1), torch.full_like(m, -1))
+
+    def _seat_pass_open(self, pre: str, seat: int, act: torch.Tensor) -> dict:
+        """a player's tactical pass as it opens (`openPass`): its military
+        units of pool `pre` in pool-slot order, their planning reach (two
+        turns, no zones of control) and its tactical target list"""
+        dev = self.device
+        B, T = self.B, self.T
+        BIG = 1 << 40
+        ut = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
+        units = (act.unsqueeze(1) & getattr(self, f"{pre}_unit_alive") & (getattr(self, f"{pre}_unit_seat") == seat)
+                 & self._type_dom_mil.take(ut))
+        P = units.shape[1]
+        slot = getattr(self, f"{pre}_unit_pslot")
+        key = torch.where(units, slot, torch.full_like(slot, BIG))
+        order = torch.argsort(key, dim=1, stable=True)
+        npass = units.sum(dim=1)
+        rows, slots = units.nonzero(as_tuple=True)
+        rowof = torch.full((B, P), -1, dtype=torch.long, device=dev)
+        if rows.numel():
+            rowof[rows, slots] = torch.arange(rows.shape[0], device=dev)
+            res = self._tac_search(rows, slots, seat, _PLAN_TURNS, False, pre=pre)
+        else:
+            empty = torch.full((1, T), -1, dtype=torch.long, device=dev)
+            res = {"rank": empty, "turns": empty.clone()}
+        return {"units": units, "order": order, "npass": npass, "rowof": rowof, "res": res}
+
+    def _tac_foe_near(self, units: torch.Tensor, pre: str, seat: int, radius: int) -> bool:
+        """is a unit of a player at war with `seat` within `radius` of one of
+        `units` [B, P] of pool `pre` in some game — else no target of the
+        list is one a move of the pass could take"""
+        rows, slots = units.nonzero(as_tuple=True)
+        if not rows.numel():
+            return False
+        tiles = getattr(self, f"{pre}_unit_tile")[rows, slots].clamp(min=0)
+        near = torch.zeros(self.B, self.T, dtype=torch.float32, device=self.device)
+        near.index_add_(0, rows, (self.pair_dist[tiles].to(torch.long) <= radius).to(torch.float32))
+        return bool(((near > 0) & self._tac_hostile(seat)).any())
+
+    def _seat_reach_turns(self, op: dict, u_b: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """[B, T] twice — the reach turn (-1 none) and closing rank of each
+        game's unit at local slot `u_b`"""
+        B, T = self.B, self.T
+        bidx = torch.arange(B, device=self.device)
+        row = op["rowof"][bidx, u_b]
+        rr = row.clamp(min=0)
+        rt = torch.where((row >= 0).unsqueeze(1), op["res"]["turns"][rr], torch.full((B, T), -1, dtype=torch.long,
+                                                                                   device=self.device))
+        return rt, op["res"]["rank"][rr]
+
+    def _minor_tactics(self, s: int) -> None:
+        """A CITY-STATE'S TACTICAL TURN (`cityStateTactics`) for minor `s`:
+        its unit pool (`_seat_pool_slots`), each unit's planning reach taken
+        before any moves, its tactical target list, then Heal, Chase Target
+        (no strike) and Wander Near City in pool order; the rest end their
+        turn."""
+        seat = 100 + s
+        act = self.citystate_alive[:, s] & (self.citystate_center[:, s] >= 0)
+        if not bool(act.count_nonzero()):
+            return
+        self._seat_pool_slots(s, "major", seat, act)
+        self._tac_in_pass = True
+        self._tac_cost_held = None
+        self._tac_full_held = None
+        try:
+            self._minor_pass(s, act)
+        finally:
+            self._tac_in_pass = False
+            self._tac_cost_held = None
+            self._tac_full_held = None
+        self._seat_pool_dying(s, "major", seat, act)
+
+    def _minor_pass(self, s: int, act: torch.Tensor) -> None:
+        """`_minor_tactics`' moves"""
+        dev = self.device
+        B, T = self.B, self.T
+        bidx = torch.arange(B, device=dev)
+        seat = 100 + s
+        pre = "major"
+        op = self._seat_pass_open(pre, seat, act)
+        units, order, npass = op["units"], op["order"], op["npass"]
+        # the tactical target list as the pass begins, where a foe stands
+        # within a chase's sight of a unit (no move of the pass takes a target
+        # farther)
+        tg = self._tac_targets(seat) if self._tac_foe_near(units, pre, seat, _CHASE_SIGHT) else None
+        done = torch.zeros_like(units)
+        alive = self.major_unit_alive
+
+        def live() -> torch.Tensor:
+            return units & ~done & alive & (self.major_unit_seat == seat)
+
+        npos = int(npass.max()) if B else 0
+        home = self.citystate_center[:, s].clamp(min=0)
+        # HEAL: a hurt unit holds its plot; a hull outside its own waters
+        # heads for its city
+        hp_max = int(self.rules.combat["unitHp"])
+        ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        naval = self.unit_naval.take(ut)
+        hurt = live() & (self.major_unit_hp < hp_max)
+        away = hurt & naval & (self.tile_seat.gather(1, self.major_unit_tile.clamp(min=0)) != seat)
+        if bool(away.count_nonzero()):
+            for j in range(npos):
+                u_b = order[:, j]
+                go = (j < npass) & away[bidx, u_b] & live()[bidx, u_b]
+                if bool(go.count_nonzero()):
+                    self._tac_move_to(go, u_b, home, pre, seat, False)
+        done |= hurt
+        # CHASE TARGET: a LOW target within 8 of a unit (the list taken as the
+        # pass began: only where a foe stands near is there one to take)
+        if tg is not None:
+            self._tac_chase(live, done, op["rowof"], op["res"], tg, order, npass, pre, seat, False)
+        # WANDER NEAR CITY: by slot, each unit with Movement left
+        land_ent, wat_ent = self._tac_enter(seat)
+        for j in range(npos):
+            u_b = order[:, j]
+            ok = (j < npass) & live()[bidx, u_b] & (self.major_unit_mp[bidx, u_b] > 0)
+            if not bool(ok.count_nonzero()):
+                continue
+            rt, rk = self._seat_reach_turns(op, u_b)
+            cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat)
+                    & (self.pair_dist[home].to(torch.long) <= _WANDER_CITY_RANGE))
+            count = cand.sum(dim=1)
+            wander = ok & (count > 0)
+            pick = self._rand_range(wander, count)
+            by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
+            dest = by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1)
+            self._tac_move_to(wander, u_b, dest, pre, seat, False)
+            back = ok & (count == 0)
+            if bool(back.count_nonzero()):
+                ut_b = self.major_unit_type[bidx, u_b].clamp(min=0, max=self.NU - 1)
+                nav_b = self.unit_naval.take(ut_b)
+                emb_b = self._tac_embarks(bidx, ut_b, seat)
+                ent = torch.where(nav_b.unsqueeze(1), wat_ent,
+                                  land_ent | (wat_ent & emb_b.unsqueeze(1)))
+                alt = self._tac_alternate(back, u_b, home, pre, seat, ent)
+                self._tac_move_to(back & (alt >= 0), u_b, alt, pre, seat, False)
+            done[bidx[ok], u_b[ok]] = True
+
+    def _free_tactics(self, act: torch.Tensor) -> None:
+        """THE FREE CITIES' TACTICAL TURN (`freeCityTactics`) in the games of
+        `act`: their unit pool (row S), each unit's planning reach, then
+        Wander Near Camp round each unit's home (`freeHome`) in pool order;
+        the rest end their turn."""
+        dev = self.device
+        B, T = self.B, self.T
+        bidx = torch.arange(B, device=dev)
+        k = self.S
+        pre = "barb"
+        seat = FREE_SEAT
+
+        if not bool(act.count_nonzero()):
+            return
+        self._seat_pool_slots(k, pre, seat, act)
+        self._tac_in_pass = True
+        self._tac_cost_held = None
+        self._tac_full_held = None
+        try:
+            op = self._seat_pass_open(pre, seat, act)
+            units, order, npass = op["units"], op["order"], op["npass"]
+            done = torch.zeros_like(units)
+            homes = self._free_homes()
+
+            def live() -> torch.Tensor:
+                return units & ~done & self.barb_unit_alive & (self.barb_unit_seat == seat)
+
+            for j in range(int(npass.max()) if B else 0):
+                u_b = order[:, j]
+                home = homes[bidx, u_b]
+                ok = (j < npass) & live()[bidx, u_b] & (home >= 0)
+                if not bool(ok.count_nonzero()):
+                    continue
+                camp = home.clamp(min=0)
+                rt, rk = self._seat_reach_turns(op, u_b)
+                cseat = self.tile_seat[bidx, camp]
+                ccity = self.tile_city[bidx, camp]
+                bound = (cseat != NO_SEAT) & (ccity != -1)
+                same = (self.tile_seat == cseat.unsqueeze(1)) & (self.tile_city == ccity.unsqueeze(1))
+                cand = ((rt == 1) & ~self._tac_hostile(seat) & ~self._tac_own_mil(seat)
+                        & (self.pair_dist[camp].to(torch.long) <= _WANDER_CAMP_RANGE)
+                        & (~bound.unsqueeze(1) | same))
+                count = cand.sum(dim=1)
+                pick = self._rand_range(ok & (count > 0), count)
+                by_rank = torch.where(cand, rk, torch.full_like(rk, 1 << 40)).argsort(dim=1, stable=True)
+                dest = torch.where(count > 0, by_rank.gather(1, pick.clamp(min=0, max=T - 1).unsqueeze(1)).squeeze(1),
+                                   camp)
+                self._tac_move_to(ok, u_b, dest, pre, seat, False)
+                done[bidx[ok], u_b[ok]] = True
+        finally:
+            self._tac_in_pass = False
+            self._tac_cost_held = None
+            self._tac_full_held = None
+        self._seat_pool_dying(k, pre, seat, act)
+
+    def _free_homes(self) -> torch.Tensor:
+        """[B, U] long — `freeHome` of each hostile-pool unit: the centre of
+        the Free City that granted it, else of the nearest Free City (the
+        lowest column of equals); -1 none."""
+        row = self.FREE_ROW
+        alive = self.city_alive[:, row]  # [B, RC]
+        ctr = self.city_center[:, row]
+        cid = self.city_id[:, row]
+        fc = self.barb_unit_free_city  # [B, U]
+        mine = alive.unsqueeze(1) & (cid.unsqueeze(1) == fc.unsqueeze(2)) & (fc >= 0).unsqueeze(2)  # [B, U, RC]
+        has = mine.any(dim=2)
+        own = ctr.gather(1, mine.long().argmax(dim=2))
+        near = self._free_nearest_col()
+        nearest = torch.where(near >= 0, ctr.gather(1, near.clamp(min=0)), torch.full_like(near, -1))
+        return torch.where(has, own, nearest)

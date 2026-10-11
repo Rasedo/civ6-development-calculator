@@ -709,7 +709,7 @@ class SimPhase:
         runs/c60t_grant_w_* records `grantFreeCityUnit` names); with none free
         anywhere it is not granted. The
         unit lands in the hostile pool under FREE_SEAT, where the Free Cities'
-        walker moves it (`_free_walk`); it remembers the city that granted it
+        tactical turn moves it (`_free_tactics`); it remembers the city that granted it
         (`unit_free_city`), whose join takes it."""
         mask = mask & (unit_type >= 0)
         if not bool(mask.count_nonzero()):
@@ -768,9 +768,9 @@ class SimPhase:
         and the flat loyalty of what stands in it — no amenity, governor,
         policy or roster term, which are an OWNER's and the Free Cities player
         carries none. Each major's share accrues into the city's race
-        (`city_free_press`). Then the Free Cities' land units walk
-        (`_free_walk`). A city that reaches 0 joins the race's winner,
-        after the walk, in slot order: CIV6 "it will join the Civilization that
+        (`city_free_press`). Then the Free Cities' units take their tactical
+        turn (`_free_tactics`). A city that reaches 0 joins the race's winner,
+        after it, in slot order: CIV6 "it will join the Civilization that
         has exerted the most Loyalty pressure on it since the Free City became
         independent". A seat that pulled nothing, or holds no city any more,
         takes nothing; with no taker the city stays Free at 0. On a join the
@@ -842,7 +842,7 @@ class SimPhase:
             nxt = torch.where(act, (loy + delta).clamp(min=0, max=lmax), loy)
             self.city_loyalty[bidx, row, jc] = nxt.to(self.city_loyalty.dtype)
             joins[:, j] = act & (self.city_loyalty[bidx, row, jc] <= 0)
-        self._free_walk(acting)
+        self._free_tactics(acting)
         for j in range(self.RC):
             jl = joins[:, j] & self.city_alive[:, row, j]
             if not bool(jl.count_nonzero()):
@@ -3070,7 +3070,7 @@ class SimPhase:
     #: Reset on an ownership change: a captured unit never carries its old
     #: fortification, its old owner's aura, or movement — movesLeft = 0
     #: (acted) so the heal skips it this turn.
-    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0}
+    _CAPTURE_RESET = {"fortify": 0, "aura_mp": 0, "mp": 0, "pslot": -1}
     #: Written by the capture itself, from its own arguments.
     _CAPTURE_SET = ("alive", "seat", "tile")
 

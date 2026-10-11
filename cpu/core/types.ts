@@ -567,7 +567,7 @@ export interface GameState {
    *  (`cpu/core/barbarians.ts`) */
   barbTribes?: BarbTribe[];
   /** the barbarians' unit pool (`barbSlots`) */
-  barbPool?: BarbPool;
+  barbPool?: UnitPool;
   /** the camp step has added camps once: every later step adds one */
   barbCampsBegun?: boolean;
   /** per player (seat), the first turn a barbarian scout may report one of
@@ -758,21 +758,22 @@ export interface Unit {
    * at EMBARK_MOVES, cannot fortify/exert ZOC, and defends at a flat CS.
    * Naval units are never `embarked` — they belong on water natively. */
   embarked?: boolean;
-  /** a barbarian unit's place in its player's unit pool (`BarbPool`): the
-   *  order the AI walks the barbarians' units in */
+  /** the unit's place in its player's unit pool (`UnitPool`) — the
+   *  barbarians', a city-state's, the Free Cities': the order their tactical
+   *  AI walks their units in */
   slot?: number;
 }
 
-/** THE BARBARIANS' UNIT POOL (the player's unit list, a free list): a unit
- *  gone frees its slot at the next barbarian turn, the slots freed together
- *  pushed in ascending order; a new unit takes the slot pushed last, else a
- *  new slot past the end (`barbSlots`). */
-export interface BarbPool {
+/** A PLAYER'S UNIT POOL (the player's unit list, a free list): a unit gone
+ *  frees its slot at the player's next tactical turn, the slots freed
+ *  together pushed in ascending order; a new unit takes the slot pushed
+ *  last, else a new slot past the end (`poolSlots`, `poolDying`). */
+export interface UnitPool {
   /** slots ever used */
   size: number;
   /** freed slots, the last pushed last */
   free: number[];
-  /** slots whose unit was gone when the barbarians' last turn ended */
+  /** slots whose unit was gone when the player's last tactical turn ended */
   dying: number[];
 }
 
@@ -780,6 +781,9 @@ export interface Seat {
   seat: number;
   /** the player's handicap, a Difficulties index; absent, the AI's Prince */
   handicap?: number;
+  /** a city-state's or the Free Cities' unit pool (`poolSlots`), its slot 0
+   *  the founding Settler's */
+  unitPool?: UnitPool;
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.

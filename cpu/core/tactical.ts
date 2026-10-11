@@ -2,26 +2,29 @@
  * THE GAME'S UNIT AI: the unit pathfinder's reach and path, and the tactical
  * pass a player's units take (GameCore_XP2 TacticalAI;
  * tools/civ6lab/dll_readings.md "C-95: the unit pathfinder and the
- * planning's reach", "C-95: the tactical pass"). The barbarians' turn runs it
- * for their units (`barbarianPhase`).
+ * planning's reach", "C-95: the tactical pass", "C-96: the city-states'
+ * tactical pass"). The barbarians' turn runs it for their units
+ * (`barbarianPhase`), a city-state's turn for its own (`cityStateTactics`),
+ * the Free Cities' turn for theirs (`freeCityTactics`).
  */
-import type { GameState, Tile, Unit } from './types';
-import { DIRECTION_TYPES, hexDistance, neighborTile } from '../../world/hex';
+import type { CityState, GameState, Tile, Unit } from './types';
+import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt } from '../../world/hex';
 import { isImpassable, isWater } from '../../world/query';
 import { MP_SCALE } from '../data/constants';
-import { UNITS } from '../data/units';
+import { UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import {
-  cliffBlocksStep, encampmentBlocks, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cliffBlocksStep, encampmentBlocks, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
-import { BARB_SEAT, NO_SEAT, isBarbSeat, isCityStateSeat, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
+import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
 import { attackTargets, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, stackDefender, unitAttackRange } from './combat';
 import { canSee } from './fog';
-import { barbarianOps, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, tribeOf } from './barbarians';
+import { barbarianOps, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, tribeOf } from './barbarians';
 import { generalAuraMP } from './aura';
 import { attacksLeftOf, attacksPerTurn } from './promotions';
 import type { BarbTribe, ImprovementId } from './types';
@@ -54,19 +57,32 @@ interface PNode {
 }
 
 /** may the unit enter this plot at all (Pathfinder valid 0x2720a0, the
- *  engine's ground): no mountain or impassable plot; its domain's ground; no
- *  unit of another player on the map (an aircraft or a spy holds no plot);
- *  no city centre but its own, no live enemy Encampment; its own units it
- *  walks through */
-function enterable(state: GameState, unit: Unit, t: Tile, held: ReadonlySet<number>, centres: ReadonlySet<number>): boolean {
+ *  engine's ground): no mountain or impassable plot; its domain's ground —
+ *  a land unit's water too where its player may embark it (`canEmbark`); no
+ *  unit of a player at war with it (an aircraft or a spy holds no plot) —
+ *  another player's unit it passes, never ending there (`groundOf`'s
+ *  `stand`); no city centre but its own, no live enemy Encampment; its own
+ *  units it walks through */
+function enterable(state: GameState, unit: Unit, t: Tile, foes: ReadonlySet<number>,
+  embarks: boolean): boolean {
   if (isImpassable(t)) return false;
   const naval = !!UNITS[unit.type]?.naval;
-  if (isWater(t) !== naval) return false;
-  if (naval && !waterEnterable(state, t, unit)) return false;
-  if (held.has(t.index)) return false;
+  if (isWater(t) !== naval && !(embarks && isWater(t))) return false;
+  if (isWater(t) && !waterEnterable(state, t, unit)) return false;
+  if (foes.has(t.index)) return false;
   if (t.district === 'CITY_CENTER' && tileSeat(t) !== unit.seat) return false;
-  if (centres.has(t.index)) return false;
   return !encampmentBlocks(state, t, unit);
+}
+
+/** a major's territory closed to a city-state's unit: the major holds the
+ *  open-borders civic (Early Empire) and is not at war with it — the planning
+ *  of a city-state's units leaves such plots out (runs/h1_duelw1117 t32-37:
+ *  city-state 4's Warriors' AI_Planning.csv rows never take China's (32,11)
+ *  and (33,10) beside its own plots) */
+function majorClosedToMinor(state: GameState, seat: number, t: Tile): boolean {
+  const owner = tileSeat(t);
+  if (!isCiv(owner)) return false;
+  return !!seatOf(state, owner)?.research.civics.includes(OPEN_BORDERS_CIVIC) && !civsAtWar(state, seat, owner);
 }
 
 /** the steps' costs a tactical pass holds while it runs, per chassis and
@@ -94,8 +110,17 @@ function dropHeldCosts(): void {
 }
 
 /** `enterable` and `inEnemyZoc` for one search, each plot asked once: the
- *  ground holds still while the pathfinder runs */
-function groundOf(state: GameState, unit: Unit): { enter: (t: Tile) => boolean; zoc: (t: Tile) => boolean; attack: (t: Tile) => boolean; known: (i: number) => boolean } {
+ *  ground holds still while the pathfinder runs; `stand`, may the unit end
+ *  its move there — no other player's unit on it (the list's 0x586900) */
+interface Ground {
+  enter: (t: Tile) => boolean;
+  zoc: (t: Tile) => boolean;
+  attack: (t: Tile) => boolean;
+  known: (i: number) => boolean;
+  stand: (i: number) => boolean;
+}
+
+function groundOf(state: GameState, unit: Unit): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   for (const u of state.units) {
@@ -103,7 +128,6 @@ function groundOf(state: GameState, unit: Unit): { enter: (t: Tile) => boolean; 
     held.add(u.tileIndex);
     if (unitsHostile(state, unit, u)) foes.add(u.tileIndex);
   }
-  const centres = new Set(state.cityStates.map((c) => c.centerIndex));
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const ex = seatOf(state, unit.seat)?.explored;
@@ -111,11 +135,20 @@ function groundOf(state: GameState, unit: Unit): { enter: (t: Tile) => boolean; 
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
   const naval = !!def?.naval;
+  // the barbarians' land units plan no water (none of 6,269 of their planning
+  // rows on runs/h1_duelw1117, 1121 and 1124 holds a water plot; a major's
+  // and a city-state's do from their Shipbuilding, AI_Planning.csv)
+  const embarks = canEmbark(state, unit) && !isBarbSeat(unit.seat);
+  const minor = isCityStateSeat(unit.seat);
   return {
     known,
+    stand: (i) => !held.has(i),
     enter: (t) => {
       let v = enters.get(t.index);
-      if (v === undefined) enters.set(t.index, (v = known(t.index) && enterable(state, unit, t, held, centres)));
+      if (v === undefined) {
+        enters.set(t.index, (v = known(t.index) && enterable(state, unit, t, foes, embarks)
+          && !(minor && majorClosedToMinor(state, unit.seat, t))));
+      }
       return v;
     },
     attack: (t) => {
@@ -149,12 +182,16 @@ function groundOf(state: GameState, unit: Unit): { enter: (t: Tile) => boolean; 
  * the unit's own territory. `onClose` sees each node as it closes; the
  * search stops where it answers true.
  */
-function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode) => boolean): void {
+function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean): void {
   const { map } = state;
   const ground = groundOf(state, unit);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
-  const full = Math.floor(unitFullMoves(state, unit) * FIX / MP_SCALE);
+  // a turn starts on the full Movement of the domain its plot holds the unit
+  // in: embarked on water, a land unit's own pool ashore
+  const naval = !!UNITS[unit.type]?.naval;
+  const fullLand = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: false }) * FIX / MP_SCALE);
+  const fullSea = Math.floor(unitFullMoves(state, naval ? unit : { ...unit, embarked: true }) * FIX / MP_SCALE);
   const unmoved = unit.movesLeft >= (unit.movesFull ?? unitFullMoves(state, unit));
   const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(unit.movesLeft * FIX / MP_SCALE),
     turns: 1, closed: false, parent: null };
@@ -186,7 +223,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       for (const o of open) if (before(hi, o)) hi = o;
     }
     best.closed = true;
-    if (onClose(best)) break;
+    if (onClose(best, ground)) break;
     // an attack's plot is the path's end: no step leaves it
     if (best.attack) continue;
     const from = map.tiles[best.tile];
@@ -200,7 +237,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
       let turns = best.turns;
       if (pm <= 0) {
         turns += 1;
-        pm = full;
+        pm = !naval && isWater(from) ? fullSea : fullLand;
       }
       let cost: number;
       let moves: number;
@@ -256,8 +293,9 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
  *  the order the pathfinder closed them, the unit's own plot first. */
 export function reachPlots(state: GameState, unit: Unit, maxTurns: number): Reach[] {
   const out: Reach[] = [];
-  search(state, unit, maxTurns, false, (n) => {
-    out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+  search(state, unit, maxTurns, false, (n, ground) => {
+    // a plot another player's unit holds the unit only passes (0x586900)
+    if (n.attack || ground.stand(n.tile)) out.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
     return false;
   });
   return out;
@@ -280,16 +318,18 @@ export function pathTo(state: GameState, unit: Unit, dest: number): number[] {
 /** a move order carried out (the unit's mission 0x962030): the unit walks
  *  its path as far as its Movement carries it this turn (a zone of control
  *  ends it), the engine's step paying each; it walks through its own units
- *  but stops short of a plot of its own unit that stacks with it */
-export function moveTo(state: GameState, unit: Unit, dest: number): void {
+ *  but stops short of a plot of its own unit that stacks with it. A path
+ *  ending on a plot it attacks into stops at its side, and with `strike`
+ *  the unit strikes it there. */
+export function moveTo(state: GameState, unit: Unit, dest: number, strike = true): void {
   let path = pathTo(state, unit, dest);
   // a path ending on a plot it attacks into: it walks to its side, and
   // strikes it where its Movement and attacks last (the order's attack flag)
   const last = path.length ? path[path.length - 1] : -1;
-  const strike = last >= 0 && attackPlot(state, unit, last);
-  if (strike) path = path.slice(0, -1);
+  const into = last >= 0 && attackPlot(state, unit, last);
+  if (into) path = path.slice(0, -1);
   walk(state, unit, path);
-  if (strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
+  if (into && strike && unit.movesLeft > 0 && attacksLeftOf(unit) > 0 && state.units.includes(unit)
     && plotDistance(state, unit.tileIndex, last) === 1) {
     meleeAttack(state, unit.id, last, unit.seat);
   }
@@ -321,7 +361,7 @@ function walk(state: GameState, unit: Unit, path: number[]): void {
     from = p;
     if (mp <= 0 || inEnemyZoc(state, p, unit)) break;
   }
-  while (stop > 0 && stackedAt(state, unit, path[stop - 1])) stop -= 1;
+  while (stop > 0 && (stackedAt(state, unit, path[stop - 1]) || foreignAt(state, unit, path[stop - 1]))) stop -= 1;
   for (let i = 0; i < stop; i++) {
     if (stepUnit(state, unit, tiles[path[i]]) !== 'moved') return;
   }
@@ -336,6 +376,12 @@ function onMap(u: Unit): boolean {
 /** a unit of another player at war with the unit's on the plot (0x5862e0) */
 export function enemyAt(state: GameState, unit: Unit, tile: number): boolean {
   return state.units.some((u) => u.tileIndex === tile && onMap(u) && unitsHostile(state, unit, u));
+}
+
+/** a unit of another player than the unit's on the plot (an aircraft or a
+ *  spy holds none) */
+function foreignAt(state: GameState, unit: Unit, tile: number): boolean {
+  return state.units.some((u) => u.tileIndex === tile && u.seat !== unit.seat && onMap(u));
 }
 
 /** a unit of the unit's player on the plot that stacks with it, the unit
@@ -353,8 +399,8 @@ export function plotDistance(state: GameState, a: number, b: number): number {
 }
 
 /** TargetTypes, as the tactical target list types its entries */
-export type TargetType = 'COMBAT_DISTRICT' | 'PASSIVE_DISTRICT' | 'CAMP' | 'GOODY' | 'TRADER' | 'CIVILIAN' | 'RELIGIOUS'
-  | 'LOW' | 'MEDIUM' | 'HIGH' | 'IMPROVEMENT';
+export type TargetType = 'FRIENDLY_CITY' | 'COMBAT_DISTRICT' | 'PASSIVE_DISTRICT' | 'CAMP' | 'GOODY' | 'TRADER' | 'CIVILIAN'
+  | 'RELIGIOUS' | 'LOW' | 'MEDIUM' | 'HIGH' | 'IMPROVEMENT';
 
 /** one entry of the tactical target list: its type, its plot, the player it
  *  belongs to (none for a camp, a goody hut or an improvement) and its unit */
@@ -376,18 +422,24 @@ function rangedStrength(u: Unit): number {
 /**
  * THE TACTICAL TARGET LIST (0x783980) of `seat`: the plots in index order,
  * each one `seen` (visible) giving
- *  - a district of a player at war: a City Center or an Encampment as
- *    COMBAT_DISTRICT (and nothing else of the plot), a complete unpillaged
- *    other district as PASSIVE_DISTRICT;
+ *  - a district of its own as FRIENDLY_CITY; of a player at war a City
+ *    Center or an Encampment as COMBAT_DISTRICT (and nothing else of the
+ *    plot), a complete unpillaged other district as PASSIVE_DISTRICT;
  *  - its defending unit of a player at war (0x208b80) as LOW;
  *  - else the first of: a barbarian camp, a goody hut, a Trader at war, its
  *    one civilian at war (CIVILIAN), its religious unit at war (RELIGIOUS), an
  *    unpillaged improvement of a player at war (IMPROVEMENT);
  * and each one only `revealed` its camp, goody hut, improvement or districts.
  * Then a LOW unit stacked with a unit that cannot fight is MEDIUM (0x786d50),
- * and the barbarians' (0x786e70) make HIGH every LOW or MEDIUM unit within
+ * and the player's prioritization (TacticalAI +0xa8) runs: the barbarians'
+ * (0x786e70) make HIGH every LOW or MEDIUM unit within
  * BARBARIAN_DEFENSE_ALL_UNITS of one of their camps, or a ranged one within
- * its range + BARBARIAN_DEFENSE_RANGED_UNITS.
+ * its range + BARBARIAN_DEFENSE_RANGED_UNITS; every other player's (0x787000)
+ * takes each FRIENDLY_CITY entry in list order and makes HIGH each LOW or
+ * MEDIUM unit that threatens it — one with a ranged or bombard strength
+ * within its range of the plot, any other nearer than twice its Movement.
+ * (An ALLY_SUPPORT entry, a district of an ally, makes them MEDIUM: a
+ * city-state and the Free Cities hold no ally.)
  */
 export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<number>, revealed: ArrayLike<number> | null): Target[] {
   const { map } = state;
@@ -407,6 +459,9 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
     if (!vis && !(revealed && revealed[t.index] === 1)) continue;
     const owner = tileSeat(t);
     let combat = false;
+    if (owner === seat && t.district !== null) {
+      out.push({ type: 'FRIENDLY_CITY', tile: t.index, seat, unit: null });
+    }
     if (t.district !== null) {
       combat = t.district === 'CITY_CENTER' || t.district === 'ENCAMPMENT';
       if (hostile(owner)) {
@@ -470,6 +525,16 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
         const d = plotDistance(state, c.tile, e.tile);
         if (d <= BARB_DEFENSE_ALL) e.type = 'HIGH';
         else if (rangedStrength(e.unit) > 0 && d <= unitAttackRange(e.unit) + BARB_DEFENSE_RANGED) e.type = 'HIGH';
+      }
+    }
+  } else {
+    for (const c of out) {
+      if (c.type !== 'FRIENDLY_CITY') continue;
+      for (const e of out) {
+        if ((e.type !== 'LOW' && e.type !== 'MEDIUM') || !e.unit) continue;
+        const d = plotDistance(state, e.unit.tileIndex, c.tile);
+        const shoots = rangedStrength(e.unit) > 0 || (UNITS[e.unit.type]?.bombard ?? 0) > 0;
+        if (shoots ? d <= unitAttackRange(e.unit) : d < 2 * maxMoves(state, e.unit)) e.type = 'HIGH';
       }
     }
   }
@@ -542,9 +607,13 @@ const DEFEND_CAMP_TURNS = 3;
 /** the planning's breadth-first search (0x7920d0: two turns) */
 const PLAN_TURNS = 2;
 
-/** One pass's state: the units left, each one's planning reach, and those
- *  done (`0x570b40`). */
+/** One pass's state: its player, whether its moves strike the plot they end
+ *  on (the barbarians'; a city-state's and the Free Cities' attacks are not
+ *  ported), the units left, each one's planning reach, and those done
+ *  (`0x570b40`). */
 interface Pass {
+  seat: number;
+  strike: boolean;
   units: Unit[];
   reach: Map<number, Reach[]>;
   done: Set<number>;
@@ -573,7 +642,7 @@ function finish(pass: Pass, u: Unit, move: string, plot = -1): void {
   tacticsTrace?.(u, move, plot);
 }
 
-const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && isBarbSeat(u.seat);
+const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat;
 
 /**
  * DEFEND CAMPS (0x779010): each camp in plot order, the first DEFENDER in
@@ -853,39 +922,222 @@ function chaseTarget(state: GameState, pass: Pass): void {
     const spot = reach.find((x) => x.turns === 1 && plotDistance(state, x.tile, tgt) <= r
       && !stackedOther(state, u, x.tile));
     if (!spot) continue;
-    moveTo(state, u, spot.tile);
+    moveTo(state, u, spot.tile, pass.strike);
     finish(pass, u, 'Chase Target', tgt);
   }
 }
 
 /**
  * WANDER NEAR CAMP (0x77b9a0): each unit of AI type above EXPLORE whose
- * tribe's camp stands: of its planning reach, the plots of this turn with no
- * unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0),
- * within 5 of the camp and, where the camp's plot is a city's, of that
- * city's; ONE "Random Direction" draw over their count picks the plot it
- * moves to ("Wander"); with none it heads for its camp ("Wander Back to
- * Camp"). Its turn is done.
+ * camp stands — the plot the player's signals answer for its group
+ * (0x771250, `homeOf`: a barbarian tribe's camp): of its planning reach, the
+ * plots of this turn with no unit at war with it (0x5862e0), none of its own
+ * stacking with it (0x585eb0), within 5 of the camp and, where the camp's
+ * plot is a city's, of that city's; ONE "Random Direction" draw over their
+ * count picks the plot it moves to ("Wander"); with none it heads for its
+ * camp ("Wander Back to Camp"). Its turn is done.
  */
-function wanderNearCamp(state: GameState, pass: Pass): void {
+function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => number): void {
   for (const u of pass.units) {
     if (!live(state, pass, u) || (pass.ai.get(u.id) ?? -1) <= AI_EXPLORE) continue;
-    const tr = tribeOf(state, u.id);
-    if (!tr?.alive) continue;
-    const camp = state.map.tiles[tr.plot];
+    const home = homeOf(u);
+    if (home < 0) continue;
+    const camp = state.map.tiles[home];
     const campCity = tileSeat(camp) === NO_SEAT ? -1 : tileCity(camp);
     const cands = (pass.reach.get(u.id) ?? []).filter((e) => {
       if (e.turns !== 1 || enemyAt(state, u, e.tile) || stackedAt(state, u, e.tile)) return false;
-      if (plotDistance(state, tr.plot, e.tile) > WANDER_CAMP_RANGE) return false;
+      if (plotDistance(state, home, e.tile) > WANDER_CAMP_RANGE) return false;
       const t = state.map.tiles[e.tile];
       return campCity === -1 || (tileSeat(t) === tileSeat(camp) && tileCity(t) === campCity);
     });
     drawing = u;
-    const to = cands.length ? cands[randRange(state, cands.length, 'Random Direction')].tile : tr.plot;
+    const to = cands.length ? cands[randRange(state, cands.length, 'Random Direction')].tile : home;
     drawing = null;
-    moveTo(state, u, to);
+    moveTo(state, u, to, pass.strike);
     finish(pass, u, cands.length ? 'Wander' : 'Wander Back to Camp', to);
   }
+}
+
+/**
+ * HEAL (0x779a70, its moves 0x7737c0): each unit left, in pool order, that
+ * has taken damage (+0xcf0) is healed: a land unit holds its plot (it
+ * fortifies, 0x95eae0, or sleeps, 0x9686d0); a naval one outside its own
+ * territory heads for its player's nearest city (the first of equals), on
+ * its own ground it holds. Its turn is done. The game skips a unit in a
+ * formation (0x8be30) and one on a plot of danger (the influence map
+ * 0x716a90 above 0), which the engines do not carry: every plot reads none.
+ */
+function heal(state: GameState, pass: Pass): void {
+  for (const u of pass.units) {
+    if (!live(state, pass, u) || u.hp >= UNIT_HP) continue;
+    if (UNITS[u.type]?.naval && tileSeat(state.map.tiles[u.tileIndex]) !== u.seat) {
+      let best = -1;
+      let bd = -1;
+      for (const c of cityCentresOf(state, u.seat)) {
+        const d = plotDistance(state, u.tileIndex, c);
+        if (bd < 0 || d < bd) { bd = d; best = c; }
+      }
+      if (best >= 0) moveTo(state, u, best, pass.strike);
+    }
+    finish(pass, u, 'Heal');
+  }
+}
+
+/** WANDER NEAR CITY's radius (0x77bf50: the plots within 5 of the city) */
+const WANDER_CITY_RANGE = 5;
+/** the radius FindAlternateLocation searches round the city (0x77bf50 -> 0x585940) */
+const WANDER_BACK_RANGE = 3;
+
+/**
+ * WANDER NEAR CITY (0x77bf50) for a player of no full civilization (a
+ * city-state): each unit left of AI type EXPLORE or above with Movement
+ * left (+0xdb0), in pool order: of its planning reach, the plots of this
+ * turn within 5 of the player's capital (`home`) with no unit at war with it
+ * (0x5862e0) and none of its own stacking with it (0x585eb0); ONE "Random
+ * Direction" draw over their count picks the plot it moves to ("Wander") —
+ * the weights the loop builds are never read. With none it moves to the
+ * plot `alternateLocation` finds round the capital ("Wander Back to City",
+ * the row naming the capital), else it stays. Its turn is done.
+ */
+function wanderNearCity(state: GameState, pass: Pass, home: number): void {
+  for (const u of pass.units) {
+    if (!live(state, pass, u) || (pass.ai.get(u.id) ?? -1) < AI_EXPLORE || u.movesLeft <= 0) continue;
+    const cands = (pass.reach.get(u.id) ?? []).filter((e) => e.turns === 1
+      && plotDistance(state, home, e.tile) <= WANDER_CITY_RANGE && !enemyAt(state, u, e.tile) && !stackedAt(state, u, e.tile));
+    if (cands.length) {
+      drawing = u;
+      const to = cands[randRange(state, cands.length, 'Random Direction')].tile;
+      drawing = null;
+      moveTo(state, u, to, pass.strike);
+      finish(pass, u, 'Wander', to);
+      continue;
+    }
+    const to = alternateLocation(state, u, home, WANDER_BACK_RANGE);
+    if (to >= 0) moveTo(state, u, to, pass.strike);
+    finish(pass, u, 'Wander Back to City', home);
+  }
+}
+
+/**
+ * FIND ALTERNATE LOCATION (Unit_Placement 0x585940) for the unit round
+ * `plot`: the plots within `range` of it (0x1e000) — the game's axial steps
+ * (dx, dy) over -range..range, dx the outer — that the unit may enter
+ * (0x586360: its ground, `groundOf`), where no other player's unit stands
+ * and none of its own that stacks with it; the nearest `plot` wins, a plot
+ * of another area than `plot`'s counted three times as far, the first of
+ * equals. -1 none.
+ */
+function alternateLocation(state: GameState, unit: Unit, plot: number, range: number): number {
+  const { map } = state;
+  const at = map.tiles[plot];
+  const [q0, r0] = offsetToAxial(at.col, at.row);
+  const ground = groundOf(state, unit);
+  const dom = unitDomain(unit.type);
+  let best = -1;
+  let bestScore = Infinity;
+  for (let dx = -range; dx <= range; dx++) {
+    for (let dy = -range; dy <= range; dy++) {
+      const n = (dx < 0) !== (dy < 0) && dx !== 0 && dy !== 0 ? Math.max(Math.abs(dx), Math.abs(dy)) : Math.abs(dx) + Math.abs(dy);
+      if (n > range) continue;
+      const [c, r] = axialToOffset(q0 + dx, r0 + dy);
+      const t = tileAt(map, c, r);
+      if (!t || !ground.enter(t)) continue;
+      if (state.units.some((o) => o !== unit && o.tileIndex === t.index && onMap(o)
+        && (o.seat !== unit.seat || unitDomain(o.type) === dom))) continue;
+      let score = plotDistance(state, plot, t.index);
+      if ((t.area ?? -1) !== (at.area ?? -1)) score *= 3;
+      if (score < bestScore) {
+        bestScore = score;
+        best = t.index;
+      }
+    }
+  }
+  return best;
+}
+
+/** a city-state's units the pass walks: its military units, of AI type
+ *  COMBAT (a civilian, a support unit none) */
+function minorAiTypeOf(u: Unit): number {
+  return unitDomain(u.type) === 'military' ? AI_COMBAT : -1;
+}
+
+/**
+ * A CITY-STATE'S TACTICAL TURN (TacticalAI 0x771530 over Tactics.xml's
+ * "Minor Civ Tactical" and "Minor Civ Homeland" lists): its unit pool
+ * (`poolSlots`, slot 0 its founding Settler's), each unit's planning reach
+ * taken before any moves, its tactical target list, then the moves in the
+ * list's order, each walking the units the moves before it left, in pool
+ * order — Support Formation, Attack High Priority, Move to Safety, Attack
+ * Medium Priority, Attack Civilians, Promotion, Make Military Formation and
+ * Attack Low Priority not ported (the attacks need the combat prediction,
+ * Move to Safety the influence map), Heal, Chase Target (no strike), Wander
+ * Near City; the homeland's End Turn takes the rest.
+ */
+export function cityStateTactics(state: GameState, cityState: CityState): void {
+  const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
+  poolSlots(pool, state.units.filter((u) => u.seat === cityState.seat));
+  costsHeld = new Map();
+  try {
+    const pass = openPass(state, cityState.seat, minorAiTypeOf);
+    heal(state, pass);
+    chaseTarget(state, pass);
+    wanderNearCity(state, pass, cityState.centerIndex);
+    for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+  } finally {
+    costsHeld = null;
+  }
+  poolDying(pool, state.units.filter((u) => u.seat === cityState.seat));
+}
+
+/**
+ * THE FREE CITIES' TACTICAL TURN (their "FreeCitiesTactics" and
+ * "FreeCitiesHomeland" lists, Expansion1_Leaders.xml): their unit pool, then
+ * Attack High Priority, Attack Medium Priority, Move to Safety and Attack
+ * Low Priority not ported, Wander Near Camp — the camp their signals answer
+ * (0x771250, unread for them) read as the unit's Free City, else the
+ * nearest — and the homeland's End Turn.
+ */
+export function freeCityTactics(state: GameState): void {
+  const free = state.freeSeat;
+  if (!free) return;
+  const pool = (free.unitPool ??= { size: 0, free: [], dying: [] });
+  poolSlots(pool, state.units.filter((u) => u.seat === FREE_SEAT));
+  costsHeld = new Map();
+  try {
+    const pass = openPass(state, FREE_SEAT, minorAiTypeOf);
+    wanderNearCamp(state, pass, (u) => freeHome(state, u));
+    for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
+  } finally {
+    costsHeld = null;
+  }
+  poolDying(pool, state.units.filter((u) => u.seat === FREE_SEAT));
+}
+
+/** a Free Cities unit's home: the centre of the Free City that granted it,
+ *  else of the nearest Free City (the first of equals); -1 none */
+function freeHome(state: GameState, u: Unit): number {
+  const cities = state.freeSeat?.cities ?? [];
+  const own = cities.find((c) => c.id === u.freeCity);
+  if (own) return own.centerIndex;
+  let best = -1;
+  let bd = Infinity;
+  for (const c of cities) {
+    const d = plotDistance(state, u.tileIndex, c.centerIndex);
+    if (d < bd) { bd = d; best = c.centerIndex; }
+  }
+  return best;
+}
+
+/** a player's tactical pass as it opens: its units in pool order, their AI
+ *  types, their planning reach, its tactical target list (what it sees) */
+function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number): Pass {
+  const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
+  const ai = new Map<number, number>();
+  for (const u of units) ai.set(u.id, aiOf(u));
+  const reach = new Map<number, Reach[]>();
+  for (const u of units) reach.set(u.id, reachPlots(state, u, PLAN_TURNS));
+  const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), null);
+  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan: new Map() };
 }
 
 /** the units a stand-in still moves, at the game's moves not yet ported: one
@@ -932,7 +1184,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   const ex = state.barbSeat.explored;
   const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null);
-  const pass: Pass = { units, reach, done: new Set(), ai, targets, plan: new Map() };
+  const pass: Pass = { seat: BARB_SEAT, strike: true, units, reach, done: new Set(), ai, targets, plan: new Map() };
   // an operation's units are the operation's, not the pass's
   const opUnits = new Set<number>();
   for (const tr of state.barbTribes ?? []) for (const id of tr.op?.units ?? []) opUnits.add(id);
@@ -947,7 +1199,10 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   pillage(state, pass, true);
   pillage(state, pass, false);
   chaseTarget(state, pass);
-  wanderNearCamp(state, pass);
+  wanderNearCamp(state, pass, (u) => {
+    const tr = tribeOf(state, u.id);
+    return tr?.alive ? tr.plot : -1;
+  });
   // Explore Land (the homeland list)
   standIn(state, pass, 'HL: Explore', (u) => pass.ai.get(u.id) === AI_EXPLORE);
   // End Turn: the rest stand

@@ -273,6 +273,28 @@ def _treaty_clock_line(sim, b: int, seat: int) -> list[int]:
     return [x for p in pairs for x in p]
 
 
+def _unit_pools_row(sim, b: int) -> list[int]:
+    """`unitPools`: each live city-state's unit pool by id, then the Free
+    Cities' (`poolSlots`) — its size, its free slots, those waiting to go
+    free, each unit's slot in unit order."""
+
+    def row(k: int, pre: str, seat: int) -> list[int]:
+        nf = int(sim.seat_pool_nfree[b, k])
+        free = [int(x) for x in sim.seat_pool_free[b, k, :nf].tolist()]
+        dying = sim.seat_pool_dying[b, k].nonzero().flatten().tolist()
+        alive = getattr(sim, f"{pre}_unit_alive")[b].tolist()
+        seats = getattr(sim, f"{pre}_unit_seat")[b].tolist()
+        slots = [int(n) for a, s_, n in zip(alive, seats, getattr(sim, f"{pre}_unit_pslot")[b].tolist())
+                 if a and s_ == seat]
+        return [int(sim.seat_pool_size[b, k]), nf, *free, len(dying), *dying, len(slots), *slots]
+
+    out: list[int] = []
+    for s in range(sim.S):
+        if bool(sim.citystate_alive[b, s]):
+            out += [s, *row(s, "major", 100 + s)]
+    return out + row(sim.S, "barb", int(sim._ROW_SEAT[sim.FREE_ROW]))
+
+
 def _barb_tribes_row(sim, b: int) -> list[int]:
     """`barbTribes`: whether the camp step has added once, each tribe in order
     (plot, alive, kind, name, its two clocks, the living units and scouts it
@@ -350,6 +372,7 @@ GAME = {
     "greatPeopleByClass": lambda sim, b, rows: [_gp_by_class(sim, b)],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
     "barbTribes": lambda sim, b, rows: [_barb_tribes_row(sim, b)],
+    "unitPools": lambda sim, b, rows: [_unit_pools_row(sim, b)],
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts
     "unitCount": lambda sim, b, rows: [len(_unit_rows(sim, b))],
     "climatePhase": lambda sim, b, rows: [int(sim.climate_idx[b])],

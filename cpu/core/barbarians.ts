@@ -16,7 +16,7 @@
  * stays in the list, dead: the camp step still measures from it, and its
  * name is the last to be taken again.
  */
-import type { GameState, Tile, BarbTribe, BarbOp, BarbTarget, Unit } from './types';
+import type { GameState, Tile, BarbTribe, BarbOp, BarbTarget, Unit, UnitPool } from './types';
 import { neighbors, hexDistance, tilesWithin, tileAt, offsetToAxial, axialToOffset } from '../../world/hex';
 import { isWater, isImpassable } from '../../world/query';
 import { RESOURCES } from '../../world/resources';
@@ -636,30 +636,39 @@ export function tribeOf(state: GameState, id: number): BarbTribe | undefined {
 }
 
 /**
- * THE BARBARIANS' UNIT POOL (`BarbPool`): the slots of the units that were
- * gone when their last turn ended go free, pushed in ascending order, and
- * every barbarian unit without a slot takes one in the order it was made —
- * the slot pushed last, else a new one. Run at the start of their turn and
- * again after their camps raised their units.
+ * A PLAYER'S UNIT POOL (`UnitPool`): the slots of the units that were gone
+ * when the player's last tactical turn ended go free, pushed in ascending
+ * order, and each of the player's `units` without a slot takes one in their
+ * order — the slot pushed last, else a new one.
  */
-export function barbSlots(state: GameState): void {
-  const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
+export function poolSlots(pool: UnitPool, units: readonly Unit[]): void {
   pool.free.push(...[...pool.dying].sort((a, b) => a - b));
   pool.dying = [];
-  for (const u of state.units) {
-    if (!isBarbSeat(u.seat) || u.slot !== undefined) continue;
+  for (const u of units) {
+    if (u.slot !== undefined) continue;
     u.slot = pool.free.length ? pool.free.pop()! : pool.size++;
   }
 }
 
-/** the barbarians' turn ends: the slots whose unit is gone wait for the
- *  next turn to go free */
-export function barbSlotsDying(state: GameState): void {
-  const pool = (state.barbPool ??= { size: 0, free: [], dying: [] });
+/** the player's tactical turn ends: the slots none of its `units` holds
+ *  wait for its next turn to go free */
+export function poolDying(pool: UnitPool, units: readonly Unit[]): void {
   const held = new Set<number>();
-  for (const u of state.units) if (isBarbSeat(u.seat) && u.slot !== undefined) held.add(u.slot);
+  for (const u of units) if (u.slot !== undefined) held.add(u.slot);
   const free = new Set(pool.free);
   for (let s = 0; s < pool.size; s++) if (!held.has(s) && !free.has(s)) pool.dying.push(s);
+}
+
+/** THE BARBARIANS' UNIT POOL (`poolSlots`), their units in the order they
+ *  were made. Run at the start of their turn and again after their camps
+ *  raised their units. */
+export function barbSlots(state: GameState): void {
+  poolSlots((state.barbPool ??= { size: 0, free: [], dying: [] }), state.units.filter((u) => isBarbSeat(u.seat)));
+}
+
+/** the barbarians' turn ends (`poolDying`) */
+export function barbSlotsDying(state: GameState): void {
+  poolDying((state.barbPool ??= { size: 0, free: [], dying: [] }), state.units.filter((u) => isBarbSeat(u.seat)));
 }
 
 /**

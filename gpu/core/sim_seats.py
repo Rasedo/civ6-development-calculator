@@ -3072,6 +3072,8 @@ class SimSeats:
                     self.major_unit_seat[m] = row
                     self.major_unit_levied[m] = True
                     self.major_unit_levy_src[m] = (100 + sl).unsqueeze(1).expand_as(m)[m]
+                    # the minor's pool loses it; home again, it takes a new slot
+                    self.major_unit_pslot[m] = -1
                     self.major_unit_mp[m] = 0
                     self._gen_ver += 1
                     self.civ_treasury[:, row] = torch.where(do_l, self.civ_treasury[:, row] - levy_cost, self.civ_treasury[:, row])
@@ -13167,6 +13169,10 @@ class SimSeats:
             # arm is dead weight: `torch.where(transition, …, base_step)`
             # is `base_step` term for term when `transition` is empty.
             cost = base_step
+        # CIV6 (GlobalParameters CITY_MOVEMENT_COST 1; the movement cost's city
+        # term 0x531660): a step into a city costs one Movement at most
+        cost = torch.where(self._centre_plane().gather(1, dc1).squeeze(1),
+                           torch.clamp(cost, max=self._mp_scale), cost)
         # THE FORMATION MOVES AS ONE — no further than its slowest member, and
         # free of it under Escort Mobility.
         rider, rider_free, rider_ok = self._escort_rider(

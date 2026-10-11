@@ -26,11 +26,10 @@ import {
   MINOR_EXCLUDED_UNIT_CLASSES, MINOR_HARBOR_PROD_PCT, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS,
   MINOR_MILITARY_BUY_BP, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_PROD_PCT, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS,
   MINOR_SMALL_MILITARY, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_UPGRADE_GOLD,
-  MINOR_WALK_STEPS_DAMAGED, MINOR_WALK_STEPS_PEACE, MINOR_WALK_STEPS_WAR, MINOR_WALK_WEIGHTS_PEACE,
-  MINOR_WALK_WEIGHTS_WAR, MINOR_WALLS_PROD_PCT, type MinorBuildRow, FREE_CITY_BUILD_ROWS,
+  MINOR_WALLS_PROD_PCT, type MinorBuildRow, FREE_CITY_BUILD_ROWS,
   MINOR_REPAIR_RESUME_PCT, MINOR_CATCHUP_PCT,
 } from '../data/cityStates';
-import { ENCAMPMENT_HP, UNIT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
+import { ENCAMPMENT_HP, UNITS, URBAN_DEFENSES_TECH, WALLS_TIER_HP, WALLS_TIER_URBAN, type UnitDef } from '../data/units';
 import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
@@ -51,12 +50,12 @@ import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
-import { FREE_SEAT, civsAtWar, hiddenResourcesFor, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
+import { FREE_SEAT, hiddenResourcesFor, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
 import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
-import { landWalker, walkUnit } from './walker';
+import { cityStateTactics } from './tactical';
 import { worldEraIndex } from './eras';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
@@ -113,7 +112,7 @@ export function minorPhase(state: GameState): void {
     minorTrade(state, cityState, !ordersHeld);
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
-    if (!ordersHeld) minorWalk(state, cityState);
+    if (!ordersHeld) cityStateTactics(state, cityState);
     cityState.armySeen = minorMilitary(state, cityState).length;
   }
 }
@@ -544,29 +543,14 @@ function minorAnyResource(): boolean {
 
 /** THE ACTION REPLAY'S HOLD on the minors' orders: a city-state's moves and
  *  battles, its upgrades, its purchases, its Builders' work and the route its
- *  free Trader takes are its AI's, which the record carries, so the engine's
- *  stand-ins for them sit out (the replay issues the record's through
+ *  free Trader takes are the record's, which the replay lands (through
  *  `minorUpgradeUnit`, `minorBuyUnit`, `minorBuilderLays` and
- *  `minorRouteTo`). False outside a replay. */
+ *  `minorRouteTo`), so the engine's sit out; its units' tactical turn the
+ *  replay runs on a copy beside the record's (`minorAi`). False outside a
+ *  replay. */
 let ordersHeld = false;
 export function holdMinorOrders(on: boolean): void {
   ordersHeld = on;
-}
-
-/**
- * THE MINOR'S WALKER (`walkUnit`, C-38's census): each land military unit, in
- * unit order, walks around the minor's centre on the peace or the war tables
- * — at war while any major is at war with it — a damaged unit on the damaged
- * step table. The list is taken before anyone moves.
- */
-function minorWalk(state: GameState, cityState: CityState): void {
-  const atWar = state.seats.some((s) => civsAtWar(state, cityState.seat, s.seat));
-  const weights = atWar ? MINOR_WALK_WEIGHTS_WAR : MINOR_WALK_WEIGHTS_PEACE;
-  const walkers = state.units.filter((u) => u.seat === cityState.seat && landWalker(u));
-  for (const u of walkers) {
-    const steps = u.hp < UNIT_HP ? MINOR_WALK_STEPS_DAMAGED : atWar ? MINOR_WALK_STEPS_WAR : MINOR_WALK_STEPS_PEACE;
-    walkUnit(state, u, [cityState.centerIndex], steps, weights);
-  }
 }
 
 /**

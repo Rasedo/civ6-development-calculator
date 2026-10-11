@@ -35,7 +35,7 @@ export type DrawLabel =
   | 'Choosing random civic type for Trigger Civic Boost quest' | 'Choosing random class type for Recruit Great Person Class quest'
   | 'BT Research Choice' | 'Random Civic Choice'
   // the engines' draws at no labelled site of the game's
-  | 'Engine: minor walk' | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
+  | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
   | 'Engine: partisans' | 'Engine: breached dam'
   // the barbarians' turn
   | 'Barbarian camp region placement' | 'Barbarian camp location' | 'Barb Tribe Roll' | 'Barbarian Ranged unit roll'

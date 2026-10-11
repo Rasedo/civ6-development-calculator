@@ -891,34 +891,6 @@ export const MINOR_NAVAL_BUY_BP = srcConst('cityState.navalBuyBp', 62, { lab: 'C
 export const MINOR_NAVAL_CLASS: PromoClass = 'NAVAL_MELEE';
 
 /**
- * THE WALKER — where a minor's land military stands, fitted to C-38's census
- * (100,278 unit-turns at peace, 9,163 at war; a turn's step between two
- * records, the units of one type paired to the smallest total move since the
- * records carry no ids). Each turn a unit draws its step k (per mille over
- * 0, 1, 2, 3 — 3 folds the 4+ tail), then one destination among the plots
- * exactly k away, each weighted by its distance from home in the table below
- * (0 past the table), and walks toward it. The weights are the fixed point
- * that makes the walk's long-run distance the census's on an open grid
- * (`tools/civ6lab/minor_play_census.py --walk`): at peace d0-d5 8.1, 20.6,
- * 22.0, 18.0, 15.3, 10.8%; at war 15.9, 25.5, 23.7, 13.4, 9.1, 6.6%. A
- * damaged unit rests more (52.7% of its turns still). What a unit at war
- * attacks the census cannot say: it records no combat and no major's unit.
- */
-export const MINOR_WALK_STEPS_PEACE = srcConst('cityState.walkStepsPeace', [141, 605, 233, 21], { lab: 'C-38' });
-export const MINOR_WALK_STEPS_WAR = srcConst('cityState.walkStepsWar', [305, 440, 210, 45], { lab: 'C-38' });
-export const MINOR_WALK_STEPS_DAMAGED = srcConst('cityState.walkStepsDamaged', [527, 299, 145, 29], { lab: 'C-38' });
-export const MINOR_WALK_WEIGHTS_PEACE = srcConst('cityState.walkWeightsPeace',
-  [1000, 344, 229, 158, 136, 116, 22, 20, 16, 9, 9, 6, 7], { lab: 'C-38' });
-export const MINOR_WALK_WEIGHTS_WAR = srcConst('cityState.walkWeightsWar',
-  [1000, 121, 76, 37, 32, 26, 7, 6, 5, 4, 2, 1, 6], { lab: 'C-38' });
-/** The Free Cities' units walk the same body, from their nearest Free City
- *  (C-60's census: `cs_watch_*` player 62 and the id-tracked
- *  `rebel_watch_rebel3b/3c`, 580 unit-turns; d0-d5 12.6, 45.7, 25.9, 10.0,
- *  2.9, 2.2%; one table, the Free Cities being at war with everyone). */
-export const FREE_WALK_STEPS = srcConst('cityState.freeWalkSteps', [238, 383, 231, 148], { lab: 'C-60' });
-export const FREE_WALK_WEIGHTS = srcConst('cityState.freeWalkWeights', [1000, 594, 134, 39, 15, 24, 6], { lab: 'C-60' });
-
-/**
  * THE FREE CITY'S BUILD TABLE — the city-state production model over C-60's
  * census (`cs_watch_*` player 62, 28 Free City records): the first row that
  * wants an item it can make now takes the city's Production, one item a turn.

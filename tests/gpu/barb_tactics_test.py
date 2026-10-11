@@ -342,7 +342,7 @@ def main() -> None:
     found = None
     for s in barb_units(sim):
         if (int(ai[0, s]) < 3 or bool(sim.barb_unit_op[0, s]) or bool(sim.unit_naval[int(sim.barb_unit_type[0, s])])
-                or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0):
+                or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0 or has_target(sim, s)):
             continue
         bt = int(sim.barb_unit_tile[0, s])
         spot = [n for n in sim.neigh[bt].tolist() if open_plot(n) and int(sim.tmove[0, n]) == 0]

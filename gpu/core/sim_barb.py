@@ -35,16 +35,18 @@ class SimBarb:
 
     # ------------------------------------------------------------- the sight
 
-    def _barb_seen(self, who: str) -> torch.Tensor:
+    def _barb_seen(self, who: str | int) -> torch.Tensor:
         """[B, T] bool — `plotsSeenNow`: what the majors (`who` "majors"),
-        every living player, the barbarians included ("all", `allSeers`), or
-        the barbarians alone ("barbarians") see now — each unit's sight across
-        the plots its line reaches, each city centre two plots round, each
-        owned plot with its ring."""
+        every living player, the barbarians included ("all", `allSeers`), the
+        barbarians alone ("barbarians") or one seat (`who` its absolute seat)
+        see now — each unit's sight across the plots its line reaches, each
+        city centre two plots round, each owned plot with its ring."""
         B, T = self.B, self.T
         seen = torch.zeros(B, T, dtype=torch.bool, device=self.device)
 
         def seer(seat: torch.Tensor) -> torch.Tensor:
+            if isinstance(who, int):
+                return seat == who
             if who == "majors":
                 return (seat >= 0) & (seat < self.n_majors)
             if who == "barbarians":

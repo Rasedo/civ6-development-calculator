@@ -300,6 +300,21 @@
           "note": "the barbarians' turn (cpu/core/barbarians.ts): one row — whether the camp step has added once, the tribes in their order (plot, alive, kind, name, the two clocks, the living units and scouts each raised), then the barbarians' techs and civics, each list behind its length; per tribe also its raid and city assault (Boldness, the interval its operation set, the units asked for, the owners of the cities waited for, the homing scout's city owner, the operation's kind, owner, turns, force taken and living units), and per major the turn a scout may report it again. A scout's sight memory (tribe_saw) and the fresh marks show through the homing and the recruit. Then the barbarians' unit pool (its size, its free slots in push order, the slots waiting to go free, each barbarian unit's slot in unit order) and per tribe whether its camp defender lives."
         },
         {
+          "name": "unitPools",
+          "compare": "exact",
+          "covers": [
+            "Seat.unitPool"
+          ],
+          "planes": [
+            "seat_pool_size",
+            "seat_pool_free",
+            "seat_pool_nfree",
+            "seat_pool_dying",
+            "unit_pslot"
+          ],
+          "note": "the city-states' and the Free Cities' unit pools (`poolSlots`, the order their tactical AI walks their units in): one row — each live city-state by id (its size, its free slots in push order, the slots waiting to go free, each of its units' slots in unit order), then the Free Cities' the same."
+        },
+        {
           "name": "cityCount",
           "compare": "exact",
           "covers": [],

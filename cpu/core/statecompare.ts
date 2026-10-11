@@ -43,11 +43,11 @@ import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Unit } from './types';
+import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Unit, UnitPool } from './types';
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { BARB_SEAT, alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
+import { BARB_SEAT, FREE_SEAT, alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
@@ -469,6 +469,22 @@ const GAME: Record<string, Extractor> = {
     // go free, each unit's slot in unit order; each tribe's camp defender alive
     pool.size, pool.free.length, ...pool.free, pool.dying.length, ...pool.dying, slots.length, ...slots,
     ...tribes.map((t) => (t.defender !== undefined && live.has(t.defender) ? 1 : 0))]];
+  },
+  // each live city-state's unit pool by id, then the Free Cities' (`poolSlots`):
+  // its size, its free slots, those waiting to go free, each unit's slot in
+  // unit order
+  unitPools: (s) => {
+    const row = (seat: number, pool: UnitPool) => {
+      const slots = s.units.filter((u) => u.seat === seat).map((u) => u.slot ?? -1);
+      return [pool.size, pool.free.length, ...pool.free, pool.dying.length, ...pool.dying, slots.length, ...slots];
+    };
+    const out: number[] = [];
+    for (let id = 0; id < (s.cityStateMax ?? 0); id++) {
+      const cs = s.cityStates.find((c) => c.id === id);
+      if (cs) out.push(id, ...row(cs.seat, cs.unitPool ?? { size: 1, free: [], dying: [] }));
+    }
+    out.push(...row(FREE_SEAT, s.freeSeat?.unitPool ?? { size: 0, free: [], dying: [] }));
+    return [out];
   },
   cityCount: (s) => [civSeats(s).reduce((n, x) => n + x.cities.length, 0)],
   unitCount: (s) => [s.units.length],

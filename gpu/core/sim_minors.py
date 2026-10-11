@@ -17,7 +17,7 @@ class SimMinors:
         # religion it follows on the founder's turn); then its actions —
         # the upgrades a completion triggers, its purchases, its Builders'
         # work, its trade routes, its city's ranged strikes (the majors' own
-        # body, `cityStrikes`), its army's walk; and the army it ends the turn
+        # body, `cityStrikes`), its units' tactical turn; and the army it ends the turn
         # with
         col0 = torch.zeros(self.B, dtype=torch.long, device=self.device)
         for s in range(self.S):
@@ -40,7 +40,7 @@ class SimMinors:
             self._minor_builders(s)
             self._minor_trade(s)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
-            self._minor_walk(s)
+            self._minor_tactics(s)
             self.citystate_army_seen[:, s] = torch.where(alive, self._minor_military_count(s), seen)
 
     def _minor_levy_return(self, s: int) -> None:
@@ -662,15 +662,6 @@ class SimMinors:
         _lv = {d["level"]: d for d in rules.civ_levels}
         self._minor_any_res = bool(_lv["CITY_STATE"]["ignoresUnitStrategicResourceRequirements"])
         self._free_any_res = bool(_lv["FREE_CITIES"]["ignoresUnitStrategicResourceRequirements"])
-        # THE WALKER (`walkUnit`): per-mille step tables, distance weights
-        tbl = lambda k: torch.tensor([int(x) for x in cs[k]], dtype=torch.long, device=dev)  # noqa: E731
-        self._walk_steps_peace = tbl("walkStepsPeace")
-        self._walk_steps_war = tbl("walkStepsWar")
-        self._walk_steps_damaged = tbl("walkStepsDamaged")
-        self._walk_w_peace = tbl("walkWeightsPeace")
-        self._walk_w_war = tbl("walkWeightsWar")
-        self._free_walk_steps = tbl("freeWalkSteps")
-        self._free_walk_w = tbl("freeWalkWeights")
         # THE FREE CITY'S BUILD TABLE (`FREE_CITY_BUILD_ROWS`) and the research
         # it reads — every tech and civic of an era at or below the world's
         fkinds = list(cs["freeBuildKinds"])
@@ -1428,103 +1419,6 @@ class SimMinors:
             out = out | ((ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0).unsqueeze(1)).squeeze(1))
         return out
 
-    def _minor_walk(self, s: int) -> None:
-        """`minorWalk` — minor `s`'s land military, in slot order, walk around
-        its centre (`_walk_units`): the war tables while any major is at war
-        with it, a damaged unit on the damaged step table."""
-        alive = self.citystate_alive[:, s]
-        row = self._CITY_MINOR0 + s
-        at_war = self.war[:, row, : self.n_majors].any(dim=1)
-        home = self.pair_dist[self.citystate_center[:, s].clamp(min=0)].long()  # [B, T]
-        steps_ok = torch.where(at_war.unsqueeze(1), self._walk_steps_war.unsqueeze(0),
-                               self._walk_steps_peace.unsqueeze(0))
-        hp_max = int(self.rules.combat["unitHp"])
-        self._walk_units("major", 100 + s, alive,
-                         lambda hp: torch.where((hp < hp_max).unsqueeze(1),
-                                                self._walk_steps_damaged.unsqueeze(0), steps_ok),
-                         self._walk_weight_plane(home, at_war, self._walk_w_war, self._walk_w_peace))
-
-    def _walk_weight_plane(self, home: torch.Tensor, which: torch.Tensor, w_a: torch.Tensor,
-                           w_b: torch.Tensor) -> torch.Tensor:
-        """[B, T] long — each plot's weight at its distance from home: table
-        `w_a` where `which`, else `w_b`; 0 past the table."""
-        out = torch.zeros_like(home)
-        for w, sel in ((w_a, which), (w_b, ~which)):
-            n = int(w.numel())
-            plane = torch.where(home < n, w.take(home.clamp(max=n - 1)), torch.zeros_like(home))
-            out = torch.where(sel.unsqueeze(1), plane, out)
-        return out
-
-    def _walk_ground(self, seat: int) -> torch.Tensor:
-        """[B, T] — `walkerGround`: land, nothing impassable, and no city
-        centre but one of `seat`'s own."""
-        ctr = self._centre_seat_plane()
-        return self.passable & ~self.water & ((ctr < 0) | (ctr == seat))
-
-    def _walk_units(self, pre: str, seat: int, act: torch.Tensor, steps_of, wplane: torch.Tensor) -> None:
-        """`walkUnit` over every land military unit of `seat` in pool `pre`,
-        in slot order, off a list taken before anyone moves, in the games of
-        `act`. `wplane` [B, T] is each plot's weight at its distance from home,
-        `steps_of(hp)` the [B, 4] per-mille step table for a unit
-        of that hit points. A unit's turn: ONE draw over its step table, then
-        — for a step k > 0 — ONE draw over the walker ground exactly k away,
-        weighted, in tile order; then up to k steps toward that plot, each to
-        the first neighbour in direction order strictly closer, walker ground
-        and free for it (`_blocked_for`), paid by `_step_verb`; it stops at
-        the plot, where it cannot step, or with no Movement left."""
-        B, T, dev = self.B, self.T, self.device
-        alive = getattr(self, f"{pre}_unit_alive")
-        typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
-        cand = (act.unsqueeze(1) & alive & (getattr(self, f"{pre}_unit_seat") == seat)
-                & self._type_military.take(typ) & ~self.unit_naval.take(typ) & (self._type_air.take(typ) <= 0)
-                & ~getattr(self, f"{pre}_unit_emb"))
-        if not bool(cand.count_nonzero()):
-            return
-        lo = self.POOL_LO[pre]
-        ground = self._walk_ground(seat)
-        rank = cand.long().cumsum(dim=1) - 1
-        arange6 = torch.arange(6, device=dev)
-        zeros_b = torch.zeros(B, dtype=torch.bool, device=dev)
-        for k in range(int(cand.sum(dim=1).max())):
-            here_m = cand & (rank == k)
-            on = here_m.any(dim=1)
-            if not bool(on.count_nonzero()):
-                continue
-            g = here_m.long().argmax(dim=1) + lo  # the walker's merged slot
-            cur = self.unit_tile.gather(1, g.unsqueeze(1)).squeeze(1).clamp(min=0)
-            hp = self.unit_hp.gather(1, g.unsqueeze(1)).squeeze(1)
-            cum = steps_of(hp).cumsum(dim=1)  # [B, 4]
-            x = self._rand_range(on, 1000)
-            kstep = (cum <= x.unsqueeze(1)).sum(dim=1).clamp(max=cum.shape[1] - 1)
-            go = on & (kstep > 0)
-            if not bool(go.count_nonzero()):
-                continue
-            ring = (self.pair_dist[cur].long() == kstep.unsqueeze(1)) & ground
-            w = torch.where(ring, wplane, torch.zeros_like(wplane))
-            total = w.sum(dim=1)
-            go = go & (total > 0)
-            if not bool(go.count_nonzero()):
-                continue
-            pick = self._rand_range(go, total)
-            target = (w.cumsum(dim=1) <= pick.unsqueeze(1)).sum(dim=1).clamp(max=T - 1)
-            moving = go & (cur != target)
-            for step in range(int(kstep.max())):
-                mp = self.unit_mp.gather(1, g.unsqueeze(1)).squeeze(1)
-                moving = moving & (step < kstep) & (cur != target) & (mp > 0)
-                if not bool(moving.count_nonzero()):
-                    break
-                nb = self.neigh[cur]  # [B, 6]
-                nbc = nb.clamp(min=0)
-                d0 = self.pair_dist[target, cur].long()
-                closer = (nb >= 0) & (self.pair_dist[target.unsqueeze(1), nbc].long() < d0.unsqueeze(1))
-                ok = (closer & ground.gather(1, nbc)
-                      & ~self._blocked_for(nb, seat))
-                has = ok.any(dim=1)
-                d_i = torch.where(ok, arange6, torch.full_like(nb, 6)).min(dim=1).values.clamp(max=5)
-                dest = nbc.gather(1, d_i.unsqueeze(1)).squeeze(1)
-                mv = self._step_verb(moving & has, g, cur, dest, d_i, seat, zeros_b)
-                cur = torch.where(mv, dest, cur)
-                moving = mv
 
     def _free_research(self) -> tuple[torch.Tensor, torch.Tensor]:
         """([B, NT], [B, NC]) — `freeCityResearch`: every technology and civic
@@ -1686,18 +1580,6 @@ class SimMinors:
                     self._eff_version += 1
             halt = halt | chosen
 
-    def _free_walk(self, act: torch.Tensor) -> None:
-        """The Free Cities' land units walk (`walkUnit`, C-60's tables) around
-        the nearest Free City, in the games of `act`."""
-        row = self.FREE_ROW
-        alive = self.city_alive[:, row]
-        ctr = self.city_center[:, row].clamp(min=0)  # [B, RC]
-        d = self.pair_dist[ctr].long()  # [B, RC, T]
-        d = torch.where(alive.unsqueeze(2), d, torch.full_like(d, 1 << 30))
-        home = d.min(dim=1).values
-        wplane = self._walk_weight_plane(home, torch.ones_like(act), self._free_walk_w, self._free_walk_w)
-        steps = self._free_walk_steps.unsqueeze(0).expand(self.B, -1)
-        self._walk_units("barb", FREE_SEAT, act, lambda hp: steps, wplane)
 
     def _minor_imp_legal(self, s: int) -> torch.Tensor:
         """[B, T, K] — `validImprovements(state, tile, 100 + s)` on a LAND plot,

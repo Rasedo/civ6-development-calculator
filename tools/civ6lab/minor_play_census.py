@@ -1,8 +1,7 @@
-"""civ6lab minor_play_census — a city-state's purchases, upgrades and walker,
-and the Free Cities' walker, fitted to the watched games (C-38, C-60).
+"""civ6lab minor_play_census — a city-state's purchases and upgrades, fitted
+to the watched games (C-38).
 
-    python tools/civ6lab/minor_play_census.py            # the census
-    python tools/civ6lab/minor_play_census.py --walk     # + the walker weights' fit
+    python tools/civ6lab/minor_play_census.py
 
 What it prints and cpu/data/cityStates.ts carries: the per-minor Builder
 purchase rate's twenty quantiles (`MINOR_BUILDER_BUY_SLOTS`); the military
@@ -10,13 +9,7 @@ purchases' bank floor and rate by military count, a loss window apart
 (`MINOR_MILITARY_BUY_*`, `MINOR_LOSS_BUY_*`); the ships it buys and their
 rate (`MINOR_NAVAL_BUY_BP`); the gold an upgrade spends
 (`MINOR_UPGRADE_GOLD`, exact on the single-upgrade turns whose neighbouring
-income is flat); the land military's distance from home and a turn's step, at
-peace, at war and damaged, and the Free Cities' (`MINOR_WALK_*`,
-`FREE_WALK_*`). With `--walk` it also fits the walker's distance weights: the
-walk draws a step k from the step table and one destination among the plots
-exactly k away weighted by distance from home, so the step distribution holds
-by construction and the weights are iterated on an open hex grid until the
-long-run distance distribution is the census's.
+income is flat).
 
 Reads `runs/cs_watch_*.jsonl` (one record per living minor per turn: its
 treasury `gold`, `faith`, its city `[x, y, pop, building, _]`, its units
@@ -79,30 +72,6 @@ def land_military(ty: str) -> bool:
     return ty not in CIVILIAN and ty not in NAVAL
 
 
-WIDTHS = (44, 60, 74, 84, 96, 106)  # the install's map widths, Duel to Huge
-
-
-def hexdist(a, b, width: int = 0) -> int:
-    """Civ 6 offset coordinates, odd rows shifted right; the map wraps east-west
-    when `width` is given."""
-    def cube(x, y):
-        q = x - (y - (y & 1)) // 2
-        return q, y, -q - y
-
-    def one(bx):
-        (ax, ay, az), (cx, cy, cz) = cube(*a), cube(bx, b[1])
-        return max(abs(ax - cx), abs(ay - cy), abs(az - cz))
-    if not width:
-        return one(b[0])
-    return min(one(b[0]), one(b[0] + width), one(b[0] - width))
-
-
-def width_of(xs) -> int:
-    """the narrowest install width that holds every x seen in a game"""
-    top = max(xs) + 1
-    return next(w for w in WIDTHS if w >= top)
-
-
 def load_minors():
     games: dict = collections.defaultdict(lambda: collections.defaultdict(dict))
     for f in sorted(glob.glob(f"{RUNS}/cs_watch_*.jsonl")):
@@ -163,128 +132,6 @@ def income_estimates(trs):
     return est
 
 
-def match_steps(a, b, width):
-    """the displacements of one unit type's units between two records, paired
-    to the smallest total displacement (no ids: permutations up to six, else
-    nearest-first)"""
-    import itertools
-    if len(a) <= 6:
-        best = None
-        for perm in itertools.permutations(range(len(b))):
-            ds = [hexdist(a[i], b[j], width) for i, j in enumerate(perm)]
-            if best is None or sum(ds) < sum(best):
-                best = ds
-        return best or []
-    left = list(b)
-    out = []
-    for p in a:
-        j = min(range(len(left)), key=lambda k: hexdist(p, left[k], width))
-        out.append(hexdist(p, left.pop(j), width))
-    return out
-
-
-def walker(data):
-    """the land military's distance from its centre, per record, and a turn's
-    step, per unit — at peace and at war (the minor's record names a war), a
-    damaged unit apart"""
-    dist = {"peace": collections.Counter(), "war": collections.Counter()}
-    step = {"peace": collections.Counter(), "war": collections.Counter(), "damaged": collections.Counter()}
-    for key, rows in data.items():
-        xs = [u[1] for r in rows for u in r["units"]] + [c[0] for r in rows for c in r["cities"]]
-        if not xs:
-            continue
-        w = width_of(xs)
-        for r in rows:
-            if not r["cities"]:
-                continue
-            ctr = (r["cities"][0][0], r["cities"][0][1])
-            k = "war" if r["war"] else "peace"
-            for u in r["units"]:
-                if land_military(u[0]):
-                    dist[k][hexdist(ctr, (u[1], u[2]), w)] += 1
-        for r0, r1 in zip(rows, rows[1:]):
-            if r1["t"] != r0["t"] + 1 or not r0["cities"]:
-                continue
-            k = "war" if r0["war"] else "peace"
-            by0, by1 = collections.defaultdict(list), collections.defaultdict(list)
-            for u in r0["units"]:
-                if land_military(u[0]):
-                    by0[u[0]].append((u[1], u[2], u[3]))
-            for u in r1["units"]:
-                if land_military(u[0]):
-                    by1[u[0]].append((u[1], u[2]))
-            for ty, a in by0.items():
-                b = by1.get(ty, [])
-                if len(a) != len(b):
-                    continue
-                if all(x[2] == 0 for x in a):
-                    for d in match_steps([(x[0], x[1]) for x in a], b, w):
-                        step[k][d] += 1
-                elif len(a) == 1:
-                    step["damaged"][hexdist((a[0][0], a[0][1]), b[0], w)] += 1
-    return dist, step
-
-
-def free_city_walker():
-    """the Free Cities' land military: cs_watch's player-62 records (no ids,
-    paired as above) and the rebel3b / rebel3c watches (ids; the Free City at
-    (72, 24) on a 74-wide map)."""
-    dist, step = collections.Counter(), collections.Counter()
-    for f in sorted(glob.glob(f"{RUNS}/cs_watch_*.jsonl")):
-        rows = {}
-        xs = []
-        for ln in open(f, encoding="utf-8"):
-            if ln.startswith("{"):
-                r = json.loads(ln)
-                xs += [u[1] for u in r["units"]]
-                if r["civ"] == "CIVILIZATION_FREE_CITIES":
-                    rows[r["t"]] = r
-        if not xs:
-            continue
-        w = width_of(xs)
-        for t in sorted(rows):
-            r = rows[t]
-            if not r["cities"]:
-                continue
-            ctrs = [(c[0], c[1]) for c in r["cities"]]
-            for u in r["units"]:
-                if land_military(u[0]):
-                    dist[min(hexdist(c, (u[1], u[2]), w) for c in ctrs)] += 1
-            r1 = rows.get(t + 1)
-            if not r1 or not r1["cities"]:
-                continue
-            by0, by1 = collections.defaultdict(list), collections.defaultdict(list)
-            for u in r["units"]:
-                if land_military(u[0]):
-                    by0[u[0]].append((u[1], u[2]))
-            for u in r1["units"]:
-                if land_military(u[0]):
-                    by1[u[0]].append((u[1], u[2]))
-            for ty, a in by0.items():
-                if len(a) == len(by1.get(ty, [])):
-                    for d in match_steps(a, by1[ty], w):
-                        step[d] += 1
-    for f in sorted(glob.glob(f"{RUNS}/rebel_watch_rebel3[bc]_*.jsonl")):
-        track = collections.defaultdict(dict)
-        for ln in open(f, encoding="utf-8"):
-            r = json.loads(ln)
-            if r["kind"] == "unit" and r["p"] == 62 and land_military(r["type"]):
-                track[r["id"]][r["turn"]] = (r["x"], r["y"])
-        for pos in track.values():
-            for t, p in pos.items():
-                dist[hexdist((72, 24), p, 74)] += 1
-                if t + 1 in pos:
-                    step[hexdist(p, pos[t + 1], 74)] += 1
-    return dist, step
-
-
-def shares(c: collections.Counter, top: int) -> str:
-    n = sum(c.values())
-    parts = [f"{k}: {100 * c[k] / n:.1f}%" for k in range(top)]
-    parts.append(f"{top}+: {100 * sum(v for k, v in c.items() if k >= top) / n:.1f}%")
-    return f"n {n}  " + ", ".join(parts)
-
-
 def exact_upgrade_cost(data):
     """(spent, income change after) on the single-upgrade turns whose two
     event-free turns before carry the same income"""
@@ -303,54 +150,6 @@ def exact_upgrade_cost(data):
                 continue
             out[round(d[1] - d[2], 1)] += 1
     return out
-
-
-def walker_fit(target, steps, iters=20, turns=300_000):
-    """the distance weights (permille of the largest, d = 0..len-1, 0 past)
-    whose ring-weighted walk on an open hex grid holds `target`, the long-run
-    distance distribution, under the per-mille step table `steps`"""
-    import random
-
-    def ring(k):
-        return [(dq, dr, -dq - dr) for dq in range(-k, k + 1) for dr in range(-k, k + 1)
-                if max(abs(dq), abs(dr), abs(dq + dr)) == k]
-    rings = {k: ring(k) for k in range(1, len(steps))}
-
-    def dist(p):
-        return max(abs(p[0]), abs(p[1]), abs(p[2]))
-
-    def run(W, seed, n):
-        rnd = random.Random(seed)
-        pos = (0, 0, 0)
-        got = collections.Counter()
-        cum = [sum(steps[:k + 1]) for k in range(len(steps))]
-        for _ in range(n):
-            x = rnd.random() * cum[-1]
-            k = next(i for i, c in enumerate(cum) if x < c)
-            if k:
-                cands = [(pos[0] + o[0], pos[1] + o[1], pos[2] + o[2]) for o in rings[k]]
-                ws = [W[dist(c)] if dist(c) < len(W) else 0 for c in cands]
-                tot = sum(ws)
-                if tot > 0:
-                    y = rnd.random() * tot
-                    acc = 0
-                    for c, w in zip(cands, ws):
-                        acc += w
-                        if y < acc:
-                            pos = c
-                            break
-            got[dist(pos)] += 1
-        return [got[d] / n for d in range(len(W))]
-
-    s = sum(target)
-    target = [t / s for t in target]
-    W = [t / (1 if d == 0 else 6 * d) for d, t in enumerate(target)]
-    for it in range(iters):
-        got = run(W, it, turns)
-        W = [W[d] * (target[d] / got[d]) if got[d] > 0 else W[d] for d in range(len(W))]
-        top = max(W)
-        W = [w / top for w in W]
-    return [round(1000 * w) for w in W]
 
 
 def builder_price(n: int) -> int:
@@ -491,32 +290,6 @@ def main() -> int:
     print("\nFAITH SPENT:", len(faith_buys))
     for fb in faith_buys:
         print("  ", fb)
-    dist, step = walker(data)
-    print("\nWALKER, the minors' land military")
-    for k in ("peace", "war"):
-        print(f"  distance at {k}: {shares(dist[k], 8)}")
-    for k in ("peace", "war", "damaged"):
-        print(f"  step at {k}: {shares(step[k], 4)}")
-    fd, fs = free_city_walker()
-    print("WALKER, the Free Cities' land military")
-    print(f"  distance: {shares(fd, 5)}")
-    print(f"  step: {shares(fs, 4)}")
-    if "--walk" in sys.argv:
-        def per_mille(c, top):
-            n = sum(c.values())
-            v = [round(1000 * c[k] / n) for k in range(top)]
-            v.append(1000 - sum(v))
-            return v
-
-        def dist_of(c, top):
-            n = sum(c.values())
-            return [c[d] / n for d in range(top)]
-        for name, dc, sc in (("peace", dist["peace"], step["peace"]), ("war", dist["war"], step["war"]),
-                             ("free", fd, fs)):
-            top = 7 if name == "free" else 13
-            steps = per_mille(sc, 3)
-            print(f"  {name}: steps {steps}, weights {walker_fit(dist_of(dc, top), steps)}")
-        print(f"  damaged: steps {per_mille(step['damaged'], 3)}")
     return 0
 
 

@@ -94,9 +94,9 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'Random Era for Antiquity Site': { owner: 'lacking', dll: '0x280140', n: [3, 0] },
   'Choosing Artifact': { owner: 'lacking', n: [0, 3] },
   // the AI's
-  // the barbarians' Wander Near Camp draws it in both engines; a
-  // city-state's units' moves are the driver's
-  'Random Direction': { owner: 'ai', cpu: 'wanderNearCamp', gpu: '_tac_pass', dll: '0x77b9a0', n: [12754, 10982] },
+  // the barbarians' and the Free Cities' Wander Near Camp and a
+  // city-state's Wander Near City draw it in both engines
+  'Random Direction': { owner: 'ai', cpu: 'wanderNearCamp, wanderNearCity', gpu: '_tac_pass, _minor_tactics', dll: '0x77b9a0, 0x77bf50', n: [12754, 10982] },
   'City Build District Choice': { owner: 'ai', n: [105, 171] },
   'BT Research Choice': { owner: 'ai', cpu: 'researchChoice', gpu: '_rai_choice', dll: '0x763020', n: [108, 121] },
   'Random Civic Choice': { owner: 'ai', cpu: 'civicChoice', gpu: '_cai_choice', dll: '0x626600', n: [1, 0] },
@@ -123,7 +123,6 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
  *  another rule. Each draws under an `Engine:` label (`DrawLabel`), which the
  *  action replay never holds (`streamHold`). */
 export const ENGINE_ONLY_SITES: readonly { cpu: string; gpu: string; why: string }[] = [
-  { cpu: 'walkUnit, drawStep', gpu: '_walk_units', why: "a city-state's and a Free City's units' walk: the AI's moves (the game's \"Random Direction\" is its own)" },
   { cpu: 'minorPlan, minorPurchases, minorBuyMilitary, minorBuyNaval, minorBuilders', gpu: '_minor_plan, _minor_buy_land, _minor_buy_naval, _minor_builders', why: "a city-state's builds and buys: the AI's" },
   { cpu: 'seatPhase (the pantheon race)', gpu: '_seat_pantheon_race', why: 'the pantheon: the AI picks its belief with no draw of the game\'s' },
 ];

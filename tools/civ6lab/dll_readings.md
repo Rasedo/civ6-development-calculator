@@ -3966,6 +3966,124 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 
+## C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ
+
+`cityStateTactics` / `freeCityTactics` in cpu/core/tactical.ts, `_minor_tactics` / `_free_tactics` in gpu/core/sim_tactics.py; the replay runs them on a copy (`minorAi`, `minorAi:move`).
+
+- The lists (Tactics.xml): "Minor Civ Tactical" — Support Formation, Attack
+  High Priority, Move to Safety, Attack Medium Priority, Attack Civilians,
+  Promotion, Make Military Formation, Attack Low Priority, Heal, Chase
+  Target, Wander Near City; "Minor Civ Homeland" — First Turn Settler, Move
+  to Safety, Promotion, Builder Outside Ring, End Turn. The Free Cities
+  (Expansion1_Leaders.xml "FreeCitiesTactics") — Attack High, Attack Medium,
+  Move to Safety, Attack Low, Wander Near Camp; homeland End Turn. The move
+  ids (0x5bbf80, each global the hash of the string loaded before its
+  store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),
+  f2e164 Wander Near City (0x77bf50).
+- WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]
+  +0xc0, so a city-state's first turn, its Settler founding in the homeland
+  pass after, wanders none: every minor's t1 rows are End Turn). For a
+  player of a full civilization (0x469db0, CIVILIZATION_LEVEL_FULL_CIV)
+  only DEFENDER units, round the unit's city (+0x11d0 through 0x36f660),
+  the garrison test 0x5cdce0 first ("Garrison" rows, a draw over one plot);
+  for anyone else every unit of AI type EXPLORE or above with Movement left
+  (+0xdb0), round the player's first city (+0x158). Of its planning reach
+  the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it
+  (0x5862e0), none of its own stacking with it (0x585eb0); the weighted
+  vector's weights (influence 0x716a60, the plot's owner +0x60, revealed
+  0x2d2220) are never read: ONE "Random Direction" draw over the count, the
+  move 0x962030 to the plot drawn ("Wander", "Move To" the plot). With none:
+  FindAlternateLocation (0x585940) round the city within 3, moved to with
+  flag 0x1000, else the skip 0x95eae0 ("Wander Back to City", "Move To" the
+  city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's "Random
+  Direction" draws pair one to one with the AI_Tactical.csv rows "Wander" and
+  "Garrison", every player's in log order (1,199 of 1,199 turn-pairs of the
+  five seeds), and a draw's range is the engine's candidate count on the
+  rows the records pin (below).
+- THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with
+  a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250 —
+  for the barbarians their tribe's camp; for the Free Cities UNREAD, the
+  engines read the unit's Free City, else the nearest: AUDIT C-60's ASK).
+  Their logs hold 11 "Wander" rows (runs/h1_duelw1114 t124-127, 1130
+  t152-154), each after the recording's last snapshot (t123, t151): no
+  record pins them; 1123's eight are Attack Units.
+- FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy),
+  dx outer from -range to range, dy inner, the plot at the step within range
+  (0x1e000: x - y//2 + dx, then back; the distance max(|dx|, |dy|) where the
+  signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag
+  0x40), the player revealed it, no other player's unit on it and none of
+  its own that it may not stack with (0x9406e0); the nearest the target, a
+  plot of another area (plot +8) counted three times as far; strictly nearer
+  replaces.
+- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has
+  taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no
+  danger (the influence map 0x716a90 <= 0) is queued ("Heal"); the queue's
+  moves: a unit not of the sea domain (+0x650: 0 sea, 1 air, 2 land, the
+  gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify
+  (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside
+  its own territory heads for its player's nearest city (first of equals) —
+  where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no
+  influence map: every plot reads no danger.
+- THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player
+  0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a
+  district of the player's own: its city centre too) and each ALLY_SUPPORT
+  one (an ally's), in list order, makes each LOW or MEDIUM unit that
+  threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength
+  within its range (0x56e3d0), any other nearer than twice its Movement
+  (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The
+  type ids (0x5bcb80, each global the hash loaded before its store): f2e198
+  FRIENDLY_CITY ... f2e1bc LOW, f2e1c0 MEDIUM, f2e1c4 HIGH, f2e1c8
+  ENEMY_IMPROVEMENT, f2e1cc SETTLE_LOCATION, f2e1d0 GOODY_HUT, f2e1d4
+  ALLY_SUPPORT, f2e1d8 AIR_UNIT. The list's entries per plot owner (0x783980
+  0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's
+  (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else
+  NEUTRAL_CITY — each where the player's type flags (+0xb0) take it.
+- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a
+  plot only where 0x586900 lets the unit end — another player's unit at
+  peace it passes and never ends on (runs/h1_duelw1117 t52: city-state 2's
+  Swordsman at (15,9) plans (14,11) in turn 1 past Rome's Scout on (15,10),
+  which its list leaves out); a city-state's unit never takes a major's
+  territory the major's Early Empire closes and no war opens (t32-37: its
+  Warriors' lists leave China's (32,11), (33,10) out); a land unit whose
+  player may embark it takes water (a turn starting on the domain's pool:
+  0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none
+  (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a
+  water plot; the majors' and the minors' do from t62-69). The step's cost
+  (0x26e920's rules 0x531660..0x530240): into a city at most
+  CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river
+  crossing where either plot is a city's or water (0x531510); the embark
+  rule 0x530420 (land to water) and the disembark 0x530240 waive
+  MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1
+  bit 2, `dll_rowmap.py a5dfb0`: the City Center, the Harbor, the Cothon,
+  the Royal Navy Dockyard) stands at the FROM plot, or at the TO plot — the
+  completion (0x811b0) read off the FROM plot's district in both cases (t72:
+  2's Swordsman embarking from (15,6) onto its complete Harbor (14,7) plans
+  (1/0), the embarking paid). Mathematics' MODIFIER_PLAYER_UNITS_ADJUST_SEA_
+  MOVEMENT reaches a hull alone (t78: 2's embarked Swordsman plans on 2
+  Movement with Mathematics).
+- Measured (the action replay on 1117, 1121, 1124, 1127, 1128: each turn's
+  pass on a copy, the units where the pair's first record holds them, the
+  ground and research record t+1's, the "Random Direction" draws the log's):
+  of 5,952 unit-turns the log names "Wander" the pass wanders 5,743 (the
+  rest went first to an unported move earlier in the pass), 3,799 of the
+  5,743 draws over the log's own range, 4,147 end on record t+1's plot; Heal
+  253 of 354 by the same move, 252 end plots; Wander Back to City 54 of 61,
+  28; Chase Target 29 of 287 (most of the game's chases follow its unported
+  attacks), 101. On 1117 the planning rows the log holds for the wandering
+  units (AI_Planning.csv, matched by turn, player, type and first plot) agree
+  with the engines' turn-1 reach on 816 of 1,087; the rest are units that an
+  unported move left or entered a plot before the draw (Attack Units, an
+  operation), the embark quirk above and the record's ground between its
+  snapshots. 1,925 unit-turns log no tactical row: the minors' operations.
+- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to
+  Safety (the influence map), Support Formation 0x77ae80, Promotion
+  0x77ac30, Attack Civilians' strike, the minors' operations (Naval
+  Superiority, City Defense, Attack Barb Camp: AI_Operation.csv; their units
+  log no tactical row), the embark waiver's quirk above, the planning's
+  unrevealed plots.
+
+## C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)
+
 The weight w[y] (0x702ad0, `this` the player's AI::GrandStrategic at player
 +0x1290, its members named by the constructor 0x6f6e10) is the sum of five
 24.8 parts; the yield value 0x7a6690 is amount x Yields.DefaultValue (Gold

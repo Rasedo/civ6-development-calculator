@@ -571,7 +571,7 @@ describe('embarked and sea movement climb the tech ladder', () => {
     expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + 4));
   });
 
-  it('the sea-movement tech lifts a ship and a passenger alike, once', () => {
+  it('the sea-movement tech lifts a ship, once, and no passenger', () => {
     const state = makeState(makeMap(12, 12, 'COAST'));
     tileAtCoords(state.map, 5, 5).terrain = 'GRASSLAND';
     state.unitsMode = true;
@@ -583,7 +583,8 @@ describe('embarked and sea movement climb the tech ladder', () => {
     expect(unitFullMoves(state, u)).toBe(MP_SCALE * EMBARK_MOVES);
     grantTechs(state, SEA_MOVE_TECH);
     expect(unitFullMoves(state, ship)).toBe(MP_SCALE * (hull + SEA_MOVE_TECH_BONUS));
-    expect(unitFullMoves(state, u)).toBe(MP_SCALE * (EMBARK_MOVES + SEA_MOVE_TECH_BONUS));
+    // an embarked unit keeps its embarked pool (runs/h1_duelw1117 t78)
+    expect(unitFullMoves(state, u)).toBe(MP_SCALE * EMBARK_MOVES);
     // a LAND unit ashore gains nothing from it
     const walker = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 5, 5).index, 0)!;
     expect(unitFullMoves(state, walker)).toBe(MP_SCALE * UNITS.WARRIOR.moves);

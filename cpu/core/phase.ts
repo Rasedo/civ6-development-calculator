@@ -29,10 +29,10 @@ import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
-import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, FREE_WALK_STEPS, FREE_WALK_WEIGHTS, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
-import { landWalker, walkUnit } from './walker';
+import { freeCityTactics } from './tactical';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
@@ -383,6 +383,8 @@ export function levyUnits(state: GameState, cityStateId: number, seat: number): 
     // 75% upgrade discount) and what brings the unit home
     u.leviedFrom = cityState.seat;
     u.movesLeft = 0;
+    // the minor's pool loses it; home again, it takes a new slot (`poolSlots`)
+    delete u.slot;
   }
   cityState.levySeat = seat;
   // the minor's own turn, which follows the levy, is the term's first: the
@@ -814,8 +816,8 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
  *  runs/c60t_grant_w_x3_20260927T024338Z.jsonl,
  *  runs/c60t_grant_w_x4_20260927T024445Z.jsonl). The unit remembers the city that granted it
  *  (`Unit.freeCity`): when that city joins a civilization, the grant goes
- *  (`joinFromFreeCity`). The units walk with the Free Cities' walker
- *  (`freeCitiesPhase`). */
+ *  (`joinFromFreeCity`). The units act on the Free Cities' tactical turn
+ *  (`freeCityTactics`). */
 function grantFreeCityUnit(state: GameState, city: City, unitType: string): void {
   const probe = { type: unitType, seat: FREE_SEAT };
   const centre = state.map.tiles[city.centerIndex];
@@ -903,10 +905,9 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  fires the ranged strikes any walled city fires and runs
  *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
  *  cities press a religion they follow on that religion's founder's turn
- *  (`spreadReligiousPressure`). Then the Free Cities' land
- *  units walk (`walkUnit`, C-60's tables, around the nearest Free City, in
- *  unit order off a list taken before anyone moves); the cities that reached
- *  0 join their race's winner, in array order, after the walk. */
+ *  (`spreadReligiousPressure`). Then the Free Cities' units take their
+ *  tactical turn (`freeCityTactics`); the cities that reached 0 join their
+ *  race's winner, in array order, after it. */
 export function freeCitiesPhase(state: GameState): void {
   const free = state.freeSeat;
   if (!free || free.cities.length === 0) return;
@@ -951,10 +952,7 @@ export function freeCitiesPhase(state: GameState): void {
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));
     if (city.loyalty <= 0) joiners.push(city);
   });
-  const homes = free.cities.map((c) => c.centerIndex);
-  for (const u of state.units.filter((x) => x.seat === FREE_SEAT && landWalker(x))) {
-    walkUnit(state, u, homes, FREE_WALK_STEPS, FREE_WALK_WEIGHTS);
-  }
+  freeCityTactics(state);
   for (const city of joiners) joinFromFreeCity(state, city);
 }
 

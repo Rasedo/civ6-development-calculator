@@ -348,12 +348,11 @@ export const EMBARK_MOVE_TECHS: readonly (readonly [string, number])[] = [
 ];
 
 /**
- * CIV6 (Movement): "all units moving at sea (including embarked land units)
- * receive +1 Movement after researching Mathematics. Note that this detail
- * doesn't appear anywhere in the Civilopedia information on naval units, so
- * you shouldn't be surprised to see 5 Movement on a Frigate when its
- * Civilopedia entry says it has only 4." So it rides on the chassis stat
- * rather than being folded into it, and reaches HULLS as well as passengers.
+ * CIV6 (Technologies.xml MATHEMATICS_ADJUST_SEA_MOVEMENT,
+ * MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT Amount 1): a hull's +1 Movement
+ * after Mathematics, riding on the chassis stat. An embarked land unit keeps
+ * its embarked pool (runs/h1_duelw1117 t78: city-state 2's embarked
+ * Swordsman plans on 2 Movement with Mathematics, AI_Planning.csv).
  */
 export const SEA_MOVE_TECH = srcConst('constants.SEA_MOVE_TECH', 'MATHEMATICS',
   xml('Technologies', 'TechnologyType=TECH_MATHEMATICS', 'TechnologyType',

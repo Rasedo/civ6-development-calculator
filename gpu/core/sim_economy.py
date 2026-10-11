@@ -6256,10 +6256,10 @@ class SimEconomy:
 
     def _sea_move_mp(self, seat: torch.Tensor, emb: torch.Tensor, naval: torch.Tensor) -> torch.Tensor:
         """[B, U] — `seaMoveBonus` + `embarkTechMoves`. The Mathematics rung
-        reaches anything AT SEA (a hull or a passenger); the three embark rungs
-        raise the passenger's own pool. Each reads the unit's seat's own
-        research — a major's, a city-state's (`citystate_techs`) or the
-        barbarians' (`barb_techs`, `state.barbSeat.research`)."""
+        (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT) reaches a hull alone; the
+        three embark rungs raise the passenger's own pool. Each reads the
+        unit's seat's own research — a major's, a city-state's
+        (`citystate_techs`) or the barbarians' (`barb_techs`)."""
         row = self._row_of(seat)
         ok = (row >= 0) & (row < self.n_majors)
         r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
@@ -6275,12 +6275,12 @@ class SimEconomy:
 
         out = torch.zeros_like(row)
         if self._sea_move_tech >= 0:
-            out = out + (has_tech(self._sea_move_tech) & (emb | naval)).long() * self._sea_move_bonus
+            out = out + (has_tech(self._sea_move_tech) & naval).long() * self._sea_move_bonus
         for ti, v in self._embark_move_techs:
             out = out + (has_tech(ti) & emb & ~naval).long() * v
         return out
 
-    def _full_mp(self, pre: str) -> torch.Tensor:
+    def _full_mp(self, pre: str, emb: torch.Tensor | None = None) -> torch.Tensor:
         """[B, U] — refreshUnits' `full + generalAuraMP(state, unit)`, one rule
         for both windows: an EMBARKED land unit marches on the flat
         EMBARK_MOVES pool, everything else on its type's `moves`, plus whatever
@@ -6292,7 +6292,9 @@ class SimEconomy:
         aura after, exactly where `unitFullMoves` and refreshUnits put them.
 
         Every walker and every afford rule (`mp >= full`) must read this same
-        expression — `stepUnit` is embark-aware in both windows."""
+        expression — `stepUnit` is embark-aware in both windows. `emb` [B, U]
+        reads every unit as embarked or ashore (the pathfinder's pool of each
+        domain); the units' own state by default."""
         typ = getattr(self, f"{pre}_unit_type").clamp(min=0, max=self.NU - 1)
         # The golden dedication raises the unit's OWN movement, so it is added
         # to the type pool and then OVERRIDDEN by the embark pool below —
@@ -6339,7 +6341,8 @@ class SimEconomy:
                 typ, getattr(self, f"{pre}_unit_seat"), self._gdr_u_moves
             ).long() * self._gdr_enhanced_moves
         naval = self.unit_naval.take(typ)
-        emb = getattr(self, f"{pre}_unit_emb")
+        if emb is None:
+            emb = getattr(self, f"{pre}_unit_emb")
         # CIV6 (EFFECT_ADJUST_UNIT_MOVEMENT while embarked): the roster's rows
         base = torch.where(
             emb & ~naval,
