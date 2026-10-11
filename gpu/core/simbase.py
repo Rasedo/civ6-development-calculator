@@ -1190,6 +1190,7 @@ _MUTABLE = [
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
+    "city_free_grant",  # a Free City's count of turns toward its next grant
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step
     "seat_explored", "barb_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",

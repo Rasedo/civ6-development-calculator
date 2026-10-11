@@ -4684,7 +4684,7 @@ class SimEconomy:
         `hiddenResourcesFor`'s twin: the row's own techs — a major's, a
         city-state's (`citystate_techs`, compared like a major's; 9001 t1
         had a minor working Horses it could not yet see), and the Free row's
-        none (it holds no research). A Great Person's reveal
+        (its row `FR`). A Great Person's reveal
         (`_gp_resource_reveal`, James Young's Oil) shows one before its
         technology. A city-state sees every resource its suzerain
         (`citystate_suzerain`) sees (0x4ac140).
@@ -6259,7 +6259,8 @@ class SimEconomy:
         (MODIFIER_PLAYER_UNITS_ADJUST_SEA_MOVEMENT) reaches a hull alone; the
         three embark rungs raise the passenger's own pool. Each reads the
         unit's seat's own research — a major's, a city-state's
-        (`citystate_techs`) or the barbarians' (`barb_techs`)."""
+        (`citystate_techs`), the Free Cities' (`FR`) or the barbarians'
+        (`barb_techs`)."""
         row = self._row_of(seat)
         ok = (row >= 0) & (row < self.n_majors)
         r0 = row.clamp(min=0, max=self.n_majors - 1)  # a minor/barb row is masked, not indexed
@@ -6271,7 +6272,7 @@ class SimEconomy:
             h = (self.civ_techs[:, :, ti].gather(1, r0) & ok) | (self.barb_techs[:, ti].unsqueeze(1) & barb)
             if self.S > 0:
                 h = h | (self.citystate_techs[:, :, ti].gather(1, s0) & minor)
-            return h
+            return h | (self.citystate_techs[:, self.FR, ti].unsqueeze(1) & (seat == FREE_SEAT))
 
         out = torch.zeros_like(row)
         if self._sea_move_tech >= 0:

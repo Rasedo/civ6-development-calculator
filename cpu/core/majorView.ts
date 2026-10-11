@@ -691,7 +691,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const units = ids.map((id) => state.units.find((u) => u.id === id)).filter((u): u is Unit => !!u);
       const targets = targetsOf(i);
       const pass: Pass = { seat: i, strike: false, units, reach: new Map(), done: new Set(), ai: new Map(units.map((u) => [u.id, AI_COMBAT_UNIT])),
-        targets, plan: new Map(), danger: new Int16Array(0) };
+        targets, plan: new Map(), danger: new Int16Array(0), regions: new Set() };
       for (const u of units) {
         const p = planUnit(state, u, targets);
         pass.plan.set(u.id, p);

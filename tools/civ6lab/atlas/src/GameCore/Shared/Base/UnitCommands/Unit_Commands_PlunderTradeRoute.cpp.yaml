@@ -10,6 +10,7 @@
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the homeland's Plunder Trader — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until one stands on it.

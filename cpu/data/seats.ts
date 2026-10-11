@@ -169,22 +169,24 @@ export const FREE_CITY_PAIR_CLASS = srcConst('seats.freeCityPairClass', 'MELEE' 
     + ' melee type orders with the former owner\'s tech count on 12 of 12 — Warriors at 13 techs, Swordsmen'
     + ' at 14, Line Infantry at 38, Infantry at 56 — whatever the world era',
 });
-/** ...then ONE unit every this many of the city's turns while it stays Free,
- *  the flip turn counted as its first: the 5th, the 10th, ... — a grant, not
- *  production. */
+/** ...then ONE unit as the city's count of turns reaches this, the flip turn
+ *  its first: the 5th, the 10th, ... — a grant, not production (0x274010:
+ *  the record's count +0x18, the grant at 5 or more, the count back to 0). */
 export const FREE_CITY_GRANT_PERIOD = srcConst('seats.freeCityGrantPeriod', 5, {
-  lab: `${FREE_CITY_WATCH}: the flip in turn 115, the Crossbowman first read on turn 120;`
+  lab: 'GameCore_XP2_Release.dll 0x274010 (the count +0x18 against 5);'
+    + ` ${FREE_CITY_WATCH}: the flip in turn 115, the Crossbowman first read on turn 120;`
     + ` ${FREE_CITY_CENSUS}: 73 grants first read 4, 9, 14, ... turns after the Free City's first read`,
 });
-/** ...its CLASS drawn over these weights — the classes of the 73 grants on
- *  that cadence (29 light cavalry, 27 ranged, 12 melee, 1 recon; the 4
- *  Builders are a civilian the hostile pool does not host) — and its chassis
- *  that class's of the world era (`eraUnitOfClass`). */
-export const FREE_CITY_GRANT_CLASSES = srcConst('seats.freeCityGrantClasses',
-  ['LIGHT_CAV', 'RANGED', 'MELEE', 'RECON'] as const, { lab: FREE_CITY_CENSUS });
-export const FREE_CITY_GRANT_WEIGHTS = srcConst('seats.freeCityGrantWeights', [29, 27, 12, 1], {
-  lab: FREE_CITY_CENSUS,
+/** ...none while this many of the units the city granted stand (0x274010:
+ *  the units of the record's id, a Builder not counted; the count held). */
+export const FREE_CITY_GRANT_CAP = srcConst('seats.freeCityGrantCap', 6, {
+  lab: 'GameCore_XP2_Release.dll 0x274010 (the count of the city\'s units against 6, 0x2740e0)',
 });
+/** ...its CLASS one draw over these alike ("Free Cities Unit Choice",
+ *  0x274010: CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each),
+ *  and its chassis that class's of the world era (`eraUnitOfClass`). */
+export const FREE_CITY_GRANT_CLASSES = srcConst('seats.freeCityGrantClasses',
+  ['MELEE', 'RANGED', 'LIGHT_CAV'] as const, { lab: 'GameCore_XP2_Release.dll 0x274010 (the class list built at 0x274243)' });
 /** CIV6 (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*): the citizen
  *  pressure term is linear in the ratio of the stronger side to the weaker —
  *  NEUTRAL_LOYALTY at NEUTRAL_RATIO, MAX_LOYALTY at MAX_RATIO and beyond,

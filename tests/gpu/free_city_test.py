@@ -361,7 +361,7 @@ def test_grants(rules, path) -> None:
     # era (`eraUnitOfClass`)
     assert (sim._free_pair_n, sim._free_grant_period) == (2, 5), "the wire's grant rows"
     assert RULES["promotions"]["classes"][sim._free_pair_cls] == "MELEE"
-    assert [UNI[int(x)] if int(x) >= 0 else None for x in sim._free_grant_units[0]] == [
+    assert [UNI[int(x)] if int(x) >= 0 else None for x in sim._free_grant_units[2]] == [
         None, "HORSEMAN", "COURSER", "COURSER", "CAVALRY", "CAVALRY", "HELICOPTER", "HELICOPTER", "HELICOPTER"]
     era = int(sim._world_era()[B0].clamp(min=0))
     # the pair is the FORMER OWNER's best melee by its own research, whatever
@@ -400,31 +400,46 @@ def test_grants(rules, path) -> None:
     def grants() -> list[tuple[int, int, int]]:
         return [u for u in free_units(sim) if int(sim.unit_free_city[B0, u[0]]) == cid]
 
-    # no grant arrives until the city's fifth turn...
-    for k in range(1, 4):
+    # no grant arrives until the city's count of turns reaches five, the flip
+    # turn its first...
+    for k in range(0, 4):
         sim.turn = t0 + k
         sim._free_cities_phase()
         assert len(grants()) == 2, (k, grants())
-    # ...then one, of a class the era has a chassis for, drawn...
+    # ...then one draw over the classes alike, the class's chassis of the era
+    # (none where it has none), and the count back to 0...
     open_ = {int(x) for x in sim._free_grant_units[:, era].tolist() if int(x) >= 0}
     rng0 = int(sim.rng_state[B0])
     sim.turn = t0 + 4
     sim._free_cities_phase()
     got = grants()
-    assert len(got) == 3 and got[2][1] in open_, got
+    assert len(got) <= 3 and all(g[1] in open_ for g in got[2:]), got
     assert int(sim.rng_state[B0]) != rng0, "the grant drew nothing"
-    # ...and every fifth turn after, while the city stays Free
+    assert int(sim.city_free_grant[B0, F, col]) == 0
+    n = len(got)
     sim.turn = t0 + 5
     sim._free_cities_phase()
-    assert len(grants()) == 3
-    sim.turn = t0 + 9
-    sim._free_cities_phase()
-    assert len(grants()) == 4
+    assert len(grants()) == n and int(sim.city_free_grant[B0, F, col]) == 1
+    # ...and none while the cap of its own grants stand: the count holds
+    sim.city_free_grant[B0, F, col] = 4
+    mine = (sim.barb_unit_alive[B0] & (sim.barb_unit_seat[B0] == FREE_SEAT)
+            & (sim.barb_unit_free_city[B0] == cid)).nonzero(as_tuple=True)[0].tolist()
+    free_slots = (~sim.barb_unit_alive[B0]).nonzero(as_tuple=True)[0].tolist()
+    for s_ in free_slots[:max(0, sim._free_grant_cap - len(mine))]:
+        sim.barb_unit_alive[B0, s_] = True
+        sim.barb_unit_seat[B0, s_] = FREE_SEAT
+        sim.barb_unit_free_city[B0, s_] = cid
+    rng1 = int(sim.rng_state[B0])
+    sim._free_city_grant(torch.arange(sim.B) == B0, col)
+    assert int(sim.city_free_grant[B0, F, col]) == 5 and int(sim.rng_state[B0]) == rng1, "a capped city drew"
+    for s_ in free_slots[:max(0, sim._free_grant_cap - len(mine))]:
+        sim.barb_unit_alive[B0, s_] = False
+        sim.barb_unit_free_city[B0, s_] = -1
     # no barbarian rule walks them: the raid never moves a Free Cities unit
     before = free_units(sim)
     sim._barbarian_phase()
     assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
-    print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit every fifth turn, no barbarian walk")
+    print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit as the count reaches five, none at the cap, no barbarian walk")
 
 
 def test_grant_outward(rules, path) -> None:
@@ -596,6 +611,25 @@ def test_free_unit_defends(rules, path) -> None:
     print("  9 the defenders OK — attackable by anyone, no experience, whole turns run")
 
 
+def test_research(rules, path) -> None:
+    """`freeCitiesPhase`'s research with no Free City: the catch-up stands a
+    tech every major holds at its cost less one on the Free Cities' row `FR`,
+    and the research and civics AIs choose."""
+    sim = fresh(rules, path)
+    assert not bool(sim.city_alive[:, sim.FREE_ROW].any())
+    tech = {t["id"]: i for i, t in enumerate(RULES["techs"])}
+    pot = tech["POTTERY"]
+    sim.civ_techs[:, :, pot] = True
+    sim._free_cities_phase()
+    cost = int(sim._research_cost(False)[B0, pot])
+    cur = int(sim.citystate_cur_tech[B0, sim.FR])
+    kept = float(sim.citystate_tech_prog[B0, sim.FR]) if cur == pot else float(sim.citystate_tech_retain[B0, sim.FR, pot])
+    assert kept == cost - 1, (kept, cost)
+    assert cur >= 0 and int(sim.citystate_cur_civic[B0, sim.FR]) >= 0, "the Free Cities chose nothing"
+    assert not bool(sim.citystate_techs[B0, sim.FR, pot])
+    print("  11 the research OK — the catch-up on the Free Cities' row, the research and civics AIs' choice, no city")
+
+
 def a_fitting_revolt(rules, path) -> bool:
     """The scenes revolt the city `plant_city` gives row 0. Rows 1 and 2 must
     exert no pull on it: then row 1 (Eleanor) wins the flip's tie, the city
@@ -630,6 +664,7 @@ def main() -> int:
     test_defence_and_strike(rules, path)
     test_free_unit_defends(rules, path)
     test_treasury_and_join(rules, path)
+    test_research(rules, path)
     print("BATTERY OK free_city")
     return 0
 

@@ -734,34 +734,47 @@ class SimPhase:
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
         self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home)
 
-    def _free_grant_type(self, due: torch.Tensor) -> torch.Tensor:
-        """[B] long — `freeCityGrantType` in the games of `due`: ONE weighted
-        pick ("Free Cities Unit Choice") over `_free_grant_w` among the
-        classes the world era has a chassis for, in table order, and that
-        class's chassis of the era; -1 outside `due`. The draw is taken
-        whether or not a tile is free."""
+    def _free_city_grant(self, act: torch.Tensor, j: int) -> None:
+        """`freeCityGrant` for the Free City in column `j` in the games of
+        `act`: its count of turns (`city_free_grant`) rises by one, and at
+        `_free_grant_period` a grant falls due — none while `_free_grant_cap`
+        of the units it granted stand (the count held); else ONE draw
+        ("Free Cities Unit Choice") over the classes alike and the class's
+        chassis of the world era (`_free_grant_units`, -1 none), the count
+        back to 0."""
+        row = self.FREE_ROW
+        cnt = self.city_free_grant[:, row, j] + act.long()
+        self.city_free_grant[:, row, j] = cnt
+        due = act & (cnt >= self._free_grant_period)
+        if not bool(due.count_nonzero()):
+            return
+        cid = self.city_id[:, row, j]
+        own = (self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
+               & (self.barb_unit_free_city == cid.unsqueeze(1))).sum(dim=1)
+        due = due & (own < self._free_grant_cap)
+        if not bool(due.count_nonzero()):
+            return
+        n = self._free_grant_units.shape[0]
+        k = self._rand_range(due, n).clamp(min=0, max=n - 1)
         era = self._world_era().clamp(min=0, max=self._free_grant_units.shape[1] - 1)
-        units = self._free_grant_units[:, era].t()  # [B, classes]
-        w = torch.tensor(self._free_grant_w, dtype=torch.long, device=self.device).unsqueeze(0)
-        w = torch.where(units >= 0, w, torch.zeros_like(w))
-        total = w.sum(dim=1)
-        draw = due & (total > 0)
-        k = self._rand_weighted(draw, w).clamp(min=0)
-        got = units.gather(1, k.unsqueeze(1)).squeeze(1)
-        return torch.where(draw, got, torch.full_like(got, -1))
+        got = self._free_grant_units[k, era]
+        jc = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+        self._grant_free_unit(due, jc, torch.where(due, got, torch.full_like(got, -1)))
+        self.city_free_grant[:, row, j] = torch.where(due, torch.zeros_like(cnt), self.city_free_grant[:, row, j])
 
     def _free_cities_phase(self) -> None:
         """The FREE CITIES player's turn, after every major's — the
-        `freeCitiesPhase` twin. Each Free City's amenity tier is recorded
+        `freeCitiesPhase` twin, every turn: its research is a city-state's
+        (`_minor_research` at its row `FR`) on its cities' Science and Culture
+        (none with no city). Each Free City's amenity tier is recorded
         first, off one loop-top `_seat_amenity` over the free row: the full
         need of its population and the supply the Free Cities seat holds (its
         own luxuries, buildings and districts; no government, policy or
         governor). Its treasury (`free_treasury`) banks the Gold that same walk
         makes, in slot order, then pays its units' upkeep, the balance stopping
         at 0 as a minor's does (`_seat_upkeep_and_bankruptcy`). Then
-        each city takes its grant when one falls due — every
-        `_free_grant_period`th of its turns, the flip turn its first
-        (`city_founded_turn`), the chassis `_free_grant_type`'s — puts the same
+        each city takes its grant when one falls due (`_free_city_grant`),
+        puts the same
         walk's Production into its build table (`_free_city_build`), fires the
         ranged strikes any walled city fires (`_city_strikes`) and runs its
         loyalty (its heal is the turn's end's, `_heal_cities`): CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
@@ -781,6 +794,8 @@ class SimPhase:
         row = self.FREE_ROW
         alive = self.city_alive[:, row]
         if not bool(alive.count_nonzero()):
+            zero = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+            self._minor_research(self.FR, zero, zero)
             return
         # a Free City's reactor keeps its clock: the seat resolves no power,
         # so the age is kept here (`ageReactors`)
@@ -794,6 +809,18 @@ class SimPhase:
         # order (a dead column adds an exact 0.0), then the upkeep
         acting = alive.any(dim=1)
         walk = self._seat_city_walk(row, amen_yf=_yf, maint=self._seat_housing(row)[0])
+        # ITS RESEARCH on its cities' Science and Culture, summed in slot
+        # order; a completion reads the walk again
+        sci = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        cul = torch.zeros(self.B, dtype=torch.float64, device=self.device)
+        for j in range(self.RC):
+            sci = sci + walk[:, j, 3].double()
+            cul = cul + walk[:, j, 4].double()
+        gained = self._minor_research(self.FR, sci, cul) > 0
+        if bool(gained.count_nonzero()):
+            _yf_r = self._seat_amenity(row)[2]
+            walk_r = self._seat_city_walk(row, amen_yf=_yf_r, maint=self._seat_housing(row)[0])
+            walk = torch.where(gained.view(-1, 1, 1), walk_r, walk)
         gold = walk[:, :, 2]
         prod = walk[:, :, 1]
         income = torch.zeros(self.B, dtype=torch.float64, device=self.device)
@@ -815,18 +842,14 @@ class SimPhase:
         lmax = float(self.rules.seats["loyaltyMax"])
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-        f_techs, f_civics = self._free_research()
+        f_techs, f_civics = self.citystate_techs[:, self.FR], self.citystate_civics[:, self.FR]
         f_train = self._trainable_in(f_techs, f_civics, self._free_any_res)
         for j in range(self.RC):
             act = alive_c[:, j]
             if not bool(act.count_nonzero()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
-            # a grant falls due every `_free_grant_period`th of the city's own
-            # turns, the flip turn its first
-            due = act & ((int(self.turn) - self.city_founded_turn[:, row, j] + 1) % self._free_grant_period == 0)
-            if bool(due.count_nonzero()):
-                self._grant_free_unit(due, jc, self._free_grant_type(due))
+            self._free_city_grant(act, j)
             self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)
             self._city_strikes(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)

@@ -253,7 +253,7 @@ def main() -> None:
     seen = [0, 0, 0]
     sim4._erupt = lambda hit, ring, row: [seen.__setitem__(int(x) - VOLC0, seen[int(x) - VOLC0] + 1)
                                           for x in row[hit].tolist()]
-    sim4._flood_river = lambda hit, tile, sev: None
+    sim4._flood_river = lambda hit, tile, sev, river: None
     for _ in range(8000):
         # no turn passes between the draws: empty the storm and drought
         # tables a real turn would have aged

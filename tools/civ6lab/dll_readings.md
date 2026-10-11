@@ -1591,7 +1591,8 @@ clans' 0x8e1bf0 (no clans in these games).
   plot count (+4) or its area's (Map_Region +0xc m_area, looked up through
   vfunc +0xd8) is over 10 — NOT the continents (see "the map's regions"
   below); each keeps its
-  best-scored plots (stable order). "Barbarian camp region placement" weighs
+  best-scored plots (stable order) — the job "Barbarian Camp Evaluation", one
+  per region entry (0x14fd6f, the jobs waited on at 0x14fe72). "Barbarian camp region placement" weighs
   the regions at the global top score by their plot counts, "Barbarian camp
   location" is uniform over the region's plots, the region's weight goes to
   0; adding more than one, a plot within 7 of a tribe is passed over.
@@ -4682,7 +4683,7 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   other players' units. End plots: "HL: Move To Safety" 183 of 371 (60 with
   the stand-in), "Move to safety" 29 of 60 (0).
 
-## C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)
+## C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)
 
 `exploreLand`, `exploreTarget`, `exploreOk` in cpu/core/tactical.ts; `_tac_explore`, `_tac_explore_ok`, `_tac_explore_region` in gpu/core/sim_tactics.py; the revealed plots in cpu/core/fog.ts `revealAround` / gpu `_barb_reveal` (`barb_explored`).
 
@@ -4719,10 +4720,25 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   +0x360 / +0x3d0, the same search: "primary / secondary / tertiary
   regions"); else the first plot of the largest second count ("HL: Explore
   fallback"). The unit's plot joins the chosen.
-- PARTLY READ: the region lists' writer (the engines carry none: 36 of the
-  barbarians' 223 Explore rows of runs/h1_duelv1124 are "tertiary regions");
-  a revealed plot's +0x47 that makes a plot of positive count win once
-  ahead of a larger (0x70a6c0's second flag: not carried); the turn test on
+- THE REGION LISTS (+0x1290: the double-buffered lists +0x298 -> +0x2f0,
+  +0x308 -> +0x360, +0x378 -> +0x3d0). The primary: the region of a city's
+  plot and of each plot round it (0x700630 from the city analysis 0x5cdd70,
+  through 0x6fa5e0), the secondary the regions across those regions'
+  chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no
+  city holds neither. The tertiary: the tactical target list (0x783980)
+  gathers into a set every region of a plot its player sees (+0x290 count
+  above 0, 0x783d5c) or revealed (+0x2f0, 0x7852db), plots off any region
+  left out, and stores it (0x6fad50, ascending) after its plot walk. The
+  search over a list (0x70b6f0): the plots in index order whose region the
+  list holds, never revealed, +0x4c clear, enterable, strictly nearer
+  replacing; then not chosen and a path to it (0x272a60), else the next
+  list. The engines: `seenRegions` (`Pass.regions`) / `_tac_seen_regions`,
+  the barbarians' lists the tertiary alone ("HL: Explore tertiary regions"):
+  the "HL: Explore" rows of the 5-seed replay end on the game's plot 419 ->
+  490 of 1,056; barb:move imposed 1117 418 -> 404, 1121 1,096 -> 1,070,
+  1124 1,043 -> 1,018.
+- PARTLY READ: a revealed plot's +0x47 that makes a plot of positive count
+  win once ahead of a larger (0x70a6c0's second flag: not carried); the turn test on
   a plot of a player at war (0x70bd40: the game turn below the regions
   record's +0x128; taken as passing); a goody hut's plot taken at once by a
   full civilization (0x82d90: no barbarian).
@@ -4893,6 +4909,104 @@ cpu/core/combat.ts); `_tac_coastal_raid` in gpu/core/sim_tactics.py
   scores the tribe.
 - MEASURED: 9 of 9 Coastal Raid rows take the move (0 on the base), 5 end
   on the game's plot.
+
+## C-60: the Free Cities' research — READ (the catch-up's receivers), ported
+
+`freeCitiesPhase` (cpu/core/phase.ts) through `minorResearch`
+(cpu/core/minorBuild.ts); `_free_cities_phase` (gpu/core/sim_phase.py)
+through `_minor_research` on the research row `FR` (gpu/core/sim_minors.py).
+
+- The Free Cities player (62) holds a research of its own, logged from turn 1
+  like a city-state's (AI_Research.csv / AI_GovtPolicies.csv rows of player
+  62 in every duel; its record's techs, civics and progress in every
+  record). The catch-up 0x4cb930 / 0x39ec60 counts it among its receivers
+  (neither FULL_CIV nor TRIBE: "H-1: a minor's research catch-up"), so each
+  row the majors hold stands at its cost less one; with no city it makes no
+  Science, and a row completes once the game era's price falls below that
+  progress (runs/h1_duelw1123: Pottery at 11 of 12 from turn 2, done at t32
+  when the Classical prices make it 10; then one a turn — Writing, Animal
+  Husbandry, Mining, Bronze Working, Archery, Astrology to t38, each at its
+  old cost less one against the new price). With a city its Science and
+  Culture are its cities' (1123 t203-t210 0.45 to 0.90 a turn).
+- The engines: the seat is made at its first turn and runs a city-state's
+  research every turn — the catch-up, its cities' Science and Culture summed
+  in their order, the research and civics AIs' choices, Urban Defenses
+  fitting its cities (`urbanDefensesFit`); every reader of a seat's research
+  takes it (the walls' tier, the yield walk's techs and civics, the
+  resources it sees, the dig sites, the flank and embark rungs, the
+  embarked defence's era, the appeal's civic). Its build table reads it in
+  place of the world era's research.
+- UNREAD: the research analysis's resources term for a player of several
+  cities (the engines carry none for the Free Cities, as for the majors).
+- MEASURED (the action replay, player 62): its research choices as the
+  record's 2 of 2 in 1114, 1117 and 1124, 5 of 5 in 1130, 6 of 35 in 1123
+  (first off t35, Astrology for Archery); its analysis's rows within 0.05
+  of AI_Research.csv 1,652 of 2,074 (1114) to 3,362 of 4,233 (1117).
+
+## C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)
+
+`freeCityGrant` (cpu/core/phase.ts), `_free_city_grant`
+(gpu/core/sim_phase.py).
+
+- 0x274010, each Free City's record (+0x0c the city, +0x14 live) every
+  Free Cities turn: the count +0x18 rises by one; at 5 or more: the units
+  whose +0x11d0 names the record (the city's grants), +0x7d0 == -1, are
+  counted — a unit with build charges (+0xed0 > 0) kept aside as its
+  Builder — and with 6 or more the grant waits, the count held. With no
+  Builder of its own, no HIGH_PRIORITY_UNIT target of the player's list
+  within 5 of the city (0x272fa0) and a pillaged improvement (+0x44 set,
+  +0x4d bit 0) on a plot within 2 of it, CLASS_BUILDER is raised; else ONE
+  draw "Free Cities Unit Choice" (0x152eb0) over CLASS_MELEE, CLASS_RANGED,
+  CLASS_LIGHT_CAVALRY, weight 1 each; the unit 0x273a40: of the record's
+  allowed units (+0x28) of the class, the highest Combat (+0x48, the first
+  of equals), placed by the ring walk 0x6aef0 within 3. The count back to
+  0. Then, the city not producing (+0x2350 == 0), the first pillaged
+  district it may repair (0x173f70), else a pillaged building's repair.
+- The engines: the count `City.freeGrantTurns` / `city_free_grant`, the cap
+  6 over the units the city granted, the uniform draw, the class's chassis
+  of the world era (`eraUnitOfClass`; none, no unit). LAB: the chassis (the
+  allowed list's writer unread; the census's 12 melee of 69 combat grants
+  against a draw alike, runs of FREE_CITY_CENSUS); the units +0x7d0 skips.
+  BUILD (AUDIT C-60): the Builder grant (a civilian the hostile pool does
+  not host) and the record's repairs.
+
+## C-95: the homeland's Plunder Trader — READ, ported
+
+`homelandPlunder` in cpu/core/tactical.ts; `_tac_homeland_plunder` in
+gpu/core/sim_tactics.py.
+
+- 0x70f610, first of "Default Barbarian HL": each TRADER entry of the
+  player's target list (+0x12b8 +0x370, 40-byte entries), each homeland
+  unit (+0x208) not yet in the move list (+0x220), not +0x770, with a
+  planning (+0x1fc0) that reaches the entry's plot this turn (0x791300: one
+  turn, range 0): the row ("%d, %d, %s, %s, %s, %s (%d), Available Units:
+  %d", the count 1), a move order onto it (0x962190) and the plunder
+  (PLUNDER_TRADE_ROUTE 0x955950) queued (0x7094f0); the queue carried out as
+  the move ends (0x70a440). A civilian goes too: runs/h1_duelw1124 t137-t151,
+  t170-t173 the barbarians' captured Builder stands each turn on the plot of
+  player 4's Trader.
+- The engines: the homeland's units take a search of one turn for the
+  plot (a civilian holds no planning there); the plunder is the move's.
+- MEASURED: none of the 26 rows of the five duels takes it — a Trader on
+  its route stands on no plot in the engines (`trade.ts` spawns one only
+  where a route ends), so the target list holds no TRADER entry there.
+
+## C-95: the target list's knowledge-base entries — READ, unported
+
+- After its plot walk and the region set (0x7856f6), the tactical target
+  list 0x783980 walks the game's players (0x483b50 +0x4a0..+0x4a8) and, for
+  each its player is at war with (0x469cd0), asks its knowledge base
+  (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per
+  unit type in DB order, each record (0x5ef650, 32 bytes) whose age (+0xc)
+  is exactly 1 — seen at the last look, not at this turn's — whose unit
+  (+0, the player's unit list 0x4f2310) still stands (+0x770 clear) within
+  2 of the plot recorded (+0x10 / +0x14): the unit's own plot now. Each such
+  plot the player does not see now (+0x290 count 0) takes an entry after
+  the walk's: TARGET_LOW_PRIORITY_UNIT where the unit's type has Combat
+  (+0x48), else TARGET_CIVILIAN_UNIT. The priorities (0x786d50) follow.
+- The engines' target lists hold the walk's entries alone; the GPU's keeps
+  one unit entry a plot, in plot order, which a later entry on a plot of
+  the walk (an improvement it only revealed) does not fit (AUDIT C-95).
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

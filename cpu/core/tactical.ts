@@ -886,6 +886,9 @@ export interface Pass {
   plan: Map<number, Planner>;
   /** the player's danger map as the pass began (`dangerPlane`) */
   danger: Int16Array;
+  /** the regions of every plot the player revealed as the pass began — the
+   *  target list's set (0x783980), its tertiary region list (0x6fad50) */
+  regions: Set<number>;
 }
 
 /** the move that took the unit, as the game's tactical log names it, the
@@ -1149,6 +1152,40 @@ function plunderTraders(state: GameState, pass: Pass): void {
       finish(pass, u, 'Plunder Trader', e.tile);
       if (state.units.includes(u) && u.tileIndex === e.tile) break;
     }
+  }
+}
+
+/**
+ * THE HOMELAND'S PLUNDER TRADER (0x70f610, the first move of "Default
+ * Barbarian HL"): each TRADER target of the list, each homeland unit left
+ * and not yet queued whose plot this turn's search closes on the target's
+ * (0x791300: one turn, the plot itself) is queued with it ("Plunder
+ * Trader"); the queue carried out as the move ends (0x70a440): each queued
+ * unit that can act goes onto its plot (0x962190; a civilian stands beside
+ * the trader, runs/h1_duelw1124 t137-t151 the captured Builder), its turn
+ * done.
+ */
+function homelandPlunder(state: GameState, pass: Pass): void {
+  const queue: { u: Unit; plot: number }[] = [];
+  const queued = new Set<number>();
+  for (const e of pass.targets) {
+    if (e.type !== 'TRADER') continue;
+    for (const u of pass.units) {
+      if (!live(state, pass, u) || queued.has(u.id) || u.movesLeft <= 0) continue;
+      let hit = false;
+      search(state, u, 1, false, (n, ground) => {
+        hit = n.tile === e.tile && n.turns <= 1 && ground.stand(n.tile);
+        return hit;
+      });
+      if (!hit) continue;
+      queue.push({ u, plot: e.tile });
+      queued.add(u.id);
+    }
+  }
+  for (const q of queue) {
+    if (!canAct(state, pass, q.u)) continue;
+    moveTo(state, q.u, q.plot);
+    finish(pass, q.u, 'Plunder Trader', q.plot);
   }
 }
 
@@ -1700,6 +1737,16 @@ function revealedOf(state: GameState, seat: number): (i: number) => boolean {
   return (i) => !ex || ex.length === 0 || ex[i] === 1;
 }
 
+/** the regions of every plot the player revealed: the tactical target
+ *  list's set (0x783980), stored as the player's tertiary region list
+ *  (0x6fad50) */
+function seenRegions(state: GameState, seat: number): Set<number> {
+  const revealed = revealedOf(state, seat);
+  const out = new Set<number>();
+  for (const t of state.map.tiles) if ((t.region ?? -1) >= 0 && revealed(t.index)) out.add(t.region!);
+  return out;
+}
+
 /** may the explorer go to the plot (0x70bd40): not its own; one its player
  *  revealed; another player's ground only at war with it; no unit on it
  *  (+0x4c); on its own area unless it embarks (the barbarians never), a
@@ -1742,8 +1789,12 @@ function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => b
  * on the move's first round, the nearest unrevealed plot of its region
  * where the player has not revealed all of it ("cur region", a path to it
  * existing; a unit off any region the nearest of its area, "cur area");
- * else the plot whose sight holds the most plots the player does not see
- * now (0x70a8b0, "fallback"). The unit's own plot joins the chosen.
+ * else the nearest unrevealed plot of the player's region lists (0x70b6f0,
+ * a path to it existing) — the primary and the secondary its cities' (a
+ * player with none holds none), the tertiary the regions of the plots it
+ * revealed ("tertiary regions"); else the plot whose sight holds the most
+ * plots the player does not see now (0x70a8b0, "fallback"). The unit's own
+ * plot joins the chosen.
  */
 function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number>, first: boolean,
   revealed: (i: number) => boolean, seenNow: Uint8Array): { plot: number; move: string } | null {
@@ -1787,6 +1838,10 @@ function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number
     const area = here.area ?? -1;
     const p = nearestUnrevealed(state, u, revealed, (t) => (t.area ?? -1) === area);
     if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore cur area' };
+  }
+  if (pass.regions.size) {
+    const p = nearestUnrevealed(state, u, revealed, (t) => pass.regions.has(t.region ?? -1));
+    if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore tertiary regions' };
   }
   return best2 >= 0 ? { plot: best2, move: 'HL: Explore fallback' } : null;
 }
@@ -1997,7 +2052,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
     plan.set(u.id, p);
     reach.set(u.id, p.reach);
   }
-  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan, danger: dangerPlane(state, seat) };
+  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan, danger: dangerPlane(state, seat), regions: seenRegions(state, seat) };
 }
 
 // THE BARBARIANS' RAID ("Raid City", BehaviorTrees.xml; the reading is
@@ -2419,7 +2474,7 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     reach.set(u.id, p.reach);
   }
   const pass: Pass = { seat: BARB_SEAT, strike: true, units: all, reach, done: new Set(), ai, targets, plan,
-    danger: dangerPlane(state, BARB_SEAT) };
+    danger: dangerPlane(state, BARB_SEAT), regions: seenRegions(state, BARB_SEAT) };
   // the operations' trees first (their manager's job opens the player's
   // turn); then an operation's units are the operation's
   barbarianOpTrees(state, pass);
@@ -2450,9 +2505,10 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
     const tr = tribeOf(state, u.id);
     return tr?.alive ? tr.plot : -1;
   });
-  // THE HOMELAND ("Default Barbarian HL") takes every unit left: Move To
-  // Safety, Explore Land
+  // THE HOMELAND ("Default Barbarian HL") takes every unit left: Plunder
+  // Trader, Move To Safety, Explore Land
   pass.units = all;
+  homelandPlunder(state, pass);
   homelandSafety(state, pass);
   exploreLand(state, pass);
   // End Turn: the rest stand

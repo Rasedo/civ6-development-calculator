@@ -295,6 +295,34 @@ def _unit_pools_row(sim, b: int) -> list[int]:
     return out + row(sim.S, "barb", int(sim._ROW_SEAT[sim.FREE_ROW]))
 
 
+def _research_record(sim, b: int, s: int) -> list:
+    """`researchRecord`'s twin for research row `s`: the techs held behind
+    their count, the civics held behind theirs, each tree's progress, the
+    items in hand, the goal, the overflows, the AI's turns left, the progress
+    kept per row, then each AI's last analysis behind a flag"""
+    techs = [i for i, on in enumerate(sim.citystate_techs[b, s].tolist()) if on]
+    civics = [i for i, on in enumerate(sim.citystate_civics[b, s].tolist()) if on]
+    out = [len(techs), *techs, len(civics), *civics,
+           float(sim.citystate_tech_prog[b, s]), float(sim.citystate_civic_prog[b, s]),
+           int(sim.citystate_cur_tech[b, s]), int(sim.citystate_cur_civic[b, s]), int(sim.citystate_tech_goal[b, s]),
+           float(sim.citystate_tech_ovf[b, s]), float(sim.citystate_civic_ovf[b, s]),
+           int(sim.citystate_ai_left[b, s]), int(sim.citystate_ai_left_seen[b, s]),
+           *sim.citystate_tech_retain[b, s].tolist(), *sim.citystate_civic_retain[b, s].tolist()]
+    tv = bool(sim.citystate_ai_valid[b, s])
+    out.append(1 if tv else 0)
+    if tv:
+        out += [v for t in range(sim.citystate_ai_turns.shape[2]) for v in (
+            int(sim.citystate_ai_turns[b, s, t]), int(sim.citystate_ai_next[b, s, t]), int(sim.citystate_ai_base[b, s, t]),
+            int(sim.citystate_ai_score[b, s, t]), int(sim.citystate_ai_owned[b, s, t]))]
+    cv = bool(sim.citystate_cai_valid[b, s])
+    out.append(1 if cv else 0)
+    if cv:
+        out += [v for c in range(sim.citystate_cai_turns.shape[2]) for v in (
+            int(sim.citystate_cai_turns[b, s, c]), int(sim.citystate_cai_next[b, s, c]), int(sim.citystate_cai_base[b, s, c]),
+            int(sim.citystate_cai_score[b, s, c]), int(sim.citystate_cai_owned[b, s, c]))]
+    return out
+
+
 def _barb_tribes_row(sim, b: int) -> list[int]:
     """`barbTribes`: whether the camp step has added once, each tribe in order
     (plot, alive, kind, name, its two clocks, the living units and scouts it
@@ -392,6 +420,7 @@ GAME = {
     "iceAtStart": lambda sim, b, rows: [int(sim._ice_at_start[b])],
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
     "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
+    "freeResearch": lambda sim, b, rows: [_research_record(sim, b, sim.FR)],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1088,6 +1117,7 @@ CITY = {
     ],
     "foundedTurn": _cty("city_founded_turn"),
     "freePot": _cty("city_free_pot"),
+    "freeGrantTurns": _cty("city_free_grant"),
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.
     "greatWorks": lambda sim, b, rows: _gw_rows(sim, b, rows),

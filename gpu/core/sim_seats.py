@@ -8310,11 +8310,14 @@ class SimSeats:
 
     def _seat_civics(self, row: int) -> torch.Tensor:
         """[B, nC] the civics a city ROW's holder has researched — a major's
-        own record, a minor's own (`citystate_civics`), none for the Free row.
-        The yield walk reads research through this and `_seat_techs` alone,
-        which is what lets a city-state's city ride the same walk."""
+        own record, a minor's own (`citystate_civics`), the Free Cities' (its
+        row `FR`). The yield walk reads research through this and
+        `_seat_techs` alone, which is what lets a city-state's city ride the
+        same walk."""
         if row < self.n_majors:
             return self.civ_civics[:, row]
+        if row == self.FREE_ROW:
+            return self.citystate_civics[:, self.FR]
         s = row - self._CITY_MINOR0
         if 0 <= s < self.S:
             return self.citystate_civics[:, s]
@@ -8323,6 +8326,8 @@ class SimSeats:
     def _seat_techs(self, row: int) -> torch.Tensor:
         if row < self.n_majors:
             return self.civ_techs[:, row]
+        if row == self.FREE_ROW:
+            return self.citystate_techs[:, self.FR]
         s = row - self._CITY_MINOR0
         if 0 <= s < self.S:
             return self.citystate_techs[:, s]
@@ -11055,6 +11060,7 @@ class SimSeats:
         self.city_proj_conv[b, row, col] = 0
         self.city_proj_yield[b, row, col] = -1
         self.city_free_pot[b, row, col] = 0
+        self.city_free_grant[b, row, col] = 0
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
@@ -11524,7 +11530,8 @@ class SimSeats:
         # the race a FREE CITY runs starts at nothing "since the Free City
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
-        # ...and the turn its new owner took it (a Free City's grants count from it)
+        self.city_free_grant[b, dst_row, col] = 0
+        # ...and the turn its new owner took it
         self.city_founded_turn[b, dst_row, col] = int(self.turn)
         self._q_clear(b, dst_row, col)           # TS queue: []
         self.city_prod_bank[b, dst_row, col] = 0  # TS pushes a FRESH literal, so productionBank is undefined there
@@ -11765,8 +11772,8 @@ class SimSeats:
         seen = self._res_live() & ~self._res_hidden(row)
         s = row - self._CITY_MINOR0
         for plane, civic in ((self.antiquity, self._antiquity_civic), (self.shipwreck, self._shipwreck_civic)):
-            if civic >= 0 and row < self.n_majors:
-                seen = seen | (plane & self.civ_civics[:, row, civic].unsqueeze(1))
+            if civic >= 0 and (row < self.n_majors or row == self.FREE_ROW):
+                seen = seen | (plane & self._seat_civics(row)[:, civic].unsqueeze(1))
             elif civic >= 0 and 0 <= s < self.S:
                 # a city-state sees the dig sites its own civics reveal, and
                 # those its suzerain's do

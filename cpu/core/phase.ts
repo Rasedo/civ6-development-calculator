@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
-import { atRngPoint, randWeighted } from './rand';
+import { atRngPoint, randRange } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
@@ -30,7 +30,7 @@ import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBo
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
 import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
-import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
+import { freeCityBuild, minorBestOfClass, minorResearch, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
 import { freeCityTactics } from './tactical';
 import { POLICY_LIST } from '../data/policies';
@@ -108,7 +108,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -851,8 +851,8 @@ export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
 /** A FREE CITY's granted unit. The Free Cities player's revolt hands it
  *  `FREE_CITY_PAIR_COUNT` of the former owner's best melee on the flip turn
  *  (`freeCityPairType`), and
- *  every `FREE_CITY_GRANT_PERIOD`th of its turns while it stays Free one more
- *  (`freeCityGrantType`). Each stands on the NEAREST free land plot outward
+ *  while it stays Free one more as its grant falls due
+ *  (`freeCityGrant`). Each stands on the NEAREST free land plot outward
  *  from the centre, never the centre itself: with every plot of ring 1 held
  *  the grant landed 2 away, with rings 1 and 2 held 3 away
  *  (runs/c60s3_r1_20260926T081910Z.jsonl, runs/c60s3_r1_20260926T082156Z.jsonl,
@@ -889,21 +889,25 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
   if (u) u.freeCity = city.id;
 }
 
-/** A recurring grant's chassis: ONE weighted pick ("Free Cities Unit
- *  Choice", 0x274010 through the picker) over `FREE_CITY_GRANT_WEIGHTS`
- *  among the classes the world era has a chassis for, in table order, and
- *  that class's chassis of the era (`eraUnitOfClass`). The draw is taken
- *  whether or not a tile is free for the unit. */
-function freeCityGrantType(state: GameState): string | null {
-  const era = Math.max(0, worldEraIndex(state));
-  const open: [string, number][] = [];
-  FREE_CITY_GRANT_CLASSES.forEach((cls, i) => {
-    const id = eraUnitOfClass(cls, era);
-    if (id) open.push([id, FREE_CITY_GRANT_WEIGHTS[i]]);
-  });
-  if (open.reduce((s, [, w]) => s + w, 0) <= 0) return null;
-  const k = randWeighted(state, open.map(([, w]) => w), 'Free Cities Unit Choice');
-  return k >= 0 ? open[k][0] : null;
+/**
+ * A FREE CITY'S GRANT, each Free Cities turn (0x274010, the city's record):
+ * its count of turns (`City.freeGrantTurns`) rises by one, the flip turn's
+ * the first, and at `FREE_CITY_GRANT_PERIOD` a grant falls due. None while
+ * `FREE_CITY_GRANT_CAP` of the units the city granted stand, the count held
+ * so it falls due again the next turn; else ONE
+ * draw over `FREE_CITY_GRANT_CLASSES` alike ("Free Cities Unit Choice") and
+ * the class's chassis of the world era (`eraUnitOfClass`; none, no unit),
+ * the count back to 0.
+ */
+function freeCityGrant(state: GameState, city: City): void {
+  city.freeGrantTurns = (city.freeGrantTurns ?? 0) + 1;
+  if (city.freeGrantTurns < FREE_CITY_GRANT_PERIOD) return;
+  const own = state.units.filter((u) => u.seat === FREE_SEAT && u.freeCity === city.id);
+  if (own.length >= FREE_CITY_GRANT_CAP) return;
+  const cls = FREE_CITY_GRANT_CLASSES[randRange(state, FREE_CITY_GRANT_CLASSES.length, 'Free Cities Unit Choice')];
+  const id = eraUnitOfClass(cls, Math.max(0, worldEraIndex(state)));
+  if (id) grantFreeCityUnit(state, city, id);
+  city.freeGrantTurns = 0;
 }
 
 /** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat
@@ -951,11 +955,15 @@ function joinFromFreeCity(state: GameState, city: City): void {
   transferCity(state, FREE_SEAT, winner, city, 'joined');
 }
 
-/** The FREE CITIES player's turn, after every major's: each Free City's
+/** The FREE CITIES player's turn, after every major's and city-state's,
+ *  every turn of the game: its research is a city-state's (`minorResearch`:
+ *  the catch-up, its cities' Science and Culture, the research and civics
+ *  AIs), with no city on no yield. Each Free City's
  *  amenities are the ordinary composer's over the Free Cities seat — the full
  *  need of its population, the supply of what that seat holds (its own
  *  luxuries, buildings and districts; no government, policy or governor) —
- *  and the tier is recorded off one read of every Free City. Its
+ *  and the tier is recorded off one read of every Free City, before the
+ *  research and again after a completion. Its
  *  treasury banks the Gold those same stats make, in array order, then pays
  *  its units' upkeep and meets the `bankruptcy` that may force. Then each
  *  city takes its grant when one falls due,
@@ -967,16 +975,31 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  tactical turn (`freeCityTactics`); the cities that reached 0 join their
  *  race's winner, in array order, after it. */
 export function freeCitiesPhase(state: GameState): void {
-  const free = state.freeSeat;
-  if (!free || free.cities.length === 0) return;
+  const free = freeSeatOf(state);
+  const urban = () => urbanDefensesFit(state, FREE_SEAT);
+  if (free.cities.length === 0) {
+    minorResearch(state, free.research, FREE_SEAT, 0, 0, () => undefined, urban);
+    return;
+  }
   // a Free City's reactor keeps its clock: the seat resolves no power, so the
   // age is kept here
   ageReactors(free.cities);
   refreshParkAmenities(state, FREE_SEAT);
-  const luxMap = luxuryAmenities(state, FREE_SEAT);
-  const mods = getModifiers(state, FREE_SEAT);
+  let luxMap = luxuryAmenities(state, FREE_SEAT);
+  let mods = getModifiers(state, FREE_SEAT);
   const stats = free.cities.map((city) => computeCityStats(state, city, luxMap, mods));
   free.cities.forEach((city, i) => { city.amenityTier = amenityTierIndex(stats[i].amenities.tier.name); });
+  let science = 0;
+  let culture = 0;
+  for (const s of stats) {
+    science += s.total.science;
+    culture += s.total.culture;
+  }
+  if (minorResearch(state, free.research, FREE_SEAT, science, culture, () => undefined, urban) > 0) {
+    luxMap = luxuryAmenities(state, FREE_SEAT);
+    mods = getModifiers(state, FREE_SEAT);
+    free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, luxMap, mods); });
+  }
   let income = 0;
   for (const s of stats) income += s.total.gold;
   free.treasury += income;
@@ -996,14 +1019,9 @@ export function freeCitiesPhase(state: GameState): void {
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
   }
   const joiners: City[] = [];
-  const research = freeCityResearch(state);
+  const research = free.research;
   [...free.cities].forEach((city, i) => {
-    // the city's own turn count, the flip turn its first: `foundedTurn` is
-    // the revolt's turn, which the transfer that made it Free wrote
-    if ((state.turn - city.foundedTurn + 1) % FREE_CITY_GRANT_PERIOD === 0) {
-      const type = freeCityGrantType(state);
-      if (type) grantFreeCityUnit(state, city, type);
-    }
+    freeCityGrant(state, city);
     freeCityBuild(state, city, stats[i].total.production, research);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);

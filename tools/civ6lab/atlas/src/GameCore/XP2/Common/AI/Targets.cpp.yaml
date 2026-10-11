@@ -38,11 +38,16 @@
     - cpu/core/tactical.ts:tacticalTargets
     - cpu/core/tactical.ts:pillage
     - ai/major/view.ts:MajorAttackTargetView
+    - cpu/core/tactical.ts:Pass
+    - cpu/core/tactical.ts:seenRegions
+    - gpu/core/sim_tactics.py:_tac_seen_regions
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95: the target list's knowledge-base entries — READ, unported"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...m absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), proje..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ATION, f2e1d0 GOODY_HUT, f2e1d4   ALLY_SUPPORT, f2e1d8 AIR_UNIT. The list's entries per plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT..."
@@ -94,11 +99,20 @@
   context:
     - "...entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080: the +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id; the map refreshed by the..."
   review: imported
+- addr: 0x786160
+  final: 0x2a6aa0
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the target list's knowledge-base entries — READ, unported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "....+0x4a8) and, for each its player is at war with (0x469cd0), asks its knowledge base (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each..."
+  review: imported
 - addr: 0x7861d0
   kind: function
   status: PARTLY
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...egion (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in i..."
@@ -114,6 +128,7 @@
   impl: [cpu/core/tactical.ts:tacticalTargets]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the target list's knowledge-base entries — READ, unported"
   context:
     - "...s not seen follow (LOW, CIVILIAN where the unit cannot fight): unported (AUDIT). Then 0x786d50: a LOW unit sharing its plot with one that cannot fight is MEDIUM; the barbarians' prio..."
   review: imported

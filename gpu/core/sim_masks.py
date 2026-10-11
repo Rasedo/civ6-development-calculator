@@ -486,10 +486,10 @@ class SimMasks:
                                                    torch.zeros_like(tier)))
         if self._urban_def_tech >= 0:
             # the holder's own research: a major's `civ_techs`, a city-state's
-            # `citystate_techs`; the Free Cities row researches nothing, so its
-            # city keeps the walls it has (`seatOf(FREE_SEAT).research` is empty)
+            # `citystate_techs`, the Free Cities' (its row `FR`)
             major = r0 < self.n_majors
             urban = self.civ_techs[b, r0.clamp(max=self.n_majors - 1), self._urban_def_tech] & major
+            urban = urban | ((r0 == self.FREE_ROW) & self.citystate_techs[b, self.FR, self._urban_def_tech])
             if self.S > 0:
                 s0 = r0 - self._CITY_MINOR0
                 minor = (s0 >= 0) & (s0 < self.S)
@@ -1343,8 +1343,7 @@ class SimMasks:
     def _flank_support_live(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] bool `flankSupportLive` — the player's own combat-adjacency
         flag (0x521530, 0x521ed0), which Military Tradition sets: a major's, a
-        city-state's and the barbarians' own civics; the Free Cities research
-        none."""
+        city-state's, the Free Cities' (`FR`) and the barbarians' own civics."""
         if self._flank_support_civic < 0:
             return torch.zeros_like(seat, dtype=torch.bool)
         c = self._flank_support_civic
@@ -1354,7 +1353,8 @@ class SimMasks:
         cs = (seat >= 100) & (seat < 100 + self.S)
         cs_own = self.citystate_civics[:, :, c].gather(
             1, (seat - 100).clamp(min=0, max=max(self.S - 1, 0)).unsqueeze(1)).squeeze(1)
-        return torch.where(major, own, torch.where(cs, cs_own, (seat == BARB_SEAT) & self.barb_civics[:, c]))
+        free = (seat == FREE_SEAT) & self.citystate_civics[:, self.FR, c]
+        return torch.where(major, own, torch.where(cs, cs_own, free | ((seat == BARB_SEAT) & self.barb_civics[:, c])))
 
     def _congress_unit_cs(self, utype: torch.Tensor, seat: torch.Tensor) -> torch.Tensor:
         """`congressUnitCS`' twin — the flat Combat Strength the WORLD
@@ -1699,14 +1699,16 @@ class SimMasks:
     def _embarked_def_cs(self, seat: torch.Tensor) -> torch.Tensor:
         """[B] long `embarkedDefenseCS` — the normalized CS an embarked unit of
         this seat defends at, off the OWNER's technological era: a major's own
-        tree, or a city-state's own (`citystate_techs` / `citystate_civics`).
-        The barbarians research nothing and read era 0."""
+        tree, a city-state's own (`citystate_techs` / `citystate_civics`), the
+        Free Cities' (`FR`). The barbarians research nothing and read era 0."""
         era = torch.zeros_like(seat)
         for r in range(self.n_majors):
             era = torch.where(seat == r, self._civ_era(self.civ_techs[:, r], self.civ_civics[:, r]), era)
         for s in range(self.S):
             era = torch.where(seat == 100 + s,
                               self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]), era)
+        era = torch.where(seat == FREE_SEAT,
+                          self._civ_era(self.citystate_techs[:, self.FR], self.citystate_civics[:, self.FR]), era)
         return self._embarked_def_by_era.take(era.clamp(min=0, max=self._embarked_def_by_era.numel() - 1))
 
     def _civclass_at(self, tiles: torch.Tensor) -> torch.Tensor:

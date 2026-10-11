@@ -425,6 +425,41 @@
           "note": "the Free Cities seat's last turn shortfall (`freeSeat.goldShortfall`), which its cities' bankruptcy amenities read; 0 before the first revolt makes the seat."
         },
         {
+          "name": "freeResearch",
+          "compare": "milli",
+          "covers": [
+            "GameState.freeSeat"
+          ],
+          "planes": [
+            "citystate_techs",
+            "citystate_civics",
+            "citystate_tech_prog",
+            "citystate_civic_prog",
+            "citystate_cur_tech",
+            "citystate_cur_civic",
+            "citystate_tech_goal",
+            "citystate_tech_ovf",
+            "citystate_civic_ovf",
+            "citystate_ai_left",
+            "citystate_ai_left_seen",
+            "citystate_tech_retain",
+            "citystate_civic_retain",
+            "citystate_ai_valid",
+            "citystate_ai_turns",
+            "citystate_ai_next",
+            "citystate_ai_base",
+            "citystate_ai_score",
+            "citystate_ai_owned",
+            "citystate_cai_valid",
+            "citystate_cai_turns",
+            "citystate_cai_next",
+            "citystate_cai_base",
+            "citystate_cai_score",
+            "citystate_cai_owned"
+          ],
+          "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress and the two AIs' last analyses; empty until its first turn makes the seat."
+        },
+        {
           "name": "storms",
           "compare": "exact",
           "covers": [
@@ -2841,7 +2876,7 @@
           "planes": [
             "city_founded_turn"
           ],
-          "note": "the turn its owner founded or took the city — a Free City's revolt, which its grants count from; the luxury allocation serves no city founded this turn"
+          "note": "the turn its owner founded or took the city — a Free City's revolt; the luxury allocation serves no city founded this turn"
         },
         {
           "name": "freePot",
@@ -2853,6 +2888,17 @@
             "city_free_pot"
           ],
           "note": "a FREE CITY's build pot: its Production, banked until its build table's next item is covered; 0 for any other city."
+        },
+        {
+          "name": "freeGrantTurns",
+          "compare": "exact",
+          "covers": [
+            "City.freeGrantTurns"
+          ],
+          "planes": [
+            "city_free_grant"
+          ],
+          "note": "a FREE CITY's count of turns toward its next grant (`freeCityGrant`, 0x274010's +0x18): back to 0 at a grant, held while its own grants stand at the cap; 0 for any other city."
         },
         {
           "name": "greatWorks",

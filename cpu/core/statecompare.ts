@@ -43,7 +43,7 @@ import { wonderExtraSlots } from './effects';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Unit, UnitPool } from './types';
+import type { City, CityState, DealItem, GameState, ProjectYield, ResearchState, Seat, Tile, Unit, UnitPool } from './types';
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
@@ -517,6 +517,9 @@ const GAME: Record<string, Extractor> = {
   // the Free Cities seat's treasury: 0 until its first revolt makes the seat
   freeTreasury: (s) => [s.freeSeat?.treasury ?? 0],
   freeShortfall: (s) => [s.freeSeat?.goldShortfall ?? 0],
+  // the Free Cities' research (`minorResearch`): empty until its first turn
+  // makes the seat
+  freeResearch: (s) => [researchRecord(s.freeSeat?.research)],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -526,6 +529,35 @@ const GAME: Record<string, Extractor> = {
   // then its footprint behind its count
   droughts: (s) => [(s.droughts ?? []).flatMap((r) => [r.left, r.plots.length, ...r.plots])],
 };
+
+/** a research record flat: the techs held behind their count, the civics
+ *  held behind theirs, each tree's progress, the items in hand, the goal,
+ *  the overflows, the AI's turns left, the progress kept per row, then each
+ *  AI's last analysis behind a flag (none before the first) */
+function researchRecord(r: ResearchState | undefined): number[] {
+  const techs = (r?.techs ?? []).map((x) => idx(TECH_IDX, x)).sort((a, b) => a - b);
+  const civics = (r?.civics ?? []).map((x) => idx(CIVIC_IDX, x)).sort((a, b) => a - b);
+  const tents = new Map((r?.aiEntries ?? []).map((e) => [e.tech, e]));
+  const cents = new Map((r?.civicAiEntries ?? []).map((e) => [e.civic, e]));
+  return [
+    techs.length, ...techs, civics.length, ...civics,
+    r?.techProgress ?? 0, r?.civicProgress ?? 0,
+    idx(TECH_IDX, r?.tech ?? null), idx(CIVIC_IDX, r?.civic ?? null), idx(TECH_IDX, r?.goal ?? null),
+    r?.techOverflow ?? 0, r?.civicOverflow ?? 0, r?.aiLeft ?? 0, r?.aiLeftSeen ?? 0,
+    ...[...TECH_IDX.keys()].map((id) => r?.techRetained[id] ?? 0),
+    ...[...CIVIC_IDX.keys()].map((id) => r?.civicRetained[id] ?? 0),
+    tents.size ? 1 : 0,
+    ...(tents.size ? [...TECH_IDX.keys()].flatMap((id) => {
+      const e = tents.get(id)!;
+      return [e.turns, idx(TECH_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
+    }) : []),
+    cents.size ? 1 : 0,
+    ...(cents.size ? [...CIVIC_IDX.keys()].flatMap((id) => {
+      const e = cents.get(id)!;
+      return [e.turns, idx(CIVIC_IDX, e.next), e.base, e.score, e.owned ? 1 : 0];
+    }) : []),
+  ];
+}
 
 const wwPairs = (rec: Record<number, number>, live: (v: number) => boolean): number[] => {
   const out: number[] = [];
@@ -935,11 +967,11 @@ const CITY: Record<string, Extractor> = {
     const p = r.city.freePressure ?? [];
     return civSeats(st).map((_s, g) => p[g] ?? 0);
   }),
-  // the turn a FREE CITY revolted, which its grants count from; -1 for a
-  // city that is not Free
+  // the turn its owner founded or took the city (a FREE CITY's revolt)
   foundedTurn: overCities((r) => r.city.foundedTurn),
   // a FREE CITY's build pot (`freeCityBuild`); 0 for any other city
   freePot: overCities((r) => r.city.freePot ?? 0),
+  freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
   // every layout slot's work — object, maker, era, civilization; -1s for an
   // empty slot — which is what the theming rules and the yields read.
   greatWorks: overCities((r) => {

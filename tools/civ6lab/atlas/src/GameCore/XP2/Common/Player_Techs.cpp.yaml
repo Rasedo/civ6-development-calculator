@@ -206,7 +206,10 @@
     - cpu/core/minorBuild.ts:minorCatchUp
     - cpu/core/seats.ts:majorsAlive
     - cpu/data/cityStates.ts:MINOR_CATCHUP_PCT
-  readings: ["H-1: a minor's research catch-up — READ"]
+    - cpu/core/minorBuild.ts:minorResearch
+  readings:
+    - "H-1: a minor's research catch-up — READ"
+    - "C-60: the Free Cities' research — READ (the catch-up's receivers), ported"
   context:
     - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
   review: imported

@@ -563,7 +563,8 @@ class SimMinors:
                 want = torch.where(ready & ~claim, torch.zeros_like(want), want)
 
     def _minor_research(self, s: int, sci: torch.Tensor, cul: torch.Tensor) -> torch.Tensor:
-        """`minorResearch` — the TECHNOLOGIES first: the CATCH-UP
+        """`minorResearch` for research row `s` — a city-state's, or the Free
+        Cities' (`FR`, every game every turn) — the TECHNOLOGIES first: the CATCH-UP
         (`minorCatchUp`, read inline), the turn's Science (`sci` [B]) and the
         overflow bank, a completion at the cost leaving the rest, whose
         choice reads the research AI's analysis of the turn before
@@ -576,9 +577,11 @@ class SimMinors:
         (`_cai_turn`). CIV6 (Urban Defenses): the
         tech "builds modern fortifications around the City Centers of all
         current and future cities and their Encampment districts", so the
-        minor's perimeter arrives at the urban tier's full pool. Returns [B]
+        holder's perimeters arrive at the urban tier's full pool. Returns [B]
         long, how many trees completed a row — the upgrade trigger's count."""
-        alive = self.citystate_alive[:, s]
+        free = s == self.FR
+        alive = (torch.ones(self.B, dtype=torch.bool, device=self.device) if free
+                 else self.citystate_alive[:, s])
         gained = torch.zeros(self.B, dtype=torch.long, device=self.device)
         live = self._barb_majors_alive()
         need = ((int(self.rules.citystate["catchUpPct"]) * live.sum(dim=1) + 50) // 100).clamp(min=1)
@@ -622,7 +625,11 @@ class SimMinors:
             self._eff_version += 1
             self._rai_completion(s, fire, torch.where(fire, c, torch.full_like(c, -1)), sci)
             if self._urban_def_tech >= 0:
-                self._minor_urban_fit(s, fire & (c == self._urban_def_tech))
+                hit = fire & (c == self._urban_def_tech)
+                if free:
+                    self._urban_defenses_fit(self.FREE_ROW, hit)
+                else:
+                    self._minor_urban_fit(s, hit)
         self._rai_turn(s, alive, sci)
 
         # THE CIVICS
@@ -1517,12 +1524,6 @@ class SimMinors:
             out = out | ((ht >= 0) & self.district_complete.gather(1, ht.clamp(min=0).unsqueeze(1)).squeeze(1))
         return out
 
-
-    def _free_research(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """([B, NT], [B, NC]) — `freeCityResearch`: every technology and civic
-        of an era at or below the world's."""
-        era = self._world_era().clamp(min=0).unsqueeze(1)
-        return self._tech_era.unsqueeze(0) <= era, self._civic_era.unsqueeze(0) <= era
 
     def _free_walls_max(self, j: int) -> torch.Tensor:
         """[B] long — `wallsMax` of the Free City in column `j`."""

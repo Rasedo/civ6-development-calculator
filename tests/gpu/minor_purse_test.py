@@ -38,6 +38,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 RULES = json.loads((ROOT / "seeder" / "worlds" / "rules.json").read_text())
 UNI = [u["id"] for u in RULES["units"]]
 BLD = [b["id"] for b in RULES["buildings"]]
+TECHS = [t["id"] for t in RULES["techs"]]
 M32 = 0xFFFFFFFF
 
 
@@ -330,9 +331,10 @@ def test_free_city(rules, path) -> None:
     F = sim.FREE_ROW
     act = torch.zeros(sim.B, dtype=torch.bool)
     act[B0] = True
-    techs, civics = sim._free_research()
-    era = int(sim._world_era()[B0].clamp(min=0))
-    assert int(techs[B0].sum()) == int((sim._tech_era <= era).sum()) > 0
+    # the Free Cities' own research (its row FR), holding what the table's rows ask
+    for t in ("POTTERY", "ARCHERY", "MASONRY"):
+        sim.citystate_techs[B0, sim.FR, TECHS.index(t)] = True
+    techs, civics = sim.citystate_techs[:, sim.FR], sim.citystate_civics[:, sim.FR]
     train = sim._trainable_in(techs, civics, sim._free_any_res)
     units0 = len(fct.free_units(sim))
     prod = torch.full((sim.B,), 5.0, dtype=torch.float64)

@@ -8,8 +8,9 @@ import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
 import { getModifiers, unitUpkeep } from '../../../cpu/core/effects';
 import { worldEraIndex } from '../../../cpu/core/eras';
+import { researchCost } from '../../../cpu/core/economy';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
-import { CIV_LEADERS, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
+import { CIV_LEADERS, FREE_CITY_GRANT_CAP, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
 import { ERAS } from '../../../cpu/data/techs';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -50,6 +51,22 @@ function scene(rivalPop = 30, rivalCiv = -1) {
 }
 
 describe('the Free City step', () => {
+  it('the Free Cities research as a city-state does, every turn, with no city', () => {
+    const { state } = scene();
+    // every major holds Pottery: the catch-up stands it at its cost less one
+    for (const s of state.seats) s.research.techs.push('POTTERY');
+    freeCitiesPhase(state);
+    const r = state.freeSeat!.research;
+    const cost = researchCost(state, 'POTTERY', false, FREE_SEAT);
+    const kept = r.tech === 'POTTERY' ? r.techProgress : r.techRetained.POTTERY;
+    expect(kept).toBe(cost - 1);
+    // the research AI chose an item, and the civics AI a civic
+    expect(r.tech).not.toBeNull();
+    expect(r.civic).not.toBeNull();
+    expect(r.aiEntries?.length).toBeGreaterThan(0);
+    expect(r.techs).not.toContain('POTTERY');
+  });
+
   it('a revolt makes a Free City, not a transfer', () => {
     const { state, border, rival } = scene();
     border.loyalty = 0;
@@ -195,27 +212,41 @@ describe('the Free City step', () => {
     expect(free().every((u) => u.freeCity === city.id)).toBe(true);
     expect(city.foundedTurn).toBe(state.turn);
     // it trains nothing: nothing arrives until the city's fifth turn...
-    for (let k = 1; k < FREE_CITY_GRANT_PERIOD - 1; k++) {
+    for (let k = 0; k < FREE_CITY_GRANT_PERIOD - 1; k++) {
       state.turn = city.foundedTurn + k;
       freeCitiesPhase(state);
       expect(free().length).toBe(FREE_CITY_PAIR_COUNT);
     }
-    // ...then one, of a class the era has a chassis for, drawn...
+    // ...then one draw over the three classes alike, the class's chassis of
+    // the era (none where the era has none), and the count back to 0...
     const open = FREE_CITY_GRANT_CLASSES.map((c) => eraUnitOfClass(c, era)).filter((u) => u !== null);
     const rng0 = state.rngState;
     state.turn = city.foundedTurn + FREE_CITY_GRANT_PERIOD - 1;
     freeCitiesPhase(state);
     expect(state.rngState).not.toBe(rng0);
-    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 1);
-    expect(open).toContain(free()[FREE_CITY_PAIR_COUNT].type);
-    expect(free()[FREE_CITY_PAIR_COUNT].freeCity).toBe(city.id);
+    expect(city.freeGrantTurns).toBe(0);
+    expect(free().length).toBeLessThanOrEqual(FREE_CITY_PAIR_COUNT + 1);
+    expect(free().slice(FREE_CITY_PAIR_COUNT).every((u) => open.includes(u.type) && u.freeCity === city.id)).toBe(true);
     // ...and every fifth turn after, while the city stays Free
+    const n = free().length;
     state.turn += 1;
     freeCitiesPhase(state);
-    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 1);
-    state.turn = city.foundedTurn + 2 * FREE_CITY_GRANT_PERIOD - 1;
-    freeCitiesPhase(state);
-    expect(free().length).toBe(FREE_CITY_PAIR_COUNT + 2);
+    expect(free().length).toBe(n);
+    expect(city.freeGrantTurns).toBe(1);
+    // none while the cap of its own grants stand: the count holds
+    while (free().filter((u) => u.freeCity === city.id).length < FREE_CITY_GRANT_CAP) {
+      const g = spawnUnit(state, 'WARRIOR', city.centerIndex, FREE_SEAT);
+      if (g) g.freeCity = city.id;
+    }
+    const capped = free().length;
+    state.freeSeat!.treasury = 1e6;
+    for (let k = 0; k < FREE_CITY_GRANT_PERIOD + 1; k++) {
+      city.loyalty = LOYALTY_MAX;
+      state.turn += 1;
+      freeCitiesPhase(state);
+    }
+    expect(free().length).toBe(capped);
+    expect(city.freeGrantTurns).toBeGreaterThanOrEqual(FREE_CITY_GRANT_PERIOD);
     // the Free Cities' units are no barbarians: no camp counts or walks them
     expect(free().every((u) => !isBarbSeat(u.seat) && u.xp === undefined)).toBe(true);
   });

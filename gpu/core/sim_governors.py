@@ -508,6 +508,7 @@ class SimGovernors:
                 held |= (self.tile_seat == int(self._ROW_SEAT[r])) & self.civ_civics[:, r, _ac].unsqueeze(1)
             for s in range(self.S):
                 held |= (self.tile_seat == 100 + s) & self.citystate_civics[:, s, _ac].unsqueeze(1)
+            held |= (self.tile_seat == simbase.FREE_SEAT) & self.citystate_civics[:, self.FR, _ac].unsqueeze(1)
             out = out + (here & held).long()
         return out
 

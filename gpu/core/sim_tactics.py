@@ -335,13 +335,15 @@ class SimTactics:
 
     def _tac_tech(self, seat: int, tech: int) -> torch.Tensor:
         """[B] bool — `seat` holds `tech`: a major's research, a city-state's,
-        the barbarians'; the Free Cities hold none here."""
+        the Free Cities' (`FR`), the barbarians'."""
         if tech < 0:
             return torch.zeros(self.B, dtype=torch.bool, device=self.device)
         if 0 <= seat < self.n_majors:
             return self.civ_techs[:, seat, tech]
         if 100 <= seat < 100 + self.S:
             return self.citystate_techs[:, seat - 100, tech]
+        if seat == FREE_SEAT:
+            return self.citystate_techs[:, self.FR, tech]
         if seat == BARB_SEAT:
             return self.barb_techs[:, tech]
         return torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -1412,6 +1414,46 @@ class SimTactics:
                     self._hostile_ranged_strike(fire & (u_b == u), t, "barb", u)
                 done[bidx[go], u_b[go]] = True
 
+    def _tac_homeland_plunder(self, live, done: torch.Tensor, order: torch.Tensor, npass: torch.Tensor,
+                              tg: dict) -> None:
+        """THE HOMELAND'S PLUNDER TRADER (`homelandPlunder`): each TRADER
+        target of the list in plot order, each homeland unit left with
+        Movement, not yet queued, whose one-turn search closes on the target's
+        plot where it may stand, queued with it; the queue carried out in its
+        order — targets in plot order, units in pool order — each queued unit
+        that can act going onto its plot, its turn done."""
+        B, T, dev = self.B, self.T, self.device
+        bidx = torch.arange(B, device=dev)
+        trd = tg["ok"] == 6
+        if not bool(trd.count_nonzero()):
+            return
+        cand = live() & (self.barb_unit_mp > 0)
+        rows, slots = cand.nonzero(as_tuple=True)
+        if not rows.numel():
+            return
+        res = self._tac_search(rows, slots, BARB_SEAT, 1, False)
+        hit = (res["turns"] >= 0) & (res["turns"] <= 1) & trd[rows]
+        key = torch.where(hit, torch.arange(T, device=dev).unsqueeze(0), torch.full_like(res["turns"], T))
+        first = key.min(dim=1).values
+        P = cand.shape[1]
+        goal = torch.full((B, P), -1, dtype=torch.long, device=dev)
+        goal[rows, slots] = torch.where(first < T, first, torch.full_like(first, -1))
+        if not bool((goal >= 0).count_nonzero()):
+            return
+        n = trd.sum(dim=1)
+        tiles = torch.where(trd, self._arange_bt, torch.full_like(self._arange_bt, T)).sort(dim=1).values
+        npos = int(npass.max())
+        for j in range(int(n.max())):
+            t = tiles[:, j]
+            for jj in range(npos):
+                u_b = order[:, jj]
+                go = ((jj < npass) & (j < n) & (goal[bidx, u_b] == t) & live()[bidx, u_b]
+                      & (self.barb_unit_mp[bidx, u_b] > 0))
+                if not bool(go.count_nonzero()):
+                    continue
+                self._tac_move_to(go, u_b, t)
+                done[bidx[go], u_b[go]] = True
+
     def _tac_plunder(self, live, done: torch.Tensor, ai: torch.Tensor, reach_at, tg: dict,
                      order: torch.Tensor, npass: torch.Tensor) -> None:
         """PLUNDER TRADER (`plunderTraders`): each TRADER target of the list
@@ -2338,8 +2380,10 @@ class SimTactics:
         def live() -> torch.Tensor:
             return acting & ~done & self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
 
-        # the tactical target list as the pass begins
+        # the tactical target list as the pass begins, and its set of the
+        # regions the barbarians revealed
         tg = self._tac_targets()
+        treg = self._tac_seen_regions(BARB_SEAT)
         # the planning: the reach of two turns, no zones of control, and the
         # targets' spots and predicted blows
         want = live() & (ai >= _AI_EXPLORE)
@@ -2504,10 +2548,11 @@ class SimTactics:
             self._tac_move_to(ok, u_b, dest)
             done[bidx[ok], u_b[ok]] = True
 
-        # THE HOMELAND ("Default Barbarian HL") takes every unit left: Move
-        # To Safety, Explore Land; the rest end their turn
+        # THE HOMELAND ("Default Barbarian HL") takes every unit left:
+        # Plunder Trader, Move To Safety, Explore Land; the rest end their turn
+        self._tac_homeland_plunder(live_all, done, order, npass, tg)
         self._tac_move_to_safety(live_all, done, order, npass, rowof, res, danger, "barb", BARB_SEAT, True)
-        self._tac_explore(live_all, done, order, npass, ai, danger, "barb", BARB_SEAT)
+        self._tac_explore(live_all, done, order, npass, ai, danger, treg, "barb", BARB_SEAT)
 
     # ------------------------------------------------------- Explore Land
 
@@ -2532,8 +2577,24 @@ class SimTactics:
         foreign_ctr = self._centre_plane() & (own != seat)
         return not_here & revealed & ok_owner & ~occ & same & ~foreign_ctr
 
+    def _tac_seen_regions(self, seat: int) -> torch.Tensor:
+        """[B, T] bool — the plots whose region holds a plot `seat` revealed
+        (`Pass.regions`): the tactical target list's set (0x783980), the
+        player's tertiary region list (0x6fad50); a plot off any region none"""
+        B, T, dev = self.B, self.T, self.device
+        known = self._tac_known(seat)
+        rev = known if known is not None else torch.ones(B, T, dtype=torch.bool, device=dev)
+        reg = self.tile_region
+        R = int(reg.max()) + 1 if reg.numel() else 0
+        if R <= 0:
+            return torch.zeros(B, T, dtype=torch.bool, device=dev)
+        hit = torch.zeros(B, R + 1, dtype=torch.bool, device=dev)
+        hit.scatter_(1, torch.where(rev & (reg >= 0), reg, torch.full_like(reg, R)), True)
+        hit[:, R] = False
+        return (reg >= 0) & hit.gather(1, reg.clamp(min=0))
+
     def _tac_explore(self, live, done: torch.Tensor, order: torch.Tensor, npass: torch.Tensor, ai: torch.Tensor,
-                     danger: torch.Tensor, pre: str, seat: int) -> torch.Tensor:
+                     danger: torch.Tensor, treg: torch.Tensor, pre: str, seat: int) -> torch.Tensor:
         """EXPLORE LAND (`exploreLand`): up to three rounds over the units of
         `live()` in slot order, each round's moves carried out together as it
         ends, another round only where one moved: each unit of AI type
@@ -2544,8 +2605,10 @@ class SimTactics:
         whose sight holds the most plots its player never revealed (above 0);
         else on the first round the nearest unrevealed plot of its region
         where the region holds one (a path to it existing; off any region the
-        nearest of its area); else the first whose sight holds the most plots
-        the player does not see now. Its own plot and its target join the
+        nearest of its area), else of the regions `treg` [B, T] marks (the
+        tertiary list; the primary and the secondary are a player's cities',
+        the barbarians hold none); else the first whose sight holds the most
+        plots the player does not see now. Its own plot and its target join the
         chosen; the move it first took names its turn. Returns [B, P] each
         unit's first target (-1 none)."""
         B, T, dev = self.B, self.T, self.device
@@ -2610,7 +2673,7 @@ class SimTactics:
                 knd = torch.where(pick >= 0, 1, 0)
                 fb = go & (pick < 0) & (rnd == 1)
                 if bool(fb.count_nonzero()):
-                    alt, akind = self._tac_explore_region(fb, u_b, ut, here, pre, seat, revealed, chosen)
+                    alt, akind = self._tac_explore_region(fb, u_b, ut, here, pre, seat, revealed, chosen, treg)
                     pick = torch.where(fb & (alt >= 0), alt, pick)
                     knd = torch.where(fb & (alt >= 0), akind, knd)
                     late = fb & (alt < 0) & (best2 >= 0)
@@ -2635,12 +2698,13 @@ class SimTactics:
         return first
 
     def _tac_explore_region(self, mask: torch.Tensor, u_b: torch.Tensor, ut: torch.Tensor, here: torch.Tensor,
-                            pre: str, seat: int, revealed: torch.Tensor, chosen: torch.Tensor):
+                            pre: str, seat: int, revealed: torch.Tensor, chosen: torch.Tensor, treg: torch.Tensor):
         """[B] twice — `exploreTarget`'s first-round fallbacks for the unit
         at local slot `u_b`: the nearest unrevealed plot (the first of equals
         by index) of its region where the region holds one — off any region
         of its area — that it may enter with no unit on it, not chosen, a path
-        to it existing; the plot (-1 none) and its kind (2 region, 3 area)."""
+        to it existing; else the same over the regions `treg` marks; the plot
+        (-1 none) and its kind (2 region, 3 area, 5 tertiary regions)."""
         B, T, dev = self.B, self.T, self.device
         bidx = torch.arange(B, device=dev)
         reg = self.tile_region[bidx, here]
@@ -2655,20 +2719,31 @@ class SimTactics:
         occ = torch.zeros(B, T, dtype=torch.bool, device=dev)
         for pl in (self.military_at, self.civilian_at, self.support_at, self.embarked_at):
             occ |= pl >= 0
-        cand = mask.unsqueeze(1) & sel & ~revealed & ent & ~occ
         d = self.pair_dist[here].to(torch.long)
-        key = torch.where(cand, d * T + torch.arange(T, device=dev), torch.full_like(d, 1 << 40))
-        kmin, p = key.min(dim=1)
-        p = torch.where(kmin < (1 << 40), p, torch.full_like(p, -1))
-        p = torch.where((p >= 0) & ~chosen[bidx, p.clamp(min=0)], p, torch.full_like(p, -1))
-        on = p >= 0
-        if bool(on.count_nonzero()):
-            r_i = bidx[on]
-            res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre)
-            ok = torch.zeros(B, dtype=torch.bool, device=dev)
-            ok[r_i] = res["found"]
-            p = torch.where(ok, p, torch.full_like(p, -1))
-        return p, torch.where(reg >= 0, 2, 3)
+
+        def nearest(m: torch.Tensor, inset: torch.Tensor) -> torch.Tensor:
+            cand = m.unsqueeze(1) & inset & ~revealed & ent & ~occ
+            key = torch.where(cand, d * T + torch.arange(T, device=dev), torch.full_like(d, 1 << 40))
+            kmin, p = key.min(dim=1)
+            p = torch.where(kmin < (1 << 40), p, torch.full_like(p, -1))
+            p = torch.where((p >= 0) & ~chosen[bidx, p.clamp(min=0)], p, torch.full_like(p, -1))
+            on = p >= 0
+            if bool(on.count_nonzero()):
+                r_i = bidx[on]
+                res = self._tac_search(r_i, u_b[on], seat, 1 << 30, True, dest=p[on], pre=pre)
+                ok = torch.zeros(B, dtype=torch.bool, device=dev)
+                ok[r_i] = res["found"]
+                p = torch.where(ok, p, torch.full_like(p, -1))
+            return p
+
+        p = nearest(mask, sel)
+        kind = torch.where(reg >= 0, 2, 3)
+        rest = mask & (p < 0) & treg.any(dim=1)
+        if bool(rest.count_nonzero()):
+            p3 = nearest(rest, treg)
+            kind = torch.where(rest & (p3 >= 0), 5, kind)
+            p = torch.where(rest & (p3 >= 0), p3, p)
+        return p, kind
 
     # ------------------------------------- the city-states' and Free Cities' pass
 

@@ -252,45 +252,49 @@ class SimInit:
         # the RESOLVED suzerain contest (-1 none) and the minor's own research
         # record — `resolveSuzerain` / `minorResearch` storage
         self.citystate_suzerain = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_techs = torch.zeros(B, s_pad, len(rules.t_cost), dtype=torch.bool, device=device)
-        self.citystate_civics = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.bool, device=device)
-        self.citystate_tech_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
-        self.citystate_civic_prog = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        # the research record rows: one per city-state, then the Free Cities'
+        # (`FR`), which researches as a city-state does (`minorResearch`)
+        self.FR = s_pad
+        r_pad = s_pad + 1
+        self.citystate_techs = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.bool, device=device)
+        self.citystate_civics = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.bool, device=device)
+        self.citystate_tech_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        self.citystate_civic_prog = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # the item in hand per tree (-1 none), the progress kept on the others
         # and the overflow a completion set aside — a major's own shape
-        self.citystate_cur_tech = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_cur_civic = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_tech_retain = torch.zeros(B, s_pad, len(rules.t_cost), dtype=torch.float64, device=device)
-        self.citystate_civic_retain = torch.zeros(B, s_pad, len(rules.c_cost), dtype=torch.float64, device=device)
-        self.citystate_tech_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
-        self.citystate_civic_ovf = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
+        self.citystate_cur_tech = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.citystate_cur_civic = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.citystate_tech_retain = torch.zeros(B, r_pad, len(rules.t_cost), dtype=torch.float64, device=device)
+        self.citystate_civic_retain = torch.zeros(B, r_pad, len(rules.c_cost), dtype=torch.float64, device=device)
+        self.citystate_tech_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
+        self.citystate_civic_ovf = torch.zeros(B, r_pad, dtype=torch.float64, device=device)
         # the research AI's goal (-1 none) and its analysis of the minor's
         # last turn, which a completion's choice reads (`ResearchState.goal`,
         # `ResearchState.aiEntries`): per row its turns, next step, own value
         # and score (raw 24.8) and owned flag
         nt_ai = len(rules.t_cost)
-        self.citystate_tech_goal = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_ai_turns = torch.full((B, s_pad, nt_ai), -1, dtype=torch.long, device=device)
-        self.citystate_ai_next = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
-        self.citystate_ai_base = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
-        self.citystate_ai_score = torch.zeros(B, s_pad, nt_ai, dtype=torch.long, device=device)
-        self.citystate_ai_owned = torch.zeros(B, s_pad, nt_ai, dtype=torch.bool, device=device)
-        self.citystate_ai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        self.citystate_tech_goal = torch.full((B, r_pad), -1, dtype=torch.long, device=device)
+        self.citystate_ai_turns = torch.full((B, r_pad, nt_ai), -1, dtype=torch.long, device=device)
+        self.citystate_ai_next = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_base = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_score = torch.zeros(B, r_pad, nt_ai, dtype=torch.long, device=device)
+        self.citystate_ai_owned = torch.zeros(B, r_pad, nt_ai, dtype=torch.bool, device=device)
+        self.citystate_ai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         # the research AI's turns left on its research as its last choice set
         # them, and the value the city build analysis of the turn reads
         # (`ResearchState.aiLeft`, `aiLeftSeen`)
-        self.citystate_ai_left = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        self.citystate_ai_left_seen = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        self.citystate_ai_left = torch.zeros(B, r_pad, dtype=torch.long, device=device)
+        self.citystate_ai_left_seen = torch.zeros(B, r_pad, dtype=torch.long, device=device)
         # the civics AI's analysis of the minor's last turn, which a
         # completion's choice reads (`ResearchState.civicAiEntries`): per row
         # its turns, next step, own value and score (raw 24.8) and owned flag
         nc_ai = len(rules.c_cost)
-        self.citystate_cai_turns = torch.full((B, s_pad, nc_ai), -1, dtype=torch.long, device=device)
-        self.citystate_cai_next = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
-        self.citystate_cai_base = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
-        self.citystate_cai_score = torch.zeros(B, s_pad, nc_ai, dtype=torch.long, device=device)
-        self.citystate_cai_owned = torch.zeros(B, s_pad, nc_ai, dtype=torch.bool, device=device)
-        self.citystate_cai_valid = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        self.citystate_cai_turns = torch.full((B, r_pad, nc_ai), -1, dtype=torch.long, device=device)
+        self.citystate_cai_next = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_base = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_score = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
+        self.citystate_cai_owned = torch.zeros(B, r_pad, nc_ai, dtype=torch.bool, device=device)
+        self.citystate_cai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
         # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
         # spent down the fitted build table. The built results live on the
         # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)
@@ -3904,6 +3908,8 @@ class SimInit:
         # a FREE CITY's build pot (`City.freePot`), read at the Free Cities row
         # alone; a full city-block plane so compaction carries it
         self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
+        # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
+        self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # `City.projectYield`: the yield the city's last production step
         # converted from a district project — its amount and its yield
         # column (-1 for none) — which the city's yields read until the next
@@ -4713,13 +4719,14 @@ class SimInit:
         # the Free Cities player's own strength floor, and the units it is
         # granted (`FREE_CITY_*`, measured in the live game): the former
         # owner's best chassis of class `_free_pair_cls` on the flip turn
-        # (`_free_pair_type`), then every `_free_grant_period`th of the city's
-        # turns one unit, its class drawn over `_free_grant_w` and its chassis
-        # `_free_grant_units[class, era]` (-1 where the era has none)
+        # (`_free_pair_type`), then as the city's count of turns reaches
+        # `_free_grant_period` one unit while fewer than `_free_grant_cap` of
+        # its grants stand, its class drawn over the classes alike and its
+        # chassis `_free_grant_units[class, era]` (-1 where the era has none)
         self._free_pair_n = int(rules.seats["freeCityPairCount"])
         self._free_pair_cls = int(rules.seats["freeCityPairClass"])
         self._free_grant_period = int(rules.seats["freeCityGrantPeriod"])
-        self._free_grant_w = [int(x) for x in rules.seats["freeCityGrantWeights"]]
+        self._free_grant_cap = int(rules.seats["freeCityGrantCap"])
         self._free_grant_units = torch.tensor(
             [[int(x) for x in row] for row in rules.seats["freeCityGrantUnits"]], dtype=torch.long, device=device)
         # BANKRUPTCY on the turn's shortfall (GOLD_NEGATIVE_BALANCE_*), in

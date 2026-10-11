@@ -200,9 +200,9 @@ export function seatOf(state: GameState, seat: number): Seat | undefined {
   return state.seats[seat];
 }
 
-/** The FREE CITIES seat, made at the first revolt. It plays no civilization,
- *  researches nothing and never acts; it exists so a Free City has a holder
- *  every city walk resolves through `seatOf`. */
+/** The FREE CITIES seat, made at its first turn (`freeCitiesPhase`) or at a
+ *  revolt. It plays no civilization; it researches as a city-state does and
+ *  holds the Free Cities' cities, units and treasury. */
 export function freeSeatOf(state: GameState): Seat {
   if (!state.freeSeat) {
     state.freeSeat = { ...emptySeat(FREE_SEAT), name: 'Free Cities', color: '#7f7f7f' };

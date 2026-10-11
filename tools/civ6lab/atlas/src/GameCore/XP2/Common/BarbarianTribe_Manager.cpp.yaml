@@ -143,7 +143,10 @@
     - recording: h1_duelw1118
       turn: 92
       value: "**This reverses the weighted pick** shipped before (1 + min(d, 15)): runs/h1_duelw1118 t92 and t102 draw over 1, t138 and t151 over 3, where the weights summed 16, 16, 48, 48 (equal weights gave the s"
-  readings: ["C-74: the drought's start pick — READ (REVERSED)", "H-1: the city-states' quests — READ"]
+  readings:
+    - "C-74: the drought's start pick — READ (REVERSED)"
+    - "H-1: the city-states' quests — READ"
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
   context:
     - "...st plot is d < Spacing away) and draws over the list's COUNT, `rand(n)` through the thunk 0x152eb0, indexing the list: the scores are stored and never read. **This reverses the weighted pi..."
     - "...ic's own test; weight 1 each; one draw \"Selecting a random new quest\" over their count (0x152eb0), the type's record started (0x849400: state 1, the ids, the turn) and its picker (+0x4..."

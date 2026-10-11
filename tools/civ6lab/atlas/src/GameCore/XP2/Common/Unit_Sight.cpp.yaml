@@ -21,7 +21,7 @@
   impl: [cpu/core/fog.ts:canSee]
   readings:
     - "H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
     - 0x58b1d0 builds a unit's sight list in 24.8 fixed point (constants 0.5 and 0.05) over a ring walk;...

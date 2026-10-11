@@ -175,6 +175,12 @@
   impl: [cpu/core/aiContracts.ts:ContractCity]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x173f70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
 - addr: 0x175d10
   final: 0xfb9b0
   kind: function
@@ -185,7 +191,6 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...+0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where the value passes CityBuildAI +0xa48 and the production was set this turn or the...
-  review: imported
 - addr: 0x177d10
   kind: function
   name: City_BuildQueue
@@ -255,19 +260,17 @@
 - addr: 0x179860
   final: 0xfd370
   kind: function
-  name: queueHeadUnit
-  semantics: the unit type at the head of the city's build queue (city +0x2170 +0x1d0, kind 0), -1 none
-  status: READ
+  status: PARTLY
   cases:
     - recording: h1_duelv1124
       turn: 43
-      value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
+      value: "runs/h1_duelv1124 minor 3: t43 20/30 -> 0.5 + 0.2 = 0.7, t50 20/50 -> 1.7,   t56 0/0 -> 1.0 + 0.2."
   impl: [cpu/core/aiMilitary.ts:MilitaryFacts]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - "...it plus 20 exceeds B; the player itself adds each city's unit at the head of its queue (0x179860 on city +0x2170) of such strength — Regional (+0x398); a player at war (0x469cd0) or..."
-  review: reviewed
+  review: imported
 - addr: 0x179dd0
   kind: function
   status: PARTLY

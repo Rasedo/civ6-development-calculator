@@ -231,6 +231,7 @@
     - "H-1: the city-states' quests — READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
   context:
     - ...ns a city's own and foreign citizen pressure (24.8 fixed point, gathered by the plot walk 0x6aef0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x...
     - "...barian Camp (0x849a70): a camp within 5 of the minor's capital (the plots in range 5, 0x6aef0); no target; done when the actor clears a camp within 5 (0x849c00: distance <= 5); a..."
@@ -658,7 +659,7 @@
   kind: function
   status: PARTLY
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
@@ -679,6 +680,16 @@
     - ".claude/scratchpad/mu1/readings_c96.md: ...20's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420..."
   context:
     - "...0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rul..."
+  review: imported
+- addr: 0x272fa0
+  final: 0x1aad20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...der of its own, no HIGH_PRIORITY_UNIT target of the player's list within 5 of the city (0x272fa0) and a pillaged improvement (+0x44 set, +0x4d bit 0) on a plot within 2 of it, CLASS_BU...
   review: imported
 - addr: 0x27a680
   final: 0x1b05e0
@@ -2160,6 +2171,20 @@
     - ".claude/scratchpad/st1/reading.md: ...ery plot   of its region in plot order (0x6fd510) and sorts them best first, a   stable merge sort (0x6f5fb0); a region holds a site where one scores above   0. The best region top other than a given plot (0x..."
   context:
     - ...of its region in plot order (0x6fd510) and sorts them best first, a stable merge sort (0x6f5fb0); a region holds a site where one scores above 0. The best region top other than a give...
+  review: imported
+- addr: 0x6fad50
+  final: 0x4b12d0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/tactical.ts:Pass
+    - cpu/core/tactical.ts:seenRegions
+    - gpu/core/sim_tactics.py:_tac_seen_regions
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x783d5c) or revealed (+0x2f0, 0x7852db), plots off any region left out, and stores it (0x6fad50, ascending) after its plot walk. The search over a list (0x70b6f0): the plots in index..."
   review: imported
 - addr: 0x6fae70
   final: 0x4b13f0

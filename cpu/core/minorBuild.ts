@@ -56,7 +56,6 @@ import { irradiated } from './nuclear';
 import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
 import { cityStateTactics } from './tactical';
-import { worldEraIndex } from './eras';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
@@ -212,7 +211,8 @@ function minorMilitary(state: GameState, cityState: CityState): Unit[] {
  */
 export function minorEconomy(state: GameState, cityState: CityState): number {
   let y = computeCityStats(state, minorCity(cityState)).total;
-  const gained = minorResearch(state, cityState, y.science, y.culture);
+  const gained = minorResearch(state, cityState.research, cityState.seat, y.science, y.culture,
+    () => minorResearchResources(state, cityState), () => minorUrbanFit(state, cityState));
   if (gained > 0) y = computeCityStats(state, minorCity(cityState)).total;
   let upkeep = 0;
   for (const u of state.units) if (u.seat === cityState.seat) upkeep += unitMaintenance(u);
@@ -246,7 +246,8 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
 }
 
 /**
- * THE MINOR'S RESEARCH, each tree as a major's runs: the item in hand banks
+ * A MINOR'S RESEARCH — a city-state's or the Free Cities' (the catch-up's
+ * receivers, 0x4cb930) — each tree as a major's runs: the item in hand banks
  * the turn's yield and the overflow a completion set aside, and completes at
  * its cost, leaving the rest. Its technologies are the research AI's
  * (`aiResearch.ts`) and its civics the civics AI's (`aiCivics.ts`): a
@@ -254,14 +255,13 @@ export function minorGrowth(state: GameState, cityState: CityState): void {
  * it (`selectResearch`). First the CATCH-UP (`minorCatchUp`). Early Empire is
  * the row `borderClosedTo` reads. CIV6 (Urban Defenses): the tech "builds
  * modern fortifications around the City Centers of all current and future
- * cities and their Encampment districts" — a minor's perimeter arrives at
- * the urban tier's full pool, as `urbanDefensesFit` fits a major's cities.
- * Returns how many trees completed a row this turn — the upgrade trigger's
- * count.
+ * cities and their Encampment districts" — `urban` fits the holder's cities
+ * on its completion. `resources` gives the research analysis its resources
+ * term. Returns how many trees completed a row this turn — the upgrade
+ * trigger's count.
  */
-function minorResearch(state: GameState, cityState: CityState, science: number, culture: number): number {
-  const r = cityState.research;
-  const seat = cityState.seat;
+export function minorResearch(state: GameState, r: ResearchState, seat: number, science: number, culture: number,
+  resources: () => ((tech: string, turns: number) => number) | undefined, urban: () => void): number {
   let gained = 0;
   // THE TECHNOLOGIES: the turn's Science banks; a completion's choice reads
   // the research AI's analysis of the turn before (0x762d60); then the AI's
@@ -277,17 +277,11 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, minorResearchResources(state, cityState)), cur, researchDraw(state)));
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, resources()), cur, researchDraw(state)));
     r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
-    if (cur === URBAN_DEFENSES_TECH) {
-      cityState.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-      for (const d of cityState.districts ?? []) {
-        const t = state.map.tiles[d.tileIndex];
-        if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
-      }
-    }
+    if (cur === URBAN_DEFENSES_TECH) urban();
   }
-  r.aiEntries = researchAnalysis(state, seat, science, {}, minorResearchResources(state, cityState));
+  r.aiEntries = researchAnalysis(state, seat, science, {}, resources());
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
@@ -311,6 +305,16 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
   r.civicAiEntries = civicAnalysis(state, seat, culture);
   if (!r.civic) takeCivic(r, civicChoice(state, seat, r.civicAiEntries, null, civicDraw(state)));
   return gained;
+}
+
+/** Urban Defenses on a city-state: its centre's perimeter and its
+ *  Encampment's own pool at the urban tier's full pool */
+function minorUrbanFit(state: GameState, cityState: CityState): void {
+  cityState.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+  for (const d of cityState.districts ?? []) {
+    const t = state.map.tiles[d.tileIndex];
+    if (t.district === 'ENCAMPMENT' && t.districtComplete) t.encampOuterHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
+  }
 }
 
 /**
@@ -1457,23 +1461,6 @@ export function minorLump(state: GameState, cityState: CityState, key: 'food' | 
   if (minorFinish(state, cityState, item)) cityState.prodOverflow = (cityState.prodOverflow ?? 0) + Math.max(0, before + amount - cost);
 }
 
-/**
- * THE FREE CITIES' RESEARCH — what a Free City may raise and train. The Free
- * Cities player researches nothing of its own (`seatOf(FREE_SEAT).research`
- * stays empty, which is what its walls tier reads), so its build table reads
- * the world era, the reading its grants already take (`eraUnitOfClass`):
- * every technology and civic of an era at or below the world's.
- */
-export function freeCityResearch(state: GameState): ResearchState {
-  const era = Math.max(0, worldEraIndex(state));
-  const within = (e: Era) => Math.max(0, ERAS.indexOf(e)) <= era;
-  return {
-    tech: null, techProgress: 0, civic: null, civicProgress: 0, boosted: [], techRetained: {}, civicRetained: {},
-    techs: Object.keys(TECHS).filter((id) => within(TECHS[id].era)),
-    civics: Object.keys(CIVICS).filter((id) => within(CIVICS[id].era)),
-  };
-}
-
 /** The Free City nearest `u` — ties to the first in the Free Cities' list. */
 function nearestFreeCity(state: GameState, u: Unit): City | undefined {
   const at = state.map.tiles[u.tileIndex];
@@ -1518,7 +1505,7 @@ function freeCityBuildingOk(state: GameState, city: City, id: string, unlocks: U
  * row of its own), and the first row that wants an item the city can make now
  * completes it when the pot covers it, one item a turn. A unit row wants its
  * class's strongest chassis the Free Cities may train (`trainableIn` over
- * `freeCityResearch`; CIV6 `CivilizationLevels.IgnoresUnitStrategicResource
+ * the Free Cities' own research; CIV6 `CivilizationLevels.IgnoresUnitStrategicResource
  * Requirements` is false for FREE_CITIES and the seat holds no stockpile, so
  * no chassis that asks a resource) while no Free Cities unit of the class
  * calls the city its nearest Free City (`nearestFreeCity`) — the one

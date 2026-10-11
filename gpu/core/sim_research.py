@@ -339,7 +339,10 @@ class SimResearch:
         (`minorResearchResources`): per resource a row's improvements work
         that its city counts (its plots within three of the centre it owns,
         unimproved, the resource one it sees), one copy more's value
-        (`resourceValue`) landing in the row's turns"""
+        (`resourceValue`) landing in the row's turns; the Free Cities' row
+        (`FR`) carries none"""
+        if s == self.FR:
+            return torch.zeros_like(turns)
         R = self._rai_res_tables()
         T = self._rai_tables()
         B, NT = turns.shape

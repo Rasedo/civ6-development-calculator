@@ -14,15 +14,43 @@
   context:
     - "...x P + W x P / r^2, r one less per running competition it ranks in the top quarter of, 0x25d5f0); PLAYER_GRIEVANCE_GENERATION 0x6c3bc0 (on itself gaining: its grievances x Amount / 10..."
   review: imported
+- addr: 0x273a40
+  final: 0x1ab5c0
+  kind: function
+  name: freeCityRaise
+  semantics: "a unit of a class for a Free City's record: of its allowed units (+0x28) the highest Combat (+0x48), placed by the ring walk within 3"
+  status: PARTLY
+  readings:
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(0x152eb0) over CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each; the unit 0x273a40: of the record's allowed units (+0x28) of the class, the highest Combat (+0x48, the fir..."
+  review: reviewed
 - addr: 0x274010
   final: 0x1abac0
   kind: function
+  name: freeCityRecordTurn
+  semantics: "a Free City's record each Free Cities turn: the count +0x18 to 5, the cap of 6 of its units, the Builder for a pillaged improvement within 2 with no HIGH target within 5, else one draw over melee, ranged, light cavalry alike; then the repairs"
   status: PARTLY
-  impl: [cpu/core/phase.ts:freeCityGrantType]
-  readings: ["H-1: draws with no game site"]
+  cases:
+    - recording: h1_duelw1123
+      turn: 206
+      value: the Free City of t202 is granted a Cavalry (light cavalry) on its fifth turn
+    - recording: h1_duelw1123
+      turn: 206
+      value: the Free City of t202 is granted a Cavalry (light cavalry) on its fifth turn
+  impl:
+    - cpu/core/phase.ts:freeCityGrant
+    - gpu/core/sim_phase.py:_free_city_grant
+    - cpu/data/seats.ts:FREE_CITY_GRANT_PERIOD
+    - cpu/data/seats.ts:FREE_CITY_GRANT_CAP
+    - cpu/data/seats.ts:FREE_CITY_GRANT_CLASSES
+  readings:
+    - "H-1: draws with no game site"
+    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
   context:
     - "...theon pick (`_seat_pantheon_race`) and the Free Cities' grant (\"Free Cities Unit Choice\", 0x274010, one weighted pick: the engines' `freeCityGrantType` / `_free_grant_type` take it as the..."
-  review: imported
+  review: reviewed
 - addr: 0x2d2220
   kind: function
   status: PARTLY
@@ -240,6 +268,24 @@
   context:
     - ...lAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType = one of th...
   review: imported
+- addr: 0x6fe240
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...dd70, through 0x6fa5e0), the secondary the regions across those regions' chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no city holds neither. The tertiary: th..."
+  review: imported
+- addr: 0x6febc0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ough 0x6fa5e0), the secondary the regions across those regions' chokepoints (0x6fe240 / 0x6febc0) not already primary — a player with no city holds neither. The tertiary: the tactical..."
+  review: imported
 - addr: 0x6fece0
   final: 0x4b39a0
   kind: function
@@ -250,6 +296,18 @@
   context:
     - ...tem (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType...
   review: imported
+- addr: 0x700630
+  final: 0x4b5160
+  kind: function
+  name: settleRegionLists
+  semantics: a city's settle values, and its plot's region and its neighbours' to the primary region list (0x6fa5e0)
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+0x378 -> +0x3d0). The primary: the region of a city's plot and of each plot round it (0x700630 from the city analysis 0x5cdd70, through 0x6fa5e0), the secondary the regions across th..."
+  review: reviewed
 - addr: 0x702ad0
   kind: function
   name: YieldType

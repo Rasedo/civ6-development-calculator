@@ -749,7 +749,7 @@ def main() -> None:
     sim._tac_in_pass = True
     try:
         first = sim._tac_explore(lambda: units & ~done & sim.barb_unit_alive, done, order, units.sum(dim=1), ai, dplane,
-                                 "barb", BARB_SEAT)
+                                 sim._tac_seen_regions(BARB_SEAT), "barb", BARB_SEAT)
     finally:
         sim._tac_in_pass = False
     assert want >= 0 and int(first[0, s]) == want, f"the explorer goes first for {int(first[0, s])}, not {want}"

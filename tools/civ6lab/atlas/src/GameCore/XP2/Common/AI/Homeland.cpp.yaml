@@ -3,6 +3,18 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x7094f0
+  final: 0x4ba700
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 137
+      value: "A civilian goes too: runs/h1_duelw1124 t137-t151,   t170-t173 the barbarians' captured Builder stands each turn on the plot of   player 4's Trader."
+  readings: ["C-95: the homeland's Plunder Trader — READ, ported"]
+  context:
+    - "...a move order onto it (0x962190) and the plunder (PLUNDER_TRADE_ROUTE 0x955950) queued (0x7094f0); the queue carried out as the move ends (0x70a440). A civilian goes too: runs/h1_duelw..."
+  review: imported
 - addr: 0x70a370
   final: 0x4bb0c0
   kind: function
@@ -17,9 +29,10 @@
   final: 0x4bb190
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:exploreLand]
+  impl: [cpu/core/tactical.ts:exploreLand, cpu/core/tactical.ts:homelandPlunder]
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
+    - "C-95: the homeland's Plunder Trader — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...he chosen list; the round's move orders (0x962030) are carried out together as it ends (0x70a440); another round only where one moved.
@@ -35,7 +48,7 @@
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
   impl: [cpu/core/tactical.ts:exploreTarget]
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...s within the unit's sight +0x1998 seen from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the la..."
     - "...a revealed plot's +0x47 that makes a plot of positive count win once ahead of a larger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the..."
@@ -52,7 +65,7 @@
       value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
   impl: [cpu/core/tactical.ts:exploreTarget]
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...n from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Ex..."
@@ -65,7 +78,7 @@
   impl: [cpu/core/tactical.ts:exploreTarget, gpu/core/sim_tactics.py:_tac_explore]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
   review: reviewed
@@ -81,7 +94,7 @@
       value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
   impl: [cpu/core/tactical.ts:nearestUnrevealed, gpu/core/sim_tactics.py:_tac_explore_region]
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "..., not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area (0x70b550, \"cur area\"); then the player's primary, secondary and tertiary region lists (+0x1290 +..."
@@ -90,15 +103,21 @@
   final: 0x4bc500
   kind: function
   name: nearestUnrevealedInRegions
-  semantics: the nearest unrevealed enterable plot of the listed regions, plots in index order
+  semantics: "the nearest plot never revealed of the regions a list holds: plots in index order, +0x4c clear, enterable, strictly nearer replacing"
   status: READ
   cases:
     - recording: h1_duelw1117-1128
       turn: all
       value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
-  impl: [cpu/core/tactical.ts:nearestUnrevealed, gpu/core/sim_tactics.py:_tac_explore_region]
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: HL: Explore rows end on the game's plot 419 -> 490 of 1,056"
+  impl:
+    - cpu/core/tactical.ts:nearestUnrevealed
+    - gpu/core/sim_tactics.py:_tac_explore_region
+    - cpu/core/tactical.ts:exploreTarget
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in index order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with..."
@@ -114,7 +133,7 @@
       value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
   impl: [cpu/core/tactical.ts:exploreOk, gpu/core/sim_tactics.py:_tac_explore_ok]
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   context:
     - "...left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40: not its own plot; revealed; another player's ground only at war with it; +0x4c not abo..."
     - "...rger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the game turn below the regions record's +0x128; taken as passing); a goody hut's plot..."
@@ -151,7 +170,7 @@
     - cpu/core/tactical.ts:EXPLORE_ROUNDS
     - gpu/core/sim_tactics.py:_CITY_STRIKE_RANGE
   readings:
-    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units; each unit not done (+0x770) with Moveme..."
@@ -188,6 +207,24 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the h..."
+  review: reviewed
+- addr: 0x70f610
+  final: 0x4c0520
+  kind: function
+  name: homelandPlunderTrader
+  semantics: "the homeland's Plunder Trader: each TRADER entry, each homeland unit not queued with a planning reaching its plot this turn, the row and the move onto it with the plunder queued"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 137
+      value: "A civilian goes too: runs/h1_duelw1124 t137-t151,   t170-t173 the barbarians' captured Builder stands each turn on the plot of   player 4's Trader."
+    - recording: h1_duelw1124
+      turn: 137-151
+      value: the barbarians' captured Builder stands each turn on the plot of player 4's Trader
+  impl: [cpu/core/tactical.ts:homelandPlunder, gpu/core/sim_tactics.py:_tac_homeland_plunder]
+  readings: ["C-95: the homeland's Plunder Trader — READ, ported"]
+  context:
+    - "- 0x70f610, first of \"Default Barbarian HL\": each TRADER entry of the player's target list (+0x12b..."
   review: reviewed
 - addr: 0x710f40
   final: 0x4c1f40

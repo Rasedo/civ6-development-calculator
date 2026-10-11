@@ -150,6 +150,8 @@ export interface City {
   /** A FREE CITY's build pot: its Production, banked until the Free City
    *  build table's next item is covered (`freeCityBuild`). */
   freePot?: number;
+  /** A FREE CITY's count of turns toward its next grant (`freeCityGrant`). */
+  freeGrantTurns?: number;
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */
   spySources?: number[];
