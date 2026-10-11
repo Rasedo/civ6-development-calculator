@@ -6,24 +6,40 @@
 - addr: 0x66ae10
   final: 0x4407c0
   kind: function
-  status: PARTLY
+  name: friendshipCost
+  semantics: 9999 where the other is near a victory; else Cost - T(1, -) - U(1, +) - 20 at the focus + 30 with a war operation ready against the other (0x723db0) - 5 per war the owner wages.
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 196
+      value: Qin toward Rome 35.0:-5.0 = Friendly -15 - 20 + 30 (a war operation ready)
+  impl: [ai/major/diploActions.ts:actionCost, cpu/harness/majorDiplomacy.ts:answerFriendship]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...nd Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war..."
   context:
     - ...0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0...
-  review: imported
+  review: reviewed
 - addr: 0x66b220
   kind: function
-  status: PARTLY
+  name: demandTributeCost
+  semantics: Cost - T(1, +).
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 150
+      value: Demand Tribute's cost on the replay's rows
+  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160..."
   context:
     - ...0 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10...
-  review: imported
+  review: reviewed
 - addr: 0x66b490
   final: 0x440ea0
   kind: function
@@ -33,7 +49,7 @@
     - recording: h1_duelv1127
       turn: 68
       value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
-  impl: [ai/major/diploState.ts:answerAction]
+  impl: [ai/major/diploState.ts:answerAction, ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -48,15 +64,23 @@
   review: reviewed
 - addr: 0x66b590
   kind: function
-  status: PARTLY
+  name: delegationCost
+  semantics: Cost - T(0, +).
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 129
+      value: Qin's Delegation cost -20 = 2 x (0 - T 10), favoured
+  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...D so far - Action registration 0x666620 (delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...+0x28 desire,   +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Dema..."
   context:
     - "...re, +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x67..."
-  review: imported
+  review: reviewed
 - addr: 0x66b610
   kind: function
   status: PARTLY
@@ -67,16 +91,37 @@
   context:
     - "...+0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Op..."
   review: imported
+- addr: 0x66b990
+  kind: function
+  name: allianceCost
+  semantics: 9999 near a victory; else Cost - U(1, +) - 5 x (+0x6420 - min of the two ranks + 1).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: -10.8
+  impl: [ai/major/diploActions.ts:actionCost, ai/major/diploActions.ts:allianceRankTerm]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x66bb50
   kind: function
-  status: PARTLY
+  name: openBordersCost
+  semantics: Cost - T(1, -) - U(0, +).
+  status: READ
+  cases:
+    - recording: h1_duelv1121
+      turn: 129
+      value: Qin's Open Borders cost 0, favoured
+  impl: [ai/major/diploActions.ts:actionCost]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance..."
   context:
     - .../ 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request A...
-  review: imported
+  review: reviewed
 - addr: 0x66bf30
   final: 0x441ec0
   kind: function
@@ -91,18 +136,30 @@
 - addr: 0x66c160
   final: 0x442170
   kind: function
-  status: PARTLY
+  name: friendshipDesire
+  semantics: 0 where the other is near a victory (0x652770); else Worth + T(1, -) + U(1, +) + 20 at the focus (vt+0x30) + 20 per player of the game's list +0xfa0 the owner is at war with.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: Rome toward Qin 10.8 = -10 + 0.8 + 20 (Neutral, the focus)
+    - recording: h1_duelv1127
+      turn: 115
+      value: -39.2 = -40 + 0.8 (Unfriendly, no focus)
+  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declaration..."
   context:
     - ...0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war d...
-  review: imported
+  review: reviewed
 - addr: 0x66c800
   final: 0x4427b0
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -129,6 +186,7 @@
   final: 0x442bf0
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -143,6 +201,7 @@
   final: 0x442d70
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -150,19 +209,52 @@
   context:
     - "...value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders..."
   review: imported
+- addr: 0x66d800
+  kind: function
+  name: zeroDesire
+  semantics: "Returns 0: the desire of Denounce, the promises, the alliance types and the views."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: DENOUNCE and the promises log 0.0 on every row
+  impl: [ai/major/diploActions.ts:desire]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x66d810
+  kind: function
+  name: allianceDesire
+  semantics: 0 where the other is near a victory; else Worth + U(1, +) + 5 x (+0x6420 - min(the other's rank, the owner's) + 1).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: 10.8 = 0 (no row in Neutral) + 0.8 + 5 x (2 - 1 + 1)
+  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:allianceRankTerm]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x66dda0
   final: 0x443720
   kind: function
-  status: PARTLY
+  semantics: "Open Borders' desire: Worth + T(1, -) + whole((40 - d) x 0.5) + 10 at the focus."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: Open Borders 53 / 53 desires on the replay with T(1, -)
+  impl: [ai/major/diploActions.ts:desire]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ice p's or its era (player +0x1358 +0xf8, the Eras   row's ChronologyIndex) is later. Open Borders (0x66dda0): Worth - T, + (40 -   d) x 0.5 (whole part) for the least plot distance d (1..39) between p's   ci..."
   context:
     - .../ - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance...
     - "...its era (player +0x1358 +0xf8, the Eras row's ChronologyIndex) is later. Open Borders (0x66dda0): Worth - T, + (40 - d) x 0.5 (whole part) for the least plot distance d (1..39) betwee..."
-  review: imported
+  review: reviewed
 - addr: 0x66e750
   final: 0x443f00
   kind: function
@@ -174,6 +266,19 @@
   context:
     - ...iendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the...
   review: imported
+- addr: 0x66e950
+  kind: function
+  name: surpriseWarDesire
+  semantics: "-1 for a full civ at war with more than one major (0x3dfae0); the owner's preference of the Surprise War: favoured on, disfavoured -9999 (@f04cb0), none the other's in its eyes (0x6504a0, -1: -9999); then X = the war value 0x7b7760(hash 0x4396d725, the military AI's 0x6fec30, 5) and, with the rank n = 1 or n <= ceil(+0x6420 x 0.25), max(X, 5)."
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 63
+      value: 5.0 at rank 1 while X is -9999; -9999 at rank 2 (t62); 798 at t94
+  impl: [ai/major/diploActions.ts:desire]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x670210
   final: 0x444c60
   kind: function
@@ -194,7 +299,10 @@
     - recording: h1_duelv1127
       turn: 68
       value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
-  impl: [ai/major/diploState.ts:answerAction]
+  impl:
+    - ai/major/diploState.ts:answerAction
+    - ai/major/diploActions.ts:actionCost
+    - ai/major/diploActions.ts:stateRow
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
@@ -209,6 +317,7 @@
   kind: function
   name: stateWorth
   status: PARTLY
+  impl: [ai/major/diploActions.ts:stateRow]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -220,18 +329,39 @@
   review: imported
 - addr: 0x671b80
   kind: function
-  status: PARTLY
-  impl: [ai/major/diploState.ts:answerAction]
+  name: threatTerm
+  semantics: "T (out, the other, the owner's AI, the action, the mode, the sign flag): by the owner's preference (+0x6240) or the other's in its eyes (+0x62b0) — favoured only with the flag, disfavoured only without; 0 where the threat +0x6480[p] is 0; else L = ceil(+0x6420 x 0.25) / ceil(x 0.5) / +0x6420 by the mode, 0 where the rank n passes L, else 10 / 20 / 40 x (L - n + 1) / L; negated without the flag."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 68
+      value: "Rome toward Qin: the receiver's T = 10 (count 2, L 1, n 1)"
+  impl: [ai/major/diploActions.ts:threatTerm]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...(delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +..."
     - ".claude/scratchpad/dp2/NOTES.md: ...0 direction, minus gold cost x 0x7a6690 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0x650550(p), L=trunc(+0x6420 x 0.25) (mode 0), T=10*(L-n+1)/L   if n<=..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ames +0x6320 than its getter   and the save's serializer: its writer is unread. - THE TRUST TERM T (0x671b80): 0 unless the owner's trust of p (+0x6480[p])   is non-zero; else, with n = 1 + the players truste..."
   context:
     - "- THE TRUST TERM T (0x671b80): 0 unless the owner's trust of p (+0x6480[p]) is non-zero; else, with n = 1 + the play..."
-  review: imported
+  review: reviewed
+- addr: 0x671ef0
+  kind: function
+  name: trustTerm
+  semantics: "U (the mode, the sign flag): v = the trust +0x6560[p]; 0 where flag == (v > 0) and the action is disfavoured, or flag != (v > 0) and it is favoured; else v x 0.02 (24.8: 5) x 10 / 20 / 40, held within the weight, negated without the flag."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: "Rome toward Qin: the trust 2.00 gives the friendship's and the alliance's 0.8"
+  impl: [ai/major/diploActions.ts:trustTerm]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x672210
   final: 0x445ff0
   kind: function
@@ -246,14 +376,21 @@
 - addr: 0x672c40
   final: 0x446900
   kind: function
-  status: PARTLY
+  name: friendshipCanDo
+  semantics: CanDoAction(Declare Friendship) and, toward a full civ, the last action's turn + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS (5) at or below the turn.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: no friendship sent in the five duels
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0..."
   context:
     - .../ 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations...
-  review: imported
+  review: reviewed
 - addr: 0x672df0
   final: 0x446ab0
   kind: function
@@ -280,9 +417,16 @@
 - addr: 0x672f90
   final: 0x446c50
   kind: function
-  status: PARTLY
+  semantics: "The Delegation's can-do: an AI owner without a delegation at the target's, the savings slot 2 at half the price, CanDoAction, the last action's turn + AI_TURNS_BETWEEN_PEACE_OFFERS below the turn."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: SET_DELEGATION at t61, 68, 79
+  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-DO: not human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game C..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /..."
@@ -290,11 +434,12 @@
   context:
     - "...x68 not-ready hook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0..."
     - "- THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI affords the action's gold cost from savings s..."
-  review: imported
+  review: reviewed
 - addr: 0x6730e0
   final: 0x446da0
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -303,6 +448,15 @@
   context:
     - ...Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 /...
     - "- THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI affords the action's gold cost from savings slot 2 (0x68..."
+  review: imported
+- addr: 0x673460
+  final: 0x447120
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...s preparation, Propose Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460: the last action + AI_TURNS_BETWEEN_TRADES), the alliance's offer, the victories' pro..."
   review: imported
 - addr: 0x6737b0
   final: 0x447450
@@ -315,6 +469,19 @@
   context:
     - ...0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the static init...
   review: imported
+- addr: 0x673800
+  kind: function
+  name: warCanDo
+  semantics: "The wars' can-do: CanDeclareWarOn(0x4396d725, the surprise war) and, with the flag, the military AI's war operation against the other ready (0x723db0(other, 1, 2, 5))."
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 196
+      value: Qin's Surprise War after the war operation stood (the friendship cost's +30 t182 - t195)
+  impl: [ai/major/diploActions.ts:canDo]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x6742d0
   final: 0x447ad0
   kind: function
@@ -329,20 +496,29 @@
 - addr: 0x674820
   final: 0x447d10
   kind: function
-  status: PARTLY
+  name: friendshipPerform
+  semantics: Sends the friendship (0x238560) and stamps the last action's turn (0x3e6d20).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: no friendship sent
+  impl: [ai/major/diploActions.ts:performFriendship]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The ac..."
   context:
     - ...en Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one)...
-  review: imported
+  review: reviewed
 - addr: 0x674900
   final: 0x447df0
   kind: function
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...pref>0 || partner pref>0;   best: fav beats non-fav, else higher X (strict >). }   if best: perform 0x674900 on +0x2238[target]; done[target]=1; reset; rescan. One action per target/turn. - Receiver (0x237c60..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...n (the owner's or p's preference) beats any other, else the   higher desire. The best is performed (0x674900), p marked, and the scan   runs again: at most one action per player per turn. - THE MISSIONS' CAN-..."
@@ -352,9 +528,17 @@
 - addr: 0x674960
   final: 0x447e50
   kind: function
-  status: PARTLY
+  name: performDelegation
+  semantics: "The Delegation's perform: sends the action, stamps the last action's turn toward the player (0x3e6d20), spends the price from savings slot 1."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: DiplomacyManager SET_DELEGATION at t61, 68, 79
+  impl: [ai/major/diploActions.ts:performAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processing Action From AI to AI\", spend econ slot 1),   +0xa8 0x66d800 returns 0. -..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ot-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x..."
@@ -362,15 +546,44 @@
   context:
     - "...ook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x6..."
     - "...GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the turn. The perform (0x674960) sends the action (\"Processing Action From AI to AI\") and spends the cost from savings..."
-  review: imported
+  review: reviewed
 - addr: 0x674a10
   final: 0x447f00
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:performAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friends..."
   context:
     - ...b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Decla...
+  review: imported
+- addr: 0x674b60
+  final: 0x448050
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...rms of the Delegation (0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_P...
+  review: imported
+- addr: 0x675100
+  final: 0x4484b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...elegation (0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_PEACE_OFFERS...
+  review: imported
+- addr: 0x675410
+  final: 0x448780
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...(0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_PEACE_OFFERS (3) below...
   review: imported

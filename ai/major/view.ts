@@ -277,6 +277,26 @@ export interface MajorView extends AiValueView {
   techCount(seat: number): number;
   /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
   militaryStrength(seat: number): number;
+  /** the seat's gold in its treasury */
+  treasury(seat: number): number;
+  /** the mission `owner` may send `other` now, as the game's CanDoAction
+   *  reads it (the civic, none held, the price in the treasury, a state
+   *  that lists it): DIPLOACTION_DIPLOMATIC_DELEGATION or
+   *  DIPLOACTION_RESIDENT_EMBASSY, null for none */
+  missionOpen(owner: number, other: number): string | null;
+  /** the game's CanDoAction of a DiplomaticActionType from `owner` to
+   *  `other` as the engine carries it (the missions, Open Borders, the
+   *  friendship, the alliance, the denouncement), null for an action it does
+   *  not carry */
+  actionOpen(owner: number, other: number, action: string): boolean | null;
+  /** the game's CanDeclareWarOn from `owner` on `other`: a surprise war, or a
+   *  formal one with `formal` */
+  warOpen(owner: number, other: number, formal: boolean): boolean;
+  /** the pair's standing declared friendship / alliance */
+  declaredFriends(a: number, b: number): boolean;
+  allied(a: number, b: number): boolean;
+  /** `a`'s standing denouncement of `b` */
+  denouncing(a: number, b: number): boolean;
   score(seat: number): number;
   /** the great people of a class (GREAT_PERSON_CLASS_*) the seat has earned */
   greatPeopleOfClass(seat: number, cls: string): number;

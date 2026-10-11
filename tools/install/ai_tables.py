@@ -188,8 +188,9 @@ def build() -> str:
                                          "minDifficulty": c.get("MinDifficulty"), "maxDifficulty": c.get("MaxDifficulty")})
     trait_lists: dict[str, list] = collections.defaultdict(list)
     for c in ai_lists:
-        if c.get("LeaderType") and c["System"] in WEIGHT_SYSTEMS:
-            trait_lists[c["LeaderType"]].append({"list": c["ListType"], "system": c["System"],
+        owner = c.get("LeaderType") or c.get("AgendaType")
+        if owner and c["System"] in WEIGHT_SYSTEMS:
+            trait_lists[owner].append({"list": c["ListType"], "system": c["System"],
                                                  "minDifficulty": c.get("MinDifficulty"),
                                                  "maxDifficulty": c.get("MaxDifficulty")})
     inherit = {c["LeaderType"]: c.get("InheritFrom") for c in rows("Leaders") if c.get("LeaderType")}
@@ -212,6 +213,11 @@ def build() -> str:
 
     leader_w = {lt: [t for t in leader_traits(lt) if t in trait_lists] for lt in sorted(inherit)}
     civ_w = {ct: [t for t in ts if t in trait_lists] for ct, ts in sorted(ctraits.items())}
+    # an agenda's traits (AgendaTraits) that carry a weight list
+    atraits: dict[str, list] = collections.defaultdict(list)
+    for c in rows("AgendaTraits"):
+        if c.get("AgendaType") and c.get("TraitType") in trait_lists and c["TraitType"] not in atraits[c["AgendaType"]]:
+            atraits[c["AgendaType"]].append(c["TraitType"])
     plain = {c["ListType"]: c["System"] for c in ai_lists if not c.get("LeaderType") and not c.get("AgendaType")}
     strat_lists: dict[str, list] = collections.defaultdict(list)
     for c in rows("Strategy_Priorities"):
@@ -421,8 +427,9 @@ def build() -> str:
         " * stale file): the yields' and pseudo-yields' DefaultValue, the great\n"
         " * person classes' pseudo-yields, the governments' InfluencePointsThreshold,\n"
         " * and the AI lists the weights sum: System Yields and YieldSensitivities by\n"
-        " * trait — a leader's traits through its InheritFrom chain, a civilization's\n"
-        " * —, those and PseudoYields by strategy (Strategy_Priorities).\n */\n"
+        " * trait — a leader's traits through its InheritFrom chain, a civilization's,\n"
+        " * an agenda's (AgendaTraits) —, those and PseudoYields by strategy\n"
+        " * (Strategy_Priorities).\n */\n"
         "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
         + lit("AI_YIELD_DEFAULT", yields, "Readonly<Record<string, number>>")
         + lit("AI_PSEUDOYIELD_DEFAULT", pseudo, "Readonly<Record<string, number>>")
@@ -432,6 +439,7 @@ def build() -> str:
         + lit("AI_TRAIT_LISTS", dict(sorted(trait_lists.items())), "Readonly<Record<string, readonly AiListRef[]>>")
         + lit("AI_LEADER_TRAITS", {k: v for k, v in leader_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_CIVILIZATION_TRAITS", {k: v for k, v in civ_w.items() if v}, "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_AGENDA_TRAITS", dict(sorted(atraits.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_STRATEGY_LISTS", dict(sorted(strat_lists.items())), "Readonly<Record<string, readonly AiListRef[]>>")
         + lit("AI_STRATEGY_YIELD_PRIORITIES", strat_yields,
               "readonly { strategy: string; yield: string; pct: number }[]")

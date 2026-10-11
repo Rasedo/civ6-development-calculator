@@ -26,7 +26,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { NO_SCORE, choosePolicies, policyRecord, policyScores, type PolicyScores } from '../../ai/major/policies';
 import { AI_POLICIES } from '../../ai/major/tables';
 import type { MajorView } from '../../ai/major/view';
-import { majorView } from '../core/majorView';
+import { majorView, type MajorViewInputs } from '../core/majorView';
 import { adoptGovernment, fitPolicies, governmentSlots } from '../core/effects';
 import { seatOf } from '../core/seats';
 import type { GameState, GovernmentState } from '../core/types';
@@ -124,7 +124,7 @@ export class MajorAiProbe {
   /** `seats`: the AI majors, seat -> the record's player id; `strategies`:
    *  what each seat followed as the AI turn opened (`StrategyProbe`) */
   constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>,
-              private readonly strategies: (turn: number) => ReadonlyMap<number, ReadonlySet<string>>) {
+              private readonly inputs: (turn: number) => MajorViewInputs) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = existsSync(logs + 'AI_GovtPolicies.csv') ? readLog(logs + 'AI_GovtPolicies.csv') : null;
   }
@@ -134,7 +134,7 @@ export class MajorAiProbe {
   }
 
   private view(state: GameState, turn: number): MajorView {
-    return majorView(state, { strategies: this.strategies(turn) });
+    return majorView(state, this.inputs(turn));
   }
 
   /** before the pair's turn: the seats' governments as they stand */

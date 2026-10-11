@@ -38,7 +38,7 @@ import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, uni
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize } from '../core/game';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
+  placeSeatDistrict, putOffer, answerOffer, denounce, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
@@ -71,9 +71,9 @@ import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
-import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_INITIAL_BELIEFS, RELIGION_TYPES, beliefIdAt, gainPopulationPressure } from '../data/religion';
 import { missionOf, missionPayable } from '../core/deals';
-import { DEAL_MISSION } from '../data/seats';
+import { DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
@@ -88,13 +88,18 @@ import { buildingTable } from '../core/aiCityBuild';
 import { replayEvents } from './eventReplay';
 import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog';
 import { streamHold, type StreamHold } from './streamHold';
-import { holdRng, rngHold } from '../core/rand';
+import { holdRng, randRange, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
 import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
-import { ReligionProbe, religionAiMarkdown, type ReligionAiTally } from './religionAi';
+import { ReligionProbe, religionAiMarkdown, type ReligionActions, type ReligionAiTally } from './religionAi';
 import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
+import { enhanceRecord, foundingRecord, pantheonRecord } from '../../ai/major/religion';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
+import { DiploSender, senderMarkdown, type SenderTally } from './diploSender';
+import { answerAction } from '../../ai/major/diploState';
+import { majorView, type MajorViewInputs } from '../core/majorView';
+import type { PickedAction } from '../../ai/major/diploActions';
 import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
 import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
 import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsAi';
@@ -124,6 +129,11 @@ const LAB_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
   state: GameState;
+  /** the AI majors' religion port: their seats, the probe holding their
+   *  scores, the strategies they follow this pair, the turns the port
+   *  founded each one's pantheon */
+  religionPort: { seats: ReadonlySet<number>; probe: ReligionProbe; inputs: MajorViewInputs; pantheonTurn: Map<number, number>;
+    mustFound: Set<number> };
   /** the pair's Fortify orders: unit -> the order's place in the log and the
    *  fortification record t+1 shows (`dugIn`) */
   fortified: Map<string, { ord: number; turns: number }>;
@@ -1098,13 +1108,16 @@ function readMissions(dumpPath: string): Map<number, MissionEvent[]> {
   return out;
 }
 
-/** THE TURN'S MISSIONS as the two majors' actions on the engine's table: the
- *  sender's offer of its MISSION (`putOffer`), then the receiver's answer —
- *  its acceptance (`answerOffer`) where the record's receiver accepted, none
- *  where it refused (the offer lapses). The receiver's own AI answers beside
- *  it (`DiplomacyProbe.answer`). What the engine's table cannot carry is laid
- *  as the record holds it. */
-function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: DiplomacyProbe): void {
+/** THE TURN'S MISSIONS of the record's human majors as the two majors'
+ *  actions on the engine's table: the sender's offer of its MISSION
+ *  (`putOffer`), then the receiver's answer — its acceptance (`answerOffer`)
+ *  where the record's receiver accepted, none where it refused (the offer
+ *  lapses). The receiver's own AI answers beside every proposal of the record
+ *  (`DiplomacyProbe.answer`); an AI major's proposals are its port's own
+ *  (`applySenderPicks`), not fed. What the engine's table cannot carry is
+ *  laid as the record holds it. */
+function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: DiplomacyProbe,
+                       inputs: MajorViewInputs, fed: (seat: number) => boolean): void {
   const { state } = ctx;
   for (const e of events) {
     const a = seatOfP(ctx, e.from);
@@ -1116,7 +1129,8 @@ function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: Diploma
       continue;
     }
     const want = e.kind === 'embassy' ? MISSION_EMBASSY : MISSION_DELEGATION;
-    probe.answer(state, b, a, want, e.accepted);
+    probe.answer(state, b, a, want, e.accepted, inputs);
+    if (!fed(a)) continue;
     const why = missionOf(state, a) !== want ? `the sender's mission is the other kind`
       : !missionPayable(state, a, b) ? `not payable: held ${delegationWith(state, a, b)} treasury ${Math.round(sender.treasury ?? 0)}` : undefined;
     const offered = !why && putOffer(state, sender, [b, [[DEAL_MISSION, 0, 0]], []]);
@@ -1128,6 +1142,84 @@ function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: Diploma
     const ok = offered && answerOffer(state, receiver, a) && delegationWith(state, a, b) === want;
     if (!ok) setDelegationWith(state, a, b, want);
     count(ctx, 'diplo:missionAnswer', ok ? 'applied' : 'fallback', e.to, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
+  }
+}
+
+/** THE AI MAJORS' PANTHEONS (ai/major/religion.ts `pantheonRecord`): at its
+ *  AI turn an AI major that may found one founds the pantheon its scores
+ *  pick, through the engine's verb (`foundPantheon`) */
+function portPantheons(ctx: Ctx, rec: TurnRecord): void {
+  const { state } = ctx;
+  const rp = ctx.religionPort;
+  const view = majorView(state, rp.inputs);
+  for (const seat of rp.seats) {
+    // m_mustFoundPantheon: raised at an AI turn the seat may found one, acted
+    // on at its next
+    const raised = rp.mustFound.has(seat);
+    if (!view.pantheonOpen(seat)) {
+      rp.mustFound.delete(seat);
+      continue;
+    }
+    rp.mustFound.add(seat);
+    if (!raised) continue;
+    const pick = pantheonRecord(view, seat, rp.probe.scoresFor(state, seat));
+    if (pick.pantheon === undefined || pick.pantheon === null) continue;
+    const res = foundPantheon(state, seat, pick.pantheon);
+    count(ctx, 'religionAi:pantheon', res.ok ? 'applied' : 'refused', ctx.playerOfSeat.get(seat), res.ok ? undefined : res.reason);
+    if (!res.ok) continue;
+    rp.pantheonTurn.set(seat, state.turn - 1);
+    matchNewUnits(ctx, rec);
+  }
+}
+
+/** THE AI MAJORS' OWN MISSIONS (`DiploSender`): each pick's offer goes on
+ *  the engine's table as its sender's action; the receiver answers as the
+ *  record's did where the record holds the same proposal, else by its own
+ *  AI (`answerAction`); the sender records the answer. */
+function applySenderPicks(ctx: Ctx, picks: readonly (PickedAction & { owner: number })[], record: readonly MissionEvent[],
+                          sender: DiploSender, probe: DiplomacyProbe, inputs: MajorViewInputs): void {
+  const { state } = ctx;
+  const view = majorView(state, inputs);
+  for (const p of picks) {
+    const from = seatOf(state, p.owner) as Seat | undefined;
+    const to = seatOf(state, p.target) as Seat | undefined;
+    if (!from || !to) continue;
+    const kind = p.action === 'DIPLOACTION_RESIDENT_EMBASSY' ? 'embassy' : 'delegation';
+    const pf = ctx.playerOfSeat.get(p.owner);
+    const pt = ctx.playerOfSeat.get(p.target);
+    const rec = record.find((r) => r.from === pf && r.to === pt && r.kind === kind);
+    const accepted = rec ? rec.accepted
+      : answerAction(view, probe.stateOf(p.target, p.owner), p.target, p.owner, p.action, kind === 'embassy' ? EMBASSY_COST : DELEGATION_COST);
+    const { offer } = sender.perform(state, p.owner, p);
+    const offered = !!offer && putOffer(state, from, offer);
+    count(ctx, 'diplo:portOffer', offered ? 'applied' : 'refused', pf);
+    const landed = offered && accepted && answerOffer(state, to, p.owner);
+    count(ctx, `diplo:portAnswer:${rec ? 'record' : 'port'}`, 'applied');
+    sender.answered(p.owner, p.action, !!landed);
+  }
+}
+
+/** THE AI MAJORS' TRANSITIONS' ACTIONS (ai/major/diploState): a friendship
+ *  offered goes on the engine's table as the sender's offer, answered by an AI
+ *  receiver's own answer (`answerFriendship`) — a human seat of the record
+ *  struck none; a denouncement lands through the engine's verb. */
+function applyTransitions(ctx: Ctx, probe: DiplomacyProbe, sender: DiploSender, inputs: MajorViewInputs): void {
+  const { state } = ctx;
+  for (const x of probe.sent) {
+    if (!sender.isSender(x.owner)) continue;
+    const pf = ctx.playerOfSeat.get(x.owner);
+    if (x.kind === 'denounce') {
+      count(ctx, 'diplo:portDenounce', denounce(state, x.owner, x.other) ? 'applied' : 'refused', pf);
+      continue;
+    }
+    const from = seatOf(state, x.owner) as Seat | undefined;
+    const to = seatOf(state, x.other) as Seat | undefined;
+    if (!from || !to) continue;
+    const { offer } = sender.offerFriendship(state, x.owner, x.other);
+    const offered = !!offer && putOffer(state, from, offer);
+    count(ctx, 'diplo:portFriendship', offered ? 'applied' : 'refused', pf);
+    const accepted = sender.isSender(x.other) && probe.answerFriendship(state, x.other, x.owner, inputs);
+    if (offered && accepted) answerOffer(state, to, x.owner);
   }
 }
 
@@ -1712,6 +1804,19 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const s = seatOf(state, seatOfP(ctx, d.player));
         const id = engineId('belief', ctx.cat.beliefs[d.belief], 'BELIEF_', PANTHEONS);
         if (!s || !id) { count(ctx, 'pantheon', 'refused', d.player); break; }
+        const rp = ctx.religionPort;
+        if (rp.seats.has(s.seat)) {
+          // an AI major's pantheon is its port's (`portPantheons`), taken at
+          // its own turn: the record's is the score
+          const at = rp.pantheonTurn.get(s.seat);
+          rp.probe.actions.pantheons++;
+          if (at === state.turn - 1) rp.probe.actions.pantheonsTurnEqual++;
+          if (s.religion.pantheon === id) rp.probe.actions.pantheonsBeliefEqual++;
+          else if (rp.probe.actions.misses.length < 30) {
+            rp.probe.actions.misses.push(`t${state.turn - 1} pantheon: ours ${s.religion.pantheon ?? '-'}${at !== undefined ? ` at t${at}` : ''} record ${id}`);
+          }
+          if (s.religion.pantheon !== null) { count(ctx, 'pantheon', 'applied'); break; }
+        }
         const had = s.religion.pantheon;
         if (had === id) { count(ctx, 'pantheon', 'applied'); break; }
         // the player's pick as its action (`foundPantheon`, the record's
@@ -1764,8 +1869,27 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           }
         }
         // the founding's religion, the player's choice (the record's type)
-        const religion = r.type ? RELIGION_TYPES.indexOf(r.type) : -1;
-        const adopted = picks.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, picks, religion, holyAt) : { ok: false, reason: 'no belief to adopt' };
+        let religion = r.type ? RELIGION_TYPES.indexOf(r.type) : -1;
+        let chosen: [number, number][] = picks;
+        const rp = ctx.religionPort;
+        if (rp.seats.has(seat) && (s.religion.founded || r.founded)) {
+          // an AI major's choices are its port's (ai/major/religion.ts): the
+          // founding's religion and beliefs, each belief added
+          const view = majorView(state, rp.inputs);
+          const scores = rp.probe.scoresFor(state, seat);
+          const port: Pick<SeatActionRecord, 'religion' | 'beliefs'> = s.religion.founded ? enhanceRecord(view, seat, scores)
+            : foundingRecord(view, seat, scores, RELIGION_INITIAL_BELIEFS, (n) => randRange(state, n, 'Random Religion Choice'));
+          if (port.beliefs?.length) {
+            const named = (xs: readonly (readonly [number, number])[]) => xs.map(([c, k]) => beliefIdAt(c, k)).sort().join(' ');
+            rp.probe.choice('beliefs', named(port.beliefs), named(picks), state.turn - 1);
+            chosen = port.beliefs.map(([c, k]) => [c, k] as [number, number]);
+          }
+          if (!s.religion.founded && port.religion !== undefined && port.religion !== null) {
+            rp.probe.choice('religion', RELIGION_TYPES[port.religion], r.type ?? '-', state.turn - 1);
+            religion = port.religion;
+          }
+        }
+        const adopted = chosen.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, chosen, religion, holyAt) : { ok: false, reason: 'no belief to adopt' };
         if (adopted.ok) { count(ctx, 'religion', 'applied'); break; }
         const founding = !s.religion.founded && r.founded;
         // the founding's moment, as the engine's own founding pays it
@@ -2802,6 +2926,10 @@ export interface ReplayReport {
   governorAi?: GovernorAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
+  /** the AI majors' own diplomatic sending */
+  sender?: SenderTally;
+  /** the AI majors' own religion choices against the record's */
+  religionActions?: ReligionActions;
   settleAi?: SettleTallies;
   /** the majors' operations beside the game's operation log */
   operationsAi?: OperationsTally;
@@ -2960,11 +3088,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   diplomacy.setup(state, history.randLog, recs[0].players.map((p) => p.id).sort((x, y) => x - y));
   const strategies = new StrategyProbe(dumpPath, new Map([...majorSeats].map(([pid, seat]) => [seat, pid] as const)),
     (seat) => diplomacy.agendasOf(seat));
-  const majorAi = new MajorAiProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
-  const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
+  // what the majors' AI reads of its own: the strategies its victory manager
+  // follows, the agendas its diplomacy carries
+  const aiInputs = (turn: number): MajorViewInputs => ({ strategies: strategies.followedBefore(turn),
+    agendas: new Map([...majorSeats.values()].map((seat) => [seat, diplomacy.agendasOf(seat)] as const)) });
+  const majorAi = new MajorAiProbe(dumpPath, aiSeats, aiInputs);
+  const settleAi = new SettleProbe(dumpPath, aiSeats, aiInputs);
   const religionAi = new ReligionProbe(dumpPath, aiSeats, (seat) => strategies.knownCities(seat));
+  const sender = new DiploSender(dumpPath, aiSeats, first.playerOfSeat);
+  diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
-  const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, (turn) => strategies.followedBefore(turn));
+  const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, aiInputs);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2974,6 +3108,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
     governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
+    religionPort: { seats: new Set(aiSeats.keys()), probe: religionAi, inputs: {}, pantheonTurn: new Map(), mustFound: new Set() },
   };
   // the record's units in the importer's order
   let k = 0;
@@ -3159,7 +3294,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
-    applyMissions(ctx, missions.get(a.turn) ?? [], diplomacy);
+    {
+      // THE MAJORS' DIPLOMATIC SENDING: the record's human majors' missions
+      // fed, the AI majors' their port's own
+      const recMissions = missions.get(a.turn) ?? [];
+      const strat = aiInputs(a.turn);
+      applyMissions(ctx, recMissions, diplomacy, strat, (seat) => !sender.isSender(seat));
+      applyTransitions(ctx, diplomacy, sender, strat);
+      const picks = sender.turn(state, a.turn, strat, (o, x) => diplomacy.stateOf(o, x), (x) => diplomacy.agendasOf(x),
+        (x) => strategies.knownCities(x));
+      sender.compare(a.turn, picks, recMissions);
+      applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
+      sender.close(state, (o, x) => diplomacy.opinionOf(o, x));
+      ctx.religionPort.inputs = strat;
+      portPantheons(ctx, b);
+    }
     operationsAi.postTurn(b);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
@@ -3379,7 +3528,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (religionAi.active) report.religionAi = religionAi.tally;
   if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
+  report.religionActions = religionAi.actions;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
+  report.sender = sender.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
   if (operationsAi.active) report.operationsAi = operationsAi.tally;
   if (ctx.cityBuildLog.size) {
@@ -3497,9 +3648,10 @@ export function replayMarkdown(r: ReplayReport): string {
   }
   if (r.strategies) out.push(...strategyMarkdown(r.strategies, r.contacts));
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
-  if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi));
+  if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi, r.religionActions));
   if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
+  if (r.sender) out.push(...senderMarkdown(r.sender));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
   if (r.operationsAi) out.push(...operationsMarkdown(r.operationsAi));
   return out.join('\n') + '\n';

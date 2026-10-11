@@ -5762,22 +5762,16 @@ the pantheon, the religion founded and its beliefs are the record's
   the price the 10 / 25 above at the Gold yield's value 0x7a6690. T is
   non-zero on exactly the turns the "Threat and Trust" row's first cell
   toward the sender is (10.16 at t68 and t79, 0.00 at t117 and t191).
-- PARTLY READ: the trust term's input (+0x6480, the writer unread): the port
-  holds T at 0. The sender's side (the pick 0x64ba90, its desires, the
-  savings slot 2 and AI_TURNS_BETWEEN_PEACE_OFFERS can-do) is read above and
-  not wired: the replay takes the record's proposals.
+- The trust term, the threat it reads and the sender's side: the section
+  below.
 - THE RELIGION'S NAME: a founding takes a ReligionType (0x750fe0); the game
   names it by Religions.Name; the RequiresCustomName rows are a human's own
   naming, which the AI's choice passes over. The engines carry the type
   (`RELIGION_TYPES`, `civ_religion_type`), no name of their own.
 - Measured (the action replay, runs/h1_duelw1117 / 1121 / 1124 / 1127 /
   1128): the record's 26 mission proposals (DiplomacyManager.csv
-  SET_DELEGATION / SET_EMBASSY), 7 accepted (DiplomacySummary.csv). The
-  port's answer equals the game's on 20 / 26, in the port's state and in the
-  state on the log's opinions alike: the 19 refusals (Unfriendly) all, and 1
-  of the 7 acceptances (Neutral) — the port's Gold weight reads
-  0.2 where the logged rows give 0.4 - 0.55, and T stands at 0 (a
-  Delegation at 10 Gold needs T or a weight of 1.0 to clear Neutral's 10).
+  SET_DELEGATION / SET_EMBASSY), 7 accepted (DiplomacySummary.csv); the
+  receivers' answers in the section below.
   The founding's religion (`religionChoice`) names the record's on 5 / 5
   (Qin's favoured Taoism).
 
@@ -5948,6 +5942,211 @@ weights, the cities' yields) and to the analyzers below left unread.
   0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and
   EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (the resource value
   0x7a21e0), EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE 0x6af1e0.
+
+## C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ
+
+Port: `ai/major/diploActions.ts` (TS only); the replay's AI majors send their
+own missions (`cpu/harness/diploSender.ts`), scored against the record's
+proposals and the verbose recordings' logged desires, costs and threats.
+
+- THE THREAT (+0x6428, its data +0x6480 per player; the writer 0x647f10, each
+  diplomatic AI turn): zeroed, then per met player p the sum of (a) its
+  knowledge base entry's +4 (0x5eb7c0, m_playerKnowledge 8 bytes a player,
+  written by 0x5f0020: the most of p's team's progress num / den over the
+  game's victories, vfunc +0x58) above 0.4 (@d5fec8), x 100; (b) 0.05
+  (@d55ff0) x p's military strength (0x4bd0d0) above the owner's where that
+  lead passes 100; (c) 0.2 (@d5aff0) x the owner's +0x12a0 +0x698[p] above
+  the owner's strength where the lead passes 100. The log's "Threat and
+  Trust" row prints it first (0x652bb0: ", %3.2f:%d:%3.2f" = +0x6480[p],
+  the rank 0x650550, +0x6560[p]).
+- THE RANK (0x650550): -1 below 0, else 1 + the players threatened more.
+- THE THREAT TERM T (0x671b80; out, the other, the owner's AI, the action,
+  the mode, the sign flag): the owner's preference of the action (+0x6240),
+  else p's in its eyes (+0x62b0, 0x6504a0) — favoured runs only with the
+  flag, disfavoured only without, neither always; then 0 where the threat is
+  0, else n the rank, L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5) /
+  +0x6420 by the mode (ceilf, 0xcef33c; +0x6420 the majors met counted by
+  0x647f10, the owner among them), 0 where n > L, else 10 / 20 / 40 x (L - n
+  + 1) / L; negated without the flag. On the missions' paired desire and
+  cost rows T is the weight (n = 1, L = 1 in a duel): runs/h1_duelv1127 Qin
+  toward Rome T = 10 on 185 of 185 rows, the threat 32 - 52; Rome toward Qin
+  T = 10 exactly while its threat reads 10.16 (t63 - t96), 0 after.
+- THE FOCUS (+0x6728, data +0x6780; 0x647bb0 at the AI turn's close): per
+  met major p not the owner: a declared friend counts only within the
+  recency 0x2a81f0 against GlobalParameters +0x268 through the speed; one at
+  war, or turned away (0x3da8e0), is passed over; else p's AI's value of the
+  owner (p's +0x1280 vt+0x18) above the best so far makes p the focus; none
+  where nothing passes. The desires' +20 (+10 Open Borders, -10 Demand
+  Tribute) at the focus agrees with "the other's opinion of the owner at the
+  previous turn above 0" on 172 / 185 (Qin) and 26 / 28 (Rome) rows of
+  h1_duelv1127, 26 / 27 and 24 / 26 of 1128, 82 / 86 of 1117, 48 / 49 of 1124
+  (1121's Qin carries Gossip, below).
+- THE LAST ACTION'S TURN (+0x1160, data +0x11b8; the writer 0x3e6d20, the
+  reader 0x3d9450): the game turn, set by the performs of the Delegation
+  (0x674960), the Embassy (0x674a10) and the deal-carrying actions (0x674b60,
+  0x675100, 0x675410), and 0x681b60. The missions' can-do asks it +
+  AI_TURNS_BETWEEN_PEACE_OFFERS (3) below the turn.
+- THE SAVINGS (0x687bf0, AI::Economic +0x540 / +0x598, data +0x5b8): the
+  treasury (+0x13a0 +0xf8) less the last balance (+0x1b8) shared per slot as
+  the change x fx(weight / total weight +0x458) (the DefaultSavings list:
+  SLUSH_FUND 3, UNITS 4, PLOTS 1, GREAT_PEOPLE 1 in SavingTypes order), a
+  slot below 0 cleared; slot 2 above 150 (0x9600) gives its excess to slot 0;
+  with no Great Person class left slot 3 joins slot 0. The can-afford
+  (0x6874d0): savings[slot] >= amount x (1 - frac) and savings[0] +
+  savings[slot] >= amount. The spend (0x68acd0): the amount over the slot
+  taken from slot 0, the slot to max(0, slot - amount), the balance less the
+  amount. The missions' can-do asks slot 2 at frac 0.5; their perform spends
+  slot 1 (0x674960: r8d = 1); a refusal (0x6543a0) spends -price on slot 2.
+- PREFERENCES: the DiplomaticActions AiLists of the leader's traits, its
+  agendas' traits and its strategies (Gossip favours the Delegation, the
+  Embassy and Open Borders). A favoured action's state Worth stands at 0 or
+  more without the gold and adds +0x6320[p][a] (h1_duelv1121 Qin: +40 a step
+  over the turns, the writer unread).
+- THE YIELD WEIGHTS read the agendas' Yields lists too (AgendaTraits ->
+  AiLists AgendaType): h1_duelv1127 Qin's Gold weight 0.6 at t62 = the
+  major's DefaultYieldBias 0.2 + CLASSICAL_CHANGES 0.2 + MoneyGrubber's 0.2,
+  solved from its mission rows; Rome's 0.4 with no gold agenda.
+- THE STATE TURN'S ALLOWED ROWS weigh s(a) = the desire where CanDoAction
+  lets the action be taken, else 0 (`ai/major/diploState.ts`): runs/
+  h1_duelv1127 t100 - t105 Rome toward Qin at opinion 5 holds Demand Tribute
+  10 and Open Borders 21 (logged), Open Borders shut (Rome without Early
+  Empire): Neutral -> Friendly weighs 0, Neutral -> Unfriendly 10 — the
+  game's move at t105. The machine on the log's own opinions holds 1,037 of
+  1,365 state lines of the five duels (811 with the allowed rows untaken),
+  361 / 377 on h1_duelw1127; on the port's opinions 812 (645).
+- THE RECEIVER'S ANSWERS (`answerAction`, the record's 26 proposals): 17 / 26
+  in the port's state, 21 / 26 in the state on the log's opinions (19 / 19
+  refusals there); the acceptances 3 / 7 in the port's state (1 / 7 before
+  the weights read the strategies and agendas). The misses: the Delegations
+  of h1_duelw1127 t79 and 1128 t97 need T, whose threat stands on (a); the
+  states the port's opinions put in Neutral where the game's were
+  Unfriendly (1127 t117 - t181) or the reverse (1121 t127, 1124 t106).
+- PARTLY READ: the threat's (a) — which victories and how their progress
+  reads (vfunc +0x58) — and (c) (+0x12a0 +0x698); the other actions are the
+  next section's.
+
+## C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ
+
+Port: `ai/major/diploActions.ts` (the desires, the costs, the trust),
+`ai/major/diploState.ts` (the triggers, the checks, the transitions' actions);
+the replay lands what the AI majors' transitions send
+(`cpu/harness/replay.ts` applyTransitions) and scores every logged action
+row the port reads (`cpu/harness/diploSender.ts`).
+
+- THE FUNCTORS' MODES (the calls to T 0x671b80 and U 0x671ef0, mode and
+  sign flag): the missions' desire T(0, +), their cost (0x66b590) Cost -
+  T(0, +); Open Borders' desire (0x66dda0) T(1, -), its cost (0x66bb50)
+  Cost - T(1, -) - U(0, +); Demand Tribute's cost (0x66b220) Cost - T(1, +).
+- THE TRUST (+0x6560, the object +0x6508; 0x2e04e0 adds to it): +2 toward
+  the other party of each deal the owner strikes (the game signal +0x5a0's
+  handler 0x6535f0, subscribed by 0x651490); -10 on the signal +0x5d0
+  (0x653630, its event unread). runs/h1_duelv1127: the deal Qin proposed and
+  Rome accepted at t99 — Qin's trust of Rome 2.00 in its t99 row, Rome's of
+  Qin at t100; the Delegation Rome accepted at t79 adds none (a mission is no
+  deal). Qin's own rows of t99 weigh no trust: the deal follows its desires.
+  1128: the deal of t108, 2.00 from t108 / t109.
+- THE TRUST TERM U (0x671ef0; the mode, the sign flag): v the trust; 0 where
+  the flag matches v > 0 and the action is disfavoured, or differs and it is
+  favoured; else v x 0.02 (24.8: 5) x 10 / 20 / 40, held within the weight,
+  negated without the flag. The trust 2.00 gives 0.78 in mode 1 (the log's
+  0.8).
+- THE THREAT'S TURN (0x647f10) also counts +0x6420: zeroed, then +1 for each
+  alive major (the game's list +0xb50) met or the owner itself; and sets the
+  near-victory flags +0x64f0[p] (zeroed each turn): where the alliance level
+  0x3d7e20 toward p is at most 2 and no team has won (0x357ff0), any enabled
+  victory whose CriticalPercentage (+0x1c) is below 100 and p's team's
+  progress (GetVictoryProgressForTeam 0x357e60: the two outputs a, b) meets
+  b x pct <= a x 100. Which progress the duels' victories report is unread:
+  the flags stand from the meeting to t96 (1127), t134 (1121), t168 (1117),
+  t181 (1128), t196 (1124), for both majors at once.
+- DECLARE FRIENDSHIP: the desire (0x66c160) 0 where p is near a victory
+  (0x652770); else Worth + T(1, -) + U(1, +) + 20 at the focus + 20 per
+  player of the game's list +0xfa0 the owner is at war with. The cost
+  (0x66ae10) 9999 near a victory; else Cost - T(1, -) - U(1, +) - 20 at the
+  focus + 30 where the military AI holds a war operation ready against p
+  (0x723db0) - 5 per war. runs/h1_duelv1128 Qin toward Rome t182 - t195:
+  35.8 / -5.8, the +30 on the turns before its Surprise War of t196; t197 at
+  war 20.8 / 24.2 (no focus at war, the war's +20 / -5). On the logs' own
+  inputs (the state, the threat cells, the focus as the other's opinion at
+  t-1 above 0, the flag from the cost 9999; `.claude/scratchpad`
+  dofcheck.py) the desire holds 847 / 905 open rows, the misses the focus
+  stand-in.
+- THE ALLIANCE: the desire (0x66d810) 0 near a victory; else Worth (no row:
+  0) + U(1, +) + 5 x (+0x6420 - min(p's rank, the owner's) + 1); the cost
+  (0x66b990) Cost - U(1, +) - the same. 862 / 905 open rows on the logs'
+  inputs; 1127 Rome toward Qin 10.8 = 0 + 0.8 + 10.
+- THE SURPRISE WAR (registered 0x669310, each functor bound to the war type):
+  the desire (0x66e950) -1 for a full civ at war with two or more majors
+  (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760:
+  0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is
+  named; the parts unread), max(X, 5) where p's rank is 1 or within ceil(+0x6420
+  x 0.25). 1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while
+  X is -9999, 798 at t94. The can-do (0x673800): CanDeclareWarOn(0x4396d725)
+  and the military AI's war operation against p ready (0x723db0(p, 1, 2, 5):
+  the operations +0x318 of type 5 against +0x2a0 past their state). The
+  perform (0x675ae0) sends the declaration 0x4396d725. The record's six
+  wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,
+  1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not
+  run.
+- DENOUNCE AND THE PROMISES: the desire 0x66d800 returns 0 — never picked;
+  the denouncement comes from the state machine.
+- THE TRANSITIONS' CHECKS (0x67ff10): CanDeclareFriendship (0x67c740)
+  CanDoAction, the not-ready flag clear, toward a full civ the last action +
+  AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS (5) at or below the turn, the
+  friendship's desire at 0 or more. CanDenounce (0x67c860) an AI owner, the
+  denouncement not disfavoured, CanDoAction, CanDeclareWarOn(0x4396d725).
+  CanGoToWar (0x67c920) fewer than three wars, the military AI's war
+  operation against p (0x723cf0), the Formal War not disfavoured, 0x64a560
+  at 0 or more, CanDeclareWarOn(0x73b8c966). CanOfferAlliance (0x67ca30) the
+  friendship's spacing, then an alliance type CanDoAction lets be offered
+  and, for an AI p, its evaluator's cost of it weighed through 0.5 against
+  the owner's economic AI (unread).
+- THE TRANSITIONS' ACTIONS (0x67b410 runs a row's action for an AI owner; the
+  state moves only where it returns true): OnDeclareFriendship (0x681b60)
+  CanDoAction and no session pending, sends the friendship, stamps the last
+  action's turn, returns false — Declared Friend comes with the friendship's
+  trigger. OnDenouncePlayer (0x681c10) sends the denouncement, the military
+  AI's PrepareForWarWith (0x724f30), returns true. OnOfferAlliance
+  (0x681e80) picks an alliance type and performs it (0x674900), returns
+  false. GoToWar (0x67df10) false where a war operation stands, else the war
+  types toward the military AI (unread).
+- THE TRIGGERS (DiplomaticTriggeredTransitions): GO_TO_WAR War, MAKE_PEACE
+  Unfriendly, DENOUNCE Denounced, DENOUNCE_EXPIRES Unfriendly,
+  DECLARE_FRIENDSHIP Declared Friend, DECLARE_FRIENDSHIP_EXPIRES Friendly,
+  DECLARE_ALLIANCE Allied, LEAVE_ALLIANCE Friendly.
+- THE NOT-READY FLAG (+0x6390, the +0x6338 object; 0x650460): set by the
+  sender's 0x6543a0 on an answer of 0xc, cleared by the owner's own answer
+  to p's action (0x653f60); the AI's answer is 1 or 2, so between AI majors
+  it stays clear.
+- THE STATE WORTH'S +0x6320[p][a] (0x6504f0; the object +0x62c8): written
+  for Propose Trade alone — +AI_TRADE_VALUE_FOR_AID (150, 0x653b80) and
+  -150 (0x653840) on the emergencies' signals. A favoured action reads it
+  0; the stateWorth clips a favoured Worth at 0 or more and its gold value
+  at 0 or less, a disfavoured one the reverse.
+- A FAVOURED ACTION'S DOUBLING: runs/h1_duelv1121 Qin (Gossip favours the
+  missions and Open Borders) logs every favoured desire and cost twice the
+  reading — the Delegation 110 = 2 x (25 + T 10 + the focus 20), the Embassy
+  160 = 2 x (50 + 10 + 20), Open Borders 64 = 2 x (10 + 12 + 10), both
+  missions' cost -20 = 2 x (0 - 10) — on every row from t127. The doubling
+  instruction is unread (ASK); the port reads the single value.
+- Measured (the action replay, runs/h1_duelv1117 / 1121 / 1124 / 1127 /
+  1128, the port's states and inputs): the logged desires the port reads
+  equal on 1,391 of 3,749 rows (107 / 1,736 with the missions alone read) —
+  the alliance 682 / 682, the friendship 514 / 682 (the threat's (a)
+  missing where the port reads no threat), Open Borders 75 / 276 (9 / 309
+  on the mode-0 T), the missions 113 / 1,323 (the threat's (a), the
+  favoured doubling of 1121); the Surprise War's 682 rows wait on the war
+  value. The state lines 845 / 1,365 (812), on the log's own opinions
+  1,070 / 1,365 (1,037), the gain 1117's, whose allowed rows weigh the
+  desires now read. The transitions sent no friendship and no denouncement, as the
+  record's majors made none.
+- PARTLY READ: the war value 0x7b7760's parts, the military AI's war
+  operations (0x723db0 / 0x723cf0) and GoToWar's preparation, Propose
+  Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460:
+  the last action + AI_TURNS_BETWEEN_TRADES), the alliance's offer, the
+  victories' progress (the threat's (a), the near-victory flags), the
+  threat's (c), Request Assistance, Joint War, Third Party War, the Formal
+  War family (0x6690a0), the -10 trust signal's event, the doubling.
 
 ## DLL rules the engines contradict
 

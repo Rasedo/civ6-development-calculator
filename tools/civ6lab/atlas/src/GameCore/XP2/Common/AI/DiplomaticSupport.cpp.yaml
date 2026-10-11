@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x67ca30
+  kind: function
+  name: CanOfferAlliance
+  semantics: "Toward a full civ the last action + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS at or below the turn; then an alliance type (0xad4e30) CanDoAction lets be offered and, for an AI other, its evaluator's cost of it (0x66b490) weighed through 0.5 against the owner's economic AI (+0x1288) — the weighing unread."
+  status: PARTLY
+  impl: [ai/major/diploState.ts:CHECKS, ai/major/diploActions.ts:friendshipSpaced]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x67df10
+  kind: function
+  name: GoToWar
+  semantics: "False where a war operation stands against the other (0x723cf0); else the war types' list (Surprise, Formal, ...) toward the military AI's preparation — unread."
+  status: PARTLY
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x67ff10
   final: 0x450bf0
   kind: function
@@ -10,8 +27,49 @@
   impl: [ai/major/diploState.ts:CHECKS]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static initializer 0x67ff10   (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c,   Delegation @f2e58c, Declare Fri..."
   context:
     - ...r declarations 0x6742d0 (one). The action indices are globals of the static initializer 0x67ff10 (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c, Delegation @f2e58c, D...
+  review: imported
+- addr: 0x681b60
+  final: 0x452720
+  kind: function
+  name: OnDeclareFriendship
+  semantics: "CanDoAction(Declare Friendship) and no session pending (0x23c9e0): sends the friendship, stamps the last action's turn; returns false (the state stays until the friendship's trigger)."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: Friendly stays Friendly at opinion 25 and above
+  impl: [ai/major/diploState.ts:transitionAction, ai/major/diploActions.ts:performFriendship]
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - ...he Embassy (0x674a10) and the deal-carrying actions (0x674b60, 0x675100, 0x675410), and 0x681b60. The missions' can-do asks it + AI_TURNS_BETWEEN_PEACE_OFFERS (3) below the turn.
+  review: reviewed
+- addr: 0x681c10
+  kind: function
+  name: OnDenouncePlayer
+  semantics: "CanDoAction(Denounce) and no session pending: the diplomatic support modifiers, sends the denouncement (0x237e90), PrepareForWarWith(other) (0x724f30); returns true."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: no denouncement in the 29 duels
+  impl: [ai/major/diploState.ts:transitionAction]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x681e80
+  final: 0x4529c0
+  kind: function
+  name: OnOfferAlliance
+  status: PARTLY
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - ...ement, the military AI's PrepareForWarWith (0x724f30), returns true. OnOfferAlliance (0x681e80) picks an alliance type and performs it (0x674900), returns false. GoToWar (0x67df10) f...
   review: imported

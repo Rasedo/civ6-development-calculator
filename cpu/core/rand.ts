@@ -33,9 +33,9 @@ export type DrawLabel =
   | 'Selecting a random new quest' | 'Choosing random unit type for Train Unit quest'
   | 'Choosing random district type for Zone District quest' | 'Choosing random tech type for Trigger Tech Boost quest'
   | 'Choosing random civic type for Trigger Civic Boost quest' | 'Choosing random class type for Recruit Great Person Class quest'
-  | 'BT Research Choice' | 'Random Civic Choice'
+  | 'BT Research Choice' | 'Random Civic Choice' | 'Random Religion Choice'
   // the engines' draws at no labelled site of the game's
-  | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders' | 'Engine: pantheon'
+  | 'Engine: minor plan' | 'Engine: minor buy' | 'Engine: minor builders'
   | 'Engine: partisans' | 'Engine: breached dam'
   // the barbarians' turn
   | 'Barbarian camp region placement' | 'Barbarian camp location' | 'Barb Tribe Roll' | 'Barbarian Ranged unit roll'

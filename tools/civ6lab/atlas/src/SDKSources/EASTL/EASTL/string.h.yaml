@@ -36,6 +36,18 @@
   context:
     - "- The research and civic overflows (`m_xResearchOverflow`, serializer 0x4c6dc2; `m_xCulturalOverflow`, 0x38a93a): only the members are read; the records fit the produ..."
   review: imported
+- addr: 0x6419c0
+  final: 0x4271a0
+  kind: function
+  status: UNREAD
+  cases:
+    - recording: h1_duelv1127
+      value: "On every   logged row the threat stands T is the weight (n = 1): solved from the   missions' paired desire and cost rows (`.claude/scratchpad` solveT.py) —   runs/h1_duelv1127 Qin toward Rome T = 10 o"
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...L = trunc(+0x6420 x 0.25 / 0.5) or +0x6420 by the mode (+0x6420 is 0 in the constructor 0x6419c0, its writer unread), 0 where n > L, else 10 / 20 / 40 x (L - n + 1) / L; negated withou...
+  review: imported
 - addr: 0x6da870
   kind: function
   status: PARTLY

@@ -683,6 +683,7 @@
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and   +0x6420, the Gold weight inside th..."
   context:
@@ -1529,6 +1530,7 @@
   final: 0x436f60
   kind: function
   status: PARTLY
+  impl: [ai/major/diploActions.ts:DesireInputs]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
   notes:
@@ -1536,6 +1538,18 @@
   context:
     - "...40) and Embassy: Worth + T, then +20 where the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged branch..."
   review: imported
+- addr: 0x675ae0
+  kind: function
+  name: surpriseWarPerform
+  semantics: Sends the war declaration 0x4396d725 (0x2394a0) to the other.
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 196
+      value: DiplomacySummary 'At War, Surprise' by Qin
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x676510
   final: 0x449340
   kind: function
@@ -1574,20 +1588,45 @@
   final: 0x44dfc0
   kind: function
   name: CanDeclareFriendship
-  status: PARTLY
+  semantics: CanDoAction(Declare Friendship); not the not-ready flag; toward a full civ the last action + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS at or below the turn; the friendship's desire (0x66cc40 on +0xca8[p]) at 0 or more.
+  status: READ
   cases:
     - recording: h1_duelv1127
       value: "Read off the   records: Neutral -> Unfriendly adds only Demand Tribute, so Rome moves at   opinion <= 5 exactly while its Demand Tribute desire is positive   (runs/h1_duelv1127: -10 from 71 to 96 and "
     - recording: 1127
       turn: 192
       value: "Neutral -> Friendly adds Open Borders and   Request Assistance, so Qin moves at opinion >= -5 when its Open Borders   desire turns positive (1127 t192, 1124 t108, 1128 t167, 1117 t235: 0 at   234, no "
+  impl: [ai/major/diploState.ts:CHECKS, ai/major/diploActions.ts:friendshipSpaced]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...tions   and are taken only when required. Friendly -> Declared Friend at 25   (CanDeclareFriendship 0x67c740: CanDoAction, not-ready, the last   diplomatic turn + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS (5) toward..."
   context:
     - "...d are taken only when required. Friendly -> Declared Friend at 25 (CanDeclareFriendship 0x67c740: CanDoAction, not-ready, the last diplomatic turn + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS..."
-  review: imported
+  review: reviewed
+- addr: 0x67c860
+  kind: function
+  name: CanDenounce
+  semantics: An AI owner; the denouncement not disfavoured (0x64efa0 != -1); CanDoAction(Denounce); CanDeclareWarOn(0x4396d725).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: "no denouncement: the opinion never reached -25 in Unfriendly"
+  impl: [ai/major/diploState.ts:CHECKS]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x67c920
+  kind: function
+  name: CanGoToWar
+  semantics: An AI owner; fewer than three wars (0x3dfae0); the military AI's war operation against the other (0x723cf0(other, 1, 5)); the Formal War not disfavoured (@f2e5ac); 0x64a560 >= 0; CanDeclareWarOn(0x73b8c966).
+  status: PARTLY
+  impl: [ai/major/diploState.ts:CHECKS]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x69e790
   final: 0x463260
   kind: function
@@ -1994,6 +2033,24 @@
   context:
     - "...ckup\" FAILURE; Always Swap; Fail on Invalid Team; Required Tag; the strength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7..."
   review: imported
+- addr: 0x723cf0
+  kind: function
+  name: warOperationExists
+  semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0)."
+  status: PARTLY
+  impl: [ai/major/diploState.ts:CHECKS]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x723db0
+  kind: function
+  name: warOperationReady
+  semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0) past its state; the operation's states unread."
+  status: PARTLY
+  impl: [ai/major/diploActions.ts:DesireInputs, ai/major/diploActions.ts:canDo]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x724dd0
   final: 0x4d0610
   kind: function
@@ -2199,6 +2256,31 @@
     - ...end), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) (the last for a negative count) each one Amenity mor...
     - "...abe0 less the stockpile 0x4aa790 at T = H, +50.0 for a resource with a +0xd0 list — and 0x79ea80's sort order; a city-state's held / have read as its owned plots that hand the resource..."
   review: reviewed
+- addr: 0x7b7760
+  kind: function
+  name: warValue
+  semantics: "The war value: 0x7b7ab0 (855 instructions: the plots, units and cities) + 0x7b7830 unless the flag + 0x7b87b0 (PSEUDOYIELD_DIPLOMATIC_BONUS) where a casus belli is named; the parts unread."
+  status: PARTLY
+  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:worth]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
+- addr: 0x7b87b0
+  final: 0x534950
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 62
+      value: "1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while   X is -9999, 798 at t94."
+    - recording: 1109
+      turn: 200
+      value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...-9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread), max(X, 5) where p's rank is 1 or withi..."
+  review: imported
 - addr: 0x7b8a30
   final: 0x534c10
   kind: function
@@ -3516,6 +3598,18 @@
   name: floorf
   status: PARTLY
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
+  review: imported
+- addr: 0xcef33c
+  final: 0x9b0fdc
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      value: "On the missions' paired desire and   cost rows T is the weight (n = 1, L = 1 in a duel): runs/h1_duelv1127 Qin   toward Rome T = 10 on 185 of 185 rows, the threat 32 - 52;"
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...the rank, L = ceil(+0x6420 x 0.25) / ceil(+0x6420 x 0.5) / +0x6420 by the mode (ceilf, 0xcef33c; +0x6420 the majors met counted by 0x647f10, the owner among them), 0 where n > L, else...
   review: imported
 - addr: 0x4136b0
   binary: F

@@ -20,7 +20,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { applySeatUnitOrders } from '../core/phase';
-import { majorView } from '../core/majorView';
+import { majorView, type MajorViewInputs } from '../core/majorView';
 import { seatOf } from '../core/seats';
 import { spawnUnit, unitFullMoves } from '../core/units';
 import type { GameState, Seat } from '../core/types';
@@ -111,7 +111,7 @@ export class OperationsProbe {
 
   constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>, private readonly cat: Catalog,
               private readonly seatOfPlayer: ReadonlyMap<number, number>,
-              private readonly strategies: (turn: number) => ReadonlyMap<number, ReadonlySet<string>>) {
+              private readonly inputs: (turn: number) => MajorViewInputs) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = readLog(`${logs}AI_Operation.csv`, () => true);
     this.evalLog = readLog(`${logs}AI_Operation_Eval.csv`, (r) => !/^-?\d+, (CITY VALUES|MINOR CIV LEVY),/.test(r));
@@ -143,7 +143,7 @@ export class OperationsProbe {
     const copy = structuredClone(state);
     const had = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
     for (const [seat, player] of this.seats) {
-      const view = majorView(copy, { strategies: this.strategies(copy.turn) });
+      const view = majorView(copy, this.inputs(copy.turn));
       const due = view.cityBuilds(seat).filter((b) => b.unitType && b.turnsLeft <= 1);
       for (const u of next.units) {
         if (u.owner !== player || had.has(`${u.owner}:${u.id}`)) continue;
@@ -169,13 +169,13 @@ export class OperationsProbe {
       if (!seatOf(copy, seat)) continue;
       let ai = this.ais.get(seat);
       if (!ai) this.ais.set(seat, (ai = newOpsAi(seat)));
-      let view = majorView(copy, { strategies: this.strategies(turn) });
+      let view = majorView(copy, this.inputs(turn));
       const out = operationsTurn(ai, {
         turn,
         view: () => view,
         act: (rows) => {
           applySeatUnitOrders(copy, seatOf(copy, seat) as Seat, rows);
-          view = majorView(copy, { strategies: this.strategies(turn) });
+          view = majorView(copy, this.inputs(turn));
         },
       });
       const ours = out.lines.map(norm);

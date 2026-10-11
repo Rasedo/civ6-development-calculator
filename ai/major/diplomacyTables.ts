@@ -8478,3 +8478,445 @@ export const DIPLO_ACTIONS: readonly { type: string; cost: number; prereqCivic: 
   "duration": 30
  }
 ];
+export const DIPLO_PREFERENCE_LISTS: Readonly<Record<string, readonly { action: string; favored: boolean }[]>> = {
+ "AgressiveDiplomacy": [
+  {
+   "action": "DIPLOACTION_DENOUNCE",
+   "favored": true
+  }
+ ],
+ "BlackQueenDiplomacyPreference": [
+  {
+   "action": "DIPLOACTION_KEEP_PROMISE_DONT_SPY",
+   "favored": false
+  }
+ ],
+ "CitySateProtectionLoverCityStateProtectionPreference": [
+  {
+   "action": "DIPLOACTION_DECLARE_PROTECTORATE_WAR",
+   "favored": true
+  }
+ ],
+ "CityStateAllyNoWarPreference": [
+  {
+   "action": "DIPLOACTION_DECLARE_WAR_MINOR_CIV",
+   "favored": false
+  }
+ ],
+ "CurtinDiplomacy": [
+  {
+   "action": "DIPLOACTION_LIBERATE_CITY",
+   "favored": true
+  }
+ ],
+ "CyrusPreferBackstabbing": [
+  {
+   "action": "DIPLOACTION_DECLARE_SURPRISE_WAR",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_DENOUNCE",
+   "favored": false
+  }
+ ],
+ "GilgameshDiplomacy": [
+  {
+   "action": "DIPLOACTION_DECLARE_FRIENDSHIP",
+   "favored": true
+  }
+ ],
+ "GossipFavoredDiplomacy": [
+  {
+   "action": "DIPLOACTION_RESIDENT_EMBASSY",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_OPEN_BORDERS",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_DIPLOMATIC_DELEGATION",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_KEEP_PROMISE_DONT_SPY",
+   "favored": false
+  }
+ ],
+ "IronConfederacyDiplomacy": [
+  {
+   "action": "DIPLOACTION_ALLIANCE_RESEARCH",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_ALLIANCE_MILITARY",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_ALLIANCE_ECONOMIC",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_ALLIANCE_CULTURAL",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_ALLIANCE_RELIGIOUS",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_ALLIANCE_TEAMUP",
+   "favored": true
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_SURPRISE_WAR",
+   "favored": false
+  }
+ ],
+ "IronCrownDiplomacyPreference": [
+  {
+   "action": "DIPLOACTION_DECLARE_WAR_MINOR_CIV",
+   "favored": true
+  }
+ ],
+ "LowCityStatePreferenceWarDiploActions": [
+  {
+   "action": "DIPLOACTION_DECLARE_WAR_MINOR_CIV",
+   "favored": false
+  }
+ ],
+ "MauryaEmpireDiplomacy": [
+  {
+   "action": "DIPLOACTION_DECLARE_TERRITORIAL_WAR",
+   "favored": true
+  }
+ ],
+ "MinorCivDiplomacy": [
+  {
+   "action": "DIPLOACTION_DECLARE_HOLY_WAR",
+   "favored": false
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_LIBERATION_WAR",
+   "favored": false
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_RECONQUEST_WAR",
+   "favored": false
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_SURPRISE_WAR",
+   "favored": false
+  }
+ ],
+ "NukeLoverUseNukePreference": [
+  {
+   "action": "DIPLOACTION_USE_NUCLEAR_WEAPON",
+   "favored": true
+  }
+ ],
+ "PeacekeeperWarLimits": [
+  {
+   "action": "DIPLOACTION_DECLARE_SURPRISE_WAR",
+   "favored": false
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_FORMAL_WAR",
+   "favored": false
+  },
+  {
+   "action": "DIPLOACTION_DECLARE_WAR_MINOR_CIV",
+   "favored": false
+  }
+ ],
+ "ReligiousVictoryDiplomacy": [
+  {
+   "action": "DIPLOACTION_KEEP_PROMISE_DONT_CONVERT",
+   "favored": false
+  }
+ ],
+ "SagaPreference": [
+  {
+   "action": "DIPLOACTION_DECLARE_PROTECTORATE_WAR",
+   "favored": true
+  }
+ ],
+ "ShortLifeDiplomacy": [
+  {
+   "action": "DIPLOACTION_MAKE_PEACE",
+   "favored": false
+  }
+ ],
+ "TomyrisDiplomacy": [
+  {
+   "action": "DIPLOACTION_DECLARE_SURPRISE_WAR",
+   "favored": false
+  }
+ ],
+ "WilhelminaEmergencyAllianceList": [
+  {
+   "action": "DIPLOACTION_ALLIANCE_MILITARY_EMERGENCY(NOT_IN_YET)",
+   "favored": true
+  }
+ ],
+ "WithShieldDiplomacy": [
+  {
+   "action": "DIPLOACTION_MAKE_PEACE",
+   "favored": false
+  }
+ ]
+};
+export const DIPLO_PREFERENCES_BY_TRAIT: Readonly<Record<string, readonly string[]>> = {
+ "MINOR_CIV_DEFAULT_TRAIT": [
+  "MinorCivDiplomacy"
+ ],
+ "TRAIT_AGENDA_ALLY_OF_ENKIDU": [
+  "GilgameshDiplomacy"
+ ],
+ "TRAIT_AGENDA_BACKSTABBER": [
+  "CyrusPreferBackstabbing"
+ ],
+ "TRAIT_AGENDA_BACKSTAB_AVERSE": [
+  "TomyrisDiplomacy"
+ ],
+ "TRAIT_AGENDA_BLACK_QUEEN": [
+  "BlackQueenDiplomacyPreference"
+ ],
+ "TRAIT_AGENDA_DELIAN_LEAGUE": [
+  "CityStateAllyNoWarPreference"
+ ],
+ "TRAIT_AGENDA_GOSSIP": [
+  "GossipFavoredDiplomacy"
+ ],
+ "TRAIT_AGENDA_IRON_CONFEDERACY": [
+  "IronConfederacyDiplomacy"
+ ],
+ "TRAIT_AGENDA_IRON_CROWN": [
+  "IronCrownDiplomacyPreference"
+ ],
+ "TRAIT_AGENDA_MAURYA_EMPIRE": [
+  "MauryaEmpireDiplomacy"
+ ],
+ "TRAIT_AGENDA_PEACEKEEPER": [
+  "PeacekeeperWarLimits"
+ ],
+ "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR": [
+  "CitySateProtectionLoverCityStateProtectionPreference"
+ ],
+ "TRAIT_AGENDA_PREFER_NUKES": [
+  "NukeLoverUseNukePreference"
+ ],
+ "TRAIT_AGENDA_SAGA": [
+  "SagaPreference"
+ ],
+ "TRAIT_AGENDA_SHORT_LIFE_GLORY": [
+  "ShortLifeDiplomacy"
+ ],
+ "TRAIT_AGENDA_WITH_SHIELD": [
+  "WithShieldDiplomacy"
+ ],
+ "TRAIT_LEADER_AGGRESSIVE_MILITARY": [
+  "AgressiveDiplomacy"
+ ],
+ "TRAIT_LEADER_ARTHASHASTRA": [
+  "TerritorialWarriorList"
+ ],
+ "TRAIT_LEADER_BANNOCKBURN": [
+  "LiberationWarriorList"
+ ],
+ "TRAIT_LEADER_CITADEL_CIVILIZATION": [
+  "CurtinDiplomacy"
+ ],
+ "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR": [
+  "LowCityStatePreferenceWarDiploActions"
+ ],
+ "TRAIT_LEADER_RELIGION_CITY_STATES": [
+  "ProtectorateWarriorList"
+ ],
+ "TRAIT_RADIO_ORANJE": [
+  "WilhelminaEmergencyAllianceList"
+ ]
+};
+export const DIPLO_PREFERENCES_BY_STRATEGY: Readonly<Record<string, readonly string[]>> = {
+ "VICTORY_STRATEGY_RELIGIOUS_VICTORY": [
+  "ReligiousVictoryDiplomacy"
+ ]
+};
+export const DIPLO_PREFERENCE_LEADER_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "LEADER_ABRAHAM_LINCOLN": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_ALEXANDER": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_AMBIORIX": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_CHANDRAGUPTA": [
+  "TRAIT_LEADER_ARTHASHASTRA",
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_CLEOPATRA_ALT": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_CYRUS": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_GANDHI": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_GENGHIS_KHAN": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_GILGAMESH": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_GORGO": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_HARALD_ALT": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR",
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_HARDRADA": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_JADWIGA": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_JAYAVARMAN": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_JOHN_CURTIN": [
+  "TRAIT_LEADER_CITADEL_CIVILIZATION",
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_JULIUS_CAESAR": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_KRISTINA": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_LAURIER": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_LUDWIG": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_MATTHIAS_CORVINUS": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR",
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_MINOR_CIV_DEFAULT": [
+  "MINOR_CIV_DEFAULT_TRAIT"
+ ],
+ "LEADER_MONTEZUMA": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_NADER_SHAH": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_POUNDMAKER": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_QIN_ALT": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_ROBERT_THE_BRUCE": [
+  "TRAIT_LEADER_BANNOCKBURN",
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_SHAKA": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_SULEIMAN": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_SULEIMAN_ALT": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "LEADER_TAMAR": [
+  "TRAIT_LEADER_RELIGION_CITY_STATES",
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_T_ROOSEVELT": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_T_ROOSEVELT_ROUGHRIDER": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ],
+ "LEADER_WILHELMINA": [
+  "TRAIT_RADIO_ORANJE"
+ ],
+ "LEADER_WU_ZETIAN": [
+  "TRAIT_LEADER_LOW_CITY_STATE_PREFERENCE_WAR"
+ ]
+};
+export const DIPLO_PREFERENCE_AGENDA_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "AGENDA_CITY_STATE_PROTECTOR": [
+  "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR"
+ ],
+ "AGENDA_NUKE_LOVER": [
+  "TRAIT_AGENDA_PREFER_NUKES"
+ ],
+ "AGENDA_ALLY_OF_ENKIDU": [
+  "TRAIT_AGENDA_ALLY_OF_ENKIDU"
+ ],
+ "AGENDA_BACKSTAB_AVERSE": [
+  "TRAIT_AGENDA_BACKSTAB_AVERSE"
+ ],
+ "AGENDA_BLACK_QUEEN": [
+  "TRAIT_AGENDA_BLACK_QUEEN"
+ ],
+ "AGENDA_DELIAN_LEAGUE": [
+  "TRAIT_AGENDA_DELIAN_LEAGUE"
+ ],
+ "AGENDA_IRON_CROWN": [
+  "TRAIT_AGENDA_IRON_CROWN"
+ ],
+ "AGENDA_PEACEKEEPER": [
+  "TRAIT_AGENDA_PEACEKEEPER"
+ ],
+ "AGENDA_WITH_YOUR_SHIELD_OR_ON_IT": [
+  "TRAIT_AGENDA_WITH_SHIELD"
+ ],
+ "AGENDA_IRON_CONFEDERACY": [
+  "TRAIT_AGENDA_IRON_CONFEDERACY"
+ ],
+ "AGENDA_MAURYA_EMPIRE": [
+  "TRAIT_AGENDA_MAURYA_EMPIRE"
+ ],
+ "AGENDA_GOSSIP": [
+  "TRAIT_AGENDA_GOSSIP"
+ ],
+ "AGENDA_AMBIORIX_ARMY": [
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "AGENDA_SHORT_LIFE_GLORY": [
+  "TRAIT_AGENDA_SHORT_LIFE_GLORY"
+ ],
+ "AGENDA_BACKSTABBER": [
+  "TRAIT_AGENDA_BACKSTABBER"
+ ],
+ "AGENDA_SAGA": [
+  "TRAIT_AGENDA_SAGA"
+ ]
+};
+export const AI_DEFAULT_SAVINGS: readonly { saving: string; weight: number }[] = [
+ {
+  "saving": "SAVING_SLUSH_FUND",
+  "weight": 3
+ },
+ {
+  "saving": "SAVING_UNITS",
+  "weight": 4
+ },
+ {
+  "saving": "SAVING_PLOTS",
+  "weight": 1
+ },
+ {
+  "saving": "SAVING_GREAT_PEOPLE",
+  "weight": 1
+ }
+];

@@ -22,3 +22,16 @@
   context:
     - "- THE STATE TURN (0x67b6e0, the entries built by 0x67aff0, their terms by 0x67aaf0). Each DiplomaticStateTransitions row out of the state, in tab..."
   review: imported
+- addr: 0x67b410
+  kind: function
+  name: runTransitionAction
+  semantics: "A transition's action (+0x60) run for an AI owner, its result whether the state moves; no action: true."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: Friendly rows at opinion 25 stay Friendly (CanDeclareFriendship / OnDeclareFriendship)
+  impl: [ai/major/diploState.ts:transitionAction]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed

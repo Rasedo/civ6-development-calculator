@@ -13,9 +13,11 @@
  *   turn while that is negative;
  * - the victory manager's Strategy_YieldPriorities rows of the strategies
  *   followed (PercentageDelta x 0.01; the install has none);
- * - the Yields lists (0x6fde70, 0x7ba440): the leader's and the
- *   civilization's trait lists (a list kept while the player's handicap lies
- *   in its MinDifficulty..MaxDifficulty) and the followed strategies' lists,
+ * - the Yields lists (0x6fde70, 0x7ba440): the leader's, the civilization's
+ *   and its agendas' trait lists (a list kept while the player's handicap
+ *   lies in its MinDifficulty..MaxDifficulty; runs/h1_duelv1127: Qin's Gold
+ *   weight 0.6 at t62 = the major's 0.2, Classical's 0.2, Money Grubber's
+ *   0.2) and the followed strategies' lists,
  *   each row Value x 0.01 (subtracted where Favored is false; an item kept
  *   while the handicap lies in its own bounds);
  * - the sensitivity boost (0x6fafc0): for a yield whose sensitivity s (the
@@ -38,7 +40,7 @@
  * the victory manager's update), handed in by the caller; a city-state
  * follows none.
  */
-import { AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_LEADER_TRAITS, AI_LIST_ITEMS, AI_STRATEGY_LISTS, AI_STRATEGY_YIELD_PRIORITIES,
+import { AI_AGENDA_TRAITS, AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_LEADER_TRAITS, AI_LIST_ITEMS, AI_STRATEGY_LISTS, AI_STRATEGY_YIELD_PRIORITIES,
   AI_TRAIT_LISTS } from '../data/aiTables';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
@@ -56,9 +58,11 @@ export const AI_YIELDS = ['YIELD_FOOD', 'YIELD_PRODUCTION', 'YIELD_GOLD', 'YIELD
 const PRINCE = AI_DIFFICULTIES.indexOf('DIFFICULTY_PRINCE');
 
 /** What the weights take from the majors' AI: the strategies the player
- *  follows (its victory manager, ai/major/strategies.ts). */
+ *  follows (its victory manager, ai/major/strategies.ts) and its agendas
+ *  (ai/major/diplomacy.ts). */
 export interface AiWeightInputs {
   strategies?: ReadonlySet<string>;
+  agendas?: readonly string[];
 }
 
 /** the strategies the player follows: a major's as its AI names them, a
@@ -68,12 +72,14 @@ export function followedStrategies(seat: number, inputs: AiWeightInputs = {}): s
   return [...(inputs.strategies ?? [])];
 }
 
-/** the seat's leader's and civilization's traits that carry a weight list */
-function traitsOf(seat: number, s: Seat): readonly string[] {
+/** the seat's leader's, civilization's and agendas' traits that carry a
+ *  weight list */
+function traitsOf(seat: number, s: Seat, agendas: readonly string[]): readonly string[] {
   if (!isCiv(seat)) return [];
   const entry = CIV_LEADERS[s.civ];
   if (!entry) return [];
-  return [...(AI_LEADER_TRAITS[`LEADER_${entry.leader}`] ?? []), ...(AI_CIVILIZATION_TRAITS[`CIVILIZATION_${entry.civ}`] ?? [])];
+  return [...(AI_LEADER_TRAITS[`LEADER_${entry.leader}`] ?? []), ...(AI_CIVILIZATION_TRAITS[`CIVILIZATION_${entry.civ}`] ?? []),
+    ...agendas.flatMap((a) => AI_AGENDA_TRAITS[a] ?? [])];
 }
 
 /** a row's difficulty bounds hold the handicap */
@@ -84,10 +90,11 @@ function within(r: AiListRef | AiListItem, h: number): boolean {
 /** one system's sum per item over the lists the player's traits (`traits`)
  *  and strategies carry: each row fx(Value x 0.01), Favored false subtracted
  *  (0x6dd1b0) */
-function listSum(seat: number, s: Seat, strategies: readonly string[], system: string, traits: boolean): Map<string, number> {
+function listSum(seat: number, s: Seat, strategies: readonly string[], system: string, traits: boolean,
+                 agendas: readonly string[] = []): Map<string, number> {
   const h = s.handicap ?? PRINCE;
   const lists: string[] = [];
-  if (traits) for (const t of traitsOf(seat, s)) for (const r of AI_TRAIT_LISTS[t] ?? []) if (r.system === system && within(r, h)) lists.push(r.list);
+  if (traits) for (const t of traitsOf(seat, s, agendas)) for (const r of AI_TRAIT_LISTS[t] ?? []) if (r.system === system && within(r, h)) lists.push(r.list);
   for (const st of strategies) for (const r of AI_STRATEGY_LISTS[st] ?? []) if (r.system === system && within(r, h)) lists.push(r.list);
   const out = new Map<string, number>();
   for (const l of lists) {
@@ -139,9 +146,10 @@ export function yieldWeights(state: GameState, seat: number, inputs: AiWeightInp
   // the victory manager's Yields (Strategy_YieldPriorities)
   for (const r of AI_STRATEGY_YIELD_PRIORITIES) if (strategies.includes(r.strategy) && r.yield in w) w[r.yield] += fxConst(r.pct * 0.01);
   // the Yields lists
-  for (const [y, v] of listSum(seat, s, strategies, 'Yields', true)) if (y in w) w[y] += v;
+  const agendas = inputs.agendas ?? [];
+  for (const [y, v] of listSum(seat, s, strategies, 'Yields', true, agendas)) if (y in w) w[y] += v;
   // the sensitivity boost
-  const sens = listSum(seat, s, strategies, 'YieldSensitivities', true);
+  const sens = listSum(seat, s, strategies, 'YieldSensitivities', true, agendas);
   const others = state.seats.map((o) => o.seat).filter((o) => o !== seat && isCiv(o) && majorsMet(state, seat, o));
   for (const [y, sv] of sens) {
     if (!(y in w) || sv <= 0 || !others.length) continue;

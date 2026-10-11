@@ -87,6 +87,18 @@
   context:
     - "..., over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army records, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N thei..."
   review: imported
+- addr: 0x5eb7c0
+  kind: function
+  name: playerKnowledgeEntry
+  semantics: The knowledge base's 8-byte entry of a player (m_playerKnowledge +0x650, its slot through +0x2b48).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: "the entry Rome reads of Qin: 0.5"
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  review: reviewed
 - addr: 0x5ebb30
   final: 0x3f2e80
   kind: function
@@ -149,6 +161,18 @@
   context:
     - "- The record (0x5ef9a0): an entry per city the player knows (its own and those it sees): the yields truncated,..."
   review: imported
+- addr: 0x5f0020
+  kind: function
+  name: victoryProgressEntry
+  semantics: "A knowledge base entry's +4: the most of the player's team's progress (num / den, the GameVictory vfunc +0x58) over the game's victories."
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: Qin's entry 0.5 (Rome's threat 10.16) t63 - t96
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  review: reviewed
 - addr: 0x5f0110
   final: 0x3f5ca0
   kind: function

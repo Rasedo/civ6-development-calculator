@@ -1,0 +1,32 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x357e60
+  final: 0x254340
+  kind: function
+  name: GetVictoryProgressForTeam
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 96
+      value: "Which progress the duels' victories report is unread:   the flags stand from the meeting to t96 (1127), t134 (1121), t168 (1117),   t181 (1128), t196 (1124), for both majors at once."
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...ticalPercentage (+0x1c) is below 100 and p's team's progress (GetVictoryProgressForTeam 0x357e60: the two outputs a, b) meets b x pct <= a x 100. Which progress the duels' victories re..."
+  review: imported
+- addr: 0x357ff0
+  final: 0x2544d0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 96
+      value: "Which progress the duels' victories report is unread:   the flags stand from the meeting to t96 (1127), t134 (1121), t168 (1117),   t181 (1128), t196 (1124), for both majors at once."
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...ach turn): where the alliance level 0x3d7e20 toward p is at most 2 and no team has won (0x357ff0), any enabled victory whose CriticalPercentage (+0x1c) is below 100 and p's team's pr..."
+  review: imported

@@ -228,6 +228,27 @@ export function seatProximity(state: GameState, a: number, b: number): number {
 }
 
 /**
+ * THE GATES a war of `kind` (-1: `defaultWarKind`) from `declarer` on `target`
+ * must pass, read without a change: the pair met, at peace, neither friends
+ * nor allies, no peace treaty binding, the casus belli held and no ban on
+ * the kind. `declareWar` asks them first; the majors' AI reads them as the
+ * game's CanDeclareWarOn.
+ */
+export function warGate(state: GameState, declarer: number, target: number, kind = -1, agreed = false): RuleResult {
+  if (!seatOf(state, declarer) || !seatOf(state, target) || declarer === target) return no('No such civilization.');
+  if (isCiv(declarer) && isCiv(target) && !majorsMet(state, declarer, target)) return no('Not met.');
+  if (civsAtWar(state, declarer, target)) return no('Already at war.');
+  if (seatsAllied(state, declarer, target) || seatsFriends(state, declarer, target)) return no('A friend cannot be attacked.');
+  const bound = treatyTurnsWith(state, declarer, target);
+  if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
+  const k = kind < 0 ? defaultWarKind(state, declarer, target) : kind;
+  if (!warKindAllowed(state, declarer, target, k, agreed)) return no('No casus belli for that war.');
+  // CIV6 (Faces of Peace): the war kind is what the ban reads
+  if (warBanned(state, declarer, target, k !== WAR_KIND_SURPRISE)) return no('This civilization may not declare that war.');
+  return ok;
+}
+
+/**
  * `declarer` DECLARES a war of `kind` on `target` — the ONE body every path
  * that opens a war between two majors runs (the record's war column, the
  * nuclear strike's blast): the gates, then the war axis and its clock, the
@@ -242,21 +263,11 @@ export function seatProximity(state: GameState, a: number, b: number): number {
  * each other"; an ally is a friend twice over.
  */
 export function declareWar(state: GameState, declarer: number, target: number, kind = -1, agreed = false): RuleResult {
-  const actor = seatOf(state, declarer);
-  const foe = seatOf(state, target);
-  if (!actor || !foe || declarer === target) return no('No such civilization.');
-  if (isCiv(declarer) && isCiv(target) && !majorsMet(state, declarer, target)) return no('Not met.');
-  if (civsAtWar(state, declarer, target)) return no('Already at war.');
-  if (seatsAllied(state, declarer, target) || seatsFriends(state, declarer, target)) return no('A friend cannot be attacked.');
-  const bound = treatyTurnsWith(state, declarer, target);
-  if (bound > 0) return no(`The peace treaty binds for another ${bound} turns.`);
+  const gate = warGate(state, declarer, target, kind, agreed);
+  if (!gate.ok) return gate;
   const k = kind < 0 ? defaultWarKind(state, declarer, target) : kind;
-  if (!warKindAllowed(state, declarer, target, k, agreed)) return no('No casus belli for that war.');
-  // CIV6 (Faces of Peace): the war kind is what the ban reads, so every pure
-  // read above moves AHEAD of the first mutation (`WAR_BAN_ROWS`)
-  if (warBanned(state, declarer, target, k !== WAR_KIND_SURPRISE)) {
-    return no('This civilization may not declare that war.');
-  }
+  const actor = seatOf(state, declarer)!;
+  const foe = seatOf(state, target)!;
   setWar(state, declarer, target, true);
   setWarTurnsWith(state, declarer, target, 0);
   // CIV6 (Trade Route): "When war is declared, any existing Trade Routes
@@ -2470,21 +2481,32 @@ export function answerOffer(state: GameState, actor: Seat, fj: number): boolean 
  * names the target, a major the seat has met (`majorsMet`). A seat with no
  * city takes no diplomacy.
  */
+/** a denouncement `actor` may make of `target` now: a major it has met with
+ *  a city, none standing, at peace, and — CIV6 (Denouncing): "You cannot
+ *  denounce Declared Friends or Allies - you have to wait until these states
+ *  expire." */
+export function denounceOpen(state: GameState, actor: number, target: number): boolean {
+  const t = seatOf(state, target);
+  if (!seatOf(state, actor) || !isCiv(actor) || !t || !isCiv(target) || t.cities.length === 0 || !majorsMet(state, actor, target)) return false;
+  if (denounceActive(state, actor, target) || civsAtWar(state, actor, target)) return false;
+  return !seatsFriends(state, actor, target) && !seatsAllied(state, actor, target);
+}
+
+/** `actor` DENOUNCES `target` where it may (`denounceOpen`): the stamp, the
+ *  grievance it prices */
+export function denounce(state: GameState, actor: number, target: number): boolean {
+  if (!denounceOpen(state, actor, target)) return false;
+  const a = seatOf(state, actor)!;
+  const t = seatOf(state, target)!;
+  a.denounced[target] = state.turn;
+  grievanceDenounce(state, actor, target);
+  state.eventLog.push(`${a.name} denounces ${t.name}.`);
+  return true;
+}
+
 function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | undefined): void {
   if (!isCiv(actor.seat) || actor.cities.length === 0) return;
-  for (const tj of recG?.denounce ?? []) {
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
-    if (denounceActive(state, actor.seat, target.seat)) continue; // already standing
-    if (civsAtWar(state, actor.seat, target.seat)) continue;
-    // CIV6 (Denouncing): "You cannot denounce Declared Friends or Allies -
-    // you have to wait until these states expire."
-    if (seatsFriends(state, actor.seat, target.seat)) continue;
-    if (seatsAllied(state, actor.seat, target.seat)) continue;
-    actor.denounced[target.seat] = state.turn;
-    grievanceDenounce(state, actor.seat, target.seat);
-    state.eventLog.push(`${actor.name} denounces ${target.name}.`);
-  }
+  for (const tj of recG?.denounce ?? []) denounce(state, actor.seat, tj);
   for (const [kind, tj] of recG?.gift ?? []) {
     // CIV6 (Trading): "You may trade almost anything in the game, including
     // ... Great Works", and the one-sided half of that screen is the gift —

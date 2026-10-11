@@ -11,11 +11,11 @@ import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiP
 import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 import { isExplored } from './fog';
-import { CITY_STRIKE_RANGE, loyaltyPerTurn, plotPressure } from './phase';
+import { CITY_STRIKE_RANGE, denounceOpen, loyaltyPerTurn, plotPressure, warGate } from './phase';
 import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
 import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
-import { BARB_SEAT, borderTurnsFrom, campTiles, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
+import { BARB_SEAT, borderTurnsFrom, campTiles, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
 import { pathTo, reachPlots } from './tactical';
 import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { plotsSeenNow, ringPlots } from './barbarians';
@@ -48,6 +48,9 @@ import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
 import { beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unitProdCost } from './game';
+import { alliancePayable, dealItemPayable, friendshipPayable, missionOf, missionPayable } from './deals';
+import { DEAL_OPEN_BORDERS } from '../data/seats';
+import { WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
 
 /** What the view takes from the majors' AI itself: per major the strategies
  *  it follows (ai/major/strategies.ts), which its weights and its civic list
@@ -55,6 +58,9 @@ import { beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unit
  *  state is not the moment the AI reads. */
 export interface MajorViewInputs {
   strategies?: ReadonlyMap<number, ReadonlySet<string>>;
+  /** per major the agendas its diplomacy carries (ai/major/diplomacy.ts),
+   *  which its weights read */
+  agendas?: ReadonlyMap<number, readonly string[]>;
   civicsHeld?: (seat: number) => ReadonlySet<string>;
   /** the seat's era (an index into AI_ERAS), where the caller's state is not
    *  the moment the AI reads */
@@ -119,7 +125,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     }
     return isCiv(i) && isCiv(j) ? metTurnWith(state, i, j) : null;
   };
-  const weightInputs = (i: number): AiWeightInputs => ({ strategies: inputs.strategies?.get(i) ?? new Set() });
+  const weightInputs = (i: number): AiWeightInputs => ({ strategies: inputs.strategies?.get(i) ?? new Set(), agendas: inputs.agendas?.get(i) ?? [] });
   const slotsOf = (i: number): MajorSlotView[] => {
     const cards = seat(i).government.policies;
     return governmentSlots(state, i).map((k, j) => ({ slot: slotType(k), policy: cards[j] ? policyType(cards[j]!) : null }));
@@ -450,6 +456,24 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     playerEra: (i) => inputs.playerEra?.(i) ?? civEraIndex(seat(i).research.techs, seat(i).research.civics),
     techCount: (i) => seat(i).research.techs.length,
     militaryStrength: (i) => militaryStrength(state, i),
+    treasury: (i) => seatOf(state, i)?.treasury ?? 0,
+    actionOpen: (i, j, action) => {
+      if (!isCiv(i) || !isCiv(j) || civsAtWar(state, i, j)) return false;
+      if (action === 'DIPLOACTION_DIPLOMATIC_DELEGATION' || action === 'DIPLOACTION_RESIDENT_EMBASSY') {
+        return missionPayable(state, i, j) && (missionOf(state, i) === MISSION_EMBASSY) === (action === 'DIPLOACTION_RESIDENT_EMBASSY');
+      }
+      if (action === 'DIPLOACTION_OPEN_BORDERS') return dealItemPayable(state, i, j, [DEAL_OPEN_BORDERS, 0, 0]);
+      if (action === 'DIPLOACTION_DECLARE_FRIENDSHIP') return friendshipPayable(state, i, j);
+      if (action === 'DIPLOACTION_ALLIANCE') return alliancePayable(state, i, j, 0);
+      if (action === 'DIPLOACTION_DENOUNCE') return denounceOpen(state, i, j);
+      return null;
+    },
+    warOpen: (i, j, formal) => warGate(state, i, j, formal ? WAR_KIND_FORMAL : WAR_KIND_SURPRISE).ok,
+    declaredFriends: (i, j) => seatsFriends(state, i, j),
+    allied: (i, j) => seatsAllied(state, i, j),
+    denouncing: (i, j) => denounceActive(state, i, j),
+    missionOpen: (i, j) => (isCiv(i) && isCiv(j) && missionPayable(state, i, j)
+      ? (missionOf(state, i) === MISSION_EMBASSY ? 'DIPLOACTION_RESIDENT_EMBASSY' : 'DIPLOACTION_DIPLOMATIC_DELEGATION') : null),
     score: (i) => scoreLines(state, seat(i)).reduce((a, b) => a + b, 0),
     greatPeopleOfClass: (i, cls) => {
       const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;

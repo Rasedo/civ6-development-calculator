@@ -113,6 +113,18 @@
   context:
     - "...(0x4e4656, before the resources step 0x4e46c0 and the cities), after the turn's decay (0x3d7270): a city's loss stands as its owner's last processing laid it. Recorded: runs/h1_duel..."
   review: imported
+- addr: 0x3d7e20
+  kind: function
+  name: allianceLevel
+  semantics: "+0x3140[p]: (v >= 0) + (v >= ALLIANCE_LEVEL_TWO_XP) + (v >= ALLIANCE_LEVEL_THREE_XP) through the game speed."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 100
+      value: "no alliance: level 0, the near-victory flags computed"
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x3d8d20
   final: 0x2a5950
   kind: function
@@ -135,15 +147,23 @@
   review: imported
 - addr: 0x3d9450
   kind: function
-  status: UNREAD
+  name: lastActionTurn
+  semantics: Player_Diplomacy +0x11b8[player], the turn of the last action sent (0x3e6d20).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: the Embassy's attempts at 142 and 146
+  impl: [ai/major/diploActions.ts:canDo]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...+0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processing Action From AI to AI\",..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...+ slot 2 >= the cost); CanDoAction; and the last   diplomatic turn with p (diplomacy +0x11b8[p] via 0x3d9450, writer unread)   + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the   turn. The..."
   context:
     - ...= the cost); CanDoAction; and the last diplomatic turn with p (diplomacy +0x11b8[p] via 0x3d9450, writer unread) + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the...
-  review: imported
+  review: reviewed
 - addr: 0x3da560
   final: 0x2a6a50
   kind: function
@@ -157,6 +177,17 @@
   context:
     - "...er (0x783980 0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else NEUTRAL_CITY — each where..."
     - ...0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency,...
+  review: imported
+- addr: 0x3da8e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      value: "The desires' +20 (+10 Open Borders, -10 Demand   Tribute) at the focus agrees with \"the other's opinion of the owner at the   previous turn above 0\" on 172 / 185 (Qin) and 26 / 28 (Rome) rows of   h1_"
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  context:
+    - ...0x2a81f0 against GlobalParameters +0x268 through the speed; one at war, or turned away (0x3da8e0), is passed over; else p's AI's value of the owner (p's +0x1280 vt+0x18) above the best...
   review: imported
 - addr: 0x3daaf0
   final: 0x2a6be0
@@ -244,9 +275,30 @@
 - addr: 0x3dfae0
   final: 0x2aad00
   kind: function
-  status: PARTLY
+  name: warCount
+  semantics: The alive majors (the game's list +0xb50) the player's team is at war with.
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 197
+      value: "Qin at war with Rome: the friendship's +20 and the cost's -5"
+  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:warsOf]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   context:
     - "...wer Cities (cities <= threshold); Handicap at or below (player +0x908); Major Civ Wars (0x3dfae0: majors at war <= threshold); Is On Island (GrandStrategic +0x4a0); Has Agenda (+0xe20,..."
-  review: imported
+  review: reviewed
+- addr: 0x3e6d20
+  kind: function
+  name: setLastActionTurn
+  semantics: Player_Diplomacy +0x1160 (data +0x11b8)[player] = the turn; the performs of the missions and the deal-carrying actions write it.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: the missions' retries four or more turns apart
+  impl: [ai/major/diploActions.ts:performAction, ai/major/diploActions.ts:SenderMemory]
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+  review: reviewed

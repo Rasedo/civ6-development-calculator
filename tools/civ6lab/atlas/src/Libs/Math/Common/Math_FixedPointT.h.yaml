@@ -201,6 +201,20 @@
     - "...>= the row's); Good Faith / Tech / Culture City (0x7bcd60: some city's yield advantage 0x5d83c0, flag 0, >= threshold << 8); Fewer Cities (cities <= threshold); Handicap at or below (..."
     - "- The advantage (0x5d83c0, flag 0): x = the greater of the city AI's stored yield (CityBuildAI +0x1118, unread: t..."
   review: imported
+- addr: 0x647f10
+  kind: function
+  name: threatTurn
+  semantics: "The threat (+0x6428, data +0x6480) per met player: (a) the knowledge base entry +4 (best victory progress) above 0.4, x 100; (b) 0.05 x the player's military strength above the owner's where the lead passes 100; (c) 0.2 x +0x12a0 +0x698[p] above the owner's strength past 100."
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: Rome toward Qin 10.16 = (0.5 - 0.398) x 100 at t63 - t96
+  impl: [ai/major/diploActions.ts:threat, ai/major/diploActions.ts:DesireInputs]
+  readings:
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x67aaf0
   final: 0x44c9a0
   kind: function
@@ -345,6 +359,38 @@
   context:
     - "...0), reached from a city of the player (its build AI's +0x870 set), value the city value 0x79fef0 (the \"CITY VALUES\" lines; unread), enemy strength 0x5eadb0 within 3 where the player'..."
     - "...0xb58, the port takes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's c..."
+  review: imported
+- addr: 0x7b7830
+  final: 0x5340b0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 62
+      value: "1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while   X is -9999, 798 at t94."
+    - recording: 1109
+      turn: 200
+      value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...s (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread), max(X, 5) w..."
+  review: imported
+- addr: 0x7b7ab0
+  final: 0x534220
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      turn: 62
+      value: "1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while   X is -9999, 798 at t94."
+    - recording: 1109
+      turn: 200
+      value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - "...more majors (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread),..."
   review: imported
 - addr: 0x8c4540
   kind: function

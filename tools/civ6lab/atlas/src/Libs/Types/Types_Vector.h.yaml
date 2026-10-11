@@ -25,6 +25,19 @@
   context:
     - "...; the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed 0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the move 0x962030 to the p..."
   review: imported
+- addr: 0x2e04e0
+  kind: function
+  name: addTrust
+  semantics: The trust +0x6560 (object +0x6508)[player] += the amount.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 99
+      value: the trust 0.00 -> 2.00 on the deal
+  impl: [ai/major/diploActions.ts:dealStruck]
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  review: reviewed
 - addr: 0x328de0
   final: 0x232460
   kind: function
@@ -77,16 +90,28 @@
 - addr: 0x647bb0
   final: 0x42b1e0
   kind: function
-  status: PARTLY
+  name: focusTurn
+  semantics: "The focus (+0x6728, data +0x6780) at the AI turn's close: the met major not at war nor turned away whose AI values the owner highest above 0 (a declared friend within the recency); none where nothing passes."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 62
+      value: +20 at the focus on 172 / 185 rows where Rome's opinion of Qin at t-1 is above 0
+  impl:
+    - ai/major/diploActions.ts:focusTurn
+    - cpu/harness/majorDiplomacy.ts:Lane
+    - cpu/harness/majorDiplomacy.ts:closeView
+    - ai/major/diploActions.ts:SenderMemory
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...20   where the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the   +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged   branches give max(X + 20, 20) instead (AI owner and a human..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...C-97): the +0x6320 term (the desires' D of 0,   20, 40 over the records), the focus player +0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against..."
   context:
     - "...the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged branches give max(X + 20, 20) instead (AI owner an..."
     - "...+0x6320 term (the desires' D of 0, 20, 40 over the records), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81..."
-  review: imported
+  review: reviewed
 - addr: 0x69f340
   kind: function
   status: PARTLY
@@ -272,6 +297,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before the turn's triggers: one pe..."
+  review: imported
+- addr: 0x724f30
+  final: 0x4d0770
+  kind: function
+  name: PrepareForWarWith
+  status: PARTLY
+  readings:
+    - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+  context:
+    - ...nDenouncePlayer (0x681c10) sends the denouncement, the military AI's PrepareForWarWith (0x724f30), returns true. OnOfferAlliance (0x681e80) picks an alliance type and performs it (0x67...
   review: imported
 - addr: 0x727510
   final: 0x4d26e0

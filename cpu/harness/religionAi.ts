@@ -5,9 +5,10 @@
  * of that game (`<dump>.logs/AI_Religious.csv`), and its picks — the
  * pantheon, the founding's beliefs and each belief the religion adds — run
  * where `Game_Religion.csv` shows the game's, on the scores the port takes
- * and on the log's own scores of that turn. The record's choices still land
- * (the replay's `pantheon` and `religion` decisions); this reads, it does not
- * drive.
+ * and on the log's own scores of that turn. The AI majors' choices are the
+ * port's own (`act`): the pantheon when the seat may found one, the founding's
+ * religion and beliefs and each belief added where the record's player made
+ * its choice, scored against the record's (`actions`).
  *
  * The log numbers the AI's turn by the turn the pair starts from (as
  * AI_GovtPolicies.csv: `majorAi.ts`); the scores are taken after the pair,
@@ -121,6 +122,25 @@ export class ReligionProbe {
 
   /** the seat's knowledge base's cities as the analysis's subjects, in its
    *  order: the entries whose city stands */
+  /** the port's belief scores of an AI major now, on its knowledge base —
+   *  the scores `postTurn` scores against the log's */
+  scoresFor(state: GameState, seat: number): BeliefScores {
+    return beliefScores(majorView(state), seat, this.subjects(state, seat));
+  }
+
+  /** the port's choices taken against the record's: pantheons (the turn and
+   *  the belief), the religions founded and the beliefs added */
+  readonly actions = { pantheons: 0, pantheonsTurnEqual: 0, pantheonsBeliefEqual: 0, choices: 0, choicesEqual: 0,
+    misses: [] as string[] };
+
+  /** a choice the port made against the record's */
+  choice(what: string, ours: string, theirs: string, turn: number): void {
+    const a = this.actions;
+    a.choices++;
+    if (ours === theirs) a.choicesEqual++;
+    else if (a.misses.length < 30) a.misses.push(`t${turn} ${what}: ours ${ours} record ${theirs}`);
+  }
+
   private subjects(state: GameState, seat: number): AiCitySubject[] {
     const view = majorView(state);
     const at = new Map(view.mapCities().map((c) => [`${c.plot}:${c.owner}`, c] as const));
@@ -225,12 +245,16 @@ export class ReligionProbe {
   }
 }
 
+export type ReligionActions = ReligionProbe['actions'];
+
 const pickLine = (name: string, p: PickTally): string =>
   `${name}: pantheons ${p.pantheonsEqual} / ${p.pantheons}, religions founded ${p.religionsEqual} / ${p.religions}, religion beliefs ${p.beliefsEqual} / ${p.beliefs}; first miss: ${p.firstMiss ?? '-'}.`;
 
 /** the tally as the replay report's section */
-export function religionAiMarkdown(t: ReligionAiTally): string[] {
+export function religionAiMarkdown(t: ReligionAiTally, acts?: ReligionActions): string[] {
   const out = ['', '## The majors\' AI: religion (ai/major/religion.ts)', '',
+    ...(acts ? [`- The port's own choices: pantheons ${acts.pantheons}, on the record's turn ${acts.pantheonsTurnEqual}, the record's belief ${acts.pantheonsBeliefEqual}; `
+      + `religions and beliefs ${acts.choicesEqual} / ${acts.choices} as the record's.`, ...acts.misses.map((m) => `  - ${m}`)] : []),
     `- ${pickLine('On the ported scores', t.ported)}`,
     `- ${pickLine('On the game\'s logged scores', t.logged)}`,
     `- Score lines: ${t.scoreLines}; equal ${t.scoreEqual}; the log's above 0 ${t.valuedLines}, equal ${t.valuedEqual}; turns ${t.turns}, every line equal ${t.turnsEqual}; first miss: ${t.firstScoreMiss ?? '-'}.`,

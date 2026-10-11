@@ -4,8 +4,9 @@
  * stale file): the yields' and pseudo-yields' DefaultValue, the great
  * person classes' pseudo-yields, the governments' InfluencePointsThreshold,
  * and the AI lists the weights sum: System Yields and YieldSensitivities by
- * trait — a leader's traits through its InheritFrom chain, a civilization's
- * —, those and PseudoYields by strategy (Strategy_Priorities).
+ * trait — a leader's traits through its InheritFrom chain, a civilization's,
+ * an agenda's (AgendaTraits) —, those and PseudoYields by strategy
+ * (Strategy_Priorities).
  */
 import type { AiModifier } from '../core/aiModifiers';
 import type { AiListRef, AiListItem } from '../core/aiValue';
@@ -119,6 +120,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "BasilFavoredYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": 33,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "ClassicalPseudoYields": [
   {
    "item": "PSEUDOYIELD_GPP_MERCHANT",
@@ -162,6 +172,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_SCIENCE",
    "value": 30,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "CultureLoverCulturePreference": [
+  {
+   "item": "YIELD_CULTURE",
+   "value": 20,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -317,6 +336,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "ElizabethYields": [
+  {
+   "item": "YIELD_GOLD",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "EthiopiaYields": [
   {
    "item": "YIELD_FAITH",
@@ -344,6 +372,24 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "PSEUDOYIELD_UNIT_SETTLER",
    "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "FaithLoverFaithPreference": [
+  {
+   "item": "YIELD_FAITH",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "FoodLoverFoodPreference": [
+  {
+   "item": "YIELD_FOOD",
+   "value": 20,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -432,6 +478,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "IndustrialRevolutionPreference": [
+  {
+   "item": "YIELD_PRODUCTION",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "IndustrialYields": [
   {
    "item": "YIELD_FAITH",
@@ -443,6 +498,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_GOLD",
    "value": 15,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "IndustryLoverIndustryPreference": [
+  {
+   "item": "YIELD_PRODUCTION",
+   "value": 20,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -461,6 +525,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "YIELD_GOLD",
    "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LordOfMinesYields": [
+  {
+   "item": "YIELD_GOLD",
+   "value": 25,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -726,6 +799,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "MoneyGrubberGoldPreference": [
+  {
+   "item": "YIELD_GOLD",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "NavalUnitPreferences": [
   {
    "item": "PSEUDOYIELD_UNIT_NAVAL_COMBAT",
@@ -737,6 +819,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
   {
    "item": "PSEUDOYIELD_UNIT_COMBAT",
    "value": -90,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "NewRomeCulturePreference": [
+  {
+   "item": "YIELD_CULTURE",
+   "value": 20,
    "favored": true,
    "minDifficulty": null,
    "maxDifficulty": null
@@ -827,6 +918,15 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "ScienceLoverSciencePreference": [
+  {
+   "item": "YIELD_SCIENCE",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "ScienceSensitivity": [
   {
    "item": "YIELD_SCIENCE",
@@ -868,6 +968,24 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
    "maxDifficulty": null
   }
  ],
+ "TamarYields": [
+  {
+   "item": "YIELD_FAITH",
+   "value": 20,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "WilhelminaYields": [
+  {
+   "item": "YIELD_GOLD",
+   "value": 25,
+   "favored": true,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "WonderObsessedIndustrialBonus": [
   {
    "item": "PSEUDOYIELD_WONDER",
@@ -879,6 +997,118 @@ export const AI_LIST_ITEMS: Readonly<Record<string, readonly AiListItem[]>> = {
  ]
 };
 export const AI_TRAIT_LISTS: Readonly<Record<string, readonly AiListRef[]>> = {
+ "TRAIT_AGENDA_BASIL_ZEALOT": [
+  {
+   "list": "BasilFavoredYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_BILLIONAIRE": [
+  {
+   "list": "WilhelminaYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_LORD_OF_MINES": [
+  {
+   "list": "LordOfMinesYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_NARIKALA_FORTRESS": [
+  {
+   "list": "TamarYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_NEW_ROME": [
+  {
+   "list": "NewRomeCulturePreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_CULTURE": [
+  {
+   "list": "CultureLoverCulturePreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_FAITH": [
+  {
+   "list": "FaithLoverFaithPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_FOOD": [
+  {
+   "list": "FoodLoverFoodPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_INCOME": [
+  {
+   "list": "MoneyGrubberGoldPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_INDUSTRIAL_REVOLUTION": [
+  {
+   "list": "IndustrialRevolutionPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_INDUSTRY": [
+  {
+   "list": "IndustryLoverIndustryPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_PREFER_SCIENCE": [
+  {
+   "list": "ScienceLoverSciencePreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_SAINT": [
+  {
+   "list": "FaithLoverFaithPreference",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "TRAIT_AGENDA_TRADE_AGREEMENT": [
+  {
+   "list": "ElizabethYields",
+   "system": "Yields",
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
  "TRAIT_CIVILIZATION_DISTRICT_ACROPOLIS": [
   {
    "list": "GreeceYields",
@@ -1228,6 +1458,345 @@ export const AI_CIVILIZATION_TRAITS: Readonly<Record<string, readonly string[]>>
  ],
  "CIVILIZATION_MAYA": [
   "TRAIT_CIVILIZATION_MAYAB"
+ ]
+};
+export const AI_AGENDA_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "AGENDA_AIRPOWER": [
+  "TRAIT_AGENDA_PREFER_AIRPOWER"
+ ],
+ "AGENDA_ALLY_OF_ENKIDU": [
+  "TRAIT_AGENDA_ALLY_OF_ENKIDU"
+ ],
+ "AGENDA_AMBIORIX_ARMY": [
+  "TRAIT_AGENDA_AMBIORIX_ARMY",
+  "TRAIT_LEADER_AGGRESSIVE_MILITARY"
+ ],
+ "AGENDA_ANGEVIN_EMPIRE": [
+  "TRAIT_AGENDA_ANGEVIN_EMPIRE"
+ ],
+ "AGENDA_ARCHIPELAGIC_STATE": [
+  "TRAIT_AGENDA_ARCHIPELAGIC_STATE"
+ ],
+ "AGENDA_AYYUBID_DYNASTY": [
+  "TRAIT_AGENDA_AYYUBID_DYNASTY"
+ ],
+ "AGENDA_BACKSTABBER": [
+  "TRAIT_AGENDA_BACKSTABBER"
+ ],
+ "AGENDA_BACKSTAB_AVERSE": [
+  "TRAIT_AGENDA_BACKSTAB_AVERSE"
+ ],
+ "AGENDA_BARBARIAN_LOVER": [
+  "TRAIT_AGENDA_BARBARIAN_LOVER"
+ ],
+ "AGENDA_BASIL_ZEALOT": [
+  "TRAIT_AGENDA_BASIL_ZEALOT"
+ ],
+ "AGENDA_BIG_STICK_POLICY": [
+  "TRAIT_AGENDA_BIG_STICK_POLICY"
+ ],
+ "AGENDA_BILLIONAIRE": [
+  "TRAIT_AGENDA_BILLIONAIRE"
+ ],
+ "AGENDA_BLACK_QUEEN": [
+  "TRAIT_AGENDA_BLACK_QUEEN"
+ ],
+ "AGENDA_BULL_MOOSE": [
+  "TRAIT_AGENDA_BULL_MOOSE"
+ ],
+ "AGENDA_BUSHIDO": [
+  "TRAIT_AGENDA_BUSHIDO"
+ ],
+ "AGENDA_CANADIAN_EXPEDITIONARY": [
+  "TRAIT_AGENDA_CANADIAN_EXPEDITIONARY"
+ ],
+ "AGENDA_CHEOMSEONGDAE": [
+  "TRAIT_AGENDA_CHEOMSEONGDAE"
+ ],
+ "AGENDA_CITY_PLANNER": [
+  "TRAIT_AGENDA_CITY_PLANNER"
+ ],
+ "AGENDA_CITY_STATE_ALLY": [
+  "TRAIT_AGENDA_CITY_STATE_ALLY"
+ ],
+ "AGENDA_CITY_STATE_PROTECTOR": [
+  "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR"
+ ],
+ "AGENDA_CIVILIZED": [
+  "TRAIT_AGENDA_PREFER_CLEAR_BANDIT_CAMPS"
+ ],
+ "AGENDA_COUNTER_REFORMER": [
+  "TRAIT_AGENDA_COUNTER_REFORMER"
+ ],
+ "AGENDA_COURT_INTRIGUE": [
+  "TRAIT_AGENDA_COURT_INTRIGUE"
+ ],
+ "AGENDA_CULTURED": [
+  "TRAIT_AGENDA_PREFER_CULTURE"
+ ],
+ "AGENDA_DARWINIST": [
+  "TRAIT_AGENDA_ENJOYS_WAR",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_DECOLONIZATION": [
+  "TRAIT_AGENDA_DECOLONIZATION"
+ ],
+ "AGENDA_DELIAN_LEAGUE": [
+  "TRAIT_AGENDA_DELIAN_LEAGUE"
+ ],
+ "AGENDA_DEMAGOGUE": [
+  "TRAIT_AGENDA_PREFER_NOFAVOR"
+ ],
+ "AGENDA_DESTINATION_CIV": [
+  "TRAIT_AGENDA_PREFER_NOTOURISM"
+ ],
+ "AGENDA_DEVOUT": [
+  "TRAIT_AGENDA_PREFER_FAITH"
+ ],
+ "AGENDA_END_TO_SUFFERING": [
+  "TRAIT_AGENDA_END_TO_SUFFERING"
+ ],
+ "AGENDA_ENTHUSIASTIC_DISCIPLE": [
+  "TRAIT_AGENDA_ENTHUSIASTIC_DISCIPLE"
+ ],
+ "AGENDA_ENVIRONMENTALIST": [
+  "TRAIT_AGENDA_PREFER_ENVIRONMENT"
+ ],
+ "AGENDA_ETERNAL": [
+  "TRAIT_AGENDA_ETERNAL"
+ ],
+ "AGENDA_ETHIOPIAN_HIGHLANDS": [
+  "TRAIT_AGENDA_ETHIOPIAN_HIGHLANDS"
+ ],
+ "AGENDA_EXPANSIONIST": [
+  "TRAIT_AGENDA_EXPANSIONIST"
+ ],
+ "AGENDA_EXPLOITATIVE": [
+  "TRAIT_AGENDA_PREFER_EXPLOITATION"
+ ],
+ "AGENDA_EXPLORER": [
+  "TRAIT_AGENDA_EXPLORATION_OBSESSED"
+ ],
+ "AGENDA_FLAT_EARTHER": [
+  "TRAIT_AGENDA_FLAT_EARTHER"
+ ],
+ "AGENDA_FLOWER_OF_SCOTLAND": [
+  "TRAIT_AGENDA_FLOWER_OF_SCOTLAND"
+ ],
+ "AGENDA_FUN_LOVING": [
+  "TRAIT_AGENDA_PREFER_HAPPINESS"
+ ],
+ "AGENDA_GALLIC_WARS": [
+  "TRAIT_AGENDA_GALLIC_WARS"
+ ],
+ "AGENDA_GOLDEN_AGE": [
+  "TRAIT_AGENDA_SYCOPHANT"
+ ],
+ "AGENDA_GOSSIP": [
+  "TRAIT_AGENDA_GOSSIP"
+ ],
+ "AGENDA_GREAT_PERSON_ADVOCATE": [
+  "TRAIT_AGENDA_GREAT_PERSON_ADVOCATE"
+ ],
+ "AGENDA_GREAT_PERSON_OBSESSED": [
+  "TRAIT_AGENDA_GREAT_PERSON_OBSESSED"
+ ],
+ "AGENDA_GREAT_WHITE_FLEET": [
+  "TRAIT_AGENDA_GREAT_WHITE_FLEET"
+ ],
+ "AGENDA_HAMMURABI_DISTRICTS": [
+  "TRAIT_AGENDA_HAMMURABI_DISTRICTS"
+ ],
+ "AGENDA_HORN_CHEST_LOINS": [
+  "TRAIT_AGENDA_HORN_CHEST_LOINS"
+ ],
+ "AGENDA_HORSE_LORD": [
+  "TRAIT_AGENDA_HORSE_LORD"
+ ],
+ "AGENDA_IDEOLOGUE": [
+  "TRAIT_AGENDA_PREFER_SAME_GOVERNMENT"
+ ],
+ "AGENDA_INDUSTRIALIST": [
+  "TRAIT_AGENDA_PREFER_INDUSTRY"
+ ],
+ "AGENDA_INDUSTRIAL_REVOLUTION": [
+  "TRAIT_AGENDA_INDUSTRIAL_REVOLUTION"
+ ],
+ "AGENDA_INTOLERANT": [
+  "TRAIT_AGENDA_INTOLERANT"
+ ],
+ "AGENDA_IRON_CONFEDERACY": [
+  "TRAIT_AGENDA_IRON_CONFEDERACY"
+ ],
+ "AGENDA_IRON_CROWN": [
+  "TRAIT_AGENDA_IRON_CROWN"
+ ],
+ "AGENDA_JOAO_EXPLORER": [
+  "TRAIT_JOAO_EXPLORATION_AGENDA"
+ ],
+ "AGENDA_KAITIAKITANGA": [
+  "TRAIT_AGENDA_KAITIAKITANGA"
+ ],
+ "AGENDA_KUBLAI_PAX": [
+  "TRAIT_AGENDA_KUBLAI_PAX"
+ ],
+ "AGENDA_LADY_SIX_SKY": [
+  "TRAIT_AGENDA_LADY_SIX_SKY"
+ ],
+ "AGENDA_LAST_VIKING_KING": [
+  "TRAIT_AGENDA_LAST_VIKING_KING"
+ ],
+ "AGENDA_LAWGIVER": [
+  "TRAIT_AGENDA_LAWGIVER"
+ ],
+ "AGENDA_LIBERTARIAN": [
+  "TRAIT_AGENDA_PREFER_NODIPLOVP"
+ ],
+ "AGENDA_LION_OF_MALI": [
+  "TRAIT_AGENDA_LION_OF_MALI"
+ ],
+ "AGENDA_LORD_OF_MINES": [
+  "TRAIT_AGENDA_LORD_OF_MINES"
+ ],
+ "AGENDA_MAAT": [
+  "TRAIT_AGENDA_MAAT"
+ ],
+ "AGENDA_MAGNIFICENCES": [
+  "TRAIT_AGENDA_MAGNIFICENCES"
+ ],
+ "AGENDA_MAURYA_EMPIRE": [
+  "TRAIT_AGENDA_MAURYA_EMPIRE"
+ ],
+ "AGENDA_MONEY_GRUBBER": [
+  "TRAIT_AGENDA_PREFER_INCOME"
+ ],
+ "AGENDA_NARIKALA_FORTRESS": [
+  "TRAIT_AGENDA_NARIKALA_FORTRESS"
+ ],
+ "AGENDA_NATURALIST": [
+  "TRAIT_AGENDA_NATURALIST"
+ ],
+ "AGENDA_NEW_ROME": [
+  "TRAIT_AGENDA_NEW_ROME"
+ ],
+ "AGENDA_NUKE_LOVER": [
+  "TRAIT_AGENDA_PREFER_NUKES"
+ ],
+ "AGENDA_OPTIMUS_PRINCEPS": [
+  "TRAIT_AGENDA_OPTIMUS_PRINCEPS"
+ ],
+ "AGENDA_PARANOID": [
+  "TRAIT_AGENDA_PARANOID"
+ ],
+ "AGENDA_PATRON_OF_ARTS": [
+  "TRAIT_AGENDA_PATRON_OF_ARTS"
+ ],
+ "AGENDA_PEACEKEEPER": [
+  "TRAIT_AGENDA_PEACEKEEPER"
+ ],
+ "AGENDA_PERPETUALLY_ON_GUARD": [
+  "TRAIT_AGENDA_PERPETUALLY_ON_GUARD"
+ ],
+ "AGENDA_PILLAGER": [
+  "TRAIT_AGENDA_PREFER_PILLAGE"
+ ],
+ "AGENDA_POPULOUS": [
+  "TRAIT_AGENDA_PREFER_POPULATION"
+ ],
+ "AGENDA_PREFER_FOOD": [
+  "TRAIT_AGENDA_PREFER_FOOD"
+ ],
+ "AGENDA_PREFER_LANDPOWER": [
+  "TRAIT_AGENDA_PREFER_LANDPOWER"
+ ],
+ "AGENDA_PRESERVER_OF_THE_UNION": [
+  "TRAIT_AGENDA_LINCOLN"
+ ],
+ "AGENDA_QUEEN_OF_NILE": [
+  "TRAIT_AGENDA_QUEEN_OF_NILE"
+ ],
+ "AGENDA_RAVEN_BANNER": [
+  "TRAIT_AGENDA_RAVEN_BANNER"
+ ],
+ "AGENDA_SAGA": [
+  "TRAIT_AGENDA_SAGA"
+ ],
+ "AGENDA_SAINT": [
+  "TRAIT_AGENDA_SAINT"
+ ],
+ "AGENDA_SAKOKU": [
+  "TRAIT_AGENDA_SAKOKU"
+ ],
+ "AGENDA_SAPA_INCA": [
+  "TRAIT_AGENDA_SAPA_INCA"
+ ],
+ "AGENDA_SEJONG": [
+  "TRAIT_AGENDA_SEJONG"
+ ],
+ "AGENDA_SHORT_LIFE_GLORY": [
+  "TRAIT_AGENDA_SHORT_LIFE_GLORY",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_SICILIAN_WARS": [
+  "TRAIT_AGENDA_SICILIAN_WARS"
+ ],
+ "AGENDA_SIHAI": [
+  "TRAIT_AGENDA_SIHAI"
+ ],
+ "AGENDA_SIMON_BOLIVAR": [
+  "TRAIT_AGENDA_SIMON_BOLIVAR"
+ ],
+ "AGENDA_SPIRIT_OF_TUCAPEL": [
+  "TRAIT_AGENDA_SPIRIT_OF_TUCAPEL"
+ ],
+ "AGENDA_STANDING_ARMY": [
+  "TRAIT_AGENDA_PREFER_STANDING_ARMY"
+ ],
+ "AGENDA_SULTAN": [
+  "TRAIT_AGENDA_SULTAN"
+ ],
+ "AGENDA_SUN_NEVER_SETS": [
+  "TRAIT_AGENDA_SUN_NEVER_SETS"
+ ],
+ "AGENDA_SYCOPHANT": [
+  "TRAIT_AGENDA_SYCOPHANT"
+ ],
+ "AGENDA_SYMPATHIZER": [
+  "TRAIT_AGENDA_SYMPATHIZER"
+ ],
+ "AGENDA_TECHNOPHILE": [
+  "TRAIT_AGENDA_PREFER_SCIENCE"
+ ],
+ "AGENDA_TLATOANI": [
+  "TRAIT_AGENDA_TLATOANI"
+ ],
+ "AGENDA_TRADE_AGREEMENT": [
+  "TRAIT_AGENDA_TRADE_AGREEMENT"
+ ],
+ "AGENDA_TRIEU_DEFENDER": [
+  "TRAIT_AGENDA_TRIEU_DEFENDER"
+ ],
+ "AGENDA_TURTLER": [
+  "TRAIT_AGENDA_TURTLER"
+ ],
+ "AGENDA_WESTERNIZER": [
+  "TRAIT_AGENDA_WESTERNIZER"
+ ],
+ "AGENDA_WITH_YOUR_SHIELD_OR_ON_IT": [
+  "TRAIT_AGENDA_WITH_SHIELD",
+  "TRAIT_AGENDA_IGNORE_WARMONGERING"
+ ],
+ "AGENDA_WONDER_ADVOCATE": [
+  "TRAIT_AGENDA_WONDER_ADVOCATE"
+ ],
+ "AGENDA_WONDER_OBSESSED": [
+  "TRAIT_AGENDA_WONDER_OBSESSED"
+ ],
+ "AGENDA_YINDING": [
+  "TRAIT_AGENDA_YINDING"
+ ],
+ "AGENDA_ZEALOT": [
+  "TRAIT_AGENDA_ZEALOT"
  ]
 };
 export const AI_STRATEGY_LISTS: Readonly<Record<string, readonly AiListRef[]>> = {
