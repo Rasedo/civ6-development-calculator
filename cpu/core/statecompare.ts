@@ -403,7 +403,6 @@ const GAME: Record<string, Extractor> = {
   victoryType: (s) => [s.victoryType ?? 0],
   victoryRow: (s) => [s.victoryRow ?? -1],
   congressSessions: (s) => [s.congressSessions ?? 0],
-  congressSlate: (s) => [s.congressSlate ?? [-1, -1]],
   // The running SCORED COMPETITION, flat: [kind, turnsLeft, score per civ
   // seat in ascending order, then membership]. -1 kind = none.
   competition: (s) => {

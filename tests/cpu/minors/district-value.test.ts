@@ -87,11 +87,11 @@ describe('the project value (0x7b28c0)', () => {
 describe('the savings (0x687bf0) and the unit purchases (0x68be60)', () => {
   it('shares the treasury\'s change by the DefaultSavings weights and holds PLOTS at 150', () => {
     const e = newEconomicMemory();
-    savingsTurn(e, 90 * FX);
+    savingsTurn(e, 90 * FX, true);
     // 3 / 4 / 1 / 1 of 9, each fraction truncated to 1/256
     expect(e.savings.map((x) => x / FX)).toEqual([(90 * 85) / 256, (90 * 113) / 256, (90 * 28) / 256, (90 * 28) / 256]
       .map((x) => Math.floor(x * 256) / 256));
-    savingsTurn(e, (90 + 2000) * FX);
+    savingsTurn(e, (90 + 2000) * FX, true);
     expect(e.savings[SLOT_PLOTS]).toBe(150 * FX);
   });
 

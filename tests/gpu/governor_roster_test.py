@@ -191,7 +191,7 @@ def poke_neutralize(rules, path):
     gi = int(sim._governor_at(row)[0, cols[0]])
     assert gi >= 0
 
-    turns = sim._gov_neutralize
+    turns = 6  # a spy's Neutralize Governor
     sim.neutralize_governor(0, row, gi, turns)
     assert int(sim._governor_at(row)[0, cols[0]]) < 0, "a neutralized governor holds no city"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and starts his next posting cold"

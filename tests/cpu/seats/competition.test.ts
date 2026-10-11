@@ -21,12 +21,11 @@ import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { emptySeat, setTileOwner } from '../../../cpu/core/seats';
 import { resolveCompetition, startCompetition, competitionOf, scoreProject, raiseAidRequest, scoreGoldGift } from '../../../cpu/core/competition';
-import { targetSpaceSize } from '../../../cpu/core/congress';
 import { PROJECTS } from '../../../cpu/data/projects';
 import { emitCarbon } from '../../../cpu/core/climate';
 import {
   COMPETITIONS, COMPETITION_CLIMATE, COMPETITION_TURNS, COMPETITION_WORLDS_FAIR,
-  COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION, COMPETITION_AID_REQUEST, CONGRESS_COMPETITION,
+  COMPETITION_WORLD_GAMES, COMPETITION_SPACE_STATION, COMPETITION_AID_REQUEST,
 } from '../../../cpu/data/seats';
 import { tilesWithin } from '../../../world/hex';
 import type { City, GameState, Seat } from '../../../cpu/core/types';
@@ -333,9 +332,6 @@ describe('the Aid Request', () => {
     expect(AID.goldPoints).toBe(2);
     expect(AID.silverFavor).toBe(100);
     expect(AID.bronzeFavor).toBe(50);
-    expect(COMPETITIONS.indexOf(AID)).toBe(COMPETITIONS.length - 1); // last: the ballot's rows come first
-    const state = table();
-    expect(targetSpaceSize(state, CONGRESS_COMPETITION)).toBe(COMPETITIONS.length - 1);
     expect(PROJECTS.SEND_AID!.competitionOnly).toBe('AID_REQUEST');
   });
 

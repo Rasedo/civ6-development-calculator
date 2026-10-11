@@ -88,7 +88,7 @@ describe('the pick, the perform and the answer', () => {
     const mem = newDiploActionMemory();
     const gaps = newDiploActionGaps();
     const v = view();
-    savingsTurn(senderOf(mem, 1), 90 * 256);
+    savingsTurn(senderOf(mem, 1), 90 * 256, true);
     const ins = new Map([[0, inputs('DIPLO_STATE_NEUTRAL')]]);
     const picks = pickActions(v, mem, 1, ins, [], gaps, () => undefined);
     expect(picks.map((p) => p.action)).toEqual([ACTION_DELEGATION]);

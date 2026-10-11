@@ -2500,6 +2500,19 @@
     - "...: the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civilization only, 0x469db0)..."
     - "...3fb70): the first strictly highest pantheon entry not taken. A belief for the religion (0x751430): entries not taken of class 1..4 whose class the religion has room for (0x3409a0 ->..."
   review: imported
+- addr: 0x751590
+  kind: function
+  name: faithPatronage
+  semantics: "The religion AI's turn (0x74fbf0, after 0x74de60), not for a human: among the persons the player may patronize with Faith (0x2f26c0) the cheapest whose price its Faith (+0x1340 +0x100) exceeds, with a plot it can act on (0x561070); the PATRONIZE operation with Faith."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 30
+      value: Faith patronage of Zoroaster (the record's purse)
+  impl: [ai/major/greatPeople.ts:faithPatronage, cpu/harness/greatPeopleAi.ts:GreatPeopleProbe]
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  review: reviewed
 - addr: 0x751830
   final: 0x4eefd0
   kind: function
@@ -4126,6 +4139,15 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...the slots' values (`m_values`, 24.8); per promotion in the GovernorPromotions order (0xad5830) 0x38 bytes, +0x30 its score. A governor's promotions are its GovernorPromotionSets row..."
+  review: imported
+- addr: 0xad58b0
+  final: 0x7d0d40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...the savings turn 0x687bf0 at its close): K = 0.5 (@d20458, fixed). Over the classes (0xad58b0) and each class's standing person (0x2f64a0): a person the player may claim (0x2f28a0)..."
   review: imported
 - addr: 0xad5a50
   final: 0x7d0ee0

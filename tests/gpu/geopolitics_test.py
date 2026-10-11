@@ -1187,24 +1187,24 @@ def main() -> None:
     # the suzerain tests: >= suzerainEnvoys AND strictly more than every civ seat
     suz_min = int(s4.rules.citystate.get("suzerainEnvoys", 3))
     s4.seat_citystate_envoys[:, 0].zero_(); s4.seat_citystate_envoys[:, 1:].zero_()
-    assert int(s4._suzerain_count(0)[0]) == 0, "no envoys -> no suzerainties"
+    assert int(s4._suzerains_held(0)[0]) == 0, "no envoys -> no suzerainties"
     s4.seat_citystate_envoys[:, 0, 0] = suz_min - 1
-    assert int(s4._suzerain_count(0)[0]) == 0, "below the envoy minimum is not suzerainty"
+    assert int(s4._suzerains_held(0)[0]) == 0, "below the envoy minimum is not suzerainty"
     s4.seat_citystate_envoys[:, 0, 0] = suz_min
-    assert int(s4._suzerain_count(0)[0]) == 1, "at the minimum with no civ contest -> suzerain"
+    assert int(s4._suzerains_held(0)[0]) == 1, "at the minimum with no civ contest -> suzerain"
     if s4.n_majors > 1:
         s4.seat_citystate_envoys[:, 1, 0] = suz_min  # a TIE leaves no suzerain (real Civ 6)
-        assert int(s4._suzerain_count(0)[0]) == 0, "a tie must leave NO suzerain"
+        assert int(s4._suzerains_held(0)[0]) == 0, "a tie must leave NO suzerain"
         s4.seat_citystate_envoys[:, 1, 0] = suz_min + 1
-        assert int(s4._suzerain_count(1)[0]) == 1, "the strictly-higher civ is suzerain"
-        assert int(s4._suzerain_count(0)[0]) == 0, "... and seat 0 is not"
+        assert int(s4._suzerains_held(1)[0]) == 1, "the strictly-higher civ is suzerain"
+        assert int(s4._suzerains_held(0)[0]) == 0, "... and seat 0 is not"
     # the accrual itself: tier + suzerainties, and it is CUMULATIVE
     s5 = build(rules, path, steps=0)
     f0 = int(s5.civ_diplo_favor[0, 0])
     s5.step()
     f1 = int(s5.civ_diplo_favor[0, 0])
     assert f1 >= f0, "favor never decreases"
-    exp = int(s5._adopted_gov_tier(0)[0]) + s5._favor_per_suz * int(s5._suzerain_count(0)[0])
+    exp = int(s5._adopted_gov_tier(0)[0]) + s5._favor_per_suz * int(s5._suzerains_held(0)[0])
     s5.step()
     assert int(s5.civ_diplo_favor[0, 0]) - f1 == exp, (
         f"favor step must be tier+suzerainties ({exp}), got {int(s5.civ_diplo_favor[0, 0]) - f1}"
@@ -1271,46 +1271,26 @@ def main() -> None:
     assert _era_ok is not None, "no tech reaches the Medieval era — check the era table"
     if s6.n_majors > 1:
         s6.civ_diplo_favor[:, 1] = 90
-    # the slate is ANNOUNCED a session ahead (a first session draws its own,
-    # at random) — hand this one its announcement so the order is pinned
-    s6.congress_slate[0, 0] = 0
-    s6.congress_slate[0, 1] = 1
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 1, "the session must convene"
+    _drawn = s6.congress_active[0, :, 0].tolist()
+    assert all(s6._congress_res[r]["min"] <= 2 <= s6._congress_res[r]["max"] for r in _drawn), "the slate left the Medieval era"
+    # the votes on a slate of UDT and Patronage: every free vote is outcome A
+    _udt, _pat = s6._congress_at["URBAN_DEVELOPMENT_TREATY"], s6._congress_at["PATRONAGE"]
+    s6.civ_diplo_points.zero_()
+
+    def _full(v: int) -> torch.Tensor:
+        return torch.full((s6.B,), v, dtype=torch.long)
+
+    s6._congress_votes(torch.ones(s6.B, dtype=torch.bool), _full(_udt), _full(_pat), torch.zeros(s6.B, dtype=torch.bool),
+                       _full(-1), torch.full((s6.B, s6.n_majors, 3, 4), -1, dtype=torch.long))
     # pre-Modern there is no DV resolution, so the favor curve never walks
     assert int(s6.civ_diplo_favor[0, 0]) == 50 and int(s6.civ_diplo_favor[0, 1]) == 90, "favor spends on the DV resolution only"
-    # the Medieval-eligible slate is UDT (0) then Patronage (1), outcome A
-    assert s6.congress_active[0, :, 0].tolist() == [0, 1], "the Medieval slate is UDT + Patronage"
+    assert s6.congress_active[0, :, 0].tolist() == [_udt, _pat], "the slate stands as voted"
     assert s6.congress_active[0, :, 1].tolist() == [0, 0], "every free vote is outcome A"
     # every alive major voted the winning combo -> +1 DVP each per resolution
     for _r in range(s6.n_majors):
         assert int(s6.civ_diplo_points[0, _r]) == 2 * s6._dvp_per_res, "winning-combo voters each take the point"
-
-    # the SLATE ROTATES: at Industrial three rows are eligible (UDT,
-    # Patronage, Migration), and session 2 starts its window at rank 2
-    s7 = build(rules, path, steps=0)
-    _era_ind = None
-    for _t in range(s7.civ_techs.shape[2]):
-        s7.civ_techs[:, 0].zero_(); s7.civ_techs[:, 0, _t] = True
-        if int(s7._civ_era(s7.civ_techs[:, 0], s7.civ_civics[:, 0])[0]) == 4:
-            _era_ind = _t
-            break
-    assert _era_ind is not None, "no tech lands exactly on the Industrial era"
-    s7.turn = s7._congress_interval + 1
-    s7.congress_sessions[:] = 1  # pretend session 1 already ran
-    # session 2 convenes on the slate ANNOUNCED at session 1's close — hand it
-    # the announcement, computed from the catalog rather than pinned positions
-    _elig = [i for i, r in enumerate(s7._congress_res) if r["min"] <= 4 <= r["max"]]
-    assert len(_elig) >= 4, "the Industrial pool wants at least four eligible rows"
-    s7.congress_slate[0, 0] = _elig[2]
-    s7.congress_slate[0, 1] = _elig[3]
-    s7._world_congress()
-    assert s7.congress_active[0, :, 0].tolist() == [_elig[2], _elig[3]], (
-        f"the announced slate must convene as announced, got {s7.congress_active[0, :, 0].tolist()}"
-    )
-    assert s7._congress_res[_elig[2]]["id"] == "MIGRATION_TREATY", "the announced pair lands on Migration"
-    # Migration's scripted vote is A-on-self; ties keep the LOWER seat
-    assert s7.congress_active[0, 0, 1].tolist() == 0 and s7.congress_active[0, 0, 2].tolist() == 0
 
     # the DV resolution from Modern: the favor curve, the pile-on, the refunds
     s8 = build(rules, path, steps=0)
@@ -1362,32 +1342,32 @@ def main() -> None:
             and int(s8.civ_diplo_points[0, 2]) == _reg[2] + s8._dvp_per_res), "B voters take the combo point"
 
     # the standing effects: write the plane directly, read every helper
-    s8.congress_active[:, 0, :] = torch.tensor([1, 0, 2], dtype=torch.long)   # Patronage A on class 2
-    s8.congress_active[:, 1, :] = torch.tensor([2, 1, 0], dtype=torch.long)   # Migration B on seat 0
+    s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["PATRONAGE"], 0, 2], dtype=torch.long)   # Patronage A on class 2
+    s8.congress_active[:, 1, :] = torch.tensor([s8._congress_at["MIGRATION_TREATY"], 1, 0], dtype=torch.long)   # Migration B on seat 0
     s8._eff_version += 1
     assert float(s8._congress_gpp_factor(2)[0]) == 2.0 and float(s8._congress_gpp_factor(0)[0]) == 1.0
     assert float(s8._congress_growth(0)[0]) == 0.8 and float(s8._congress_growth(1)[0]) == 1.0
     assert float(s8._congress_loyalty(0)[0]) == s8._c_mig_loy and float(s8._congress_loyalty(1)[0]) == 0.0
-    s8.congress_active[:, 0, :] = torch.tensor([3, 0, 1], dtype=torch.long)   # Heritage A on ART
+    s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["HERITAGE_ORGANIZATION"], 0, 1], dtype=torch.long)   # Heritage A on ART
     assert s8._congress_gw_kmult()[0].tolist() == [1, 2, 1, 1, 1, 1, 1, 1]  # per Great Work object type
-    s8.congress_active[:, 0, :] = torch.tensor([3, 1, 2], dtype=torch.long)   # Heritage B on MUSIC
+    s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["HERITAGE_ORGANIZATION"], 1, 2], dtype=torch.long)   # Heritage B on MUSIC
     assert s8._congress_gw_kmult()[0].tolist() == [1, 1, 0, 1, 1, 1, 1, 1]
     # the UDT ban empties the banned district's building columns in the mask
-    s8.congress_active[:, 0, :] = torch.tensor([0, 1, 0], dtype=torch.long)   # UDT B on district 0
+    s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["URBAN_DEVELOPMENT_TREATY"], 1, 0], dtype=torch.long)   # UDT B on district 0
     s8._eff_version += 1
     _bb = s8._seat_buildable(0)
     _banned_cols = (s8._b_req_district == 0).nonzero(as_tuple=True)[0]
     assert len(_banned_cols) > 0, "district 0 must own buildings"
     assert not bool(_bb[:, :, _banned_cols].any()), "the UDT ban must empty the district's building columns"
     if s8._holy_didx >= 0:
-        s8.congress_active[:, 0, :] = torch.tensor([0, 1, s8._holy_didx], dtype=torch.long)
+        s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["URBAN_DEVELOPMENT_TREATY"], 1, s8._holy_didx], dtype=torch.long)
         assert bool(s8._congress_holy_blocked().all()), "a HOLY_SITE ban refuses the worship faith-buy"
 
     # a session ends the standing Migration Treaty: each city of its target
     # keeps its growth percent's residue, floor(−20·2.56) + floor(20·2.56) = −1
     # (`City.growthDrift`, `congressSession`)
-    s8.congress_active[:, 0, :] = torch.tensor([3, 0, 1], dtype=torch.long)   # Heritage A on ART
-    s8.congress_active[:, 1, :] = torch.tensor([2, 1, 0], dtype=torch.long)   # Migration B on seat 0
+    s8.congress_active[:, 0, :] = torch.tensor([s8._congress_at["HERITAGE_ORGANIZATION"], 0, 1], dtype=torch.long)   # Heritage A on ART
+    s8.congress_active[:, 1, :] = torch.tensor([s8._congress_at["MIGRATION_TREATY"], 1, 0], dtype=torch.long)   # Migration B on seat 0
     s8._eff_version += 1
     s8.city_growth_drift.zero_()
     s8.turn = 2 * s8._congress_interval + 1
@@ -1408,7 +1388,7 @@ def main() -> None:
         s9.civ_diplo_points[:, 0].zero_()
         s9.civ_diplo_points[:, 1] = s9._dvp_win
         assert int(s9._diplomatic_victor()[0]) == 1, "a civ wins at the threshold"
-    print("world congress OK — schedule, announced slate, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
+    print("world congress OK — schedule, slate, combo DVP, DV curve+refunds, effect readers, UDT ban, victory")
 
 
 if __name__ == "__main__":

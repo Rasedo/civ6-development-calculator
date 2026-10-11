@@ -5,37 +5,32 @@
 # set `review: reviewed`.
 - addr: 0x596b40
   kind: function
+  name: congressCompetitionDraw
+  semantics: "After the slate's draws (called from 0x599275): the EmergencyAlliances rows of Trigger EMERGENCY_TRIGGER_WORLD_CONGRESS (the game's +0xb40 table: byte +0x48, +0x50) whose live record reads -1 (not running) and whose TargetRequirementSet holds (the game era's window), weight 1 each: ONE 'World Congress Resolutions' draw, the pick the competition the session starts."
   status: READ
   cases:
-    - recording: h1_duelw1117
-      turn: 61
-      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
-    - recording: 1117
+    - recording: h1_duelv1127
       turn: 161
-      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+      value: "a draw over 1 after the Diplomatic Victory row's: the World's Fair, STARTED t162 (1117)"
+  impl: [cpu/core/congress.ts:drawCongressSlate, gpu/core/sim_seats.py:_congress_draw_slate]
   readings: ["H-1: the World Congress slate (0x598270) — READ"]
-  context:
-    - "...10, 9, 8; t121, t141: 12, 11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's (called from 0x599275): it walks a database collection (0xad5430: the game's +0xb40 tab..."
-  review: imported
+  review: reviewed
 - addr: 0x598270
   kind: function
+  name: congressSessionSetup
+  semantics: "The session's slate, drawn when it sits: the resolutions in the game era's window (row +0x68 / +0x98) that CanUseResolutions allows, the InjectionOnly ones apart (+0xb8); min(3, n) 'World Congress Resolutions' draws (0x59a680), each over what is left removing its pick, the first two the slate; then one draw over the InjectionOnly rows (the Diplomatic Victory resolution from Modern); then 0x596b40."
   status: READ
   cases:
-    - recording: h1_duelw1117
-      turn: 61
-      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
-    - recording: 1117
-      turn: 161
-      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+    - recording: h1_duelv1127
+      turn: 121
+      value: 12, 11, 10 -> Military Advisory, Mercenary Companies (the slate at t101 held Mercenary Companies too)
   impl:
-    - cpu/core/congress.ts:congressSession
-    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/core/congress.ts:drawCongressSlate
     - gpu/core/sim_seats.py:_congress_draw_slate
+    - cpu/data/seats.ts:RAW_CONGRESS_RESOLUTIONS
+    - cpu/harness/drawSites.ts:DRAW_SITES
   readings: ["H-1: the World Congress slate (0x598270) — READ"]
-  context:
-    - "## H-1: the World Congress slate (0x598270) — READ"
-    - "...2, 11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's (called from 0x599275): it walks a database collection (0xad5430: the game's +0xb40 table), keeps each row whos..."
-  review: imported
+  review: reviewed
 - addr: 0x59a540
   kind: function
   status: READ

@@ -8,7 +8,6 @@ import { warKindCode } from '../data/warKinds';
 import { availableCivicsIn, availableTechsIn, governmentsOpen, governmentSlots, darkAgeEra, seatGovernment, unlockedPolicyIds } from './effects';
 import { goldAffordable } from './game';
 import { researchOwed } from './boosts';
-import { congressPolicyBlocked } from './congress';
 import { cityStateById, hasMet, isSuzerain } from './cityStates';
 import { civsAtWar, atWarWithAny, isCityStateSeat, cityStateOfSeat, majorsMet, seatOf, treatyTurnsWith, warTurnsWith } from './seats';
 import { warTargets } from './phase';
@@ -54,7 +53,7 @@ export function policyObs(state: GameState, seat: number): {
   const government = gov ? GOVERNMENT_LIST.findIndex((g) => g.id === gov) : -1;
   const gov_open = governmentsOpen(state, seat);
   if (!gov) return { unlocked: [], slots: [0, 0, 0, 0], government, gov_open };
-  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, seat), s.government.held, gov);
+  const open = unlockedPolicyIds(s.research, darkAgeEra(state, seat), s.government.held, gov);
   const unlocked: number[] = [];
   POLICY_LIST.forEach((p, i) => { if (open.has(p.id)) unlocked.push(i); });
   const held = governmentSlots(state, seat);

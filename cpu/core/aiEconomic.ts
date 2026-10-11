@@ -9,7 +9,10 @@
  * balance shared over the SavingTypes slots by the DefaultSavings weights
  * (each share the change x the weight's fraction of the total, the fraction
  * truncated to 1/256), a slot below 0 cleared, the PLOTS slot held at 150
- * with the excess to the SLUSH_FUND. A spend (0x68acd0) takes its slot, the
+ * with the excess to the SLUSH_FUND, and with no Great Person class
+ * available (0x2f7eb0) the GREAT_PEOPLE slot joined to the SLUSH_FUND; a
+ * major's turn closes on the Gold patronage (`goldPatronage`,
+ * ai/major/greatPeople.ts). A spend (0x68acd0) takes its slot, the
  * overflow from slot 0, and lowers the balance; the can-afford (0x6874d0)
  * asks the slot for the price x (1 - frac) and slot 0 + the slot for the
  * price.
@@ -26,6 +29,7 @@ import { FX } from './aiValue';
 export const SLOT_SLUSH = 0;
 export const SLOT_UNITS = 1;
 export const SLOT_PLOTS = 2;
+export const SLOT_GREAT_PEOPLE = 3;
 /** the PLOTS slot's ceiling (0x687bf0: 0x9600) */
 const PLOTS_CAP = 150 * FX;
 const TOTAL_WEIGHT = AI_DEFAULT_SAVINGS.reduce((a, s) => a + s.weight, 0);
@@ -41,8 +45,9 @@ export interface EconomicMemory {
 
 export const newEconomicMemory = (): EconomicMemory => ({ savings: AI_DEFAULT_SAVINGS.map(() => 0), balance: 0 });
 
-/** THE SAVINGS TURN (0x687bf0) on the treasury `treasury`, raw */
-export function savingsTurn(e: EconomicMemory, treasury: number): void {
+/** THE SAVINGS TURN (0x687bf0) on the treasury `treasury`, raw;
+ *  `classAvailable` whether a Great Person class is available */
+export function savingsTurn(e: EconomicMemory, treasury: number, classAvailable: boolean): void {
   const delta = treasury - e.balance;
   for (let i = 0; i < e.savings.length; i++) {
     e.savings[i] += (delta * SHARE[i]) >> 8;
@@ -51,6 +56,10 @@ export function savingsTurn(e: EconomicMemory, treasury: number): void {
   if (e.savings[SLOT_PLOTS] > PLOTS_CAP) {
     e.savings[SLOT_SLUSH] += e.savings[SLOT_PLOTS] - PLOTS_CAP;
     e.savings[SLOT_PLOTS] = PLOTS_CAP;
+  }
+  if (!classAvailable) {
+    e.savings[SLOT_SLUSH] += e.savings[SLOT_GREAT_PEOPLE];
+    e.savings[SLOT_GREAT_PEOPLE] = 0;
   }
   e.balance = treasury;
 }

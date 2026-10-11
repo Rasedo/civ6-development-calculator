@@ -66,6 +66,14 @@
     - "...angeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x1963..."
     - "...d the resources step 0x4a8ed0 in Player DoTurn. A city's growth (City::ChangePopulation 0x1c79b0) is neither: the culture its border banks after the growth reads its new size's amenity..."
   review: imported
+- addr: 0x1cb000
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - ...over the cities the city build AI's +0x10f8[class] where it has one and the city's own 0x1cb000 on its amenities, the player's bonus a turn +0x1d8[class] whole, x (1 + 0x43c340 / 100:...
+  review: imported
 - addr: 0x1cb470
   final: 0x132cb0
   kind: function

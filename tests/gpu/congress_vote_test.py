@@ -48,15 +48,22 @@ def build():
     return sim
 
 
-def session(sim, turn: int) -> None:
-    """Run the Regular Session closing `turn`, exactly as the next turn's
-    step would after the barbarians. The slate is ANNOUNCED state — pin it
-    deterministically first, so every section reads the same slots whatever
-    the draw did last session."""
-    sim.congress_slate[:, 0] = 0
-    sim.congress_slate[:, 1] = 1 if len(sim._congress_res) > 1 else -1
-    sim.turn = turn + 1
-    sim._world_congress()
+def blank(sim) -> torch.Tensor:
+    """[B, n, 3, 4] — no ballot anywhere: every major votes the AI line."""
+    return torch.full((sim.B, sim.n_majors, 3, 4), -1, dtype=torch.long)
+
+
+def session(sim, bal: torch.Tensor, slate: tuple[int, int] = (0, 1), comp: int = -1) -> None:
+    """The votes of a Regular Session on `slate` (catalog indices) with these
+    ballots — what `_world_congress` runs once it has drawn the slate."""
+    B = sim.B
+    fires = torch.ones(B, dtype=torch.bool)
+    dv = sim._world_era() >= sim._congress_dv_min
+
+    def full(v: int) -> torch.Tensor:
+        return torch.full((B,), v, dtype=torch.long)
+
+    sim._congress_votes(fires, full(slate[0]), full(slate[1]), dv, full(comp), bal)
 
 
 def main() -> None:
@@ -66,17 +73,39 @@ def main() -> None:
     NR = len(sim._congress_res)
     assert NR, "no resolution in the catalog"
 
-    # --- 1) THE SLATE a ballot addresses ------------------------------------
-    fires, res0, res1, dv = sim._congress_upcoming(iv)
+    # --- 1) THE SLATE, drawn when the session sits ---------------------------
+    fires, dv = sim._congress_due(iv)
     assert bool(fires[0]), "a session must fire on an interval turn"
-    assert int(res0[0]) == -1, "no slate stands before the first announcement"
-    sim.congress_slate[:, 0] = 0
-    sim.congress_slate[:, 1] = 1 if NR > 1 else -1
-    fires, res0, res1, dv = sim._congress_upcoming(iv)
-    assert int(res0[0]) == 0, "the announced slate must read back"
-    quiet, _, _, _ = sim._congress_upcoming(iv + 1)
+    quiet, _ = sim._congress_due(iv + 1)
     assert not bool(quiet[0]), "no session on an off-interval turn"
-    print(f"  the slate at turn {iv}: slots {int(res0[0])}, {int(res1[0])}; dv={bool(dv[0])}")
+    res0, res1, comp = sim._congress_draw_slate(fires)
+    era = int(sim._world_era()[0])
+    for r in (int(res0[0]), int(res1[0])):
+        assert r >= 0 and sim._congress_res[r]["min"] <= era <= sim._congress_res[r]["max"], "the slate left its era"
+    assert int(res0[0]) != int(res1[0]), "a pick is removed before the next draw"
+    print(f"  the slate at turn {iv}: slots {int(res0[0])}, {int(res1[0])}; dv={bool(dv[0])}; competition {int(comp[0])}")
+
+    # the draws: three over the eligible resolutions, one over the Diplomatic
+    # Victory row, one over the competitions in their era (Modern: the
+    # World's Fair alone)
+    ranges: list[int] = []
+    draw0 = sim._rand_range
+
+    def spy0(mask, mx):
+        ranges.append(int(torch.as_tensor(mx).reshape(-1)[0]))
+        return draw0(mask, mx)
+
+    sim._rand_range = spy0
+    sim._world_era = lambda: torch.full((sim.B,), 5, dtype=torch.long)
+    try:
+        *_, comp = sim._congress_draw_slate(fires)
+    finally:
+        del sim._rand_range
+        del sim._world_era
+    E = ranges[0]
+    assert ranges == [E, E - 1, E - 2, 1, 1], f"the Modern session drew {ranges}"
+    assert int(comp[0]) == sim._comp_fair, "the World's Fair is the Modern competition"
+    print(f"  a Modern session draws {ranges}: the slate, the Diplomatic Victory row, the World's Fair")
 
     # The Diplomatic Victory resolution runs in the same session and pours
     # every seat's whole bank into it, which would eat the refunds below. It
@@ -86,7 +115,7 @@ def main() -> None:
     # --- 2) A BALLOT OVERRIDES THE AI LINE ----------------------------------
     # One seat names a target its own preference would not pick, and buys
     # enough votes that its target wins the plurality outright.
-    r = int(res0[0])
+    r = 0
     kind = sim._congress_res[r]["t"]
     size = sim._congress_space(kind)
     assert size >= 2, "this resolution has only one target — nothing to override"
@@ -97,14 +126,14 @@ def main() -> None:
         sim.civ_diplo_favor[:, row] = 0
     step = 2 * sim._congress_vprice   # the k-th extra vote costs step x k
     sim.civ_diplo_favor[:, voter] = step * (1 + 2 + 3 + 4 + 5)  # five extra votes
-    sim.civ_congress_vote[0, voter, 0] = torch.tensor([0, other, 5, 0])
-    session(sim, iv)
+    bal = blank(sim)
+    bal[0, voter, 0] = torch.tensor([0, other, 5, 0])
+    session(sim, bal)
     assert int(sim.congress_active[0, 0, 0]) == r, "slot 0 did not stand the slate's resolution"
     assert int(sim.congress_active[0, 0, 2]) == other, (
         f"the bought ballot lost: target {int(sim.congress_active[0, 0, 2])}, wanted {other}"
     )
     assert int(sim.civ_diplo_favor[0, voter]) == 0, "the winning combo takes the whole spend"
-    assert not bool((sim.civ_congress_vote[0] >= 0).any()), "the ballot must clear after the session"
     print(f"  five bought votes carried target {other} over the AI's {pref}")
 
     # --- 3) THE CURVE: what the bank cannot clear, it does not buy ----------
@@ -124,24 +153,26 @@ def main() -> None:
     # outcome with a losing target gets half.
     sim.congress_active[:] = -1
     bank = step * (1 + 2 + 3)
+    bal = blank(sim)
     for row in range(sim.n_majors):
         sim.civ_diplo_favor[:, row] = bank
-        sim.civ_congress_vote[0, row, 0] = torch.tensor([0, 0, 3, 0])
+        bal[0, row, 0] = torch.tensor([0, 0, 3, 0])
     loser = sim.n_majors - 1
-    sim.civ_congress_vote[0, loser, 0] = torch.tensor([1, 0, 3, 0])   # outcome B, alone
-    session(sim, iv)
+    bal[0, loser, 0] = torch.tensor([1, 0, 3, 0])   # outcome B, alone
+    session(sim, bal)
     assert int(sim.congress_active[0, 0, 1]) == 0, "outcome A had the votes and must win"
     assert int(sim.civ_diplo_favor[0, loser]) == bank, (
         f"a losing OUTCOME is refunded in full, got {int(sim.civ_diplo_favor[0, loser])}"
     )
     sim.congress_active[:] = -1
+    bal = blank(sim)
     for row in range(sim.n_majors):
         sim.civ_diplo_favor[:, row] = bank
-        sim.civ_congress_vote[0, row, 0] = torch.tensor([0, 0, 3, 0])
+        bal[0, row, 0] = torch.tensor([0, 0, 3, 0])
     near = sim.n_majors - 1
-    sim.civ_congress_vote[0, near, 0] = torch.tensor([0, min(1, size - 1), 1, 0])
+    bal[0, near, 0] = torch.tensor([0, min(1, size - 1), 1, 0])
     sim.civ_diplo_favor[:, near] = step
-    session(sim, iv)
+    session(sim, bal)
     assert int(sim.congress_active[0, 0, 2]) == 0, "the crowd's target must win"
     assert int(sim.civ_diplo_favor[0, near]) == step // 2, (
         f"the winning outcome on a losing target keeps half, got {int(sim.civ_diplo_favor[0, near])}"
@@ -152,16 +183,16 @@ def main() -> None:
     # Everyone votes A on seat 1 — who is NOT the DVP leader. The +2 must
     # follow the target the tally produced, not the leader.
     sim._congress_dv_min = -1
-    sim._congress_res = []   # the DV resolution alone, so its points are readable
+    bal = blank(sim)
     for row in range(sim.n_majors):
         sim.civ_diplo_favor[:, row] = 0
         sim.civ_diplo_points[:, row] = 0
-        sim.civ_congress_vote[0, row, 2] = torch.tensor([0, 1, 0, 0])
+        bal[0, row, 2] = torch.tensor([0, 1, 0, 0])
     sim.civ_diplo_points[:, 0] = 5   # seat 0 leads
     lead = sim._congress_leader(torch.ones(sim.B, dtype=torch.bool))
     assert int(lead[0]) == 0, f"seat 0 should lead on points, got {int(lead[0])}"
     before = int(sim.civ_diplo_points[0, 1])
-    session(sim, iv)
+    session(sim, bal, slate=(-1, -1))   # the DV resolution alone, so its points are readable
     after = int(sim.civ_diplo_points[0, 1])
     # +1 for voting the winning combo, +2 for being the winning target
     assert after == before + sim._dvp_per_res + sim._congress_dv_delta, (
@@ -203,17 +234,6 @@ def main() -> None:
     stand("TRADE_POLICY", 1, 1)
     assert bool(sim2._congress_intl_banned(1)[0]) and not bool(sim2._congress_intl_banned(0)[0])
 
-    if sim2._npol:
-        pol = min(1, sim2._npol - 1)
-        held = torch.zeros(sim2.B, sim2._npol, dtype=torch.bool)
-        held[:, pol] = True
-        stand("POLICY_TREATY", 0, pol)
-        assert float(sim2._congress_policy_favor(held)[0]) == sim2._c_policy_favor
-        assert float(sim2._congress_policy_favor(~held)[0]) == 0.0
-        assert int(sim2._congress_policy_blocked()[0]) == -1
-        stand("POLICY_TREATY", 1, pol)
-        assert int(sim2._congress_policy_blocked()[0]) == pol
-
     gov = torch.ones(sim2.B, dtype=torch.long)
     stand("WORLD_IDEOLOGY", 0, 1)
     assert int(sim2._congress_wildcard_delta(gov)[0]) == sim2._c_ideology_slots
@@ -239,10 +259,6 @@ def main() -> None:
 
     if sim2.S:
         ct = int(sim2.citystate_type[0, 0])
-        stand("TREATY_ORGANIZATION", 0, ct)
-        assert float(sim2._congress_suz_favor_weight()[0, 0]) == sim2._c_plus100
-        stand("TREATY_ORGANIZATION", 1, ct)
-        assert float(sim2._congress_suz_favor_weight()[0, 0]) == 0.0
         stand("SOVEREIGNTY", 0, ct)
         assert float(sim2._cs_route_sov6()[0, 0].sum()) > 0.0
         assert not bool(sim2._congress_suz_bonus_blocked()[0, 0])
@@ -257,7 +273,7 @@ def main() -> None:
             sim2._c_plus100 if len(sim2._proj_rows) == 1 else 1.0)
         stand("PUBLIC_WORKS_PROGRAM", 1, 0)
         assert float(sim2._congress_project_mult(0)[0]) == sim2._c_minus50
-    print(f"  the twelve wider-slate readers answer both faces over {K} slate slots")
+    print(f"  the wider-slate readers answer both faces over {K} slate slots")
 
     # --- 7) TRADE POLICY B ends the standing legs it forbids ----------------
     row, other = 0, 1
@@ -509,57 +525,28 @@ def main() -> None:
     simC = build()
     nrow = simC.n_majors
     assert nrow >= 3, "the podium's two quarters need three in the field"
-    ci = simC._congress_at["SCORED_COMPETITION"]
-    # the VOTED rows: a triggered competition (the Aid Request) is never on the ballot
-    assert simC._congress_space(simC._congress_res[ci]["t"]) == simC._comp_voted_n == len(simC._comps) - 1, (
-        "the target space and the competition catalog disagree"
-    )
     simC._congress_dv_min = 99
-    simC.congress_slate[:, 0] = ci
-    simC.congress_slate[:, 1] = -1
-    simC.turn = iv + 1
     for row in range(nrow):
         simC.civ_diplo_favor[:, row] = 0
-        simC.civ_congress_vote[0, row, 0] = torch.tensor([0, 0, 0, 0])
-    against = nrow - 1
-    simC.civ_congress_vote[0, against, 0] = torch.tensor([1, 0, 0, 0])   # outcome B
-    simC._world_congress()
-    assert int(simC.comp_kind[0]) == simC._comp_climate, "an enacted competition did not start"
-    assert int(simC.comp_left[0]) == simC._comp_turns, "the window is not 30 turns"
-    assert bool(simC.comp_member[0, 0]) and not bool(simC.comp_member[0, against]), (
-        "the field is the A voters, and only them"
-    )
+    # the session starts the competition it drew, every living major in its field
+    session(simC, blank(simC), slate=(-1, -1), comp=simC._comp_climate)
+    assert int(simC.comp_kind[0]) == simC._comp_climate, "the drawn competition did not start"
+    assert int(simC.comp_left[0]) == simC._comp_turns, "the window is not its turns"
+    assert bool(simC.comp_member[0, :nrow].all()), "the field is every living major"
+    # a running one is never started over
+    session(simC, blank(simC), slate=(-1, -1), comp=simC._comp_fair)
+    assert int(simC.comp_kind[0]) == simC._comp_climate, "a second competition took the one slot"
 
-    # the score is the gap to the WORLD's highest polluter, and a seat outside
-    # the field scores nothing however clean it is
+    # the score is the gap to the WORLD's highest polluter
     simC.civ_co2_turn[:] = 0
     simC.civ_co2_turn[0, 0] = 10
     simC.civ_co2_turn[0, 1] = 4
     simC._resolve_competition()
     assert float(simC.comp_score[0, 0]) == 0.0, "the highest polluter scored"
     assert float(simC.comp_score[0, 1]) == 6.0, "the gap to the top polluter is the score"
-    assert float(simC.comp_score[0, against]) == 0.0, "a seat outside the field scored"
     assert float(simC.civ_co2_turn[0, 0]) == 0.0, "the turn's emission carried into the next"
     assert int(simC.comp_left[0]) == simC._comp_turns - 1, "the clock did not run"
-
-    # ...and on the FREE vote the smokestack decides: the dirtiest seat refuses
-    # the competition it cannot score in, and the rest enact it.
     simC.comp_kind[:] = -1
-    simC.civ_co2[:] = 0
-    simC.civ_co2[0, 0] = 100
-    o_dirty, t_dirty = simC._congress_pref(ci, 0)
-    o_clean, t_clean = simC._congress_pref(ci, 1)
-    assert int(o_dirty[0]) == 1, "the highest polluter voted for the competition"
-    assert int(o_clean[0]) == 0, "a seat that stands to score refused"
-    assert int(t_dirty[0]) < len(simC._comps) and int(t_clean[0]) < len(simC._comps), (
-        "the free vote named a competition the catalog does not hold"
-    )
-    simC.congress_slate[:, 0] = ci
-    simC.congress_slate[:, 1] = -1
-    simC.turn = 2 * iv + 1
-    simC._world_congress()
-    assert int(simC.comp_kind[0]) == simC._comp_climate, "the free vote did not enact it"
-    assert not bool(simC.comp_member[0, 0]), "the seat that voted B joined the field"
 
     # the podium at the window's end: gold to the best, then the two quarters
     ones = torch.ones(simC.B, dtype=torch.bool, device=simC.device)
@@ -680,15 +667,13 @@ def main() -> None:
     def arms(outcome: int, target: int):
         s = build()
         s._congress_dv_min = 99
-        s.congress_slate[:, 0] = ai
-        s.congress_slate[:, 1] = -1
-        s.turn = iv + 1
+        bal = blank(s)
         for r in range(nrow):
             s.civ_diplo_favor[:, r] = 0
-            s.civ_congress_vote[0, r, 0] = torch.tensor([outcome, target, 0, 0])
+            bal[0, r, 0] = torch.tensor([outcome, target, 0, 0])
             for k in range(ND):
                 s.civ_wmd[0, r, k] = START[r][k]
-        s._world_congress()
+        session(s, bal, slate=(ai, -1))
         got = [int(s.congress_active[0, 0, f]) for f in range(3)]
         assert got == [ai, outcome, target], f"the ballot did not carry: {got}"
         return [[int(s.civ_wmd[0, r, k]) for k in range(ND)] for r in range(nrow)]
@@ -738,15 +723,13 @@ def main() -> None:
     simT = build()
     simT._congress_dv_min = 99
     mi, ui = simT._congress_at["MERCENARY_COMPANIES"], simT._congress_at["URBAN_DEVELOPMENT_TREATY"]
-    simT.congress_slate[:, 0] = mi
-    simT.congress_slate[:, 1] = ui
-    simT.turn = iv + 1
+    bal = blank(simT)
     for row in range(simT.n_majors):
         simT.civ_diplo_favor[:, row] = 0
         # row 0 casts the Urban Development ballot first, the others the reverse
         first = 1 if row == 0 else 0
-        simT.civ_congress_vote[0, row, 0] = torch.tensor([1, -1, 0, first])
-        simT.civ_congress_vote[0, row, 1] = torch.tensor([0, -1, 0, 1 - first])
+        bal[0, row, 0] = torch.tensor([1, -1, 0, first])
+        bal[0, row, 1] = torch.tensor([0, -1, 0, 1 - first])
     ranges: list[int] = []
     draw = simT._rand_range
 
@@ -763,7 +746,7 @@ def main() -> None:
             lists.append(int(m[0].sum()))
     simT._rand_range = spy
     try:
-        simT._world_congress()
+        session(simT, bal, slate=(mi, ui))
     finally:
         del simT._rand_range
     assert ranges[-len(lists):] == lists, f"the target draws ran {ranges} for the lists {lists}"
@@ -771,7 +754,7 @@ def main() -> None:
         "the Mercenary ballots took no drawn currency")
     print(f"  the target draws run over the offered lists {lists}, rows in order, each in its cast order")
 
-    print("CONGRESS VOTE OK — the slate, the override, the curve, both refunds, the DV target, "
+    print("CONGRESS VOTE OK — the slate draw, the override, the curve, both refunds, the DV target, "
           "the wider slate, the route ban, the culture bomb, the feature target, "
           "the three late resolutions, the favor tie-break, the scored competition, "
           "Arms Control and the target draws")

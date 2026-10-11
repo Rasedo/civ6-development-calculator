@@ -2,10 +2,9 @@
  * SCORED COMPETITIONS — the World Congress's other Diplomatic Victory faucet.
  *
  * CIV6 (World Congress): they are "chances for civilizations to win esteem
- * through events and projects that benefit the world", and "If enacted,
- * players who vote in favor of the Scored Competition will compete to
- * contribute to the cause. The players that contribute the most will receive
- * lucrative rewards."
+ * through events and projects that benefit the world". A Regular Session
+ * draws one to start (`drawCongressSlate`), every living major in its field
+ * (runs/h1_duelw1117 Game_Emergencies.csv: SCORING lists both players).
  *
  * CIV6 (Competition): one runs for exactly 30 turns, "after which it ends and
  * winners are chosen". "The civilization with the highest score wins the Gold
@@ -32,9 +31,8 @@ export function competitionOf(state: GameState): Competition | undefined {
 }
 
 /**
- * Enact one. The field is the seats that voted FOR it — "players who vote in
- * favor of the Scored Competition will compete" — and a seat with no city is
- * not in the world to compete.
+ * Enact one over `field`; a seat with no city is not in the world to
+ * compete.
  *
  * ONE at a time. Real Civ 6 bounds nothing here; both engines carry a single
  * slot, which is what makes the score table a fixed plane.

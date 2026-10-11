@@ -167,7 +167,7 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     + qMil.filter((q) => !isRngType((q as { unit: string }).unit)).length;
   const me = seatOf(state, seat);
   // THE WORLD CONGRESS block: the ballot currency, the STANDING slate — what
-  // the last session passed and on whom — the one about to sit, and the
+  // the last session passed and on whom — the session about to sit, and the
   // running competition. `env._congress_block` renders the identical layout.
   const congress: number[] = [
     (me?.diplomaticFavor ?? 0) / 100.0,
@@ -188,9 +188,8 @@ export function observeSeat(state: GameState, seat: number, cityMax: number, hor
     live && live.target === seat ? 1 : 0,
     live && live.members.includes(seat) ? 1 : 0,
   );
-  // THE SESSION ABOUT TO SIT: a ballot addresses the ANNOUNCED slate, and the
-  // turns until it is what makes the ballot worth filling in now.
-  for (let k = 0; k < 2; k++) congress.push(Math.max(0, (state.congressSlate?.[k] ?? -1) + 1));
+  // THE SESSION ABOUT TO SIT: the turns until it, and whether the Diplomatic
+  // Victory resolution sits in it.
   const wera = worldEraIndex(state);
   congress.push(
     ((CONGRESS_INTERVAL - state.turn % CONGRESS_INTERVAL) % CONGRESS_INTERVAL) / CONGRESS_INTERVAL,

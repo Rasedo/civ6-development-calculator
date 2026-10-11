@@ -1486,29 +1486,46 @@ order. The engines follow (`drawPromoOffer` / `_promo_offer_draw`).
 
 ## H-1: the World Congress slate (0x598270) — READ
 
-The session setup lists the resolutions in their era (EarliestEra / LatestEra
-at row +0x68 / +0x98 against the game era) that the Lua `CanUseResolutions`
-allows, split by InjectionOnly (row +0xb8, `dll_rowmap.py 0xa6a7b0`): of the
-rest, min(3, n) "World Congress Resolutions" draws, each over what is left
-and removing its pick (0x59a680); with three drawn, the first two the
-previous session did not hold stand, else all drawn; then ONE draw over the
-InjectionOnly rows (the Diplomatic Victory resolution, Modern on: a lone row,
-a draw over 1). runs/h1_duelw1117 t61, t81, t101: 10, 9, 8; t121, t141: 12,
-11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's
-(called from 0x599275): it walks a database collection (0xad5430: the
-game's +0xb40 table), keeps each row whose byte +0x48 is set and +0x50 non-
-null and whose live record (0x27a680 -> 0x25bef0 on the row's +0x20) reads
--1 at +0x0 and +0xc — not in play —, weighs each 1 and draws ONE "World
-Congress Resolutions" pick over them (0x59a540), appending the pick at
-+0x310. The scored competitions fit it: 1117 / 1118 / 1121 all draw it at
-t161, and at t181, after the step, China (player 1) draws two "Choosing
-random civic boost to grant based on era" — the World's Fair's top tier
-(WORLD_FAIR_TOP_TIER_CULTURE, MODIFIER_EMERGENCY_PLAYERS_GRANT_RANDOM_CIVIC_
-BOOST_BY_ERA, Expansion2_Emergencies.xml). Which table +0xb40 is stays
-unread (LAB).
+The session setup, at the session itself, lists the resolutions in their
+era (EarliestEra / LatestEra at row +0x68 / +0x98 against the game era)
+that the Lua `CanUseResolutions` allows (WorldCongress.lua: World Religion
+with a religion founded, the Luxury resolution with a luxury on the map),
+split by InjectionOnly (row +0xb8, `dll_rowmap.py 0xa6a7b0`): of the rest,
+in the database's order, min(3, n) "World Congress Resolutions" draws, each
+over what is left and removing its pick (0x59a680), the first two the slate
+voted at that session, the third drawn and dropped; then ONE draw over the
+InjectionOnly rows (the Diplomatic Victory resolution, Modern on: a lone
+row, a draw over 1). runs/h1_duelv1127: t61 10, 9, 8 -> 1, 1, 5 (the Trade
+Treaty, World Religion voted; Sovereignty dropped), t81 10, 9, 8 -> Border
+Control, Sovereignty; t121 12, 11, 10 -> Military Advisory, Mercenary
+Companies (Mercenary Companies held at t101 too: no repeat rule); t161 14
+(Modern: World Religion out, Heritage, World Ideology, Global Energy in)
+-> Urban Development, Luxury; t181 13 (Atomic) -> the Espionage Pact, the
+Trade Treaty; t221 10 (Information) -> Mercenary Companies, the Global
+Energy Treaty — each the session's voted pair. A second 0/1 from t161 is
+0x596b40's (called from 0x599275): it walks a database collection
+(0xad5430: the game's +0xb40 table), keeps each row whose byte +0x48 is
+set and +0x50 non-null and whose live record (0x27a680 -> 0x25bef0 on the
+row's +0x20) reads -1 at +0x0 and +0xc — not in play —, weighs each 1 and
+draws ONE "World Congress Resolutions" pick over them (0x59a540), appending
+the pick at +0x310. The scored competitions fit it: the EmergencyAlliances
+rows of Trigger EMERGENCY_TRIGGER_WORLD_CONGRESS (Expansion2_Emergencies.xml)
+whose TargetRequirementSet's game era holds (the World's Fair Modern only,
+the World Games from Atomic, the Climate Accords from Information, the Space
+Station from Future; the Nobel Prizes need TRAIT_CIVILIZATION_NOBEL_PRIZE).
+1117 / 1118 / 1121 all draw it at t161, Game_Emergencies.csv's World's Fair
+STARTED at t162 and SCORED ENDED at the next session (1117 t181, both
+players SCORING), the World Games t182 - t201, the Climate Accords t222 -
+t241, the Space Station from t242; at t181, after the step, China (player 1)
+draws two "Choosing random civic boost to grant based on era" — the World's
+Fair's top tier (WORLD_FAIR_TOP_TIER_CULTURE, MODIFIER_EMERGENCY_PLAYERS_
+GRANT_RANDOM_CIVIC_BOOST_BY_ERA, Expansion2_Emergencies.xml). The table's
+row order is the database's EmergencyAlliances order (LAB: +0xb40 unread).
 The "Random congress resolution target" draws after them (16 sites,
-0x611140..) are the AI's targets. The engines (`congressSession` /
-`_congress_draw_slate`) follow, over the resolutions they model.
+0x611140..) are the AI's targets. The engines (`drawCongressSlate` /
+`_congress_draw_slate`) follow: the slate's pool the install's resolutions
+in their order, the competitions `CONGRESS_COMPETITIONS`, every living
+major the field.
 
 ## H-1: the random boost and free research pickers — READ
 
@@ -7061,10 +7078,12 @@ Port: `ai/major/congress.ts` (TS only; tables `AI_RESOLUTIONS`,
 `tools/install/ai_tables.py`); the analyzers in the shared value layer
 (`cpu/core/aiModifiers.ts`); the valid targets and the target draw in both
 engines (`cpu/core/congressTargets.ts`, `drawTargets` / `_congress_targets`,
-`_congress_target_draws`; `cpu/data/congressTargets.ts`). The replay puts
-each AI major's ballot on its record (`vote`) at the engine's Regular
-Session and scores its ballot on the game's own slate against
-World_Congress.csv (`cpu/harness/congressAi.ts`).
+`_congress_target_draws`; `cpu/data/congressTargets.ts`). The replay's AI
+majors cast the engine's Regular Session's ballots through its decider
+(`holdCongressBallots`), and their ballots on the game's own slate, on the
+game's favor and Diplomatic Victory points of the session's turn
+(Player_Stats_2.csv), are scored against World_Congress.csv
+(`cpu/harness/congressAi.ts`).
 
 - THE SESSION'S PLACE: its draws are the turn's last — the slate's "World
   Congress Resolutions" draws, then the targets' — after every player's and
@@ -7073,8 +7092,8 @@ World_Congress.csv (`cpu/harness/congressAi.ts`).
   session and votes on it then (1127 t61: 10, 9, 8 -> 1, 1, 5 = the Trade
   Treaty, World Religion, Sovereignty; the Trade Treaty and World Religion
   voted; t81 5, 6, 6 -> Border Control, Sovereignty, Public Relations; the
-  first two voted). The engines announce a session's slate at the session
-  before and vote on it then (the seats' ballots ride the turn's records).
+  first two voted). The engines draw it there too and vote on it then: the
+  ballots the session's decider casts, the AI line for a seat without one.
 - THE EVALUATION (0x622140, a CultureAi job; per resolution of the session,
   entries of 0x20 at +0xa58): each option's value (0x7b3be0, Value_Manager)
   into +0x18 / +0x1c; then where the player's +0x348[r] (the Resolutions
@@ -7208,11 +7227,66 @@ World_Congress.csv (`cpu/harness/congressAi.ts`).
   Deforestation Treaty: jungle 2, forest 3, marsh 5 by index, the drawn 1
   and 2 the logged 3 and 5).
 - Measured (the action replay, runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128,
-  the port's ballot on the game's slate, the AI major of each): the
-  outcome as the log's OPTIONS on 103 / 109 resolutions, the votes as its
-  VOTES on 58 / 109 (the Diplomatic Victory resolution's votes run high: its
-  desire), the target where the port names one 60 / 75; the port leaves 31
-  ballots to the draw, the game draws 65 times for both majors.
+  the port's ballot on the game's slate, the AI major of each, on the game's
+  favor and Diplomatic Victory points): the outcome as the log's OPTIONS on
+  106 / 109 resolutions, the votes as its VOTES on 83 / 109 (on the
+  engine's points 58: the Diplomatic Victory desire's W x P / rem^2 term
+  needs the game's points, 1127 China 20 from t182), the target where the
+  port names one 66 / 75; the port leaves 31 ballots to the draw, the game
+  draws 65 times for both majors. The misses left: 1127 t161 the Luxury
+  resolution valued 45 against the Diplomatic Victory one's 440 (its votes
+  2 for 4).
+
+## C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ
+
+Port: `ai/major/greatPeople.ts` (TS only; `AI_GREAT_PERSON_CLASSES` from
+`tools/install/ai_tables.py`, the GreatPersonClasses table in database
+order); the replay runs it at each AI turn's close and lands it through the
+engine's patronage verb (`patronizeGreatPerson`: the record's `buy` kind 4,
+`buyFaith` kind 15) (`cpu/harness/greatPeopleAi.ts`).
+
+- THE GOLD PATRONAGE (0x6898b0, AI::Economic, called from the savings turn
+  0x687bf0 at its close): K = 0.5 (@d20458, fixed). Over the classes
+  (0xad58b0) and each class's standing person (0x2f64a0): a person the
+  player may claim (0x2f28a0) whose RECRUIT_GREAT_PERSON operation
+  (0xe8e854ba, the individual 0x385fc342) can start is recruited and ends
+  the call. Else, where it may patronize with Gold (0x2f26c0), the price
+  (0x2f70e0, whole) a candidate where it is cheaper than the best so far,
+  the SLUSH_FUND and GREAT_PEOPLE savings together exceed it, the
+  GREAT_PEOPLE savings alone exceed K x it, and the person can act on some
+  plot (0x561070). The cheapest: the PATRONIZE_GREAT_PERSON operation
+  (0xebdeb9f6, the yield 0x2b8aba02 Gold); the price over the GREAT_PEOPLE
+  savings taken from the SLUSH_FUND, that slot to max(0, slot - price), the
+  balance (+0x1b8) less the price.
+- THE SAVINGS' GREAT PEOPLE SLOT (0x687bf0): with no class available
+  (0x2f7eb0) it joins the SLUSH_FUND and stands at 0.
+- THE FAITH PATRONAGE (0x751590, the religion AI's turn 0x74fbf0 after
+  0x74de60, not for a human): the cheapest person it may patronize with
+  Faith (0x2f26c0) whose price its Faith (+0x1340 +0x100) exceeds and that
+  can act on some plot; the PATRONIZE operation with Faith.
+- CanPatronize (0x2f26c0): the class may be earned (0x2f23f0), the person
+  stands (its timeline entry), the player has not passed on it (+0x10), the
+  purse holds the price, the yield's patronage not barred (0x43d1e0) —
+  `patronizeGreatPerson`'s checks.
+- THE PASS (0x2f8c00): its one caller is the player operation handler
+  0x48b9d0: the AI never passes. After it, 0x2f2e90 claims for the player
+  with the most points who can (0x2f8100 the same on a points change) —
+  the engines' claim at the points.
+- PARTLY READ: 0x561070 (over every plot, 0x55f900, the plots the person
+  can act on: the port takes one as held); 0x43c410 (a class's points a
+  turn: over the cities the city build AI's +0x10f8[class] where it has one
+  and the city's own 0x1cb000 on its amenities, the player's bonus a turn
+  +0x1d8[class] whole, x (1 + 0x43c340 / 100: +0x250[class] and the
+  modifier 0xf8705d00); the congress hints 0x67e680 / 0x67e730 read it, the
+  engines' `greatPersonPointsPerTurn` the city's own).
+- Measured (the action replay, the five duels, the AI major of each): the
+  port's patronages 19, the game's 51 (Game_GreatPeople.csv's grants beyond
+  the class's points, the purse that paid), none on the same turn — the
+  engine's purses and points are not the game's; the Faith rule on the
+  record's own purse decides 26 times, 4 of them the game's (1127 t89 the
+  Scientist at 258 + 22 Faith against 257, 1117 t73 the Writer with the
+  Oracle's 25% off). The rest want the turn's points and Faith as the AI
+  reads them (LAB).
 
 ## DLL rules the engines contradict
 

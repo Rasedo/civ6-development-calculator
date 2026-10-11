@@ -29,11 +29,10 @@ import { isCiv, majorsMet, unitsOf } from './seats';
 import { gpOffer } from './greatPeople';
 
 /** the install ResolutionType an engine resolution stands for (its
- *  `target` tag's row), null for a row the install lacks */
-export function congressInstallType(res: number): string | null {
+ *  `target` tag's row) */
+export function congressInstallType(res: number): string {
   const src = CONGRESS_RESOLUTIONS[res]?.src as { target?: { where?: string } } | undefined;
-  const m = /ResolutionType=(\S+)/.exec(src?.target?.where ?? '');
-  return m ? m[1] : null;
+  return /ResolutionType=(\S+)/.exec(src?.target?.where ?? '')![1];
 }
 
 const CURRENCY_YIELDS = ['YIELD_PRODUCTION', 'YIELD_GOLD', 'YIELD_FAITH'];
@@ -80,10 +79,9 @@ export function congressCandidates(type: string): readonly { target: number; ind
 }
 
 /** THE TARGETS resolution `res` offers `seat` now, the engine's indices in
- *  the game's order; empty for a resolution the install lacks */
+ *  the game's order */
 export function congressTargets(state: GameState, seat: number, res: number): number[] {
-  const type = congressInstallType(res);
-  return type ? congressTargetsOf(state, seat, type) : [];
+  return congressTargetsOf(state, seat, congressInstallType(res));
 }
 
 /** THE TARGETS the install's ResolutionType offers `seat` now */

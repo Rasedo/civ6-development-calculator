@@ -282,7 +282,7 @@ class BatchEnv:
 
     def _congress_block(self, row: int) -> torch.Tensor:
         """[B, ladder.CONGRESS] — the ballot currency, the STANDING slate, the
-        one about to sit and the running competition, the same layout
+        session about to sit and the running competition, the same layout
         `observeSeat` renders."""
         s = self.sim
         d = s.dtype
@@ -296,8 +296,6 @@ class BatchEnv:
             cols.append(torch.where(live, s.congress_active[:, k, 2], torch.zeros_like(res)).to(d))
         kind, phase, is_me, member = s._emergency_view(row)
         cols += [kind.to(d), phase.to(d), is_me.to(d), member.to(d)]
-        for k in range(2):
-            cols.append((s.congress_slate[:, k] + 1).clamp(min=0).to(d))
         iv = max(1, int(s._congress_interval))
         cols.append(torch.full((s.B,), float((iv - int(s.turn) % iv) % iv) / iv,
                                dtype=d, device=s.device))

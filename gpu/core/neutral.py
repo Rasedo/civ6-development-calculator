@@ -9,8 +9,7 @@ trade route it would open), `nuke` (the silo launch it would take),
 `research` (the open techs and civics with their prices), `policy` (the cards
 it may slot, the slots, the government it is in and those it may adopt), `war` (the open war columns and the kind each
 declaration takes), `envoy` (the bank and the courtship per city-state),
-`congress` (the session the coming turn holds and this seat's preference on
-it) and `gp` (the Great Person offers and this seat's points); `war` also says
+`congress` (whether a Special Session sits) and `gp` (the Great Person offers and this seat's points); `war` also says
 whether the seat is at war with anyone. After them
 `cities`: one row per living city in the seat's ARRAY order, with its
 production columns, the plots each open district column may take, its
@@ -447,24 +446,9 @@ def _beliefs(sim, row: int) -> dict:
 
 
 def _congress(sim, row: int) -> dict:
-    """The `congress` group: the session the coming step would hold — it sits
-    at the close of the current turn, before the counter moves — and what
-    this seat prefers on each resolution of its slate."""
-    turn = int(sim.turn)
-    _fires, res0, res1, dv = sim._congress_upcoming(turn)
-    slate = torch.stack([res0, res1], dim=1)                          # -1 off a session turn
-    pref_o, pref_t = torch.full_like(slate, -1), torch.full_like(slate, -1)
-    for r in sorted({r for r in slate.flatten().tolist() if r >= 0}):
-        o, t = sim._congress_pref(r, row)
-        at = slate == r
-        pref_o = torch.where(at, o.unsqueeze(1), pref_o)
-        pref_t = torch.where(at, t.unsqueeze(1), pref_t)
-    return {("congress", "slate"): slate, ("congress", "pref_outcome"): pref_o,
-            ("congress", "pref_target"): pref_t, ("congress", "dv"): dv,
-            ("congress", "leader"): sim._congress_leader(dv),
-            ("congress", "special"): sim._special_upcoming(turn),
-            ("congress", "favor"): _floored(sim.civ_diplo_favor[:, row]),
-            ("congress", "vote_step"): torch.full((sim.B,), 2 * int(sim._congress_vprice), dtype=torch.long, device=sim.device)}
+    """The `congress` group: whether a Special Session sits at the close of
+    the current turn (its ballot rides the record's `vote`)."""
+    return {("congress", "special"): sim._special_upcoming(int(sim.turn))}
 
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense

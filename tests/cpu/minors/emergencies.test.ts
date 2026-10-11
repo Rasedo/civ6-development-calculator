@@ -232,7 +232,7 @@ describe('emergencies: the session, the war and the clock', () => {
     emergencySessions(state);
     // seat 0 buys enough weight that the NO side outvotes the lone member
     seatOf(state, 0)!.diplomaticFavor = 2 * CONGRESS_VOTE_PRICE * (1 + 2 + 3);  // three extra votes
-    seatOf(state, 0)!.congressVote = [null, null, null, [1, 0, 3, 0]];
+    seatOf(state, 0)!.congressVote = [1, 3];
     state.turn = 8;
     emergencySessions(state);
     expect(emergencies(state).length).toBe(0);

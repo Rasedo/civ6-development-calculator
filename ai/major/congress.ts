@@ -462,8 +462,8 @@ function hintTarget(kind: string | null, h: CongressHint): number {
 /** THE OWNER'S BALLOT for the session's resolutions (`slate`: the slot, the
  *  engine's resolution index — -1 for the Diplomatic Victory one — and the
  *  install type): [the outcome (0 = A, 1 = B), the target (-1: the engine's
- *  draw), the extra votes, the cast order] per slot, as the record's `vote`
- *  carries it */
+ *  draw), the extra votes, the cast order] per slot, the session's ballot
+ *  (`CongressBallot`) */
 export function congressBallot(view: MajorView, seat: number, agendas: readonly string[],
                                slate: readonly { slot: number; index: number; type: string }[]): {
   vote: ([number, number, number, number] | null)[]; evals: ResolutionEval[]; votes: Map<string, number>; targets: number[] } {

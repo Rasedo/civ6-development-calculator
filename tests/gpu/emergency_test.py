@@ -273,8 +273,8 @@ def main() -> None:
     sim._special_sessions(blank_votes(sim))
     sim.turn = 101
     down = blank_votes(sim)
-    down[:, tgt, sim._special_slot, 0] = 1        # against
-    down[:, tgt, sim._special_slot, 2] = 3        # and buying the weight to carry it
+    down[:, tgt, 0] = 1        # against
+    down[:, tgt, 1] = 3        # and buying the weight to carry it
     sim.civ_diplo_favor[:, tgt] = float(2 * sim._congress_vprice * (1 + 2 + 3))  # three extra votes
     sim._special_sessions(down)
     assert one(sim.emg_kind[:, 0]) == -1, "a voted-down emergency survived"

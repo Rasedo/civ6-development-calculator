@@ -12,9 +12,8 @@ the seat's living cities in array order and carry exactly the production
 mask's open columns, and every plot of every open district column with the
 adjacency the placement ranks it by; the specialist slots and pins, the
 workable plots and the plots a sibling holds that `_swap_tile_ok` lets the
-city claim. The `congress` group reads the engine's own schedule and
-preference (a session turn is forced, forty turns never reach one), and the
-`gp` group the standing offers. Every unit row lists exactly the unit mask's
+city claim. The `congress` group reads the engine's Special Session
+schedule, and the `gp` group the standing offers. Every unit row lists exactly the unit mask's
 open columns, and the driver rebuilds that mask from them; a forced war
 lists the enemy's improvements and cities, and the driver marches every
 unit where a candidate-by-candidate scan would. The head carries the engine
@@ -549,17 +548,8 @@ def main() -> None:
                     sw.append([t, holder[0], int(t in worked[b]), int(sim.tile_locked[b, t])])
                 assert c["swapFrom"] == sorted(sw), f"{where}: city {c['centre']} swapFrom {c['swapFrom']} vs {sorted(sw)}"
                 live_swap += len(sw)
-            # CONGRESS: the coming session as the engine's own schedule reads it
-            fires, res0, res1, dv = sim._congress_upcoming(int(sim.turn) + 1)
-            cg = ob["congress"]
-            assert cg["slate"] == [int(res0[b]), int(res1[b])], f"{where}: congress.slate {cg['slate']}"
-            assert cg["dv"] == bool(dv[b]) and cg["leader"] == int(sim._congress_leader(dv)[b]), f"{where}: congress dv/leader"
-            assert cg["special"] == bool(sim._special_upcoming(int(sim.turn) + 1)[b]), f"{where}: congress.special"
-            assert cg["favor"] == int(math.floor(float(sim.civ_diplo_favor[b, row]))), f"{where}: congress.favor"
-            assert cg["vote_step"] == 2 * int(sim._congress_vprice), f"{where}: congress.vote_step"
-            for s, r in enumerate(cg["slate"]):
-                want = (-1, -1) if r < 0 else tuple(int(x[b]) for x in sim._congress_pref(r, row))
-                assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"{where}: congress pref slot {s}"
+            # CONGRESS: the coming Special Session as the engine's schedule reads it
+            assert ob["congress"] == {"special": bool(sim._special_upcoming(int(sim.turn))[b])}, f"{where}: congress"
             # GREAT PEOPLE: one row per class
             gp = ob["gp"]
             nG = sim.gp_offer.shape[1] if sim._gp_nc else 0
@@ -582,25 +572,6 @@ def main() -> None:
             live_tgt += check_targets(sim, row, b, ob, tgt_ctx)
             live_units += len(ob["units"])
         check_driver_units(sim, st, row, nobs, tgt_ctx["mask"])
-    # A SESSION TURN, forced: forty turns never reach the Congress, so the
-    # schedule is made to announce the first two resolutions with the
-    # Diplomatic Victory vote, and every seat's preference is read back
-    NR = len(sim._congress_res)
-    assert NR >= 2, f"{NR} congress resolutions in the catalog"
-    on = torch.ones(sim.B, dtype=torch.bool)
-    sim._congress_upcoming = lambda _turn: (on, torch.zeros(sim.B, dtype=torch.long),
-                                            torch.ones(sim.B, dtype=torch.long), on)
-    live_pref = 0
-    for row in range(sim.n_majors):
-        for b, ob in enumerate(neutral.seat_obs(sim, row)):
-            cg = ob["congress"]
-            assert cg["slate"] == [0, 1] and cg["dv"], f"seat {row} game {b}: the forced session {cg}"
-            assert cg["leader"] == int(sim._congress_leader(on)[b]), f"seat {row} game {b}: congress.leader"
-            for s in range(2):
-                want = tuple(int(x[b]) for x in sim._congress_pref(s, row))
-                assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"seat {row} game {b}: pref slot {s}"
-                live_pref += 1
-    del sim._congress_upcoming
     # A WAR, forced: seats 0 and 1 fight, so both list the other's cities and
     # improvements and their units have somewhere to march
     sim.war[:, 0, 1] = True
@@ -629,7 +600,7 @@ def main() -> None:
           f"the world group {dict(live_world)}, "
           f"{live_research} open items, {live_cards} cards, {live_declare} open declarations, "
           f"{live_cols} open production columns, {live_sites} district plots, {live_work} workable plots, "
-          f"{live_swap} claimable plots, {live_gp} Great Person offers, {live_pref} congress preferences; "
+          f"{live_swap} claimable plots, {live_gp} Great Person offers; "
           f"a forced war: {live_war['warImps']} enemy improvements, {live_war['warCities']} enemy cities, "
           f"{marched} units marching)")
 

@@ -25,6 +25,7 @@ import {
 import type { KnownCity } from '../../ai/major/knowledge';
 import { majorView, type MajorViewInputs } from '../core/majorView';
 import { savingsTurn } from '../core/aiEconomic';
+import { AI_GREAT_PERSON_CLASSES } from '../../ai/major/tables';
 import { FX } from '../core/aiValue';
 import { DEAL_FRIENDSHIP, DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
 import type { GameState } from '../core/types';
@@ -225,7 +226,8 @@ export class DiploSender {
     const out: (PickedAction & { owner: number })[] = [];
     for (const [owner, pid] of this.seats) {
       if (!view.majors().includes(owner)) continue;
-      savingsTurn(senderOf(this.mem, owner), Math.trunc(view.treasury(owner) * FX));
+      savingsTurn(senderOf(this.mem, owner), Math.trunc(view.treasury(owner) * FX),
+        AI_GREAT_PERSON_CLASSES.some((c) => view.greatPersonClassAvailable(c)));
       const ins = new Map<number, PickInputs>();
       for (const other of view.majors()) {
         if (other === owner || view.metTurn(owner, other) === null) continue;

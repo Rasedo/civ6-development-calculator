@@ -1,0 +1,30 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x43c340
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...'s own 0x1cb000 on its amenities, the player's bonus a turn +0x1d8[class] whole, x (1 + 0x43c340 / 100: +0x250[class] and the modifier 0xf8705d00); the congress hints 0x67e680 / 0x67e7..."
+  review: imported
+- addr: 0x43c410
+  kind: function
+  name: greatPersonPointsPerTurn
+  semantics: "A class's points a turn: over the player's cities the city build AI's term (+0x31d0 +0x10f8[class], unread) and the city's own (0x1cb000 on its amenities), the player's bonus a turn (+0x1d8[class], whole), then x (1 + the percent 0x43c340 / 100: +0x250[class] and the modifier 0xf8705d00). Read by the congress hints 0x67e680, 0x67e730 alone."
+  status: PARTLY
+  impl: [cpu/core/greatPeople.ts:greatPersonPointsPerTurn]
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  review: reviewed
+- addr: 0x43d1e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...not passed on it (+0x10), the purse holds the price, the yield's patronage not barred (0x43d1e0) — `patronizeGreatPerson`'s checks."
+  review: imported

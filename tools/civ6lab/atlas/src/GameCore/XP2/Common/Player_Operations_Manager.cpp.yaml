@@ -17,7 +17,9 @@
   kind: function
   name: APPOINT_GOVERNOR
   status: PARTLY
-  readings: ["B-24r: the governor operations"]
+  readings:
+    - "B-24r: the governor operations"
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up..."
   review: imported

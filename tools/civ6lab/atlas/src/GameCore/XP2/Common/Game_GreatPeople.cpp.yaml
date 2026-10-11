@@ -16,6 +16,36 @@
     - ...is unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no person left, 0x2f1ed0); 250.0 for a Dark Age card in a Dark Age or a Golden Age card in a Golden Age; plus th...
     - "...he civic list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class availability 0x2f1ed0 (Strategos scores in the port where the game logs none: 4,739 lines)."
   review: imported
+- addr: 0x2f23f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "- CanPatronize (0x2f26c0): the class may be earned (0x2f23f0), the person stands (its timeline entry), the player has not passed on it (+0x10), the..."
+  review: imported
+- addr: 0x2f26c0
+  kind: function
+  name: canPatronizePerson
+  semantics: The class may be earned (0x2f23f0), the person stands in its timeline entry, the player has not passed on it (+0x10), the purse (Gold +0x13a0 +0xf8, Faith +0x1340 +0x100) holds the price (0x2f70e0) and the yield's patronage is not barred (0x43d1e0).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 171
+      value: Gold patronage of Zhang Qian
+  impl: [cpu/core/majorView.ts:greatPersonPatronage, ai/major/view.ts:MajorView]
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  review: reviewed
+- addr: 0x2f28a0
+  final: 0x209af0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...(0xad58b0) and each class's standing person (0x2f64a0): a person the player may claim (0x2f28a0) whose RECRUIT_GREAT_PERSON operation (0xe8e854ba, the individual 0x385fc342) can start..."
+  review: imported
 - addr: 0x2f2a60
   final: 0x209c80
   kind: function
@@ -23,6 +53,15 @@
   readings: ["C-93: the great person draw"]
   context:
     - ...b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants a random person of a class from the fi...
+  review: imported
+- addr: 0x2f2e90
+  final: 0x20a040
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...its one caller is the player operation handler 0x48b9d0: the AI never passes. After it, 0x2f2e90 claims for the player with the most points who can (0x2f8100 the same on a points chang..."
   review: imported
 - addr: 0x2f30c0
   final: 0x20a1e0
@@ -40,6 +79,14 @@
   readings: ["C-93: the great person draw"]
   context:
     - ...f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants a random person of a class from the first chronological era. The 9 turn-open...
+  review: imported
+- addr: 0x2f64a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...K = 0.5 (@d20458, fixed). Over the classes (0xad58b0) and each class's standing person (0x2f64a0): a person the player may claim (0x2f28a0) whose RECRUIT_GREAT_PERSON operation (0xe8..."
   review: imported
 - addr: 0x2f64d0
   kind: function
@@ -66,6 +113,14 @@
   context:
     - "The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70 its district, +0x98 its unit) and the unit's dom..."
     - "...for the person to arrive on: a Great Admiral a non-wonder district beside water, 0x2f6500) whose offer's era (0x2f64d0) is at most the actor's or its next; the picker over the..."
+  review: imported
+- addr: 0x2f70e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - ...ited and ends the call. Else, where it may patronize with Gold (0x2f26c0), the price (0x2f70e0, whole) a candidate where it is cheaper than the best so far, the SLUSH_FUND and GREAT_...
   review: imported
 - addr: 0x2f74b0
   kind: function
@@ -96,8 +151,18 @@
   status: PARTLY
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   context:
     - "...on >= threshold); Cannot Found Religion (0x7bada0: none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the play..."
+  review: imported
+- addr: 0x2f8100
+  final: 0x20d530
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "...AI never passes. After it, 0x2f2e90 claims for the player with the most points who can (0x2f8100 the same on a points change) — the engines' claim at the points."
   review: imported
 - addr: 0x2f83e0
   final: 0x20d6a0
@@ -118,11 +183,17 @@
 - addr: 0x2f8c00
   final: 0x20dbf0
   kind: function
-  status: PARTLY
-  readings: ["C-93: the great person draw"]
-  context:
-    - ...es the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants...
-  review: imported
+  name: rejectPerson
+  semantics: "The pass: called by the player operation handler 0x48b9d0 alone, so the AI never passes on a person; after it the claim 0x2f2e90."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 1-250
+      value: "Game_GreatPeople.csv: no AI major passes"
+  readings:
+    - "C-93: the great person draw"
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  review: reviewed
 - addr: 0x2f8f70
   kind: function
   status: PARTLY

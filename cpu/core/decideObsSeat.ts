@@ -5,8 +5,7 @@ import { cityStateById, envoysOf, hasMet } from './cityStates';
 import { gpOffer } from './greatPeople';
 import { GP_CLASSES } from '../data/greatPeople';
 import { worldEraIndex } from './eras';
-import { congressSessionDue, congressVoter, dvLeader, preference, specialSessionDue } from './congress';
-import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_PRICE } from '../data/seats';
+import { specialSessionDue } from './congress';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
 import { beliefPicks, canFoundReligion, openBeliefs } from './game';
@@ -47,36 +46,10 @@ function envoyGroup(state: GameState, seat: number): { avail: number; held: numb
   return { avail: seatOf(state, seat)?.envoysAvailable ?? 0, held };
 }
 
-/** The `congress` group: the Regular Session the coming step would hold — it
- *  sits at the close of the current turn, before the counter moves — its
- *  ANNOUNCED slate and the seat's `preference` per slot, whether it also holds
- *  the Diplomatic Victory resolution and who leads it, whether a Special
- *  Session sits, the seat's favor floored, the vote step (2 s: the k-th extra vote costs it
- *  x k). */
-function congressGroup(state: GameState, seat: number): Record<string, unknown> {
-  const turn = state.turn;
-  const worldEra = worldEraIndex(state);
-  const fires = congressSessionDue(turn, worldEra);
-  const slate = fires ? [...(state.congressSlate ?? [-1, -1])] : [-1, -1];
-  const prefOutcome = [-1, -1], prefTarget = [-1, -1];
-  if (slate.some((r) => r >= 0)) {
-    const ctx = congressVoter(state, seat);
-    slate.forEach((r, i) => {
-      if (r < 0) return;
-      const p = preference(state, r, seat, ctx);
-      prefOutcome[i] = p.outcome;
-      prefTarget[i] = p.target;
-    });
-  }
-  const dv = fires && worldEra >= CONGRESS_DV_MIN_ERA;
-  return {
-    slate, pref_outcome: prefOutcome, pref_target: prefTarget, dv,
-    leader: dv ? dvLeader(state) : -1,
-    special: specialSessionDue(state, turn, worldEra),
-    favor: Math.floor(seatOf(state, seat)?.diplomaticFavor ?? 0),
-    // the k-th extra vote costs vote_step x k (`voteCost`)
-    vote_step: 2 * CONGRESS_VOTE_PRICE,
-  };
+/** The `congress` group: whether a Special Session sits at the close of the
+ *  current turn (its ballot rides the record's `vote`). */
+function congressGroup(state: GameState): Record<string, unknown> {
+  return { special: specialSessionDue(state, state.turn, worldEraIndex(state)) };
 }
 
 /** The `gp` group, per Great Person class: the standing offer (`gpOffer`),

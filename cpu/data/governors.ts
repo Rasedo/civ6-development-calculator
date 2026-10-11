@@ -752,15 +752,6 @@ export const GOVERNOR_TITLE_CIVICS: readonly string[] = [
 export const WATER_WORKS_HOUSING = 2;
 export const WATER_WORKS_AMENITIES = 1;
 
-/** CIV6 (Neutralize Governor): a neutralized governor "cannot be assigned to
- *  any city for at least 6 turns", and Governance Doctrine's B face
- *  neutralizes every governor of one type for the same 6. */
-export const GOVERNOR_NEUTRALIZE_TURNS = 6;
-
-/** CIV6 (Governance Doctrine, A): "Appointing and promoting a Governor of
- *  this type yields 15 Diplomatic Favor." */
-export const GOVERNANCE_DOCTRINE_FAVOR = 15;
-
 /** the governor verbs of a seat's record (`SeatActionRecord.governors`) */
 export const GOV_APPOINT = 0;
 export const GOV_PROMOTE = 1;

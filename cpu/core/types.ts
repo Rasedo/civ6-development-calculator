@@ -331,13 +331,9 @@ export interface SeatActionRecord {
    * plot moves from one of this seat's cities to the claiming one. Both
    * engines re-validate every swap (`swapTileOk`) as it lands. */
   swapTiles?: [number, number][];
-  /** The WORLD CONGRESS ballot, one entry per slate slot in slate order
-   * (slot 2 is the always-3rd Diplomatic Victory resolution, slot 3 the
-   * Special Session): the outcome (0 = A, 1 = B), the target index (-1: a
-   * "Random congress resolution target" draw over the targets the
-   * resolution offers the seat), how many EXTRA votes to buy at the vote
-   * price, and the cast order (the seat's ballots draw their targets in it).
-   * A slot the record leaves out votes the AI line. */
+  /** The SPECIAL SESSION ballot: [outcome (0 = join, 1 = refuse), EXTRA
+   * votes to buy at the vote price]. Left out, the seat joins every
+   * emergency it is not the target of, buying none. */
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
@@ -364,9 +360,8 @@ export interface SeatActionRecord {
   government?: number | null;
 }
 
-/** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
- * for a slot this seat leaves to the AI line. */
-export type CongressVote = ([number, number, number, number] | null)[];
+/** One seat's Special Session ballot: [outcome, extra votes]. */
+export type CongressVote = [number, number];
 
 type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
 
@@ -400,7 +395,7 @@ export interface Competition {
   left: number;
   score: number[];
   member: number[];
-  /** the seat a TRIGGERED competition (the Aid Request) is held for; -1 for a voted one */
+  /** the seat a TRIGGERED competition (the Aid Request) is held for; -1 for one a session started */
   target?: number;
 }
 
@@ -449,9 +444,6 @@ export interface GameState {
    *  research eras (`recordMoments`), ascending */
   momentsWorld?: number[];
   congressSessions?: number;
-  /** the ANNOUNCED slate for the next Regular Session: resolution indices
-   *  drawn at the previous session's close (-1 = empty slot). */
-  congressSlate?: [number, number];
   /** Standing World Congress resolutions from the LAST session (res index
    * into CONGRESS_RESOLUTIONS, winning outcome 0=A/1=B, target index),
    * replaced wholesale each session. */
@@ -834,11 +826,9 @@ export interface Seat {
    *  completions have banked — CIV6 (Future Tech): "+5% ... each time it is
    *  completed". */
   researchProjectPct?: number;
-  /** THIS TURN's World Congress ballot, as the record left it. Written inside
-   * seatPhase, read by the turn's Special Sessions (`emergencySessions`) and
-   * by the Regular Session that closes the turn (`worldCongress`, after the
-   * barbarians' turn), which clears every seat's whether a session fires or
-   * not — an intent is for one turn. */
+  /** THIS TURN's Special Session ballot, as the record left it. Written
+   * inside seatPhase, read and cleared by the turn's Special Sessions
+   * (`emergencySessions`) — an intent is for one turn. */
   congressVote?: CongressVote;
   /** WON EMERGENCIES, by the seat they were won against — a Military
    * Emergency's +5 healing in that seat's territory, one count per win. */

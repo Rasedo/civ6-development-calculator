@@ -87,6 +87,15 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x67e680
+  final: 0x44f4c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "..., x (1 + 0x43c340 / 100: +0x250[class] and the modifier 0xf8705d00); the congress hints 0x67e680 / 0x67e730 read it, the engines' `greatPersonPointsPerTurn` the city's own)."
+  review: imported
 - addr: 0x67e730
   kind: function
   name: hintGreatPersonPatronage
@@ -99,6 +108,7 @@
   impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   review: reviewed
 - addr: 0x67ed10
   kind: function

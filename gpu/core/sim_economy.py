@@ -3597,9 +3597,7 @@ class SimEconomy:
             civics2.gather(1, obs.clamp(min=0).unsqueeze(0).expand(B, -1)),
             torch.zeros(B, self._npol, dtype=torch.bool, device=dev),
         )
-        banned = self._congress_policy_blocked()  # [B], -1 = nothing forbidden
-        return pol_unlocked & (
-            torch.arange(self._npol, device=dev).unsqueeze(0) != banned.unsqueeze(1))
+        return pol_unlocked
 
     def _seat_policy_mask(self, row: int) -> torch.Tensor:
         """[B, nPol] — the cards seat row `row` may SLOT right now. The per-kind

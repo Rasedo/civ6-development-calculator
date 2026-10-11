@@ -2415,17 +2415,15 @@ class SimPhase:
         bank(self.civ_tourism_rel, _rel_t)
         self._bank_tourism_per_rival(row, active, _nat_gen, _rel_t, _late)
         self._update_cultural_dominance(row, active)
-        # POLICY TREATY outcome A pays every seat holding the named card, on
-        # top of the government tier, the (Treaty-Organization-weighted)
-        # suzerain term and CIV6 (Alliance): "In Gathering Storm, each Alliance
-        # gives you +1 Diplomatic Favor per turn per level". Each ORIGINAL
+        # The government tier, the suzerain term and CIV6 (Alliance): "In
+        # Gathering Storm, each Alliance gives you +1 Diplomatic Favor per
+        # turn per level". Each ORIGINAL
         # CAPITAL this row sits in costs it. The rate can go negative, and the
         # bank floors at zero.
         bank(self.civ_diplo_favor,
              self._adopted_gov_tier(row)
-             + self._favor_per_suz * self._suzerain_count(row)
+             + self._favor_per_suz * self._suzerains_held(row)
              + self._favor_per_alliance * self._alliance_levels_of(row).sum(dim=1)
-             + self._congress_policy_favor(self._seat_slotted(row))
              # CIV6 (Foreign Ministry, GS): "+3 Diplomatic Favor per turn."
              + self._seat_building_sum(row, self._b_favor)
              + self._card_favor_per_building(row)

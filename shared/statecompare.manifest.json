@@ -94,17 +94,6 @@
           ]
         },
         {
-          "name": "congressSlate",
-          "compare": "exact",
-          "covers": [
-            "GameState.congressSlate"
-          ],
-          "planes": [
-            "congress_slate"
-          ],
-          "note": "the ANNOUNCED slate for the next Regular Session — resolution indices drawn at the previous session's close, -1 for an empty slot."
-        },
-        {
           "name": "competition",
           "compare": "milli",
           "covers": [
@@ -117,7 +106,7 @@
             "comp_score",
             "comp_member"
           ],
-          "note": "The running scored competition, flat: [kind, turnsLeft, target (-1 for a voted one), score per civ seat, membership per civ seat]. -1 kind = none."
+          "note": "The running scored competition, flat: [kind, turnsLeft, target (-1 for one a session started), score per civ seat, membership per civ seat]. -1 kind = none."
         },
         {
           "name": "congressActive",
@@ -4067,7 +4056,7 @@
       },
       {
         "plane": "civ_congress_vote",
-        "why": "THIS TURN's World Congress ballot. Written inside seatPhase and cleared by worldCongress at the turn tail whether a session fires or not, so it is never live at a turn boundary and there is no TS field to compare it against."
+        "why": "THIS TURN's Special Session ballot. Written inside seatPhase and cleared by emergencySessions at the turn tail whether a session sits or not, so it is never live at a turn boundary and there is no TS field to compare it against."
       },
       {
         "plane": "centre_slot_at",

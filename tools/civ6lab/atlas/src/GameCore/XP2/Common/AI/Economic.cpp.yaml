@@ -34,11 +34,13 @@
     - cpu/core/aiEconomic.ts:SLOT_PLOTS
     - cpu/core/aiEconomic.ts:savingsTurn
     - cpu/core/aiWeights.ts:strategies
+    - cpu/core/aiEconomic.ts:SLOT_GREAT_PEOPLE
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."
@@ -60,6 +62,19 @@
   context:
     - "...bmission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD..."
   review: imported
+- addr: 0x6898b0
+  kind: function
+  name: goldPatronage
+  semantics: "The close of the savings turn (0x687bf0): over the classes (0xad58b0) a person the player may claim and whose RECRUIT operation can start is recruited and ends the call; else among the persons it may patronize with Gold (0x2f26c0) the cheapest whose price (0x2f70e0) the SLUSH_FUND and GREAT_PEOPLE savings together exceed and the GREAT_PEOPLE savings alone exceed half of (@d20458 0.5), with a plot it can act on (0x561070); the PATRONIZE operation, the price spent from the GREAT_PEOPLE slot (the overflow from the SLUSH_FUND, the balance lowered)."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 171
+      value: Gold patronage of Zhang Qian (the record's purse)
+  impl: [ai/major/greatPeople.ts:goldPatronage, ai/major/greatPeople.ts:GOLD_PATRONAGE_SAVED]
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  review: reviewed
 - addr: 0x68ab40
   final: 0x458ac0
   kind: function
@@ -80,7 +95,6 @@
   context:
     - ...the production was set this turn or the last (city +0x2600); the economic AI's listener 0x68ab40 takes a unit or building contract it may buy with gold; any taker makes it ACCEPTED (SU...
     - "...city trees' nodes. The submission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose Pu..."
-  review: reviewed
 - addr: 0x68acd0
   kind: function
   name: spend

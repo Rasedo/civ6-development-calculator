@@ -28,17 +28,17 @@ import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from 
 import { snipeRing, snipeRing3 } from './unitOrders';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
-import { congressPolicyBlocked, congressSessionDue, congressVoter, preference as congressPreference } from './congress';
+import { congressVoter, preference as congressPreference } from './congress';
 import { congressTargets, congressTargetsOf } from './congressTargets';
-import { worldEraIndex } from './eras';
-import { CONGRESS_DV_MIN_ERA, DIPLO_VICTORY_POINTS } from '../data/seats';
+import { DIPLO_VICTORY_POINTS } from '../data/seats';
 import { GWO_COUNT } from '../data/greatWorks';
 import { gwCountsByObj } from './greatWorks';
 import { UNIT_PROMO_CLASS } from '../data/promotions';
 import { availableBuildings } from './rules';
 import { carryLayout, darkAgeEra, fitPoliciesLoose, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
-import { gpOffer, gpOfferCost, greatPersonPointsPerTurn } from './greatPeople';
+import { gpCapped, gpOffer, gpOfferCost, greatPersonPointsPerTurn, patronageCost } from './greatPeople';
+import { gpActivateOk } from './gpAbility';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
@@ -131,7 +131,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
   const slottable = (i: number, gov: string | null): Set<string> => {
     const s = seat(i);
     if (!gov) return new Set();
-    return unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, i), s.government.held, gov);
+    return unlockedPolicyIds(s.research, darkAgeEra(state, i), s.government.held, gov);
   };
   const metTurn = (i: number, j: number): number | null => {
     if (isCityStateSeat(j)) {
@@ -506,8 +506,6 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     congressTarget: (i, r) => congressPreference(state, r, i, congressVoter(state, i)).target,
     congressTargets: (i, r) => congressTargets(state, i, r),
     congressTargetsOf: (i, type) => congressTargetsOf(state, i, type),
-    congressSlate: () => (congressSessionDue(state.turn, worldEraIndex(state)) ? [...(state.congressSlate ?? [-1, -1])] : [-1, -1]),
-    congressDv: () => congressSessionDue(state.turn, worldEraIndex(state)) && worldEraIndex(state) >= CONGRESS_DV_MIN_ERA,
     cityStateBonus: (cs) => {
       const c = seatOf(state, cs) as CityState | undefined;
       return c ? `MINOR_CIV_BONUS_${c.type.toUpperCase()}` : null;
@@ -575,6 +573,24 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     greatPersonOffered: (cls) => {
       const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
       return GP_CLASSES.includes(c) && gpOffer(state, c) !== -2;
+    },
+    greatPersonPatronage: (i, cls, currency) => {
+      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
+      const k = GP_CLASSES.indexOf(c);
+      const s = seatOf(state, i);
+      if (k < 0 || !s || gpOffer(state, c) < 0 || gpCapped(s, c) || (state.gpPassedBy?.[k] ?? -1) === i) return -1;
+      const cost = patronageCost(state, i, c, currency === 'gold');
+      const purse = currency === 'gold' ? s.treasury ?? 0 : s.faith;
+      return Number.isFinite(cost) && purse >= cost ? cost : -1;
+    },
+    faith: (i) => seatOf(state, i)?.faith ?? 0,
+    greatPersonUsable: (i, cls) => {
+      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
+      const at = GP_CLASSES.includes(c) ? gpOffer(state, c) : -1;
+      const s = seatOf(state, i);
+      if (at < 0 || !s) return false;
+      const person = { type: c, seat: i, gpAt: at, charges: 1, tileIndex: 0 } as Unit;
+      return state.map.tiles.some((_t, k) => (s.explored?.[k] ?? 0) > 0 && ((person.tileIndex = k), gpActivateOk(state, person)));
     },
     greatWorksMade: (i) => cityHolders(state).reduce((n, h) => n + h.cities.reduce((m, c) =>
       m + (c.greatWorks ?? []).filter((w) => w.seat === i).length, 0), 0),

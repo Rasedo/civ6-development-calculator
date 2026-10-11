@@ -7,32 +7,26 @@ import { decayGrievances, grievanceFavorPenalty, grievanceHeldCapitals } from '.
 import { chargeProjectResource, chargeUnitResource } from './stockpile';
 import { isSuzerain } from './cityStates';
 import { cardFavorPerBuilding, seatTourism, seatTourismReligious, seatBuildingSum, tourismIntlPct, lateEraTourism, civEraIndex } from './city';
-import { seatGovernment, slottedPolicyIndices } from './effects';
+import { seatGovernment } from './effects';
 import { selectResearch } from './economy';
 import { GOVERNMENTS } from '../data/policies';
 import { growthFoodNeeded } from '../data/constants';
 import { ALLIANCE_C3_TOUR_PCT, ALLIANCE_CULTURAL, DIPLO_FAVOR_PER_SUZERAIN, FAVOR_OCCUPIED_CAPITAL, FAVOR_PER_ALLIANCE, ENLIGHTENMENT_CIVIC, TOURISM_RELIGIOUS_PENALTY_PCT, TOURISM_PER_VISITOR_PER_CIV, CULTURE_PER_DOMESTIC_TOURIST } from '../data/seats';
 import { seatWonderFlag } from './wonders';
-import { CITY_STATE_TYPES } from '../data/cityStates';
 import { emergencyEnvoyGold } from './emergency';
 import { pollutionFavorPenalty } from './climate';
-import { congressPolicyFavor, congressSuzFavorMult } from './congress';
 import { tourismFavorOf, slotFavorOf } from './effects';
 
-/** Suzerained city-states, each weighted by what TREATY ORGANIZATION does to
- *  the favor its TYPE pays — x2 on outcome A, x0 on B, 1 while nothing
- *  stands. Unweighted this is a plain count. */
+/** The city-states this seat is suzerain of. */
 export function suzerainCount(state: GameState, seat: number): number {
-  return state.cityStates.reduce(
-    (n, cityState) => n + (isSuzerain(state, cityState, seat)
-      ? congressSuzFavorMult(state, CITY_STATE_TYPES.indexOf(cityState.type)) : 0), 0);
+  return state.cityStates.reduce((n, cityState) => n + (isSuzerain(state, cityState, seat) ? 1 : 0), 0);
 }
 
-export function diplomaticFavorPerTurn(gov: string | null, suzerains: number, treaty = 0,
+export function diplomaticFavorPerTurn(gov: string | null, suzerains: number,
                                        occupiedCapitals = 0, alliances = 0,
                                        buildings = 0, pollution = 0, grievances = 0): number {
   const tier = gov ? GOVERNMENTS[gov]?.tier ?? 0 : 0;
-  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains + treaty
+  return tier + DIPLO_FAVOR_PER_SUZERAIN * suzerains
     + FAVOR_PER_ALLIANCE * alliances + buildings
     - FAVOR_OCCUPIED_CAPITAL * occupiedCapitals - pollution - grievances;
 }
@@ -52,14 +46,6 @@ export function occupiedCapitals(state: GameState, seat: number): number {
   if (!s) return 0;
   return s.cities.reduce((n, c) => n + ((c.origCapitalSeat ?? -1) >= 0
     && (c.origCapitalSeat ?? -1) !== seat ? 1 : 0), 0);
-}
-
-/** POLICY TREATY outcome A pays every seat holding the named card. */
-function policyTreatyFavor(state: GameState, seat: number): number {
-  const sx = seatOf(state, seat);
-  if (!sx) return 0;
-  // the cards the seat CHOSE (a driver decision), not a fill of its own
-  return congressPolicyFavor(state, slottedPolicyIndices(state, seat));
 }
 
 /** CIV6 (City-State Emergency, success): "+1 Gold/turn for each Envoy they
@@ -91,7 +77,7 @@ export function seatAccumulators(state: GameState, seat: number, govCityIds?: Re
   updateCulturalDominance(state.seats, s);
   s.diplomaticFavor = Math.max(0, (s.diplomaticFavor ?? 0)
     + diplomaticFavorPerTurn(seatGovernment(state, seat), suzerainCount(state, seat),
-                             policyTreatyFavor(state, seat), occupiedCapitals(state, seat),
+                             occupiedCapitals(state, seat),
                              allianceLevels(state, seat),
                              seatBuildingSum(state, seat, 'favorPerTurn') + cardFavorPerBuilding(state, seat),
                              pollutionFavorPenalty(state, seat),

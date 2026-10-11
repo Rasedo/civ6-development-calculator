@@ -668,17 +668,15 @@ export const DIPLO_VICTORY_POINTS = srcConst('eras.diploVictoryPoints', 20,
   gp('DIPLOMATIC_VICTORY_POINTS_REQUIRED'));
 
 type CongressTargetKind = 'district' | 'gpClass' | 'gwObject' | 'seat'
-  | 'currency' | 'policy' | 'government' | 'project' | 'csType' | 'feature'
-  | 'building' | 'promoClass' | 'religion' | 'governor' | 'spyMission'
-  | 'competition' | 'luxury';
+  | 'currency' | 'government' | 'project' | 'csType' | 'feature'
+  | 'building' | 'promoClass' | 'religion' | 'spyMission' | 'luxury';
 /** The wire ORDER of the target kinds: a resolution's `t` on the exported
  *  rules is this array's index, so the GPU's `_congress_space` /
- *  `_congress_pref` switch on the same numbers. APPEND only. */
+ *  `_congress_pref` switch on the same numbers. */
 export const CONGRESS_TARGET_KINDS: readonly CongressTargetKind[] = [
   'district', 'gpClass', 'gwObject', 'seat',
-  'currency', 'policy', 'government', 'project', 'csType', 'feature',
-  'building', 'promoClass', 'religion', 'governor', 'spyMission', 'competition',
-  'luxury',
+  'currency', 'government', 'project', 'csType', 'feature',
+  'building', 'promoClass', 'religion', 'spyMission', 'luxury',
 ];
 
 interface CongressResolutionDef {
@@ -694,8 +692,7 @@ interface CongressResolutionDef {
 }
 /**
  * PROVENANCE (cpu/data/provenance.ts): the install's own `Resolutions` row for each
- * modelled resolution. Four rows this catalog carries have no readable install row at
- * all (POLICY_TREATY, TREATY_ORGANIZATION, GOVERNANCE_DOCTRINE, SCORED_COMPETITION) and stay untagged.
+ * modelled resolution.
  */
 const CONGRESS_SRC: Record<string, SrcMap> = {
   URBAN_DEVELOPMENT_TREATY: {
@@ -791,108 +788,12 @@ const CONGRESS_SRC: Record<string, SrcMap> = {
 };
 
 /**
- * The modeled resolution subset — the rows whose BOTH outcomes land on
- * existing engine channels, era windows verbatim from the wiki table.
- * Catalog order is load-bearing: the slate rotation and the wire's res
- * indices key on it.
+ * The install's resolutions (Expansion2_Congress.xml `Resolutions`) but the
+ * InjectionOnly Diplomatic Victory one, in the install's row order — the
+ * order the session's "World Congress Resolutions" draws index (0x598270)
+ * and the wire's res indices key on.
  */
 const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
-  // CIV6: "A: +100% Production towards buildings in this district. /
-  // B: No buildings can be created in this district." (through Modern) The
-  // target space is UDT_DISTRICTS.
-  { id: 'URBAN_DEVELOPMENT_TREATY', name: 'Urban Development Treaty', minEra: 0, maxEra: 5, target: 'district' },
-  // CIV6: "A: +100% points towards Great People of this class. / B: No
-  // points earned towards Great People of this class" — B zeroes EVERY
-  // source, districts, buildings and projects alike. (through Modern)
-  { id: 'PATRONAGE', name: 'Patronage', minEra: 0, maxEra: 5, target: 'gpClass' },
-  // CIV6: "A: +20% Population growth but -5 Loyalty per turn in target
-  // player's cities. / B: +5 Loyalty per turn but -20% growth." (Industrial+)
-  { id: 'MIGRATION_TREATY', name: 'Migration Treaty', minEra: 4, maxEra: 99, target: 'seat' },
-  // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
-  // Tourism from Great Works of this type." (Modern+)
-  { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwObject' },
-  // CIV6: "A: Producing, or purchasing military units using the chosen
-  // currency type, is +100% of the cost / B: ... -50% of the cost." The
-  // target is the YIELD units are paid in — Production, Gold or Faith
-  // (WorldCongress.lua, WC_Validate_YieldBan) — so the multiplier rides the
-  // production cost on Production and the purchase price on a currency.
-  { id: 'MERCENARY_COMPANIES', name: 'Mercenary Companies', minEra: 0, maxEra: 99, target: 'currency' },
-  // CIV6: "A: Each Trade Route sent to target player provides +4 Gold to the
-  // sender. This player receives +1 Trade Route capacity. / B: All active
-  // international Trade Routes between target player and other players are
-  // ended. No new routes of such kind can be established."
-  { id: 'TRADE_POLICY', name: 'Trade Policy', minEra: 0, maxEra: 99, target: 'seat' },
-  // CIV6: "A: All players with this Policy in their Government gain 1
-  // Diplomatic Favor per turn. / B: This Policy cannot be assigned by any
-  // player."
-  { id: 'POLICY_TREATY', name: 'Policy Treaty', minEra: 0, maxEra: 99, target: 'policy' },
-  // CIV6: "A: This Government type gains a Wildcard policy slot. / B: This
-  // Government type loses a Wildcard policy slot." (Modern+)
-  { id: 'WORLD_IDEOLOGY', name: 'World Ideology', minEra: 5, maxEra: 99, target: 'government' },
-  // CIV6: "A: New Districts built by target player act as Culture bombs. /
-  // B: Target player's borders cannot grow via Culture." (through Modern)
-  { id: 'BORDER_CONTROL_TREATY', name: 'Border Control Treaty', minEra: 0, maxEra: 5, target: 'seat' },
-  // CIV6: "A: Being Suzerain of a City-State of this type yields +100%
-  // Diplomatic Favor. / B: No Diplomatic Favor earned from being Suzerain of
-  // a City-State of this type."
-  { id: 'TREATY_ORGANIZATION', name: 'Treaty Organization', minEra: 0, maxEra: 99, target: 'csType' },
-  // CIV6: "A: +100% of the City-States' yield when sending a Trade Route to a
-  // City-State of this type. / B: City-States of this type do not provide
-  // their unique Suzerain bonus." (through Modern)
-  { id: 'SOVEREIGNTY', name: 'Sovereignty', minEra: 0, maxEra: 5, target: 'csType' },
-  // CIV6: "A: +100% Production towards this Project. / B: -50% Production
-  // towards this Project." (Atomic through Information)
-  { id: 'PUBLIC_WORKS_PROGRAM', name: 'Public Works Program', minEra: 6, maxEra: 7, target: 'project' },
-  // CIV6: "A: Clearing Features of this type yields Gold equal to the
-  // Production and Food. / B: Features of this type cannot be cleared by any
-  // player." (Atomic through Information) The target space is the CLEARABLE
-  // features — the rows carrying a chop, in catalog order.
-  { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
-  // CIV6 (Expansion2_Congress.xml, ResolutionEffects): WhichEffect 1 (A) is
-  // WC_RES_BUILDING_PRODUCTION_BAN, "Ban the production of buildings of this
-  // type"; WhichEffect 2 (B) is WC_RES_BUILDING_PRODUCTION_BUFF, +100%
-  // Production toward them (runs/h1_duelw1106 t222-241: A on the Fossil Fuel
-  // Power Plant takes it off Xian's list). (Modern+) The target space is the
-  // POWER PLANTS (WC_Validate_PowerBuilding), in catalog order.
-  { id: 'GLOBAL_ENERGY_TREATY', name: 'Global Energy Treaty', minEra: 5, maxEra: 99, target: 'building' },
-  // CIV6: "A: Target player generates 100% more Grievances, and other players
-  // generate 100% more Grievances against this player. / B: Target player
-  // generates 50% fewer Grievances, and other players generate 50% fewer
-  // Grievances against this player." (through Atomic) It scales EVERY write
-  // the target is either side of.
-  { id: 'PUBLIC_RELATIONS', name: 'Public Relations', minEra: 0, maxEra: 6, target: 'seat' },
-  // CIV6: "A: +5 Combat Strength for units of this promotion class. /
-  // B: -5 Combat Strength for units of this promotion class." (through Atomic)
-  { id: 'MILITARY_ADVISORY', name: 'Military Advisory', minEra: 0, maxEra: 6, target: 'promoClass' },
-  // CIV6: "A: +10 Religious Combat Strength for all units of this Religion. /
-  // B: Condemning a unit of this Religion yields 25 Diplomatic Favor."
-  // CIV6 (Expansion2_Congress.xml): NO EarliestEra, LatestEra ERA_INDUSTRIAL —
-  // available from the start THROUGH the Industrial era, not from it. A
-  // religion IS its founder's seat here, so the target space is the seat roster.
-  { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 0, maxEra: 4, target: 'religion' },
-  // CIV6: "A: Appointing and promoting a Governor of this type yields 15
-  // Diplomatic Favor. / B: All active Governors of this type are neutralized
-  // for 6 Turns." The published table gives it no era window.
-  { id: 'GOVERNANCE_DOCTRINE', name: 'Governance Doctrine', minEra: 0, maxEra: 99, target: 'governor' },
-  // CIV6: "A: All Spies function +2 levels higher for the Target Operation. /
-  // B: Target Operation is unavailable." The published table gives it no era
-  // window; the floor here is where the chassis page puts the unit —
-  // "Starting in the Renaissance era, Spies will become available" — because
-  // neither outcome can act before a Spy can run an operation.
-  // CIV6 (Expansion2_Congress.xml): EarliestEra Industrial, LatestEra Atomic.
-  { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 4, maxEra: 6, target: 'spyMission' },
-  // CIV6 (World Congress): a SCORED COMPETITION is enacted by a resolution in
-  // a Regular Session, and those "start appearing from the Modern Era onward".
-  // "If enacted, players who vote in favor of the Scored Competition will
-  // compete to contribute to the cause" — so outcome A runs it with its A
-  // voters as the field, and B is the world declining to hold it. The TARGET
-  // names WHICH competition, which is why a second one is a data row.
-  { id: 'SCORED_COMPETITION', name: 'Scored Competition', minEra: 5, maxEra: 99, target: 'competition' },
-  // CIV6: "A: All players have their Weapons of Mass Destruction set equal to
-  // target player's. / B: Target player loses all of their Weapons of Mass
-  // Destruction." The published table puts it in the Atomic era, which is
-  // also the first era a device can exist in.
-  { id: 'ARMS_CONTROL', name: 'Arms Control', minEra: 6, maxEra: 99, target: 'seat' },
   // CIV6: "A: +1 Amenity on duplicates of a Resource. / B: This Luxury
   // resource grants no Amenities." (Renaissance through Industrial per the
   // published table.) Outcome A's REACH — which cities a duplicate's +1
@@ -900,6 +801,83 @@ const RAW_CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] = [
   // copy, served first (`luxuryAmenities`, fitted on the H-1 records).
   // CIV6 (Expansion2_Congress.xml): the row carries NO era columns.
   { id: 'LUXURY_POLICY', name: 'Luxury Policy', minEra: 0, maxEra: 99, target: 'luxury' },
+  // CIV6: "A: Each Trade Route sent to target player provides +4 Gold to the
+  // sender. This player receives +1 Trade Route capacity. / B: All active
+  // international Trade Routes between target player and other players are
+  // ended. No new routes of such kind can be established."
+  { id: 'TRADE_POLICY', name: 'Trade Policy', minEra: 0, maxEra: 99, target: 'seat' },
+  // CIV6: "A: +10 Religious Combat Strength for all units of this Religion. /
+  // B: Condemning a unit of this Religion yields 25 Diplomatic Favor."
+  // CIV6 (Expansion2_Congress.xml): NO EarliestEra, LatestEra ERA_INDUSTRIAL —
+  // available from the start THROUGH the Industrial era, not from it. A
+  // religion IS its founder's seat here, so the target space is the seat roster.
+  { id: 'WORLD_RELIGION', name: 'World Religion', minEra: 0, maxEra: 4, target: 'religion' },
+  // CIV6: "A: Producing, or purchasing military units using the chosen
+  // currency type, is +100% of the cost / B: ... -50% of the cost." The
+  // target is the YIELD units are paid in — Production, Gold or Faith
+  // (WorldCongress.lua, WC_Validate_YieldBan) — so the multiplier rides the
+  // production cost on Production and the purchase price on a currency.
+  { id: 'MERCENARY_COMPANIES', name: 'Mercenary Companies', minEra: 0, maxEra: 99, target: 'currency' },
+  // CIV6: "A: All players have their Weapons of Mass Destruction set equal to
+  // target player's. / B: Target player loses all of their Weapons of Mass
+  // Destruction." The published table puts it in the Atomic era, which is
+  // also the first era a device can exist in.
+  { id: 'ARMS_CONTROL', name: 'Arms Control', minEra: 6, maxEra: 99, target: 'seat' },
+  // CIV6: "A: Great Works of this type generate +100% Tourism. / B: No
+  // Tourism from Great Works of this type." (Modern+)
+  { id: 'HERITAGE_ORGANIZATION', name: 'Heritage Organization', minEra: 5, maxEra: 99, target: 'gwObject' },
+  // CIV6: "A: This Government type gains a Wildcard policy slot. / B: This
+  // Government type loses a Wildcard policy slot." (Modern+)
+  { id: 'WORLD_IDEOLOGY', name: 'World Ideology', minEra: 5, maxEra: 99, target: 'government' },
+  // CIV6: "A: +100% Production towards buildings in this district. /
+  // B: No buildings can be created in this district." (through Modern) The
+  // target space is UDT_DISTRICTS.
+  { id: 'URBAN_DEVELOPMENT_TREATY', name: 'Urban Development Treaty', minEra: 0, maxEra: 5, target: 'district' },
+  // CIV6: "A: New Districts built by target player act as Culture bombs. /
+  // B: Target player's borders cannot grow via Culture." (through Modern)
+  { id: 'BORDER_CONTROL_TREATY', name: 'Border Control Treaty', minEra: 0, maxEra: 5, target: 'seat' },
+  // CIV6: "A: +100% Production towards this Project. / B: -50% Production
+  // towards this Project." (Atomic through Information)
+  { id: 'PUBLIC_WORKS_PROGRAM', name: 'Public Works Program', minEra: 6, maxEra: 7, target: 'project' },
+  // CIV6: "A: +100% points towards Great People of this class. / B: No
+  // points earned towards Great People of this class" — B zeroes EVERY
+  // source, districts, buildings and projects alike. (through Modern)
+  { id: 'PATRONAGE', name: 'Patronage', minEra: 0, maxEra: 5, target: 'gpClass' },
+  // CIV6 (Expansion2_Congress.xml, ResolutionEffects): WhichEffect 1 (A) is
+  // WC_RES_BUILDING_PRODUCTION_BAN, "Ban the production of buildings of this
+  // type"; WhichEffect 2 (B) is WC_RES_BUILDING_PRODUCTION_BUFF, +100%
+  // Production toward them (runs/h1_duelw1106 t222-241: A on the Fossil Fuel
+  // Power Plant takes it off Xian's list). (Modern+) The target space is the
+  // POWER PLANTS (WC_Validate_PowerBuilding), in catalog order.
+  { id: 'GLOBAL_ENERGY_TREATY', name: 'Global Energy Treaty', minEra: 5, maxEra: 99, target: 'building' },
+  // CIV6: "A: +100% of the City-States' yield when sending a Trade Route to a
+  // City-State of this type. / B: City-States of this type do not provide
+  // their unique Suzerain bonus." (through Modern)
+  { id: 'SOVEREIGNTY', name: 'Sovereignty', minEra: 0, maxEra: 5, target: 'csType' },
+  // CIV6: "A: +20% Population growth but -5 Loyalty per turn in target
+  // player's cities. / B: +5 Loyalty per turn but -20% growth." (Industrial+)
+  { id: 'MIGRATION_TREATY', name: 'Migration Treaty', minEra: 4, maxEra: 99, target: 'seat' },
+  // CIV6: "A: Clearing Features of this type yields Gold equal to the
+  // Production and Food. / B: Features of this type cannot be cleared by any
+  // player." (Atomic through Information) The target space is the CLEARABLE
+  // features — the rows carrying a chop, in catalog order.
+  { id: 'DEFORESTATION_TREATY', name: 'Deforestation Treaty', minEra: 6, maxEra: 7, target: 'feature' },
+  // CIV6: "A: Target player generates 100% more Grievances, and other players
+  // generate 100% more Grievances against this player. / B: Target player
+  // generates 50% fewer Grievances, and other players generate 50% fewer
+  // Grievances against this player." (through Atomic) It scales EVERY write
+  // the target is either side of.
+  { id: 'PUBLIC_RELATIONS', name: 'Public Relations', minEra: 0, maxEra: 6, target: 'seat' },
+  // CIV6: "A: All Spies function +2 levels higher for the Target Operation. /
+  // B: Target Operation is unavailable." The published table gives it no era
+  // window; the floor here is where the chassis page puts the unit —
+  // "Starting in the Renaissance era, Spies will become available" — because
+  // neither outcome can act before a Spy can run an operation.
+  // CIV6 (Expansion2_Congress.xml): EarliestEra Industrial, LatestEra Atomic.
+  { id: 'ESPIONAGE_PACT', name: 'Espionage Pact', minEra: 4, maxEra: 6, target: 'spyMission' },
+  // CIV6: "A: +5 Combat Strength for units of this promotion class. /
+  // B: -5 Combat Strength for units of this promotion class." (through Atomic)
+  { id: 'MILITARY_ADVISORY', name: 'Military Advisory', minEra: 0, maxEra: 6, target: 'promoClass' },
 ];
 export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] =
   RAW_CONGRESS_RESOLUTIONS.map((r) => ({ ...r, src: CONGRESS_SRC[r.id] }));
@@ -914,28 +892,24 @@ export const UDT_DISTRICTS: readonly DistrictId[] = [
   'GOVERNMENT_PLAZA', 'WATER_PARK', 'PRESERVE', 'DIPLOMATIC_QUARTER',
 ];
 
-export const CONGRESS_UDT = 0;
-export const CONGRESS_PATRONAGE = 1;
-export const CONGRESS_MIGRATION = 2;
-export const CONGRESS_HERITAGE = 3;
-export const CONGRESS_MERCENARY = 4;
-export const CONGRESS_TRADE_POLICY = 5;
-export const CONGRESS_POLICY_TREATY = 6;
-export const CONGRESS_IDEOLOGY = 7;
+export const CONGRESS_LUXURY_POLICY = 0;
+export const CONGRESS_TRADE_POLICY = 1;
+export const CONGRESS_WORLD_RELIGION = 2;
+export const CONGRESS_MERCENARY = 3;
+export const CONGRESS_ARMS_CONTROL = 4;
+export const CONGRESS_HERITAGE = 5;
+export const CONGRESS_IDEOLOGY = 6;
+export const CONGRESS_UDT = 7;
 export const CONGRESS_BORDER_CONTROL = 8;
-export const CONGRESS_TREATY_ORG = 9;
-export const CONGRESS_SOVEREIGNTY = 10;
-export const CONGRESS_PUBLIC_WORKS = 11;
-export const CONGRESS_DEFORESTATION = 12;
-export const CONGRESS_GLOBAL_ENERGY = 13;
-export const CONGRESS_PUBLIC_RELATIONS = 14;
-export const CONGRESS_MILITARY_ADVISORY = 15;
-export const CONGRESS_WORLD_RELIGION = 16;
-export const CONGRESS_GOVERNANCE = 17;
-export const CONGRESS_ESPIONAGE = 18;
-export const CONGRESS_COMPETITION = 19;
-export const CONGRESS_ARMS_CONTROL = 20;
-export const CONGRESS_LUXURY_POLICY = 21;
+export const CONGRESS_PUBLIC_WORKS = 9;
+export const CONGRESS_PATRONAGE = 10;
+export const CONGRESS_GLOBAL_ENERGY = 11;
+export const CONGRESS_SOVEREIGNTY = 12;
+export const CONGRESS_MIGRATION = 13;
+export const CONGRESS_DEFORESTATION = 14;
+export const CONGRESS_PUBLIC_RELATIONS = 15;
+export const CONGRESS_ESPIONAGE = 16;
+export const CONGRESS_MILITARY_ADVISORY = 17;
 /** Public Relations' two outcomes, as PERCENTAGES of a grievance write. */
 export const CONGRESS_PR_MULT_A = srcConst('eras.congressPrMultA', 200,
   { derived: '100 + the install\'s Public Relations outcome-A Amount (+100%), as a PERCENTAGE of a grievance write', inputs: [modArg('WC_RES_PLAYER_GRIEVANCES_BUFF')] });
@@ -997,9 +971,6 @@ export const CONGRESS_TRADE_GOLD = srcConst('eras.congressTradeGold', 4,
   modArg('INCREASES_TRADE_TO_GOLD'));
 export const CONGRESS_TRADE_CAPACITY = srcConst('eras.congressTradeCapacity', 1,
   modArg('TARGET_ADD_TRADE_ROUTE'));
-/** Policy Treaty outcome A: favor per turn to every seat holding the card. */
-export const CONGRESS_POLICY_FAVOR = srcConst('eras.congressPolicyFavor', 1,
-  { pedia: 'CIV6 (Policy Treaty, outcome A): "All players with this Policy in their Government gain 1 Diplomatic Favor per turn" — the install ships no readable WC_RES row for Policy Treaty' });
 /** World Ideology: the wildcard slot the targeted government gains or loses. */
 export const CONGRESS_IDEOLOGY_SLOTS = srcConst('eras.congressIdeologySlots', 1,
   modArg('GOVT_ADD_WILDCARD_SLOT'));
@@ -1368,13 +1339,11 @@ export const AGREEMENT_TURNS = srcConst('seats.agreementTurns', speedTurns(30),
   speedTurnsSrc(gp('DIPLOMACY_ALLIANCE_TIME_LIMIT'), 30));
 
 // ---------------------------------------------------------------------------
-// SCORED COMPETITIONS (GS), which a Regular Session enacts.
+// SCORED COMPETITIONS (GS), which a Regular Session starts
+// (`CONGRESS_COMPETITIONS`).
 //
 // CIV6 (World Congress): they are "chances for civilizations to win esteem
-// through events and projects that benefit the world", and "If enacted,
-// players who vote in favor of the Scored Competition will compete to
-// contribute to the cause. The players that contribute the most will receive
-// lucrative rewards."
+// through events and projects that benefit the world".
 //
 // CIV6 (Competition): each runs for exactly 30 turns, "after which it ends and
 // winners are chosen". "The civilization with the highest score wins the Gold
@@ -1450,8 +1419,7 @@ interface CompetitionDef {
   silverPerm?: Partial<Record<GpPermKey, number>>;
   bronzePerm?: Partial<Record<GpPermKey, number>>;
   /** CIV6 (EmergencyAlliances.Trigger): a competition the CONGRESS never
-   *  votes in — a game event starts it, against a TARGET seat. Kept LAST
-   *  in the list: the ballot's target space is the rows before it. */
+   *  starts — a game event starts it, against a TARGET seat. */
   triggered?: boolean;
 }
 /** the eight classes the World's Fair scores — every Great Person class but
@@ -1555,6 +1523,19 @@ export const COMPETITION_WORLDS_FAIR = 1;
 export const COMPETITION_WORLD_GAMES = 2;
 export const COMPETITION_SPACE_STATION = 3;
 export const COMPETITION_AID_REQUEST = 4;
+
+/** THE COMPETITIONS A REGULAR SESSION STARTS: the EmergencyAlliances rows
+ *  with Trigger EMERGENCY_TRIGGER_WORLD_CONGRESS (Expansion2_Emergencies.xml)
+ *  in row order, each with its TargetRequirementSet's game-era window
+ *  (REQUIREMENT_GAME_ERA_ATLEAST_EXPANSION / _ATMOST_EXPANSION, as era
+ *  indices). The three Nobel Prizes also need a civilization with
+ *  TRAIT_CIVILIZATION_NOBEL_PRIZE, which no seat carries. */
+export const CONGRESS_COMPETITIONS: readonly { kind: number; minEra: number; maxEra: number }[] = [
+  { kind: COMPETITION_WORLDS_FAIR, minEra: 5, maxEra: 5 },
+  { kind: COMPETITION_SPACE_STATION, minEra: 8, maxEra: 99 },
+  { kind: COMPETITION_CLIMATE, minEra: 7, maxEra: 99 },
+  { kind: COMPETITION_WORLD_GAMES, minEra: 6, maxEra: 99 },
+];
 
 /** CIV6 (Diplomatic Visibility and Gossip): "There are 5 levels of diplomatic
  *  visibility: None, Limited, Open, Secret, and Top Secret." Each source is

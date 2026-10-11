@@ -9,14 +9,14 @@ import { foundCity } from '../../cpu/core/game';
 import { emptySeat } from '../../cpu/core/seats';
 import { seatGroups } from '../../cpu/core/decideObs';
 import { SEAT_GROUPS } from '../../cpu/core/decideObsSeat';
-import { congressSessionDue, specialSessionDue, CONGRESS_CUR_FAITH } from '../../cpu/core/congress';
+import { congressSessionDue, specialSessionDue } from '../../cpu/core/congress';
 import { EMG_CALLED } from '../../cpu/core/emergency';
 import { GP_CLASSES, GREAT_PEOPLE } from '../../cpu/data/greatPeople';
 import { BELIEF_CATALOGS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES } from '../../cpu/data/religion';
 import { TECHS, ERAS } from '../../cpu/data/techs';
 import {
-  CONGRESS_BORDER_CONTROL, CONGRESS_INTERVAL, CONGRESS_MERCENARY, CONGRESS_MIGRATION,
-  CONGRESS_MIN_ERA, CONGRESS_VOTE_PRICE,
+  CONGRESS_INTERVAL,
+  CONGRESS_MIN_ERA,
 } from '../../cpu/data/seats';
 import type { CityState, GameState } from '../../cpu/core/types';
 
@@ -117,40 +117,11 @@ describe('seat scalar groups', () => {
 
   it('congress: nothing sits off a session turn or before the era', () => {
     const state = scene();
-    // the coming step is a session turn: the session closes the turn it sits
-    // in, before the counter moves...
     state.turn = CONGRESS_INTERVAL;
-    state.seats[0].diplomaticFavor = 7.9;
-    state.congressSlate = [CONGRESS_MIGRATION, CONGRESS_BORDER_CONTROL];
-    // ...but the world is Ancient: the Congress is closed
-    expect(SEAT_GROUPS.congress(state, 0)).toEqual({
-      slate: [-1, -1], pref_outcome: [-1, -1], pref_target: [-1, -1], dv: false,
-      leader: -1, special: false, favor: 7, vote_step: 2 * CONGRESS_VOTE_PRICE,
-    });
+    expect(SEAT_GROUPS.congress(state, 0)).toEqual({ special: false });
     expect(congressSessionDue(CONGRESS_INTERVAL, CONGRESS_MIN_ERA - 1)).toBe(false);
     expect(congressSessionDue(CONGRESS_INTERVAL + 1, CONGRESS_MIN_ERA)).toBe(false);
     expect(congressSessionDue(2 * CONGRESS_INTERVAL, CONGRESS_MIN_ERA)).toBe(true);
-  });
-
-  it('congress: the announced slate, the preference per slot, the DV leader', () => {
-    const state = scene();
-    state.seats[1].research.techs.push(LAST_TECH);
-    state.turn = CONGRESS_INTERVAL;          // the session closes this turn
-    state.congressSlate = [CONGRESS_MIGRATION, CONGRESS_MERCENARY];
-    state.seats[1].faith = 50;
-    state.seats[1].treasury = 10;
-    state.seats[1].diplomaticPoints = 3;
-    const g = SEAT_GROUPS.congress(state, 1) as Record<string, unknown>;
-    expect(g.slate).toEqual([CONGRESS_MIGRATION, CONGRESS_MERCENARY]);
-    // Migration: A on yourself; Mercenary Companies: B on the currency held most
-    expect(g.pref_outcome).toEqual([0, 1]);
-    expect(g.pref_target).toEqual([1, CONGRESS_CUR_FAITH]);
-    expect(g.dv).toBe(true);
-    expect(g.leader).toBe(1);
-    // before the first announcement the slate is empty: nothing to prefer
-    state.congressSlate = undefined;
-    const g0 = SEAT_GROUPS.congress(state, 0) as Record<string, unknown>;
-    expect([g0.slate, g0.pref_outcome, g0.pref_target]).toEqual([[-1, -1], [-1, -1], [-1, -1]]);
   });
 
   it('congress: a Special Session sits once a called emergency is due', () => {

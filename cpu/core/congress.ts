@@ -4,24 +4,25 @@
  * every winning-combo voter, refund tiers, the always-3rd Diplomatic Victory
  * resolution) are sourced verbatim at the catalog (data/seats.ts).
  *
- * The VOTE rides the wire: `SeatActionRecord.vote` carries one
- * [outcome, target, extra votes, cast order] per slate slot, and a seat that
- * submits none falls back to the deterministic self-interest rule below. A
- * ballot naming target -1 takes a "Random congress resolution target" draw
- * over the targets the resolution offers the seat (`congressTargets`), as the
- * game's AI does where its hint is not among them (0x611140 ..): seats in
- * order, each seat's ballots in its cast order, before the tally.
+ * A Regular Session draws its slate when it sits and votes on it then. The
+ * ballots come from the decider `holdCongressBallots` installs (the majors'
+ * AI on the replay): one [outcome, target, extra votes, cast order] per
+ * slot; a seat it gives none, and every seat without a decider, votes the
+ * AI line (`preference`, the Diplomatic Victory pile-on). A ballot naming
+ * target -1 takes a "Random congress resolution target" draw over the
+ * targets the resolution offers the seat (`congressTargets`), as the game's
+ * AI does where its hint is not among them (0x611140 ..): seats in order,
+ * each seat's ballots in its cast order, before the tally.
  */
 import { randRange } from './rand';
 import { congressTargets, congressTargetsOf } from './congressTargets';
-import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
+import type { DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { GP_CLASSES } from '../data/greatPeople';
 import { gwCountsByObj } from './greatWorks';
 import { GWO_COUNT } from '../data/greatWorks';
 import { CITY_STATE_TYPES } from '../data/cityStates';
-import { POLICY_LIST, GOVERNMENT_LIST } from '../data/policies';
+import { GOVERNMENT_LIST } from '../data/policies';
 import { PROJECT_LIST } from '../data/projects';
-import { GOVERNORS } from '../data/governors';
 import { clearableFeatures } from '../../world/features';
 import { LUXURY_IDS, RESOURCES, resourceImprovement } from '../../world/resources';
 import { citiesOf, isCiv, seatOf, tileSeat, unitsOf } from './seats';
@@ -32,25 +33,23 @@ import {
   CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_PRICE,
   CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY,
   CONGRESS_GW_MULT, DVP_PER_RESOLUTION,
-  CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY,
-  CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG,
+  CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY,
+  CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL,
   CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_DEFORESTATION,
   CONGRESS_PLUS_100, CONGRESS_MINUS_50, CONGRESS_TRADE_GOLD,
-  CONGRESS_TRADE_CAPACITY, CONGRESS_POLICY_FAVOR, CONGRESS_IDEOLOGY_SLOTS,
+  CONGRESS_TRADE_CAPACITY, CONGRESS_IDEOLOGY_SLOTS,
   CONGRESS_GLOBAL_ENERGY, CONGRESS_ENERGY_PROD_MULT, UDT_DISTRICTS,
   CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION,
   CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL, CONGRESS_LUXURY_POLICY,
   CONGRESS_PR_MULT_A, CONGRESS_PR_MULT_B, CONGRESS_ADVISORY_CS,
-  CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_GOVERNANCE,
-  CONGRESS_COMPETITION, COMPETITIONS, CONGRESS_INTERVAL, CONGRESS_MIN_ERA,
+  CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR,
+  CONGRESS_COMPETITIONS, CONGRESS_INTERVAL, CONGRESS_MIN_ERA,
 } from '../data/seats';
 import { EMG_CALLED } from './emergency';
-import { seatGovernment, slottedPolicyIndices } from './effects';
+import { seatGovernment } from './effects';
 import { envoysOf } from './cityStates';
 import { POWER_PLANT_IDS } from '../data/buildings';
 import { SPY_OFFENSIVE_MISSIONS } from '../data/espionage';
-import { GOVERNOR_NEUTRALIZE_TURNS } from '../data/governors';
-import { neutralizeGovernor } from './governors';
 import { startCompetition } from './competition';
 import { diploVictoryMoment } from './eras';
 import { PROMO_CLASSES, UNIT_PROMO_CLASS } from '../data/promotions';
@@ -66,18 +65,33 @@ export const CONGRESS_CUR_PRODUCTION = 0;
 export const CONGRESS_CUR_GOLD = 1;
 export const CONGRESS_CUR_FAITH = 2;
 
-/**
- * What a VOTER knows that this module deliberately cannot look up. Adoption
- * lives in `effects`, which reads the standing slate back — so the facts come
- * IN and this file stays a leaf. `worldCongress` builds one per seat.
- */
+/** What a voter's `preference` reads beside the state: its live government
+ *  and its envoys per city-state type (`congressVoter`). */
 export interface CongressVoterCtx {
   /** GOVERNMENT_LIST index of the seat's live government; 0 if none. */
   government: number;
-  /** POLICY_LIST indices the seat currently has slotted, ascending. */
-  policies: readonly number[];
   /** envoys held, per CITY_STATE_TYPES index. */
   envoysByType: readonly number[];
+}
+
+/** One seat's Regular Session ballot: [outcome, target, extra votes, cast
+ *  order] for slate slot 0, 1 and the Diplomatic Victory resolution (2), or
+ *  null for a slot it leaves to the AI line. */
+export type CongressBallot = ([number, number, number, number] | null)[];
+
+/** What a session sits on: the slate's two resolutions (-1 none), whether the
+ *  Diplomatic Victory resolution sits, and the competition it starts
+ *  (a COMPETITIONS index, -1 none). */
+export interface CongressSlate { slate: readonly number[]; dv: boolean; competition: number }
+
+/** The decider asked for every seat's ballot once the slate is drawn. */
+export type CongressDecider = (state: GameState, slate: CongressSlate) => readonly (CongressBallot | null)[];
+
+let congressDecider: CongressDecider | null = null;
+
+/** Install (or clear, with null) the decider of the Regular Sessions' ballots. */
+export function holdCongressBallots(fn: CongressDecider | null): void {
+  congressDecider = fn;
 }
 
 /** The DIPLOMATIC VICTORY resolution's slot in the vote head — the always-3rd
@@ -119,7 +133,7 @@ function argmaxLow(counts: readonly number[]): number {
 
 /** The AI free-vote preference for a non-DV resolution: outcome A on the
  * target the voter holds the most of (self for the Migration Treaty). What a
- * seat votes when its record carries no vote for this slot. */
+ * seat votes when its ballot leaves this slot to the AI line. */
 export function preference(state: GameState, res: number, seat: number,
                            ctx: CongressVoterCtx): { outcome: number; target: number } {
   const sx = state.seats[seat];
@@ -159,23 +173,11 @@ export function preference(state: GameState, res: number, seat: number,
       // A pays the NAMED seat's cities for every route in and widens its
       // capacity, so a seat names itself.
       return { outcome: 0, target: seat };
-    case CONGRESS_POLICY_TREATY: {
-      // A pays every holder of the card, so a seat names one it has slotted.
-      return { outcome: 0, target: ctx.policies.length ? ctx.policies[0] : 0 };
-    }
     case CONGRESS_IDEOLOGY:
       return { outcome: 0, target: ctx.government };
     case CONGRESS_BORDER_CONTROL:
       // A is the gift (culture bombs), B the attack — a seat votes itself the gift.
       return { outcome: 0, target: seat };
-    case CONGRESS_GOVERNANCE: {
-      // A pays favor for appointing and promoting the named type, B
-      // neutralizes it — a seat names the governor its own next title will
-      // buy, which is the first it has not appointed yet.
-      const roster = seatOf(state, seat)?.governors ?? [];
-      const want = roster.findIndex((g) => !g.appointed);
-      return { outcome: 0, target: want >= 0 ? want : 0 };
-    }
     case CONGRESS_PUBLIC_RELATIONS:
       // A DOUBLES the target's grievance flow — the self-serving ballot is B
       // on yourself, halving your own.
@@ -217,12 +219,9 @@ export function preference(state: GameState, res: number, seat: number,
       }
       return { outcome: 0, target: argmaxLow(counts) };
     }
-    case CONGRESS_TREATY_ORG:
-    case CONGRESS_SOVEREIGNTY: {
-      // Both name a CITY-STATE TYPE and both pay the patron, so both read the
-      // same signal: where this seat's envoys already are.
+    case CONGRESS_SOVEREIGNTY:
+      // a CITY-STATE TYPE: where this seat's envoys already are
       return { outcome: 0, target: argmaxLow(ctx.envoysByType) };
-    }
     case CONGRESS_PUBLIC_WORKS: {
       const counts = PROJECT_LIST.map(() => 0);
       for (const city of sx.cities) {
@@ -255,14 +254,6 @@ export function preference(state: GameState, res: number, seat: number,
         if (i >= 0) counts[i]++;
       }
       return { outcome: 0, target: argmaxLow(counts) };
-    }
-    case CONGRESS_COMPETITION: {
-      // Climate Accords pays every seat BELOW the highest polluter, so the
-      // seat that stands to score enacts it and the dirtiest refuses. The
-      // target is which competition to run.
-      let top = 0;
-      for (const s of state.seats) if (isCiv(s.seat)) top = Math.max(top, s.co2 ?? 0);
-      return { outcome: (sx.co2 ?? 0) >= top ? 1 : 0, target: 0 };
     }
     default: { // CONGRESS_HERITAGE: a Great Work OBJECT type (TargetKind GREATWORKOBJECT)
       const counts = new Array<number>(GWO_COUNT).fill(0);
@@ -357,17 +348,13 @@ export function targetSpaceSize(state: GameState, res: number): number {
     case 'gpClass': return GP_CLASSES.length;
     case 'gwObject': return GWO_COUNT;
     case 'currency': return CONGRESS_CURRENCIES.length;
-    case 'policy': return POLICY_LIST.length;
     case 'government': return GOVERNMENT_LIST.length;
     case 'project': return PROJECT_LIST.length;
     case 'csType': return CITY_STATE_TYPES.length;
     case 'feature': return CLEARABLE_FEATURES.length;
     case 'building': return POWER_PLANT_IDS.length;
     case 'promoClass': return PROMO_CLASSES.length;
-    case 'governor': return GOVERNORS.length;
     case 'spyMission': return SPY_OFFENSIVE_MISSIONS.length;
-    // a TRIGGERED row (the Aid Request) is never on the ballot; it sits last
-    case 'competition': return COMPETITIONS.filter((c) => !c.triggered).length;
     case 'luxury': return LUXURY_IDS.length;
     // a religion IS its founder's seat here, so its space is the seat roster
     case 'religion': return state.seats.length;
@@ -380,7 +367,7 @@ function clamp(v: number, hi: number): number {
 }
 
 function runResolution(state: GameState, res: number, slot: number,
-                       recorded: readonly (CongressVote | null)[],
+                       recorded: readonly (CongressBallot | null)[],
                        voters: readonly CongressVoterCtx[]): void {
   const space = targetSpaceSize(state, res);
   const votes: Vote[] = [];
@@ -399,24 +386,9 @@ function runResolution(state: GameState, res: number, slot: number,
   const win = tally(votes, space, spent);
   settle(state, votes, spent, win);
   state.congress!.push({ res, outcome: win.outcome, target: win.target });
-  // CIV6 (Governance Doctrine, B): "All active Governors of this type are
-  // neutralized for 6 Turns." The clock starts AT the session, so this is the
-  // one resolution outcome that fires once instead of standing.
-  // CIV6 (World Congress): "If enacted, players who vote in favor of the
-  // Scored Competition will compete to contribute to the cause" — outcome A
-  // starts the 30-turn window, and its own A voters are the field.
-  if (res === CONGRESS_COMPETITION && win.outcome === 0) {
-    startCompetition(state, win.target, votes.filter((v) => v.outcome === 0).map((v) => v.seat));
-  }
   // CIV6 (Arms Control): an inventory is state rather than a standing
-  // modifier, so this one is enforced at the session too.
+  // modifier, so this one is enforced at the session.
   if (res === CONGRESS_ARMS_CONTROL) armsControl(state, win.outcome, win.target);
-  if (res === CONGRESS_GOVERNANCE && win.outcome === 1) {
-    for (const sx of state.seats) {
-      const g = (sx.governors ?? [])[win.target];
-      if (g?.appointed) neutralizeGovernor(state, sx.seat, win.target, GOVERNOR_NEUTRALIZE_TURNS);
-    }
-  }
 }
 
 /** A Regular Session sits at `turn`: every CONGRESS_INTERVAL turn once the
@@ -445,18 +417,16 @@ export function dvLeader(state: GameState): number {
 }
 
 /** What a voter knows that `preference` cannot look up itself: the live
- *  government, the cards it CHOSE (a driver decision, not a fill of its own)
- *  and its envoys per city-state type. */
+ *  government and its envoys per city-state type. */
 export function congressVoter(state: GameState, seat: number): CongressVoterCtx {
   const gov = seatGovernment(state, seat);
-  const policies = slottedPolicyIndices(state, seat);
   const envoysByType = CITY_STATE_TYPES.map(() => 0);
   for (const cityState of state.cityStates ?? []) {
     const t = CITY_STATE_TYPES.indexOf(cityState.type);
     if (t >= 0) envoysByType[t] += envoysOf(cityState, seat);
   }
   const government = gov ? Math.max(0, GOVERNMENT_LIST.findIndex((g) => g.id === gov)) : 0;
-  return { government, policies, envoysByType };
+  return { government, envoysByType };
 }
 
 /** The Diplomatic Victory resolution. Without an intent a seat votes the AI
@@ -464,7 +434,7 @@ export function congressVoter(state: GameState, seat: number): CongressVoterCtx 
  * pours ALL its favor in. The +/-2 lands on the WINNING TARGET immediately
  * (no clamp — the win check is a >= threshold, so negative points are harmless
  * and un-invented). */
-function runDvResolution(state: GameState, recorded: readonly (CongressVote | null)[]): void {
+function runDvResolution(state: GameState, recorded: readonly (CongressBallot | null)[]): void {
   const leader = dvLeader(state);
   if (leader < 0) return;
   const space = state.seats.length;
@@ -496,8 +466,8 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
  * session's two resolutions, `dv` whether the Diplomatic Victory one sits.
  * `_congress_target_draws` is the twin.
  */
-function drawTargets(state: GameState, recorded: readonly (CongressVote | null)[], slate: readonly number[],
-                     dv: boolean): (CongressVote | null)[] {
+function drawTargets(state: GameState, recorded: readonly (CongressBallot | null)[], slate: readonly number[],
+                     dv: boolean): (CongressBallot | null)[] {
   return recorded.map((ballot, c) => {
     if (!ballot || state.seats[c]?.cities.length === 0) return ballot;
     const out = ballot.map((v) => (v ? [...v] as [number, number, number, number] : null));
@@ -513,47 +483,59 @@ function drawTargets(state: GameState, recorded: readonly (CongressVote | null)[
   });
 }
 
+/** CanUseResolutions (WorldCongress.lua): World Religion needs a founded
+ *  religion, the Luxury resolution a luxury on the map; the rest stand. */
+function congressUsable(state: GameState, res: number): boolean {
+  if (res === CONGRESS_WORLD_RELIGION) return state.seats.some((sx) => sx.religion?.founded);
+  if (res === CONGRESS_LUXURY_POLICY) return state.map.tiles.some((t) => !!t.resource && RESOURCES[t.resource].category === 'luxury');
+  return true;
+}
+
+/**
+ * THE SLATE of a Regular Session, drawn when it sits (the DLL's session setup
+ * 0x598270; runs/h1_duelv1127 t61 - t221): over the resolutions in the game
+ * era's window that CanUseResolutions allows, in the install's order,
+ * min(3, n) "World Congress Resolutions" draws, each over what is left and
+ * removing its pick, the first two the slate; then one draw over the
+ * InjectionOnly rows in their era (the Diplomatic Victory resolution from
+ * Modern, a lone row); then one draw (0x596b40) over the competitions in
+ * their era (`CONGRESS_COMPETITIONS`) not running, the pick the competition
+ * the session starts. `_congress_draw_slate` is the twin.
+ */
+export function drawCongressSlate(state: GameState, worldEra: number): CongressSlate {
+  const pool: number[] = [];
+  for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
+    const r = CONGRESS_RESOLUTIONS[i];
+    if (worldEra >= r.minEra && worldEra <= r.maxEra && congressUsable(state, i)) pool.push(i);
+  }
+  const drawn: number[] = [];
+  for (let k = Math.min(3, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length, 'World Congress Resolutions'), 1)[0]);
+  const dv = worldEra >= CONGRESS_DV_MIN_ERA;
+  if (dv) randRange(state, 1, 'World Congress Resolutions');
+  const comps = CONGRESS_COMPETITIONS.filter((c) => worldEra >= c.minEra && worldEra <= c.maxEra && state.competition?.kind !== c.kind);
+  const competition = comps.length ? comps[randRange(state, comps.length, 'World Congress Resolutions')].kind : -1;
+  return { slate: [drawn[0] ?? -1, drawn[1] ?? -1], dv, competition };
+}
+
 /** One Regular Session, after the barbarians' turn closes the turn every
  * player acted in (the game's draw log: the session's draws the last of the
  * turn, before the next turn's random-event step; runs/h1_duelv1127 t61):
- * the ANNOUNCEMENT of the next session's slate first — the DLL's session
- * setup 0x598270 draws it: the era-eligible resolutions that are not
- * InjectionOnly, each weight 1: min(3, eligible) "World Congress
- * Resolutions" draws, each over what is left and removing its pick; with
- * three drawn, the first two the slate voted now did not hold stand (fewer
- * when it held more), else every one drawn; then ONE draw over the
- * InjectionOnly rows in their era (the Diplomatic Victory resolution from
- * Modern, a lone row: a draw over 1) —, then the ballots' target draws
- * (`drawTargets`), then the votes on the slate announced at the session
- * before. The Diplomatic Victory resolution sits every session from Modern.
- * The standing effects REPLACE the previous session's and hold until the
- * next one. `_congress_draw_slate` is the twin of the draw. */
-export function congressSession(state: GameState, worldEra: number,
-                                recorded: readonly (CongressVote | null)[],
-                                voters: readonly CongressVoterCtx[]): void {
+ * the slate drawn (`drawCongressSlate`), the decider's ballots, then
+ * `congressVotes`. */
+export function congressSession(state: GameState, worldEra: number): void {
+  const at = drawCongressSlate(state, worldEra);
+  congressVotes(state, at, congressDecider ? congressDecider(state, at) : []);
+}
+
+/** The votes on a drawn slate: the ballots' target draws (`drawTargets`),
+ * the two resolutions, the Diplomatic Victory one where it sits, then the
+ * competition drawn starts with every living major in its field (one runs
+ * at a time). The standing effects REPLACE the previous session's and hold
+ * until the next one. */
+export function congressVotes(state: GameState, at: CongressSlate, recorded: readonly (CongressBallot | null)[]): void {
   state.congressSessions = (state.congressSessions ?? 0) + 1;
-  const slate = (state.congressSlate ??= [-1, -1]);
-  const draw = (): void => {
-    const pool: number[] = [];
-    for (let i = 0; i < CONGRESS_RESOLUTIONS.length; i++) {
-      if (worldEra >= CONGRESS_RESOLUTIONS[i].minEra && worldEra <= CONGRESS_RESOLUTIONS[i].maxEra) pool.push(i);
-    }
-    const before = [slate[0], slate[1]];
-    const want = Math.min(2, pool.length);
-    const drawn: number[] = [];
-    for (let k = Math.min(want + 1, pool.length); k > 0; k--) drawn.push(pool.splice(randRange(state, pool.length, 'World Congress Resolutions'), 1)[0]);
-    const kept = drawn.length > want ? drawn.filter((r) => !before.includes(r)).slice(0, want) : drawn;
-    slate[0] = kept[0] ?? -1;
-    slate[1] = kept[1] ?? -1;
-    if (worldEra >= CONGRESS_DV_MIN_ERA) randRange(state, 1, 'World Congress Resolutions');
-  };
-  // a session whose slate was never announced (the FIRST one, or an
-  // announcement that found nothing eligible) draws its own, now
-  if (slate[0] === -1 && slate[1] === -1) draw();
-  const voting = [slate[0], slate[1]];
-  // ANNOUNCE the next session's slate (era-eligibility at announcement)
-  draw();
-  const ballots = drawTargets(state, recorded, voting, worldEra >= CONGRESS_DV_MIN_ERA);
+  const voters = state.seats.map((sx) => congressVoter(state, sx.seat));
+  const ballots = drawTargets(state, recorded, at.slate, at.dv);
   // the standing Migration Treaty detaches from its target's cities, each
   // keeping the residue its growth percent leaves (`City.growthDrift`)
   const migration = congressEffect(state, CONGRESS_MIGRATION);
@@ -562,8 +544,11 @@ export function congressSession(state: GameState, worldEra: number,
     for (const c of citiesOf(state, migration.target)) c.growthDrift = (c.growthDrift ?? 0) + residue;
   }
   state.congress = [];
-  voting.filter((r) => r >= 0).forEach((res, slot) => runResolution(state, res, slot, ballots, voters));
-  if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, ballots);
+  at.slate.filter((r) => r >= 0).forEach((res, slot) => runResolution(state, res, slot, ballots, voters));
+  if (at.dv) runDvResolution(state, ballots);
+  if (at.competition >= 0 && !state.competition) {
+    startCompetition(state, at.competition, state.seats.filter((sx) => isCiv(sx.seat) && sx.cities.length > 0).map((sx) => sx.seat));
+  }
 }
 
 function congressEffect(state: GameState, res: number): { outcome: number; target: number } | null {
@@ -715,31 +700,12 @@ export function congressIntlBanned(state: GameState, seat: number): boolean {
   return !!e && e.outcome === 1 && e.target === seat;
 }
 
-/** Policy Treaty outcome A: favor per turn for a seat holding the named card. */
-export function congressPolicyFavor(state: GameState, slotted: readonly number[]): number {
-  const e = congressEffect(state, CONGRESS_POLICY_TREATY);
-  return e && e.outcome === 0 && slotted.includes(e.target) ? CONGRESS_POLICY_FAVOR : 0;
-}
-
-/** Policy Treaty outcome B: the POLICY_LIST index no seat may slot; -1 none. */
-export function congressPolicyBlocked(state: GameState): number {
-  const e = congressEffect(state, CONGRESS_POLICY_TREATY);
-  return e && e.outcome === 1 ? e.target : -1;
-}
-
 /** World Ideology: the wildcard slots the named GOVERNMENT gains (A) or
  *  loses (B). */
 export function congressWildcardDelta(state: GameState, government: number): number {
   const e = congressEffect(state, CONGRESS_IDEOLOGY);
   if (!e || e.target !== government) return 0;
   return e.outcome === 0 ? CONGRESS_IDEOLOGY_SLOTS : -CONGRESS_IDEOLOGY_SLOTS;
-}
-
-/** Governance Doctrine outcome A: the governor TYPE whose appointment and
- *  promotion pays Diplomatic Favor; -1 when not standing. */
-export function congressGovernorFavorType(state: GameState): number {
-  const e = congressEffect(state, CONGRESS_GOVERNANCE);
-  return e && e.outcome === 0 ? e.target : -1;
 }
 
 /** Border Control Treaty outcome A: the seat whose new districts act as
@@ -754,14 +720,6 @@ export function congressCultureBombSeat(state: GameState): number {
 export function congressBorderFrozen(state: GameState, seat: number): boolean {
   const e = congressEffect(state, CONGRESS_BORDER_CONTROL);
   return !!e && e.outcome === 1 && e.target === seat;
-}
-
-/** Treaty Organization: the favor multiplier on being suzerain of a
- *  city-state of this type. */
-export function congressSuzFavorMult(state: GameState, csType: number): number {
-  const e = congressEffect(state, CONGRESS_TREATY_ORG);
-  if (!e || e.target !== csType) return 1;
-  return e.outcome === 0 ? CONGRESS_PLUS_100 : 0;
 }
 
 /** Sovereignty outcome A (WC_RES_MODIFY_CITY_STATE_TRADE_YIELD, Amount 100,

@@ -74,9 +74,9 @@ describe('diplomatic favor', () => {
   // CIV6 (Diplomatic Favor, "Losing Favor"): -5/turn per ORIGINAL CAPITAL
   // occupied, and a seat stuck on a negative rate sits at 0.
   it('charges -5 per turn for each occupied original capital', () => {
-    expect(diplomaticFavorPerTurn('MONARCHY', 0, 0, 1))
+    expect(diplomaticFavorPerTurn('MONARCHY', 0, 1))
       .toBe(GOVERNMENTS.MONARCHY.tier - FAVOR_OCCUPIED_CAPITAL);
-    expect(diplomaticFavorPerTurn('MONARCHY', 0, 0, 2))
+    expect(diplomaticFavorPerTurn('MONARCHY', 0, 2))
       .toBe(GOVERNMENTS.MONARCHY.tier - 2 * FAVOR_OCCUPIED_CAPITAL);
     expect(FAVOR_OCCUPIED_CAPITAL).toBe(5);
   });

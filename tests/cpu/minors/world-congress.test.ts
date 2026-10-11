@@ -5,8 +5,8 @@ import { growthDetachResidue, growthPct256 } from '../../../cpu/core/city';
 import { endTurn, unitPurchaseCost } from '../../../cpu/core/game';
 import { cityBorderGrowth, seatPhase, worldCongress } from '../../../cpu/core/phase';
 import { seededGame } from '../helpers';
-import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_TREATY_ORG, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION, UDT_DISTRICTS } from '../../../cpu/data/seats';
-import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressPolicyFavor, congressPolicyBlocked, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressSuzFavorMult, congressCsRouteFactor, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
+import { CONGRESS_INTERVAL, CONGRESS_MIN_ERA, DVP_PER_RESOLUTION, DIPLO_VICTORY_POINTS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION, CONGRESS_HERITAGE, CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_IDEOLOGY, CONGRESS_BORDER_CONTROL, CONGRESS_SOVEREIGNTY, CONGRESS_PUBLIC_WORKS, CONGRESS_RESOLUTIONS, CONGRESS_TARGET_KINDS , CONGRESS_DEFORESTATION, UDT_DISTRICTS } from '../../../cpu/data/seats';
+import { preference as congressPreference, congressChopBanned, congressChopGold, congressGppFactor, congressGrowthMult, congressLoyaltyDelta, congressUdtBlockedDistrict, congressUdtProdDistrict, congressGwMult, congressUnitCostMult, congressTradeGold, congressRouteCapacity, congressIntlBanned, congressWildcardDelta, congressCultureBombSeat, congressBorderFrozen, congressCsRouteFactor, congressSuzBonusBlocked, congressProjectMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_FAITH } from '../../../cpu/core/congress';
 import { cityTradeYields, congressCancelBannedIntl, routeOriginYields } from '../../../cpu/core/trade';
 import { completeQueueItem } from '../../../cpu/core/production';
 import { setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
@@ -21,9 +21,9 @@ import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
 import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_PRICE, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
 import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL } from '../../../cpu/data/seats';
-import { congressPactBanned, congressPactLevels, targetSpaceSize } from '../../../cpu/core/congress';
+import { congressPactBanned, congressPactLevels, congressVotes, drawCongressSlate, targetSpaceSize, type CongressBallot } from '../../../cpu/core/congress';
 import { competitionOf } from '../../../cpu/core/competition';
-import { CONGRESS_COMPETITION, COMPETITION_CLIMATE, COMPETITION_TURNS } from '../../../cpu/data/seats';
+import { COMPETITION_WORLDS_FAIR, COMPETITION_TURNS, CONGRESS_LUXURY_POLICY } from '../../../cpu/data/seats';
 import { SPY_OFFENSIVE_MISSIONS, SPY_UNIT, SPY_M_SIPHON_FUNDS, SPY_M_FOMENT_UNREST, SPY_M_GAIN_SOURCES } from '../../../cpu/data/espionage';
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
 import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
@@ -50,6 +50,12 @@ function newGame(opponents = 1) {
   state.grievances = {};
   state.autoResearch = false;
   return state;
+}
+
+/** A session on `slate` (two resolution indices), with these ballots. */
+function vote(state: ReturnType<typeof newGame>, slate: readonly number[], ballots: readonly (CongressBallot | null)[] = [],
+              dv = false, competition = -1) {
+  congressVotes(state, { slate, dv, competition }, ballots);
 }
 
 /** Force every civ past the Medieval gate by handing them a Medieval tech. */
@@ -99,12 +105,9 @@ describe('world congress', () => {
   it('a pre-Modern session runs the two-slot slate, spends NO favor, and pays every winning-combo voter', () => {
     const state = newGame(1);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticFavor = 50;
     (state.seats[1] as Seat).diplomaticFavor = 90;
-    // the slate is ANNOUNCED state — pin the draw deterministically
-    state.congressSlate = [CONGRESS_UDT, CONGRESS_PATRONAGE];
-    worldCongress(state);
+    vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE]);
     expect(state.congressSessions).toBe(1);
     expect(state.congress!.map((a) => a.res)).toEqual([CONGRESS_UDT, CONGRESS_PATRONAGE]);
     expect(state.congress!.every((a) => a.outcome === 0)).toBe(true);
@@ -132,15 +135,13 @@ describe('world congress', () => {
     const state = newGame(1);
     medieval(state);
     seatOf(state, 0)!.research.techs.push('RADIO'); // the world era is Modern
-    state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticPoints = 5; // seat 0 leads
-    state.congressSlate = [CONGRESS_UDT, CONGRESS_PATRONAGE]; // pin the announced draw
     // 65 favor buys 5 extra votes at s = 2 (4+8+12+16+20 = 60, 4 short of
     // the 6th)
     seatOf(state, 0)!.diplomaticFavor = 65;
     // 84 favor buys exactly 6 (4+8+...+24)
     (state.seats[1] as Seat).diplomaticFavor = 84;
-    worldCongress(state);
+    vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE], [], true);
     // the DV resolution is not a STANDING effect — only the two slates are
     expect(state.congress!.length).toBe(2);
     // seat 1's B-on-leader (1+6 votes) beats seat 0's A-on-self (1+5):
@@ -307,17 +308,6 @@ describe('world congress: the wider slate', () => {
     expect(b.tradeRoutes).toEqual([]);
   });
 
-  it('Policy Treaty pays every holder of the card, or bans it outright', () => {
-    const state = newGame(1);
-    state.congress = [{ res: CONGRESS_POLICY_TREATY, outcome: 0, target: 3 }];
-    expect(congressPolicyFavor(state, [1, 3])).toBe(1);
-    expect(congressPolicyFavor(state, [1, 2])).toBe(0);
-    expect(congressPolicyBlocked(state)).toBe(-1);
-    state.congress = [{ res: CONGRESS_POLICY_TREATY, outcome: 1, target: 3 }];
-    expect(congressPolicyBlocked(state)).toBe(3);
-    expect(congressPolicyFavor(state, [3])).toBe(0);
-  });
-
   it('World Ideology moves one wildcard slot on the named government only', () => {
     const state = newGame(1);
     state.congress = [{ res: CONGRESS_IDEOLOGY, outcome: 0, target: 2 }];
@@ -353,22 +343,13 @@ describe('world congress: the wider slate', () => {
     expect(city.nextPlot).not.toBe(7);
   });
 
-  it('Treaty Organization and Sovereignty key on the city-state TYPE', () => {
+  it('Sovereignty keys on the city-state TYPE', () => {
     const state = newGame(1);
-    state.congress = [
-      { res: CONGRESS_TREATY_ORG, outcome: 0, target: 2 },
-      { res: CONGRESS_SOVEREIGNTY, outcome: 0, target: 3 },
-    ];
-    expect(congressSuzFavorMult(state, 2)).toBe(2);
-    expect(congressSuzFavorMult(state, 1)).toBe(1);
+    state.congress = [{ res: CONGRESS_SOVEREIGNTY, outcome: 0, target: 3 }];
     expect(congressCsRouteFactor(state, 3)).toBe(2);
     expect(congressCsRouteFactor(state, 2)).toBe(0);
     expect(congressSuzBonusBlocked(state, 3)).toBe(false);
-    state.congress = [
-      { res: CONGRESS_TREATY_ORG, outcome: 1, target: 2 },
-      { res: CONGRESS_SOVEREIGNTY, outcome: 1, target: 3 },
-    ];
-    expect(congressSuzFavorMult(state, 2)).toBe(0);
+    state.congress = [{ res: CONGRESS_SOVEREIGNTY, outcome: 1, target: 3 }];
     expect(congressCsRouteFactor(state, 3)).toBe(0);
     expect(congressSuzBonusBlocked(state, 3)).toBe(true);
   });
@@ -401,7 +382,7 @@ describe('world congress: the wider slate', () => {
 
   it('the AI line takes the gift, on the operation its own spies are running', () => {
     const state = newGame(1);
-    const ctx = { government: 0, policies: [], envoysByType: [] };
+    const ctx = { government: 0, envoysByType: [] };
     const first = congressPreference(state, CONGRESS_ESPIONAGE, 0, ctx);
     expect(first).toEqual({ outcome: 0, target: 0 });
     const spy = spawnUnit(state, SPY_UNIT, seatOf(state, 0)!.cities[0].centerIndex, 0)!;
@@ -416,7 +397,7 @@ describe('world congress: the wider slate', () => {
     // for every resolution — a kind with no arm falls through to a default
     // that sizes and picks off a different catalog entirely.
     const state = newGame(1);
-    const ctx = { government: 0, policies: [], envoysByType: [] };
+    const ctx = { government: 0, envoysByType: [] };
     for (let r = 0; r < CONGRESS_RESOLUTIONS.length; r++) {
       expect(CONGRESS_TARGET_KINDS).toContain(CONGRESS_RESOLUTIONS[r].target);
       const space = targetSpaceSize(state, r);
@@ -430,22 +411,45 @@ describe('world congress: the wider slate', () => {
     }
   });
 
-  it('a Scored Competition opens a window whose field is its own A voters', () => {
-    // CIV6 (World Congress): "players who vote in favor of the Scored
-    // Competition will compete to contribute to the cause".
+  it('a session starts the competition it drew, every living major in its field', () => {
     const state = newGame(2);
     medieval(state);
-    // the highest polluter has nothing to score, so its own line refuses
-    seatOf(state, 0)!.co2 = 100;
-    state.turn = CONGRESS_INTERVAL + 1;
-    state.congressSlate = [CONGRESS_COMPETITION, CONGRESS_UDT];
-    worldCongress(state);
+    (state.seats[2] as Seat).cities = []; // eliminated
+    vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE], [], false, COMPETITION_WORLDS_FAIR);
     const c = competitionOf(state)!;
-    expect(c.kind).toBe(COMPETITION_CLIMATE);
+    expect(c.kind).toBe(COMPETITION_WORLDS_FAIR);
     expect(c.left).toBe(COMPETITION_TURNS);
-    expect(c.member[0]).toBe(0);
-    expect(c.member[1]).toBe(1);
-    expect(c.member[2]).toBe(1);
+    expect(c.member).toEqual([1, 1, 0]);
+  });
+
+  it('the slate draws three over the eligible resolutions in the install order, then the DV and competition draws', () => {
+    // runs/h1_duelv1127 t61: 10, 9, 8 "World Congress Resolutions" draws,
+    // the first two the slate
+    const state = newGame(1);
+    medieval(state);
+    const drawn: number[] = [];
+    holdRng({ point: () => undefined, draw: (_s, max: number, label: DrawLabel) => {
+      if (label === 'World Congress Resolutions') drawn.push(max);
+    } });
+    try {
+      const pre = drawCongressSlate(state, 2);
+      expect(pre.dv).toBe(false);
+      expect(pre.competition).toBe(-1);
+      expect(pre.slate.every((r) => r >= 0 && CONGRESS_RESOLUTIONS[r].minEra <= 2)).toBe(true);
+      // Medieval: the ten resolutions without an EarliestEra, but World
+      // Religion with no religion founded
+      expect(drawn).toEqual([9, 8, 7]);
+      expect(pre.slate).not.toContain(CONGRESS_WORLD_RELIGION);
+      drawn.length = 0;
+      const modern = drawCongressSlate(state, 5);
+      // Modern: + Heritage, World Ideology, Global Energy, Migration,
+      // Espionage, - World Religion; the DV draw over 1; the World's Fair alone
+      expect(drawn).toEqual([14, 13, 12, 1, 1]);
+      expect(modern).toMatchObject({ dv: true, competition: COMPETITION_WORLDS_FAIR });
+    } finally {
+      holdRng(null);
+    }
+    expect(CONGRESS_RESOLUTIONS[CONGRESS_LUXURY_POLICY].id).toBe('LUXURY_POLICY');
   });
 });
 
@@ -547,7 +551,7 @@ describe('the Deforestation Treaty', () => {
     const marsh = CLEARABLE.indexOf('MARSH');
     for (const t of owned) t.feature = 'MARSH';
     const p = congressPreference(state, CONGRESS_DEFORESTATION, 0,
-      { government: 0, policies: [], envoysByType: CITY_STATE_TYPES.map(() => 0) });
+      { government: 0, envoysByType: CITY_STATE_TYPES.map(() => 0) });
     expect(p.outcome).toBe(0);
     expect(p.target).toBe(marsh);
   });
@@ -634,13 +638,9 @@ describe('the three unwritten resolutions', () => {
     const outcomeWin = (rich: number) => {
       const state = newGame(3);
       medieval(state);
-      state.turn = CONGRESS_INTERVAL + 1;
-      for (const sx of state.seats) {
-        sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
-        sx.congressVote = [[sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 0],
-                           [sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 1]];
-      }
-      worldCongress(state);
+      for (const sx of state.seats) sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
+      vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE], state.seats.map((sx) => [[sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 0],
+        [sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 1]]));
       return state.congress!.map((a) => a.outcome);
     };
     expect(outcomeWin(1)).toEqual([1, 1]);   // B, on the favor it committed
@@ -648,13 +648,11 @@ describe('the three unwritten resolutions', () => {
 
     const state = newGame(3);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL + 1;
-    for (const sx of state.seats) {
-      sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
+    for (const sx of state.seats) sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
+    vote(state, [CONGRESS_UDT, CONGRESS_PATRONAGE], state.seats.map((sx) => {
       const target = sx.seat === 3 ? 1 : 0;
-      sx.congressVote = [[0, target, sx.seat === 3 ? 2 : 0, 0], [0, target, sx.seat === 3 ? 2 : 0, 1]];
-    }
-    worldCongress(state);
+      return [[0, target, sx.seat === 3 ? 2 : 0, 0], [0, target, sx.seat === 3 ? 2 : 0, 1]];
+    }));
     // the HIGHER target index wins the tie, which the lower-index rule alone
     // could never produce
     expect(state.congress!.map((a) => a.target)).toEqual([1, 1]);
@@ -665,15 +663,12 @@ describe('the three unwritten resolutions', () => {
 // set equal to the target player. / B: The target player loses all of their
 // Weapons of Mass Destruction." Era 6, so no gate seed ever draws it.
 describe('arms control', () => {
-  function session(wmd: readonly (readonly number[])[], vote: readonly [number, number]) {
+  function session(wmd: readonly (readonly number[])[], ballot: readonly [number, number]) {
     const state = newGame(2);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL + 1;
-    state.congressSlate = [CONGRESS_ARMS_CONTROL, CONGRESS_HERITAGE];
     state.seats.forEach((sx, c) => { sx.wmd = [...wmd[c]]; });
-    for (const sx of state.seats) sx.congressVote = [[vote[0], vote[1], 0, 0], [0, 0, 0, 1]];
-    worldCongress(state);
-    expect(state.congress![0]).toEqual({ res: CONGRESS_ARMS_CONTROL, outcome: vote[0], target: vote[1] });
+    vote(state, [CONGRESS_ARMS_CONTROL, CONGRESS_HERITAGE], state.seats.map(() => [[ballot[0], ballot[1], 0, 0], [0, 0, 0, 1]]));
+    expect(state.congress![0]).toEqual({ res: CONGRESS_ARMS_CONTROL, outcome: ballot[0], target: ballot[1] });
     return state.seats.map((sx) => [...(sx.wmd ?? [])]);
   }
 
@@ -690,7 +685,7 @@ describe('arms control', () => {
 
   it('the AI line strips the nearest rival when it leads, and disarms the world when it does not', () => {
     const state = newGame(2);
-    const ctx = { government: 0, policies: [], envoysByType: [] };
+    const ctx = { government: 0, envoysByType: [] };
     state.seats[0].wmd = [3, 0];
     state.seats[1].wmd = [0, 0];
     state.seats[2].wmd = [1, 0];
@@ -713,11 +708,8 @@ describe('the target draws', () => {
   it('a ballot naming target -1 draws over the targets the resolution offers, seats in order, each in its cast order', () => {
     const state = newGame(1);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL + 1;
-    state.congressSlate = [CONGRESS_MERCENARY, CONGRESS_UDT];
     // seat 0 casts the Urban Development ballot first, seat 1 the reverse
-    seatOf(state, 0)!.congressVote = [[1, -1, 0, 1], [0, -1, 0, 0]];
-    (state.seats[1] as Seat).congressVote = [[1, -1, 0, 0], [0, -1, 0, 1]];
+    const ballots: CongressBallot[] = [[[1, -1, 0, 1], [0, -1, 0, 0]], [[1, -1, 0, 0], [0, -1, 0, 1]]];
     const lists = [congressTargets(state, 0, CONGRESS_UDT).length, congressTargets(state, 0, CONGRESS_MERCENARY).length,
       congressTargets(state, 1, CONGRESS_MERCENARY).length, congressTargets(state, 1, CONGRESS_UDT).length];
     const drawn: number[] = [];
@@ -725,7 +717,7 @@ describe('the target draws', () => {
       if (label === 'Random congress resolution target') drawn.push(max);
     } });
     try {
-      worldCongress(state);
+      vote(state, [CONGRESS_MERCENARY, CONGRESS_UDT], ballots);
     } finally {
       holdRng(null);
     }

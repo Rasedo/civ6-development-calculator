@@ -123,7 +123,6 @@ class SimGovernors:
             if bool(m.count_nonzero()):
                 rows = m.nonzero(as_tuple=True)[0]
                 ap[rows, gi[rows]] = True
-                self._governance_doctrine(row, rows, gi[rows])
             # PROMOTE
             p = arg.clamp(0, max(NP - 1, 0))
             okp = (arg >= 0) & (arg < NP)
@@ -134,7 +133,6 @@ class SimGovernors:
             if bool(m.count_nonzero()):
                 rows = m.nonzero(as_tuple=True)[0]
                 pr[rows, gi[rows]] = pr[rows, gi[rows]] | (torch.ones_like(p[rows]) << p[rows])
-                self._governance_doctrine(row, rows, gi[rows])
             free = ap[bidx, gi] & (out[bidx, gi] <= 0)
             # ASSIGN to a city
             hit = (self.city_center[:, row] == arg.unsqueeze(1)) & alive & (arg >= 0).unsqueeze(1)
@@ -157,15 +155,6 @@ class SimGovernors:
                     city[rows, gi[rows]] = -1
                     minor[rows, gi[rows]] = arg[rows]
                     est[rows, gi[rows]] = self._gov_establish[gi[rows]]
-
-    def _governance_doctrine(self, row: int, rows: torch.Tensor, governor: torch.Tensor) -> None:
-        """CIV6 (Governance Doctrine, A): "Appointing and promoting a Governor
-        of this type yields 15 Diplomatic Favor"."""
-        out, tgt = self._congress_by_id("GOVERNANCE_DOCTRINE")
-        pay = (out[rows] == 0) & (tgt[rows] == governor)
-        if bool(pay.count_nonzero()):
-            hit = rows[pay]
-            self.civ_diplo_favor[hit, row] = self.civ_diplo_favor[hit, row] + self._gov_doctrine_favor
 
     def _minor_gov_row(self, row: int, key: str) -> torch.Tensor:
         """[B, S] f64 — one governor channel, summed over whatever this seat has

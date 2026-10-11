@@ -3,7 +3,6 @@ import { makeMap, makeState, settleAt, tileAtCoords, grantCivics } from '../help
 import { seatOf } from '../../../cpu/core/seats';
 import { applySeatPolicies } from '../../../cpu/core/phase';
 import { computeAdoption, unlockedPolicyIds, fitPolicies, fitPoliciesLoose, governmentSlots, darkAgeEra, wonderExtraSlots, slottedPolicyIndices } from '../../../cpu/core/effects';
-import { congressPolicyBlocked } from '../../../cpu/core/congress';
 import { POLICY_LIST, POLICIES } from '../../../cpu/data/policies';
 import type { GameState, SeatActionRecord } from '../../../cpu/core/types';
 
@@ -28,9 +27,9 @@ function scene(): { state: GameState; open: Set<string>; greedy: string[] } {
   settleAt(state, tileAtCoords(state.map, 5, 5).index, 0);
   grantCivics(state, 'CODE_OF_LAWS', 'CRAFTSMANSHIP', 'FOREIGN_TRADE');
   const s = seatOf(state, 0)!;
-  const adoption = computeAdoption(s.research, wonderExtraSlots(state, 0), congressPolicyBlocked(state), darkAgeEra(state, 0), s.government.held);
+  const adoption = computeAdoption(s.research, wonderExtraSlots(state, 0), darkAgeEra(state, 0), s.government.held);
   expect(adoption.government).not.toBeNull();
-  const open = unlockedPolicyIds(s.research, congressPolicyBlocked(state), darkAgeEra(state, 0), s.government.held, adoption.government!);
+  const open = unlockedPolicyIds(s.research, darkAgeEra(state, 0), s.government.held, adoption.government!);
   const greedy = adoption.policies.filter((p): p is string => p !== null);
   expect(greedy.length).toBeGreaterThan(0);
   return { state, open, greedy };

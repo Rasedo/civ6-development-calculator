@@ -446,6 +446,9 @@ def build() -> str:
         + lit("AI_PROMOTION_CLASSES", [k for k, _ in in_game_order("UnitPromotionClasses", "PromotionClassType",
                                                                     keyed(rows("UnitPromotionClasses"), "PromotionClassType"))],
               "readonly string[]")
+        + lit("AI_GREAT_PERSON_CLASSES", [k for k, _ in in_game_order("GreatPersonClasses", "GreatPersonClassType",
+                                                                       keyed(rows("GreatPersonClasses"), "GreatPersonClassType"))],
+              "readonly string[]")
     )
     # each city-state's modifiers its envoys are worth (the diplomatic AI's
     # +0x6868 list, 0x651490): its leader's traits through the InheritFrom

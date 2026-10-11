@@ -44,7 +44,6 @@ import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from 
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
 import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldPrice, governmentSlots, seatGovernment, darkAgeEra,
   unlockedPolicyIds } from '../core/effects';
-import { congressPolicyBlocked } from '../core/congress';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra } from '../core/economy';
 import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/aiResearch';
 import { civicAiChoice, civicAnalysis, type CivicEntry } from '../core/aiCivics';
@@ -95,6 +94,8 @@ import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { ReligionProbe, religionAiMarkdown, type ReligionActions, type ReligionAiTally } from './religionAi';
 import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
 import { CongressProbe, congressAiMarkdown, type CongressAiTally } from './congressAi';
+import { GreatPeopleProbe, greatPeopleAiMarkdown, type GreatPeopleAiTally } from './greatPeopleAi';
+import { holdCongressBallots } from '../core/congress';
 import { enhanceRecord, foundingRecord, pantheonRecord } from '../../ai/major/religion';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { DiploSender, senderMarkdown, type SenderTally } from './diploSender';
@@ -1484,7 +1485,7 @@ function verifyPolicies(ctx: Ctx, staged: PolicyDecision[]): void {
     let why: string | undefined;
     if (!same) {
       const gov = seatGovernment(ctx.state, s.seat);
-      const open = gov ? unlockedPolicyIds(s.research, congressPolicyBlocked(ctx.state), darkAgeEra(ctx.state, s.seat), s.government.held, gov)
+      const open = gov ? unlockedPolicyIds(s.research, darkAgeEra(ctx.state, s.seat), s.government.held, gov)
         : new Set<string>();
       why = !govOk ? `government ${gid} not adopted (in ${s.government.chosen})`
         : ids.some((id) => !open.has(id)) ? `a card not unlocked: ${ids.filter((id) => !open.has(id)).join(',')}`
@@ -2926,6 +2927,7 @@ export interface ReplayReport {
   religionAi?: ReligionAiTally;
   governorAi?: GovernorAiTally;
   congressAi?: CongressAiTally;
+  greatPeopleAi?: GreatPeopleAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   /** the AI majors' own diplomatic sending */
@@ -3101,6 +3103,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const religionAi = new ReligionProbe(dumpPath, aiSeats, (seat) => strategies.knownCities(seat));
   const sender = new DiploSender(dumpPath, aiSeats, first.playerOfSeat);
   const congressAi = new CongressProbe(dumpPath, aiSeats, first.playerOfSeat);
+  const greatPeopleAi = new GreatPeopleProbe(dumpPath, aiSeats, cat);
   diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
   const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, aiInputs);
@@ -3178,8 +3181,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     // the AI majors' ballots of the session the engine's turn holds
-    congressAi.turn(state, a.turn, aiInputs(a.turn), (x) => diplomacy.agendasOf(x),
-      (state.seatActions as Record<number, Record<number, SeatActionRecord>>)[state.turn - 1]);
+    if (congressAi.active) congressAi.arm(a.turn, aiInputs(a.turn), (x) => diplomacy.agendasOf(x));
     majorAi.preTurn(state);
     strategies.preTurn(state, recordA.state, turnStartCompletions(ctx, b, a.turn), recordMilitary(a, cat, ctx.seatOfPlayer));
     diplomacy.preTurn(state, recordA.state, read.state);
@@ -3315,6 +3317,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       sender.compare(a.turn, picks, recMissions);
       applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
       sender.close(state, (o, x) => diplomacy.opinionOf(o, x));
+      greatPeopleAi.turn(state, a, b, strat, sender.memory);
       ctx.religionPort.inputs = strat;
       portPantheons(ctx, b);
     }
@@ -3530,6 +3533,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdCityStrikes(false);
   holdLevies(false);
   holdBarbarians(null);
+  holdCongressBallots(null);
   if (strategies.active) {
     report.strategies = strategies.tally;
     report.contacts = strategies.contacts(state);
@@ -3538,6 +3542,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (religionAi.active) report.religionAi = religionAi.tally;
   if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
   if (congressAi.active) report.congressAi = congressAi.tally;
+  report.greatPeopleAi = greatPeopleAi.tally;
   report.religionActions = religionAi.actions;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   report.sender = sender.tally;
@@ -3661,6 +3666,7 @@ export function replayMarkdown(r: ReplayReport): string {
   if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi, r.religionActions));
   if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
   if (r.congressAi) out.push(...congressAiMarkdown(r.congressAi));
+  if (r.greatPeopleAi) out.push(...greatPeopleAiMarkdown(r.greatPeopleAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.sender) out.push(...senderMarkdown(r.sender));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));

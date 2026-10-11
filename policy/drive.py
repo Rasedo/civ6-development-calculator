@@ -854,45 +854,17 @@ def _decide_swap(nobs: list, device):
     return torch.tensor([p or [-1, -1] for p in picks], dtype=torch.long, device=device).unsqueeze(1)
 
 
-def _decide_vote(nobs: list, row: int, device):
-    """The WORLD CONGRESS ballot for the session the coming step would run,
-    off the observation's `congress` group. The ladder votes its own
-    interest: its preference on each slate resolution, free; and on the
-    Diplomatic Victory resolution it backs itself or blocks the leader, with
-    every point of favor it has. Slot 3 is the SPECIAL session — join every
-    emergency it is not the target of. Returns [B, 4, 4] — [outcome, target,
-    extra votes, cast order (the slot)] per slot — or None on a quiet turn."""
-    cg = _obs_group(nobs, "congress", device)
-    slate = _obs_dense(nobs, "congress", "slate", device)
-    special = cg["special"]
-    if not bool((slate >= 0).count_nonzero()) and not bool(cg["dv"].count_nonzero()) and not bool(special.count_nonzero()):
+def _decide_vote(nobs: list, device):
+    """The SPECIAL SESSION ballot for the session the coming step would
+    hold, off the observation's `congress` group: the ladder joins every
+    emergency it is not the target of, buying no votes. Returns [B, 2] —
+    [outcome, extra votes] — or None on a quiet turn."""
+    special = _obs_group(nobs, "congress", device)["special"]
+    if not bool(special.count_nonzero()):
         return None
-    pref_o = _obs_dense(nobs, "congress", "pref_outcome", device)
-    pref_t = _obs_dense(nobs, "congress", "pref_target", device)
     B = len(nobs)
-    out = torch.full((B, 4, 4), -1, dtype=torch.long, device=device)
-    zero = torch.zeros(B, dtype=torch.long, device=device)
-    # THE SPECIAL SESSION: the ladder joins every emergency it is not the
-    # target of, which is also what a seat with no ballot does.
-    for f in range(3):
-        out[:, 3, f] = torch.where(special, zero, out[:, 3, f])
-    for slot in (0, 1):
-        m = slate[:, slot] >= 0
-        out[:, slot, 0] = torch.where(m, pref_o[:, slot], out[:, slot, 0])
-        out[:, slot, 1] = torch.where(m, pref_t[:, slot], out[:, slot, 1])
-        out[:, slot, 2] = torch.where(m, zero, out[:, slot, 2])
-    lead = cg["leader"]
-    ok = cg["dv"] & (lead >= 0)
-    if bool(ok.count_nonzero()):
-        # ALL of it: the curve runs out of favor before it runs out of rungs,
-        # so favor/step + 1 is an upper bound on what the bank can buy.
-        want = torch.div(cg["favor"], cg["vote_step"].clamp(min=1), rounding_mode="floor") + 1
-        out[:, 2, 0] = torch.where(ok, (lead != row).long(), out[:, 2, 0])
-        out[:, 2, 1] = torch.where(ok, lead.clamp(min=0), out[:, 2, 1])
-        out[:, 2, 2] = torch.where(ok, want, out[:, 2, 2])
-    for k in range(4):
-        out[:, k, 3] = torch.where(out[:, k, 0] >= 0, torch.full_like(zero, k), out[:, k, 3])
-    return out if bool((out[:, :, 0] >= 0).count_nonzero()) else None
+    out = torch.full((B, 2), -1, dtype=torch.long, device=device)
+    return torch.where(special.unsqueeze(1), torch.zeros_like(out), out)
 
 
 def _decide_route(route: dict):
@@ -1558,7 +1530,7 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     nuke = (_nk["device"], _nk["tile"])
     spec, lock = _decide_citizens(st, nobs)
     swap = _decide_swap(nobs, dev)
-    vote = _decide_vote(nobs, row, dev)
+    vote = _decide_vote(nobs, dev)
     gp_pass = _decide_gp_pass(nobs, row, seeds, t, dev)
     beliefs = _decide_beliefs(nobs, row, seeds, t, dev)
     religion = _decide_religion(nobs, beliefs, row, seeds, t, dev)

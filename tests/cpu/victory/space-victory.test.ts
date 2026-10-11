@@ -10,6 +10,7 @@ import { resolveSeatPower } from '../../../cpu/core/stockpile';
 import { STRATEGIC_IDS, scaleByGameSpeed } from '../../../cpu/data/constants';
 import { TECHS } from '../../../cpu/data/techs';
 import { CIVICS } from '../../../cpu/data/civics';
+import { COMPETITION_AID_REQUEST } from '../../../cpu/data/seats';
 
 // space race / science victory. Gated on Information/Future techs, so no gate
 // lane reaches it and these pokes are the only proof of the semantics. The GPU
@@ -134,6 +135,9 @@ describe('science victory', () => {
     expect(seatOf(state, 0)!.spaceLy).toBe(1);
     expect(state.victoryType).toBe(0);
     expect(state.gameOver).toBe(false);
+    // a running competition holds the one slot: no session's Space Station
+    // speeds the craft
+    state.competition = { kind: COMPETITION_AID_REQUEST, left: 10 * SPACE_FLIGHT_LY, score: [0, 0], member: [0, 0], target: 1 };
     for (let i = 0; i < SPACE_FLIGHT_LY - 2; i++) endTurn(state);
     expect(seatOf(state, 0)!.spaceLy).toBe(SPACE_FLIGHT_LY - 1);
     expect(state.victoryType).toBe(0);

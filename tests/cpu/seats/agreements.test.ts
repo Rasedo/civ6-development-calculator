@@ -136,8 +136,8 @@ describe('the agreements run on one 30-turn clock', () => {
     expect(allyTurnsWith(state, 2, 1)).toBe(SIGNED);
 
     expect(allianceLevels(state, 1)).toBe(1); // a fresh alliance is level 1
-    expect(diplomaticFavorPerTurn(null, 0, 0, 0, 1)
-      - diplomaticFavorPerTurn(null, 0, 0, 0, 0)).toBe(FAVOR_PER_ALLIANCE);
+    expect(diplomaticFavorPerTurn(null, 0, 0, 1)
+      - diplomaticFavorPerTurn(null, 0, 0, 0)).toBe(FAVOR_PER_ALLIANCE);
   });
 
   it('a denouncement expires at the agreement term, and its casus belli with it', () => {

@@ -35,10 +35,10 @@ describe('dark-age policy cards', () => {
   it('a dark card is offered only in a DARK AGE and only inside its window over the game era', () => {
     const research = omniscient();
     const wide = bench(POLICY_LIST.length);
-    const normal = new Set(computeAdoption(research, wide, -1, -1).policies.filter(Boolean) as string[]);
+    const normal = new Set(computeAdoption(research, wide, -1).policies.filter(Boolean) as string[]);
     const ordinary = (s: Set<string>) => [...s].filter((id) => !POLICIES[id]?.dark).sort();
     for (let era = 0; era < ERAS.length; era++) {
-      const dark = new Set(computeAdoption(research, wide, -1, era).policies.filter(Boolean) as string[]);
+      const dark = new Set(computeAdoption(research, wide, era).policies.filter(Boolean) as string[]);
       for (const card of DARK) {
         expect(normal.has(card.id)).toBe(false); // never outside a Dark Age
         expect(dark.has(card.id)).toBe(era >= card.dark!.firstEra && era <= card.dark!.lastEra);
@@ -58,7 +58,7 @@ describe('dark-age policy cards', () => {
   it('a dark card never takes a typed slot, however wide the typed bench', () => {
     const research = omniscient();
     const era = DARK[0].dark!.firstEra;
-    const adopted = computeAdoption(research, { military: 8, economic: 8, diplomatic: 8, wildcard: 0 }, -1, era);
+    const adopted = computeAdoption(research, { military: 8, economic: 8, diplomatic: 8, wildcard: 0 }, era);
     const gov = GOVERNMENTS[adopted.government!]!;
     const baseWild = gov.slots.filter((k) => k === 'wildcard').length;
     const placedDark = (adopted.policies.filter(Boolean) as string[]).filter((id) => POLICIES[id]?.dark);

@@ -23,9 +23,6 @@ export const EMG_PENDING = 0;
 export const EMG_CALLED = 1;
 export const EMG_RUNNING = 2;
 
-/** The special session's slot in the vote head, past the two rotating
- *  resolutions and the always-3rd Diplomatic Victory one. */
-export const CONGRESS_SPECIAL_SLOT = 3;
 
 export interface Emergency {
   /** EMERGENCIES index */

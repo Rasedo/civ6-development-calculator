@@ -368,10 +368,6 @@ export interface MajorView extends AiValueView {
    *  Victory resolution's by its install type */
   congressTargets(seat: number, resolution: number): readonly number[];
   congressTargetsOf(seat: number, type: string): readonly number[];
-  /** the slate the seat's coming session votes on: the engine's resolution
-   *  indices (-1 none), and whether the Diplomatic Victory one sits */
-  congressSlate(): readonly number[];
-  congressDv(): boolean;
   /** a city-state's MinorCivBonusType and its suzerain (-1 none) */
   cityStateBonus(cs: number): string | null;
   suzerain(cs: number): number;
@@ -394,6 +390,16 @@ export interface MajorView extends AiValueView {
   greatPeopleOfClass(seat: number, cls: string): number;
   /** a great person of the class stands offered now */
   greatPersonOffered(cls: string): boolean;
+  /** the price of patronizing the standing person of class `cls` with Gold
+   *  or Faith where the player may (0x2f26c0: a person stands, the player
+   *  may earn the class and has not passed on its person, its purse holds
+   *  the price), else -1 */
+  greatPersonPatronage(seat: number, cls: string, currency: 'gold' | 'faith'): number;
+  /** the player's Faith */
+  faith(seat: number): number;
+  /** whether class `cls`'s standing person could act on some plot the
+   *  player has revealed (0x561070, the activation's test per plot) */
+  greatPersonUsable(seat: number, cls: string): boolean;
   /** the great works the seat's civilization made, wherever they hang */
   greatWorksMade(seat: number): number;
   /** the seat's domestic tourists (+0x10b0) and the tourists it draws from

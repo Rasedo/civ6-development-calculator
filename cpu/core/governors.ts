@@ -7,11 +7,10 @@ import { FEATURE_ADD_CIVIC } from '../data/appeal';
 import type { GpAppeal } from './appeal';
 import { seatBuildingSum, cityHasPark, growthDetachResidue } from './city';
 import { cityDistrictSum, darkBuildings } from './yields';
-import { congressGovernorFavorType } from './congress';
 import { getModifiers } from './effects';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
-  GOVERNANCE_DOCTRINE_FAVOR, GOV_ACTIONS_MAX, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit, promotionBitValue, type GovernorEffects,
+  GOV_ACTIONS_MAX, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit, promotionBitValue, type GovernorEffects,
 } from '../data/governors';
 
 /**
@@ -266,7 +265,6 @@ export function appointGovernor(state: GameState, seat: number, i: number): bool
   const g = s ? governorsOf(s)[i] : undefined;
   if (!s || !g || g.appointed || governorTitlesAvailable(state, seat) <= 0) return false;
   g.appointed = true;
-  payGovernanceDoctrine(state, s, i);
   return true;
 }
 
@@ -277,7 +275,6 @@ export function promoteGovernor(state: GameState, seat: number, i: number, p: nu
   const g = s ? governorsOf(s)[i] : undefined;
   if (!s || !g || !promotionLegal(g, i, p) || governorTitlesAvailable(state, seat) <= 0) return false;
   g.promotions += promotionBitValue(p);
-  payGovernanceDoctrine(state, s, i);
   return true;
 }
 
@@ -520,9 +517,3 @@ export function neutralizeGovernor(state: GameState, seat: number, i: number, tu
   g.outTurns = Math.max(g.outTurns, turns);
 }
 
-/** CIV6 (Governance Doctrine, A): "Appointing and promoting a Governor of
- *  this type yields 15 Diplomatic Favor." */
-function payGovernanceDoctrine(state: GameState, s: Seat, governor: number): void {
-  if (congressGovernorFavorType(state) !== governor) return;
-  s.diplomaticFavor = (s.diplomaticFavor ?? 0) + GOVERNANCE_DOCTRINE_FAVOR;
-}

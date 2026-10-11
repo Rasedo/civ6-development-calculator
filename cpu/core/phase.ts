@@ -53,9 +53,9 @@ import { beliefSeatYields, computeCityStats, cityBuildingSum, luxuryAmenities, d
 import { accrueStockpiles, canTrainWithStockpile, capStockpiles, chargeUnitResource, chargeUnitUpkeep, layRailroad, resolveSeatPower } from './stockpile';
 import { ageReactors } from './disasters';
 import { droughtBars } from '../data/disasters';
-import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressPolicyBlocked, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue, congressVoter } from './congress';
+import { congressSession, congressBorderFrozen, congressLoyaltyDelta, congressProjectMult, congressEnergyProdMult, congressUdtProdDistrict, congressSessionDue } from './congress';
 import { buyVotes } from './congress';
-import { CONGRESS_SPECIAL_SLOT, EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
+import { EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, EMERGENCY_MILITARY, EMERGENCY_NUCLEAR, emergencies, emergencyLoyalty, emergencyName, emergencyPressureCut, emergencyStrikeCS, raiseEmergency } from './emergency';
 import { irradiated, wmdUpkeep } from './nuclear';
 import { EMERGENCIES, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { logDistrictCost } from './difflog';
@@ -1292,9 +1292,9 @@ function holdSpecialSession(state: GameState, e: Emergency,
   for (let c = 0; c < state.seats.length; c++) {
     const sx = state.seats[c];
     if (sx.cities.length === 0) continue;
-    const v = recorded[c]?.[CONGRESS_SPECIAL_SLOT];
+    const v = recorded[c];
     const yes = c !== e.target && (v ? Math.trunc(v[0]) === 0 : true);
-    const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : 0);
+    const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[1])) : 0);
     spent[c] = bought.spent;
     cast.push({ seat: c, yes, weight: 1 + bought.extra });
   }
@@ -1401,29 +1401,28 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
  * turn the players acted in, after the barbarians' turn and before the next
  * turn's random-event step (the game's draw log puts its draws there:
  * runs/h1_duelv1127 t61), so endTurn calls it right after `barbarianPhase`
- * on the turn the barbarians close (`state.turn - 1`), on the ballots that
- * turn's records banked, which it clears. `_world_congress` is the twin.
+ * on the turn the barbarians close (`state.turn - 1`). `_world_congress` is
+ * the twin.
  */
 export function worldCongress(state: GameState): void {
-  const recorded = state.seats.map((sx) => sx.congressVote ?? null);
-  for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for ONE turn
   const turn = state.turn - 1;
   const worldEra = worldEraIndex(state);
   if (!congressSessionDue(turn, worldEra)) return;
-  congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
+  congressSession(state, worldEra);
   state.lastSessionTurn = turn;
   congressCancelBannedIntl(state);
 }
 
 /**
  * THE SPECIAL SESSIONS AND THE EMERGENCIES: a Special Session may sit on ANY
- * turn once the Congress is open, on the ballots the turn's records banked;
- * a running emergency and a running competition are settled whether one sat
- * or not. Called from endTurn after every player's start, before the turn
- * counter moves. `_emergency_sessions` is the twin.
+ * turn once the Congress is open, on the ballots the turn's records banked,
+ * which it clears; a running emergency and a running competition are
+ * settled whether one sat or not. Called from endTurn after every player's
+ * start, before the turn counter moves. `_emergency_sessions` is the twin.
  */
 export function emergencySessions(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
+  for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for ONE turn
   if (worldEraIndex(state) >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
   resolveEmergencies(state);
   resolveCompetition(state);
@@ -1690,7 +1689,7 @@ export function applySeatPolicies(state: GameState, actor: Seat, rec: SeatAction
   if (rec.policies) {
     const gov = seatGovernment(state, actor.seat);
     if (gov) {
-      const open = unlockedPolicyIds(actor.research, congressPolicyBlocked(state), darkAgeEra(state, actor.seat), actor.government.held, gov);
+      const open = unlockedPolicyIds(actor.research, darkAgeEra(state, actor.seat), actor.government.held, gov);
       const ids = rec.policies.map((i) => POLICY_LIST[i]?.id).filter((id): id is string => !!id && open.has(id));
       const fit = ids.length === rec.policies.length ? fitPolicies(governmentSlots(state, actor.seat), ids) : null;
       // a lapsed card the set keeps keeps its standing; one it drops is gone
@@ -1800,7 +1799,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
     const claim = actor.cities.find((c) => c.centerIndex === centre);
     if (claim && swapTileOk(state, claim, tileIndex)) setTileOwner(state.map.tiles[tileIndex], claim.seat, claim.id);
   }
-  // The WORLD CONGRESS ballot is banked, not spent: the session runs at the
+  // The SPECIAL SESSION ballot is banked, not spent: the session runs at the
   // turn tail, after every seat has had its phase.
   if (rec.vote) actor.congressVote = rec.vote;
   if (rec.gpPass !== undefined && rec.gpPass >= 0) passGreatPerson(state, actor.seat, rec.gpPass);

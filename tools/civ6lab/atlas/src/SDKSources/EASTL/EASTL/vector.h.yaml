@@ -62,6 +62,14 @@
   context:
     - "...ignment 0x8b5bf0 over the governors and the slots, one pass (its last argument), with λ 0x6ecee0 (the start: each assigned governor on its city's slot, the slot's occupant it), λ 0x6ec..."
   review: reviewed
+- addr: 0x74de60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the great people's patronage — the Gold and Faith patronage READ, the usable plots and the points a turn PARTLY READ"
+  context:
+    - "- THE FAITH PATRONAGE (0x751590, the religion AI's turn 0x74fbf0 after 0x74de60, not for a human): the cheapest person it may patronize with Faith (0x2f26c0) whose pri..."
+  review: imported
 - addr: 0x80f9d0
   kind: function
   name: Siege City's assignment start

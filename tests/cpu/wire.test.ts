@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { envoysOf, setMet } from '../../cpu/core/cityStates';
 import { makeMap, makeState, tileAtCoords } from './helpers';
-import { seatPhase, warTargets, worldCongress } from '../../cpu/core/phase';
+import { emergencySessions, seatPhase, warTargets } from '../../cpu/core/phase';
 import { effectiveSpecialists } from '../../cpu/core/city';
 import { placeCityStateAt } from '../../cpu/core/cityStates';
 import { PLACEABLE_DISTRICTS } from '../../cpu/data/districts';
@@ -341,19 +341,17 @@ describe('the action FILE drives the TS civ', () => {
     expect(plot.locked).toBe(false);
   });
 
-  it('a recorded BALLOT overrides the AI vote line', () => {
+  it('a recorded Special Session BALLOT is banked for the turn', () => {
     const state = makeState(makeMap(14, 14, 'GRASSLAND'));
     const civ = addCiv(state, 6, 6);
-    const target = 3;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: {
       production: [], tech: null, civic: null, units: [],
-      vote: [[0, target, 0, 0], null, null],
+      vote: [1, 2],
     } } };
     seatPhase(state);
-    expect(civ.congressVote).toEqual([[0, target, 0, 0], null, null]);
-    // `worldCongress` (the Regular Session after the barbarians' turn) clears
-    // the ballot either way
-    worldCongress(state);
+    expect(civ.congressVote).toEqual([1, 2]);
+    // `emergencySessions` clears the ballot either way
+    emergencySessions(state);
     expect(civ.congressVote).toBeUndefined();
   });
 

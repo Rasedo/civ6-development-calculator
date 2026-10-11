@@ -1,8 +1,8 @@
 /**
  * THE MAJORS' WORLD CONGRESS AI IN THE ACTION REPLAY (ai/major/congress.ts):
- * at each turn the engine's Regular Session sits, every AI major's ballot on
- * the engine's slate goes on its record (`vote`: the outcome, the target,
- * the extra votes); and its ballot on the game's own slate of that session
+ * at each Regular Session the engine holds, every AI major's ballot on the
+ * slate the session drew is the session's decider's (`holdCongressBallots`:
+ * the outcome, the target, the extra votes); and its ballot on the game's own slate of that session
  * is scored against the game's log (`<dump>.logs/World_Congress.csv`: per
  * resolution and player the VOTES cast and the OPTIONS taken — the outcome,
  * the target) and its draw log's target draws (`<dump>.randcalls.csv`).
@@ -10,10 +10,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { congressBallot, type ResolutionEval } from '../../ai/major/congress';
 import { majorView, type MajorViewInputs } from '../core/majorView';
-import { congressSessionDue } from '../core/congress';
-import { worldEraIndex } from '../core/eras';
-import type { GameState, SeatActionRecord } from '../core/types';
-import { CONGRESS_RESOLUTIONS } from '../data/seats';
+import { holdCongressBallots, type CongressBallot, type CongressSlate } from '../core/congress';
+import type { GameState } from '../core/types';
+import { CIV_LEADERS, CONGRESS_RESOLUTIONS } from '../data/seats';
 import { CONGRESS_TARGET_TABLES } from '../data/congressTargets';
 import { congressCandidates, congressInstallType } from '../core/congressTargets';
 
@@ -59,6 +58,23 @@ export interface CongressAiTally {
   misses: string[];
 }
 
+/** Player_Stats_2.csv's favor and Diplomatic Victory points by
+ *  `${turn}:${civilization type}` */
+function readStats(path: string): Map<string, { favor: number; points: number }> {
+  const out = new Map<string, { favor: number; points: number }>();
+  if (!existsSync(path)) return out;
+  const lines = readFileSync(path, 'utf8').split('\n');
+  const head = lines[0].split(',').map((x) => x.trim());
+  const pv = head.indexOf('Diplo Victory');
+  const fv = head.indexOf('BALANCE: Favor');
+  for (const line of lines.slice(1)) {
+    const c = line.split(',').map((x) => x.trim());
+    if (c.length <= Math.max(pv, fv)) continue;
+    out.set(`${c[0]}:${c[1]}`, { favor: Number(c[fv]), points: Number(c[pv]) });
+  }
+  return out;
+}
+
 /** the "Random congress resolution target" draws of the game's draw log by
  *  turn (`<dump>.randcalls.csv`) */
 function readTargetDraws(path: string): Map<number, number> {
@@ -75,6 +91,7 @@ function readTargetDraws(path: string): Map<number, number> {
 export class CongressProbe {
   private readonly log: Map<number, Map<string, Map<number, LoggedChoice>>> | null;
   private readonly draws: Map<number, number>;
+  private readonly stats: Map<string, { favor: number; points: number }>;
   readonly tally: CongressAiTally = {
     sessions: 0, lines: 0, outcomeEqual: 0, votesEqual: 0, targetLines: 0, targetEqual: 0, drawsOurs: 0, drawsGame: 0, misses: [],
   };
@@ -85,6 +102,7 @@ export class CongressProbe {
     const path = dumpPath.replace(/\.jsonl$/, '.logs/World_Congress.csv');
     this.log = existsSync(path) ? readCongressLog(path) : null;
     this.draws = readTargetDraws(dumpPath.replace(/\.jsonl$/, '.randcalls.csv'));
+    this.stats = readStats(dumpPath.replace(/\.jsonl$/, '.logs/Player_Stats_2.csv'));
   }
 
   get active(): boolean {
@@ -92,39 +110,51 @@ export class CongressProbe {
   }
 
   /**
-   * THE BALLOTS of the turn's Regular Session, before the engine's turn:
-   * each AI major's ballot on the engine's slate (and the Diplomatic
-   * Victory resolution where it sits) onto its record of the turn
-   * (`records`, by seat), scored against the log's session of `turn`.
+   * THE DECIDER of the Regular Session the engine's coming turn holds
+   * (`holdCongressBallots`): once the session draws its slate, each AI
+   * major's ballot on it, the view on the state of that moment; and its
+   * ballot on the game's own slate of the session, on the game's favor and
+   * Diplomatic Victory points of the session's turn (Player_Stats_2.csv),
+   * scored against the log's session of `turn`.
    */
-  turn(state: GameState, turn: number, inputs: MajorViewInputs, agendasOf: (seat: number) => readonly string[],
-       records: Record<number, SeatActionRecord>): void {
-    if (!congressSessionDue(state.turn, worldEraIndex(state))) return;
+  arm(turn: number, inputs: MajorViewInputs, agendasOf: (seat: number) => readonly string[]): void {
+    holdCongressBallots((state, at) => this.session(state, turn, inputs, agendasOf, at));
+  }
+
+  private session(state: GameState, turn: number, inputs: MajorViewInputs, agendasOf: (seat: number) => readonly string[],
+                  at: CongressSlate): (CongressBallot | null)[] {
     const view = majorView(state, inputs);
-    const engine = view.congressSlate().map((index, slot) => ({ slot, index, type: index >= 0 ? congressInstallType(index) : null }))
-      .filter((s): s is { slot: number; index: number; type: string } => s.type !== null);
-    if (view.congressDv()) engine.push({ slot: 2, index: -1, type: 'WC_RES_DIPLOVICTORY' });
+    const game = (seat: number) => {
+      const civ = CIV_LEADERS[state.seats[seat]?.civ ?? -1]?.civ;
+      return civ ? this.stats.get(`${turn}:CIVILIZATION_${civ}`) : undefined;
+    };
+    const gameView = { ...view, favor: (i: number) => game(i)?.favor ?? view.favor(i),
+      diplomaticPoints: (i: number) => game(i)?.points ?? view.diplomaticPoints(i) };
+    const engine = at.slate.map((index, slot) => ({ slot, index, type: index >= 0 ? congressInstallType(index) : '' }))
+      .filter((s) => s.index >= 0);
+    if (at.dv) engine.push({ slot: 2, index: -1, type: 'WC_RES_DIPLOVICTORY' });
     const logged = this.log?.get(turn) ?? this.log?.get(turn + 1);
     this.tally.sessions++;
+    const out: (CongressBallot | null)[] = state.seats.map(() => null);
     let drawn = 0;
     for (const [seat, pid] of this.seats) {
-      if (!view.majors().includes(seat)) continue;
+      if (!view.players().includes(seat)) continue;
       const { vote } = congressBallot(view, seat, agendasOf(seat), engine);
-      (records[seat] ??= { production: [], tech: null, civic: null, units: [] }).vote = vote;
+      out[seat] = vote;
       if (!logged) continue;
       // the game's slate of the session, the engine's index of each (-1 for
-      // the Diplomatic Victory resolution and one the catalog lacks), in
-      // slots past the engine's
+      // the Diplomatic Victory resolution)
       const theirs = [...logged.keys()].filter((r) => logged.get(r)?.has(pid))
         .map((type, k) => ({ slot: k, type, index: CONGRESS_RESOLUTIONS.findIndex((_r, i) => congressInstallType(i) === type) }));
-      const own = congressBallot(view, seat, agendasOf(seat), theirs);
+      const own = congressBallot(gameView, seat, agendasOf(seat), theirs);
       drawn += own.targets.filter((x) => x < 0).length;
-      this.score(turn, pid, view.favor(seat), theirs, own.evals, own.votes, own.targets, logged);
+      this.score(turn, pid, gameView.favor(seat), theirs, own.evals, own.votes, own.targets, logged);
     }
     if (logged) {
       this.tally.drawsOurs += drawn;
       this.tally.drawsGame += this.draws.get(turn) ?? this.draws.get(turn + 1) ?? 0;
     }
+    return out;
   }
 
   /** the log's index of a target the port names, null where unread */

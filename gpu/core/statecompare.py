@@ -384,7 +384,6 @@ GAME = {
     "victoryType": lambda sim, b, rows: [int(sim.victory_type[b])],
     "victoryRow": lambda sim, b, rows: [int(sim.victory_row[b])],
     "congressSessions": lambda sim, b, rows: [int(sim.congress_sessions[b])],
-    "congressSlate": lambda sim, b, rows: [[int(x) for x in sim.congress_slate[b].tolist()]],
     # ONE row, so ONE outer list. The game group has a single row and the
     # fold reads `vals[0]`: a FLAT list would compare only its first element
     # (the competition's kind, the first resolution's id, the first

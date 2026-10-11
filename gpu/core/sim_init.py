@@ -761,21 +761,16 @@ class SimInit:
         self.comp_left = torch.zeros(B, dtype=torch.long, device=device)
         self.comp_score = torch.zeros(B, _pw, dtype=dtype, device=device)
         self.comp_member = torch.zeros(B, _pw, dtype=torch.bool, device=device)
-        # the seat a TRIGGERED competition (the Aid Request) is held for; -1 for a voted one
+        # the seat a TRIGGERED competition (the Aid Request) is held for; -1 for one a session started
         self.comp_target = torch.full((B,), -1, dtype=torch.long, device=device)
         self.congress_sessions = torch.zeros(B, dtype=torch.long, device=device)
-        # the ANNOUNCED slate for the next Regular Session (resolution
-        # indices; -1 = empty slot), drawn at the previous session's close.
-        self.congress_slate = torch.full((B, 2), -1, dtype=torch.long, device=device)
         # Standing World Congress resolutions of the LAST session, 2 slots x
         # (res, outcome 0=A/1=B, target); -1 empty. Replaced every session.
         self.congress_active = torch.full((B, 2, 3), -1, dtype=torch.long, device=device)
-        # THIS TURN's ballot per major: [outcome, target, extra votes] for the
-        # two rotating slate slots, the always-3rd Diplomatic Victory
-        # resolution and the SPECIAL SESSION. -1 in the outcome field = no
-        # intent, vote the AI line. `_world_congress` clears it whether a
-        # session fires or not.
-        self.civ_congress_vote = torch.full((B, self.n_majors, 4, 4), -1, dtype=torch.long, device=device)
+        # THIS TURN's SPECIAL SESSION ballot per major: [outcome, extra votes].
+        # -1 in the outcome field = no intent: join every emergency the major
+        # is not the target of. `_emergency_sessions` reads and clears it.
+        self.civ_congress_vote = torch.full((B, self.n_majors, 2), -1, dtype=torch.long, device=device)
         # EMERGENCIES, one fixed table of slots. A live row carries its kind,
         # the offending seat, the contested city id, the phase (0 pending, 1
         # called, 2 running) and the turn that phase acts on; `emg_affected`
@@ -921,7 +916,6 @@ class SimInit:
         self._c_minus50 = float(_er2["congressMinus50"])
         self._c_trade_gold = float(_er2["congressTradeGold"])
         self._c_trade_cap = int(_er2["congressTradeCapacity"])
-        self._c_policy_favor = float(_er2["congressPolicyFavor"])
         self._c_pr_a = int(_er2["congressPrMultA"])
         self._c_pr_b = int(_er2["congressPrMultB"])
         self._c_advisory_cs = int(_er2["congressAdvisoryCs"])
@@ -956,11 +950,11 @@ class SimInit:
         _cids = [c["id"] for c in self._comps]
         self._comp_climate = _cids.index("CLIMATE_ACCORDS")
         self._comp_fair = _cids.index("WORLDS_FAIR") if "WORLDS_FAIR" in _cids else -1
-        # the Aid Request: TRIGGERED, never on the ballot — the ballot's target
-        # space is the VOTED rows, which the catalog keeps first
+        # the Aid Request: TRIGGERED by a major's population lost to a random event
         self._comp_aid = _cids.index("AID_REQUEST") if "AID_REQUEST" in _cids else -1
-        self._comp_voted_n = sum(1 for c in self._comps if not int(c["triggered"]))
-        assert all(int(c["triggered"]) == 0 for c in self._comps[:self._comp_voted_n]), "a triggered competition must sit LAST"
+        # the competitions a Regular Session draws over, (kind, first era,
+        # last era) in the install's row order (`CONGRESS_COMPETITIONS`)
+        self._congress_comps = [(int(k), int(lo), int(hi)) for k, lo, hi in _er2["congressCompetitions"]]
         # ONE <EmergencyScoreSources> table per competition, as [kind, amount,
         # of] rows: kind indexes the SCORE_* constants, `of` names the Great
         # Person class / project / building / district the kind reads, and -1
@@ -976,7 +970,6 @@ class SimInit:
         self._emg_rows = [{"id": str(e["id"]), "turns": int(e["turns"])} for e in _er2["emergencies"]]
         self._emg_at = {r["id"]: i for i, r in enumerate(self._emg_rows)}
         self._emg_slots = int(_er2["emergencySlots"])
-        self._special_slot = 3  # the special session's slot in the vote head
         # a Deforestation Treaty target `k` is the tile feature `_congress_feat[k]`
         self._congress_feat = [int(x) for x in _er2["congressFeatures"]]
         # the terrains a building's Coast plot clause pays on
@@ -1076,8 +1069,6 @@ class SimInit:
                                             dtype=torch.long, device=device)
         self._gov_title_civics = torch.tensor(_er["governorTitleCivics"] or [-1],
                                               dtype=torch.long, device=device)
-        self._gov_neutralize = int(_er["governorNeutralizeTurns"])
-        self._gov_doctrine_favor = int(_er["governanceDoctrineFavor"])
         self._gov_actions_max = int(_er["govActionsMax"])
         self._gpromo_gov = torch.tensor([int(p["gov"]) for p in _gp] or [0], dtype=torch.long, device=device)
         self._gpromo_tier = torch.tensor([int(p["tier"]) for p in _gp] or [0], dtype=torch.long, device=device)

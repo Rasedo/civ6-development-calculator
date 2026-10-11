@@ -113,9 +113,8 @@ def main() -> int:
 
     # ---- 3. the Aid Request: triggered, targeted, scored per gold / war / pollution
     k = cids.index("AID_REQUEST")
-    assert int(sim._comps[k].get("triggered", 0)) == 1 and k == len(cids) - 1, "the Aid Request is triggered and LAST"
-    assert sim._comp_aid == k and sim._comp_voted_n == len(cids) - 1
-    assert sim._congress_space(15) == len(cids) - 1, "the ballot never offers the triggered row"
+    assert int(sim._comps[k].get("triggered", 0)) == 1, "the Aid Request is triggered"
+    assert sim._comp_aid == k and k not in [c for c, _lo, _hi in sim._congress_comps], "no session starts the triggered row"
     sim.comp_kind[B0] = -1
     hit = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool)
     hit[B0, 1] = True
