@@ -7,7 +7,7 @@
   final: 0x27fe90
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/evaluate.ts:mul]
+  impl: [cpu/core/operations/evaluate.ts:mul]
   readings:
     - "H-1: a boost lands as progress — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"

@@ -18,8 +18,8 @@
   name: Operation Diplomacy (execution)
   status: PARTLY
   impl:
-    - ai/major/operations/assault.ts:ASSAULT_NODES
-    - ai/major/operations/assault.ts:operationDiplomacy
+    - cpu/core/operations/assault.ts:ASSAULT_NODES
+    - cpu/core/operations/assault.ts:operationDiplomacy
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
@@ -39,10 +39,10 @@
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
+    - cpu/core/operations/nodes.ts:moveDest
+    - cpu/core/operations/nodes.ts:moveOrder
     - cpu/core/tactical.ts:moveExec
     - gpu/core/sim_tactics.py:_barb_move_exec
-    - ai/major/operations/nodes.ts:moveOrder
-    - ai/major/operations/nodes.ts:moveDest
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -57,11 +57,25 @@
   context:
     - ...Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Ca...
   review: imported
+- addr: 0x8189f0
+  final: 0x578920
+  kind: function
+  name: "Recruit Units (execution: the recruit contract)"
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 157
+      value: "Without it the port's CITY_ASSAULT operations hold no   contract and never reach their Contract Manager's turn limit: runs/   h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -   t18"
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  context:
+    - "- THE CONTRACT FOR AN OPERATION'S UNIT (Recruit Units' execution 0x8189f0): for an AI player with the team's unit to build set (+0x8c, from 0x739cd0: the first..."
+  review: reviewed
 - addr: 0x8196d0
   final: 0x579560
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:changeTarget]
+  impl: [cpu/core/operations/nodes.ts:changeTarget]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -74,8 +88,8 @@
   name: Operation Diplomacy (update)
   status: PARTLY
   impl:
-    - ai/major/operations/assault.ts:ASSAULT_NODES
-    - ai/major/operations/assault.ts:operationDiplomacy
+    - cpu/core/operations/assault.ts:ASSAULT_NODES
+    - cpu/core/operations/assault.ts:operationDiplomacy
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
@@ -86,7 +100,7 @@
   final: 0x579e90
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:operationIsReady]
+  impl: [cpu/core/operations/nodes.ts:operationIsReady]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -104,9 +118,9 @@
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
+    - cpu/core/operations/nodes.ts:moveOrder
     - cpu/core/tactical.ts:moveUpdate
     - gpu/core/sim_tactics.py:_barb_move_update
-    - ai/major/operations/nodes.ts:moveOrder
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

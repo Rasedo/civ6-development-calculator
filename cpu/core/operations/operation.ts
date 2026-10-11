@@ -8,10 +8,10 @@
  * candidate for it names (the best other target of its kind), the strengths
  * its tree's nodes weigh, and the behaviour tree it runs.
  */
-import { AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from './tables';
+import { AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from '../../data/aiOperations';
 import type { AiOpDef, AiOpTeam, AiTeamReq } from './types';
-import type { BtRun } from '../../../cpu/core/behaviorTree';
-import type { MajorUnitView, MajorView } from '../view';
+import type { BtRun } from '../behaviorTree';
+import type { MajorUnitView, MajorView } from '../../../ai/major/view';
 import type { OpsContext } from './nodes';
 
 export const NO_PLOT = -1;

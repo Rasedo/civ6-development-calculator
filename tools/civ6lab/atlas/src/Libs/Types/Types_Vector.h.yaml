@@ -395,7 +395,7 @@
       turn: 9
       value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
   impl:
-    - ai/major/operations/warValue.ts:regionalStrength
+    - ai/major/warValue.ts:regionalStrength
     - cpu/core/aiMilitary.ts:combatDesire
     - gpu/core/sim_cityvalue.py:_cv_combat_desire
   readings:
@@ -418,10 +418,7 @@
     - recording: h1_duelv1117
       turn: 20
       value: China's Attack Enemy City against Caguana (3) once prepared for war, no war declared
-  impl:
-    - ai/major/operations/manager.ts:operationsTurn
-    - ai/major/operations/manager.ts:regions
-    - ai/major/operations/manager.ts:blank
+  impl: [cpu/core/operations/manager.ts:blank, cpu/core/operations/manager.ts:operationsTurn]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -438,7 +435,7 @@
     - recording: h1_duelv1117
       turn: 20
       value: China's candidates against Caguana from t20 to t56, its war desires positive at t18
-  impl: [ai/major/operations/manager.ts:OpsAi, ai/major/operations/manager.ts:prepareForWarWith]
+  impl: [cpu/core/operations/manager.ts:OpsAi, cpu/core/operations/manager.ts:prepareForWarWith]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
@@ -450,7 +447,7 @@
   final: 0x4d2400
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/manager.ts:blank]
+  impl: [cpu/core/operations/manager.ts:blank]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x727510
@@ -476,7 +473,7 @@
     - recording: h1_duelv1117
       turn: 20
       value: Attack Enemy City 442.9 at Caguana, the city value
-  impl: [ai/major/operations/evaluate.ts:enemyCities, ai/major/operations/evaluate.ts:targetsOf]
+  impl: [cpu/core/operations/evaluate.ts:enemyCities, cpu/core/operations/evaluate.ts:targetsOf]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
@@ -537,7 +534,7 @@
   final: 0x554b10
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:findAvailableUnit, cpu/core/aiCityTrees.ts:findAvailableUnit]
+  impl: [cpu/core/aiCityTrees.ts:findAvailableUnit, cpu/core/operations/nodes.ts:findAvailableUnit]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -572,7 +569,7 @@
   kind: function
   name: Siege City's assignment move
   status: PARTLY
-  impl: [ai/major/operations/assault.ts:siegeCityExecute]
+  impl: [cpu/core/operations/assault.ts:siegeCityExecute]
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:

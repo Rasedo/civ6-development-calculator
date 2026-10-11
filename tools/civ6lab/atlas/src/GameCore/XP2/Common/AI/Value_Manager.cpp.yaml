@@ -12,7 +12,7 @@
     - recording: h1_duelv1117
       turn: 18
       value: Caguana 450 + 200 + Production / Science / Culture x 7 + 10 a lead point
-  impl: [ai/major/operations/cityValue.ts:cityWorth]
+  impl: [cpu/core/operations/cityValue.ts:cityWorth]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"

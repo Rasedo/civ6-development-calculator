@@ -393,9 +393,9 @@
       value: Antananarivo 657.3 (ours 657.1), 665.4 (665.2) at t38
   impl:
     - ai/major/governors.ts:governorValue
-    - ai/major/operations/cityValue.ts:axialDistance
-    - ai/major/operations/cityValue.ts:cityValue
-    - ai/major/operations/evaluate.ts:enemyCities
+    - cpu/core/operations/cityValue.ts:axialDistance
+    - cpu/core/operations/cityValue.ts:cityValue
+    - cpu/core/operations/evaluate.ts:enemyCities
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
@@ -419,7 +419,7 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
-  impl: [ai/major/operations/warValue.ts:balance]
+  impl: [ai/major/warValue.ts:balance]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -438,7 +438,7 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
-  impl: [ai/major/operations/warValue.ts:spoils]
+  impl: [ai/major/warValue.ts:spoils]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"

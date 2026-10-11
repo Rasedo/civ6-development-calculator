@@ -410,7 +410,7 @@ export interface MajorView extends AiValueView {
   scienceWonders(seat: number): number;
   /** the space race projects the seat has completed */
   spaceProjects(seat: number): number;
-  // THE OPERATIONS' VIEW (ai/major/operations/)
+  // THE OPERATIONS' VIEW (cpu/core/operations/)
   /** what each of the seat's cities produces */
   cityBuilds(seat: number): readonly MajorCityBuildView[];
   /** the seat's cities as the contracts read them (aiContracts.ts): the
@@ -466,6 +466,16 @@ export interface MajorView extends AiValueView {
    *  its planning predicts it (0x791470's district branch), 0 where its
    *  planning holds no plot to strike the city from within two turns */
   cityBlow(unitId: number, plot: number): number;
+  /** the hit points a unit's blow from where it stands would take from the
+   *  city on the plot (the combat simulation 0x213e00 / 0x205720) */
+  cityBlowFrom(unitId: number, plot: number): number;
+  /** the city centre on the plot as its threat reads it: its defense
+   *  strength (GetDefenseStrength), its strength with the garrison
+   *  (0x24a180), its damage above 0; null where no city stands there */
+  cityDefense(plot: number): { defense: number; strength: number; damaged: boolean } | null;
+  /** the city's walls do not hold the unit back (a siege assist on it: unit
+   *  +0x18b8 / +0x18b9 / +0xb94 / +0xc14) */
+  wallsBypassed(unitId: number, plot: number): boolean;
   /** the seat's tactical target list */
   attackTargets(seat: number): readonly MajorAttackTargetView[];
   /** the attack assignment (0x776140) of the seat's units over the targets
@@ -477,7 +487,7 @@ export interface MajorView extends AiValueView {
   /** the unit action column that strikes the plot from where the unit stands
    *  (ATTACK_d beside it, SNIPE_k / SNIPE3_k at range), -1 for none */
   strikeColumn(unitId: number, plot: number): number;
-  // THE WAR DESIRES' VIEW (ai/major/operations/warValue.ts)
+  // THE WAR DESIRES' VIEW (ai/major/warValue.ts)
   /** the unit a civilian of the install type becomes captured
    *  (UnitCaptures BecomesUnitType), null for none */
   capturedAs(unitType: string): string | null;

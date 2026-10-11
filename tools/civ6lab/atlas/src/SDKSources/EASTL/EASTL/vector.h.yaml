@@ -74,7 +74,7 @@
   kind: function
   name: Siege City's assignment start
   status: PARTLY
-  impl: [ai/major/operations/assault.ts:siegeCityExecute]
+  impl: [cpu/core/operations/assault.ts:siegeCityExecute]
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:

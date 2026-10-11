@@ -24,13 +24,13 @@
   final: 0x4dbea0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/operation.ts:addMember]
+  impl: [cpu/core/operations/operation.ts:addMember]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x738050
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:recruitUnits, ai/major/operations/recruit.ts:recruitOperation]
+  impl: [cpu/core/operations/nodes.ts:recruitUnits, cpu/core/operations/recruit.ts:recruitOperation]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
@@ -51,15 +51,29 @@
       turn: 20
       value: Battle line 31:15, 0 endangered
   impl:
-    - ai/major/operations/assault.ts:WEIGHED
-    - ai/major/operations/assault.ts:marchPoint
-    - ai/major/operations/assault.ts:updateTeam
-    - ai/major/operations/operation.ts:OpTeam
+    - cpu/core/operations/assault.ts:WEIGHED
+    - cpu/core/operations/assault.ts:marchPoint
+    - cpu/core/operations/assault.ts:updateTeam
+    - cpu/core/operations/operation.ts:OpTeam
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
+  review: reviewed
+- addr: 0x739cd0
+  final: 0x4ddce0
+  kind: function
+  name: the operation's unit to build (first team +0x14)
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 157
+      value: "Without it the port's CITY_ASSAULT operations hold no   contract and never reach their Contract Manager's turn limit: runs/   h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -   t18"
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  context:
+    - "...s' execution 0x8189f0): for an AI player with the team's unit to build set (+0x8c, from 0x739cd0: the first team's +0x14), a contract for it — its value the Recruit Value tag (x 3 wh..."
   review: reviewed
 - addr: 0x739f60
   kind: function
@@ -74,7 +88,7 @@
   final: 0x4ddd60
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/manager.ts:startOperation]
+  impl: [cpu/core/operations/manager.ts:startOperation]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -104,24 +118,27 @@
 - addr: 0x73a8e0
   final: 0x4de400
   kind: function
+  name: an operation's target gone
   status: PARTLY
   impl:
-    - ai/major/operations/nodes.ts:targetGone
+    - cpu/core/operations/assault.ts:isCityThreatened
+    - cpu/core/operations/nodes.ts:targetGone
+    - cpu/core/operations/operation.ts:targetGone
     - cpu/core/tactical.ts:raidTargetGone
-    - ai/major/operations/operation.ts:targetGone
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:
     - ...peration Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operation Attack Units 0x80ecf0 (target gone SUCCES...
-  review: imported
+  review: reviewed
 - addr: 0x73aa60
   final: 0x4de580
   kind: function
   name: an operation ready
   status: PARTLY
-  impl: [ai/major/operations/manager.ts:warOperationReady]
+  impl: [cpu/core/operations/manager.ts:warOperationReady]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -144,12 +161,19 @@
 - addr: 0x73abf0
   final: 0x4de710
   kind: function
-  status: PARTLY
-  impl: [ai/major/operations/nodes.ts:targetValid]
+  name: an operation's target still valid
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 76
+      value: Attack Enemy City, Operation Change Target INVALID, No backup
+  impl: [cpu/core/operations/nodes.ts:assaultTargetValid, cpu/core/operations/nodes.ts:targetValid]
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   notes:
     - "imported: cited by the code, in no dll_readings section"
     - ".claude/scratchpad/cb5/NOTES.md: ...minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x..."
-  review: imported
+  review: reviewed
 - addr: 0x73b360
   final: 0x4dee80
   kind: function
@@ -173,7 +197,7 @@
   final: 0x4df2e0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:planFormations]
+  impl: [cpu/core/operations/nodes.ts:planFormations]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x...
@@ -182,18 +206,18 @@
   kind: function
   status: PARTLY
   impl:
-    - ai/major/operations/operation.ts:fitsMaxima
-    - ai/major/operations/recruit.ts:passesOthers
-    - ai/major/operations/recruit.ts:recruitMinimums
+    - cpu/core/operations/operation.ts:fitsMaxima
+    - cpu/core/operations/recruit.ts:passesOthers
+    - cpu/core/operations/recruit.ts:recruitMinimums
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x73c7c0
   kind: function
   status: PARTLY
   impl:
-    - ai/major/operations/operation.ts:unitStrength
-    - ai/major/operations/operation.ts:fitsMaxima
-    - ai/major/operations/recruit.ts:recruitStrength
+    - cpu/core/operations/operation.ts:fitsMaxima
+    - cpu/core/operations/operation.ts:unitStrength
+    - cpu/core/operations/recruit.ts:recruitStrength
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x73e610
@@ -212,7 +236,7 @@
   final: 0x4e18f0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:switchToBackup]
+  impl: [cpu/core/operations/nodes.ts:switchToBackup]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -224,7 +248,7 @@
   final: 0x4e1bf0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:refreshStrengths]
+  impl: [cpu/core/operations/nodes.ts:refreshStrengths]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -236,7 +260,7 @@
   final: 0x4e2670
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:refreshStrengths, ai/major/operations/assault.ts:WEIGHED]
+  impl: [cpu/core/operations/assault.ts:WEIGHED, cpu/core/operations/nodes.ts:refreshStrengths]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -248,9 +272,11 @@
 - addr: 0x73fba0
   final: 0x4e29b0
   kind: function
+  name: the team update (counts, readiness, unit to build)
   status: PARTLY
-  impl: [ai/major/operations/operation.ts:OpTeam, ai/major/operations/operation.ts:memberStrength]
+  impl: [cpu/core/operations/operation.ts:OpTeam, cpu/core/operations/operation.ts:memberStrength]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed

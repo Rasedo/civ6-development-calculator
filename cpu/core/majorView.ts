@@ -20,8 +20,8 @@ import { assignTo, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets
 import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
 import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { cityDefenseStrength, cityStrikeStrength, encircled, predictCityBlow, unitAttackRange } from './combat';
-import { outerPool } from './rules';
+import { centreStrength, cityDefenseStrength, cityStrikeStrength, encircled, predictCityBlow, siegeAssist, unitAttackRange } from './combat';
+import { outerPool, wallsTier } from './rules';
 import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
 import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
@@ -188,6 +188,12 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     }
     return citiesOf(state, i).find((c) => c.id === id);
   };
+  // a seat's cities; a city-state's its one city (`minorCity`)
+  const seatCities = (i: number): City[] => {
+    if (!isCityStateSeat(i)) return citiesOf(state, i);
+    const cs = seatOf(state, i) as CityState | undefined;
+    return cs && cs.centerIndex >= 0 ? [minorCity(cs)] : [];
+  };
   const centres = new Set([...state.seats, ...state.cityStates, ...(state.freeSeat ? [state.freeSeat] : [])]
     .flatMap((s) => s.cities.map((c) => c.centerIndex)));
   for (const cs of state.cityStates) if (cs.centerIndex >= 0) centres.add(cs.centerIndex);
@@ -221,7 +227,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const id = r.replace(/^RESOURCE_/, '');
       return map.tiles.filter((t) => t.resource === id && tileSeat(t) === i && t.improvement && !t.pillaged).length;
     },
-    cityPlots: (i) => citiesOf(state, i).map((c) => c.centerIndex),
+    cityPlots: (i) => seatCities(i).map((c) => c.centerIndex),
     homeContinent: (i) => homeContinent(state, i),
     pressureAt: (i, p) => plotPressure(state, i, map.tiles[p]),
     strategies: (i) => new Set(followedStrategies(i, weightInputs(i))),
@@ -599,14 +605,14 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       ? touristsDrawn(state.seats, seat(i), o) : 0), 0),
     scienceWonders: (i) => citiesOf(state, i).reduce((n, c) => n + c.wonders.filter((w) => (BUILDINGS[w.id]?.yields?.science ?? 0) > 0).length, 0),
     spaceProjects: (i) => seat(i).projectsDone.filter((id) => PROJECTS[id]?.victory).length,
-    cityBuilds: (i) => citiesOf(state, i).map((c) => {
+    cityBuilds: (i) => seatCities(i).map((c) => {
       const head = c.queue[0];
       const unit = head?.kind === 'settler' ? 'UNIT_SETTLER' : head?.kind === 'unit' ? gameTypeOf('unit', head.unit, 'UNIT_') : null;
       if (!head || !unit) return { city: c.id, plot: c.centerIndex, unitType: null, turnsLeft: -1 };
       const prod = Math.max(1, computeCityStats(state, c).total.production);
       return { city: c.id, plot: c.centerIndex, unitType: unit, turnsLeft: Math.max(0, Math.ceil((itemCost(head, state, c) - head.progress) / prod)) };
     }),
-    contractCities: (i) => citiesOf(state, i).map((c): ContractCity => {
+    contractCities: (i) => seatCities(i).map((c): ContractCity => {
       const head = c.queue[0];
       const current = !head ? null
         : head.kind === 'settler' ? { unit: 'UNIT_SETTLER', building: null, district: null }
@@ -733,6 +739,25 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (!u) return 0;
       const target = { type: 'COMBAT_DISTRICT' as const, tile: p, seat: tileSeat(map.tiles[p]), unit: null };
       return planUnit(state, u, [target]).entries.some((e) => e.spots.length > 0) ? predictCityBlow(state, u, p) : 0;
+    },
+    cityDefense: (p) => {
+      const held = cityAtIndex(state, p);
+      const cs = held ? undefined : cityStateAtPlot(state, p);
+      const city = held ? held.city : cs && cs.centerIndex === p ? minorCity(cs) : null;
+      if (!city) return null;
+      const hp = districtHealth(state, p);
+      return { defense: cityDefenseStrength(state, city), strength: centreStrength(state, city), damaged: !!hp && hp.hp < hp.max };
+    },
+    cityBlowFrom: (id, p) => {
+      const u = state.units.find((x) => x.id === id);
+      return u ? predictCityBlow(state, u, p) : 0;
+    },
+    wallsBypassed: (id, p) => {
+      const u = state.units.find((x) => x.id === id);
+      const held = cityAtIndex(state, p);
+      const cs = held ? undefined : cityStateAtPlot(state, p);
+      const shape = held ? held.city : cs && cs.centerIndex === p ? { buildings: cs.buildings ?? [], seat: cs.seat, outerHp: cs.outerHp } : null;
+      return !!u && !!shape && siegeAssist(state, u, p, wallsTier(state, shape)) !== 0;
     },
     attackTargets: (i) => targetsOf(i).map((t) => ({
       type: t.type, plot: t.tile, owner: t.seat, unitType: t.unit ? gameTypeOf('unit', t.unit.type, 'UNIT_') : null,

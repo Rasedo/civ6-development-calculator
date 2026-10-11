@@ -197,6 +197,15 @@
     - "...er (0x783980 0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else NEUTRAL_CITY — each where..."
     - ...0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency,...
   review: imported
+- addr: 0x3da5e0
+  kind: function
+  name: the other player has denounced the owner
+  status: PARTLY
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  context:
+    - "...red friend (0x3da770): a full civ the owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0); anoth..."
+  review: reviewed
 - addr: 0x3da770
   final: 0x2a6c50
   kind: function
@@ -206,6 +215,7 @@
       value: "The replay's   sender and OperationsProbe share the seat's operations AI: the fitted   feed from AI_Diplomacy.csv is gone."
   readings:
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:
     - ...number at most the +0xb50 list's size >> 1 and the player is neither a declared friend (0x3da770) nor an ally (0x3da560), PrepareForWarWith(player, 1) (0x724f30). The pick skips a pl...
   review: imported
@@ -226,6 +236,7 @@
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:
     - ...0x2a81f0 against GlobalParameters +0x268 through the speed; one at war, or turned away (0x3da8e0), is passed over; else p's AI's value of the owner (p's +0x1280 vt+0x18) above the best...
   review: reviewed

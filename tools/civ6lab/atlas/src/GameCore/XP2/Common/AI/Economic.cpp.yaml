@@ -96,6 +96,7 @@
   context:
     - ...the production was set this turn or the last (city +0x2600); the economic AI's listener 0x68ab40 takes a unit or building contract it may buy with gold; any taker makes it ACCEPTED (SU...
     - "...city trees' nodes. The submission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose Pu..."
+  review: reviewed
 - addr: 0x68acd0
   kind: function
   name: spend

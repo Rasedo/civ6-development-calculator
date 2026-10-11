@@ -12,7 +12,7 @@
  * team takes leave the offer.
  */
 import { NO_PLOT, addMember, hasAiType, unitStrength, type Operation, type OpTeam } from './operation';
-import type { MajorUnitView, MajorView } from '../view';
+import type { MajorUnitView, MajorView } from '../../../ai/major/view';
 
 export interface RecruitLog {
   (line: string): void;

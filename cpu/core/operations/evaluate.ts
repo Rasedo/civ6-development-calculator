@@ -16,11 +16,10 @@
  * logs its value.
  */
 import { NO_PLOT, type Operation } from './operation';
-import type { AiOpDef } from './types';
-import { bestSettleSite, type SettleRegions } from '../settle';
+import type { AiOpDef, OpsSettle } from './types';
 import { cityValue } from './cityValue';
 import type { KnownUnit } from './knowledge';
-import type { MajorKnownCityView, MajorView } from '../view';
+import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
 
 /** one candidate (the 0x70-byte entries at manager +0x328) */
 export interface Candidate {
@@ -95,12 +94,11 @@ interface Target {
 /** the targets of a candidate's definition (0x747230), in the walk's order */
 function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
   const { def } = c;
-  const { regions } = inputs;
   switch (def.targetType) {
     // the best settle site but the running operation's target, its score's
     // whole part (0x6fe2b0) the value, above 0
     case 'TARGET_SETTLE_LOCATION': {
-      const best = bestSettleSite(regions, c.op ? c.op.target : -1);
+      const best = inputs.settle?.best(c.op ? c.op.target : -1) ?? null;
       const whole = best ? best.score >> 8 : 0;
       return best && whole > 0 ? [{ plot: best.plot, value: whole << 8, enemyStr: 0 }] : [];
     }
@@ -181,11 +179,11 @@ function distLimit(view: MajorView, def: AiOpDef, rally: number, target: number)
 /** the 24.8 product (0x16e7d0) */
 const mul = (a: number, b: number): number => Math.trunc((a * b) / 256);
 
-/** what an evaluation reads beside the view: the settle regions, the
+/** what an evaluation reads beside the view: the seat's settling AI, the
  *  targets the running operations hold (0x724dd0) and the cities the
  *  knowledge base held when the evaluation ran */
 export interface EvalInputs {
-  regions: SettleRegions;
+  settle: OpsSettle | null;
   taken: ReadonlySet<number>;
   known: readonly MajorKnownCityView[];
   /** a player's army as the knowledge base holds it (the seat's own: its

@@ -3114,7 +3114,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const greatPeopleAi = new GreatPeopleProbe(dumpPath, aiSeats, cat);
   diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
-  const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, aiInputs);
+  // the operations of every AI party with a manager: the AI majors and the
+  // city-states
+  const opsSeats = new Map([...aiSeats, ...[...first.minorOfPlayer].map(([player, cs]) => [cs.seat, player] as [number, number])]);
+  const operationsAi = new OperationsProbe(dumpPath, opsSeats, cat, first.seatOfPlayer, aiInputs);
   // the wars of the AI majors' diplomatic sending read their operations' AI
   if (operationsAi.active) sender.war = operationsAi.warHooks();
   const ctx: Ctx = {

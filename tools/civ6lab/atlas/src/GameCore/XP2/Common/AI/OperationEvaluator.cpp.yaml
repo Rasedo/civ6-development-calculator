@@ -8,9 +8,9 @@
   kind: function
   status: PARTLY
   impl:
-    - ai/major/operations/evaluate.ts:oddsOf
-    - ai/major/operations/evaluate.ts:distLimit
-    - ai/major/operations/evaluate.ts:evaluate
+    - cpu/core/operations/evaluate.ts:distLimit
+    - cpu/core/operations/evaluate.ts:evaluate
+    - cpu/core/operations/evaluate.ts:oddsOf
   readings:
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

@@ -12,12 +12,12 @@
  * list the node picks through the tactical attack assignment, the
  * assignment's moves and blows leaving as the seat's unit action rows.
  */
-import { BT_ERROR, BT_FAILURE, BT_RUNNING, BT_SUCCESS, dataBool, dataInt, dataTag, type BtHandler } from '../../../cpu/core/behaviorTree';
+import { BT_ERROR, BT_FAILURE, BT_RUNNING, BT_SUCCESS, dataBool, dataInt, dataTag, type BtHandler } from '../behaviorTree';
 import { NO_PLOT, type OpTeam, type Operation } from './operation';
-import { generalizedAssignment } from '../../../cpu/core/aiAssignment';
+import { generalizedAssignment } from '../aiAssignment';
 import { moveTo, opUnits, targetGone, unitsById, xy } from './operation';
 import type { OpsContext } from './nodes';
-import type { MajorAttackTargetView, MajorAttackView, MajorUnitView, MajorView } from '../view';
+import type { MajorAttackTargetView, MajorAttackView, MajorUnitView, MajorView } from '../../../ai/major/view';
 
 
 /** a datum's value where the node holds the datum, `absent` where not (the
@@ -191,6 +191,83 @@ const canAlphaCity: BtHandler<OpsContext> = {
     return Math.fround(sum) >= Math.fround(Math.fround(hp.max - hp.damage) * 0.5) ? BT_SUCCESS : BT_FAILURE;
   },
 };
+
+// IS CITY THREATENED (0x813050): the target gone (0x73a8e0), or the city on
+// it threatened (CityBuildAI +0x1b8 above -1): SUCCESS; else FAILURE
+const isCityThreatened: BtHandler<OpsContext> = {
+  update(_node, _run, ctx) {
+    const { op } = ctx;
+    if (targetGone(ctx.view(), ctx.seat, op)) return BT_SUCCESS;
+    return op.target !== NO_PLOT && ctx.threat(op.target) > -1 ? BT_SUCCESS : BT_FAILURE;
+  },
+};
+
+// GARRISON CITY (0x8133c0 update, 0x810d30 execution): SUCCESS with the
+// target gone, RUNNING while the operation holds units, else FAILURE
+const garrisonCity: BtHandler<OpsContext> = {
+  update(_node, _run, ctx) {
+    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    return opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE;
+  },
+  execute: garrisonExecute,
+};
+
+/** the garrison's pick (0x810d30) over the operation's units in order: the
+ *  one on the city its garrison (its ranged strength, or its Bombard less 5
+ *  where higher, and its Combat); of those whose planning reaches the city
+ *  this turn (0x791300, 1 turn) the candidate — a RangedCombat above the
+ *  best so far and the garrison's, else a Bombard less 5 above the best with
+ *  the garrison holding no ranged strength, else (none chosen, the garrison
+ *  no ranged strength, no ranged best) a Combat above the best and the
+ *  garrison's. With no garrison of the operation's and no military unit of
+ *  the seat on the city, the candidate moves in. With a garrison and a
+ *  stronger candidate, the candidate moves beside the city (the swap
+ *  command 0x972880 into it is unported). The fortify commands are none in
+ *  the action rows. */
+function garrisonExecute(_node: Parameters<BtHandler<OpsContext>['update']>[0], _run: unknown, ctx: OpsContext): void {
+  const view = ctx.view();
+  const { op } = ctx;
+  const city = op.target;
+  if (city === NO_PLOT) return;
+  const units = unitsById(view, ctx.seat);
+  let garrison: MajorUnitView | null = null;
+  let gRanged = 0;
+  let gCombat = 0;
+  let bestRanged = 0;
+  let bestCombat = 0;
+  let pick: MajorUnitView | null = null;
+  for (const id of opUnits(op)) {
+    const u = units.get(id);
+    if (!u) continue;
+    if (u.plot === city) {
+      garrison = u;
+      gCombat = u.combat;
+      gRanged = Math.max(u.ranged, u.bombard - 5);
+      continue;
+    }
+    if (!view.unitReach(u.id, 1).some((r) => r.plot === city)) continue;
+    if (u.ranged > bestRanged && u.ranged > gRanged) {
+      bestRanged = u.ranged;
+      pick = u;
+    } else if (u.bombard - 5 > bestRanged && gRanged === 0) {
+      bestRanged = u.bombard - 5;
+      pick = u;
+    }
+    if (u.combat > bestCombat && u.combat > gCombat) {
+      bestCombat = u.combat;
+      if (!pick && gRanged === 0 && bestRanged === 0) pick = u;
+    }
+  }
+  if (!garrison) {
+    if (view.units(ctx.seat).some((u) => u.plot === city && u.combat + u.ranged + u.bombard > 0)) return;
+    if (pick) moveTo(ctx, pick, city);
+    return;
+  }
+  const stronger = gRanged < bestRanged || (gRanged <= 0 && gCombat < bestCombat);
+  if (!stronger || !pick) return;
+  const spot = view.planSpot(pick.id, city, 1, true, 1);
+  if (spot >= 0 && spot !== pick.plot) moveTo(ctx, pick, spot);
+}
 
 // OPERATION DIPLOMACY (0x819db0 update, 0x8163f0 execution)
 const operationDiplomacy: BtHandler<OpsContext> = {
@@ -856,6 +933,8 @@ function operationAttackExecute(_node: Parameters<BtHandler<OpsContext>['update'
 export const ASSAULT_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   'Is At War': isAtWar,
   'Can Alpha City': canAlphaCity,
+  'Is City Threatened': isCityThreatened,
+  'Garrison City': garrisonCity,
   'Operation Diplomacy': operationDiplomacy,
   'Operation Attack City': { ...operationAttackCity, execute: attackCityExecute },
   'Operation Air Assault': { ...operationAirAssault, execute: airAssaultExecute },

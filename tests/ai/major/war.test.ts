@@ -1,18 +1,19 @@
-// The majors' war operations (ai/major/operations): the city's defense the
+// The majors' war operations (cpu/core/operations): the city's defense the
 // city value reads, the knowledge base's army records' ageing, the march
 // point and battle line of the team update, and Is At War.
 import { describe, expect, it } from 'vitest';
-import { cityDefense } from '../../../ai/major/operations/cityValue';
-import { knownArmy, lookArmy, type ArmyRecords } from '../../../ai/major/operations/knowledge';
-import { updateTeam, ASSAULT_NODES } from '../../../ai/major/operations/assault';
+import { cityDefense } from '../../../cpu/core/operations/cityValue';
+import { knownArmy, lookArmy, type ArmyRecords } from '../../../cpu/core/operations/knowledge';
+import { updateTeam, ASSAULT_NODES } from '../../../cpu/core/operations/assault';
 import { compileTree, newRun, BT_FAILURE, BT_SUCCESS } from '../../../cpu/core/behaviorTree';
 import type { MajorKnownCityView, MajorPlotView, MajorUnitView, MajorView } from '../../../ai/major/view';
-import type { OpTeam, Operation } from '../../../ai/major/operations/operation';
-import type { OpsContext } from '../../../ai/major/operations/nodes';
-import { balance, regionalStrength, type WarValueInputs } from '../../../ai/major/operations/warValue';
+import type { OpTeam, Operation } from '../../../cpu/core/operations/operation';
+import type { OpsContext } from '../../../cpu/core/operations/nodes';
+import { balance, regionalStrength, type WarValueInputs } from '../../../ai/major/warValue';
 import { generalizedAssignment } from '../../../cpu/core/aiAssignment';
 import { FX } from '../../../cpu/core/aiValue';
-import type { KnownUnit } from '../../../ai/major/operations/knowledge';
+import type { KnownUnit } from '../../../cpu/core/operations/knowledge';
+import { cityThreat } from '../../../cpu/core/operations/cityThreat';
 
 const W = 12;
 const H = 12;
@@ -131,5 +132,22 @@ describe('the generalized assignment (0x8b5bf0)', () => {
     const at = [-1, -1];
     generalizedAssignment(2, 2, at, (i, j) => g[i][j], () => -1, 3);
     expect(at).toEqual([1, 0]);
+  });
+});
+
+describe('the city\'s threat (0x5cbd10)', () => {
+  const BARB = 63;
+  const known = (plot: number, type = 'UNIT_WARRIOR'): KnownUnit => ({ id: plot, owner: BARB, type, plot, combat: 20, ranged: 0, damage: 0, seen: 1 });
+  const threatView = view({
+    players: () => [0, 1, BARB], majors: () => [0, 1], barbarianSeat: () => BARB, declaredFriends: () => false, atWar: () => false,
+    denounced: () => false, cityDefense: () => ({ defense: 10, strength: 12, damaged: false }),
+  });
+  const inputs = (units: KnownUnit[]) => ({ army: (p: number) => (p === BARB ? units : []), operationNear: () => false });
+  it('the barbarians\' units within 3 at the defense plus 5 or more threaten the city', () => {
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7))]))).toBe(2);
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 9))]))).toBe(-1);
+  });
+  it('an explorer never counts', () => {
+    expect(cityThreat(threatView, 0, at(5, 5), inputs([known(at(5, 7), 'UNIT_SCOUT')]))).toBe(-1);
   });
 });

@@ -11,9 +11,9 @@
  * less the defenders about it; never below 0. The war candidates value their
  * targets so ("CITY VALUES" in AI_Operation_Eval.csv).
  */
-import { FX, fdiv, fmul, fxConst, pseudoYieldValue, yieldValue } from '../../../cpu/core/aiValue';
-import { LOYALTY_PRESS_MAX_LOYALTY } from '../../../cpu/data/seats';
-import type { MajorKnownCityView, MajorView } from '../view';
+import { FX, fdiv, fmul, fxConst, pseudoYieldValue, yieldValue } from '../aiValue';
+import { LOYALTY_PRESS_MAX_LOYALTY } from '../../data/seats';
+import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
 import { armyStrength, type ArmyUnit } from './evaluate';
 
 /** the turns of the 25 the march term scales by (0x5254d0(0x19): x the game

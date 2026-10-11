@@ -48,14 +48,14 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
+    - cpu/core/operations/nodes.ts:barred
+    - cpu/core/operations/nodes.ts:moveDest
+    - cpu/core/tactical.ts:moveBarred
+    - cpu/core/tactical.ts:safePlot
     - cpu/core/tactical.ts:stackedAt
     - cpu/core/tactical.ts:strike
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/core/tactical.ts:wanderNearCity
-    - ai/major/operations/nodes.ts:moveDest
-    - ai/major/operations/nodes.ts:barred
-    - cpu/core/tactical.ts:safePlot
-    - cpu/core/tactical.ts:moveBarred
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -90,11 +90,11 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
+    - cpu/core/operations/nodes.ts:barred
     - cpu/core/tactical.ts:enemyAt
+    - cpu/core/tactical.ts:moveBarred
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/core/tactical.ts:wanderNearCity
-    - ai/major/operations/nodes.ts:barred
-    - cpu/core/tactical.ts:moveBarred
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -116,8 +116,8 @@
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
   impl:
+    - cpu/core/operations/nodes.ts:barred
     - cpu/core/tactical.ts:alternateLocation
-    - ai/major/operations/nodes.ts:barred
     - cpu/core/tactical.ts:moveBarred
   readings:
     - "H-1: a civilian stepped on — READ"

@@ -37,13 +37,14 @@
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
   impl:
+    - ai/major/view.ts:MajorView
+    - cpu/core/operations/assault.ts:pillageExecute
+    - cpu/core/tactical.ts:coastalRaids
+    - cpu/core/tactical.ts:homelandPlunder
+    - cpu/core/tactical.ts:moveExec
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
-    - cpu/core/tactical.ts:coastalRaids
-    - cpu/core/tactical.ts:moveExec
-    - cpu/core/tactical.ts:homelandPlunder
-    - ai/major/operations/assault.ts:pillageExecute
-    - ai/major/view.ts:MajorView
+    - cpu/core/operations/assault.ts:garrisonExecute
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -51,6 +52,7 @@
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the homeland's Plunder Trader — READ, ported"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed

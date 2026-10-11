@@ -27,11 +27,11 @@
  * - THE CASUS BELLI (0x7b87b0): PSEUDOYIELD_DIPLOMATIC_BONUS of an amount
  *   of 0 per third player the seat has met — nothing.
  */
-import { FX, fdiv, fmul } from '../../../cpu/core/aiValue';
-import type { MajorView } from '../view';
-import { cityValue } from './cityValue';
-import type { ArmyUnit } from './evaluate';
-import type { KnownUnit } from './knowledge';
+import { FX, fdiv, fmul } from '../../cpu/core/aiValue';
+import type { MajorView } from './view';
+import { cityValue } from '../../cpu/core/operations/cityValue';
+import type { ArmyUnit } from '../../cpu/core/operations/evaluate';
+import type { KnownUnit } from '../../cpu/core/operations/knowledge';
 
 /** -9999 in 24.8 (@f04cb0) */
 export const WAR_NONE = -9999 * FX;

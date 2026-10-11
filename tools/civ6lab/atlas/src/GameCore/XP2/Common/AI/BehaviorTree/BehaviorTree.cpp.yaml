@@ -58,10 +58,7 @@
   final: 0x5432a0
   kind: function
   status: PARTLY
-  impl:
-    - cpu/core/behaviorTree.ts:propagate
-    - cpu/core/behaviorTree.ts:AiTreeNode
-    - cpu/core/behaviorTree.ts:propagate
+  impl: [cpu/core/behaviorTree.ts:AiTreeNode, cpu/core/behaviorTree.ts:propagate]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...val / Naval Choose Target: the index their update stored) and the parent propagation's (0x7d1750: a finished child tells its parent's function, @f2ed70, which may finish the parent and..."

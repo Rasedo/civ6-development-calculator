@@ -69,10 +69,13 @@
       turn: 25
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
   impl:
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
     - cpu/core/goodyHuts.ts:goodyEligible
+    - cpu/core/operations/cityValue.ts:MARCH_TURNS
+    - cpu/core/operations/nodes.ts:child
     - cpu/core/trade.ts:PLUNDER_ROUTE_TURNS
-    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
     - cpu/data/aiValue.ts:AI_BELIEF_HORIZON
+    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
     - cpu/data/barbarians.ts:BarbTribeDef
     - cpu/data/cityStates.ts:LEVY_TURNS
     - cpu/data/constants.ts:CAMP_DISPERSAL_GOLD
@@ -80,9 +83,6 @@
     - cpu/data/disasters.ts:DROUGHT_TURNS
     - cpu/data/religion.ts:PANTHEON_FAITH_COST
     - cpu/data/seats.ts:ERA_MIN_TURNS
-    - ai/major/operations/nodes.ts:child
-    - cpu/core/aiPlotValue.ts:PlotValueFacts
-    - ai/major/operations/cityValue.ts:MARCH_TURNS
   readings:
     - "B-31r-S1: the plunder payout — CLOSED"
     - "C-94: the game era, the ages and the founding moments — READ"

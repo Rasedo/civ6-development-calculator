@@ -39,7 +39,7 @@
   final: 0x5575f0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:settle]
+  impl: [cpu/core/operations/nodes.ts:settle]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...0 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gon...
@@ -48,7 +48,7 @@
   final: 0x557e40
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:planFormations]
+  impl: [cpu/core/operations/nodes.ts:planFormations]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -91,7 +91,7 @@
   final: 0x558b50
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:settle]
+  impl: [cpu/core/operations/nodes.ts:settle]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...d70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the...

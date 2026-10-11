@@ -519,7 +519,7 @@
     - recording: h1_duelv1128
       turn: 196
       value: Qin's Surprise War after the war operation stood (the friendship cost's +30 t182 - t195)
-  impl: [ai/major/diploActions.ts:canDo, ai/major/operations/manager.ts:surpriseWarReady]
+  impl: [ai/major/diploActions.ts:canDo, cpu/core/operations/manager.ts:surpriseWarReady]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -539,7 +539,7 @@
   impl:
     - ai/major/diploActions.ts:bestFavoured
     - ai/major/diploActions.ts:pickActions
-    - ai/major/operations/manager.ts:notReadyHook
+    - cpu/core/operations/manager.ts:notReadyHook
     - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"

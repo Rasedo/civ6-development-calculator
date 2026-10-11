@@ -32,7 +32,7 @@
   final: 0x42ef50
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/warValue.ts:WMD_FLAG]
+  impl: [ai/major/warValue.ts:WMD_FLAG]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
@@ -137,7 +137,7 @@
     - recording: 1117
       turn: 18
       value: The replay sets it two   turns after the first desire, a LAB fit (1117 t18 -> t20, t32 -> t34;
-  impl: [ai/major/operations/manager.ts:peaceMade, cpu/harness/operationsAi.ts:after]
+  impl: [cpu/core/operations/manager.ts:peaceMade, cpu/harness/operationsAi.ts:after]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"

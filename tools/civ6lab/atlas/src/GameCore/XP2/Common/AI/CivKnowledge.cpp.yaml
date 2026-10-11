@@ -22,11 +22,12 @@
 - addr: 0x5eadb0
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/evaluate.ts:armyStrength]
+  impl: [cpu/core/operations/evaluate.ts:armyStrength]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb5/NOTES.md: ...urn's KB update -> t-1); +0.5*count term absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..),..."
@@ -51,7 +52,7 @@
     - recording: h1_duelv1117
       turn: 18
       value: Caguana 19 / 9 (AI_Knowledge.csv's 9)
-  impl: [ai/major/operations/cityValue.ts:cityDefense]
+  impl: [cpu/core/operations/cityValue.ts:cityDefense]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
@@ -69,7 +70,7 @@
     - recording: h1_duelv1124
       turn: 43
       value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
-  impl: [ai/major/operations/warValue.ts:regionalStrength]
+  impl: [ai/major/warValue.ts:regionalStrength]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
@@ -80,11 +81,14 @@
   kind: function
   name: a known city's defenses and walls counted
   status: PARTLY
-  impl: [ai/major/operations/evaluate.ts:enemyCities]
+  impl:
+    - cpu/core/operations/evaluate.ts:enemyCities
+    - cpu/core/operations/nodes.ts:assaultTargetValid
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...> 0 needs the city AI's +0x1b8 above -1), value 0, enemy strength 0x5eb2c0 x 1.5 per 0x5eb600 > 1 and +0x58 > 1 (unread terms); COMBAT_DISTRICT / PASSIVE — the enemy's known cities..."
@@ -109,7 +113,7 @@
   kind: function
   name: a known city's wonders
   status: PARTLY
-  impl: [ai/major/operations/cityValue.ts:cityWorth, ai/major/view.ts:MajorKnownCityView]
+  impl: [ai/major/view.ts:MajorKnownCityView, cpu/core/operations/cityValue.ts:cityWorth]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
@@ -149,7 +153,7 @@
     - ai/major/knowledge.ts:knowledgeTurn
     - cpu/core/minorBuild.ts:ARMY_RECORD_AGE
     - cpu/core/minorBuild.ts:minorKnowledge
-    - ai/major/operations/knowledge.ts:lookArmy
+    - cpu/core/operations/knowledge.ts:lookArmy
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -213,7 +217,7 @@
 - addr: 0x5ef760
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/evaluate.ts:armyStrength]
+  impl: [cpu/core/operations/evaluate.ts:armyStrength]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x5ef9a0

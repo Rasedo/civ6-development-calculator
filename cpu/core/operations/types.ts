@@ -1,4 +1,4 @@
-/** The operation tables' row shapes (ai/major/operations/tables.ts). */
+/** The operation tables' row shapes (cpu/data/aiOperations.ts). */
 
 /** an AiOperationDefs row */
 export interface AiOpDef {
@@ -68,4 +68,14 @@ export interface AiTriggeredTree {
   operation: string | null;
   event: string;
   priority: number;
+}
+
+/** what a seat's settling AI gives its operations (a major's from
+ *  ai/major/settle.ts; none for a party that never settles) */
+export interface OpsSettle {
+  /** the best region top but `exclude` (0x6fe2b0): its plot and its score,
+   *  fixed point; null for none */
+  best(exclude: number): { plot: number; score: number } | null;
+  /** a plot the seat may found a city on that still scores */
+  canFoundAt(plot: number): boolean;
 }

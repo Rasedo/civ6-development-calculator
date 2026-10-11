@@ -1,0 +1,16 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x972880
+  final: 0x67c690
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/operations/assault.ts:garrisonExecute]
+  readings:
+    - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...
+  review: imported

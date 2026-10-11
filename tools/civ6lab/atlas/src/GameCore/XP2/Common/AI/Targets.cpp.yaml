@@ -182,7 +182,7 @@
   impl:
     - cpu/core/fog.ts:cityStateSight
     - cpu/core/minorBuild.ts:minorKnowledge
-    - ai/major/operations/knowledge.ts:lookArmy
+    - cpu/core/operations/knowledge.ts:lookArmy
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

@@ -8,8 +8,8 @@
  * read the strength of a player's known army about a plot from them
  * (0x5eadb0).
  */
-import { ARMY_RECORD_AGE } from '../../../cpu/core/minorBuild';
-import type { MajorView } from '../view';
+import { ARMY_RECORD_AGE } from '../minorBuild';
+import type { MajorView } from '../../../ai/major/view';
 
 /** a unit as the knowledge base holds it */
 export interface KnownUnit {

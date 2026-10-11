@@ -1,6 +1,6 @@
 /**
- * THE MAJORS' OPERATIONS BESIDE THE ACTION REPLAY: each AI major's
- * operations (ai/major/operations) run on record t as the importer reads it
+ * THE OPERATIONS BESIDE THE ACTION REPLAY: each AI major's and each
+ * city-state's operations (cpu/core/operations) run on record t as the importer reads it
  * — the AI's own operation state carried from turn to turn, its units'
  * moves carried out on a copy of the state — and scored against the game's
  * own AI_Operation.csv and AI_Operation_Eval.csv of that game, line by line,
@@ -25,18 +25,19 @@ import { citiesOf, seatOf } from '../core/seats';
 import { computeCityStats } from '../core/city';
 import { spawnUnit, unitFullMoves } from '../core/units';
 import type { GameState, Seat } from '../core/types';
-import { newOpsAi, notReadyHook, operationsTurn, opsOf, peaceMade, remapUnits, surpriseWarReady, type OpsAi } from '../../ai/major/operations/manager';
-import { knownArmy } from '../../ai/major/operations/knowledge';
-import { warValue } from '../../ai/major/operations/warValue';
+import { newOpsAi, notReadyHook, operationsTurn, opsOf, peaceMade, remapUnits, surpriseWarReady, type OpsAi } from '../core/operations/manager';
+import { knownArmy } from '../core/operations/knowledge';
+import { warValue } from '../../ai/major/warValue';
+import { opsSettle } from '../../ai/major/settle';
 import type { MajorView } from '../../ai/major/view';
 import type { WarHooks } from './diploSender';
-import { opUnits } from '../../ai/major/operations/operation';
+import { opUnits } from '../core/operations/operation';
 import { engineRowOf } from './import';
 import { gameTypeOf } from '../data/aliases';
 import type { Catalog, TurnRecord } from './record';
 
 /** the families measured: the operations the port starts, then all */
-const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'Attack Enemy City', 'Attack Walled City', 'all'] as const;
+const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'City Defense', 'Attack Enemy City', 'Attack Walled City', 'all'] as const;
 const TRACE = (process.env.REPLAY_TRACE ?? '').split(',').includes('operations');
 
 /** a line's operation name */
@@ -262,6 +263,7 @@ export class OperationsProbe {
           view = majorView(copy, this.inputs(turn));
         },
         built: built.get(seat) ?? [],
+        settle: view.majors().includes(seat) ? opsSettle(() => view, seat) : null,
         producing: (city) => {
           const plot = view.cityBuilds(seat).find((b) => b.city === city)?.plot;
           const k = after.cityBuilds(seat).findIndex((b) => b.plot === plot);
@@ -398,7 +400,7 @@ export class OperationsProbe {
 }
 
 export function operationsMarkdown(t: OperationsTally): string[] {
-  const out = ['', "## The majors' AI: operations (ai/major/operations)", ''];
+  const out = ['', "## The AI's operations (cpu/core/operations)", ''];
   const e = t.evals;
   out.push(`Candidates against no enemy (AI_Operation_Eval.csv, enemy -1): turns ${e.turns}, every line equal ${e.turnsEqual}; lines log ${e.log}, ours ${e.ours}; first miss: ${e.firstMiss ?? '-'}.`);
   const w = t.warEvals;

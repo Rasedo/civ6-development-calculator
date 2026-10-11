@@ -15,6 +15,7 @@
  * their sum, less the danger << 8; a condition the plot fails (its
  * threshold) zeroes the score. A plot is a site with a score above 0.
  */
+import type { OpsSettle } from '../../cpu/core/operations/types';
 import { AI_FEATURES, AI_GLOBALS, AI_PLOT_EVAL_BY_CIV, AI_PLOT_EVAL_BY_LEADER, AI_PLOT_EVAL_BY_STRATEGY, AI_PLOT_EVAL_CONDITIONS, AI_PLOT_EVAL_LISTS,
   AI_RESOURCE_CLASS } from './tables';
 import { dangerMap } from './danger';
@@ -328,3 +329,12 @@ export function firstTurnSettlerOrders(view: MajorView, seat: number, sr: Settle
   return rows;
 }
 
+/** the seat's settling AI as its operations read it: the regions made on
+ *  first use, a site tested on the view as it stands */
+export function opsSettle(view: () => MajorView, seat: number): OpsSettle {
+  let sr: SettleRegions | null = null;
+  return {
+    best: (exclude) => bestSettleSite((sr ??= settleRegions(view(), seat)), exclude),
+    canFoundAt: (plot) => canFoundAt(view(), seat, plot),
+  };
+}

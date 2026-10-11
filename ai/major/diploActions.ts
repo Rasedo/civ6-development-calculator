@@ -53,7 +53,7 @@
  * (`DiploActionGaps`): the actions whose desire it does not read, a
  * favoured action's desire and cost (twice the reading on runs/h1_duelv1121
  * Qin's Gossip rows; the doubling instruction unread), the threat's (a) and
- * (c). The wars' desires read the war value (operations/warValue.ts), their
+ * (c). The wars' desires read the war value (warValue.ts), their
  * can-do the military AI's war operation (0x723db0), their not-ready hook
  * its PrepareForWarWith.
  */

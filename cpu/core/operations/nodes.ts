@@ -6,15 +6,15 @@
  * operation it runs in; an action's moves leave as the seat's unit action
  * rows through the context's `act`, the view then read anew.
  */
+import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
-  type BtHandler, type BtRun } from '../../../cpu/core/behaviorTree';
+  type BtHandler, type BtRun } from '../behaviorTree';
 import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnits, targetGone, teamReady, unitsById, xy, type Operation } from './operation';
 import { desiredStrength, recruitOperation } from './recruit';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
-import { canFoundAt } from '../settle';
-import type { MajorUnitView, MajorView } from '../view';
+import type { MajorUnitView, MajorView } from '../../../ai/major/view';
 import { CP_ACCEPTED, CP_CLAIMED, CP_IN_PROGRESS, CP_SUBMITTED, buildUnitNode, contractManagerNode, treeContractOf,
-  type ContractNodeWorld } from '../../../cpu/core/aiContracts';
+  type ContractNodeWorld } from '../aiContracts';
 
 /** a request an operation's Operation Diplomacy made of the diplomatic AI
  *  (a diplomatic contract, contract manager +0x368 type 4): the
@@ -45,6 +45,10 @@ export interface OpsContext {
   /** the seat's diplomatic requests standing, by id */
   diplomacy: ReadonlyMap<number, DiplomacyRequest>;
   requestDiplomacy(action: string, enemy: number, value: number): number;
+  /** the seat's settling AI, none for a party that never settles */
+  settle: OpsSettle | null;
+  /** a city's threat by its plot (CityBuildAI +0x1b8), -1 none */
+  threat(plot: number): number;
   log(line: string): void;
 }
 
@@ -81,7 +85,7 @@ const changeTarget: BtHandler<OpsContext> = {
       switchToBackup(op);
       return BT_SUCCESS;
     };
-    if (!targetValid(view, ctx.seat, op)) {
+    if (!targetValid(ctx, op)) {
       if (backupOk) return swap('INVALID, Changing to backup');
       ctx.log(`${op.def.name}, Operation Change Target INVALID, No backup`);
       return BT_FAILURE;
@@ -118,11 +122,49 @@ const changeTarget: BtHandler<OpsContext> = {
   },
 };
 
-/** the target still one the operation can act on (0x73abf0): for a settle
- *  target, a plot the seat may found on that still scores */
-export function targetValid(view: MajorView, seat: number, op: Operation): boolean {
+/** the city's garrison heal a turn (GlobalParameters
+ *  COMBAT_HEAL_CITY_GARRISON, GlobalParameters +0x1b8) */
+const CITY_GARRISON_HEAL = 20;
+
+/** THE ASSAULT'S TARGET STILL VALID (0x73abf0's COMBAT_DISTRICT branch): the
+ *  seat's known record of the city on the target (this turn's) — none,
+ *  invalid; its defenses and walls (0x5eb600) no more than its defensible
+ *  districts (+0x58), valid; a walled-city definition (TargetParameter 1,
+ *  op +0x124), valid; else per member of its teams: one the walls do not
+ *  hold back (a siege assist on the city), valid; else its predicted blow
+ *  on the city summed — one blow at the garrison's heal or more, valid; two
+ *  at half of it or more, valid; the small blows' sum above the heal,
+ *  valid; none of these, invalid. The blow back on the member is unread
+ *  (none). */
+function assaultTargetValid(ctx: OpsContext, op: Operation): boolean {
+  const view = ctx.view();
+  const owner = view.plots()[op.target].owner;
+  const rec = view.knownCities(ctx.seat).find((k) => k.plot === op.target && k.owner === owner);
+  if (!rec) return false;
+  const marks = rec.districts.reduce((n, d) => n + (d.defense > 0 ? 1 : 0) + (d.walls > 0 ? 1 : 0), 0);
+  if (marks <= rec.districts.length) return true;
+  if (op.def.targetParameter === 1) return true;
+  let sum = 0;
+  let big = 0;
+  for (const id of opUnits(op)) {
+    if (view.wallsBypassed(id, op.target)) return true;
+    const dealt = view.cityBlowFrom(id, op.target);
+    sum += dealt;
+    if (dealt >= CITY_GARRISON_HEAL) return true;
+    if (dealt < CITY_GARRISON_HEAL >> 1) {
+      if (sum > CITY_GARRISON_HEAL) return true;
+    } else if (++big > 1) return true;
+  }
+  return false;
+}
+
+/** the target still one the operation can act on (0x73abf0): a city
+ *  assault's (assaultTargetValid); for a settle target, a plot the seat may
+ *  found on that still scores */
+export function targetValid(ctx: OpsContext, op: Operation): boolean {
   if (op.target === NO_PLOT) return false;
-  if (op.def.targetType === 'TARGET_SETTLE_LOCATION') return canFoundAt(view, seat, op.target);
+  if (op.def.targetType === 'TARGET_ENEMY_COMBAT_DISTRICT') return assaultTargetValid(ctx, op);
+  if (op.def.targetType === 'TARGET_SETTLE_LOCATION') return ctx.settle?.canFoundAt(op.target) ?? false;
   return true;
 }
 

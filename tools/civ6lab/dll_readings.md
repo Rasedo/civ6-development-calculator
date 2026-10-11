@@ -4126,9 +4126,8 @@ operations' contracts, the improvement values below, the purchases).
   the city's plot through the player's operation manager (0x7265b0), slot
   5 holding its tree (+0x780), its target the city, its worth the city's
   (0x7a0ac0), its threat CityBuildAI +0x1b8. The city-states run it (1124
-  player 3 t19 "City Defense, Started"); the threat's writer, the minors'
-  operation manager and the tree's Is City Threatened, Garrison City and
-  Can Alpha City are unread.
+  player 3 t19 "City Defense, Started"); the threat, the one manager and
+  the tree's nodes: "City Defense and the assault target's validity".
 - A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
   research (AI_Research.csv prints it alive while RESEARCHING), CLAIMED
   off it, COMPLETED when held. The AI's view at turn T: the record of T,
@@ -5972,18 +5971,14 @@ DebugGameplay.sqlite).
   3:9, 3:13 -> 3:11 around a held rally 3:10).
 - PARTLY READ / unread: Naval Choose Target 0x803590 (the tactical
   analysis's target list by domain 0x802ea0 unread: the port finds none and
-  skips its children); the executions of Operation Attack 0x80c180 (Attack
-  Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units
-  0x80d790 ("Operation Protect Units"), Naval Patrol 0x803060 (the explore
-  move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation
-  Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes
-  (Can Alpha City, Is At War, Operation Diplomacy, Operation Pillage,
-  Operation Siege City, Operation Attack City, Operation Air Assault, Build
-  Military Improvement), City Defense's (Is City Threatened, Garrison City).
+  skips its children); the executions of Defend Units 0x80d790 ("Operation Protect Units"), Naval
+  Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval
+  Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0,
+  0x791300).
 
 ## C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread
 
-Ported in `ai/major/operations/` (manager.ts, evaluate.ts, recruit.ts,
+Ported in `cpu/core/operations/` (manager.ts, evaluate.ts, recruit.ts,
 operation.ts); measured by the replay's OperationsProbe against
 AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
 
@@ -6058,7 +6053,7 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
 
 ## C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ
 
-Ported in `ai/major/operations/` (cityValue.ts, evaluate.ts's district
+Ported in `cpu/core/operations/` (cityValue.ts, evaluate.ts's district
 walk, manager.ts's war candidates, knowledge.ts, assault.ts); measured by
 the replay's OperationsProbe (the war candidates' eval lines, the "CITY
 VALUES" lines, the "Attack Enemy City" / "Attack Walled City" families).
@@ -6267,17 +6262,15 @@ AI_Knowledge.csv).
   city list (CityBuildAI +0x870: the port takes every known city); the land
   strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0,
   0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war
-  record +0xc's writer; the team update's danger and attack strengths; Is
-  City Threatened and Garrison City (City Defense's tree, its start
-  0x5cced0).
+  record +0xc's writer; the team update's danger and attack strengths.
 
 ## C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread
 
-Ported in `ai/major/operations/warValue.ts` (the war value),
+Ported in `ai/major/warValue.ts` (the war value),
 `ai/major/diploActions.ts` (the Surprise War's and the city-state war's
-desires, the pick's not-ready hook), `ai/major/operations/manager.ts`
+desires, the pick's not-ready hook), `cpu/core/operations/manager.ts`
 (PrepareForWarWith from the hook, the readiness 0x723db0, the contracts on
-`cpu/core/aiContracts.ts`), `ai/major/operations/assault.ts` (the
+`cpu/core/aiContracts.ts`), `cpu/core/operations/assault.ts` (the
 executions), `cpu/core/aiAssignment.ts` (the generalized assignment) and
 `cpu/core/tactical.ts` (the district targets); measured by the replay's
 DiplomaticSender (the desire rows, the war declarations) and
@@ -6415,6 +6408,101 @@ execution families) on runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128.
   +0xc's writer (every WAR line logs 0.00); 0x650890's signal (taken as the
   peace); Siege City's first part (the ZOC-ignoring units' adjacent move);
   the air units' contract.
+
+## C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread
+
+The one operation manager is `cpu/core/operations/` (manager.ts,
+operation.ts, nodes.ts, recruit.ts, types.ts, evaluate.ts, assault.ts,
+knowledge.ts, cityValue.ts, cityThreat.ts; its tables
+`cpu/data/aiOperations.ts`): the majors' AI and the city-states run it, a
+party that settles handing it its settling AI. Measured by the replay's
+OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
+/ 1121 / 1124 / 1127 / 1128, AI_Operation.csv).
+
+- THE CITY'S THREAT (0x5cbd10; CityBuildAI autovariable m_cityThreat at
+  +0x160, its data +0x1b8, set by the city's update 0x5ce680 — a
+  city-state's update sets it and returns): per player of the game's list
+  (+0x4a0) but the owner and a declared friend (0x3da770): a full civ the
+  owner fights (0x469cd0) or that has denounced it (0x3da5e0) or that it
+  denounced (0x3da8e0), and the barbarians, are hostile (margin 5.0);
+  another full civ, margin 20.0 or the centre's strength with its garrison
+  (0x24a180) where higher; a city-state the owner does not fight is
+  skipped. An undamaged city with an operation of the owner against the
+  player whose target lies within 5 of it (0x723cf0) skips the player. The
+  knowledge base's units of the player within 5 (a full civ's) or 3
+  (0x5eadb0) each by its unit row: s = max(Combat +0x48, RangedCombat
+  +0x6c, Bombard + 20 where +0x40 is above 0), counted where it bombards,
+  where ranged and s above D - 15.0, or s above D - 5.0 (D the centre's
+  GetDefenseStrength, 24.8), an explorer (PSEUDOYIELD_UNIT_EXPLORER) never;
+  their sum at D plus the margin or more threatens the city, at level 2 —
+  +1 above 2 of city +0x1a60, +2 with +0x5e8, +1 with +0x1c78's list, +
+  +0x588 / 5, all unread — at most 1 for a player not hostile; the first
+  such player decides, else -1. The units within 2 above 5.0 strength (a
+  second 0x5eadb0) set the autovariable +0x1c0 (unread use).
+- THE DEFENCE EVENT 0x5cced0 (slot 5): a threat above -1 with the slot's
+  operation gone starts the list's operation ("City Defense") at the city
+  through the manager's start by name 0x7265b0; the port runs it in the
+  manager's turn before the running operations log their lines (the log's
+  order: "City Defense, Started" then each operation's "running" line).
+- IS CITY THREATENED (0x813050): the target gone (0x73a8e0: a camp off the
+  knowledge base's camps, a district target off its city records, a
+  friendly city or a settle plot never, any other kind always) or the city
+  on the target threatened (+0x1b8 above -1): SUCCESS, else FAILURE.
+  GARRISON CITY (0x8133c0): the target gone SUCCESS; the operation's units
+  (0x6092c0) any RUNNING, none FAILURE. Its execution (0x810d30): over the
+  operation's units in order, the one on the city its garrison (its ranged
+  strength or its Bombard less 5, its Combat); of those whose planning
+  reaches the city in a turn (0x791300) the candidate by ranged, then
+  Bombard less 5, then Combat strength above the garrison's; with no
+  garrison and no military unit of the seat on the city (formation class
+  neither 0 nor 3), the candidate moves in and fortifies (0x56d6f0) unless
+  ranged; with a garrison and a stronger candidate, the candidate moves to
+  its planning's spot by the city and swaps in (the swap command 0x972880,
+  unported); else the garrison fortifies (0x95eae0) where it has no range
+  and the teams' +0x98 - +0x94 is at most 10.
+- THE DISTRICT TARGET STILL VALID (0x73abf0, TARGET_ENEMY_COMBAT_DISTRICT):
+  the knowledge base's record of the city on the target (owner +0, city id
+  +4, kind 2 at +2) — none, invalid; its defenses and walls (0x5eb600) at
+  most its defensible districts (+0x58), valid; op +0x124 at 1 valid (the
+  definition's TargetParameter by the log, its writer unread); else per
+  member of its teams alive (+0x770 clear): one the walls do not hold back
+  (unit +0x18b8 / +0x18b9, the counts +0xb94 / +0xc14: a siege assist on
+  the city in the port), valid, unless the city's flag (an owner major:
+  city +0x158's lookup +0x1c above 0; else player +0x12f0 +0xf4 above 0;
+  unread, taken clear); else the combat simulation's blow (0x213e00 ..
+  0x205720, dealt +0x24, taken +0x28 — the blow back none in the port)
+  against COMBAT_HEAL_CITY_GARRISON (20, GlobalParameters +0x1b8): either
+  at 20 or more valid; both below 10: the taken sum above 40 or the dealt
+  sum above 20 valid; else a second such member valid; none, invalid.
+  runs/h1_duelv1128 China's Attack Enemy City of t73 on a city that raised
+  its defenses turns INVALID at t76 with no team member; the port's of t68
+  turns INVALID at t76 (the log's first, t69, at once: the port starts a
+  turn early).
+- THE CONTRACT FOR AN OPERATION'S UNIT (Recruit Units' execution 0x8189f0):
+  for an AI player with the team's unit to build set (+0x8c, from 0x739cd0:
+  the first team's +0x14), a contract for it — its value the Recruit Value
+  tag (x 3 where its row's +0x40 is above 0), its turn limit the Time Limit
+  tag (autovariable +0x168), submitted (0x60bb50) — held under the Contract
+  ID tag; one accepted or in progress for the same unit stays. The team's
+  unit to build (+0x14) is written by the team update 0x73fba0 through the
+  military AI's unit list (+0x268, the cities' lists handed over by
+  0x79a320; the choice 0x79cba0 / 0x79bd30 over its ranked 0x168-byte
+  entries, unread). Without it the port's CITY_ASSAULT operations hold no
+  contract and never reach their Contract Manager's turn limit: runs/
+  h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -
+  t180 in the log (10-turn limits), the port's of t77 to the end.
+- MEASURED (the action replay on the five verbose duels, the majors and the
+  city-states on the manager): City Defense started log / port 1117 35 /
+  69, 1121 25 / 53, 1124 23 / 27, 1127 132 / 222, 1128 45 / 54 (1128 t15
+  Xi'an's on the log's turn; the port's threat leaves and comes back a
+  turn at a time where the log's holds); Settle New City's turns with every
+  line equal 1117 38 -> 34, 1121 25 -> 30, 1124 30 -> 35, 1127 14 -> 25,
+  1128 27 -> 38 (the units City Defense holds); the city-states' Attack
+  Barb Camp runs to the game's end with no recruit contract (1128 running
+  lines log 183, port 770). The record's six wars (runs/h1_duelw1109 t200,
+  1110 t124, 1112 t200, 1118 t239, 1120 t216, 1128 t196): the port declares
+  none; its war operations hold no contract and never end, no team reaches
+  the march point.
 
 ## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
 

@@ -1,15 +1,19 @@
 /**
  * THE OPERATION MANAGER (AI/MilitaryAI 0x722690 -> 0x727510, Operation.cpp;
- * the reading is tools/civ6lab/dll_readings.md "C-97: the operations").
+ * the reading is tools/civ6lab/dll_readings.md "C-97: the operations"), the
+ * one manager of every party that runs operations: the majors and the
+ * city-states (their limits by their leader trait); a party that settles
+ * hands it its settling AI (OpsSettle).
  *
- * Each turn of an AI major: the settle evaluation's AI_EVENT_DESIRE_SETTLE
- * starts the "Settle New City" operation (TriggeredBehaviorTrees
- * TRIGGER_SETTLE_SPOT, through 0x800c60 -> 0x7265b0) where the seat runs none;
+ * Each turn of the seat: for a seat that settles, the settle evaluation's
+ * AI_EVENT_DESIRE_SETTLE starts the "Settle New City" operation
+ * (TriggeredBehaviorTrees TRIGGER_SETTLE_SPOT, through 0x800c60 -> 0x7265b0)
+ * where the seat runs none;
  * the military AI's turn builds the candidates and evaluates them
  * (evaluate.ts) on the knowledge base's city records of the turn before;
  * the manager logs the valid ones' values and, the records refreshed, the
- * CITY VALUES; a running operation's candidate names its backup (0x73e610);
- * each
+ * CITY VALUES; each city's threat and its City Defense (cityDefense); a
+ * running operation's candidate names its backup (0x73e610); each
  * running operation logs its target and refreshes its strengths and its
  * teams' readiness (0x73eb60, 0x73f7d0, 0x73b360); the best new candidate
  * that starts itself — the highest Priority, then the best odds, the first
@@ -21,18 +25,18 @@
  * takes the slot freed last, else a new one, and the manager walks them in
  * slot order.
  */
-import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from './tables';
-import { compileTree, newRun, tick, type BtNode } from '../../../cpu/core/behaviorTree';
+import { AI_LEADER_OP_LISTS, AI_OP_DEFS, AI_OP_LIMIT_LISTS, AI_OP_LISTS, AI_TREES } from '../../data/aiOperations';
+import { compileTree, newRun, tick, type BtNode } from '../behaviorTree';
 import { NO_PLOT, addMember, newTeams, opUnits, xy, type Operation } from './operation';
 import { OP_NODES, refreshStrengths, switchToBackup, type DiplomacyRequest, type OpsContext } from './nodes';
 import { CP_ACCEPTED, CP_FAILED, CP_IN_PROGRESS, contractBuilt, contractEvaluate, newContractBook, queueContract, reapContracts, type ContractBook,
-  type ContractItem, type ContractNodeWorld } from '../../../cpu/core/aiContracts';
+  type ContractItem, type ContractNodeWorld } from '../aiContracts';
 import { evaluate, type ArmyUnit, type Candidate } from './evaluate';
 import { knownArmy, lookArmy, type ArmyRecords } from './knowledge';
 import { cityValue } from './cityValue';
-import { bestSettleSite, settleRegions, type SettleRegions } from '../settle';
-import type { AiOpDef } from './types';
-import type { MajorKnownCityView, MajorView } from '../view';
+import { cityThreat } from './cityThreat';
+import type { AiOpDef, OpsSettle } from './types';
+import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
 
 export interface OpsAi {
   seat: number;
@@ -58,6 +62,10 @@ export interface OpsAi {
   known: readonly MajorKnownCityView[] | null;
   /** the knowledge base's army records */
   army: ArmyRecords;
+  /** each city's threat (CityBuildAI +0x1b8, -1 none) and its defence
+   *  slot's operation (CityEvents slot 5, -1 none), by the city's plot */
+  threat: Map<number, number>;
+  defense: Map<number, number>;
 }
 
 export interface OpsTurnEnv {
@@ -72,6 +80,8 @@ export interface OpsTurnEnv {
   /** what a city of the seat produces once its turn's choice is made (the
    *  Default Specialization runs before the trees tick), null for nothing */
   producing(city: number): ContractItem | null;
+  /** the seat's settling AI, none for a party that never settles */
+  settle: OpsSettle | null;
 }
 
 /** a turn's AI_Operation.csv lines and AI_Operation_Eval.csv lines, each
@@ -84,7 +94,7 @@ export interface OpsTurnLog {
 }
 
 export const newOpsAi = (seat: number): OpsAi => ({ seat, slots: [], free: [], nextOp: 0, book: newContractBook(), nextContract: 0,
-  prepareForWar: new Set(), diplomacy: new Map(), known: null, army: new Map() });
+  prepareForWar: new Set(), diplomacy: new Map(), known: null, army: new Map() , threat: new Map(), defense: new Map() });
 
 /** PrepareForWarWith (0x724f30): the seat prepares for war with the player,
  *  or no longer */
@@ -172,14 +182,16 @@ export function allowedOps(leader: string | null): AiOpDef[] {
 }
 
 /** the seat's operation limits by OperationType (AiOperationTypes and
- *  PerWarOperationTypes lists: a major's trait lists and those of the
- *  strategies it follows) */
+ *  PerWarOperationTypes lists: its leader trait's — a major's
+ *  TRAIT_LEADER_MAJOR_CIV, a city-state's MINOR_CIV_DEFAULT_TRAIT — and a
+ *  major's of the strategies it follows) */
 function limitsOf(view: MajorView, seat: number): { base: Map<string, number>; perWar: Map<string, number> } {
   const base = new Map<string, number>();
   const perWar = new Map<string, number>();
-  const followed = view.strategies(seat);
+  const followed = view.majors().includes(seat) ? view.strategies(seat) : new Set<string>();
+  const trait = view.majors().includes(seat) ? 'TRAIT_LEADER_MAJOR_CIV' : view.cityStateSeats().includes(seat) ? 'MINOR_CIV_DEFAULT_TRAIT' : null;
   for (const l of AI_OP_LIMIT_LISTS) {
-    const applies = l.trait === 'TRAIT_LEADER_MAJOR_CIV' || (!l.trait && !l.agenda && l.strategies.length > 0 && l.strategies.every((s) => followed.has(s)));
+    const applies = (l.trait !== null && l.trait === trait) || (!l.trait && !l.agenda && l.strategies.length > 0 && l.strategies.every((s) => followed.has(s)));
     if (!applies) continue;
     const into = l.system === 'PerWarOperationTypes' ? perWar : base;
     for (const [k, v] of Object.entries(l.items)) into.set(k, (into.get(k) ?? 0) + v);
@@ -214,6 +226,27 @@ function endOperation(ai: OpsAi, op: Operation): void {
   if (k < 0) return;
   ai.slots[k] = null;
   ai.free.push(k);
+}
+
+/** THE CITIES' UPDATE (0x5ce680) as the operations read it: each city's
+ *  threat (0x5cbd10, cityThreat); a threatened city whose defence slot holds
+ *  no running operation starts City Defense at its plot (the defence event
+ *  0x5cced0 through the manager's start by name 0x7265b0), the slot holding
+ *  it */
+function cityDefense(ai: OpsAi, view: MajorView, turn: number, log: (l: string) => void): void {
+  const def = AI_OP_DEFS['City Defense'];
+  for (const city of view.cityPlots(ai.seat)) {
+    const threat = cityThreat(view, ai.seat, city, {
+      army: (p) => knownArmy(ai.army, p),
+      operationNear: (p, plot, dist) => opsOf(ai).some((o) => o.enemy === p && o.target !== NO_PLOT && view.plotDistance(o.target, plot) <= dist),
+    });
+    ai.threat.set(city, threat);
+    const slot = ai.defense.get(city) ?? -1;
+    if (slot !== -1 && opsOf(ai).some((o) => o.id === slot)) continue;
+    ai.defense.set(city, -1);
+    if (threat <= -1 || !def) continue;
+    ai.defense.set(city, startOperation(ai, view, def, -1, city, city, turn, log).id);
+  }
 }
 
 /** the seat's running operations of an OperationType */
@@ -266,7 +299,7 @@ function contractWorld(ai: OpsAi, env: OpsTurnEnv, op: Operation): ContractNodeW
 }
 
 /** One turn of the seat's operations. */
-export function operationsTurn(ai: OpsAi, env: OpsTurnEnv, sr?: SettleRegions): OpsTurnLog {
+export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
   const lines: string[] = [];
   const evals: string[] = [];
   const log = (l: string) => lines.push(l);
@@ -278,7 +311,6 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv, sr?: SettleRegions): 
     refreshStrengths(context(ai, env, op, log));
   }
   updateContracts(ai, view, env);
-  const regions = sr ?? settleRegions(view, ai.seat);
   const allowed = allowedOps(view.leaderType(ai.seat));
   const staging = stagingPlots(view, ai.seat);
   const army = (p: number): readonly ArmyUnit[] => (p === ai.seat ? view.units(ai.seat) : knownArmy(ai.army, p));
@@ -296,10 +328,10 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv, sr?: SettleRegions): 
     for (const def of allowed) if (def.enemyType === 'WAR') cands.push(blank(def, p));
   }
   for (const def of allowed) if (def.enemyType === 'NONE') cands.push(blank(def, -1));
-  const inputs = { regions, taken: new Set(opsOf(ai).map((o) => o.target)), known: ai.known ?? view.knownCities(ai.seat), army };
+  const inputs = { settle: env.settle, taken: new Set(opsOf(ai).map((o) => o.target)), known: ai.known ?? view.knownCities(ai.seat), army };
   for (const c of cands) evaluate(view, ai.seat, c, staging, inputs);
   const { base, perWar } = limitsOf(view, ai.seat);
-  // AI_EVENT_DESIRE_SETTLE (0x7265b0): Settle New City starts where the seat
+  // AI_EVENT_DESIRE_SETTLE (0x7265b0): for a seat that settles, Settle New City starts where the seat
   // runs fewer than its limit, from the candidate for it: the settle site as
   // its target (else the candidate's), the candidate's rally; with no target
   // the candidate is weighed again for the new operation and its target
@@ -307,8 +339,8 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv, sr?: SettleRegions): 
   const settleDef = AI_OP_DEFS['Settle New City'];
   const settleCand = cands.find((c) => c.def === settleDef && !c.op);
   const settleType = settleDef.operationType ?? '';
-  if (settleCand && count(ai, settleType) < (base.get(settleType) ?? 0)) {
-    const site = view.cityPlots(ai.seat).length > 0 ? bestSettleSite(regions) : null;
+  if (env.settle && settleCand && count(ai, settleType) < (base.get(settleType) ?? 0)) {
+    const site = view.cityPlots(ai.seat).length > 0 ? env.settle?.best(-1) ?? null : null;
     const op = startOperation(ai, view, settleDef, -1, site ? site.plot : settleCand.target, settleCand.rally, env.turn, log);
     if (op.target === NO_PLOT) {
       const again: Candidate = { ...blank(settleDef, -1), presetRally: op.target, presetStrength: op.strength, op };
@@ -342,6 +374,7 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv, sr?: SettleRegions): 
   const known = (ai.known = view.knownCities(ai.seat));
   lookArmy(ai.army, view, ai.seat, env.turn);
   const cityValues = known.filter((k) => k.owner !== ai.seat).map((k) => ({ plot: k.plot, value: cityValue(view, ai.seat, k, known, army) }));
+  cityDefense(ai, view, env.turn, log);
   // each operation's target and teams
   for (const op of opsOf(ai)) {
     log(`${op.def.name} running, TARGET ${xy(view, op.target)}`);
@@ -381,6 +414,8 @@ function context(ai: OpsAi, env: OpsTurnEnv, op: Operation, log: (l: string) => 
       ai.diplomacy.set(id, { id, action, enemy, value, turn: env.turn, op: op.id });
       return id;
     },
+    settle: env.settle,
+    threat: (plot) => ai.threat.get(plot) ?? -1,
     log,
   };
 }
