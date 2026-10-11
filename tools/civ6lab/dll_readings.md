@@ -4719,7 +4719,7 @@ the port on the record's state and on the replayed engine's).
   the 29 duels the autoplayed slot turns Friendly at 15 and back to Neutral
   at 5 (oscillating at 5 against Unfriendly every turn), while Qin turns
   Friendly from Neutral at opinions down to -2 (30 times) — the AI's pick in
-  the band, unread.
+  the band, read in "C-97: the majors' diplomatic actions".
 - THE VERBOSE LOG (runs/h1_duelv1124, the same game as h1_duelw1124 with
   the AI's diplomatic action log on): AI_Diplomacy.csv adds, per turn,
   player and DiplomaticActionType, "desire:cost" toward each player met
@@ -4731,7 +4731,8 @@ the port on the record's state and on the replayed engine's).
   -36.8, Delegation -9.5 / 0.5 / -8.7 as the game runs). The Embassy went at
   106 (Diplomatic Service at 103) with desire 11.3 over cost -18.7; the
   Delegation stood at 15.5 over -9.5 from 99 and was never sent — the pick
-  is not the margin alone. T, G and the pick are unread.
+  is not the margin alone. The terms and the pick: "C-97: the majors'
+  diplomatic actions".
 - THE ATTEMPTS (the five verbose duels, runs/h1_duelv1124 and h1_duelv1117 /
   1121 / 1127 / 1128): an action's entry reads 0.0:0.0 on the turns the AI
   takes it, and DiplomacySummary.csv names only the ones the other side
@@ -4743,9 +4744,9 @@ the port on the record's state and on the replayed engine's).
   choice is measured by the attempt turns: the Delegation tried at once
   after the meeting (1127 t61), the Embassy once Diplomatic Service is held
   (1127: held from 118, first try 117 at the civic's completion; 1124: 106,
-  held from 103; 1117: held from 95, met 161, first try 171). The accept
-  side (the receiver's evaluator) and the retry spacing are unread.
-- Open (AUDIT C-97 BUILD): FORCE_INCURSION's count and thresholds, NEAR_CULTURE_BORDER, SETTLED_CITIES' ledger, GOVERNMENTS, PEACEFUL, the third-party, pledge, espionage, archaeology and one-sided-trade modifiers, the other agendas' own effects (Last Viking King, Zealot, Turtler, Lord of Mines, Kaitiakitanga, Exploitative, Flat Earther, Paranoid), the event triggers of requirement-driven modifiers, a meeting between two players' turns (1104 t76), the diplomatic state's Allow band, threat and trust, the action evaluator's T and G terms, the receiver's acceptance and the retry spacing, and the decisions themselves as per-seat actions (delegation, embassy, open borders, friendship, denouncement, war, peace, deals). Not engine facts: the majors' meeting, the Delegation and Embassy as two missions (the replay takes both from the logs), the game's grievances (absent from the records). ASK: the agenda pool's default GameLimit (read as every major).
+  held from 103; 1117: held from 95, met 161, first try 171). The
+  receiver's answer and the can-do: "C-97: the majors' diplomatic actions".
+- Open (AUDIT C-97 BUILD): FORCE_INCURSION's count and thresholds, NEAR_CULTURE_BORDER, SETTLED_CITIES' ledger, GOVERNMENTS, PEACEFUL, the third-party, pledge, espionage, archaeology and one-sided-trade modifiers, the other agendas' own effects (Last Viking King, Zealot, Turtler, Lord of Mines, Kaitiakitanga, Exploitative, Flat Earther, Paranoid), the event triggers of requirement-driven modifiers, a meeting between two players' turns (1104 t76), threat, and ("C-97: the majors' diplomatic actions") the evaluator's unread terms and the decisions themselves as per-seat actions (delegation, embassy, open borders, friendship, denouncement, war, peace, deals). Not engine facts: the majors' meeting, the Delegation and Embassy as two missions (the replay takes both from the logs), the game's grievances (absent from the records). ASK: the agenda pool's default GameLimit (read as every major).
 
 ## C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)
 
@@ -5179,6 +5180,130 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with
   0x7a0ac0), City Defense's start (0x5cced0 "Defense %s"), the knowledge
   base's camp order (the port reads plot order).
+
+## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
+
+AI::Diplomatic (player +0x1280; DiplomaticActions.cpp, DiplomaticState.cpp,
+Diplomatic.cpp). Port: `ai/major/diploState.ts` (the state turn); check:
+the action replay's diplomacy section (`cpu/harness/majorDiplomacy.ts`:
+state lines on the port's opinion and, the state turn alone, on the log's
+own opinions). Evidence: the verbose recordings runs/h1_duelv1117 / 1121 /
+1124 / 1127 / 1128 (AI_Diplomacy.csv's action rows, DiplomacyManager.csv,
+DiplomacySummary.csv).
+
+- THE LOG'S ACTION ROWS (0x652800): per action and player, ", %3.1f:%3.1f"
+  is FIRST 0x66cc40 (the evaluation record's +0x48 vector, "Desired" in the
+  record's own dump 0x676510) and SECOND 0x66b490 (+0x68, "Cost") of the
+  record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88). The records are
+  refilled per action by 0x670210: +0x68 from the action's COST functor,
+  +0x48 from its DESIRE functor, the fourth argument the owner's diplomatic
+  AI. 0.0:0.0 on an attempt turn (the record reset by the perform).
+- THE FUNCTORS (registered per action in 0x672210, slots +0x08 cost, +0x28 desire,
+  +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):
+  Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy
+  0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /
+  0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship
+  0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance
+  0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).
+  The action indices are globals of the static initializer 0x67ff10
+  (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c,
+  Delegation @f2e58c, Declare Friendship @f2e594, Propose Trade @f2e5d4).
+- STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row
+  of the owner's state toward p for the action (Worth +0x24, Cost +0x18),
+  less the action's gold cost valued at the owner's Gold weight (0x527610 ->
+  0x7a6690), both sign-clipped by the owner's preference of the action
+  (+0x6240, the AiFavoredItems lists; favored keeps Worth >= 0 and drops a
+  positive gold value) or else p's (+0x62b0); the worth adds +0x6320[p][a]
+  (0x6504f0). No other instruction of the DLL names +0x6320 than its getter
+  and the save's serializer: its writer is unread.
+- THE TRUST TERM T (0x671b80): 0 unless the owner's trust of p (+0x6480[p])
+  is non-zero; else, with n = 1 + the players trusted more (0x650550) and L =
+  trunc(+0x6420 x 0.25 / 0.5 / -) for modes 0 / 1 / 2, T = (10 / 20 / 40) x
+  (L - n + 1) / L where n <= L; negated when the caller asks.
+- THE DESIRES READ: Delegation (0x66cd40) and Embassy: Worth + T, then +20
+  where the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the
+  +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged
+  branches give max(X + 20, 20) instead (AI owner and a human p; both AI).
+  Demand Tribute (0x66c800): Worth, -10 where +0x6780 names p, + (20 - T in
+  mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats
+  +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras
+  row's ChronologyIndex) is later. Open Borders (0x66dda0): Worth - T, + (40 -
+  d) x 0.5 (whole part) for the least plot distance d (1..39) between p's
+  cities in the knowledge base and the owner's, +10 where +0x6780 names p.
+  The cost functors: Cost - T.
+- THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first;
+  then, repeatedly, every met player p not yet acted on this turn, whose
+  entry is valid, unchanged this turn (+0x1a) and with no pending session,
+  offers the actions of the owner's state toward p (the entry's list): an
+  action is skipped DISFAVORED by the owner's or p's preference, with desire
+  <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0:
+  the per-player per-action flag +0x6390, then the can-do functor); a
+  favoured action (the owner's or p's preference) beats any other, else the
+  higher desire. The best is performed (0x674900), p marked, and the scan
+  runs again: at most one action per player per turn.
+- THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI
+  affords the action's gold cost from savings slot 2 (0x6874d0: slot 2 >=
+  half the cost and slot 0 + slot 2 >= the cost); CanDoAction; and the last
+  diplomatic turn with p (diplomacy +0x11b8[p] via 0x3d9450, writer unread)
+  + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the
+  turn. The perform (0x674960) sends the action ("Processing Action From AI
+  to AI") and spends the cost from savings slot 1 (0x68acd0).
+- THE ECONOMIC AI'S SAVINGS (0x687bf0, each AI turn): the treasury's change
+  since the last balance (+0x1b8) shared over the four SavingTypes by the
+  AiLists DefaultSavings weights (SLUSH_FUND 3, UNITS 4, PLOTS 1,
+  GREAT_PEOPLE 1 of 9), a slot below 0 cleared, slot 2 capped at 150 (the
+  excess to slot 0); a spend (0x68acd0) takes its slot, the overflow from
+  slot 0, and lowers the balance by the amount.
+- THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):
+  an AI receiver answers by 0x653f60: an action outside its state's lists
+  toward the sender refuses; else the value 0x66b490 of its incoming record
+  (+0xca8[sender]) above 0 refuses, at or below 0 accepts. On acceptance the
+  cost moves from sender to receiver and the mission is set; then the
+  sender's AI records the answer (0x6543a0: a refusal returns the cost to
+  savings slot 2; answer 12 sets +0x6338[p][a]). Confirmed on every answer
+  of the five verbose duels (20 / 20): accepted exactly where the
+  receiver's own logged cost of the action toward the sender is <= 0 —
+  every refusal in Unfriendly (Cost 75 / 100), every acceptance in Neutral
+  (runs/h1_duelv1127: the Delegation refused 61, 68, accepted 79; the
+  Embassy refused 117 ... 186, accepted 191 at Rome's Neutral).
+- THE STATE TURN (0x67b6e0, the entries built by 0x67aff0, their terms by
+  0x67aaf0). Each DiplomaticStateTransitions row out of the state, in table
+  order: REQUIRED when RequireTransitionMax <= opinion (else, without it,
+  opinion <= RequireTransitionMin) and the AllowTransitionCheck passes —
+  the first required row is taken (OnTransitionAction fires); else ALLOWED
+  when AllowTransitionMin <= opinion <= AllowTransitionMax and the check
+  passes, weighing the sum of s(a) over the AI-allowed, non-leaving actions
+  the target adds, less the sum over those it drops, plus the best s(a) of
+  the actions leading into the target (s = desire where CanDoAction, else
+  0); the heaviest positive row is taken when the target state has a row
+  for every action the owner now desires (desire > 0). Read off the
+  records: Neutral -> Unfriendly adds only Demand Tribute, so Rome moves at
+  opinion <= 5 exactly while its Demand Tribute desire is positive
+  (runs/h1_duelv1127: -10 from 71 to 96 and Neutral at opinion 5; 15 at 97
+  and Unfriendly; from 105 Unfriendly at 5 and Neutral the next turn, the
+  required return, every turn); Neutral -> Friendly adds Open Borders and
+  Request Assistance, so Qin moves at opinion >= -5 when its Open Borders
+  desire turns positive (1127 t192, 1124 t108, 1128 t167, 1117 t235: 0 at
+  234, no move). Unfriendly -> Neutral and Friendly -> Neutral drop actions
+  and are taken only when required. Friendly -> Declared Friend at 25
+  (CanDeclareFriendship 0x67c740: CanDoAction, not-ready, the last
+  diplomatic turn + AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS (5) toward a full
+  civ, the Declare Friendship desire of the incoming record >= 0) never
+  passes in the 29 duels (151 Rome lines at 25 and 26 stay Friendly).
+  The required rows alone hold 4,828 / 5,049 of Rome's state lines and
+  5,300 / 5,341 of Qin's over the 29 duels and the five verbose ones (following the log
+  after a miss).
+- PARTLY READ / unread (AUDIT C-97): the +0x6320 term (the desires' D of 0,
+  20, 40 over the records), the focus player +0x6780 (0x647bb0: the met
+  major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency
+  0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and
+  +0x6420, the Gold weight inside the valuation (the logged costs give
+  gold values of 6 to 74 for 25 / 50 gold), the last diplomatic turn's
+  writer (+0x11b8; the Embassy's retries come 4 to 10 turns apart), the
+  savings' other spenders (purchases' slots), the remaining functors (Open
+  Borders' knowledge-base distance, Request Assistance, Declare Friendship,
+  the war declarations, Propose Trade and the deals), CanDoAction
+  (0x3dd9a0), and the checks CanDenounce / CanGoToWar / CanOfferAlliance.
 
 ## DLL rules the engines contradict
 

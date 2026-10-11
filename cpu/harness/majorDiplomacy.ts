@@ -3,7 +3,9 @@
  * opinion of the others (ai/major/diplomacy.ts) run at each major's turn
  * start on the replayed engine, and scored against the game's own log of
  * that game (`<dump>.logs/AI_Diplomacy.csv`, the opinion each major holds of
- * each player it has met, per turn). The probe reads; it drives nothing.
+ * each player it has met, per turn), and each major's diplomatic state
+ * toward the others (ai/major/diploState.ts) run on that opinion and scored
+ * against the same rows' states. The probe reads; it drives nothing.
  *
  * The set-up's draws ("Random Diplomatic Value", "Choose random agenda") and
  * the civic agenda's draws are the game's own, taken from its draw log in
@@ -16,6 +18,9 @@ import {
   diplomacySetup, diplomacyTurnStart, newDiploGaps, opinion, opinionModifiers, type DiploDraw, type DiploGaps,
   type DiplomacyMemory,
 } from '../../ai/major/diplomacy';
+import {
+  diploState, diploStateTurn, newDiploStateGaps, newDiploStateMemory, type DiploStateGaps, type DiploStateMemory,
+} from '../../ai/major/diploState';
 import { majorView } from '../core/majorView';
 import type { GameState } from '../core/types';
 import type { LoggedDraw, RandLog } from './randLog';
@@ -79,6 +84,22 @@ export interface DiplomacyLaneTally {
   /** what the port could not evaluate: requirement and modifier types, counted per evaluation */
   gapRequirements: Record<string, number>;
   gapModifierTypes: Record<string, number>;
+  /** state lines: one per (turn, major, met major) the log holds, the port's
+   *  diplomatic state (ai/major/diploState) against the log's */
+  stateLines: number;
+  stateEqual: number;
+  stateFirstMiss?: string;
+  stateMisses: string[];
+  /** the logged transitions the port's state followed, and missed: from>to */
+  stateMoves: Record<string, [number, number]>;
+  /** what the state turn could not evaluate: checks and allowed rows */
+  gapChecks: Record<string, number>;
+  gapAllowed: Record<string, number>;
+  /** the same state lines, the machine run on the log's own opinions (the
+   *  state turn alone) */
+  onLogLines: number;
+  onLogEqual: number;
+  onLogMisses: string[];
 }
 
 /** the port on the record's own state (its logic alone), and on the
@@ -89,14 +110,24 @@ export interface DiplomacyTally {
 }
 
 const laneTally = (): DiplomacyLaneTally => ({ lines: 0, equal: 0, misses: [], byOwner: {}, agendas: {}, drawMisses: [],
-  gapRequirements: {}, gapModifierTypes: {} });
+  gapRequirements: {}, gapModifierTypes: {}, stateLines: 0, stateEqual: 0, stateMisses: [], stateMoves: {}, gapChecks: {},
+  gapAllowed: {}, onLogLines: 0, onLogEqual: 0, onLogMisses: [] });
 
 class Lane {
   mem: DiplomacyMemory | null = null;
   feed: LogFeed | null = null;
   readonly gaps: DiploGaps = newDiploGaps();
+  readonly states: DiploStateMemory = newDiploStateMemory();
+  readonly stateGaps: DiploStateGaps = newDiploStateGaps();
+  /** the state machine run on the log's own opinions */
+  readonly onLog: DiploStateMemory = newDiploStateMemory();
+  readonly onLogGaps: DiploStateGaps = newDiploStateGaps();
+  /** the log's last state per owner>other */
+  readonly logged = new Map<string, string>();
   readonly tally = laneTally();
 }
+
+const short = (s: string | null | undefined) => (s ?? '-').replace('DIPLO_STATE_', '');
 
 export class DiplomacyProbe {
   private readonly log: Map<string, LogRow> | null;
@@ -161,12 +192,39 @@ export class DiplomacyProbe {
       const view = this.view(state, next && owner !== majors[0] ? next : undefined);
       if (!view.majors().includes(owner)) continue;
       diplomacyTurnStart(view, mem, owner, feed.draw(turn), lane.gaps);
-      const row = this.log.get(`${turn}:${this.players.get(owner)}`);
+      diploStateTurn(view, lane.states, owner, (o) => opinion(mem, owner, o), lane.stateGaps);
+      const row: LogRow | undefined = this.log.get(`${turn}:${this.players.get(owner)}`);
       if (!row) continue;
-      const logged = row.filter(([, s]) => MAJOR_STATES.has(s));
+      const logged: LogRow = row.filter(([, s]) => MAJOR_STATES.has(s));
       const others = majors.filter((o) => o !== owner && view.metTurn(owner, o) !== null);
+      // the state turn alone: the same machine on the log's own opinions
+      const logOpinion = new Map(others.map((o, k) => [o, logged[k]?.[0] ?? 0] as const));
+      diploStateTurn(view, lane.onLog, owner, (o) => logOpinion.get(o) ?? 0, lane.onLogGaps);
       for (let k = 0; k < Math.max(logged.length, others.length); k++) {
         const other = others[k];
+        const gameState: string | undefined = logged[k]?.[1];
+        t.onLogLines++;
+        if (gameState !== undefined && other !== undefined && diploState(lane.onLog, owner, other) === gameState) t.onLogEqual++;
+        else if (t.onLogMisses.length < 40) {
+          t.onLogMisses.push(`t${turn} ${owner}->${other ?? '?'}: ours ${short(other === undefined ? null : diploState(lane.onLog, owner, other))} `
+            + `game ${short(gameState)} at opinion ${logged[k]?.[0] ?? '-'}`);
+        }
+        const ourState = other === undefined ? null : diploState(lane.states, owner, other);
+        t.stateLines++;
+        const pk = `${owner}>${other ?? '?'}`;
+        const before = lane.logged.get(pk);
+        if (gameState !== undefined) lane.logged.set(pk, gameState);
+        if (before !== undefined && gameState !== undefined && before !== gameState) {
+          const mk = `${short(before)}>${short(gameState)}`;
+          const mv = (t.stateMoves[mk] ??= [0, 0]);
+          mv[ourState === gameState ? 0 : 1]++;
+        }
+        if (gameState !== undefined && ourState === gameState) t.stateEqual++;
+        else {
+          const miss = `t${turn} ${owner}->${other ?? '?'}: ours ${short(ourState)} game ${short(gameState)} at opinion ${logged[k]?.[0] ?? '-'}`;
+          t.stateFirstMiss ??= miss;
+          if (t.stateMisses.length < 40) t.stateMisses.push(miss);
+        }
         const game = logged[k]?.[0];
         const ours = other === undefined ? undefined : opinion(mem, owner, other);
         const byOwner = (t.byOwner[String(owner)] ??= [0, 0]);
@@ -188,6 +246,8 @@ export class DiplomacyProbe {
     t.drawMisses = feed.misses.slice(0, 30);
     t.gapRequirements = Object.fromEntries(lane.gaps.requirements);
     t.gapModifierTypes = Object.fromEntries(lane.gaps.modifierTypes);
+    t.gapChecks = Object.fromEntries(lane.stateGaps.checks);
+    t.gapAllowed = Object.fromEntries(lane.stateGaps.allowed);
   }
 }
 
@@ -198,7 +258,13 @@ function laneMarkdown(name: string, t: DiplomacyLaneTally): string[] {
     `- Agendas: ${Object.entries(t.agendas).map(([s, a]) => `seat ${s} ${a.join(' ')}`).join('; ')}.`,
     `- Draws off the log: ${t.drawMisses.length ? t.drawMisses.join('; ') : 'none'}.`,
     `- Not read yet: requirement types ${JSON.stringify(t.gapRequirements)}; modifier types ${JSON.stringify(t.gapModifierTypes)}.`,
-    '', 'Misses:', '', ...t.misses.map((m) => `- ${m}`), ''];
+    '', 'Misses:', '', ...t.misses.map((m) => `- ${m}`), '',
+    `- Diplomatic state lines (ai/major/diploState, the port's opinion): ${t.stateLines}; equal ${t.stateEqual}; first miss: ${t.stateFirstMiss ?? '-'}.`,
+    `- The log's state changes the port followed / missed: ${Object.entries(t.stateMoves).map(([k, [a, b]]) => `${k} ${a} / ${b}`).join(', ') || 'none'}.`,
+    `- Not read yet: checks ${JSON.stringify(t.gapChecks)}; allowed rows weighed on unread desires ${JSON.stringify(t.gapAllowed)}.`,
+    `- The state turn alone, on the log's own opinions: ${t.onLogEqual} / ${t.onLogLines} lines.`,
+    '', 'State misses:', '', ...t.stateMisses.map((m) => `- ${m}`), '',
+    'State misses on the log\'s opinions:', '', ...t.onLogMisses.map((m) => `- ${m}`), ''];
 }
 
 /** the tally as the replay report's section */
