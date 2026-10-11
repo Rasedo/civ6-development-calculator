@@ -17,7 +17,13 @@
  *    x1.25 for a civilization's unique unit (TraitType).
  *
  * The city build AI's unit value reads it (0x79ca90: 0 for a unit the table
- * lacks) and 0x79d2d0 (the entry's obsolete flag).
+ * lacks) and 0x79d2d0 (the entry's obsolete flag); the operations' unit
+ * choice (0x79bd30) its entries (`unitProductionEntries`): beside the value,
+ * the sums of the at-war players' counts (+0x2c) and of each player's (the
+ * per-player vector +0x38), the sum over every player (+0x30), the entry
+ * buildable (+0x0e: its PrereqTech and PrereqCivic held, its
+ * StrategicResource owned), its strength (+0x18: max(Combat,
+ * RangedCombat)) and its maintenance resource (+0x24).
  */
 import { AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
 import { FX, fdiv, fmul, fxConst } from './aiValue';
@@ -33,6 +39,14 @@ export interface UnitProductionFacts {
   /** the knowledge base's count of the unit type over every player (the
    *  per-player counts 0x5eb650 reads, AI_Knowledge.csv's ARMY lines) */
   known(unit: string): number;
+  /** the same per player, with the players of the game's list (+0x4a0) and
+   *  those at war with the player (0x469cd0); absent, none */
+  knownBy?(unit: string, player: number): number;
+  players?: readonly number[];
+  atWar?(player: number): boolean;
+  /** the unit's PrereqTech and PrereqCivic held and its StrategicResource
+   *  owned (0x4aa790) */
+  buildable?(unit: string): boolean;
 }
 
 export interface UnitProductionEntry {
@@ -40,11 +54,31 @@ export interface UnitProductionEntry {
   obsolete: boolean;
 }
 
+/** one entry of the table as the operations' unit choice reads it */
+export interface UnitProductionRow extends UnitProductionEntry {
+  unit: string;
+  buildable: boolean;
+  /** the sums over the at-war players (+0x2c) and over every player (+0x30),
+   *  24.8, and per player (+0x38) */
+  atWar: number;
+  all: number;
+  perPlayer: ReadonlyMap<number, number>;
+  /** max(Combat, RangedCombat) (+0x18) */
+  strength: number;
+  /** its Units_XP2 maintenance resource (+0x24), null for none */
+  maintenance: string | null;
+}
+
 const COMBAT_PSEUDO = new Set(['PSEUDOYIELD_UNIT_COMBAT', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT', 'PSEUDOYIELD_UNIT_AIR_COMBAT']);
 const UNIQUE = fxConst(1.25);
 
 /** 0x7989e0: the table, by unit type */
 export function unitProductionTable(f: UnitProductionFacts): Map<string, UnitProductionEntry> {
+  return new Map(unitProductionEntries(f).map((e) => [e.unit, { value: e.value, obsolete: e.obsolete }]));
+}
+
+/** 0x7989e0: the table's entries in the Units' database order */
+export function unitProductionEntries(f: UnitProductionFacts): UnitProductionRow[] {
   const entries: number[] = [];
   AI_UNITS.forEach((u, k) => {
     if (!f.isVersion(u.type)) return;
@@ -52,6 +86,10 @@ export function unitProductionTable(f: UnitProductionFacts): Map<string, UnitPro
     entries.push(k);
   });
   const sums = new Map<number, number>(entries.map((k) => [k, 0]));
+  const all = new Map<number, number>(entries.map((k) => [k, 0]));
+  const atWar = new Map<number, number>(entries.map((k) => [k, 0]));
+  const perPlayer = new Map<number, Map<number, number>>(entries.map((k) => [k, new Map()]));
+  const players = f.players ?? [];
   let total = 0;
   AI_UNITS.forEach((u, i) => {
     if (u.combat === 0 || f.obsolete(u.type)) return;
@@ -59,14 +97,32 @@ export function unitProductionTable(f: UnitProductionFacts): Map<string, UnitPro
     const n = f.known(u.type);
     if (n <= 0) return;
     total += n;
-    for (const k of entries) sums.set(k, sums.get(k)! + AI_UNIT_EFFICIENCY[i][k] * n);
+    let w = 0;
+    for (const p of players) if (f.atWar?.(p)) w += f.knownBy?.(u.type, p) ?? 0;
+    for (const k of entries) {
+      sums.set(k, sums.get(k)! + AI_UNIT_EFFICIENCY[i][k] * n);
+      // the choice's sums read the table's other way (the entry's row
+      // against the opposing unit's column): AI_Operation.csv's "Contract
+      // for" names the Warrior Monk against Warriors and Spearmen, the
+      // strongest; the value's way names the Scout
+      const eff = AI_UNIT_EFFICIENCY[k][i];
+      all.set(k, all.get(k)! + eff * n);
+      atWar.set(k, atWar.get(k)! + eff * w);
+      const per = perPlayer.get(k)!;
+      for (const p of players) {
+        const c = f.knownBy?.(u.type, p) ?? 0;
+        if (c > 0) per.set(p, (per.get(p) ?? 0) + eff * c);
+      }
+    }
   });
-  const out = new Map<string, UnitProductionEntry>();
-  for (const k of entries) {
+  return entries.map((k) => {
     const u = AI_UNITS[k];
     let v = total === 0 ? FX : sums.get(k)! > 0 ? fdiv(total * FX, sums.get(k)!) : 0;
     if (u.trait) v = fmul(v, UNIQUE);
-    out.set(u.type, { value: v, obsolete: f.obsolete(u.type) });
-  }
-  return out;
+    return {
+      unit: u.type, value: v, obsolete: f.obsolete(u.type), buildable: f.buildable?.(u.type) ?? false,
+      atWar: atWar.get(k)!, all: all.get(k)!, perPlayer: perPlayer.get(k)!, strength: Math.max(u.combat, u.rangedCombat),
+      maintenance: u.maintenanceResource,
+    };
+  });
 }

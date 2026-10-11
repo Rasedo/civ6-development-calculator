@@ -219,6 +219,7 @@ def build() -> str:
     trait_lists = {trait: lt for lt, trait in city_lists.items() if trait}
 
     ai_types = [k[0] for k in keyed(rows("UnitAiTypes"), "AiType")]
+    ai_priority = [k[0] for k, c in keyed(rows("UnitAiTypes"), "AiType").items() if str(c.get("Priority", "")).lower() in ("true", "1")]
     unit_ai: dict[str, list[str]] = {}
     for c in rows("UnitAiInfos"):
         unit_ai.setdefault(c["UnitType"], [])
@@ -258,6 +259,9 @@ def build() -> str:
         "",
         "/** UnitAiTypes in rowid order */",
         f"export const AI_UNIT_AI_TYPES: readonly string[] = {js(ai_types)};",
+        "",
+        "/** UnitAiTypes with Priority */",
+        f"export const AI_UNIT_AI_PRIORITY: readonly string[] = {js(ai_priority)};",
         "",
         "/** UnitAiInfos: each unit type's AI types in rowid order */",
         f"export const AI_UNIT_AI: Readonly<Record<string, readonly string[]>> = {js(unit_ai)};",

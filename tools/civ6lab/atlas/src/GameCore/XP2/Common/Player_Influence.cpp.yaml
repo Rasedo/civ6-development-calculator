@@ -16,6 +16,17 @@
     - ...or, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then...
     - "...FECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x Player_Influence +0x270 x the amount as PSEUDOY..."
   review: imported
+- addr: 0x449b70
+  final: 0x2e90f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/operations/nodes.ts:recruitContract]
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0), the tree's, submitted (0x60bb50) and held under the tag. The levy (Allow Levying, 0x449b70, \"LEVIED FROM\") and the stealing signal's gate (player signal +0x1c8, Allow Stealing) a..."
+  review: imported
 - addr: 0x449cc0
   final: 0x2e9200
   kind: function

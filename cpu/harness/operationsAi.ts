@@ -29,6 +29,7 @@ import { newOpsAi, notReadyHook, operationsTurn, opsOf, peaceMade, remapUnits, s
 import { knownArmy } from '../core/operations/knowledge';
 import { warValue } from '../../ai/major/warValue';
 import { opsSettle } from '../../ai/major/settle';
+import { seatUnitRows } from '../core/operations/unitRows';
 import type { MajorView } from '../../ai/major/view';
 import type { WarHooks } from './diploSender';
 import { opUnits } from '../core/operations/operation';
@@ -251,6 +252,8 @@ export class OperationsProbe {
       if (!ai) this.ais.set(seat, (ai = newOpsAi(seat)));
       let view = majorView(copy, this.inputs(turn));
       const after = majorView(nextState, this.inputs(turn));
+      // the military AI's unit production table, once a turn
+      let rows: ReturnType<typeof seatUnitRows> | null = null;
       // a peace the seat made since its last turn (0x650890)
       const now = new Set(view.players().filter((p) => p !== seat && view.atWar(seat, p)));
       for (const p of this.wars.get(seat) ?? []) if (!now.has(p)) peaceMade(ai, p);
@@ -264,6 +267,11 @@ export class OperationsProbe {
         },
         built: built.get(seat) ?? [],
         settle: view.majors().includes(seat) ? opsSettle(() => view, seat) : null,
+        unitRows: () => (rows ??= (() => {
+          const counts = new Map<string, number>();
+          for (const r of ai.army.values()) counts.set(`${r.type}|${r.owner}`, (counts.get(`${r.type}|${r.owner}`) ?? 0) + 1);
+          return seatUnitRows(copy, seat, (u, p) => counts.get(`${u}|${p}`) ?? 0, view.players(), (p) => view.atWar(seat, p));
+        })()),
         producing: (city) => {
           const plot = view.cityBuilds(seat).find((b) => b.city === city)?.plot;
           const k = after.cityBuilds(seat).findIndex((b) => b.plot === plot);

@@ -36,6 +36,7 @@ import { knownArmy, lookArmy, type ArmyRecords } from './knowledge';
 import { cityValue } from './cityValue';
 import { cityThreat } from './cityThreat';
 import type { AiOpDef, OpsSettle } from './types';
+import type { UnitProductionRow } from '../aiUnitProduction';
 import type { MajorKnownCityView, MajorView } from '../../../ai/major/view';
 
 export interface OpsAi {
@@ -60,8 +61,10 @@ export interface OpsAi {
    *  records refresh after the military AI's evaluation), null before the
    *  first */
   known: readonly MajorKnownCityView[] | null;
-  /** the knowledge base's army records */
+  /** the knowledge base's army records and its camps (m_barbarians +0x638,
+   *  in their order) */
   army: ArmyRecords;
+  camps: number[];
   /** each city's threat (CityBuildAI +0x1b8, -1 none) and its defence
    *  slot's operation (CityEvents slot 5, -1 none), by the city's plot */
   threat: Map<number, number>;
@@ -82,6 +85,8 @@ export interface OpsTurnEnv {
   producing(city: number): ContractItem | null;
   /** the seat's settling AI, none for a party that never settles */
   settle: OpsSettle | null;
+  /** the seat's unit production entries (the military AI's +0x268) */
+  unitRows(): readonly UnitProductionRow[];
 }
 
 /** a turn's AI_Operation.csv lines and AI_Operation_Eval.csv lines, each
@@ -94,7 +99,7 @@ export interface OpsTurnLog {
 }
 
 export const newOpsAi = (seat: number): OpsAi => ({ seat, slots: [], free: [], nextOp: 0, book: newContractBook(), nextContract: 0,
-  prepareForWar: new Set(), diplomacy: new Map(), known: null, army: new Map() , threat: new Map(), defense: new Map() });
+  prepareForWar: new Set(), diplomacy: new Map(), known: null, army: new Map() , camps: [], threat: new Map(), defense: new Map() });
 
 /** PrepareForWarWith (0x724f30): the seat prepares for war with the player,
  *  or no longer */
@@ -228,6 +233,16 @@ function endOperation(ai: OpsAi, op: Operation): void {
   ai.free.push(k);
 }
 
+/** the knowledge base's camps: its update drops a camp whose plot the seat
+ *  sees with none there (0x5ebb30), its look adds each camp on a plot the
+ *  seat sees (0x7877e0 -> 0x5f0110) */
+function lookCamps(ai: OpsAi, view: MajorView): void {
+  const seen = view.plotsSeen(ai.seat);
+  const camps = new Set(view.campPlots());
+  ai.camps = ai.camps.filter((p) => !seen.has(p) || camps.has(p));
+  for (const p of [...camps].sort((a, b) => a - b)) if (seen.has(p) && !ai.camps.includes(p)) ai.camps.push(p);
+}
+
 /** THE CITIES' UPDATE (0x5ce680) as the operations read it: each city's
  *  threat (0x5cbd10, cityThreat); a threatened city whose defence slot holds
  *  no running operation starts City Defense at its plot (the defence event
@@ -328,7 +343,7 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
     for (const def of allowed) if (def.enemyType === 'WAR') cands.push(blank(def, p));
   }
   for (const def of allowed) if (def.enemyType === 'NONE') cands.push(blank(def, -1));
-  const inputs = { settle: env.settle, taken: new Set(opsOf(ai).map((o) => o.target)), known: ai.known ?? view.knownCities(ai.seat), army };
+  const inputs = { settle: env.settle, camps: ai.camps, taken: new Set(opsOf(ai).map((o) => o.target)), known: ai.known ?? view.knownCities(ai.seat), army };
   for (const c of cands) evaluate(view, ai.seat, c, staging, inputs);
   const { base, perWar } = limitsOf(view, ai.seat);
   // AI_EVENT_DESIRE_SETTLE (0x7265b0): for a seat that settles, Settle New City starts where the seat
@@ -373,6 +388,7 @@ export function operationsTurn(ai: OpsAi, env: OpsTurnEnv): OpsTurnLog {
   // another player
   const known = (ai.known = view.knownCities(ai.seat));
   lookArmy(ai.army, view, ai.seat, env.turn);
+  lookCamps(ai, view);
   const cityValues = known.filter((k) => k.owner !== ai.seat).map((k) => ({ plot: k.plot, value: cityValue(view, ai.seat, k, known, army) }));
   cityDefense(ai, view, env.turn, log);
   // each operation's target and teams
@@ -416,6 +432,8 @@ function context(ai: OpsAi, env: OpsTurnEnv, op: Operation, log: (l: string) => 
     },
     settle: env.settle,
     threat: (plot) => ai.threat.get(plot) ?? -1,
+    unitRows: () => env.unitRows(),
+    camps: () => ai.camps,
     log,
   };
 }

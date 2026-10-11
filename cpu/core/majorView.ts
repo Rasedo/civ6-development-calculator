@@ -10,7 +10,7 @@ import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
-import { isExplored } from './fog';
+import { cityStateSight, isExplored } from './fog';
 import { CITY_STRIKE_RANGE, denounceOpen, loyaltyPerTurn, plotPressure, plotPressureLead, warGate } from './phase';
 import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
@@ -216,6 +216,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return hexDistance(map, ta.col, ta.row, tb.col, tb.row);
     },
     revealed: (i, p) => isExplored(state, i, p),
+    campPlots: () => [...campTiles(state)],
     plotYield: (i, p, type) => {
       let ctx = yctx.get(i);
       if (!ctx) yctx.set(i, (ctx = makeYieldCtx(state, i)));
@@ -478,7 +479,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     plotsSeen: (i) => {
       let v = seenBy.get(i);
       if (!v) {
-        const seen = plotsSeenNow(state, new Set([i]));
+        // a city-state's look is its own (`cityStateSight`)
+        const seen = isCityStateSeat(i) ? cityStateSight(state, i) : plotsSeenNow(state, new Set([i]));
         const out = new Set<number>();
         seen.forEach((x, k) => { if (x) out.add(k); });
         seenBy.set(i, (v = out));
@@ -647,7 +649,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     bestCombatStrength: (i) => seatOf(state, i)?.bestMeleeCS ?? 0,
     knownUnits: (i, j) => {
       if (i === j) return unitsOf(state, j).map((u) => unitView(state, u));
-      const seen = plotsSeenNow(state, new Set([i]));
+      const seen = isCityStateSeat(i) ? cityStateSight(state, i) : plotsSeenNow(state, new Set([i]));
       return unitsOf(state, j).filter((u) => seen[u.tileIndex] && unitVisibleTo(state, u, i)).map((u) => unitView(state, u));
     },
     barbarianCamps: (i) => [...campTiles(state)].filter((p) => isExplored(state, i, p)).sort((a, b) => a - b),

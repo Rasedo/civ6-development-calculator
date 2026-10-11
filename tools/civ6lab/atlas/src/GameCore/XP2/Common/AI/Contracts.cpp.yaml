@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x5f47c0
+  final: 0x3f9300
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...hat unit stays, any other is cancelled (0x5cc8e0) and leaves the tree — a new contract (0x5f47c0): the unit, the Recruit Value (x 3 for a unit row +0x40 above 0), the Time Limit as its..."
+  review: imported
 - addr: 0x5f4be0
   final: 0x3f96f0
   kind: function

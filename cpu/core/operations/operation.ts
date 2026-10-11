@@ -29,8 +29,14 @@ export interface OpTeam {
   goals: number[];
   /** enemy targets stand within reach of its members (team +0x90) */
   engaged: boolean;
-  /** every requirement's minimum met (team +0x11) */
+  /** every requirement's minimum met (team +0x10); that and the initial
+   *  strength advantage (+0x11, its readiness); that and the ongoing one
+   *  (+0x12) */
+  minsMet: boolean;
   ready: boolean;
+  ongoing: boolean;
+  /** the unit the team asks to be built (+0x14), null for none */
+  unit: string | null;
   /** the members' strength (0x73fba0): each its larger of combat and ranged
    *  strength, less a tenth of its damage */
   strength: number;
@@ -76,7 +82,7 @@ export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
     return { def: t, reqs, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
-      ready: false, strength: 0 };
+      minsMet: false, ready: false, ongoing: false, unit: null, strength: 0 };
   });
 }
 
@@ -116,15 +122,9 @@ export function removeMember(team: OpTeam, u: MajorUnitView): void {
   });
 }
 
-/** every requirement's minimum met: its count, and its share of the
- *  members */
-export function teamReady(team: OpTeam): boolean {
-  return team.reqs.every((r, i) => {
-    if (r.min !== null && team.counts[i] < r.min) return false;
-    if (r.minPercentage > 0 && team.counts[i] < team.members.length * r.minPercentage) return false;
-    return true;
-  });
-}
+/** the operation's unit to build (0x739cd0): the first team's that names
+ *  one, null for none */
+export const opUnit = (op: Operation): string | null => op.teams.find((t) => t.unit !== null)?.unit ?? null;
 
 /** May the unit join the team without breaking a requirement's maximum
  *  (0x73be10 / 0x73c7c0)? Each requirement it carries: its count below the
@@ -153,10 +153,11 @@ export function opUnits(op: Operation): number[] {
 /** the operation's target gone (0x73a8e0): a camp target no camp the seat
  *  knows stands on; a city target no city stands on; never a friendly city
  *  or a settle site; any other kind always */
-export function targetGone(view: MajorView, seat: number, op: Operation): boolean {
+export function targetGone(ctx: OpsContext, op: Operation): boolean {
+  const view = ctx.view();
   switch (op.def.targetType) {
     case 'TARGET_BARBARIAN_CAMP':
-      return !view.barbarianCamps(seat).includes(op.target);
+      return !ctx.camps().includes(op.target);
     case 'TARGET_ENEMY_COMBAT_DISTRICT':
     case 'TARGET_ENEMY_PASSIVE_DISTRICT':
       return op.target === NO_PLOT || !view.plots()[op.target].city;

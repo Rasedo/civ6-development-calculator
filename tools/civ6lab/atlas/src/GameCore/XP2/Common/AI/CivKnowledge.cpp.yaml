@@ -154,9 +154,11 @@
     - cpu/core/minorBuild.ts:ARMY_RECORD_AGE
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/core/operations/knowledge.ts:lookArmy
+    - cpu/core/operations/manager.ts:lookCamps
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "- The update (0x5ebb30): every entry ages; one whose plot the player sees with no city of its owner there is d..."
   review: imported
@@ -264,9 +266,12 @@
 - addr: 0x5f0110
   final: 0x3f5ca0
   kind: function
+  name: the knowledge base adds a camp
   status: PARTLY
+  impl: [cpu/core/operations/manager.ts:lookCamps, cpu/core/operations/manager.ts:operationsTurn]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...440 into its owner's list; a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5f0110. Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 -> 0x783570) refresh...
   review: reviewed

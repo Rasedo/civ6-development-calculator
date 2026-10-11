@@ -6490,19 +6490,8 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   its defenses turns INVALID at t76 with no team member; the port's of t68
   turns INVALID at t76 (the log's first, t69, at once: the port starts a
   turn early).
-- THE CONTRACT FOR AN OPERATION'S UNIT (Recruit Units' execution 0x8189f0):
-  for an AI player with the team's unit to build set (+0x8c, from 0x739cd0:
-  the first team's +0x14), a contract for it — its value the Recruit Value
-  tag (x 3 where its row's +0x40 is above 0), its turn limit the Time Limit
-  tag (autovariable +0x168), submitted (0x60bb50) — held under the Contract
-  ID tag; one accepted or in progress for the same unit stays. The team's
-  unit to build (+0x14) is written by the team update 0x73fba0 through the
-  military AI's unit list (+0x268, the cities' lists handed over by
-  0x79a320; the choice 0x79cba0 / 0x79bd30 over its ranked 0x168-byte
-  entries, unread). Without it the port's CITY_ASSAULT operations hold no
-  contract and never reach their Contract Manager's turn limit: runs/
-  h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -
-  t180 in the log (10-turn limits), the port's of t77 to the end.
+- THE CONTRACT FOR AN OPERATION'S UNIT: "the team's unit to build, the
+  recruit's contract and the knowledge base's camps" below.
 - MEASURED (the action replay on the five verbose duels, the majors and the
   city-states on the manager): City Defense started log / port 1117 35 /
   69, 1121 25 / 53, 1124 23 / 27, 1127 132 / 222, 1128 45 / 54 (1128 t15
@@ -6515,6 +6504,83 @@ OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
   1110 t124, 1112 t200, 1118 t239, 1120 t216, 1128 t196): the port declares
   none; its war operations hold no contract and never end, no team reaches
   the march point.
+
+## C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread
+
+Ported in `cpu/core/operations/` (nodes.ts teamUpdate and Recruit Units,
+unitChoice.ts, unitRows.ts, manager.ts lookCamps) over
+`cpu/core/aiUnitProduction.ts`'s entries; measured by the replay's
+OperationsProbe over the AI majors and the city-states (runs/h1_duelv1117
+/ 1121 / 1124 / 1127 / 1128, AI_Operation.csv's "Contract for" and
+"running" lines).
+
+- THE TEAM UPDATE (0x73fba0; the team: +0x08 its definition, +0x10 / +0x11
+  / +0x12 its flags, +0x14 its unit to build, +0x18 its members, +0x30 its
+  counts): per requirement (0x1c bytes: +0 AiType, +4 Dependence, +8
+  MinNumber, +0xc MaxNumber, +0x10 MinPercentage, +0x14 MaxPercentage,
+  +0x18 ReconsiderWhilePreparing) the members carrying its type; one with a
+  Dependence counts only where a member carries that type. Each: below its
+  MinNumber (with none, its MinPercentage of the members above its count)
+  it is needed and the minimums unmet (+0x10), else had; at its MaxNumber
+  (with none, where one more passes MaxPercentage of one more member)
+  full. Ready (+0x11): the minimums met and, with an
+  InitialStrengthAdvantage, the members' strength at the enemy's plus the
+  desired (0x723ab0) or more; +0x12 likewise with the
+  OngoingStrengthAdvantage. The unit to build (+0x14): with the readiness
+  unchanged, the old one where 0x79cba0 still takes it; else 0x79bd30 over
+  the needed types (the had ones where none is needed), barring the full,
+  against the operation's enemy (op +0x888's player). The reconsider flag's
+  unit test (+0x1fb8 +0x738, autovariable +0x778) is unread.
+- THE UNIT CHOICE (0x79bd30; its check 0x79cba0): over the military AI's
+  unit production table (+0x268, entries 0x168 bytes: +0x00 the unit, +0x08
+  obsolete, +0x0e PrereqTech and PrereqCivic held and StrategicResource
+  owned, +0x18 max(Combat, RangedCombat), +0x24 the maintenance resource,
+  +0x2c the at-war players' sum, +0x30 every player's, +0x38 per player),
+  sorted (0x7976f0, comparator 0x79d3e0): buildable first, then against
+  the player its per-player sum, the at-war sum, the all-player sum, the
+  strength, each greater first. The first entry standing (+0x0e, not
+  +0x08) of a needed type (the GlobalAI bitfield +0x408 +0x400 by unit,
+  bit by UnitAiTypes index) and no full type; a later one replaces it where
+  its type is a Priority one (UnitAiTypes +0x31: UNITTYPE_SIEGE_SUPPORT)
+  over a non-priority one, or with both sums above the chosen's. The sums
+  the choice reads run the efficiency table the other way from the value's
+  (the entry's row against the opposing unit's column): AI_Operation.csv's
+  "Contract for" names the Warrior Monk where the value's way names the
+  Scout (1128, 248 of 580 recruit lines equal against 7). The maintenance
+  resource's stockpile test (player +0x1320 +0x440 / +0x350) is unread.
+- RECRUIT UNITS (0x81c820; its data: +0x00 Already in progress, +0x10
+  Contract ID, +0x20 Recruit Range, +0x30 Allow creation, +0x40 Recruit
+  Value, +0x50 Time Limit, +0x60 Allow Stealing): "Contract for" names the
+  first team's unit to build (0x739cd0), NONE for none; done (+0x88) with no
+  units FAILURE; the tag's contract FAILED: FAILURE; COMPLETED: it leaves
+  the tree; with creation and a unit, the unit asked (+0x8c). Not done, not
+  ready (0x73aa60) and not in progress: RUNNING with a contract or a unit
+  asked, else FAILURE; otherwise done, SUCCESS. Its execution (0x8189f0):
+  for an AI player with a unit asked and a Contract ID — the tag's contract
+  accepted or in progress for that unit stays, any other is cancelled
+  (0x5cc8e0) and leaves the tree — a new contract (0x5f47c0): the unit, the
+  Recruit Value (x 3 for a unit row +0x40 above 0), the Time Limit as its
+  turn limit (autovariable +0x168, the contract's +0x1c0), the tree's,
+  submitted (0x60bb50) and held under the tag. The levy (Allow Levying,
+  0x449b70, "LEVIED FROM") and the stealing signal's gate (player signal
+  +0x1c8, Allow Stealing) are unread.
+- THE KNOWLEDGE BASE'S CAMPS (CivKnowledge m_barbarians +0x638, 0x10 bytes:
+  the plot, an age, the camp's unit): the look (0x7877e0) adds each camp
+  (plot +0x44 the barbarians' camp) on a plot the player sees (0x5f0110);
+  the update (0x5ebb30) drops one whose plot the player sees (visibility
+  +0x290, or +0x2f0) with no camp. A city-state sees its own look
+  (`cityStateSight`). Its operations' camp targets and Is Target Gone read
+  them: a city-state knows the camps it has seen, not every camp (1128
+  players 2 and 3: no Attack Barb Camp in the log, every camp of the map in
+  the port before).
+- MEASURED (the replay on the AI majors and the city-states, before /
+  after, runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128): the candidates
+  against no enemy with every line equal 99 / 196, 231 / 428, 122 / 411,
+  252 / 440, 24 / 359; Attack Barb Camp's "running" lines (log 132, 77,
+  277, 123, 183) 769 / 89, 464 / 51, 932 / 490, 913 / 126, 770 / 203;
+  "City Defense, Started" (log 35, 25, 23, 132, 45) 67, 53, 24, 236, 55. City Defense starts on the log's turns (t15, t87); where the
+  port's flickers (t88 - t114) its Recruit Units fails, done with no unit,
+  its units taken by the older operation in slot order (t87's Archer).
 
 ## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
 

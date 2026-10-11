@@ -5906,6 +5906,11 @@ export const AI_UNIT_AI_TYPES: readonly string[] = [
  "UNITTYPE_MAJOR_CIV_ONLY"
 ];
 
+/** UnitAiTypes with Priority */
+export const AI_UNIT_AI_PRIORITY: readonly string[] = [
+ "UNITTYPE_SIEGE_SUPPORT"
+];
+
 /** UnitAiInfos: each unit type's AI types in rowid order */
 export const AI_UNIT_AI: Readonly<Record<string, readonly string[]>> = {
  "UNIT_SETTLER": [

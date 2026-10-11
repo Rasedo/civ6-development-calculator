@@ -204,6 +204,8 @@ export interface MajorView extends AiValueView {
   plotDistance(a: number, b: number): number;
   /** the seat has revealed the plot */
   revealed(seat: number, plot: number): boolean;
+  /** the plots barbarian camps stand on */
+  campPlots(): readonly number[];
   /** a plot's yield of a YieldType as the seat sees it */
   plotYield(seat: number, plot: number, yieldType: string): number;
   /** the seat sees the ResourceType (its PrereqTech) */

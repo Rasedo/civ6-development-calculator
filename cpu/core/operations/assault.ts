@@ -176,7 +176,7 @@ const canAlphaCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     const view = ctx.view();
     const { op } = ctx;
-    if (targetGone(view, ctx.seat, op) || op.target === NO_PLOT) return BT_FAILURE;
+    if (targetGone(ctx, op) || op.target === NO_PLOT) return BT_FAILURE;
     const hp = view.cityHitPoints(op.target);
     if (!hp) return BT_FAILURE;
     const units = unitsById(view, ctx.seat);
@@ -197,7 +197,7 @@ const canAlphaCity: BtHandler<OpsContext> = {
 const isCityThreatened: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     const { op } = ctx;
-    if (targetGone(ctx.view(), ctx.seat, op)) return BT_SUCCESS;
+    if (targetGone(ctx, op)) return BT_SUCCESS;
     return op.target !== NO_PLOT && ctx.threat(op.target) > -1 ? BT_SUCCESS : BT_FAILURE;
   },
 };
@@ -206,7 +206,7 @@ const isCityThreatened: BtHandler<OpsContext> = {
 // target gone, RUNNING while the operation holds units, else FAILURE
 const garrisonCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
-    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     return opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE;
   },
   execute: garrisonExecute,
@@ -317,7 +317,7 @@ const operationDiplomacy: BtHandler<OpsContext> = {
 const operationAttackCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     const view = ctx.view();
-    if (targetGone(view, ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     const p = view.plots()[ctx.op.target];
     if (!p.city && !p.district) return BT_FAILURE;
     return opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE;
@@ -329,7 +329,7 @@ const operationAttackCity: BtHandler<OpsContext> = {
 const operationAirAssault: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
     const view = ctx.view();
-    if (targetGone(view, ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     const p = view.plots()[ctx.op.target];
     return p.city || p.district ? BT_SUCCESS : BT_FAILURE;
   },
@@ -341,7 +341,7 @@ const operationAirAssault: BtHandler<OpsContext> = {
 const operationPillage: BtHandler<OpsContext> = {
   update(node, _run, ctx) {
     if (!flag(node, 'Pillage Districts', true) && !flag(node, 'Pillage Improvements', true) && !flag(node, 'Get Goody Huts', true)) return BT_ERROR;
-    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     return opUnits(ctx.op).length > 0 ? BT_SUCCESS : BT_FAILURE;
   },
 };
@@ -350,7 +350,7 @@ const operationPillage: BtHandler<OpsContext> = {
 // with no enemy; SUCCESS while the operation holds units, else FAILURE
 const operationSiegeCity: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
-    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     if (ctx.op.enemy < 0) return BT_ERROR;
     return opUnits(ctx.op).length > 0 ? BT_SUCCESS : BT_FAILURE;
   },

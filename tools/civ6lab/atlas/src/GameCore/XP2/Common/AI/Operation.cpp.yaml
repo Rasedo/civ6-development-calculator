@@ -70,8 +70,10 @@
     - recording: h1_duelv1128
       turn: 157
       value: "Without it the port's CITY_ASSAULT operations hold no   contract and never reach their Contract Manager's turn limit: runs/   h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -   t18"
+  impl: [cpu/core/operations/operation.ts:opUnit]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - "...s' execution 0x8189f0): for an AI player with the team's unit to build set (+0x8c, from 0x739cd0: the first team's +0x14), a contract for it — its value the Recruit Value tag (x 3 wh..."
   review: reviewed
@@ -142,6 +144,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update found it arrived; per team its mem..."
@@ -273,10 +276,19 @@
   final: 0x4e29b0
   kind: function
   name: the team update (counts, readiness, unit to build)
-  status: PARTLY
-  impl: [cpu/core/operations/operation.ts:OpTeam, cpu/core/operations/operation.ts:memberStrength]
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 15
+      value: "City Defense's Contract for: UNIT_WARRIOR_MONK"
+  impl:
+    - cpu/core/operations/nodes.ts:refreshStrengths
+    - cpu/core/operations/nodes.ts:teamUpdate
+    - cpu/core/operations/operation.ts:OpTeam
+    - cpu/core/operations/operation.ts:memberStrength
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed

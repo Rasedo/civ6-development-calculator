@@ -67,7 +67,7 @@ describe('the knowledge base\'s army records', () => {
 
 describe('the team update (0x738f20)', () => {
   const team = (members: number[], rally: number, target: number): OpTeam => ({
-    def: {} as OpTeam['def'], reqs: [], members, counts: [], goals: [rally, target, -1, -1, -1, -1], engaged: false, ready: false, strength: 0,
+    def: {} as OpTeam['def'], reqs: [], members, counts: [], goals: [rally, target, -1, -1, -1, -1], engaged: false, minsMet: false, ready: false, ongoing: false, unit: null, strength: 0,
   });
   const op = (enemy: number) => ({ enemy } as Operation);
   it('marches to the first plot from the target back to the rally the seat may enter', () => {

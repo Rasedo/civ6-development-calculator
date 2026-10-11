@@ -110,7 +110,10 @@
     - recording: 1124
       turn: 201
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
-  impl: [cpu/core/aiMilitary.ts:MilitaryFacts, cpu/core/aiModifiers.ts:ANALYZERS]
+  impl:
+    - cpu/core/aiMilitary.ts:MilitaryFacts
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiUnitProduction.ts:UnitProductionFacts
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

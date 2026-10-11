@@ -5,7 +5,8 @@
 # set `review: reviewed`.
 - addr: 0x7989e0
   kind: function
-  status: PARTLY
+  name: the military AI's unit production table
+  status: READ
   cases:
     - recording: h1_duelv1124
       value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
@@ -16,17 +17,19 @@
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
   impl:
+    - cpu/core/aiUnitProduction.ts:unitProductionEntries
     - cpu/core/aiUnitProduction.ts:unitProductionTable
     - gpu/core/sim_cityvalue.py:_cv_unit_production
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
   context:
     - "...x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the section \"C-96 / C-97: the unit value\")."
     - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the..."
-  review: imported
+  review: reviewed
 - addr: 0x79a320
   final: 0x5236c0
   kind: function
@@ -75,8 +78,13 @@
     - recording: h1_duelv1128
       turn: 157
       value: "Without it the port's CITY_ASSAULT operations hold no   contract and never reach their Contract Manager's turn limit: runs/   h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -   t18"
+    - recording: h1_duelv1128
+      turn: 15
+      value: UNIT_WARRIOR_MONK against barbarian Warriors and Spearmen
+  impl: [cpu/core/operations/nodes.ts:teamUpdate, cpu/core/operations/unitChoice.ts:chooseUnit]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...I's unit list (+0x268, the cities' lists handed over by 0x79a320; the choice 0x79cba0 / 0x79bd30 over its ranked 0x168-byte entries, unread). Without it the port's CITY_ASSAULT operati...
   review: reviewed
@@ -117,8 +125,10 @@
     - recording: h1_duelv1128
       turn: 157
       value: "Without it the port's CITY_ASSAULT operations hold no   contract and never reach their Contract Manager's turn limit: runs/   h1_duelv1128 China's Attack Walled City lives t157 - t168 and t168 -   t18"
+  impl: [cpu/core/operations/nodes.ts:teamUpdate, cpu/core/operations/unitChoice.ts:keepUnit]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-96 / C-97: the team's unit to build, the recruit's contract and the knowledge base's camps — the team update's requirements and readiness, the unit choice, Recruit Units' result and contract, the camps READ; the maintenance resource test, the recruit's stealing and levy unread"
   context:
     - ...military AI's unit list (+0x268, the cities' lists handed over by 0x79a320; the choice 0x79cba0 / 0x79bd30 over its ranked 0x168-byte entries, unread). Without it the port's CITY_ASSA...
   review: reviewed

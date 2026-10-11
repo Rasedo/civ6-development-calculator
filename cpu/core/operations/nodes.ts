@@ -8,13 +8,18 @@
  */
 import type { OpsSettle } from './types';
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
-  type BtHandler, type BtRun } from '../behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnits, targetGone, teamReady, unitsById, xy, type Operation } from './operation';
+  type BtHandler, type BtNode, type BtRun } from '../behaviorTree';
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnit, opUnits, targetGone, unitsById, xy, type OpTeam, type Operation } from './operation';
+import { chooseUnit, keepUnit } from './unitChoice';
+import type { UnitProductionRow } from '../aiUnitProduction';
+import { AI_UNITS } from '../../data/aiBuildTables';
+import { AI_UNIT_INDEX } from '../aiCityBuild';
+import { FX } from '../aiValue';
 import { desiredStrength, recruitOperation } from './recruit';
 import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
 import type { MajorUnitView, MajorView } from '../../../ai/major/view';
-import { CP_ACCEPTED, CP_CLAIMED, CP_IN_PROGRESS, CP_SUBMITTED, buildUnitNode, contractManagerNode, treeContractOf,
-  type ContractNodeWorld } from '../aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, submitContract,
+  treeContractOf, type AiContract, type ContractNodeWorld } from '../aiContracts';
 
 /** a request an operation's Operation Diplomacy made of the diplomatic AI
  *  (a diplomatic contract, contract manager +0x368 type 4): the
@@ -49,6 +54,10 @@ export interface OpsContext {
   settle: OpsSettle | null;
   /** a city's threat by its plot (CityBuildAI +0x1b8), -1 none */
   threat(plot: number): number;
+  /** the seat's unit production entries (the military AI's +0x268) */
+  unitRows(): readonly UnitProductionRow[];
+  /** the camps its knowledge base holds, in its order */
+  camps(): readonly number[];
   log(line: string): void;
 }
 
@@ -238,55 +247,142 @@ const recruitUnits: BtHandler<OpsContext> = {
     }
     refreshStrengths(ctx);
     const after = opUnits(op).length;
-    const contract = contractFor(ctx);
-    ctx.log(`${op.def.name}, Operation Recruit, ${after} units, Recruited ${after - before}, Contract for: ${contract ?? 'UNIT_WARRIOR_MONK'}`);
+    const unit = opUnit(op);
+    ctx.log(`${op.def.name}, Operation Recruit, ${after} units, Recruited ${after - before}, Contract for: ${unit ?? 'NONE'}`);
     if (m.done && after === 0) return BT_FAILURE;
-    if (m.done || inProgress || op.teams.every(teamReady)) {
+    // the recruit's contract (the Contract ID tag): failed, the node fails;
+    // completed, it leaves the tree
+    const w = ctx.contractWorld();
+    const tag = dataTag(node, 'Contract ID');
+    const c = tag ? treeContractOf(w.book, w.tree, run.blackboard.get(tag)) : undefined;
+    if (c && c.progress === CP_FAILED) {
+      w.tree.contracts = w.tree.contracts.filter((id) => id !== c.id);
+      return BT_FAILURE;
+    }
+    if (c && c.progress === CP_COMPLETED) w.tree.contracts = w.tree.contracts.filter((id) => id !== c.id);
+    if (creation && unit !== null) m.unit = unit;
+    if (m.done || inProgress || op.teams.every((t) => t.ready)) {
       m.done = true;
       return BT_SUCCESS;
     }
-    if (contract || creation) return BT_RUNNING;
+    if (c || (creation && m.unit)) return BT_RUNNING;
     return BT_FAILURE;
   },
+  execute: recruitContract,
 };
 
-/** the unit type of the operation's open production request (a contract
- *  of its tree still before COMPLETED), null for none */
-function contractFor(ctx: OpsContext): string | null {
+/** RECRUIT UNITS' EXECUTION (0x8189f0): for the unit the update asked
+ *  (+0x8c) with a Contract ID tag — the tag's contract accepted or in
+ *  progress for that unit stays; any other is cancelled and leaves the tree
+ *  — a contract for it: its value the Recruit Value tag's (x 3 for a unit
+ *  with a Bombard strength, row +0x40), its turn limit the Time Limit's
+ *  (autovariable +0x168, the contract's +0x1c0), the unit joining the
+ *  tree once built; submitted, the tag holding it. A levy (Allow Levying,
+ *  0x449b70) is unported. */
+function recruitContract(node: BtNode, run: BtRun, ctx: OpsContext): void {
+  const m = run.mem[node.index];
+  const unit = m.unit as string | undefined;
+  const tag = dataTag(node, 'Contract ID');
+  if (!unit || !tag) return;
   const w = ctx.contractWorld();
-  for (const id of ctx.op.contracts) {
-    const c = treeContractOf(w.book, w.tree, id);
-    if (c?.unit && [CP_CLAIMED, CP_SUBMITTED, CP_ACCEPTED, CP_IN_PROGRESS].includes(c.progress)) return c.unit;
+  const held = treeContractOf(w.book, w.tree, run.blackboard.get(tag));
+  if (held) {
+    if ((held.progress === CP_ACCEPTED || held.progress === CP_IN_PROGRESS) && held.unit === unit) return;
+    held.progress = CP_CANCELLED;
+    w.tree.contracts = w.tree.contracts.filter((id) => id !== held.id);
   }
-  return null;
+  const row = AI_UNITS[AI_UNIT_INDEX.get(unit) ?? -1];
+  const value = (Number(tagOf(run, node, 'Recruit Value')) || 0) * FX * (row && row.bombard > 0 ? 3 : 1);
+  const limit = dataInt(node, 'Time Limit');
+  const c: AiContract = {
+    id: w.newContractId(), tree: w.tree.id, treeName: w.tree.name, unit, building: null, district: null, plot: -1,
+    value, city: -1, maxTurns: limit !== undefined && limit > 0 ? limit : 0, turns: -1, progress: CP_CLAIMED, assign: true,
+  };
+  w.tree.contracts.push(c.id);
+  submitContract(w.book, c, w.cities, w.turn, (city) => w.clearProduction(city), (city, k) => w.submitted(city, k));
+  run.blackboard.set(tag, c.id);
+}
+
+/** a data tag's value on the blackboard */
+function tagOf(run: BtRun, node: BtNode, name: string): unknown {
+  const t = dataTag(node, name);
+  return t ? run.blackboard.get(t) : undefined;
 }
 
 /** the operation's strengths (0x73eb60, 0x73f7d0): the enemy's about the
  *  target (the hostile units the seat sees within 3 of it, each its larger
- *  of combat and ranged strength), each team's members' and their sum */
+ *  of combat and ranged strength), each team's (teamUpdate) and their sum */
 export function refreshStrengths(ctx: OpsContext): void {
   const { op } = ctx;
   const view = ctx.view();
-  const units = unitsById(view, ctx.seat);
   op.enemyStrength = op.target === NO_PLOT ? 0 : view.hostileUnits(ctx.seat)
     .filter((h) => view.plotDistance(h.plot, op.target) <= 3)
     .reduce((s, h) => s + Math.max(h.melee, h.ranged), 0);
   let total = 0;
   const targets = view.attackTargets(ctx.seat);
   for (const t of op.teams) {
-    t.counts = t.reqs.map((r) => t.members.filter((id) => {
-      const u = units.get(id);
-      return !!u && hasAiType(u.type, r.aiType);
-    }).length);
-    t.strength = t.members.reduce((s, id) => {
-      const u = units.get(id);
-      return u ? s + memberStrength(u) : s;
-    }, 0);
-    t.ready = teamReady(t);
+    teamUpdate(ctx, t);
     updateTeam(view, ctx.seat, op, t, targets);
     total += t.strength;
   }
   op.strength = total;
+}
+
+/** THE TEAM UPDATE (0x73fba0): per requirement the members carrying its AI
+ *  type (one with a Dependence counted only where a member carries that
+ *  type); the strength, each member's larger of combat and ranged strength
+ *  less a tenth of its damage. Each requirement counted: below its
+ *  MinNumber (or, with none, below its MinPercentage of the members) it is
+ *  needed and the minimums unmet, else had; at its MaxNumber (or, with
+ *  none, where one more passes its MaxPercentage of one more member) full.
+ *  Ready (+0x11): the minimums met and, with an InitialStrengthAdvantage,
+ *  the strength at the enemy's plus the desired (0x723ab0) or more; ongoing
+ *  (+0x12) likewise with the OngoingStrengthAdvantage. The unit to build
+ *  (+0x14): the one it had where the readiness held and the choice may
+ *  still take it (0x79cba0), else the choice (0x79bd30) over the needed
+ *  types (the had ones where none is needed), barring the full ones,
+ *  against the operation's enemy. */
+function teamUpdate(ctx: OpsContext, t: OpTeam): void {
+  const { op } = ctx;
+  const view = ctx.view();
+  const units = unitsById(view, ctx.seat);
+  const types = t.members.map((id) => units.get(id)?.type).filter((x): x is string => !!x);
+  t.counts = t.reqs.map((r) => types.filter((u) => hasAiType(u, r.aiType)).length);
+  t.strength = t.members.reduce((s, id) => {
+    const u = units.get(id);
+    return u ? s + memberStrength(u) : s;
+  }, 0);
+  const n = t.members.length;
+  const need: string[] = [];
+  const have: string[] = [];
+  const full: string[] = [];
+  let mins = true;
+  t.reqs.forEach((r, i) => {
+    if (r.dependence && !types.some((u) => hasAiType(u, r.dependence!))) return;
+    const c = t.counts[i];
+    if (r.min !== null && r.min >= 0) {
+      mins = mins && c >= r.min;
+      (c < r.min ? need : have).push(r.aiType);
+    } else {
+      const want = Math.fround(n * r.minPercentage);
+      mins = mins && c >= Math.trunc(want);
+      (want > c ? need : have).push(r.aiType);
+    }
+    if (r.max !== null && r.max >= 0) {
+      if (c >= r.max) full.push(r.aiType);
+    } else if (c + 1 > Math.fround((n + 1) * r.maxPercentage)) full.push(r.aiType);
+  });
+  const wasReady = t.ready;
+  const reaches = (adv: number): boolean =>
+    t.strength >= Math.trunc(op.enemyStrength + desiredStrength(view, ctx.seat, op.enemy, adv, op.enemyStrength));
+  t.minsMet = mins;
+  t.ready = mins && (t.def.initialStrengthAdvantage === 0 || reaches(t.def.initialStrengthAdvantage));
+  t.ongoing = t.ready && (t.def.ongoingStrengthAdvantage === 0 || reaches(t.def.ongoingStrengthAdvantage));
+  const wanted = need.length ? need : have;
+  const rows = ctx.unitRows();
+  const old = t.unit;
+  t.unit = old !== null && wasReady === t.ready && keepUnit(rows, old, wanted, full) ? old : null;
+  if (t.unit === null || wasReady !== t.ready) t.unit = chooseUnit(rows, wanted, full, op.enemy);
 }
 
 // LOCK UNITS (0x7f5240): the units locked to the operation
@@ -525,7 +621,7 @@ const success: BtHandler<OpsContext> = { update: () => BT_SUCCESS };
 // the operation holds units, else FAILURE
 const operationAttack: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
-    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     return opUnits(ctx.op).length > 0 ? BT_RUNNING : BT_FAILURE;
   },
 };
@@ -534,7 +630,7 @@ const operationAttack: BtHandler<OpsContext> = {
 // RUNNING where the node says Always Running, SUCCESS where not
 const operationAttackUnits: BtHandler<OpsContext> = {
   update(node, _run, ctx) {
-    if (targetGone(ctx.view(), ctx.seat, ctx.op)) return BT_SUCCESS;
+    if (targetGone(ctx, ctx.op)) return BT_SUCCESS;
     return dataBool(node, 'Always Running') ? BT_RUNNING : BT_SUCCESS;
   },
 };
@@ -560,7 +656,7 @@ const navalChooseTarget: BtHandler<OpsContext> = {
 // OPERATION IS READY (0x81a090): every team's minimums met
 const operationIsReady: BtHandler<OpsContext> = {
   update(_node, _run, ctx) {
-    return ctx.op.teams.every(teamReady) ? BT_SUCCESS : BT_FAILURE;
+    return ctx.op.teams.every((t) => t.ready) ? BT_SUCCESS : BT_FAILURE;
   },
 };
 

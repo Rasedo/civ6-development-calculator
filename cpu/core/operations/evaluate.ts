@@ -124,7 +124,7 @@ function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInpu
     // each camp the seat knows, valued 50 a known camp; the enemy strength 6
     // and the barbarians' units within 3 of it
     case 'TARGET_BARBARIAN_CAMP': {
-      const camps = view.barbarianCamps(seat);
+      const camps = inputs.camps;
       const barb = view.barbarianSeat();
       return camps.map((p) => ({ plot: p, value: (camps.length * 50) << 8, enemyStr: Math.trunc(6 + armyStrength(view, inputs.army(barb), p, 3)) }));
     }
@@ -185,6 +185,8 @@ const mul = (a: number, b: number): number => Math.trunc((a * b) / 256);
 export interface EvalInputs {
   settle: OpsSettle | null;
   taken: ReadonlySet<number>;
+  /** the camps the knowledge base holds */
+  camps: readonly number[];
   known: readonly MajorKnownCityView[];
   /** a player's army as the knowledge base holds it (the seat's own: its
    *  units) */
