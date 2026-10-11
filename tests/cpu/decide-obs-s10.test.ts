@@ -34,8 +34,8 @@ const LAST_TECH = Object.keys(TECHS).find((id) => TECHS[id].era === ERAS[ERAS.le
 
 describe('seat scalar groups', () => {
   it('registers the GPU group names', () => {
-    expect(Object.keys(SEAT_GROUPS)).toEqual(['nuke', 'envoy', 'congress', 'gp', 'belief']);
-    expect(Object.keys(seatGroups(scene(), 0))).toEqual(expect.arrayContaining(['nuke', 'envoy', 'congress', 'gp', 'belief']));
+    expect(Object.keys(SEAT_GROUPS)).toEqual(['nuke', 'envoy', 'congress', 'gp', 'belief', 'governor']);
+    expect(Object.keys(seatGroups(scene(), 0))).toEqual(expect.arrayContaining(['nuke', 'envoy', 'congress', 'gp', 'belief', 'governor']));
   });
 
   it('nuke: -1 each without a device', () => {

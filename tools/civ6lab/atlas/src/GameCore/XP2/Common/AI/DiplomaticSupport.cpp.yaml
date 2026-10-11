@@ -12,6 +12,17 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
+- addr: 0x67dd40
+  final: 0x44ebf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  context:
+    - "...x1e) at the AI's discount rate 0x6fec30, the context filled by the TargetKind's handler 0x67dd40) into +0x18 / +0x1c; then where the player's +0x348[r] (the Resolutions lists: AiLists..."
+    - "...x612e50, one per AITargetChooser, chosen by the TargetKind's hash): the handler's hint (0x67dd40) where it names one of the valid targets (the resolution's vfunc +0xd0), else a \"Random..."
+    - "...LAYER_BAN_*, ... 20 of them): the port's option values are 0; the TargetKind handlers 0x67dd40 and the target choosers are unread — the port names the engines' own line (`congressTar..."
+  review: imported
 - addr: 0x67df10
   kind: function
   name: GoToWar

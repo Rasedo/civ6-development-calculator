@@ -1472,7 +1472,7 @@ DECIDE_FIELDS = (
     "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
     "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
     "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass",
-    "policies", "beliefs", "government", "pantheon", "religion",
+    "policies", "beliefs", "government", "pantheon", "religion", "gov",
 )
 
 
@@ -1562,12 +1562,74 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     religion = _decide_religion(nobs, beliefs, row, seeds, t, dev)
     pantheon = _decide_pantheon(nobs, row, seeds, t, dev)
     government = _decide_government(st, nobs, row, seeds, t, dev)
+    gov = _decide_governors(st, nobs, dev)
     return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
             "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies,
-            "beliefs": beliefs, "government": government, "pantheon": pantheon, "religion": religion}
+            "beliefs": beliefs, "government": government, "pantheon": pantheon, "religion": religion,
+            "gov": gov}
+
+
+# the governor verbs of the record (`SeatActionRecord.governors`, TS GOV_*)
+GOV_APPOINT, GOV_PROMOTE, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR = 0, 1, 2, 3
+
+
+def _decide_governors(st, nobs: list, dev) -> torch.Tensor | None:
+    """[B, K, 3] the seat's GOVERNOR verbs (verb, governor, argument), -1
+    padding; None where no game names one. The titles in hand go first to the
+    unappointed governors in roster order, then to the open promotions by
+    governor, then index; a governor the catalog sends abroad and holds no post goes
+    to the met city-state where the seat holds the most envoys (ties to the
+    lower index); every other idle governor takes the lowest-loyalty city no
+    governor holds (ties by array position)."""
+    K = int(st.gov_actions_max)
+    out = torch.full((len(nobs), K, 3), -1, dtype=torch.long)
+    any_ = False
+    for b, o in enumerate(nobs):
+        g = o["governor"]
+        ap = [bool(x) for x in g["appointed"]]
+        city, minor, out_t = list(g["city"]), list(g["minor"]), list(g["out"])
+        acts = []
+        titles = int(g["titles"])
+        legal = sorted(g["legal"], key=lambda p: (g["promo_gov"][p], p))
+        while titles > 0:
+            nxt = next((i for i, a in enumerate(ap) if not a), -1)
+            if nxt >= 0:
+                acts.append([GOV_APPOINT, nxt, 0])
+                ap[nxt] = True
+            elif legal:
+                p = legal.pop(0)
+                acts.append([GOV_PROMOTE, int(g["promo_gov"][p]), p])
+            else:
+                break
+            titles -= 1
+        held = o["envoy"]["held"]
+        for i in range(len(ap)):
+            if not (g["abroad"][i] and ap[i] and city[i] < 0 and minor[i] < 0 and out_t[i] <= 0):
+                continue
+            best, best_n = -1, -1
+            for s, n in enumerate(held):
+                if n >= 0 and n > best_n:
+                    best, best_n = s, n
+            if best >= 0:
+                acts.append([GOV_ASSIGN_MINOR, i, best])
+                minor[i] = best
+        taken = {c for i, c in enumerate(city) if ap[i] and c >= 0}
+        free = sorted((c["loyalty"], k, c["centre"]) for k, c in enumerate(o["cities"]) if c["centre"] not in taken)
+        at = 0
+        for i in range(len(ap)):
+            if not ap[i] or city[i] >= 0 or minor[i] >= 0 or out_t[i] > 0:
+                continue
+            if at >= len(free):
+                break
+            acts.append([GOV_ASSIGN_CITY, i, free[at][2]])
+            at += 1
+        for k, a in enumerate(acts[:K]):
+            out[b, k] = torch.tensor(a, dtype=torch.long)
+            any_ = True
+    return out.to(dev) if any_ else None
 
 
 def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:

@@ -3,7 +3,7 @@ import { emptySeat, seatOf, seatOfCityState, setTileOwner } from '../../../cpu/c
 import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
 import { tilesWithin } from '../../../world/hex';
 import { governorPhase, governorsOf, minorGovernorEffects, neutralizeGovernor, governorClocks } from '../../../cpu/core/governors';
-import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, promotionBitValue } from '../../../cpu/data/governors';
+import { GOVERNORS, GOVERNOR_INDEX, GOVERNOR_PROMOTION_INDEX, GOV_ASSIGN_MINOR, promotionBitValue } from '../../../cpu/data/governors';
 import { envoysHere, envoysOf, isSuzerain, minorLuxuries, resolveSuzerain, suzerainOf } from '../../../cpu/core/cityStates';
 import { luxuryAmenities } from '../../../cpu/core/city';
 import { SUZERAIN_ENVOYS } from '../../../cpu/data/cityStates';
@@ -55,24 +55,19 @@ function post(state: GameState, cs: CityState, promotions = 0) {
 }
 
 describe('the governor at a city-state', () => {
-  it('only Amani travels, and the phase sends her where the seat already has envoys', () => {
+  it('only Amani travels: the record posts her at a city-state, and no other governor', () => {
     expect(GOVERNORS.filter((g) => g.cityStates).map((g) => g.id)).toEqual(['AMANI']);
     const state = world();
-    const near = addCs(state, 10, 10, { envoys: { 0: 1 } });
     const far = addCs(state, 16, 14, { envoys: { 0: 4 } });
-    const unmet = addCs(state, 20, 6, { met: [], envoys: { 0: 9 } });
     const roster = governorsOf(seatOf(state, 0)!);
     for (const g of roster) g.appointed = true;
-    governorPhase(state, 0);
+    const other = AMANI === 0 ? 1 : 0;
+    governorPhase(state, 0, [[GOV_ASSIGN_MINOR, other, far.id], [GOV_ASSIGN_MINOR, AMANI, far.id]]);
     expect(roster[AMANI].minorId).toBe(far.id);
-    expect(roster[AMANI].minorId).not.toBe(unmet.id);
     expect(roster[AMANI].cityId).toBe(-1);       // she took no city
     // seated with the clock full, exactly as a city posting is
     expect(roster[AMANI].establishTurns).toBe(GOVERNORS[AMANI].establishTurns);
-    for (let i = 0; i < roster.length; i++) {
-      if (i !== AMANI) expect(roster[i].minorId).toBe(-1);
-    }
-    expect(near.id).not.toBe(far.id);
+    expect(roster[other].minorId).toBe(-1);
   });
 
   it('an unestablished posting pays nothing, and the clock runs down abroad', () => {

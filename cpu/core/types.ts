@@ -336,6 +336,12 @@ export interface SeatActionRecord {
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
+  /** THE GOVERNOR VERBS, applied in order after the seat's governor clocks:
+   *  [verb, governor roster index, argument] each — `GOV_APPOINT` (argument
+   *  0), `GOV_PROMOTE` (a GOVERNOR_PROMOTIONS index), `GOV_ASSIGN_CITY` (the
+   *  city's CENTRE tile), `GOV_ASSIGN_MINOR` (a city-state roster index). At
+   *  most GOV_ACTIONS_MAX; both engines re-validate each (`applyGovernorActions`). */
+  governors?: [number, number, number][];
   /** the PANTHEON this seat founds this turn, a `PANTHEONS` row (data
    *  order); absent = none. Paid from its Faith where it banks the turn's. */
   pantheon?: number | null;

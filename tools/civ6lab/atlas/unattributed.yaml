@@ -1466,18 +1466,28 @@
 - addr: 0x611140
   final: 0x406a40
   kind: function
+  name: congressTargetChooser
+  semantics: "One of the 16 AITargetChooser functions (0x611140 .. 0x612e50): the hint where the valid targets (the resolution's vfunc +0xd0) hold it, else a 'Random congress resolution target' draw over their count; recorded by 0x487650."
   status: READ
   cases:
-    - recording: h1_duelw1117
+    - recording: h1_duelv1127
       turn: 61
-      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
-    - recording: 1117
-      turn: 161
-      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+      value: RandCalls 'Random congress resolution target' draws at the sessions
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
-  readings: ["H-1: the World Congress slate (0x598270) — READ"]
+  readings:
+    - "H-1: the World Congress slate (0x598270) — READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
   context:
     - "...s stays unread (LAB). The \"Random congress resolution target\" draws after them (16 sites, 0x611140..) are the AI's targets. The engines (`congressSession` / `_congress_draw_slate`) follow,..."
+  review: reviewed
+- addr: 0x612e50
+  final: 0x408750
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  context:
+    - "- THE TARGET (0x611140 .. 0x612e50, one per AITargetChooser, chosen by the TargetKind's hash): the handler's hint (0x67dd4..."
   review: imported
 - addr: 0x616570
   kind: function
@@ -1490,6 +1500,15 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...ty 1, λ 0x6ed060 (the move: the slot's occupant replaced and returned) and the knapsack 0x616570 -> 0x61ddb0 (at capacity 1 the first largest gain above 0). Per slot in order, per gove..."
+  review: imported
+- addr: 0x617d70
+  final: 0x40d840
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  context:
+    - "- THE ORDER (0x61dc50, 0x617d70's comparator): the resolutions a list names first, then the desire, the greatest first."
   review: imported
 - addr: 0x6182e0
   final: 0x40de20
@@ -1936,7 +1955,9 @@
   final: 0x4b38f0
   kind: function
   status: PARTLY
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x..."
   context:

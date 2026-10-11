@@ -24,7 +24,7 @@ import {
   PROMO_COLS, SPY_OP_PROMO_LEVELS, UNIT_PROMO_CLASS, promoRows,
 } from '../../../cpu/data/promotions';
 import { governorAt, governorPhase, governorsOf, neutralizeGovernor } from '../../../cpu/core/governors';
-import { GOVERNOR_TITLE_CIVICS } from '../../../cpu/data/governors';
+import { GOVERNOR_TITLE_CIVICS, GOV_APPOINT, GOV_ASSIGN_CITY } from '../../../cpu/data/governors';
 import {
   SPY_UNIT, SPY_IDLE, SPY_TRAVELLING, SPY_MISSIONS,
   SPY_SOURCES_TURNS, SPY_GOVERNOR_TURNS,
@@ -714,7 +714,7 @@ describe('what a finished mission does', () => {
     const { state, theirs, them } = spyState();
     const spy = spyAt(state, 0, theirs);
     them.research.civics.push(GOVERNOR_TITLE_CIVICS[0]); // one title → one appointment
-    governorPhase(state, them.seat);
+    governorPhase(state, them.seat, [[GOV_APPOINT, 0, 0], [GOV_ASSIGN_CITY, 0, theirs.centerIndex]]);
     const gi = governorAt(state, theirs);
     expect(gi).toBeGreaterThanOrEqual(0);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(true);
@@ -725,7 +725,8 @@ describe('what a finished mission does', () => {
     expect(governorAt(state, theirs)).toBe(-1);
     expect(missionOffered(state, spy, SPY_M_NEUTRALIZE_GOVERNOR)).toBe(false);
 
-    governorPhase(state, them.seat); // the clock ticks in his own phase, not the spy's
+    // the clock ticks in his own phase, not the spy's
+    governorPhase(state, them.seat, [[GOV_ASSIGN_CITY, gi, theirs.centerIndex]]);
     expect(g.outTurns).toBe(SPY_GOVERNOR_TURNS - 1);
     expect(governorAt(state, theirs)).toBe(-1); // and he cannot be re-seated while it runs
   });

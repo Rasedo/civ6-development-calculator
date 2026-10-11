@@ -15,7 +15,6 @@ from __future__ import annotations
 import torch
 
 from . import simbase
-from .simbase import js_round
 
 
 class SimGovernors:
@@ -51,13 +50,9 @@ class SimGovernors:
 
     def _governor_phase(self, row: int, active: torch.Tensor) -> None:
         """`governorPhase`: the seat's governor turn, after its Culture is
-        summed and before its tallies and cities: the clocks, then spend the
-        available titles and seat every idle governor.
-
-        The CHOICE is a deterministic heuristic both engines mirror exactly —
-        appoint in catalog order, promote the first legal promotion in catalog
-        order, and seat an idle governor in the seat's lowest-loyalty
-        ungoverned city (quantized milli loyalty, ties by array position)."""
+        summed and before its tallies and cities: the clocks, then the verbs
+        its record names (`applyGovernorActions`)."""
+        acts = self._driven_gov.pop(row, None)
         NG = self.n_governors
         if NG == 0:
             return
@@ -75,11 +70,8 @@ class SimGovernors:
 
         _fp = self._governor_appeal_fingerprint(row)
         self._governor_clocks(row, live)
-        titles = (self._governor_titles_earned(row) - self._governor_titles_spent(row)).clamp(min=0)
-        titles = torch.where(live, titles, torch.zeros_like(titles))
-        self._governor_spend(row, titles)
-        self._governor_post_minor(row, live)
-        self._governor_seat(row, live)
+        if acts is not None:
+            self._governor_apply(row, live, acts)
         # Appointing, promoting, seating and the establishment clock all move
         # `_appeal_lend_plane`, and `_tile_appeal` is version-cached — without
         # this the appeal a governor grants arrives a turn late, and the
@@ -98,55 +90,73 @@ class SimGovernors:
                 + self.civ_gov_minor[:, row].sum()
                 + self.civ_gov_establish[:, row].sum())
 
-    def _governor_spend(self, row: int, titles: torch.Tensor) -> None:
-        """Spend every available title: a title buys an appointment while one
-        governor is unappointed, otherwise the first legal promotion in catalog
-        order. The DEFAULT ability (tier 0) rides the appointment and is never
-        bought."""
-        dev, NG, NP = self.device, self.n_governors, self.n_gov_promos
+    def _governor_apply(self, row: int, live: torch.Tensor, acts: torch.Tensor) -> None:
+        """`applyGovernorActions`: the record's verbs in order, each gated as
+        its TS verb is — APPOINT (0) an unappointed governor with a title in
+        hand; PROMOTE (1) with a title, a promotion of the governor's own, not
+        held, a prerequisite held; ASSIGN to a city (2, its CENTRE) an
+        appointed, unneutralized governor to a living city of the seat no other
+        appointed governor holds; ASSIGN to a city-state (3, its roster index)
+        one the catalog sends abroad, to a living city-state. A refused verb
+        changes nothing."""
+        dev, NG, NP, B = self.device, self.n_governors, self.n_gov_promos, self.B
         ap = self.civ_gov_appointed[:, row]
         pr = self.civ_gov_promos[:, row]
-        gidx = torch.arange(NG, device=dev)
-        pidx = torch.arange(NP, device=dev)
-        # promotion -> its governor slot, as a [NG, NP] membership grid
-        mine = self._gpromo_gov.reshape(1, -1) == gidx.reshape(-1, 1)
-        buyable = mine & (self._gpromo_tier.reshape(1, -1) > 0)
-
-        for _ in range(int(titles.max().item()) if titles.numel() else 0):
-            act = titles > 0
-            if not bool(act.count_nonzero()):
-                break
-            # (a) APPOINT the first unappointed governor
-            unap = act.unsqueeze(1) & ~ap
-            take_ap = unap.any(dim=1)
-            first = torch.where(take_ap, unap.long().argmax(dim=1), torch.full((self.B,), -1, device=dev))
-            if bool(take_ap.count_nonzero()):
-                rows = take_ap.nonzero(as_tuple=True)[0]
-                ap[rows, first[rows]] = True
-                self._governance_doctrine(row, rows, first[rows])
-            # (b) otherwise PROMOTE — the first legal promotion, scanning
-            #     governors in catalog order and promotions inside each
-            want = act & ~take_ap
-            any_legal = torch.zeros_like(act)
-            if bool(want.count_nonzero()):
-                have = ((pr.unsqueeze(2) >> pidx.reshape(1, 1, -1)) & 1).bool()  # [B, NG, NP]
-                # a prerequisite is a bitmask over the promotion list: at least
-                # ONE of the named promotions must be held (0 = none required)
-                req = self._gpromo_req.reshape(1, 1, -1)
-                met = (req == 0) | ((pr.unsqueeze(2) & req) != 0)
-                legal = ap.unsqueeze(2) & buyable.unsqueeze(0) & ~have & met
-                flat = legal.reshape(self.B, NG * NP)
-                any_legal = want & flat.any(dim=1)
-                if bool(any_legal.count_nonzero()):
-                    rows = any_legal.nonzero(as_tuple=True)[0]
-                    pick = flat[rows].long().argmax(dim=1)
-                    g, p = pick // NP, pick % NP
-                    pr[rows, g] = pr[rows, g] | (torch.ones_like(p) << p)
-                    self._governance_doctrine(row, rows, g)
-            # a row that bought nothing has nothing left to buy: TS breaks out
-            # of the whole spend loop there, so its unspent titles simply stay
-            spent = take_ap | any_legal
-            titles = torch.where(spent, titles - 1, torch.zeros_like(titles))
+        city = self.civ_gov_city[:, row]
+        minor = self.civ_gov_minor[:, row]
+        est = self.civ_gov_establish[:, row]
+        out = self.civ_gov_out[:, row]
+        ids = self.city_id[:, row]
+        alive = self.city_alive[:, row]
+        earned = self._governor_titles_earned(row)
+        bidx = torch.arange(B, device=dev)
+        for k in range(min(int(acts.shape[1]), self._gov_actions_max)):
+            verb, g, arg = acts[:, k, 0], acts[:, k, 1], acts[:, k, 2]
+            on = live & (verb >= 0) & (g >= 0) & (g < NG)
+            if not bool(on.count_nonzero()):
+                continue
+            gi = g.clamp(0, NG - 1)
+            titles = (earned - self._governor_titles_spent(row)).clamp(min=0)
+            g_ap = ap[bidx, gi]
+            # APPOINT
+            m = on & (verb == 0) & ~g_ap & (titles > 0)
+            if bool(m.count_nonzero()):
+                rows = m.nonzero(as_tuple=True)[0]
+                ap[rows, gi[rows]] = True
+                self._governance_doctrine(row, rows, gi[rows])
+            # PROMOTE
+            p = arg.clamp(0, max(NP - 1, 0))
+            okp = (arg >= 0) & (arg < NP)
+            g_pr = pr[bidx, gi]
+            req = self._gpromo_req[p]
+            m = (on & (verb == 1) & okp & g_ap & (titles > 0) & (self._gpromo_gov[p] == gi)
+                 & (self._gpromo_tier[p] > 0) & (((g_pr >> p) & 1) == 0) & ((req == 0) | ((g_pr & req) != 0)))
+            if bool(m.count_nonzero()):
+                rows = m.nonzero(as_tuple=True)[0]
+                pr[rows, gi[rows]] = pr[rows, gi[rows]] | (torch.ones_like(p[rows]) << p[rows])
+                self._governance_doctrine(row, rows, gi[rows])
+            free = ap[bidx, gi] & (out[bidx, gi] <= 0)
+            # ASSIGN to a city
+            hit = (self.city_center[:, row] == arg.unsqueeze(1)) & alive & (arg >= 0).unsqueeze(1)
+            cid = torch.where(hit.any(dim=1), ids.gather(1, hit.long().argmax(dim=1, keepdim=True)).squeeze(1),
+                              torch.full_like(arg, -1))
+            others = ap & (city == cid.unsqueeze(1)) & (torch.arange(NG, device=dev).reshape(1, -1) != gi.unsqueeze(1))
+            m = on & (verb == 2) & free & (cid >= 0) & ~others.any(dim=1)
+            if bool(m.count_nonzero()):
+                rows = m.nonzero(as_tuple=True)[0]
+                city[rows, gi[rows]] = cid[rows]
+                minor[rows, gi[rows]] = -1
+                est[rows, gi[rows]] = self._gov_establish[gi[rows]]
+            # ASSIGN to a city-state
+            if self.S > 0:
+                s_ok = (arg >= 0) & (arg < self.S)
+                cs_alive = self.citystate_alive[bidx, arg.clamp(0, self.S - 1)] & s_ok
+                m = on & (verb == 3) & free & self._gov_minor_ok[gi] & cs_alive
+                if bool(m.count_nonzero()):
+                    rows = m.nonzero(as_tuple=True)[0]
+                    city[rows, gi[rows]] = -1
+                    minor[rows, gi[rows]] = arg[rows]
+                    est[rows, gi[rows]] = self._gov_establish[gi[rows]]
 
     def _governance_doctrine(self, row: int, rows: torch.Tensor, governor: torch.Tensor) -> None:
         """CIV6 (Governance Doctrine, A): "Appointing and promoting a Governor
@@ -239,70 +249,6 @@ class SimGovernors:
         out = torch.stack([self._envoys_here_one(r) for r in range(self.n_majors)], dim=1)
         self._envoys_all_cache = (tuple(x.clone() for x in ins), out, simbase.plane_stamp(planes))
         return out
-
-    def _governor_post_minor(self, row: int, live: torch.Tensor) -> None:
-        """CIV6 (Amani, Messenger): "Can be assigned to a City-state" — she is
-        the only governor the catalog sends abroad, and she goes before the
-        cities are handed out. WHICH minor is this model's own line, like every
-        other governor choice here: the one where the seat already holds the
-        most envoys, since that is where her two and Puppeteer's doubling decide
-        a suzerainty. Ties take the lowest roster index."""
-        S, dev = self.S, self.device
-        if S == 0 or self.n_governors == 0:
-            return
-        env = self.seat_citystate_envoys[:, row, :S].to(torch.long)
-        ok = self.citystate_alive[:, :S] & self.seat_citystate_met[:, row, :S]
-        key = torch.where(ok, env * S - torch.arange(S, device=dev).reshape(1, -1),
-                          torch.full_like(env, -(1 << 40)))
-        pick = key.argmax(dim=1)
-        for g in range(self.n_governors):
-            if not bool(self._gov_minor_ok[g]):
-                continue
-            idle = (live & self.civ_gov_appointed[:, row, g] & (self.civ_gov_city[:, row, g] < 0)
-                    & (self.civ_gov_minor[:, row, g] < 0) & (self.civ_gov_out[:, row, g] <= 0)
-                    & ok.any(dim=1))
-            if not bool(idle.count_nonzero()):
-                continue
-            rows = idle.nonzero(as_tuple=True)[0]
-            self.civ_gov_minor[rows, row, g] = pick[rows]
-            self.civ_gov_establish[rows, row, g] = self._gov_establish[g]
-
-    def _governor_seat(self, row: int, live: torch.Tensor) -> None:
-        """Seat every idle governor in the lowest-loyalty ungoverned city. A
-        city already holding one is not a candidate, and a neutralized governor
-        "cannot be assigned to any city"."""
-        dev, NG, RC = self.device, self.n_governors, self.RC
-        ap = self.civ_gov_appointed[:, row]
-        city = self.civ_gov_city[:, row]
-        est = self.civ_gov_establish[:, row]
-        out = self.civ_gov_out[:, row]
-        alive = self.city_alive[:, row]                    # [B, RC]
-        ids = self.city_id[:, row]                         # [B, RC]
-
-        # the cities already taken, as a slot mask
-        taken = torch.zeros(self.B, RC, dtype=torch.bool, device=dev)
-        for g in range(NG):
-            has = ap[:, g] & (city[:, g] >= 0)
-            taken |= has.unsqueeze(1) & (ids == city[:, g].unsqueeze(1)) & alive
-
-        q = js_round(self.city_loyalty[:, row] * 1000).long()
-        for g in range(NG):
-            idle = (live & ap[:, g] & (city[:, g] < 0) & (out[:, g] <= 0)
-                    & (self.civ_gov_minor[:, row, g] < 0))
-            if not bool(idle.count_nonzero()):
-                continue
-            free = alive & ~taken
-            key = torch.where(free, q * RC + torch.arange(RC, device=dev).reshape(1, -1),
-                              torch.full_like(q, 1 << 40))
-            pick = key.argmin(dim=1)
-            got = idle & free.any(dim=1)
-            if not bool(got.count_nonzero()):
-                continue
-            rows = got.nonzero(as_tuple=True)[0]
-            sl = pick[rows]
-            city[rows, g] = ids[rows, sl]
-            est[rows, g] = self._gov_establish[g]
-            taken[rows, sl] = True
 
     def _governor_clocks(self, row: int, live: torch.Tensor) -> None:
         """`governorClocks`: the neutralization clock, the governor whose city

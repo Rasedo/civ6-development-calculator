@@ -58,6 +58,18 @@
   context:
     - ...at its best slot value, an appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0...
   review: imported
+- addr: 0x487650
+  kind: function
+  name: recordCongressOption
+  semantics: "Records a player's choice on a resolution: the target (the valid list's entry), the outcome; logs ', OPTIONS, %s, %d, %d, %d' (0x5b4620)."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: World_Congress.csv OPTIONS rows
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
@@ -84,6 +96,19 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - ...adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0...
+  review: reviewed
+- addr: 0x61dc50
+  kind: function
+  name: resolutionOrder
+  semantics: "The session's order: a resolution the player's +0x348 names before one it does not; else the greater desire first."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: Qin's listed Trade Treaty takes the 4 votes, World Religion 1
+  impl: [ai/major/congress.ts:allocateVotes]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
   review: reviewed
 - addr: 0x647bb0
   final: 0x42b1e0

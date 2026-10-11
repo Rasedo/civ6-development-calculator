@@ -457,6 +457,7 @@ class SimSeats:
         government: torch.Tensor | None = None,  # [B] the government roster position to adopt; -1/None = no decision
         pantheon: torch.Tensor | None = None,  # [B] the pantheon row the seat founds; -1/None = none
         religion: torch.Tensor | None = None,  # [B] the RELIGION_TYPES row a founding takes; -1/None = none
+        gov: torch.Tensor | None = None,  # [B, K, 3] the GOVERNOR verbs (verb, governor, argument); -1 = padding
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -503,6 +504,8 @@ class SimSeats:
             self._driven_pantheon[row] = pantheon
         if government is not None:
             self._driven_government[row] = government
+        if gov is not None:
+            self._driven_gov[row] = gov
 
     def _reset_war_clock(self, i: int, j: int, mask: torch.Tensor) -> None:
         self.war_turns[:, i, j] = torch.where(mask, torch.zeros_like(self.war_turns[:, i, j]), self.war_turns[:, i, j])

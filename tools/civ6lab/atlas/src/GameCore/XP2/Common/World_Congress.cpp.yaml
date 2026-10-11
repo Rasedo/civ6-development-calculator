@@ -64,3 +64,16 @@
   context:
     - "...n(3, n) \"World Congress Resolutions\" draws, each over what is left and removing its pick (0x59a680); with three drawn, the first two the previous session did not hold stand, else all drawn..."
   review: imported
+- addr: 0x59bc40
+  final: 0x3c0ba0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: runs/h1_duelv1127 Qin's whole favor bought   4 votes at t61 (29), 9 at t101 (149), 7 at t121 (85), and paid 24, 144,   84 (Player_Stats_2's favor balance).
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  context:
+    - "...cost, else the votes floor(F x desire / S) buys; the votes cast max(1, min(want, cap)) (0x59bc40) and their price taken from F (0x527680: s x n x (n - 1), s = 5 through the game speed..."
+  review: imported

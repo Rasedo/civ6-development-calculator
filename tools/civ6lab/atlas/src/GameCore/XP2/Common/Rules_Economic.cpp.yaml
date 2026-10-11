@@ -34,13 +34,17 @@
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
     - recording: h1_duelw1110
       value: "Player 0 of   runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234   and Charismatic Leader 18: its agenda's Influence row at 1.25 (the   pseudo-yield weight above)."
-  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON, cpu/data/seats.ts:missionPrice]
+  impl:
+    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
+    - cpu/data/seats.ts:missionPrice
+    - ai/major/congress.ts:CONGRESS_HORIZON
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: the upgrade's gold — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
   context:
     - "...VEST_IMPROVED_DEGRADATION 50 − 30 more pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08, t..."
     - "..., \"iNetProduction >= 0\"), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUC..."
@@ -218,6 +222,19 @@
   context:
     - ...orth +0x24, Cost +0x18), less the action's gold cost valued at the owner's Gold weight (0x527610 -> 0x7a6690), both sign-clipped by the owner's preference of the action (+0x6240, the...
   review: reviewed
+- addr: 0x527680
+  kind: function
+  name: votePrice
+  semantics: "s x (|n| - 1) x |n|, s = 5 through the game speed (0x525400), whole: 2 online."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 121
+      value: 7 votes cost 84 (85 -> 5 with the turn's +4)
+  impl: [ai/major/congress.ts:voteCost]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x5276c0
   final: 0x371060
   kind: function
@@ -268,6 +285,19 @@
   context:
     - "...' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (..."
   review: imported
+- addr: 0x527d80
+  kind: function
+  name: votesForFavor
+  semantics: 1 for a sum at or below 0; else whole((sqrtf(4 x sum / s + 1) + 1) x 0.5).
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 61
+      value: 29 favor buys 4 votes
+  impl: [ai/major/congress.ts:votesFor]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x527e30
   final: 0x3715b0
   kind: function

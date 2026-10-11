@@ -297,6 +297,11 @@ export interface MajorView extends AiValueView {
   allied(a: number, b: number): boolean;
   /** `a`'s standing denouncement of `b` */
   denouncing(a: number, b: number): boolean;
+  /** the seat's diplomatic favor */
+  favor(seat: number): number;
+  /** the target the engine's own congress line names for the seat on a
+   *  resolution (the engine's CONGRESS_RESOLUTIONS index) */
+  congressTarget(seat: number, resolution: number): number;
   score(seat: number): number;
   /** the great people of a class (GREAT_PERSON_CLASS_*) the seat has earned */
   greatPeopleOfClass(seat: number, cls: string): number;

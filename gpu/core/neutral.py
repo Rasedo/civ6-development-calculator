@@ -117,6 +117,7 @@ class Static:
     comp_aid: int
     promise_cost: list
     gov_tier: list
+    gov_actions_max: int
 
     def col(self, name: str) -> int:
         """The unit action column called `name`, -1 where the layout has none."""
@@ -211,6 +212,7 @@ def _static(rules, width: int, height: int, wrap_x: bool, n_majors: int, n_citys
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
         promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
         gov_tier=[int(g["tier"]) for g in rules.governments],
+        gov_actions_max=int(rules.eras["govActionsMax"]),
     )
 
 
@@ -381,7 +383,46 @@ def _columns(sim, row: int) -> dict:
     out["gp", "price"] = _as_long(sim.gp_price[:, :nG])
     out["gp", "points"] = _floored(sim.civ_gpp[:, row, :nG])
     out.update(_beliefs(sim, row))
+    out.update(_governors(sim, row))
     return out
+
+
+def _governors(sim, row: int) -> dict:
+    """The `governor` group: per governor roster index whether it is
+    appointed, its promotion bits, the centre of this seat's living city it
+    holds (-1 none), the city-state it is posted at (-1 none), its neutralize
+    turns, whether it may go abroad; the titles to spend now and the
+    promotions `promoteGovernor` would take now."""
+    B, dev, NG, NP = sim.B, sim.device, sim.n_governors, sim.n_gov_promos
+    if NG == 0:
+        z = torch.zeros(B, 0, dtype=torch.long, device=dev)
+        return {("governor", "titles"): torch.zeros(B, dtype=torch.long, device=dev),
+                ("governor", "appointed"): z, ("governor", "promotions"): z, ("governor", "city"): z,
+                ("governor", "minor"): z, ("governor", "out"): z, ("governor", "abroad"): z,
+                ("governor", "promo_gov"): torch.zeros(B, NP, dtype=torch.long, device=dev),
+                ("governor", "legal"): torch.zeros(B, NP, dtype=torch.bool, device=dev)}
+    titles = (sim._governor_titles_earned(row) - sim._governor_titles_spent(row)).clamp(min=0)
+    ap = sim.civ_gov_appointed[:, row]
+    pr = sim.civ_gov_promos[:, row]
+    gc = sim.civ_gov_city[:, row]                                          # [B, NG] city ids
+    hit = ((sim.city_id[:, row].unsqueeze(1) == gc.unsqueeze(2)) & sim.city_alive[:, row].unsqueeze(1)
+           & (gc >= 0).unsqueeze(2))                                       # [B, NG, RC]
+    ctr = _as_long(sim.city_center[:, row]).unsqueeze(1).expand(-1, NG, -1)
+    centre = torch.where(hit.any(dim=2), ctr.gather(2, hit.long().argmax(dim=2, keepdim=True)).squeeze(2),
+                         torch.full_like(gc, -1))
+    pidx = torch.arange(NP, device=dev)
+    g_of = sim._gpromo_gov.reshape(1, -1).expand(B, -1)                    # [B, NP]
+    pr_of = pr.gather(1, g_of.clamp(min=0))                                # its governor's bits
+    have = ((pr_of >> pidx.reshape(1, -1)) & 1).bool()
+    req = sim._gpromo_req.reshape(1, -1)
+    legal = ((titles > 0).unsqueeze(1) & ap.gather(1, g_of.clamp(min=0)) & (g_of >= 0)
+             & (sim._gpromo_tier.reshape(1, -1) > 0) & ~have & ((req == 0) | ((pr_of & req) != 0)))
+    return {("governor", "titles"): titles, ("governor", "appointed"): ap.long(),
+            ("governor", "promotions"): pr, ("governor", "city"): centre,
+            ("governor", "minor"): sim.civ_gov_minor[:, row], ("governor", "out"): _as_long(sim.civ_gov_out[:, row]),
+            ("governor", "abroad"): sim._gov_minor_ok.long().reshape(1, -1).expand(B, -1),
+            ("governor", "promo_gov"): sim._gpromo_gov[:NP].reshape(1, -1).expand(B, -1),
+            ("governor", "legal"): legal}
 
 
 def _beliefs(sim, row: int) -> dict:
@@ -429,7 +470,7 @@ def _congress(sim, row: int) -> dict:
 # the `list` fields that hold ASCENDING INDICES; every other list is dense
 _INDEX_LISTS = {("policy", "unlocked"), ("policy", "gov_open"), ("war", "declare"), ("war", "sue"),
                 ("belief", "follower"), ("belief", "worship"), ("belief", "founder"), ("belief", "enhancer"),
-                ("belief", "pantheon"), ("belief", "religion")}
+                ("belief", "pantheon"), ("belief", "religion"), ("governor", "legal")}
 
 
 def _city_rows(sim, row: int) -> list:
@@ -446,7 +487,8 @@ def _city_rows(sim, row: int) -> list:
     rank = torch.argsort(order, dim=1)                                # slot -> array position
     scal = torch.stack([_as_long(sim.city_center[:, row]), sim.city_is_cap[:, row].long(),
                         _as_long(sim.city_pop[:, row]),
-                        (sim.city_current[:, row] == sim.SETTLER).sum(dim=2)], dim=2)
+                        (sim.city_current[:, row] == sim.SETTLER).sum(dim=2),
+                        simbase.js_round(sim.city_loyalty[:, row] * 1000).long()], dim=2)
     scal = scal.gather(1, order.unsqueeze(2).expand(-1, -1, scal.shape[2]))
     opened = mask.nonzero()                                           # (b, slot, column), ascending
     site_rows = torch.zeros(0, 5, dtype=torch.long, device=sim.device)
@@ -472,9 +514,9 @@ def _city_rows(sim, row: int) -> list:
     work_rows, swap_rows = _citizen_rows(sim, row, alive)
     n_alive = alive.sum(dim=1).tolist()
     rank_l, scal_l, spec_l = rank.tolist(), scal.tolist(), spec.tolist()
-    out = [[{"centre": c, "isCapital": bool(cap), "pop": pop, "settlerQueued": sq, "prodOpen": [], "distSites": [],
-             "specSlots": sp[:nD], "specPin": sp[nD:], "workTiles": [], "swapFrom": []}
-            for (c, cap, pop, sq), sp in zip(scal_l[b][:n_alive[b]], spec_l[b])] for b in range(B)]
+    out = [[{"centre": c, "isCapital": bool(cap), "pop": pop, "settlerQueued": sq, "loyalty": loy, "prodOpen": [],
+             "distSites": [], "specSlots": sp[:nD], "specPin": sp[nD:], "workTiles": [], "swapFrom": []}
+            for (c, cap, pop, sq, loy), sp in zip(scal_l[b][:n_alive[b]], spec_l[b])] for b in range(B)]
     for b, j, c in opened.tolist():
         k = rank_l[b][j]
         if k < n_alive[b]:

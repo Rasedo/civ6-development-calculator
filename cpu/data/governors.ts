@@ -760,3 +760,11 @@ export const GOVERNOR_NEUTRALIZE_TURNS = 6;
 /** CIV6 (Governance Doctrine, A): "Appointing and promoting a Governor of
  *  this type yields 15 Diplomatic Favor." */
 export const GOVERNANCE_DOCTRINE_FAVOR = 15;
+
+/** the governor verbs of a seat's record (`SeatActionRecord.governors`) */
+export const GOV_APPOINT = 0;
+export const GOV_PROMOTE = 1;
+export const GOV_ASSIGN_CITY = 2;
+export const GOV_ASSIGN_MINOR = 3;
+/** the most governor verbs one record carries */
+export const GOV_ACTIONS_MAX = 16;

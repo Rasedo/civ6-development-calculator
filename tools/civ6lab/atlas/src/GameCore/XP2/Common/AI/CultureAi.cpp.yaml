@@ -102,6 +102,19 @@
     - ...ents it unlocks, each max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0 -> 0x7b26b0, unread); then a civic of an era at or before the game's ([player+0x1358]...
     - "- The policy job (0x621eb0): score -1.0; a card that is not a Dark Age card needs its PrereqCivic held (0x39d1f0)..."
   review: imported
+- addr: 0x622140
+  kind: function
+  name: evaluateResolutions
+  semantics: "Per resolution entry (+0xa58, 0x20 each): the option values 0x7b3be0(r, 1 / 2, the discount rate, 0, 30, the player) into +0x18 / +0x1c; the player's +0x348[r] above 0: outcome 1 (+0x14) and +0x18 the desire (+0x10); below 0: outcome 2 and +0x1c; else the greater, 1 on a tie."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 101
+      value: "Qin's Airpower disfavours Mercenary Companies: outcome 2"
+  impl: [ai/major/congress.ts:evaluateResolutions, ai/major/congress.ts:CONGRESS_HORIZON]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x622e90
   kind: function
   status: PARTLY
@@ -183,6 +196,19 @@
     - "...%d\" — the score and the turns of every row with turns at least 0; \"RANDOMLY CHOSEN CIVIC\" 0x626600)."
     - "- THE CHOICE, 0x626600 (key): the comparator 0x6182e0 over the entries — unowned before owned; a row whose nex..."
   review: imported
+- addr: 0x628450
+  kind: function
+  name: congressVotes
+  semantics: "The session's handler: favor F; the wants' price sum (whole(desire/2) votes each, at least 1) against F; per resolution in order the votes max(1, min(want, cap)), want whole(desire/2) where F covers the sum else the votes floor(F x desire / S) buys, cap the votes F's remainder buys; cast (0x59bc40), paid (0x527680); then the target by the TargetKind's chooser."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 101
+      value: Qin 9 votes on Mercenary Companies from 149 favor
+  impl: [ai/major/congress.ts:allocateVotes]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x6293e0
   final: 0x41a400
   kind: function

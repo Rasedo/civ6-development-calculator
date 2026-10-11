@@ -31,7 +31,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import BatchSim, load_rules, fixture_paths
-from warmup import warm_base, opened
+from warmup import warm_base, opened, drive_governors
 
 B0 = 0
 
@@ -123,6 +123,7 @@ def test_the_establishment_clock_bumps(rules, path, row: int, col: int) -> None:
     assert int(sim._tile_appeal()[B0, t]) == before, "an establishing governor already paid"
 
     # the tick that lands it — the write `_governor_phase` owes the cache
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim.civ_gov_establish[B0, row, g]) == 0, "the clock did not run out"
     got, want = int(sim._tile_appeal()[B0, t]), int(uncached_appeal(sim)[B0, t])
@@ -135,7 +136,9 @@ def test_a_quiet_turn_invalidates_nothing(rules, path, row: int) -> None:
     sim = fresh(rules, path)
     sim._tile_appeal()
     v = sim._eff_version
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert sim._eff_version == v, (
         f"a governor phase that changed nothing bumped the version {sim._eff_version - v}x — "

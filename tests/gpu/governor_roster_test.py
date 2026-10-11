@@ -12,8 +12,8 @@ engine's own loaders — nothing is hardcoded.
 Covered:
   a. Titles: each of the named civics earns one, an appointment spends one and
      each promotion spends one more; the roster stops when nothing is legal.
-  b. Order: appointments run down the catalog, and once every governor is
-     appointed a title buys the FIRST legal promotion (its governor's own row,
+  b. Order (the driver's verbs): appointments run down the catalog, and once
+     every governor is appointed a title buys the FIRST legal promotion (its governor's own row,
      tier > 0, prerequisite held).
   c. Establishment: an assigned governor pays LOYALTY at once and NO ability
      until its own clock runs out, then every channel opens together.
@@ -33,7 +33,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, drive_governors
 
 
 def build(rules, path, steps: int = 18, dtype=torch.float64):
@@ -112,7 +112,8 @@ def poke_order(rules, path):
         sim.civ_gov_promos[0, row, :] = 0
         sim.civ_gov_city[0, row, :] = -1
         grant_titles(sim, row, k)
-        sim._governor_spend(row, sim._governor_titles_earned(row))
+        drive_governors(sim, row)
+        sim._governor_apply(row, torch.ones(sim.B, dtype=torch.bool), sim._driven_gov.pop(row))
         got = sim.civ_gov_appointed[0, row].nonzero(as_tuple=True)[0].tolist()
         assert got == list(range(k)), f"{k} titles must appoint governors {list(range(k))} (got {got})"
 
@@ -121,7 +122,11 @@ def poke_order(rules, path):
     sim.civ_gov_appointed[0, row, :] = False
     sim.civ_gov_promos[0, row, :] = 0
     grant_titles(sim, row, NG + 1)
-    sim._governor_spend(row, sim._governor_titles_earned(row))
+    # the driver reads the promotions open as the turn opens: the appointments
+    # first, the spare title on the next decision
+    for _turn in range(2):
+        drive_governors(sim, row)
+        sim._governor_apply(row, torch.ones(sim.B, dtype=torch.bool), sim._driven_gov.pop(row))
     held = [(g, int(sim.civ_gov_promos[0, row, g])) for g in range(NG)
             if int(sim.civ_gov_promos[0, row, g])]
     assert len(held) == 1, f"one spare title buys exactly one promotion (got {held})"
@@ -145,6 +150,7 @@ def poke_establish(rules, path):
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
     sim.civ_gov_establish[0, row, :] = 0
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
 
     seat = cols[0]
@@ -180,6 +186,7 @@ def poke_neutralize(rules, path):
     sim.civ_gov_appointed[0, row, :] = False
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     gi = int(sim._governor_at(row)[0, cols[0]])
     assert gi >= 0
@@ -189,12 +196,14 @@ def poke_neutralize(rules, path):
     assert int(sim._governor_at(row)[0, cols[0]]) < 0, "a neutralized governor holds no city"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and starts his next posting cold"
     for k in range(turns):
+        drive_governors(sim, row)
         sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
         left = int(sim.civ_gov_out[0, row, gi])
         assert left == turns - 1 - k, f"the clock ticks once per phase (turn {k}: {left})"
         if left > 0:
             assert not bool((sim._governor_at(row)[0] >= 0).any()), \
                 "he cannot be assigned to ANY city while the clock runs"
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim._governor_at(row)[0, cols[0]]) == gi, \
         "…and takes the lowest-loyalty free city again once it is out"
@@ -211,6 +220,7 @@ def poke_city_lost(rules, path):
     sim.civ_gov_appointed[0, row, :] = False
     sim.civ_gov_promos[0, row, :] = 0
     sim.civ_gov_city[0, row, :] = -1
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     gi = int(sim._governor_at(row)[0, cols[0]])
     for _ in range(int(sim._gov_establish[gi])):
@@ -222,6 +232,7 @@ def poke_city_lost(rules, path):
     assert int(sim.civ_gov_city[0, row, gi]) < 0, "the city is gone, so is the posting"
     assert int(sim.civ_gov_establish[0, row, gi]) == 0, "and the establishment with it"
     assert bool(sim.civ_gov_appointed[0, row, gi]), "the APPOINTMENT survives — the title is spent"
+    drive_governors(sim, row)
     sim._governor_phase(row, sim.civ_alive[:, row] & sim.city_alive[:, row].any(dim=1))
     assert int(sim._governor_at(row)[0, cols[1]]) == gi, "he takes the surviving city next phase"
     print("  e city lost OK (posting and clock cleared, appointment kept)")

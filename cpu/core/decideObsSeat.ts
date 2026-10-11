@@ -11,6 +11,8 @@ import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
 import { beliefPicks, canFoundReligion, openBeliefs } from './game';
 import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES } from '../data/religion';
+import { governorPromotionOpen, governorsOf, governorTitlesAvailable } from './governors';
+import { GOVERNORS, GOVERNOR_PROMOTIONS } from '../data/governors';
 
 /**
  * THE SEAT SCALARS (the silo launch, envoys, congress, the Great Person pass,
@@ -115,10 +117,39 @@ function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
   };
 }
 
+/** The `governor` group, per governor roster index: whether it is
+ *  appointed, its promotions' bits, the CENTRE tile of the seat's living city
+ *  it holds (-1 none), the city-state roster index it is posted at (-1
+ *  none), its neutralize turns left, whether the catalog sends it abroad;
+ *  per promotion the governor it belongs to;
+ *  the titles the seat may spend now, the promotions open now (ascending,
+ *  `governorPromotionOpen` with a title in hand). */
+function governorGroup(state: GameState, seat: number): Record<string, unknown> {
+  const sx = seatOf(state, seat);
+  const roster = sx ? governorsOf(sx) : [];
+  const cities = sx?.cities ?? [];
+  const titles = governorTitlesAvailable(state, seat);
+  return {
+    titles,
+    appointed: GOVERNORS.map((_g, i) => (roster[i]?.appointed ? 1 : 0)),
+    promotions: GOVERNORS.map((_g, i) => roster[i]?.promotions ?? 0),
+    city: GOVERNORS.map((_g, i) => cities.find((c) => c.id === roster[i]?.cityId)?.centerIndex ?? -1),
+    minor: GOVERNORS.map((_g, i) => roster[i]?.minorId ?? -1),
+    out: GOVERNORS.map((_g, i) => roster[i]?.outTurns ?? 0),
+    abroad: GOVERNORS.map((g) => (g.cityStates ? 1 : 0)),
+    promo_gov: GOVERNOR_PROMOTIONS.map((p) => GOVERNORS.findIndex((g) => g.id === p.governor)),
+    legal: GOVERNOR_PROMOTIONS.flatMap((p, k) => {
+      const i = GOVERNORS.findIndex((g) => g.id === p.governor);
+      return i >= 0 && governorPromotionOpen(state, seat, i, k) ? [k] : [];
+    }),
+  };
+}
+
 export const SEAT_GROUPS: Record<string, SeatEmitter> = {
   nuke: nukeGroup,
   envoy: envoyGroup,
   congress: congressGroup,
   gp: gpGroup,
   belief: beliefGroup,
+  governor: governorGroup,
 };

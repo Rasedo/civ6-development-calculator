@@ -11,8 +11,8 @@ its Luxury resources to you" (Affluence); "While established in a city-state,
 doubles the number of Envoys you have there" (Puppeteer).
 
 Proven here:
-  * the catalog sends exactly one governor abroad, and `_governor_post_minor`
-    picks the met, live minor this seat already has the most envoys at;
+  * the catalog sends exactly one governor abroad, and the record's verb
+    (`_governor_apply`) posts her at a live minor and no other governor;
   * an unestablished posting pays nothing and its clock runs down abroad;
   * `_envoys_here` adds her two and Puppeteer doubles what she is part of,
     leaving the STORE and every other minor alone;
@@ -137,29 +137,28 @@ def main() -> int:
         "Messenger is Amani's DEFAULT — the posting itself must pay her two envoys")
     print(f"  0 the catalog sends governor {AMANI} abroad; Messenger is row {MESS}")
 
-    # --- 1) the phase's own choice ------------------------------------------
+    # --- 1) the record's verb -------------------------------------------------
+    def verbs(sim, acts):
+        t = torch.tensor(acts, dtype=torch.long).reshape(1, -1, 3).expand(sim.B, -1, -1)
+        sim._governor_apply(row, torch.ones(sim.B, dtype=torch.bool), t)
+
     s1 = fresh(rules, paths[0])
-    s1.seat_citystate_envoys[b, row, :s1.S] = 0
-    s1.seat_citystate_envoys[b, row, 0] = 1
-    s1.seat_citystate_envoys[b, row, 1] = 4
-    s1.seat_citystate_met[b, row, :s1.S] = True
     s1.civ_gov_appointed[b, row, :] = True
     s1.civ_gov_city[b, row, :] = -1
-    s1._governor_post_minor(row, torch.ones(s1.B, dtype=torch.bool))
+    other = 1 if AMANI == 0 else 0
+    verbs(s1, [[3, other, 1], [3, AMANI, 1]])
     assert int(s1.civ_gov_minor[b, row, AMANI]) == 1, (
-        f"she went to minor {int(s1.civ_gov_minor[b, row, AMANI])}, not the one with 4 envoys")
+        f"she went to minor {int(s1.civ_gov_minor[b, row, AMANI])}, not the record's")
     assert int(s1.civ_gov_establish[b, row, AMANI]) == int(s1._gov_establish[AMANI])
-    for g in range(s1.n_governors):
-        if g != AMANI:
-            assert int(s1.civ_gov_minor[b, row, g]) == -1, f"governor {g} travelled"
-    # an UNMET minor is no candidate
+    assert int(s1.civ_gov_minor[b, row, other]) == -1, f"governor {other} travelled"
+    # a DEAD minor takes nobody
     s2 = fresh(rules, paths[0])
-    s2.seat_citystate_met[b, row, :s2.S] = False
     s2.civ_gov_appointed[b, row, AMANI] = True
     s2.civ_gov_city[b, row, AMANI] = -1
-    s2._governor_post_minor(row, torch.ones(s2.B, dtype=torch.bool))
-    assert int(s2.civ_gov_minor[b, row, AMANI]) == -1, "she went to a minor nobody has met"
-    print("  1 the posting takes the met minor with the most envoys, and no other governor")
+    s2.citystate_alive[b, 0] = False
+    verbs(s2, [[3, AMANI, 0]])
+    assert int(s2.civ_gov_minor[b, row, AMANI]) == -1, "she went to a conquered minor"
+    print("  1 the record posts her at a live minor, and no other governor")
 
     # --- 2) the clock, and what an unestablished posting pays -----------------
     s3 = fresh(rules, paths[0])
@@ -244,13 +243,14 @@ def main() -> int:
     s7._governor_clocks(row, s7.civ_alive[:, row] & s7.city_alive[:, row].any(dim=1))
     assert int(s7.civ_gov_minor[b, row, AMANI]) == -1, "a dead minor keeps its governor"
     assert int(s7.civ_gov_establish[b, row, AMANI]) == 0
-    # and a posted governor is never handed a city as well
+    # and a city the record hands her ends the posting abroad
     s8 = fresh(rules, paths[0])
     post(s8, row, AMANI, 0)
-    s8.civ_gov_city[b, row, AMANI] = -1
-    s8._governor_seat(row, torch.ones(s8.B, dtype=torch.bool))
-    assert int(s8.civ_gov_city[b, row, AMANI]) == -1, "she took a city while posted abroad"
-    print("  6 a conquered minor sends her home, and a posting takes no city")
+    slot = int(s8.city_alive[b, row].long().argmax())
+    verbs(s8, [[2, AMANI, int(s8.city_center[b, row, slot])]])
+    assert int(s8.civ_gov_city[b, row, AMANI]) == int(s8.city_id[b, row, slot]), "she took no city"
+    assert int(s8.civ_gov_minor[b, row, AMANI]) == -1, "she kept her posting abroad"
+    print("  6 a conquered minor sends her home, and a city ends a posting")
 
     print("BATTERY OK amani")
     return 0

@@ -26,6 +26,20 @@ def opened(rules, path, turns: int = 0, dtype=torch.float64):
     return settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype), turns)
 
 
+def drive_governors(sim, row: int) -> None:
+    """The driver's governor verbs for seat `row` off its neutral observation
+    (`policy/drive.py` `_decide_governors`), stashed for the seat's governor
+    phase as a record would stash them."""
+    root = Path(__file__).resolve().parents[2]
+    if str(root / "policy") not in sys.path:
+        sys.path.insert(0, str(root / "policy"))
+    import drive
+    from core import neutral
+    gov = drive._decide_governors(neutral.static_for(sim), neutral.seat_obs(sim, row), sim.device)
+    if gov is not None:
+        sim._driven_gov[row] = gov
+
+
 def _own(v):
     return list(v) if isinstance(v, list) else v
 

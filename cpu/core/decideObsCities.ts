@@ -33,6 +33,8 @@ export interface CityObs {
   isCapital: boolean;
   pop: number;
   settlerQueued: number;
+  /** its loyalty in thousandths, rounded */
+  loyalty: number;
   prodOpen: number[];
   distSites: number[][];
   specSlots: number[];
@@ -188,6 +190,7 @@ export function citiesObs(state: GameState, seat: number): CityObs[] {
     isCapital: city.isCapital,
     pop: city.population,
     settlerQueued: city.queue.filter((q) => q.kind === 'settler').length,
+    loyalty: Math.round((city.loyalty ?? 100) * 1000),
     ...productionObs(state, actor, city, gates),
     ...specialistObs(state, city),
     ...citizenObs(state, city, worked),

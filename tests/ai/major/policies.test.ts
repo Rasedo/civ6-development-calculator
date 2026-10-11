@@ -41,7 +41,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     governmentColumn: () => -1,
     pantheonColumn: () => -1, beliefColumn: () => null, religionColumn: () => -1, religionsFounded: () => new Set(),
     pantheonOpen: () => false, religionOpen: () => false, beliefPicks: () => 0, treasury: () => 0, missionOpen: () => null, actionOpen: () => null, warOpen: () => false,
-    declaredFriends: () => false, allied: () => false, denouncing: () => false,
+    declaredFriends: () => false, allied: () => false, denouncing: () => false, favor: () => 0, congressTarget: () => 0,
     majors: () => [0],
     leader: () => null,
     metTurn: () => null,

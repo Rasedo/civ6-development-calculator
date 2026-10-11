@@ -11,7 +11,7 @@ import { congressGovernorFavorType } from './congress';
 import { getModifiers } from './effects';
 import {
   GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_DEFAULT_PROMOTION, GOVERNOR_TITLE_CIVICS,
-  GOVERNANCE_DOCTRINE_FAVOR, promotionBit, promotionBitValue, type GovernorEffects,
+  GOVERNANCE_DOCTRINE_FAVOR, GOV_ACTIONS_MAX, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit, promotionBitValue, type GovernorEffects,
 } from '../data/governors';
 
 /**
@@ -259,17 +259,6 @@ export function governorFlag(state: GameState, city: City, pick: (e: GovernorEff
   return cityGovernorEffects(state, city).some((e) => pick(e) === true);
 }
 
-/**
- * The seat's governor turn, run once at the top of its own turn and before
- * anything reads the roster: spend the available titles, seat every idle
- * governor, then tick both clocks.
- *
- * The CHOICE is a deterministic heuristic both engines mirror exactly —
- * appoint in catalog order, promote the first legal promotion in catalog
- * order, and seat an idle governor in the seat's lowest-loyalty ungoverned
- * city (quantized milli loyalty, ties by array position). Which governor to
- * hire is a strategy decision no rule of the game settles.
- */
 /** APPOINT governor `i` with a title. False when it already serves or the
  *  seat holds no title to spend. */
 export function appointGovernor(state: GameState, seat: number, i: number): boolean {
@@ -316,76 +305,29 @@ export function assignGovernor(state: GameState, seat: number, i: number, to: { 
 }
 
 /** THE SEAT'S GOVERNOR TURN, in its processing after the culture tally and
- *  before its cities: the clocks (`governorClocks`), then this script's
- *  choices — titles spent, Amani posted, idle governors seated. A governor
- *  seated here starts its establishment clock on the next processing, as the
- *  game's AI seats after its clocks. */
-export function governorPhase(state: GameState, seat: number): void {
-  const s = seatOf(state, seat);
-  if (!s) return;
+ *  before its cities: the clocks (`governorClocks`), then the seat's record's
+ *  governor verbs (`applyGovernorActions`). A governor seated here starts its
+ *  establishment clock on the next processing, as the game's AI seats after
+ *  its clocks. */
+export function governorPhase(state: GameState, seat: number, actions: readonly (readonly [number, number, number])[]): void {
+  if (!seatOf(state, seat)) return;
   governorClocks(state, seat);
-  const roster = governorsOf(s);
+  applyGovernorActions(state, seat, actions);
+}
 
-  let titles = governorTitlesAvailable(state, seat);
-  while (titles > 0) {
-    const next = roster.findIndex((g) => !g.appointed);
-    if (next >= 0) {
-      appointGovernor(state, seat, next);
-      titles -= 1;
-      continue;
+/** THE GOVERNOR VERBS of a seat's record, in order, each through its verb
+ *  and re-validated there: appoint, promote, assign to a city (named by its
+ *  CENTRE tile) or to a city-state (its roster index). A verb its verb
+ *  refuses changes nothing. */
+export function applyGovernorActions(state: GameState, seat: number, actions: readonly (readonly [number, number, number])[]): void {
+  for (const [verb, i, arg] of actions.slice(0, GOV_ACTIONS_MAX)) {
+    if (verb === GOV_APPOINT) appointGovernor(state, seat, i);
+    else if (verb === GOV_PROMOTE) promoteGovernor(state, seat, i, arg);
+    else if (verb === GOV_ASSIGN_MINOR) assignGovernor(state, seat, i, { minorId: arg });
+    else if (verb === GOV_ASSIGN_CITY) {
+      const city = citiesOf(state, seat).find((c) => c.centerIndex === arg);
+      if (city) assignGovernor(state, seat, i, { cityId: city.id });
     }
-    let took = false;
-    for (let i = 0; i < roster.length && !took; i++) {
-      for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
-        if (!promotionLegal(roster[i], i, p)) continue;
-        promoteGovernor(state, seat, i, p);
-        took = true;
-        break;
-      }
-    }
-    if (!took) break;
-    titles -= 1;
-  }
-
-  // CIV6 (Amani, Messenger): "Can be assigned to a City-state" — she is the
-  // only governor the catalog sends abroad, and she goes before the cities are
-  // handed out. WHICH minor is this model's own line, like every other
-  // governor choice here: the one where the seat already holds the most
-  // envoys, since that is where her two and Puppeteer's doubling decide a
-  // suzerainty. Ties take the first in the roster.
-  // the ledger is read inline here: `cityStates` reads the roster back for the
-  // effective envoy count, so this module must not import it.
-  const met = (state.cityStates ?? []).filter((m) => m.met.includes(seat));
-  for (let i = 0; i < roster.length; i++) {
-    const g = roster[i];
-    if (!GOVERNORS[i].cityStates || !g.appointed) continue;
-    if (g.cityId >= 0 || g.minorId >= 0 || g.outTurns > 0) continue;
-    let best = -1, bestN = -1;
-    for (const m of met) {
-      const n = m.envoys[seat] ?? 0;
-      if (n > bestN) { bestN = n; best = m.id; }
-    }
-    if (best < 0) continue;
-    assignGovernor(state, seat, i, { minorId: best });
-  }
-
-  // Seat every idle governor. A city already holding one is not a candidate,
-  // and a neutralized governor "cannot be assigned to any city".
-  const cities = citiesOf(state, seat);
-  const taken = new Set<number>();
-  for (const g of roster) if (g.appointed && g.cityId >= 0) taken.add(g.cityId);
-  const free = cities
-    .map((c, i) => ({ c, i, q: Math.round((c.loyalty ?? 100) * 1000) }))
-    .filter((x) => !taken.has(x.c.id))
-    .sort((a, b) => a.q - b.q || a.i - b.i);
-  let at = 0;
-  for (let i = 0; i < roster.length; i++) {
-    const g = roster[i];
-    if (!g.appointed || g.cityId >= 0 || g.minorId >= 0 || g.outTurns > 0) continue;
-    if (at >= free.length) break;
-    assignGovernor(state, seat, i, { cityId: free[at].c.id });
-    taken.add(g.cityId);
-    at += 1;
   }
 }
 

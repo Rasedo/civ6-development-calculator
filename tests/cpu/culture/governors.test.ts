@@ -7,7 +7,7 @@ import { makeState, tileAtCoords } from '../helpers';
 import { seatPhase } from '../../../cpu/core/phase';
 import { addEraScore, enterEra, agePressure } from '../../../cpu/core/eras';
 import { governorAt, governorPhase, governorsOf, governorTitlesAvailable, governorTitlesEarned, governorTitlesSpent, hasPromotion } from '../../../cpu/core/governors';
-import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
+import { GOVERNORS, GOVERNOR_PROMOTIONS, GOVERNOR_PROMOTION_INDEX, GOVERNOR_TITLE_CIVICS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_PROMOTE, promotionBit, promotionBitValue } from '../../../cpu/data/governors';
 import { tilesWithin } from '../../../world/hex';
 import { AGE_PRESSURE, GOVERNOR_LOYALTY, LOYALTY_MAX } from '../../../cpu/data/seats';
 import type { GameState, City, Governor, Seat } from '../../../cpu/core/types';
@@ -138,35 +138,40 @@ describe('governors / era score', () => {
     expect(governorTitlesSpent(civ)).toBe(2);
   });
 
-  // ---- the phase: appoint in catalog order, seat the lowest loyalty -----------
-  it('governorPhase appoints in catalog order and seats the lowest-loyalty cities, ties by array position', () => {
+  // ---- the phase: the record's verbs, each re-validated ------------------------
+  it('governorPhase applies the record\'s appointments and seats in order, refusing what its verb refuses', () => {
     const state = makeState();
     const civ = addCiv(state, 5, 5, { research: titledResearch(2) });
-    addCity(state, civ, 3, 5, 30);   // index 1 — the tie's WINNER (lower position)
-    addCity(state, civ, 7, 5, 30);   // index 2 — the tie's loser
-    addCity(state, civ, 10, 10, 20); // index 3 — outright lowest
-    governorPhase(state, civ.seat);
-
+    const a = addCity(state, civ, 3, 5, 30);
+    const b = addCity(state, civ, 7, 5, 30);
+    governorPhase(state, civ.seat, [
+      [GOV_APPOINT, 0, 0], [GOV_ASSIGN_CITY, 0, a.centerIndex],
+      [GOV_APPOINT, 1, 0], [GOV_ASSIGN_CITY, 1, a.centerIndex], // the city holds one governor
+      [GOV_APPOINT, 2, 0],                                          // no title left
+      [GOV_ASSIGN_CITY, 1, b.centerIndex],
+    ]);
     const roster = governorsOf(civ);
     expect(roster.filter((g) => g.appointed).length).toBe(2);
-    expect(roster[0].cityId).toBe(civ.cities[3].id);
-    expect(roster[1].cityId).toBe(civ.cities[1].id);
-    expect(governorAt(state, civ.cities[2])).toBe(-1);
-    expect(governorAt(state, civ.cities[0])).toBe(-1); // the capital pins at LOYALTY_MAX and ranks last
-    // the establishment clock starts full: the phase's clocks run before it
-    // seats her (`governorClocks`)
+    expect(roster[0].cityId).toBe(a.id);
+    expect(roster[1].cityId).toBe(b.id);
+    expect(governorAt(state, a)).toBe(0);
+    // the establishment clock starts full: the phase's clocks run before the verbs
     expect(roster[0].establishTurns).toBe(GOVERNORS[0].establishTurns);
     expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
   });
 
-  it('governorPhase promotes once the whole roster is appointed', () => {
+  it('governorPhase promotes with a title, a promotion of the governor\'s own and its prerequisite held', () => {
     const state = makeState();
-    const civ = addCiv(state, 5, 5, { research: titledResearch(GOVERNORS.length + 1) });
-    governorPhase(state, civ.seat);
+    const civ = addCiv(state, 5, 5, { research: titledResearch(3) });
+    const own = GOVERNOR_PROMOTIONS.findIndex((p) => p.governor === GOVERNORS[0].id && p.tier === 1);
+    const other = GOVERNOR_PROMOTIONS.findIndex((p) => p.governor === GOVERNORS[1].id && p.tier === 1);
+    governorPhase(state, civ.seat, [[GOV_APPOINT, 0, 0], [GOV_PROMOTE, 0, other], [GOV_PROMOTE, 0, own]]);
     const roster = governorsOf(civ);
-    expect(roster.every((g) => g.appointed)).toBe(true);
-    expect(roster.reduce((n, g) => n + (g.promotions ? 1 : 0), 0)).toBe(1);
-    expect(governorTitlesAvailable(state, civ.seat)).toBe(0);
+    expect(roster[0].promotions).toBe(1 << own);
+    expect(governorTitlesAvailable(state, civ.seat)).toBe(1);
+    // with no verb the phase runs the clocks alone
+    governorPhase(state, civ.seat, []);
+    expect(roster.filter((g) => g.appointed).length).toBe(1);
   });
 
   // ---- enterEra: the ages at the bars, the next bars ---------------------------
@@ -227,13 +232,15 @@ describe('governors / era score', () => {
   });
 
   // ---- seatPhase-driven: the weakest city gets +GOVERNOR_LOYALTY -------------
-  it('seatPhase seats a governor (+GOVERNOR_LOYALTY) on the weakest city when titles ≥ 1', () => {
+  it('seatPhase seats the record\'s governor (+GOVERNOR_LOYALTY) on its city when titles ≥ 1', () => {
     function scenario(nCivics: number): { weak: number; strong: number } {
       const state = makeState();
       const r0 = addCiv(state, 5, 5, { research: titledResearch(nCivics) });
-      addCity(state, r0, 3, 5, 40); // weakest non-capital
+      const weak = addCity(state, r0, 3, 5, 40); // weakest non-capital
       addCity(state, r0, 7, 5, 60); // stronger non-capital
       addCiv(state, 10, 10); // a second civ so r0's cities feel foreign pressure (loyalty runs)
+      state.seatActions = { [state.turn - 1]: { [r0.seat]: { production: [], tech: null, civic: null, units: [],
+        governors: [[GOV_APPOINT, 0, 0], [GOV_ASSIGN_CITY, 0, weak.centerIndex]] } } };
       // the phase seats her after its cities' loyalty is read: she pays
       // from the next turn
       seatPhase(state);

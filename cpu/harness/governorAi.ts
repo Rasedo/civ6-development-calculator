@@ -19,11 +19,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { AI_GOVERNORS } from '../../ai/major/tables';
 import { governorChoice, governorLogLine, governorScores, governorTurn, type GovernorChoice, type GovernorScores, type GovernorTurn } from '../../ai/major/governors';
 import type { MajorView } from '../../ai/major/view';
-import { appointGovernor, assignGovernor, promoteGovernor } from '../core/governors';
+import { applyGovernorActions } from '../core/governors';
 import { majorView } from '../core/majorView';
 import { seatOf } from '../core/seats';
 import type { GameState } from '../core/types';
-import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, PROMO_INSTALL_ID } from '../data/governors';
+import {
+  GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE,
+  PROMO_INSTALL_ID,
+} from '../data/governors';
 
 /** REPLAY_TRACE=governorScores prints every score line that differs from the
  *  log's to stderr */
@@ -117,17 +120,28 @@ const choiceText = (c: GovernorChoice): string => (!c ? '-' : 'appoint' in c ? `
 const engineGovernor = (type: string): number => GOVERNORS.findIndex((g) => GOVERNOR_INSTALL_ID[g.id] === type);
 const enginePromotion = (type: string): number => GOVERNOR_PROMOTIONS.findIndex((p) => PROMO_INSTALL_ID[p.id] === type);
 
-/** the port's turn through the engine's own verbs */
-export function applyGovernorTurn(state: GameState, seat: number, t: GovernorTurn): void {
+/** the port's turn as the seat's record column (`SeatActionRecord.governors`):
+ *  the appointment or promotion, then each assignment — a city by its CENTRE
+ *  tile, a city-state by its roster index */
+export function governorVerbs(state: GameState, seat: number, t: GovernorTurn): [number, number, number][] {
+  const out: [number, number, number][] = [];
   const c = t.choice;
-  if (c && 'appoint' in c) appointGovernor(state, seat, engineGovernor(c.appoint));
-  else if (c) promoteGovernor(state, seat, engineGovernor(c.promote), enginePromotion(c.promotion));
+  if (c && 'appoint' in c) out.push([GOV_APPOINT, engineGovernor(c.appoint), 0]);
+  else if (c) out.push([GOV_PROMOTE, engineGovernor(c.promote), enginePromotion(c.promotion)]);
   for (const a of t.assign) {
     const i = engineGovernor(a.governor);
     if (i < 0 || !a.slot) continue;
     const minor = state.cityStates.find((m) => m.seat === a.slot!.seat);
-    assignGovernor(state, seat, i, minor ? { minorId: minor.id } : { cityId: a.slot.id });
+    const city = seatOf(state, seat)?.cities.find((x) => x.id === a.slot!.id);
+    if (minor) out.push([GOV_ASSIGN_MINOR, i, minor.id]);
+    else if (city) out.push([GOV_ASSIGN_CITY, i, city.centerIndex]);
   }
+  return out;
+}
+
+/** the port's turn through the record's column */
+export function applyGovernorTurn(state: GameState, seat: number, t: GovernorTurn): void {
+  applyGovernorActions(state, seat, governorVerbs(state, seat, t));
 }
 
 const empty = (t: GovernorTurn | undefined): boolean => !t || (!t.choice && t.assign.length === 0);

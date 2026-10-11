@@ -2254,7 +2254,8 @@ draw of the game's, so the engines' integer draw there is the driver's stand-in
   border +20% in the t99 -> t100 processing; Pingala seated t27, border
   +15% at t32, civic progress from t33; the AI seats after its clocks, so
   a seating counts its EstablishTurns processings from the next. Engines:
-  `governorPhase` = `governorClocks` then the script, after the Culture
+  `governorPhase` = `governorClocks` then the record's governor verbs
+  (`applyGovernorActions` / `_governor_apply`), after the Culture
   tally, before the cities (`_governor_phase` / `_governor_clocks`).
 
 ## H-1: the border bank in fixed point — READ
@@ -6318,6 +6319,57 @@ row the port reads (`cpu/harness/diploSender.ts`).
   victories' progress (the threat's (a), the near-victory flags), the
   threat's (c), Request Assistance, Joint War, Third Party War, the Formal
   War family (0x6690a0), the -10 trust signal's event, the doubling.
+
+## C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ
+
+Port: `ai/major/congress.ts` (TS only; tables `AI_RESOLUTIONS`,
+`AI_RESOLUTION_LISTS*` from `tools/install/ai_tables.py`); the replay puts
+each AI major's ballot on its record (`vote`) at the engine's Regular
+Session and scores its ballot on the game's own slate against
+World_Congress.csv (`cpu/harness/congressAi.ts`).
+
+- THE EVALUATION (0x622140, a CultureAi job; per resolution of the session,
+  entries of 0x20 at +0xa58): each option's value (0x7b3be0, Value_Manager:
+  the option's modifiers — the game's +0x3978 / +0x3990 collections, the
+  ResolutionEffects rows of WhichEffect 1 / 2 — summed through 0x7a4b20
+  from turn 0 to a horizon of 30 (0x1e) at the AI's discount rate 0x6fec30,
+  the context filled by the TargetKind's handler 0x67dd40) into +0x18 / +0x1c;
+  then where the player's +0x348[r] (the Resolutions lists: AiLists System
+  Resolutions owned by a leader's or an agenda's trait, or a strategy) is
+  above 0 the outcome A (+0x14 = 1) with its value the desire (+0x10), below
+  0 the outcome B with its; else the greater, A on a tie.
+- THE ORDER (0x61dc50, 0x617d70's comparator): the resolutions a list names
+  first, then the desire, the greatest first.
+- THE VOTES (0x628450, the session's handler): F the player's favor (the
+  Congress player +0x110). The cost of the session's wants: the sum over
+  the resolutions of the price of whole(desire / 2) votes, at least 1; the
+  sum of the positive desires S, at least 1.0. Per resolution in order: the
+  cap the votes F's remainder buys (0x527d80: 1 for nothing, else
+  whole((sqrt(4 x F / s + 1) + 1) x 0.5) in single precision); the want
+  whole(desire / 2) where F covers the cost, else the votes floor(F x desire
+  / S) buys; the votes cast max(1, min(want, cap)) (0x59bc40) and their price
+  taken from F (0x527680: s x n x (n - 1), s = 5 through the game speed
+  0x525400, whole — 2 online). runs/h1_duelv1127 Qin's whole favor bought
+  4 votes at t61 (29), 9 at t101 (149), 7 at t121 (85), and paid 24, 144,
+  84 (Player_Stats_2's favor balance). The engines' extra vote costs 10
+  times its rank (`buyVotes`, CONGRESS_VOTE_STEP): the game's k-th extra vote
+  costs 4k online.
+- THE TARGET (0x611140 .. 0x612e50, one per AITargetChooser, chosen by the
+  TargetKind's hash): the handler's hint (0x67dd40) where it names one of
+  the valid targets (the resolution's vfunc +0xd0), else a "Random congress
+  resolution target" draw over the valid targets' count; the choice and the
+  outcome recorded by 0x487650 (the log's OPTIONS row).
+- PARTLY READ: no analyzer of the modifiers reads a resolution's effect
+  types (EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE, EFFECT_ADJUST_PLAYER_BAN_*,
+  ... 20 of them): the port's option values are 0; the TargetKind handlers
+  0x67dd40 and the target choosers are unread — the port names the engines'
+  own line (`congressTarget`).
+- Measured (the action replay, runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128,
+  the port's ballot on the game's slate): the outcome as the
+  log's OPTIONS on 97 / 109 resolutions of the AI majors, the votes as its
+  VOTES on 51 / 109 (every vote past the first wants a desire, the option
+  values the port reads as 0), the target on the resolutions naming a
+  player 16 / 27.
 
 ## DLL rules the engines contradict
 

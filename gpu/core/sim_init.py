@@ -1067,6 +1067,7 @@ class SimInit:
                                               dtype=torch.long, device=device)
         self._gov_neutralize = int(_er["governorNeutralizeTurns"])
         self._gov_doctrine_favor = int(_er["governanceDoctrineFavor"])
+        self._gov_actions_max = int(_er["govActionsMax"])
         self._gpromo_gov = torch.tensor([int(p["gov"]) for p in _gp] or [0], dtype=torch.long, device=device)
         self._gpromo_tier = torch.tensor([int(p["tier"]) for p in _gp] or [0], dtype=torch.long, device=device)
         self._gpromo_req = torch.tensor([int(p["requires"]) for p in _gp] or [0], dtype=torch.long, device=device)
@@ -4800,6 +4801,7 @@ class SimInit:
         self._driven_vote: dict = {}
         self._driven_gp_pass: dict = {}
         self._driven_beliefs: dict = {}
+        self._driven_gov: dict = {}
         self._driven_religion: dict = {}
         self._driven_pantheon: dict = {}
         self._driven_buy_nat: dict = {}

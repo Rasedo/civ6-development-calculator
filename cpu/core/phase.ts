@@ -2933,11 +2933,11 @@ export function seatPhase(state: GameState): void {
     }
     // THE GOVERNORS, after the Culture is summed and before the tourism,
     // favor and grievance tallies and the cities: the clocks, then this
-    // seat's choices (`governorPhase`). A governor established now paid no
+    // seat's record's verbs (`governorPhase`). A governor established now paid no
     // Culture this turn; her abilities reach the city walk below, and the
     // envoys she brings count toward the Favor. A posting is an envoy count,
     // so the minors' stored answer moves with it.
-    governorPhase(state, actor.seat);
+    governorPhase(state, actor.seat, rec?.governors ?? []);
     resolveSuzerains(state);
     // the tourism term reads the seat's ERA off its completed research: after
     // this turn's techs, before any civic completes

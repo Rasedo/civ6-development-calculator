@@ -43,7 +43,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import BatchSim, load_rules, load_fixture, fixture_paths
-from warmup import settle_all
+from warmup import settle_all, drive_governors
 
 
 # ------------------------------------------------------------------ helpers ---
@@ -279,7 +279,7 @@ def _grant_titles(sim, row: int, n: int) -> None:
 
 def poke_governor_civ(rules, path):
     """d(civ). Two title civics appoint two governors, which seat the two
-    LOWEST-loyalty cities via _seat_phase; a boundary TIE resolves to the lower
+    LOWEST-loyalty cities through the driver's verbs and _seat_phase; a boundary TIE resolves to the lower
     slot index. Two-run diff (2 titles vs 0) isolates the +GOVERNOR_LOYALTY
     from the (identical) pressure."""
     sim = build(rules, path)
@@ -311,7 +311,9 @@ def poke_governor_civ(rules, path):
         sim.restore(snap)
         _grant_titles(sim, r + 1, nc)
         titles = int(sim._governor_titles_earned(r + 1)[0])
-        # the turn that seats them, then the turn their loyalty first pays
+        # the turn that seats them (the driver's verbs), then the turn their
+        # loyalty first pays
+        drive_governors(sim, r + 1)
         sim._seat_phase()
         sim._seat_phase()
         return titles, {s: float(sim.city_loyalty[0, r + 1, s]) for s in [cap] + noncap}
@@ -337,11 +339,13 @@ def poke_governor_seat0(rules, path):
     weakest = min(cols, key=lambda c: (q(float(sim.city_loyalty[0, 0, c])), c))  # ties by array position = column
     _grant_titles(sim, 0, 1)
     snap = sim.snapshot()
+    drive_governors(sim, 0)
     sim._governor_phase(0, sim.civ_alive[:, 0] & sim.city_alive[:, 0].any(dim=1))
     apply_loyalty_row(sim, tier)
     with_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in range(sim.RC) if bool(sim.city_alive[0, 0, c])}
     sim.restore(snap)
     _grant_titles(sim, 0, 0)
+    drive_governors(sim, 0)
     sim._governor_phase(0, sim.civ_alive[:, 0] & sim.city_alive[:, 0].any(dim=1))
     apply_loyalty_row(sim, tier)
     no_gov = {c: float(sim.city_loyalty[0, 0, c]) for c in with_gov}
@@ -422,6 +426,7 @@ def poke_capital_immunity(rules, path):
     pcap = int(sim2.city_is_cap[0, 0].nonzero()[0])
     sim2.city_loyalty[0, 0, pcap] = 5.0
     _grant_titles(sim2, 0, 1)
+    drive_governors(sim2, 0)
     sim2._governor_phase(0, sim2.civ_alive[:, 0] & sim2.city_alive[:, 0].any(dim=1))
     tier = torch.zeros(sim2.B, sim2.RC, dtype=torch.long)
     apply_loyalty_row(sim2, tier)

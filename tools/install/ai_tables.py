@@ -347,6 +347,41 @@ def build() -> str:
             "governors": [g for g, _ in gov_rows if p in gp_sets[g]],
             "modifiers": [modifier(m) for m in sorted(gp_mods[p])],
         })
+    # the World Congress AI: each resolution in database order, its option
+    # effects (ResolutionEffects WhichEffect 1 / 2, ordered by the row id) and
+    # its target chooser; the Resolutions lists (AiLists System Resolutions)
+    # and the traits and strategies that own them
+    eff: dict[str, list[list[tuple[int, str]]]] = collections.defaultdict(lambda: [[], []])
+    for c in rows("ResolutionEffects"):
+        if c.get("ResolutionType") and c.get("ModifierId"):
+            k = int(c.get("WhichEffect", 1) or 1) - 1
+            if k in (0, 1):
+                eff[c["ResolutionType"]][k].append((int(c.get("ResolutionEffectId", 0) or 0), c["ModifierId"]))
+    resolutions_ai = [{
+        "type": r, "targetKind": c.get("TargetKind"), "chooser": c.get("AITargetChooser"),
+        "effects": [[modifier(m) for _i, m in sorted(eff[r][k])] for k in (0, 1)],
+    } for r, c in in_game_order("Resolutions", "ResolutionType", keyed(rows("Resolutions"), "ResolutionType"))]
+    res_lists = {k: c for k, c in keyed(rows("AiLists"), "ListType").items() if c.get("System") == "Resolutions"}
+    res_items: dict[str, list] = collections.defaultdict(list)
+    for c in rows("AiFavoredItems"):
+        if c.get("ListType") in res_lists and c.get("Item"):
+            res_items[c["ListType"]].append({"resolution": c["Item"],
+                                             "favored": (c.get("Favored") or "true").lower() not in ("false", "0")})
+    res_by_trait: dict[str, list[str]] = collections.defaultdict(list)
+    for k, c in res_lists.items():
+        t = c.get("LeaderType") or c.get("AgendaType")
+        if t and res_items.get(k):
+            res_by_trait[t].append(k)
+    ag_traits: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("AgendaTraits"):
+        if c.get("AgendaType") and c.get("TraitType") in res_by_trait and c["TraitType"] not in ag_traits[c["AgendaType"]]:
+            ag_traits[c["AgendaType"]].append(c["TraitType"])
+    res_leader = {lt: [t for t in leader_traits(lt) if t in res_by_trait] for lt in sorted(inherit)}
+    res_by_strategy: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("Strategy_Priorities"):
+        if c.get("ListType") in res_lists and res_items.get(c["ListType"]):
+            res_by_strategy[c["StrategyType"]].append(c["ListType"])
+
     governors_ai = []
     for g, c in gov_rows:
         mine = [p for p, _ in promo_rows if p in gp_sets[g]]
@@ -365,7 +400,7 @@ def build() -> str:
         "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
         " * layered install (`--check` reports a stale file). Policies and governments\n"
         " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type {\n  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy,\n  AiStrategyBias,\n} from './types';\n\n"
+        "import type {\n  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiResolution, AiSlotType,\n  AiStrategy, AiStrategyBias,\n} from './types';\n\n"
         + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
         + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
         + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
@@ -388,6 +423,13 @@ def build() -> str:
         + lit("AI_FAVORED_RELIGIONS_BY_LEADER", dict(sorted(fav_leader.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_FAVORED_RELIGIONS_BY_CIV", dict(sorted(fav_civ.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_GOVERNORS", governors_ai, "readonly AiGovernor[]")
+        + lit("AI_RESOLUTIONS", resolutions_ai, "readonly AiResolution[]")
+        + lit("AI_RESOLUTION_LISTS", {k: res_items[k] for k in sorted(res_items)},
+              "Readonly<Record<string, readonly { resolution: string; favored: boolean }[]>>")
+        + lit("AI_RESOLUTION_LISTS_BY_TRAIT", dict(sorted(res_by_trait.items())), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_RESOLUTION_LISTS_BY_STRATEGY", dict(sorted(res_by_strategy.items())), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_RESOLUTION_LEADER_TRAITS", {k: v for k, v in res_leader.items() if v}, "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_RESOLUTION_AGENDA_TRAITS", dict(sorted(ag_traits.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_GOVERNOR_PROMOTIONS", gov_promos, "readonly AiGovernorPromotion[]")
     )
     # each city-state's modifiers its envoys are worth (the diplomatic AI's

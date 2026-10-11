@@ -4,8 +4,8 @@
  * run in DATABASE ORDER, the index the game's AI loops walk.
  */
 import type {
-  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy,
-  AiStrategyBias,
+  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiResolution, AiSlotType,
+  AiStrategy, AiStrategyBias,
 } from './types';
 
 export const AI_POLICIES: readonly AiPolicy[] = [
@@ -13645,6 +13645,1593 @@ export const AI_GOVERNORS: readonly AiGovernor[] = [
   ]
  }
 ];
+export const AI_RESOLUTIONS: readonly AiResolution[] = [
+ {
+  "type": "WC_RES_DIPLOVICTORY",
+  "targetKind": "PLAYER",
+  "chooser": "PlayerOrDiploLeader",
+  "effects": [
+   [
+    {
+     "id": "APPLY_INCREASED_DIPLO_VP_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "ADD_DIPLOMATIC_VICTORY_POINTS"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_DECREASED_DIPLO_VP_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "SUBTRACT_DIPLOMATIC_VICTORY_POINTS"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_LUXURY",
+  "targetKind": "RESOURCE",
+  "chooser": "MostCommonLuxury",
+  "effects": [
+   [
+    {
+     "id": "NO_CAP_LUXURY_RESOURCE",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_NO_CAP_RESOURCE",
+     "args": {}
+    }
+   ],
+   [
+    {
+     "id": "BAN_LUXURY_RESOURCE",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BAN_RESOURCE",
+     "args": {}
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_TRADE_TREATY",
+  "targetKind": "PLAYER",
+  "chooser": "TradingPartners",
+  "effects": [
+   [
+    {
+     "id": "APPLY_TARGET_FREE_TRADE_ROUTE",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "TARGET_ADD_TRADE_ROUTE"
+     }
+    },
+    {
+     "id": "APPLY_INCREASES_TRADE_TO_GOLD_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "INCREASES_TRADE_TO_GOLD"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_INTERNATIONAL_MAJOR_TRADE_ROUTES_DISABLED",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "INTERNATIONAL_MAJOR_TRADE_ROUTES_DISABLED"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_WORLD_RELIGION",
+  "targetKind": "RELIGION",
+  "chooser": "ReligiousTarget",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_RELIGIOUS_UNITS_STRENGTH",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_UNITS_RELIGIOUS_STRENGTH_BY_RELIGION_TYPE",
+     "args": {
+      "Amount": "10"
+     }
+    }
+   ],
+   [
+    {
+     "id": "ANYONE_CONDEMNS_FOR_FAVOR",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ADJUST_RELIGION_ANYONE_CONDEMNS_FAVOR",
+     "args": {
+      "Amount": "25"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_MERCENARY_COMPANIES",
+  "targetKind": "YIELD",
+  "chooser": "UnitBuildYield",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_UNIT_PRODUCTION_YIELD_DEBUFF",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD",
+     "args": {
+      "Amount": "-100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "WC_RES_UNIT_PRODUCTION_YIELD_BUFF",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD",
+     "args": {
+      "Amount": "50"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_ARMS_CONTROL",
+  "targetKind": "PLAYER",
+  "chooser": null,
+  "effects": [
+   [
+    {
+     "id": "WC_RES_MEET_WMD_TARGET",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "PLAYERS_EQUALIZE_WMD_COUNTS"
+     }
+    }
+   ],
+   [
+    {
+     "id": "WC_RES_WMD_BAN",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "PLAYER_TARGET_WMD_BAN"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_HERITAGE_ORG",
+  "targetKind": "GREATWORKOBJECT",
+  "chooser": "GreatWorkObjects",
+  "effects": [
+   [
+    {
+     "id": "ADD_TOURISM_FROM_GREAT_WORK_OBJECT",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_GREAT_WORK_OBJECT_TOURISM_MODIFIER",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "NO_TOURISM_FROM_GREAT_WORK_OBJECT",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_GREAT_WORK_OBJECT_NO_TOURISM",
+     "args": {
+      "NoTourism": "true"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_WORLD_IDEOLOGY",
+  "targetKind": "GOVERNMENT",
+  "chooser": "Government",
+  "effects": [
+   [
+    {
+     "id": "GOVT_ADD_WILDCARD_SLOT",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_GOVERNMENT_SLOTS",
+     "args": {
+      "GovernmentSlotType": "SLOT_WILDCARD",
+      "Amount": "1"
+     }
+    }
+   ],
+   [
+    {
+     "id": "GOVT_LOSE_WILDCARD_SLOT",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_GOVERNMENT_SLOTS",
+     "args": {
+      "GovernmentSlotType": "SLOT_WILDCARD",
+      "Amount": "-1"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_URBAN_DEVELOPMENT",
+  "targetKind": "DISTRICT",
+  "chooser": "District",
+  "effects": [
+   [
+    {
+     "id": "INCREASE_DISTRICT_BUILDING_PRODUCTION",
+     "collection": "COLLECTION_ALL_CITIES",
+     "effect": "EFFECT_ADJUST_DISTRICT_BUILDING_PRODUCTION",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "BAN_DISTRICT_BUILDING",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION",
+     "args": {
+      "BanDistrictBuildings": "true"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_BORDER_CONTROL",
+  "targetKind": "PLAYER",
+  "chooser": "BorderControlTarget",
+  "effects": [
+   [
+    {
+     "id": "APPLY_ALL_DISTRICTS_CULTURE_BOMB_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "ALL_DISTRICTS_CULTURE_BOMB"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_NO_CULTURE_BORDER_EXPANSION_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "NO_CULTURE_BORDER_EXPANSION"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_PUBLIC_WORKS",
+  "targetKind": "PROJECT",
+  "chooser": "Project",
+  "effects": [
+   [
+    {
+     "id": "INCREASE_PROJECT_PRODUCTION",
+     "collection": "COLLECTION_ALL_CITIES",
+     "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "DECREASE_PROJECT_PRODUCTION",
+     "collection": "COLLECTION_ALL_CITIES",
+     "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+     "args": {
+      "Amount": "-50"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_PATRONAGE",
+  "targetKind": "GREATPERSONCLASS",
+  "chooser": "GreatPersonPatronage",
+  "effects": [
+   [
+    {
+     "id": "INCREASE_GREAT_PERSON_POINTS",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "NO_GREAT_PERSON_POINTS",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_NO_GREAT_PERSON_POINTS",
+     "args": {}
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_GLOBAL_ENERGY_TREATY",
+  "targetKind": "BUILDING",
+  "chooser": "PowerBuilding",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_BUILDING_PRODUCTION_BAN",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION",
+     "args": {}
+    }
+   ],
+   [
+    {
+     "id": "WC_RES_BUILDING_PRODUCTION_BUFF",
+     "collection": "COLLECTION_ALL_CITIES",
+     "effect": "EFFECT_ADJUST_BUILDING_PRODUCTION",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_SOVEREIGNTY",
+  "targetKind": "MINORCIVBONUS",
+  "chooser": "MinorCivBonus",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_MODIFY_CITY_STATE_TRADE_YIELD",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_TRADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER",
+     "args": {
+      "Amount": "100"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_DISABLE_UNIQUE_SUZERAIN_BONUS_TO_MINORCIVTYPES",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_MINORCIVBONUSTYPE",
+     "args": {
+      "ModifierId": "WC_RES_DISABLE_UNIQUE_SUZERAIN_BONUS"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_MIGRATION_TREATY",
+  "targetKind": "PLAYER",
+  "chooser": "MigrationTarget",
+  "effects": [
+   [
+    {
+     "id": "APPLY_GROWTH_BONUS_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_CITY_GROWTH_BONUS"
+     }
+    },
+    {
+     "id": "APPLY_LOYALTY_PENALTY_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_CITY_LOYALTY_PENALTY"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_GROWTH_PENALTY_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_CITY_GROWTH_PENALTY"
+     }
+    },
+    {
+     "id": "APPLY_LOYALTY_BONUS_TO_PLAYER",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_CITY_LOYALTY_BONUS"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_DEFORESTATION_TREATY",
+  "targetKind": "FEATURE",
+  "chooser": "FeatureType",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_DEFORESTATION_BAN",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_BAN_CHOP",
+     "args": {
+      "NoRemove": "true"
+     }
+    }
+   ],
+   [
+    {
+     "id": "WC_RES_DEFORESTATION_GOLD",
+     "collection": "COLLECTION_MAJOR_PLAYERS",
+     "effect": "EFFECT_ADJUST_PLAYER_ADD_CHOP_YIELD",
+     "args": {
+      "YieldType": "YIELD_GOLD",
+      "Amount": "100"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_PUBLIC_RELATIONS",
+  "targetKind": "PLAYER",
+  "chooser": "GrievancesType",
+  "effects": [
+   [
+    {
+     "id": "APPLY_PLAYER_GRIEVANCES_BUFF",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_PLAYER_GRIEVANCES_BUFF"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_PLAYER_GRIEVANCES_DEBUFF",
+     "collection": "COLLECTION_OWNER",
+     "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
+     "args": {
+      "ModifierId": "WC_RES_PLAYER_GRIEVANCES_DEBUFF"
+     }
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_ESPIONAGE_PACT",
+  "targetKind": "UNITOPERATION",
+  "chooser": "SpyOperationType",
+  "effects": [
+   [
+    {
+     "id": "WC_RES_OPERATION_CHANCE_BUFF",
+     "collection": "COLLECTION_ALL_UNITS",
+     "effect": "EFFECT_ADJUST_UNIT_SPY_OPERATION_CHANCE",
+     "args": {
+      "Amount": "2"
+     }
+    }
+   ],
+   [
+    {
+     "id": "WC_RES_OPERATION_REMOVE",
+     "collection": "COLLECTION_ALL_UNITS",
+     "effect": "EFFECT_CHANGE_UNIT_OPERATION_AVAILABILITY",
+     "args": {}
+    }
+   ]
+  ]
+ },
+ {
+  "type": "WC_RES_MILITARY_ADVISORY",
+  "targetKind": "UNITPROMOTIONCLASS",
+  "chooser": "UnitPromotionType",
+  "effects": [
+   [
+    {
+     "id": "APPLY_RES_UNIT_COMBAT_BUFF",
+     "collection": "COLLECTION_ALL_UNITS",
+     "effect": "EFFECT_ATTACH_MODIFIER_IF_PROMOTION_CLASS_MATCHES",
+     "args": {
+      "ModifierId": "WC_RES_UNIT_COMBAT_BUFF"
+     }
+    }
+   ],
+   [
+    {
+     "id": "APPLY_RES_UNIT_COMBAT_DEBUFF",
+     "collection": "COLLECTION_ALL_UNITS",
+     "effect": "EFFECT_ATTACH_MODIFIER_IF_PROMOTION_CLASS_MATCHES",
+     "args": {
+      "Amount": "WC_RES_UNIT_COMBAT_DEBUFF"
+     }
+    }
+   ]
+  ]
+ }
+];
+export const AI_RESOLUTION_LISTS: Readonly<Record<string, readonly { resolution: string; favored: boolean }[]>> = {
+ "AirPowerResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "AllRoadToRomeResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": false
+  }
+ ],
+ "AngevinEmpireResolutions": [
+  {
+   "resolution": "WC_RES_MIGRATION_TREATY",
+   "favored": true
+  }
+ ],
+ "AyyubidDynastyResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_URBAN_DEVELOPMENT",
+   "favored": true
+  }
+ ],
+ "BasilFavoredResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ],
+ "BillionaireResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "BlackQueenResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "BullMooseResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": true
+  }
+ ],
+ "CityStateAllyResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": true
+  }
+ ],
+ "CityStateProtectorResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": false
+  }
+ ],
+ "CivilizedResolutions": [
+  {
+   "resolution": "WC_RES_LUXURY",
+   "favored": false
+  }
+ ],
+ "CounterReformerResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": false
+  }
+ ],
+ "CourtResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_BORDER_CONTROL",
+   "favored": true
+  }
+ ],
+ "CulturedResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_IDEOLOGY",
+   "favored": false
+  }
+ ],
+ "DelianLeagueResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": true
+  }
+ ],
+ "DemagogueResolutions": [
+  {
+   "resolution": "WC_RES_DIPLOVICTORY",
+   "favored": true
+  }
+ ],
+ "DestinationCivResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": true
+  }
+ ],
+ "DevoutResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ],
+ "DharmaResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ],
+ "EleanorResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_DIPLOVICTORY",
+   "favored": true
+  }
+ ],
+ "ElectronicsFactoryResolutions": [
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": false
+  }
+ ],
+ "EndToSufferingResolutions": [
+  {
+   "resolution": "WC_RES_MIGRATION_TREATY",
+   "favored": true
+  }
+ ],
+ "EnthusiasticDiscipleResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ],
+ "EnvironmentalistResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": true
+  }
+ ],
+ "ExaltedGoddessResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  }
+ ],
+ "ExpansionistResolutions": [
+  {
+   "resolution": "WC_RES_BORDER_CONTROL",
+   "favored": false
+  }
+ ],
+ "ExploitativeResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": false
+  }
+ ],
+ "ExplorerResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "ExtraLightCavalryResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "FlatEartherResolutions": [
+  {
+   "resolution": "WC_RES_PUBLIC_WORKS",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": false
+  }
+ ],
+ "FoundingFathersResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_IDEOLOGY",
+   "favored": true
+  }
+ ],
+ "FunLovingResolutions": [
+  {
+   "resolution": "WC_RES_LUXURY",
+   "favored": true
+  }
+ ],
+ "GreatMountainsResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": false
+  }
+ ],
+ "GreatPersonAdvocateResolutions": [
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": true
+  }
+ ],
+ "GreatPersonObessessedResolutions": [
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_PUBLIC_WORKS",
+   "favored": true
+  }
+ ],
+ "GreatTurkishBombardResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "GreatWallResolutions": [
+  {
+   "resolution": "WC_RES_BORDER_CONTROL",
+   "favored": false
+  }
+ ],
+ "GreatWhiteFleetResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "HorseLordResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "IdealogueResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_IDEOLOGY",
+   "favored": true
+  }
+ ],
+ "IndustrialRevolutionResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": false
+  }
+ ],
+ "IndustrialistResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": false
+  }
+ ],
+ "IntolerantResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": false
+  }
+ ],
+ "IronConfederacyResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "IronCrownResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_GOVERNANCE_DOCTRINE",
+   "favored": false
+  }
+ ],
+ "KaitiakitangaResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": true
+  }
+ ],
+ "LandPowerResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "LastVikingResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "LibertarianResolutions": [
+  {
+   "resolution": "WC_RES_DIPLOVICTORY",
+   "favored": false
+  }
+ ],
+ "LionOfMaliResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": true
+  },
+  {
+   "resolution": "WC_EMERGENCY_WORLD_FAIR",
+   "favored": true
+  }
+ ],
+ "LordOfMinesResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_URBAN_DEVELOPMENT",
+   "favored": false
+  }
+ ],
+ "MaatResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": false
+  }
+ ],
+ "ManaResolutions": [
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": false
+  }
+ ],
+ "MediterraneanColoniesResolutions": [
+  {
+   "resolution": "WC_RES_MIGRATION_TREATY",
+   "favored": true
+  }
+ ],
+ "MoneyGrubberResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "NarikalaFortressResolutions": [
+  {
+   "resolution": "WC_RES_URBAN_DEVELOPMENT",
+   "favored": true
+  }
+ ],
+ "NkisiResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": true
+  }
+ ],
+ "NukeLoverResolutions": [
+  {
+   "resolution": "WC_RES_ARMS_CONTROL",
+   "favored": true
+  }
+ ],
+ "OptimusPrincepsResolutions": [
+  {
+   "resolution": "WC_RES_BORDER_CONTROL",
+   "favored": false
+  }
+ ],
+ "OrtooResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "ParanoidResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_BORDER_CONTROL",
+   "favored": true
+  }
+ ],
+ "PatronOfArtsResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": true
+  }
+ ],
+ "PillagerResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": false
+  }
+ ],
+ "PopulousResolutions": [
+  {
+   "resolution": "WC_RES_MIGRATION_TREATY",
+   "favored": true
+  }
+ ],
+ "RavenBannerResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": true
+  }
+ ],
+ "SagaResolutions": [
+  {
+   "resolution": "WC_RES_SOVEREIGNTY",
+   "favored": false
+  }
+ ],
+ "SaintResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ],
+ "SakokuResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_ARMS_CONTROL",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": false
+  }
+ ],
+ "ScottishEnlightenmentResolutions": [
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": true
+  }
+ ],
+ "SejongResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": false
+  }
+ ],
+ "ShortLifeGloryResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "SpiritOfTucapelResolutions": [
+  {
+   "resolution": "WC_RES_MIGRATION_TREATY",
+   "favored": false
+  }
+ ],
+ "StandingArmyResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "SultanResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": false
+  }
+ ],
+ "SunNeverSetsResolutions": [
+  {
+   "resolution": "WC_RES_DEFORESTATION_TREATY",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_GLOBAL_ENERGY_TREATY",
+   "favored": false
+  }
+ ],
+ "TaSetiResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": false
+  }
+ ],
+ "TechnophileResolutions": [
+  {
+   "resolution": "WC_RES_HERITAGE_ORG",
+   "favored": false
+  }
+ ],
+ "TlatoaniResolutions": [
+  {
+   "resolution": "WC_RES_LUXURY",
+   "favored": true
+  }
+ ],
+ "TradeAgreementResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "TraitReligiousConvertResolutions": [
+  {
+   "resolution": "WC_RES_URBAN_DEVELOPMENT",
+   "favored": false
+  }
+ ],
+ "TreasureFleetResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "TurtlerResolutions": [
+  {
+   "resolution": "WC_RES_MERCENARY_COMPANIES",
+   "favored": true
+  },
+  {
+   "resolution": "WC_RES_ARMS_CONTROL",
+   "favored": false
+  },
+  {
+   "resolution": "WC_RES_PATRONAGE",
+   "favored": false
+  }
+ ],
+ "WesternizerResolutions": [
+  {
+   "resolution": "WC_RES_TRADE_TREATY",
+   "favored": true
+  }
+ ],
+ "ZealotResolutions": [
+  {
+   "resolution": "WC_RES_WORLD_RELIGION",
+   "favored": true
+  }
+ ]
+};
+export const AI_RESOLUTION_LISTS_BY_TRAIT: Readonly<Record<string, readonly string[]>> = {
+ "TRAIT_AGENDA_ANGEVIN_EMPIRE": [
+  "AngevinEmpireResolutions"
+ ],
+ "TRAIT_AGENDA_AYYUBID_DYNASTY": [
+  "AyyubidDynastyResolutions"
+ ],
+ "TRAIT_AGENDA_BASIL_ZEALOT": [
+  "BasilFavoredResolutions"
+ ],
+ "TRAIT_AGENDA_BILLIONAIRE": [
+  "BillionaireResolutions"
+ ],
+ "TRAIT_AGENDA_BLACK_QUEEN": [
+  "BlackQueenResolutions"
+ ],
+ "TRAIT_AGENDA_BULL_MOOSE": [
+  "BullMooseResolutions"
+ ],
+ "TRAIT_AGENDA_CITY_STATE_ALLY": [
+  "CityStateAllyResolutions"
+ ],
+ "TRAIT_AGENDA_COUNTER_REFORMER": [
+  "CounterReformerResolutions"
+ ],
+ "TRAIT_AGENDA_COURT_INTRIGUE": [
+  "CourtResolutions"
+ ],
+ "TRAIT_AGENDA_DELAIN_LEAGUE": [
+  "DelianLeagueResolutions"
+ ],
+ "TRAIT_AGENDA_END_TO_SUFFERING": [
+  "EndToSufferingResolutions"
+ ],
+ "TRAIT_AGENDA_ENTHUSIASTIC_DISCIPLE": [
+  "EnthusiasticDiscipleResolutions"
+ ],
+ "TRAIT_AGENDA_EXPANSIONIST": [
+  "ExpansionistResolutions"
+ ],
+ "TRAIT_AGENDA_EXPLORATION_OBSESSED": [
+  "ExplorerResolutions"
+ ],
+ "TRAIT_AGENDA_FLAT_EARTHER": [
+  "FlatEartherResolutions"
+ ],
+ "TRAIT_AGENDA_GREAT_PERSON_ADVOCATE": [
+  "GreatPersonAdvocateResolutions"
+ ],
+ "TRAIT_AGENDA_GREAT_PERSON_OBSESSED": [
+  "GreatPersonObessessedResolutions"
+ ],
+ "TRAIT_AGENDA_GREAT_WHITE_FLEET": [
+  "GreatWhiteFleetResolutions"
+ ],
+ "TRAIT_AGENDA_HORSE_LORD": [
+  "HorseLordResolutions"
+ ],
+ "TRAIT_AGENDA_INDUSTRIAL_REVOLUTION": [
+  "IndustrialRevolutionResolutions"
+ ],
+ "TRAIT_AGENDA_INTOLERANT": [
+  "IntolerantResolutions"
+ ],
+ "TRAIT_AGENDA_IRON_CONFEDERACY": [
+  "IronConfederacyResolutions"
+ ],
+ "TRAIT_AGENDA_IRON_CROWN": [
+  "IronCrownResolutions"
+ ],
+ "TRAIT_AGENDA_KAITIAKITANGA": [
+  "KaitiakitangaResolutions"
+ ],
+ "TRAIT_AGENDA_LAST_VIKING_KING": [
+  "LastVikingResolutions"
+ ],
+ "TRAIT_AGENDA_LION_OF_MALI": [
+  "LionOfMaliResolutions"
+ ],
+ "TRAIT_AGENDA_LORD_OF_MINES": [
+  "LordOfMinesResolutions"
+ ],
+ "TRAIT_AGENDA_MAAT": [
+  "MaatResolutions"
+ ],
+ "TRAIT_AGENDA_NARIKALA_FORTRESS": [
+  "NarikalaFortressResolutions"
+ ],
+ "TRAIT_AGENDA_OPTIMUS_PRINCEPS": [
+  "OptimusPrincepsResolutions"
+ ],
+ "TRAIT_AGENDA_PARANOID": [
+  "ParanoidResolutions"
+ ],
+ "TRAIT_AGENDA_PATRON_OF_ARTS": [
+  "PatronOfArtsResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_AIRPOWER": [
+  "AirPowerResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR": [
+  "CityStateProtectorResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_CLEAR_BANDIT_CAMPS": [
+  "CivilizedResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_CULTURE": [
+  "CulturedResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_ENVIRONMENT": [
+  "EnvironmentalistResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_EXPLOITATION": [
+  "ExploitativeResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_FAITH": [
+  "DevoutResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_HAPPINESS": [
+  "FunLovingResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_INCOME": [
+  "MoneyGrubberResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_INDUSTRY": [
+  "IndustrialistResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_LANDPOWER": [
+  "LandPowerResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_NODIPLOVP": [
+  "LibertarianResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_NOFAVOR": [
+  "DemagogueResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_NOTOURISM": [
+  "DestinationCivResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_NUKES": [
+  "NukeLoverResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_PILLAGE": [
+  "PillagerResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_POPULATION": [
+  "PopulousResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_SAME_GOVERNMENT": [
+  "IdealogueResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_SCIENCE": [
+  "TechnophileResolutions"
+ ],
+ "TRAIT_AGENDA_PREFER_STANDING_ARMY": [
+  "StandingArmyResolutions"
+ ],
+ "TRAIT_AGENDA_RAVEN_BANNER": [
+  "RavenBannerResolutions"
+ ],
+ "TRAIT_AGENDA_SAGA": [
+  "SagaResolutions"
+ ],
+ "TRAIT_AGENDA_SAINT": [
+  "SaintResolutions"
+ ],
+ "TRAIT_AGENDA_SEJONG": [
+  "SejongResolutions"
+ ],
+ "TRAIT_AGENDA_SHORT_LIFE_GLORY": [
+  "ShortLifeGloryResolutions"
+ ],
+ "TRAIT_AGENDA_SPIRIT_OF_TUCAPEL": [
+  "SpiritOfTucapelResolutions"
+ ],
+ "TRAIT_AGENDA_SULTAN": [
+  "SultanResolutions"
+ ],
+ "TRAIT_AGENDA_SUN_NEVER_SETS": [
+  "SunNeverSetsResolutions"
+ ],
+ "TRAIT_AGENDA_TLATOANI": [
+  "TlatoaniResolutions"
+ ],
+ "TRAIT_AGENDA_TRADE_AGREEMENT": [
+  "TradeAgreementResolutions"
+ ],
+ "TRAIT_AGENDA_TURTLER": [
+  "TurtlerResolutions",
+  "SakokuResolutions"
+ ],
+ "TRAIT_AGENDA_WESTERNIZER": [
+  "WesternizerResolutions"
+ ],
+ "TRAIT_AGENDA_ZEALOT": [
+  "ZealotResolutions"
+ ],
+ "TRAIT_CIVILIZATION_ALL_ROADS_TO_ROME": [
+  "AllRoadToRomeResolutions"
+ ],
+ "TRAIT_CIVILIZATION_BUILDING_ELECTRONICS_FACTORY": [
+  "ElectronicsFactoryResolutions"
+ ],
+ "TRAIT_CIVILIZATION_DHARMA": [
+  "DharmaResolutions"
+ ],
+ "TRAIT_CIVILIZATION_EXTRA_LIGHT_CAVALRY": [
+  "ExtraLightCavalryResolutions"
+ ],
+ "TRAIT_CIVILIZATION_FOUNDING_FATHERS": [
+  "FoundingFathersResolutions"
+ ],
+ "TRAIT_CIVILIZATION_GREAT_MOUNTAINS": [
+  "GreatMountainsResolutions"
+ ],
+ "TRAIT_CIVILIZATION_GREAT_TURKISH_BOMBARD": [
+  "GreatTurkishBombardResolutions"
+ ],
+ "TRAIT_CIVILIZATION_IMPROVEMENT_GREAT_WALL": [
+  "GreatWallResolutions"
+ ],
+ "TRAIT_CIVILIZATION_MAORI_MANA": [
+  "ManaResolutions"
+ ],
+ "TRAIT_CIVILIZATION_MEDITERRANEAN_COLONIES": [
+  "MediterraneanColoniesResolutions"
+ ],
+ "TRAIT_CIVILIZATION_MONGOLIAN_ORTOO": [
+  "OrtooResolutions"
+ ],
+ "TRAIT_CIVILIZATION_NKISI": [
+  "NkisiResolutions"
+ ],
+ "TRAIT_CIVILIZATION_SCOTTISH_ENLIGHTENMENT": [
+  "ScottishEnlightenmentResolutions"
+ ],
+ "TRAIT_CIVILIZATION_TA_SETI": [
+  "TaSetiResolutions"
+ ],
+ "TRAIT_CIVILIZATION_TREASURE_FLEET": [
+  "TreasureFleetResolutions"
+ ],
+ "TRAIT_LEADER_ELEANOR_LOYALTY": [
+  "EleanorResolutions"
+ ],
+ "TRAIT_LEADER_EXALTED_GODDESS": [
+  "ExaltedGoddessResolutions"
+ ],
+ "TRAIT_LEADER_RELIGIOUS_CONVERT": [
+  "TraitReligiousConvertResolutions"
+ ]
+};
+export const AI_RESOLUTION_LISTS_BY_STRATEGY: Readonly<Record<string, readonly string[]>> = {};
+export const AI_RESOLUTION_LEADER_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "LEADER_ELEANOR_ENGLAND": [
+  "TRAIT_LEADER_ELEANOR_LOYALTY"
+ ],
+ "LEADER_ELEANOR_FRANCE": [
+  "TRAIT_LEADER_ELEANOR_LOYALTY"
+ ],
+ "LEADER_GITARJA": [
+  "TRAIT_LEADER_EXALTED_GODDESS"
+ ],
+ "LEADER_MVEMBA": [
+  "TRAIT_LEADER_RELIGIOUS_CONVERT"
+ ]
+};
+export const AI_RESOLUTION_AGENDA_TRAITS: Readonly<Record<string, readonly string[]>> = {
+ "AGENDA_AIRPOWER": [
+  "TRAIT_AGENDA_PREFER_AIRPOWER"
+ ],
+ "AGENDA_ANGEVIN_EMPIRE": [
+  "TRAIT_AGENDA_ANGEVIN_EMPIRE"
+ ],
+ "AGENDA_AYYUBID_DYNASTY": [
+  "TRAIT_AGENDA_AYYUBID_DYNASTY"
+ ],
+ "AGENDA_BASIL_ZEALOT": [
+  "TRAIT_AGENDA_BASIL_ZEALOT"
+ ],
+ "AGENDA_BILLIONAIRE": [
+  "TRAIT_AGENDA_BILLIONAIRE"
+ ],
+ "AGENDA_BLACK_QUEEN": [
+  "TRAIT_AGENDA_BLACK_QUEEN"
+ ],
+ "AGENDA_BULL_MOOSE": [
+  "TRAIT_AGENDA_BULL_MOOSE"
+ ],
+ "AGENDA_CITY_STATE_ALLY": [
+  "TRAIT_AGENDA_CITY_STATE_ALLY"
+ ],
+ "AGENDA_CITY_STATE_PROTECTOR": [
+  "TRAIT_AGENDA_PREFER_CITY_STATE_PROTECTOR"
+ ],
+ "AGENDA_CIVILIZED": [
+  "TRAIT_AGENDA_PREFER_CLEAR_BANDIT_CAMPS"
+ ],
+ "AGENDA_COUNTER_REFORMER": [
+  "TRAIT_AGENDA_COUNTER_REFORMER"
+ ],
+ "AGENDA_COURT_INTRIGUE": [
+  "TRAIT_AGENDA_COURT_INTRIGUE"
+ ],
+ "AGENDA_CULTURED": [
+  "TRAIT_AGENDA_PREFER_CULTURE"
+ ],
+ "AGENDA_DEMAGOGUE": [
+  "TRAIT_AGENDA_PREFER_NOFAVOR"
+ ],
+ "AGENDA_DESTINATION_CIV": [
+  "TRAIT_AGENDA_PREFER_NOTOURISM"
+ ],
+ "AGENDA_DEVOUT": [
+  "TRAIT_AGENDA_PREFER_FAITH"
+ ],
+ "AGENDA_END_TO_SUFFERING": [
+  "TRAIT_AGENDA_END_TO_SUFFERING"
+ ],
+ "AGENDA_ENTHUSIASTIC_DISCIPLE": [
+  "TRAIT_AGENDA_ENTHUSIASTIC_DISCIPLE"
+ ],
+ "AGENDA_ENVIRONMENTALIST": [
+  "TRAIT_AGENDA_PREFER_ENVIRONMENT"
+ ],
+ "AGENDA_EXPANSIONIST": [
+  "TRAIT_AGENDA_EXPANSIONIST"
+ ],
+ "AGENDA_EXPLOITATIVE": [
+  "TRAIT_AGENDA_PREFER_EXPLOITATION"
+ ],
+ "AGENDA_EXPLORER": [
+  "TRAIT_AGENDA_EXPLORATION_OBSESSED"
+ ],
+ "AGENDA_FLAT_EARTHER": [
+  "TRAIT_AGENDA_FLAT_EARTHER"
+ ],
+ "AGENDA_FUN_LOVING": [
+  "TRAIT_AGENDA_PREFER_HAPPINESS"
+ ],
+ "AGENDA_GREAT_PERSON_ADVOCATE": [
+  "TRAIT_AGENDA_GREAT_PERSON_ADVOCATE"
+ ],
+ "AGENDA_GREAT_PERSON_OBSESSED": [
+  "TRAIT_AGENDA_GREAT_PERSON_OBSESSED"
+ ],
+ "AGENDA_GREAT_WHITE_FLEET": [
+  "TRAIT_AGENDA_GREAT_WHITE_FLEET"
+ ],
+ "AGENDA_HORSE_LORD": [
+  "TRAIT_AGENDA_HORSE_LORD"
+ ],
+ "AGENDA_IDEOLOGUE": [
+  "TRAIT_AGENDA_PREFER_SAME_GOVERNMENT"
+ ],
+ "AGENDA_INDUSTRIALIST": [
+  "TRAIT_AGENDA_PREFER_INDUSTRY"
+ ],
+ "AGENDA_INDUSTRIAL_REVOLUTION": [
+  "TRAIT_AGENDA_INDUSTRIAL_REVOLUTION"
+ ],
+ "AGENDA_INTOLERANT": [
+  "TRAIT_AGENDA_INTOLERANT"
+ ],
+ "AGENDA_IRON_CONFEDERACY": [
+  "TRAIT_AGENDA_IRON_CONFEDERACY"
+ ],
+ "AGENDA_IRON_CROWN": [
+  "TRAIT_AGENDA_IRON_CROWN"
+ ],
+ "AGENDA_KAITIAKITANGA": [
+  "TRAIT_AGENDA_KAITIAKITANGA"
+ ],
+ "AGENDA_LAST_VIKING_KING": [
+  "TRAIT_AGENDA_LAST_VIKING_KING"
+ ],
+ "AGENDA_LIBERTARIAN": [
+  "TRAIT_AGENDA_PREFER_NODIPLOVP"
+ ],
+ "AGENDA_LION_OF_MALI": [
+  "TRAIT_AGENDA_LION_OF_MALI"
+ ],
+ "AGENDA_LORD_OF_MINES": [
+  "TRAIT_AGENDA_LORD_OF_MINES"
+ ],
+ "AGENDA_MAAT": [
+  "TRAIT_AGENDA_MAAT"
+ ],
+ "AGENDA_MONEY_GRUBBER": [
+  "TRAIT_AGENDA_PREFER_INCOME"
+ ],
+ "AGENDA_NARIKALA_FORTRESS": [
+  "TRAIT_AGENDA_NARIKALA_FORTRESS"
+ ],
+ "AGENDA_NUKE_LOVER": [
+  "TRAIT_AGENDA_PREFER_NUKES"
+ ],
+ "AGENDA_OPTIMUS_PRINCEPS": [
+  "TRAIT_AGENDA_OPTIMUS_PRINCEPS"
+ ],
+ "AGENDA_PARANOID": [
+  "TRAIT_AGENDA_PARANOID"
+ ],
+ "AGENDA_PATRON_OF_ARTS": [
+  "TRAIT_AGENDA_PATRON_OF_ARTS"
+ ],
+ "AGENDA_PILLAGER": [
+  "TRAIT_AGENDA_PREFER_PILLAGE"
+ ],
+ "AGENDA_POPULOUS": [
+  "TRAIT_AGENDA_PREFER_POPULATION"
+ ],
+ "AGENDA_PREFER_LANDPOWER": [
+  "TRAIT_AGENDA_PREFER_LANDPOWER"
+ ],
+ "AGENDA_RAVEN_BANNER": [
+  "TRAIT_AGENDA_RAVEN_BANNER"
+ ],
+ "AGENDA_SAGA": [
+  "TRAIT_AGENDA_SAGA"
+ ],
+ "AGENDA_SAINT": [
+  "TRAIT_AGENDA_SAINT"
+ ],
+ "AGENDA_SEJONG": [
+  "TRAIT_AGENDA_SEJONG"
+ ],
+ "AGENDA_SHORT_LIFE_GLORY": [
+  "TRAIT_AGENDA_SHORT_LIFE_GLORY"
+ ],
+ "AGENDA_SPIRIT_OF_TUCAPEL": [
+  "TRAIT_AGENDA_SPIRIT_OF_TUCAPEL"
+ ],
+ "AGENDA_STANDING_ARMY": [
+  "TRAIT_AGENDA_PREFER_STANDING_ARMY"
+ ],
+ "AGENDA_SULTAN": [
+  "TRAIT_AGENDA_SULTAN"
+ ],
+ "AGENDA_SUN_NEVER_SETS": [
+  "TRAIT_AGENDA_SUN_NEVER_SETS"
+ ],
+ "AGENDA_TECHNOPHILE": [
+  "TRAIT_AGENDA_PREFER_SCIENCE"
+ ],
+ "AGENDA_TLATOANI": [
+  "TRAIT_AGENDA_TLATOANI"
+ ],
+ "AGENDA_TRADE_AGREEMENT": [
+  "TRAIT_AGENDA_TRADE_AGREEMENT"
+ ],
+ "AGENDA_TURTLER": [
+  "TRAIT_AGENDA_TURTLER"
+ ],
+ "AGENDA_WESTERNIZER": [
+  "TRAIT_AGENDA_WESTERNIZER"
+ ],
+ "AGENDA_ZEALOT": [
+  "TRAIT_AGENDA_ZEALOT"
+ ]
+};
 export const AI_GOVERNOR_PROMOTIONS: readonly AiGovernorPromotion[] = [
  {
   "type": "GOVERNOR_PROMOTION_REDOUBT",

@@ -26,7 +26,7 @@ import { CIVICS } from '../data/civics';
 import { COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
-import { congressPolicyBlocked } from './congress';
+import { congressPolicyBlocked, congressVoter, preference as congressPreference } from './congress';
 import { carryLayout, darkAgeEra, fitPoliciesLoose, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
 import { gpOffer } from './greatPeople';
@@ -472,6 +472,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     declaredFriends: (i, j) => seatsFriends(state, i, j),
     allied: (i, j) => seatsAllied(state, i, j),
     denouncing: (i, j) => denounceActive(state, i, j),
+    favor: (i) => seatOf(state, i)?.diplomaticFavor ?? 0,
+    congressTarget: (i, r) => congressPreference(state, r, i, congressVoter(state, i)).target,
     missionOpen: (i, j) => (isCiv(i) && isCiv(j) && missionPayable(state, i, j)
       ? (missionOf(state, i) === MISSION_EMBASSY ? 'DIPLOACTION_RESIDENT_EMBASSY' : 'DIPLOACTION_DIPLOMATIC_DELEGATION') : null),
     score: (i) => scoreLines(state, seat(i)).reduce((a, b) => a + b, 0),

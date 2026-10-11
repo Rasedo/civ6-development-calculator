@@ -202,6 +202,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -462,6 +463,15 @@
     - ...its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(...
     - "...records and the Combat Desire's strengths (the unit value's inputs), the project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries' amenities over the player's cities, strat..."
   review: imported
+- addr: 0x7b3be0
+  kind: function
+  name: resolutionOptionValue
+  semantics: "An option's value: the option's modifier collection (game +0x3978 option 1, +0x3990 option 2) summed through 0x7a4b20 in a context the TargetKind handler 0x67dd40 fills; option outside 1 / 2: -9999. The analyzers of the resolutions' effect types are unread."
+  status: PARTLY
+  impl: [ai/major/congress.ts:optionValue]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+  review: reviewed
 - addr: 0x7b3e50
   final: 0x531f20
   kind: function

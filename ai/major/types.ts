@@ -96,6 +96,16 @@ export interface AiReligion {
  *  AssignCityState, Governors_XP2's AssignToMajor, its TraitType, its
  *  promotions (GovernorPromotionSets in GovernorPromotions order) and its own
  *  modifiers (its BaseAbility promotions') */
+/** a Resolutions row for the World Congress AI: its TargetKind, its
+ *  AITargetChooser, each option's modifiers (ResolutionEffects WhichEffect
+ *  1 / 2, ordered by the row id) */
+export interface AiResolution {
+  type: string;
+  targetKind: string | null;
+  chooser: string | null;
+  effects: readonly (readonly AiModifier[])[];
+}
+
 export interface AiGovernor {
   type: string;
   identityPressure: number;

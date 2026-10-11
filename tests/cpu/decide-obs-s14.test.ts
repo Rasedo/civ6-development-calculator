@@ -40,7 +40,7 @@ describe('the cities group', () => {
     expect(rows[0].specSlots).toEqual(PLACEABLE_DISTRICTS.map(() => 0));
     expect(rows[0].specPin).toEqual(PLACEABLE_DISTRICTS.map(() => -1));
     expect(Object.keys(rows[0])).toEqual(
-      ['centre', 'isCapital', 'pop', 'settlerQueued', 'prodOpen', 'distSites', 'specSlots', 'specPin', 'workTiles', 'swapFrom']);
+      ['centre', 'isCapital', 'pop', 'settlerQueued', 'loyalty', 'prodOpen', 'distSites', 'specSlots', 'specPin', 'workTiles', 'swapFrom']);
   });
 
   it('prodOpen: the settler at population 2, idle always, a combat unit, the Builder while it has work and none stands', () => {

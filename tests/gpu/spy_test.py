@@ -15,7 +15,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 from core import load_rules, fixture_paths
-from warmup import hold_works, opened
+from warmup import hold_works, opened, drive_governors
 
 
 def fresh(rules, path, turns=30):
@@ -274,6 +274,7 @@ def main() -> None:
 
     # -- 10: a neutralized governor leaves the city, and the clock is HIS ----
     sim.civ_civics[0, foe] = True  # every title the ladder can hand out
+    drive_governors(sim, foe)
     sim._governor_phase(foe, sim.civ_alive[:, foe] & sim.city_alive[:, foe].any(dim=1))
     gi = int(sim._governor_at(foe)[0, theirs])
     assert gi >= 0, "the holder's only city is governor-seated"

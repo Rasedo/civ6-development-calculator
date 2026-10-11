@@ -50,8 +50,8 @@ import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/
 import { civicAiChoice, civicAnalysis, type CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
 import { recordMoments } from '../core/moments';
-import { appointGovernor, assignGovernor, governorsOf, promoteGovernor } from '../core/governors';
-import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
+import { applyGovernorActions, governorsOf } from '../core/governors';
+import { GOVERNOR_PROMOTIONS, GOV_APPOINT, GOV_ASSIGN_CITY, GOV_ASSIGN_MINOR, GOV_PROMOTE, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
@@ -94,6 +94,7 @@ import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { ReligionProbe, religionAiMarkdown, type ReligionActions, type ReligionAiTally } from './religionAi';
 import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
+import { CongressProbe, congressAiMarkdown, type CongressAiTally } from './congressAi';
 import { enhanceRecord, foundingRecord, pantheonRecord } from '../../ai/major/religion';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { DiploSender, senderMarkdown, type SenderTally } from './diploSender';
@@ -1918,7 +1919,8 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
       }
       case 'governors': {
         // each appointment, promotion and assignment the record's player
-        // made, through the engine's own verbs: the clocks are the engine's
+        // made, as its record's column (`applyGovernorActions`): the clocks
+        // are the engine's
         const seat = seatOfP(ctx, d.player);
         const s = seatOf(state, seat);
         const g = seatOf(next.state, seat)?.governors;
@@ -1942,15 +1944,15 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           if (sameAs(was[i]) && same()) return;
           changed++;
           if (!port) {
-            if (x.appointed && !e.appointed) appointGovernor(state, seat, i);
+            const verbs: [number, number, number][] = [];
+            if (x.appointed && !e.appointed) verbs.push([GOV_APPOINT, i, 0]);
             for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
-              if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) promoteGovernor(state, seat, i, p);
+              if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) verbs.push([GOV_PROMOTE, i, p]);
             }
-            if (cityId >= 0 || x.minorId >= 0) {
-              if (cityId !== e.cityId || x.minorId !== e.minorId) {
-                assignGovernor(state, seat, i, x.minorId >= 0 ? { minorId: x.minorId } : { cityId });
-              }
+            if ((cityId >= 0 || x.minorId >= 0) && (cityId !== e.cityId || x.minorId !== e.minorId)) {
+              verbs.push(x.minorId >= 0 ? [GOV_ASSIGN_MINOR, i, x.minorId] : [GOV_ASSIGN_CITY, i, to!.centerIndex]);
             }
+            applyGovernorActions(state, seat, verbs);
           }
           if (same()) {
             equal++;
@@ -2427,28 +2429,6 @@ function recordCityName(ctx: Ctx, seat: number, id: number): string {
   const c = seatOf(ctx.state, seat)?.cities.find((x) => x.id === id);
   const r = c ? cityAt(ctx.next.state, c.centerIndex) : undefined;
   return (r ? ctx.next.dumpOfCity.get(r)?.name ?? '?' : '?').replace(/^LOC_CITY_NAME_/, '');
-}
-
-/** THE GOVERNORS are their player's decisions (`governors`): what the
- *  engine's own script (`governorPhase`) appointed, promoted or assigned in
- *  the turn is undone, while its clocks run — an assignment it made leaves
- *  the slot as it stood, a turn further on its establishment. */
-function undoGovernorScript(state: GameState, rosters: Map<number, Governor[]>): void {
-  for (const s of state.seats) {
-    const was = rosters.get(s.seat);
-    if (!was) continue;
-    const roster = governorsOf(s);
-    roster.forEach((g, i) => {
-      const w = was[i];
-      if (!w.appointed && g.appointed) { roster[i] = w; return; }
-      g.promotions = w.promotions;
-      const moved = (g.cityId >= 0 || g.minorId >= 0) && (g.cityId !== w.cityId || g.minorId !== w.minorId);
-      if (!moved) return;
-      g.cityId = w.cityId;
-      g.minorId = w.minorId;
-      g.establishTurns = w.cityId >= 0 || w.minorId >= 0 ? Math.max(0, w.establishTurns - 1) : 0;
-    });
-  }
 }
 
 /** THE FORTIFY ORDER is its player's decision: a unit digs in only while it
@@ -2934,6 +2914,7 @@ export interface ReplayReport {
   majorAi?: MajorAiTally;
   religionAi?: ReligionAiTally;
   governorAi?: GovernorAiTally;
+  congressAi?: CongressAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   /** the AI majors' own diplomatic sending */
@@ -3106,6 +3087,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const settleAi = new SettleProbe(dumpPath, aiSeats, aiInputs);
   const religionAi = new ReligionProbe(dumpPath, aiSeats, (seat) => strategies.knownCities(seat));
   const sender = new DiploSender(dumpPath, aiSeats, first.playerOfSeat);
+  const congressAi = new CongressProbe(dumpPath, aiSeats, first.playerOfSeat);
   diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
   const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, aiInputs);
@@ -3179,6 +3161,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     activeBoosts(ctx, b, activePlayer(a));
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
+    // the AI majors' ballots of the session the engine's turn holds
+    congressAi.turn(state, a.turn, aiInputs(a.turn), (x) => diplomacy.agendasOf(x),
+      (state.seatActions as Record<number, Record<number, SeatActionRecord>>)[state.turn - 1]);
     majorAi.preTurn(state);
     strategies.preTurn(state, recordA.state, turnStartCompletions(ctx, b, a.turn), recordMilitary(a, cat, ctx.seatOfPlayer));
     diplomacy.preTurn(state, recordA.state, read.state);
@@ -3268,7 +3253,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
-    const rosters = new Map(state.seats.map((s) => [s.seat, structuredClone(governorsOf(s))]));
     // THE ACTIVE PLAYER'S START runs first in the engine's turn, and in the
     // game after the city-states' starts the record's pair holds (record
     // t+1 is read in its turn): their catch-up counts its research as its
@@ -3291,7 +3275,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       break;
     }
     holdMinorCatchUp(null);
-    undoGovernorScript(state, rosters);
     stream.actions(a.turn);
     for (const [u, hp] of spent) if (u.hp > hp) u.hp = hp;
     // a rested unit struck in a later player's turn heals at its own next
@@ -3538,6 +3521,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (religionAi.active) report.religionAi = religionAi.tally;
   if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
+  if (congressAi.active) report.congressAi = congressAi.tally;
   report.religionActions = religionAi.actions;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   report.sender = sender.tally;
@@ -3660,6 +3644,7 @@ export function replayMarkdown(r: ReplayReport): string {
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi, r.religionActions));
   if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
+  if (r.congressAi) out.push(...congressAiMarkdown(r.congressAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.sender) out.push(...senderMarkdown(r.sender));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));

@@ -14,7 +14,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     greatPersonClassAvailable: () => true, cities: () => [], cityYield: () => 0, policyColumn: () => -1, governmentColumn: () => -1,
     pantheonColumn: () => -1, beliefColumn: () => null, religionColumn: () => -1, religionsFounded: () => new Set(),
     pantheonOpen: () => false, religionOpen: () => false, beliefPicks: () => 0, treasury: () => 0, missionOpen: () => null, actionOpen: () => null, warOpen: () => false,
-    declaredFriends: () => false, allied: () => false, denouncing: () => false,
+    declaredFriends: () => false, allied: () => false, denouncing: () => false, favor: () => 0, congressTarget: () => 0,
     yieldWeight: () => 0, pseudoYieldWeight: () => 0, districts: () => [], districtYield: () => 0, cityHasBuilding: () => false,
     tradeRouteCapacity: () => 0, influenceTokensUsed: () => 0, tributaries: () => 0, unitMaintenances: () => [], cityOwnedPlots: () => [], traders: () => 0, tradeKnowledge: () => null, cityHasDistrict: () => false, cityReligion: () => -1, plotTerrain: () => 'TERRAIN_GRASS', plotFeature: () => null, plotsWithinReadAsAxial: () => [], cityDistricts: () => [], cityPlot: () => -1, districtPlot: () => null, cityFoodSurplus: () => 0, unitCost: () => 0, beliefsHeld: () => new Set(), religionBeliefs: () => [],
     districtBuildingYields: () => [],
