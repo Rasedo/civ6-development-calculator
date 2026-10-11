@@ -3214,7 +3214,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const pid = ctx.playerOfSeat.get(cs.seat);
         const name = pid === undefined ? undefined : a.cities.find((c) => c.owner === pid)?.name;
         const logged = name === undefined ? undefined : ctx.cityBuildLog.get(`${a.turn}:${pid}:${name}`);
-        if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs, minorKnownUnits(state, cs))), ctx.cityBuildPer);
+        if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs, minorKnownUnits(cs))), ctx.cityBuildPer);
       }
     }
     // the city-states' research AI: each choice its turn made, against the

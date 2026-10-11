@@ -998,6 +998,7 @@
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -2122,6 +2123,16 @@
   context:
     - "...TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 — is clear): entries, in the Units' order, for each unit the pla..."
   review: imported
+- addr: 0x79d340
+  final: 0x525600
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiResource.ts:ResourceFacts]
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - ...anceAmount (Units_XP2) over the resource's units in the military AI's production table (0x79d340); have = 0x4a93c0(r, 1); where have is below twice the need, T = H (or H = 0) and count...
+  review: reviewed
 - addr: 0x79d3a0
   final: 0x525660
   kind: function
@@ -2133,6 +2144,25 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - ...nance resource scales it; the player's units of each type counted into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The value 0x799b9d computes from the player's counts (...
+  review: imported
+- addr: 0x79ea80
+  final: 0x526900
+  kind: function
+  status: UNREAD
+  impl: [cpu/core/aiResource.ts:ResourceFacts]
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - ...end), the player's cities with their amenities less those required (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) (the last for a negative count) each one Amenity mor...
+    - "...abe0 less the stockpile 0x4aa790 at T = H, +50.0 for a resource with a +0xd0 list — and 0x79ea80's sort order; a city-state's held / have read as its owned plots that hand the resource..."
+  review: reviewed
+- addr: 0x7b8a30
+  final: 0x534c10
+  kind: function
+  status: PARTLY
+  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  context:
+    - "- SpaceRace (+0xe8 bit 2): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and 1.0 per space-race project the player has completed."
   review: imported
 - addr: 0x7baa20
   final: 0x535f90

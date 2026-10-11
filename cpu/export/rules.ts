@@ -314,6 +314,9 @@ import { CIVIC_COST_AFTER_ERA_PCT, CIVIC_COST_BEFORE_ERA_PCT, TECH_COST_AFTER_ER
 import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned (order is the column index)
 
 import { RESOURCES } from '../../world/resources';
+import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
+import { AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
   BARB_SCOUT_WAIT, BARB_ISLAND_PLOTS, BARB_COAST_WATER, BARB_MAX_UNITS, BARB_MAX_SCOUTS, BARB_NAMES_PER_KIND, BARB_CAMP_TERRAINS,
@@ -989,6 +992,10 @@ export function buildRules() {
       pyWonder: PSEUDOYIELD_WONDER,
       pyDistrict: PSEUDOYIELD_DISTRICT,
       unlockShare: AI_UNLOCK_SHARE,
+      // the resources term's pseudo-yields and the yields' DefaultValue (AI_YIELDS order)
+      pyHappiness: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_HAPPINESS,
+      pyLuxury: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_RESOURCE_LUXURY,
+      yieldDefault: AI_YIELDS.map((y) => AI_YIELD_DEFAULT[y]),
     },
     researchAi: {
       taskBias: RESEARCH_AI_TASK_BIAS,
@@ -1628,6 +1635,15 @@ export function buildRules() {
         return t ? techIdx.get(t) ?? -1 : -1;
       }),
       yields: RESOURCE_IDS.map((id) => YIELD_KEYS.map((k) => RESOURCES[id]?.yields?.[k] ?? 0)),
+      // the resource value's rows (`resourceValue`): class (0 none, 1 luxury, 2
+      // strategic), Happiness, and the units asking it (`AI_RESOURCE_EXPORT`)
+      ai: RESOURCE_IDS.map((id) => {
+        const e = AI_RESOURCE_EXPORT(id);
+        return { cls: e.cls, happy: e.happy, units: e.units.map((u) => ({
+          need: u.need, ver: u.ver, obsT: u.obsTechs.map((t) => techIdx.get(t) ?? -1), obsC: u.obsCivics.map((c) => civicIdx.get(c) ?? -1),
+          eng: u.engine.map((x) => Object.keys(UNITS).indexOf(x)),
+        })) };
+      }),
       improvement: RESOURCE_IDS.map((id) => {
         const imp = RESOURCES[id]?.improvement;
         return imp ? IMPROVEMENT_IDS.indexOf(imp) : -1;
@@ -2914,6 +2930,8 @@ export function buildRules() {
       aiDistricts: techUnlocks(t.id).districts,
       aiWonders: techUnlocks(t.id).wonders,
       embarkAll: t.embarkAll ? 1 : 0,
+      // the resources the research value's improvement walk reaches (`TECH_IMPROVEMENT_RESOURCES`)
+      aiResources: aiTechResources(t.id).map((r) => RESOURCE_IDS.indexOf(r as never)).filter((i) => i >= 0),
     })),
     civics: civicList.map((c) => ({
       id: c.id,

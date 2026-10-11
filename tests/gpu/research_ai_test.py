@@ -100,11 +100,56 @@ def test_analysis_and_choice(rules) -> None:
     print("  research analysis and choice OK")
 
 
+def test_resources(rules) -> None:
+    """the resources term (`minorResearchResources`, tests/cpu/minors/
+    research-resources.test.ts): one Amenity more's value, a strategic's 25
+    a chronology step over the need, a luxury's at least its pseudo-yield"""
+    sim = build(rules)
+    ti = tech_index()
+    raw = json.loads((FIXTURES / "rules.json").read_text(encoding="utf-8"))
+    s, b = 0, 0
+    dt = torch.float64
+    tot = torch.zeros(sim.B, 6, dtype=dt, device=sim.device)
+    tot[:, :] = torch.tensor([4, 5, 3, 2.5, 2, 0], dtype=dt)
+    zero = torch.zeros(sim.B, dtype=dt, device=sim.device)
+
+    def amen(bal: int) -> int:
+        return int(sim._rai_amenity_turn(s, tot, torch.full((sim.B,), bal, dtype=torch.long, device=sim.device), zero)[b])
+
+    assert amen(0) == 256, "the level holds: PSEUDOYIELD_HAPPINESS of 1"
+    assert amen(2) == 530, "Content -> Happy"
+    assert amen(-1) == 564, "Displeased -> Content"
+    # the minor's plots within three: none holds a resource but one Iron
+    centre = int(sim.citystate_center[b, s])
+    near = (sim.pair_dist[centre].long() <= 3).nonzero(as_tuple=True)[0]
+    sim.res_id[b, near] = -1
+    tile = int(next(t for t in near.tolist() if t != centre))
+    iron = next(i for i, a in enumerate(raw["resources"]["ai"]) if a["cls"] == 2 and any(i in t["aiResources"] for t in raw["techs"] if t["id"] == "MINING"))
+    sim.res_id[b, tile] = iron
+    sim.res_imp[b, tile] = int(raw["resources"]["improvement"][iron])
+    sim.res_stripped[b, tile] = False
+    sim.improvement[b, tile] = -1
+    sim.tile_seat[b, tile] = 100 + s
+    sim.citystate_techs[b, s].zero_()
+    sim.citystate_techs[b, s, ti["BRONZE_WORKING"]] = True
+    nt = sim.citystate_techs.shape[2]
+    turns = torch.zeros(sim.B, nt, dtype=torch.long, device=sim.device)
+    turns[b, ti["MINING"]] = 10
+    turns[b, ti["POTTERY"]] = 10
+    term = sim._rai_resources(s, turns)
+    assert int(term[b, ti["MINING"]]) == 465, f"Iron at 10 turns: {int(term[b, ti['MINING']])}"
+    assert int(term[b, ti["POTTERY"]]) == 0
+    turns[b, ti["MINING"]] = 0
+    assert int(sim._rai_resources(s, turns)[b, ti["MINING"]]) == 640, "Iron landing now"
+    print("  research resources OK")
+
+
 def main() -> None:
     rules = load_rules()
     print(f"research_ai_test on {fixture_paths()[0].name}:")
     test_value(rules)
     test_analysis_and_choice(rules)
+    test_resources(rules)
     print("RESEARCH AI OK")
 
 

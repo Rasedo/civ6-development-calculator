@@ -180,8 +180,11 @@ function researchOf(state: GameState, seat: number): ResearchState {
 }
 
 /** THE ANALYSIS: every technology's entry, in table order, scored and
- *  propagated; `science` is the seat's Science a turn */
-export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {}): ResearchEntry[] {
+ *  propagated; `science` is the seat's Science a turn, `resourceTerm` the
+ *  value's resources term (per improvement the row unlocks, the resources its
+ *  cities hold unimproved, 0x5d45c0 -> 0x7a21e0) where the seat's facts give it */
+export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {},
+  resourceTerm?: (tech: string, turns: number) => number): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat, weights);
@@ -189,7 +192,7 @@ export function researchAnalysis(state: GameState, seat: number, science: number
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, id, turns, pw);
+    const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (resourceTerm && turns <= AI_VALUE_HORIZON ? resourceTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   const leader = leaderOf(state, seat);

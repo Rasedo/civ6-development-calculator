@@ -697,6 +697,9 @@ def main() -> None:
     sim.unit_tile[0, c] = ft
     sim.unit_emb[0, c] = False
     sim._occ_set(torch.tensor([0]), torch.tensor([ft]), torch.tensor([c]))
+    # ...and its player knows the ground it stands on: its search walks the
+    # plots it revealed
+    sim.seat_explored[0, int(sim.unit_seat[0, c]), sim.pair_dist[ft].long() <= 4] = True
     sim.barb_unit_hp[0, s] = 40
     sim.unit_hp[0, c] = int(rules.combat["unitHp"])
     sim._barb_reset_mp()

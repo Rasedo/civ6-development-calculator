@@ -314,12 +314,16 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiCityBuild.ts:amenityPerTurn, cpu/core/aiCityBuild.ts:value]
+  impl:
+    - cpu/core/aiCityBuild.ts:amenityPerTurn
+    - cpu/core/aiCityBuild.ts:value
+    - cpu/core/aiResource.ts:ResourceFacts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...nce(+0x38) gold subtracted;  then value = PV(v, rate, H) - PV(v, rate, turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca..."
     - ".claude/scratchpad/cb/notes.txt: ...r: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."

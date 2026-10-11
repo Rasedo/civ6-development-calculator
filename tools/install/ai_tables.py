@@ -481,6 +481,24 @@ def build_city(rows, modifier) -> str:
         lst = pc_lists.get(c.get("ListType", ""))
         if lst and lst.get("LeaderType") and c.get("Item"):
             pc_by_trait[lst["LeaderType"]][c["Item"]] = num(c, "Value")
+    # the resources (the resource value 0x7a21e0: class, Happiness, PeakEra;
+    # the units whose StrategicResource it is, Units' order) and the
+    # improvements (the research value's improvement walk: PrereqTech /
+    # PrereqCivic, the civilization trait, Buildable, the valid resources in
+    # Improvement_ValidResources' order), each in DATABASE ORDER
+    strat_units = collections.defaultdict(list)
+    for u in units:
+        if u["resource"]:
+            strat_units[u["resource"]].append(u["type"])
+    resources = [{"type": r, "class": c.get("ResourceClassType"), "happiness": num(c, "Happiness"),
+                  "peakEra": c.get("PeakEra") if c.get("PeakEra") not in (None, "", "NO_ERA") else None,
+                  "units": strat_units[r]}
+                 for r, c in in_game_order("Resources", "ResourceType", keyed(rows("Resources"), "ResourceType"))]
+    valid = multi("Improvement_ValidResources", "ImprovementType")
+    improvements = [{"type": i, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType"),
+                     "buildable": c.get("Buildable") == "true",
+                     "resources": [r["ResourceType"] for r in valid[i]]}
+                    for i, c in in_game_order("Improvements", "ImprovementType", keyed(rows("Improvements"), "ImprovementType"))]
     eff_units, eff = efficiency_table()
     if eff_units != [u["type"] for u in units]:
         raise SystemExit("AI_UnitEfficiency.csv's units differ from the Units rows")
@@ -494,10 +512,13 @@ def build_city(rows, modifier) -> str:
         " * stale file): the Buildings, Units and Projects in DATABASE ORDER — the\n"
         " * index the AI's value tables run in — with the columns and child rows\n"
         " * the values and the Default Specialization pick read.\n */\n"
-        "import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';\n\n"
+        "import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';\n"
+        "import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';\n\n"
         f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n\n"
         f"export const AI_UNITS: readonly AiUnitRow[] = {json.dumps(units, indent=1)};\n\n"
         f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n\n"
+        f"export const AI_RESOURCES: readonly AiResourceRow[] = {json.dumps(resources, indent=1)};\n\n"
+        f"export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = {json.dumps(improvements, indent=1)};\n\n"
         "/** the promotion class lists by leader trait (AiFavoredItems of the\n"
         " *  AiLists of System UnitPromotionClasses): class -> Value */\n"
         "export const AI_PROMOTION_CLASS_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "

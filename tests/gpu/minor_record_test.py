@@ -249,6 +249,38 @@ def test_minor_army(rules) -> None:
     print(f"  minor army OK: two Warriors per minor, centre and ring, 20/15 heal, gone with the minor")
 
 
+def test_minor_knowledge(rules) -> None:
+    """The knowledge base's army records (`minorKnowledge`): the look records
+    the minor's own units (seen this turn, on their plot); a dead unit's
+    record keeps its turn; the next turn's ageing keeps a record 21 turns and
+    drops it at 22; a reclaimed slot leaves its record slot-less."""
+    path = fixture_paths()[0]
+    sim = warm_base(str(path), lambda: opened(rules, path, 0))
+    b, s = 0, 0
+    seat = 100 + s
+    mine = (sim.unit_alive[b] & (sim.unit_seat[b] == seat)).nonzero(as_tuple=True)[0]
+    assert mine.numel() >= 2, "the minor holds no army to see"
+    sim._minor_knowledge(s, True)
+    slot = sim.citystate_kb_slot[b, s]
+    got = sorted(int(x) for x in slot.tolist() if x >= 0)
+    assert all(int(u) in got for u in mine.tolist()), f"own units {mine.tolist()} not recorded: {got}"
+    k = int((slot == int(mine[0])).nonzero()[0])
+    assert int(sim.citystate_kb_seen[b, s, k]) == int(sim.turn)
+    assert int(sim.citystate_kb_plot[b, s, k]) == int(sim.unit_tile[b, mine[0]])
+    # the unit dies: its record stays, unrefreshed
+    sim.unit_alive[b, mine[0]] = False
+    t0 = int(sim.turn)
+    sim.turn = t0 + 21
+    sim._minor_knowledge(s, True)
+    assert int(sim.citystate_kb_slot[b, s, k]) == int(mine[0]) and int(sim.citystate_kb_seen[b, s, k]) == t0, \
+        "a dead unit's record dropped before 22 turns"
+    sim.turn = t0 + 22
+    sim._minor_knowledge(s, True)
+    assert int(sim.citystate_kb_slot[b, s, k]) == -2, "a record 22 turns old survived the ageing"
+    sim.turn = t0
+    print("  minor knowledge OK: own units recorded, a dead one's record kept 21 turns, dropped at 22")
+
+
 def main() -> None:
     rules = load_rules()
     print(f"minor_record_test on {fixture_paths()[0].name}:")
@@ -259,6 +291,7 @@ def main() -> None:
     test_containment(rules)
     test_minor_conversion(rules)
     test_minor_army(rules)
+    test_minor_knowledge(rules)
     print("MINOR RECORD OK")
 
 

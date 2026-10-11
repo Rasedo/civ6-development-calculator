@@ -6,6 +6,7 @@
  * the values and the Default Specialization pick read.
  */
 import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';
+import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';
 
 export const AI_BUILDINGS: readonly AiBuildingRow[] = [
  {
@@ -15134,6 +15135,980 @@ export const AI_PROJECTS: readonly string[] = [
  "PROJECT_LIJIA_FAITH",
  "PROJECT_LIJIA_FOOD",
  "PROJECT_LIJIA_GOLD"
+];
+
+export const AI_RESOURCES: readonly AiResourceRow[] = [
+ {
+  "type": "RESOURCE_BANANAS",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_CATTLE",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_COPPER",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_CRABS",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_DEER",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_FISH",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_RICE",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SHEEP",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_STONE",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_WHEAT",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_CITRUS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_COCOA",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_COFFEE",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_COTTON",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_DIAMONDS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_DYES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_FURS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_GYPSUM",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_INCENSE",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_IVORY",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_JADE",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_MARBLE",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_MERCURY",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_PEARLS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SALT",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SILK",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SILVER",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SPICES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SUGAR",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_TEA",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_TOBACCO",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_TRUFFLES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_WHALES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_WINE",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_JEANS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_PERFUME",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 6,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_COSMETICS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_TOYS",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_CINNAMON",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 6,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_CLOVES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 6,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_ALUMINUM",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_FIGHTER",
+   "UNIT_AMERICAN_P51",
+   "UNIT_BOMBER",
+   "UNIT_HELICOPTER",
+   "UNIT_JET_FIGHTER",
+   "UNIT_JET_BOMBER"
+  ]
+ },
+ {
+  "type": "RESOURCE_COAL",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_IRONCLAD",
+   "UNIT_BATTLESHIP",
+   "UNIT_BRAZILIAN_MINAS_GERAES"
+  ]
+ },
+ {
+  "type": "RESOURCE_HORSES",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_HORSEMAN",
+   "UNIT_CAVALRY",
+   "UNIT_RUSSIAN_COSSACK",
+   "UNIT_MACEDONIAN_HETAIROI",
+   "UNIT_MONGOLIAN_KESHIG",
+   "UNIT_COURSER",
+   "UNIT_HUNGARY_BLACK_ARMY",
+   "UNIT_HUNGARY_HUSZAR",
+   "UNIT_COLOMBIAN_LLANERO",
+   "UNIT_ETHIOPIAN_OROMO_CAVALRY"
+  ]
+ },
+ {
+  "type": "RESOURCE_IRON",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_SWORDSMAN",
+   "UNIT_ROMAN_LEGION",
+   "UNIT_KONGO_SHIELD_BEARER",
+   "UNIT_JAPANESE_SAMURAI",
+   "UNIT_NORWEGIAN_BERSERKER",
+   "UNIT_KNIGHT",
+   "UNIT_ARABIAN_MAMLUK",
+   "UNIT_MAN_AT_ARMS",
+   "UNIT_POLISH_HUSSAR",
+   "UNIT_MACEDONIAN_HYPASPIST",
+   "UNIT_PERSIAN_IMMORTAL",
+   "UNIT_GEORGIAN_KHEVSURETI",
+   "UNIT_CUIRASSIER",
+   "UNIT_MALI_MANDEKALU_CAVALRY",
+   "UNIT_BYZANTINE_TAGMA"
+  ]
+ },
+ {
+  "type": "RESOURCE_NITER",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_MUSKETMAN",
+   "UNIT_SPANISH_CONQUISTADOR",
+   "UNIT_BOMBARD",
+   "UNIT_FRIGATE",
+   "UNIT_ENGLISH_REDCOAT",
+   "UNIT_FRENCH_GARDE_IMPERIALE",
+   "UNIT_LINE_INFANTRY",
+   "UNIT_DE_ZEVEN_PROVINCIEN",
+   "UNIT_SULEIMAN_JANISSARY"
+  ]
+ },
+ {
+  "type": "RESOURCE_OIL",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_BIPLANE",
+   "UNIT_INFANTRY",
+   "UNIT_ARTILLERY",
+   "UNIT_SUBMARINE",
+   "UNIT_TANK",
+   "UNIT_DESTROYER",
+   "UNIT_MECHANIZED_INFANTRY",
+   "UNIT_ROCKET_ARTILLERY",
+   "UNIT_MISSILE_CRUISER",
+   "UNIT_MODERN_ARMOR"
+  ]
+ },
+ {
+  "type": "RESOURCE_URANIUM",
+  "class": "RESOURCECLASS_STRATEGIC",
+  "happiness": 0,
+  "peakEra": null,
+  "units": [
+   "UNIT_GIANT_DEATH_ROBOT"
+  ]
+ },
+ {
+  "type": "RESOURCE_ANTIQUITY_SITE",
+  "class": "RESOURCECLASS_ARTIFACT",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_SHIPWRECK",
+  "class": "RESOURCECLASS_ARTIFACT",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_AMBER",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_OLIVES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_TURTLES",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_MAIZE",
+  "class": "RESOURCECLASS_BONUS",
+  "happiness": 0,
+  "peakEra": null,
+  "units": []
+ },
+ {
+  "type": "RESOURCE_HONEY",
+  "class": "RESOURCECLASS_LUXURY",
+  "happiness": 4,
+  "peakEra": null,
+  "units": []
+ }
+];
+
+export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = [
+ {
+  "type": "IMPROVEMENT_BARBARIAN_CAMP",
+  "tech": null,
+  "civic": null,
+  "trait": "TRAIT_BARBARIAN",
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_FARM",
+  "tech": null,
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_RICE",
+   "RESOURCE_WHEAT",
+   "RESOURCE_MAIZE"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_MINE",
+  "tech": "TECH_MINING",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_COPPER",
+   "RESOURCE_DIAMONDS",
+   "RESOURCE_JADE",
+   "RESOURCE_MERCURY",
+   "RESOURCE_SALT",
+   "RESOURCE_SILVER",
+   "RESOURCE_ALUMINUM",
+   "RESOURCE_COAL",
+   "RESOURCE_IRON",
+   "RESOURCE_NITER",
+   "RESOURCE_URANIUM",
+   "RESOURCE_AMBER"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_QUARRY",
+  "tech": "TECH_MINING",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_GYPSUM",
+   "RESOURCE_MARBLE",
+   "RESOURCE_STONE"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_FISHING_BOATS",
+  "tech": "TECH_SAILING",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_CRABS",
+   "RESOURCE_FISH",
+   "RESOURCE_PEARLS",
+   "RESOURCE_WHALES",
+   "RESOURCE_AMBER",
+   "RESOURCE_TURTLES"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_PASTURE",
+  "tech": "TECH_ANIMAL_HUSBANDRY",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_CATTLE",
+   "RESOURCE_SHEEP",
+   "RESOURCE_HORSES"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_PLANTATION",
+  "tech": "TECH_IRRIGATION",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_BANANAS",
+   "RESOURCE_CITRUS",
+   "RESOURCE_COCOA",
+   "RESOURCE_COFFEE",
+   "RESOURCE_COTTON",
+   "RESOURCE_DYES",
+   "RESOURCE_INCENSE",
+   "RESOURCE_SILK",
+   "RESOURCE_SPICES",
+   "RESOURCE_SUGAR",
+   "RESOURCE_TEA",
+   "RESOURCE_TOBACCO",
+   "RESOURCE_WINE",
+   "RESOURCE_OLIVES"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_CAMP",
+  "tech": "TECH_ANIMAL_HUSBANDRY",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": [
+   "RESOURCE_DEER",
+   "RESOURCE_FURS",
+   "RESOURCE_IVORY",
+   "RESOURCE_TRUFFLES",
+   "RESOURCE_HONEY"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_LUMBER_MILL",
+  "tech": "TECH_CONSTRUCTION",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_GOODY_HUT",
+  "tech": null,
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_OIL_WELL",
+  "tech": "TECH_REFINING",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": [
+   "RESOURCE_OIL"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_OFFSHORE_OIL_RIG",
+  "tech": "TECH_PLASTICS",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": [
+   "RESOURCE_OIL"
+  ]
+ },
+ {
+  "type": "IMPROVEMENT_FORT",
+  "tech": "TECH_SIEGE_TACTICS",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_AIRSTRIP",
+  "tech": "TECH_FLIGHT",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_BEACH_RESORT",
+  "tech": "TECH_RADIO",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MISSILE_SILO",
+  "tech": "TECH_ROCKETRY",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_CHATEAU",
+  "tech": null,
+  "civic": "CIVIC_HUMANISM",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_CHATEAU",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_COLOSSAL_HEAD",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_LA_VENTA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_GREAT_WALL",
+  "tech": "TECH_MASONRY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_GREAT_WALL",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_KURGAN",
+  "tech": "TECH_ANIMAL_HUSBANDRY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_KURGAN",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MISSION",
+  "tech": "TECH_EDUCATION",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MISSION",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_ROMAN_FORT",
+  "tech": null,
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_SPHINX",
+  "tech": null,
+  "civic": "CIVIC_CRAFTSMANSHIP",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_SPHINX",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_STEPWELL",
+  "tech": "TECH_IRRIGATION",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_STEPWELL",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_ZIGGURAT",
+  "tech": null,
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ZIGGURAT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_KAMPUNG",
+  "tech": "TECH_SHIPBUILDING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_KAMPUNG",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_ALCAZAR",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_GRANADA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MONASTERY",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_ARMAGH_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_PYRAMID",
+  "tech": "TECH_MASONRY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_PYRAMID",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_PAIRIDAEZA",
+  "tech": null,
+  "civic": "CIVIC_EARLY_EMPIRE",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_PAIRIDAEZA",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_OUTBACK_STATION",
+  "tech": null,
+  "civic": "CIVIC_GUILDS",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_OUTBACK_STATION",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_CHEMAMULL",
+  "tech": null,
+  "civic": "CIVIC_CRAFTSMANSHIP",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_CHEMAMULL",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_GOLF_COURSE",
+  "tech": null,
+  "civic": "CIVIC_REFORMED_CHURCH",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_GOLF_COURSE",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MEKEWAP",
+  "tech": "TECH_POTTERY",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MEKEWAP",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_POLDER",
+  "tech": null,
+  "civic": "CIVIC_GUILDS",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_POLDER",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_FISHERY",
+  "tech": "TECH_SAILING",
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_NO_PLAYER",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_CITY_PARK",
+  "tech": null,
+  "civic": "CIVIC_GAMES_RECREATION",
+  "trait": "TRAIT_CIVILIZATION_NO_PLAYER",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_GEOTHERMAL_PLANT",
+  "tech": "TECH_SYNTHETIC_MATERIALS",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_SOLAR_FARM",
+  "tech": "TECH_SATELLITES",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_WIND_FARM",
+  "tech": "TECH_COMPOSITES",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_OFFSHORE_WIND_FARM",
+  "tech": "TECH_PREDICTIVE_SYSTEMS",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_SEASTEAD",
+  "tech": "TECH_SEASTEADS",
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MOAI",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_RAPA_NUI_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MOUND",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_CAHOKIA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_NAZCA_LINE",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_NAZCA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_SKI_RESORT",
+  "tech": null,
+  "civic": "CIVIC_PROFESSIONAL_SPORTS",
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MOUNTAIN_TUNNEL",
+  "tech": "TECH_CHEMISTRY",
+  "civic": null,
+  "trait": null,
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_OPEN_AIR_MUSEUM",
+  "tech": null,
+  "civic": "CIVIC_NATIONALISM",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_OPEN_AIR_MUSEUM",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_ICE_HOCKEY_RINK",
+  "tech": null,
+  "civic": "CIVIC_COLONIALISM",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ICE_HOCKEY_RINK",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_TERRACE_FARM",
+  "tech": null,
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_TERRACE_FARM",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MAORI_PA",
+  "tech": null,
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_MAORI_PA",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MOUNTAIN_ROAD",
+  "tech": null,
+  "civic": "CIVIC_FOREIGN_TRADE",
+  "trait": "TRAIT_LEADER_PACHACUTI_IMPROVEMENT_MOUNTAIN_ROAD",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_BATEY",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_CAGUANA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_HACIENDA",
+  "tech": null,
+  "civic": "CIVIC_MERCANTILISM",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_HACIENDA",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_METEOR_GOODY",
+  "tech": null,
+  "civic": null,
+  "trait": null,
+  "buildable": false,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_ROCK_HEWN_CHURCH",
+  "tech": null,
+  "civic": "CIVIC_DRAMA_POETRY",
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_ROCK_HEWN_CHURCH",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_MAHAVIHARA",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_NALANDA_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_TRADING_DOME",
+  "tech": null,
+  "civic": null,
+  "trait": "MINOR_CIV_SAMARKAND_TRAIT",
+  "buildable": true,
+  "resources": []
+ },
+ {
+  "type": "IMPROVEMENT_FEITORIA",
+  "tech": null,
+  "civic": null,
+  "trait": "TRAIT_CIVILIZATION_IMPROVEMENT_FEITORIA",
+  "buildable": true,
+  "resources": []
+ }
 ];
 
 /** the promotion class lists by leader trait (AiFavoredItems of the

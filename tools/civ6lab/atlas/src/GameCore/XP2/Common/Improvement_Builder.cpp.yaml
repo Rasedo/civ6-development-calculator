@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x35f100
+  final: 0x25a230
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiResource.ts:TECH_IMPROVEMENT_RESOURCES]
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - "...st (row +0xd0..+0xd8, the improvements it unlocks in table order) the player may build (0x35f100: the improvement's trait against the player's civilization and leader), per resource..."
+  review: reviewed
 - addr: 0x35fd60
   final: 0x25acf0
   kind: function

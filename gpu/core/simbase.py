@@ -479,6 +479,8 @@ class Rules:
     t_repeat: torch.Tensor  # bool [NT] — CIV6 `Repeatable`: researchable again once complete
     t_ai_unlocks: torch.Tensor  # long [NT, 3] — what the research AI's value counts: buildings, districts, wonders (`techUnlocks`)
     t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
+    t_ai_res: list  # per tech the resources its improvement walk reaches, with repeats (`TECH_IMPROVEMENT_RESOURCES`)
+    res_ai: list  # per resource {cls, happy, units: [{need, ver, obsT, obsC, eng}]} (`AI_RESOURCE_EXPORT`)
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
     ai_value: dict  # the AI's value tables (`aiValue.ts`): horizon, discountPct, the pseudo-yields, unlockShare
     research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll
@@ -728,6 +730,8 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         t_repeat=torch.tensor([bool(t["repeatable"]) for t in r["techs"]], dtype=torch.bool),
         t_ai_unlocks=torch.tensor([[int(t["aiBuildings"]), int(t["aiDistricts"]), int(t["aiWonders"])] for t in r["techs"]], dtype=torch.long),
         t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
+        t_ai_res=[list(t["aiResources"]) for t in r["techs"]],
+        res_ai=list(r["resources"]["ai"]),
         c_ai_unlocks=torch.tensor([[int(c["aiBuildings"]), int(c["aiDistricts"]), int(c["aiWonders"])] for c in r["civics"]], dtype=torch.long),
         ai_value=r["aiValue"],
         research_ai=r["researchAi"],
@@ -846,6 +850,9 @@ GP_LUX_MAX = 8
 BARB_POOL_MAX = 256
 #: the slots a city-state's or the Free Cities' unit pool may number
 SEAT_POOL_MAX = 64
+#: the knowledge base's army records a city-state may hold (`armyKnown`):
+#: the units it saw over the last 22 turns, 65 at most in the verbose duels
+KB_RECORDS = 128
 UNIT_SLOTS = 256
 
 # The absolute SEAT space, shared with cpu/core/seats.ts.
@@ -1175,6 +1182,7 @@ _MUTABLE = [
     "citystate_treasury", "citystate_faith",
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
+    "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand

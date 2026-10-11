@@ -58,7 +58,9 @@
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
   impl: [cpu/data/constants.ts:CITY_MIN_STRIKE_CS]
-  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - "...ke strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890..."
   review: imported
@@ -126,6 +128,13 @@
     - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
   context:
     - "...CY_AGENDA_OPTIMUS_PRINCEPS: compute 0xb4d2b0, arguments 0xb50250): the subject's plots (0x4be720, the plots it owns) against the owner's beyond EquivalentTerritoryPercentage (20) eithe..."
+  review: imported
+- addr: 0x4be7b0
+  kind: function
+  status: PARTLY
+  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  context:
+    - "...t H: FX(-9999). A row with MaxPlayerInstances (+0x30 / +0x34) the player has completed (0x4be7b0): FX(-9999)."
   review: imported
 - addr: 0x4be880
   final: 0x32d150

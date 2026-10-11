@@ -171,7 +171,9 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/effects.ts:policyEscalated, cpu/data/constants.ts:GAME_COST_ESCALATION]
-  readings: ["B-D: the policy-unlock price — CLOSED"]
+  readings:
+    - "B-D: the policy-unlock price — CLOSED"
+    - "C-96: the project value — PARTLY READ (the structure), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...etCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
@@ -180,7 +182,10 @@
   final: 0x370f40
   kind: function
   status: PARTLY
-  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "H-1: the luxury allocation — READ"]
+  readings:
+    - "B-D-S1: the war-weariness split — CLOSED (structure)"
+    - "H-1: the luxury allocation — READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL inser..."
@@ -238,12 +243,16 @@
 - addr: 0x527a50
   final: 0x371260
   kind: function
+  name: luxuryAmenities
   status: PARTLY
-  readings: ["H-1: the luxury allocation — READ"]
+  impl: [cpu/core/aiResource.ts:luxuryAmenities]
+  readings:
+    - "H-1: the luxury allocation — READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e player holds (0x510960), resource index order: reach = the resource's per-copy reach (0x527a50); a no-cap resource (`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplie..."
-  review: imported
+  review: reviewed
 - addr: 0x527ca0
   final: 0x371420
   kind: function

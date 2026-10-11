@@ -163,7 +163,10 @@
   final: 0x31f820
   kind: function
   status: PARTLY
-  readings: ["H-1: the luxury allocation — READ"]
+  impl: [cpu/core/aiResource.ts:ResourceFacts]
+  readings:
+    - "H-1: the luxury allocation — READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplies it by its copies (0x4a93c0) and carries a wrap flag; a luxury the player owns adds `m_iExtraAmenitiesPerOwnedLuxur..."
@@ -184,6 +187,14 @@
   readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
   context:
     - "...f10): for each accumulated resource, the stockpile less the player's reserved amount (0x4aa530, m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap..."
+  review: imported
+- addr: 0x4aa700
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - "- PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, th..."
   review: imported
 - addr: 0x4aa790
   final: 0x3201d0
@@ -209,6 +220,7 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...r TOURISM weight -1 => 0); tail: extra copies,   promotion class 0x723bb0, strategic resource gate (0x4aa790 / 0x5d45c0 => value 0), maintenance < handicap 3, PV...  NEXT: unit value / military table; DS pick..."
     - ".claude/scratchpad/st1/reading.md: ...r sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownership 0) and not a bonus (0xadd080) is a new   resource. - The score (0x702380): per entry wit..."
@@ -270,6 +282,7 @@
   readings:
     - "H-1: the luxury allocation's rebuilds — PARTLY READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...m_aiReservedResources +0x528), where that is above 0, is tested strictly over the cap (0x4aabe0: 0x5254d0, the game speed's scaling, of the Resource_Consumption row's StockpileCap, pl..."
     - "...whose condition the player meets (0x4ac140) with its stockpile (0x4aa790) below the cap (0x4aabe0). The engines take CityState, StrategicResources and Relic (`goodyEligible` / `_goody_eli..."
@@ -290,6 +303,15 @@
   context:
     - "Player_Resources 0x4aa8e0 (callers: the per-city accumulation 0x4aafd0, the ownership pass 0x4ae4e0, Lua `IsResourceExtractableAt` 0x4ac120) takes the plot's im..."
   review: imported
+- addr: 0x4ab270
+  final: 0x320ba0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - "...PARTLY READ: the strategic stockpile terms — Player_Resources +0x350 (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their difference is negative, the cap 0x4aabe0 les..."
+  review: imported
 - addr: 0x4ab4b0
   final: 0x320d20
   kind: function
@@ -298,10 +320,12 @@
     - recording: h1_duelw1117
       turn: 85
       value: "runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95: the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts from the turn China (their suzerain) holds Military Eng"
+  impl: [cpu/core/minorBuild.ts:minorResourceCounts]
   readings:
     - "Border plot: GetNextBuyablePlot — READ"
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...to the total, at 1 into the   inner ring; a feature within 2 counted; a resource the player sees   (0x4ab4b0) counted by its plot's amount, and at distance 1 one the player   holds none of (0x4aa790, ownershi..."
   context:
@@ -353,6 +377,16 @@
     - ...rs. Its only caller is the tail of Player_Resources' DoTurn step 0x4a8ed0 (the holdings 0x4ab6e0, the allocation 0x4a6110, then the parks), reached from Player DoTurn 0x4e46c0 alone;...
     - "...t or export returns before it. Player_Resources' DoTurn step 0x4a8ed0 runs the holdings 0x4ab6e0, the allocation, then the parks 0x32deb0 — so a park stored at a processing pays besi..."
   review: imported
+- addr: 0x4abfe0
+  kind: function
+  name: resourceHeld
+  status: PARTLY
+  impl: [cpu/core/aiResource.ts:ResourceFacts]
+  readings:
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+  context:
+    - "...= PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T to H (0x7a2140); where the player holds it (0x4abfe0: Player_Resources +0x598[r] > 0) and count > 0, 0; else for a full civilization (0x469d..."
+  review: reviewed
 - addr: 0x4ac120
   final: 0x3215b0
   kind: function
@@ -393,6 +427,7 @@
     - "H-1: a plot's resource for its owner (strategic access) — READ"
     - "H-1: a city-state sees its suzerain's resources — READ"
     - "H-1: the goody hut's other gates and the Relic — READ"
+    - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
   context:
     - "...40, count +0x42 > 0) when the plot's owner is the player, the resource's condition holds (0x4ac140, the revealing tech), and EITHER a district stands there — any type, the city centre incl..."
     - "0x4ac140 (a player's resource condition, 0x4ab4b0's): the player's own reveal bit (+0xf0), then —..."

@@ -10886,6 +10886,8 @@ class SimSeats:
         _amen_base = have
         lux_add = self._luxury_amenities(row, have, need) if lux is None else lux
         balance = have + lux_add - need
+        # the balance as computed, for the AI values that read it (`AmenityCity.balance`)
+        self._amen_balance_of[row] = balance
         growth_f, yield_f = self._amenity_factors(balance)
         tier_idx = torch.full_like(self.city_pop[:, row, :cols], len(self.rules.amenity_tiers) - 1)
         for i in reversed(range(len(self.rules.amenity_tiers))):

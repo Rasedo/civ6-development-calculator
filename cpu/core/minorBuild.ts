@@ -34,7 +34,7 @@ import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
-import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
+import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
@@ -50,8 +50,8 @@ import { buildingPillaged, cityPower, repairBuilding } from './yields';
 import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
-import { FREE_SEAT, hiddenResourcesFor, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
+import { BARB_SEAT, FREE_SEAT, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary, unitVisibleTo } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
@@ -62,11 +62,15 @@ import { hasRiver, isWater } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
 import { AI_BUILDINGS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
-import { RESOURCES } from '../../world/resources';
+import { AI_VALUE_HORIZON } from '../data/aiValue';
+import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
+import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
-import { FX, fxConst, fxOf, turnsAt } from './aiValue';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
+import { FX, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween } from './aiValue';
 import { majorView } from './majorView';
+import { cityStateSight } from './fog';
+import { combatDesire, type CombatDesire } from './aiMilitary';
 
 /** The first legal plot in TILE-INDEX order — the GPU pick is the argmax of
  *  the eligibility plane, which is this same tile. -1 = no plot (also how a
@@ -93,6 +97,7 @@ function minorDistrictSite(state: GameState, cityState: CityState, district: Dis
  *  its city makes now, then growth and borders on the city as it stands
  *  after that (`minorGrowth`) — its city presses a religion it follows on
  *  that religion's founder's turn (`spreadReligiousPressure`) — then its
+ *  knowledge base's look (`minorKnowledge`), then its
  *  actions: a research completion's
  *  upgrades, its purchases, its Builders' work, its routes' walk and a free
  *  Trader's route, its city's ranged strikes (the majors' own body fired
@@ -108,6 +113,7 @@ export function minorPhase(state: GameState): void {
     minorPlan(state, cityState);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     minorGrowth(state, cityState);
+    minorKnowledge(state, cityState, true);
     if (!ordersHeld) minorUpgrades(state, cityState, gained);
     if (!ordersHeld) minorPurchases(state, cityState);
     if (!ordersHeld) minorBuilders(state, cityState);
@@ -115,6 +121,7 @@ export function minorPhase(state: GameState): void {
     const city = minorCity(cityState);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     if (!ordersHeld) cityStateTactics(state, cityState);
+    minorKnowledge(state, cityState, false);
     cityState.armySeen = minorMilitary(state, cityState).length;
   }
 }
@@ -270,7 +277,7 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
     if (!r.techs.includes(cur)) r.techs.push(cur);
     delete r.techRetained[cur];
     r.tech = null;
-    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science), cur, researchDraw(state)));
+    takeChoice(r, researchCompletionChoice(state, seat, r.aiEntries ?? researchAnalysis(state, seat, science, {}, minorResearchResources(state, cityState)), cur, researchDraw(state)));
     r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
     if (cur === URBAN_DEFENSES_TECH) {
       cityState.outerHp = WALLS_TIER_HP[WALLS_TIER_URBAN];
@@ -280,7 +287,7 @@ function minorResearch(state: GameState, cityState: CityState, science: number, 
       }
     }
   }
-  r.aiEntries = researchAnalysis(state, seat, science);
+  r.aiEntries = researchAnalysis(state, seat, science, {}, minorResearchResources(state, cityState));
   r.aiLeftSeen = r.aiLeft ?? 0;
   takeChoice(r, researchTurnChoice(state, seat, r.aiEntries, researchDraw(state)));
   r.aiLeft = r.tech ? researchTurnsLeft(state, seat, r, r.tech, fxOf(science)) : 0;
@@ -1021,18 +1028,167 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
   });
 }
 
-/** A minor's knowledge base's unit counts as the engine holds them: its own
- *  units by type (the knowledge base's entry of the player itself,
- *  AI_Knowledge.csv's ARMY line of its own index); the entries of the other
- *  players it has seen are not kept */
-export function minorKnownUnits(state: GameState, cityState: CityState): (unit: string) => number {
-  const own = new Map<string, number>();
+/** A record ages a turn at each update and drops once its age passes this
+ *  (0x5ebb30: the age before the increment above 0x14) */
+const ARMY_RECORD_AGE = 21;
+
+/**
+ * THE KNOWLEDGE BASE'S ARMY UPDATE (CivKnowledge, the records 0x5e9530 keeps
+ * per player and unit type). At the minor's turn (`age`: the tactical AI's
+ * turn 0x785f30 — the ageing 0x5ebb30, then the look 0x7877e0) every record
+ * ages and one past `ARMY_RECORD_AGE` drops; at its turn's end (player signal
+ * +0x228 -> 0x7877e0) the look alone. The look: each unit on a plot the minor
+ * sees (`cityStateSight`; a stealth unit only where it is seen,
+ * `unitVisibleTo`) refreshes its record — the one of its id, under its
+ * owner and type (0x5e9530 finds the unit's id in its type's list) — with the
+ * turn and its plot, or adds one. Its own units count as any other's.
+ * AI_Knowledge.csv's ARMY lines print, per player and type, the records and
+ * the oldest's age: runs/h1_duelv1124 minor 3's dead Warrior 131073 stays
+ * on its line from t17 to t38; minor 2 sees a barbarian Scout at age 1 at t7
+ * that its Warrior's t6 move brought into view.
+ */
+export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
+  const sight = cityStateSight(state, cityState.seat);
+  const kept = (cityState.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
   for (const u of state.units) {
-    if (u.seat !== cityState.seat) continue;
-    const t = installType('unit', u.type, 'UNIT_', UNITS);
-    own.set(t, (own.get(t) ?? 0) + 1);
+    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, cityState.seat)) continue;
+    const type = u.type;
+    const r = kept.find((x) => x.id === u.id && x.type === type && x.owner === u.seat);
+    if (r) {
+      r.seen = state.turn;
+      r.plot = u.tileIndex;
+    }
+    else kept.push({ id: u.id, owner: u.seat, type, seen: state.turn, plot: u.tileIndex });
   }
-  return (unit) => own.get(unit) ?? 0;
+  if (kept.length) cityState.armyKnown = kept;
+  else delete cityState.armyKnown;
+}
+/** THE COMBAT DESIRE of a minor (`combatDesire`) at its military AI's turn,
+ *  `turn` the one its knowledge base's records were last aged to: the
+ *  area of its city, its unit in training, the players in the game's order —
+ *  the majors, the city-states, the Free Cities, the barbarians (a tribe,
+ *  always at war) — at war where its seat is. Unread: the player
+ *  flags (+0xc58), a city's threat (CityBuildAI +0x1b8) and its
+ *  standing-army count (+0x2d8), taken as none. */
+export function minorCombatDesire(state: GameState, cityState: CityState, turn: number): CombatDesire {
+  const centre = state.map.tiles[cityState.centerIndex];
+  const areas = new Set<number>();
+  if (centre && (centre.area ?? -1) >= 0) areas.add(centre.area!);
+  const wars = seatOf(state, cityState.seat)?.wars ?? [];
+  const players = [
+    ...state.seats.filter((s) => isCiv(s.seat)).map((s) => ({ seat: s.seat, atWar: wars.includes(s.seat), tribe: false, flagged: false })),
+    ...state.cityStates.map((c) => ({ seat: c.seat, atWar: wars.includes(c.seat), tribe: false, flagged: false })),
+    { seat: FREE_SEAT, atWar: wars.includes(FREE_SEAT), tribe: false, flagged: false },
+    { seat: BARB_SEAT, atWar: true, tribe: true, flagged: false },
+  ];
+  return combatDesire({
+    best: Math.max(1, cityState.bestMeleeCS ?? 0, Math.max(cityState.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS)),
+    cities: cityState.centerIndex >= 0 ? 1 : 0,
+    areas,
+    self: cityState.seat,
+    players,
+    records: cityState.armyKnown ?? [],
+    areaOf: (plot) => state.map.tiles[plot]?.area ?? -1,
+    strength: (type) => {
+      const u = AI_UNITS[AI_UNIT_INDEX.get(installType('unit', type, 'UNIT_', UNITS)) ?? -1];
+      return u ? Math.max(u.combat, u.rangedCombat) : 0;
+    },
+    turn,
+    queuedUnits: cityState.prodItem?.startsWith('unit:') ? [cityState.prodItem.slice(5)] : [],
+    warFooting: false,
+    threatened: false,
+    standingArmy: 0,
+  });
+}
+
+
+/** the copies of each resource a minor's city counts (CityBuildAI +0x978,
+ *  0x5c9700): its plots within three of the centre it owns, unimproved, the
+ *  resource one it sees (0x4ab4b0) — by install type */
+export function minorResourceCounts(state: GameState, cityState: CityState): Map<string, number> {
+  const out = new Map<string, number>();
+  if (cityState.centerIndex < 0) return out;
+  const hidden = hiddenResourcesFor(state, cityState.seat);
+  const c = state.map.tiles[cityState.centerIndex];
+  for (const t of tilesWithin(state.map, c.col, c.row, 3)) {
+    if (tileSeat(t) !== cityState.seat || t.improvement || !t.resource || hidden.has(t.resource)) continue;
+    const k = installType('resource', t.resource, 'RESOURCE_', RESOURCES);
+    out.set(k, (out.get(k) ?? 0) + 1);
+  }
+  return out;
+}
+
+/** THE RESOURCE VALUE'S VIEW OF A MINOR (`resourceValue`): a city-state; its
+ *  era (`civEraIndex`) and the next as chronology; a resource held and its
+ *  copies where a plot it owns hands it over (`extractsResource`); its one
+ *  city's amenity balance; its unit production table */
+export function minorResourceFacts(state: GameState, cityState: CityState): ResourceFacts {
+  const r = cityState.research;
+  const era = civEraIndex(r.techs, r.civics);
+  const stats = computeCityStats(state, minorCity(cityState));
+  const view = majorView(state);
+  const key: Record<string, YieldKey> = {
+    YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
+  };
+  const amenity = {
+    balance: stats.amenities.have - stats.amenities.needed,
+    yields: Object.fromEntries(Object.entries(key).map(([y, k]) => [y, stats.total[k]])),
+  };
+  const extracted = new Map<string, number>();
+  for (const t of state.map.tiles) {
+    if (tileSeat(t) !== cityState.seat || !t.resource || !extractsResource(t)) continue;
+    const k = installType('resource', t.resource, 'RESOURCE_', RESOURCES);
+    extracted.set(k, (extracted.get(k) ?? 0) + 1);
+  }
+  const table = minorUnitProduction(state, cityState, minorKnownUnits(cityState));
+  const luxury = pseudoYieldValue(view, cityState.seat, FX, 'PSEUDOYIELD_RESOURCE_LUXURY');
+  return {
+    amenityParty: true,
+    eraChronology: era + 1,
+    nextEraChronology: Math.min(era + 1, ERAS.length - 1) + 1,
+    chronologyOf: (e) => {
+      const i = ERAS.indexOf(e.replace(/^ERA_/, '') as Era);
+      return i < 0 ? null : i + 1;
+    },
+    held: (res) => (extracted.get(res) ?? 0) > 0,
+    have: (res) => extracted.get(res) ?? 0,
+    cities: 1,
+    amenityValue: (_i, t, h) => valueBetween(amenityPerTurn({ view, seat: cityState.seat }, amenity), t, h),
+    luxuryPseudo: (t, h) => valueBetween(luxury, t, h),
+    inUnitTable: (u) => table.has(u),
+    unitResourceCost: (u) => {
+      const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
+      return row ? { cost: row.resourceCost, maintenance: row.maintenanceResourceAmount } : null;
+    },
+  };
+}
+
+/** the research value's resources term of a minor (0x7b3e50's improvement
+ *  walk): per resource a row's improvements work that its city counts, the
+ *  value of one copy more landing in the row's turns */
+export function minorResearchResources(state: GameState, cityState: CityState): (tech: string, turns: number) => number {
+  const counts = minorResourceCounts(state, cityState);
+  if (![...counts.values()].some((n) => n > 0)) return () => 0;
+  let facts: ResourceFacts | undefined;
+  return (tech, turns) => {
+    let v = 0;
+    for (const res of TECH_IMPROVEMENT_RESOURCES.get(tech) ?? []) {
+      if ((counts.get(res.type) ?? 0) <= 0) continue;
+      v += resourceValue(facts ??= minorResourceFacts(state, cityState), res, 1, turns, AI_VALUE_HORIZON);
+    }
+    return v;
+  };
+}
+
+/** A minor's knowledge base's unit counts (0x5eb650 over every player): its
+ *  army records by type */
+export function minorKnownUnits(cityState: CityState): (unit: string) => number {
+  const n = new Map<string, number>();
+  for (const r of cityState.armyKnown ?? []) {
+    const t = installType('unit', r.type, 'UNIT_', UNITS);
+    n.set(t, (n.get(t) ?? 0) + 1);
+  }
+  return (unit) => n.get(unit) ?? 0;
 }
 
 /** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`), its

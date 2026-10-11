@@ -894,6 +894,12 @@ CITY_STATE = {
     "minorProdOverflow": lambda sim, b, rows: [float(sim.citystate_ovf[b, s]) for s in rows],
     "minorProdKept": lambda sim, b, rows: [
         [x for i, v in enumerate(sim.citystate_kept[b, s].tolist()) if v != 0 for x in (i, v)] for s in rows],
+    "minorArmyKnown": lambda sim, b, rows: [
+        [x for r in sorted(
+            (int(o), int(t), int(n), int(p)) for k, o, t, n, p in zip(
+                sim.citystate_kb_slot[b, s].tolist(), sim.citystate_kb_owner[b, s].tolist(),
+                sim.citystate_kb_type[b, s].tolist(), sim.citystate_kb_seen[b, s].tolist(),
+                sim.citystate_kb_plot[b, s].tolist()) if k != -2) for x in r] for s in rows],
     "minorProjectYield": lambda sim, b, rows: [
         [int(sim.city_proj_yield[b, sim._CITY_MINOR0 + s, 0]), float(sim.city_proj_conv[b, sim._CITY_MINOR0 + s, 0])]
         for s in rows

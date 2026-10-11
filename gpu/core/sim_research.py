@@ -32,6 +32,18 @@ def _fpct(a, b):
     return torch.div(a * b, _FX * 100, rounding_mode="trunc")
 
 
+def _fx_const_t(x: torch.Tensor) -> torch.Tensor:
+    """`fxConst` elementwise on a float tensor: the floor as the integer part,
+    the fraction's 256ths truncated"""
+    fl = torch.floor(x)
+    return fl.long() * _FX + torch.trunc((x - fl) * _FX).long()
+
+
+def _fx_of_t(x: torch.Tensor) -> torch.Tensor:
+    """`fxOf` elementwise: rounded to the nearest raw step (JS Math.round)"""
+    return torch.floor(x * _FX + 0.5).long()
+
+
 _HALF = _fx_const(0.5)
 _SIXTH = _fx_const(0.16667)
 _NEG_SIXTH = _fx_const(-0.16667)
@@ -228,7 +240,8 @@ class SimResearch:
         far = lv[2][1].any(dim=2)
         turns = torch.where(far | spent, torch.full_like(turns, -1), turns)
         nxt = torch.where(spent, col.expand(B, -1), nxt)
-        val = self._rai_value(s, turns)
+        # the value (`techValue`) and the resources term `researchAnalysis` adds
+        val = self._rai_value(s, turns) + self._rai_resources(s, turns)
         base = torch.where(turns < 0, torch.zeros_like(val), val)
         score = base + self._rai_upstream(have, base, turns)
         return turns, nxt, base, score, spent
@@ -241,6 +254,166 @@ class SimResearch:
         T = self._rai_tables()
         w = (self._civ_era(self.citystate_techs[:, s], self.citystate_civics[:, s]) + 1) * (_FX // 2)
         return _fmul(torch.full_like(w, T["share"]), _fmul(_FX + w, torch.full_like(w, T["py_district"])))
+
+    def _rai_res_tables(self) -> dict:
+        """the resources term's static tables, built once: per tech its
+        resources [NT, K] (-1 pad); per resource its class and Happiness; the
+        units asking a strategic one, flattened (`resourceValue`'s need)"""
+        cached = getattr(self, "_rai_res_cache", None)
+        if cached is not None:
+            return cached
+        rules, dev = self.rules, self.device
+        nt, nr = len(rules.t_ai_res), len(rules.res_ai)
+        k = max([len(x) for x in rules.t_ai_res] + [1])
+        tr = torch.full((nt, k), -1, dtype=torch.long, device=dev)
+        for t, xs in enumerate(rules.t_ai_res):
+            if xs:
+                tr[t, :len(xs)] = torch.tensor(xs, dtype=torch.long, device=dev)
+        ents = [(r, u) for r, a in enumerate(rules.res_ai) for u in a["units"]]
+        ne, nc = len(ents), int(self.citystate_civics.shape[2])
+        e_obs_t = torch.zeros(max(ne, 1), nt, dtype=torch.bool, device=dev)
+        e_obs_c = torch.zeros(max(ne, 1), nc, dtype=torch.bool, device=dev)
+        e_eng = torch.zeros(max(ne, 1), self.NU, dtype=torch.bool, device=dev)
+        for i, (_r, u) in enumerate(ents):
+            for x in u["obsT"]:
+                if x >= 0:
+                    e_obs_t[i, x] = True
+            for x in u["obsC"]:
+                if x >= 0:
+                    e_obs_c[i, x] = True
+            for x in u["eng"]:
+                if x >= 0:
+                    e_eng[i, x] = True
+        cached = {
+            "tech_res": tr,
+            "cls": torch.tensor([int(a["cls"]) for a in rules.res_ai], dtype=torch.long, device=dev),
+            "happy": torch.tensor([int(a["happy"]) for a in rules.res_ai], dtype=torch.long, device=dev),
+            "e_res": torch.tensor([r for r, _u in ents] or [0], dtype=torch.long, device=dev),
+            "e_need": torch.tensor([int(u["need"]) for _r, u in ents] or [0], dtype=torch.long, device=dev),
+            "e_ver": torch.tensor([bool(u["ver"]) for _r, u in ents] or [False], dtype=torch.bool, device=dev),
+            "e_obs_t": e_obs_t, "e_obs_c": e_obs_c, "e_eng": e_eng, "n_ent": ne, "nr": nr,
+            "py_happy": _fx_const(float(rules.ai_value["pyHappiness"])),
+            "py_lux": _fx_const(float(rules.ai_value["pyLuxury"])),
+            "y_default": [_fx_const(float(v)) for v in rules.ai_value["yieldDefault"]],
+        }
+        self._rai_res_cache = cached
+        return cached
+
+    def _rai_amenity_turn(self, s: int, tot: torch.Tensor, balance: torch.Tensor, gpt: torch.Tensor) -> torch.Tensor:
+        """[B] `amenityPerTurn` of minor `s`'s city: one Amenity more —
+        PSEUDOYIELD_HAPPINESS of 1 where its happiness level holds; else of
+        the levels it climbs plus, per yield but Food, the level's
+        NonFoodYieldModifier change on the city's yield (`tot` [B, 6]) at the
+        minor's weight (Gold's -0.2 x the gold per turn `gpt` while that is
+        negative); at least 1.0"""
+        R = self._rai_res_tables()
+        tiers = self.rules.amenity_tiers
+
+        def idx(b):
+            out = torch.full_like(b, len(tiers) - 1)
+            for i in reversed(range(len(tiers))):
+                out = torch.where(b >= tiers[i][0], torch.full_like(out, i), out)
+            return out
+
+        bi, ai = idx(balance), idx(balance + 1)
+        before = len(tiers) - 1 - bi
+        after = len(tiers) - 1 - ai
+        same = _fmul(torch.full_like(balance, _FX), torch.full_like(balance, R["py_happy"]))
+        v = _fmul((after - before) * _FX, torch.full_like(balance, R["py_happy"]))
+        yf = torch.tensor([round((t[2] - 1) * 100) for t in tiers], dtype=torch.long, device=self.device)
+        pb, pa = yf[bi], yf[ai]
+        ratio = torch.div((pa + 100) * _FX * _FX, ((pb + 100) * _FX).clamp(min=1), rounding_mode="trunc") - _FX
+        gw = torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)), torch.zeros_like(gpt, dtype=torch.long))
+        add = torch.zeros_like(v)
+        for y in range(1, 6):
+            amt = _fmul(_fx_of_t(tot[:, y]), ratio)
+            val = _fmul(amt, torch.full_like(amt, R["y_default"][y]))
+            if y == 2:
+                val = _fmul(val, torch.clamp(gw, max=9 * _FX) + _FX)
+            add = add + val
+        v = torch.where(pb != -100, v + add, v)
+        return torch.where(before == after, same, torch.clamp(v, min=_FX))
+
+    def _rai_resources(self, s: int, turns: torch.Tensor) -> torch.Tensor:
+        """[B, NT] the research value's resources term of minor `s`
+        (`minorResearchResources`): per resource a row's improvements work
+        that its city counts (its plots within three of the centre it owns,
+        unimproved, the resource one it sees), one copy more's value
+        (`resourceValue`) landing in the row's turns"""
+        R = self._rai_res_tables()
+        T = self._rai_tables()
+        B, NT = turns.shape
+        dev = self.device
+        row = self._CITY_MINOR0 + s
+        seat = 100 + s
+        centre = self.citystate_center[:, s]
+        near = (self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 3) & (centre >= 0).unsqueeze(1)
+        live = self._res_live()
+        mine = self.tile_seat == seat
+        cnt_tile = near & mine & (self.improvement < 0) & live & ~self._res_hidden(row)
+        nr = R["nr"]
+        rid = self.res_id.clamp(min=0)
+        counts = torch.zeros(B, nr, dtype=torch.long, device=dev)
+        counts.scatter_add_(1, rid, cnt_tile.long())
+        if not bool((counts > 0).count_nonzero()):
+            return torch.zeros(B, NT, dtype=torch.long, device=dev)
+        ext = torch.zeros(B, nr, dtype=torch.long, device=dev)
+        ext.scatter_add_(1, rid, (mine & live & self._res_extracting()).long())
+        nn = turns.clamp(min=0)
+        h = T["horizon"]
+        # the luxury: one copy's amenities over the one city, at least the
+        # luxury pseudo-yield, at most 200; 0 where one is held
+        tot = self._seat_city_stats(row, record=False)[0][:, 0]
+        balance = self._amen_balance_of[row][:, 0].round().long()
+        mineu = self.major_unit_alive & (self.major_unit_seat == seat)
+        upkeep = (self._unit_maintenance(self.major_unit_type, self.major_unit_formation,
+                                         self.major_unit_levied).double() * mineu.double()).sum(dim=1)
+        gpt = tot[:, 2] - upkeep
+        amen = self._rai_amenity_turn(s, tot, balance, gpt)
+        a_amen = self._rai_from_landing(amen.unsqueeze(1).expand(B, NT), nn)
+        a_lux = self._rai_from_landing(torch.full((B, NT), R["py_lux"], dtype=torch.long, device=dev), nn)
+        # the strategic: the need of the minor's unit table's units asking it
+        techs = self.citystate_techs[:, s]
+        civs = self.citystate_civics[:, s]
+        if R["n_ent"]:
+            obs = ((techs.unsqueeze(1) & R["e_obs_t"].unsqueeze(0)).any(dim=2)
+                   | (civs.unsqueeze(1) & R["e_obs_c"].unsqueeze(0)).any(dim=2))          # [B, E]
+            ut = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+            own_t = torch.zeros(B, self.NU, dtype=torch.long, device=dev)
+            own_t.scatter_add_(1, ut, mineu.long())
+            owned = (own_t.unsqueeze(1) * R["e_eng"].unsqueeze(0).long()).sum(dim=2)    # [B, E]
+            intab = R["e_ver"].unsqueeze(0) & (~obs | (owned > 0))
+            need = torch.zeros(B, nr, dtype=torch.long, device=dev)
+            need.scatter_reduce_(1, R["e_res"].unsqueeze(0).expand(B, -1), torch.where(intab, R["e_need"].unsqueeze(0), torch.zeros_like(owned)), "amax")
+            used = torch.zeros(B, nr, dtype=torch.long, device=dev)
+            used.scatter_reduce_(1, R["e_res"].unsqueeze(0).expand(B, -1), intab.long(), "amax")
+        else:
+            need = torch.zeros(B, nr, dtype=torch.long, device=dev)
+            used = torch.zeros_like(need)
+        chrono = self._civ_era(techs, civs) + 1
+        out = torch.zeros(B, NT, dtype=torch.long, device=dev)
+        tr = R["tech_res"]
+        for k in range(tr.shape[1]):
+            r = tr[:, k]                                   # [NT]
+            has = (r >= 0).unsqueeze(0) & (counts.gather(1, r.clamp(min=0).unsqueeze(0).expand(B, -1)) > 0)
+            if not bool(has.count_nonzero()):
+                continue
+            rc = r.clamp(min=0)
+            cls = R["cls"][rc].unsqueeze(0)
+            held = ext.gather(1, rc.unsqueeze(0).expand(B, -1)) > 0
+            lux = torch.where(R["happy"][rc].unsqueeze(0) > 0, torch.maximum(a_amen, a_lux), a_lux)
+            lux = torch.where(held, torch.zeros_like(lux), lux).clamp(max=200 * _FX)
+            nd = need.gather(1, rc.unsqueeze(0).expand(B, -1))
+            hv = ext.gather(1, rc.unsqueeze(0).expand(B, -1))
+            n = torch.clamp(torch.minimum(torch.ones_like(nd), 2 * nd - hv), min=0)
+            w = chrono.unsqueeze(1) * _fx_const(25.0)
+            w = torch.where(nd > 0, torch.div(w * _FX, (nd * _FX).clamp(min=1), rounding_mode="trunc"), w)
+            w = torch.where(hv == 0, _fmul(w, torch.full_like(w, 2 * _FX)), w)
+            st = _fmul(_discounted(w, T["rate"], nn), n * _FX)
+            st = torch.where(used.gather(1, rc.unsqueeze(0).expand(B, -1)) > 0, st, torch.zeros_like(st))
+            v = torch.where(cls == 1, lux, torch.where(cls == 2, st, torch.zeros_like(lux))).clamp(max=800 * _FX)
+            out = out + torch.where(has, v, torch.zeros_like(v))
+        return torch.where(turns > h, torch.zeros_like(out), out)
 
     def _rai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
         """`techValue` [B, NT] for minor `s`: landing each row in `turns`

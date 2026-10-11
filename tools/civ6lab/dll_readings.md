@@ -3758,6 +3758,162 @@ rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
   Siege Tower, Military Engineer: Combat 0, the 0.01 / 100 rows), the
   religious, Archaeologist, Rock Band and air units (unported).
 
+## C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)
+
+`minorKnowledge` / `minorKnownUnits` / `minorCombatDesire` in
+`cpu/core/minorBuild.ts`, `cityStateSight` in `cpu/core/fog.ts`,
+`combatDesire` in `cpu/core/aiMilitary.ts`; GPU `_minor_knowledge` /
+`_minor_sight` in `gpu/core/sim_minors.py` (the records only). Check:
+`cpu/harness/cityBuildLab.ts` (KNOWLEDGE BASE against AI_Knowledge.csv's
+ARMY lines, COMBAT DESIRE against AI_Military.csv).
+
+- THE RECORDS (CivKnowledge.cpp, the knowledge base at player +0x12b8): per
+  player (0x18-byte vectors, 64 of them) per unit type a list of 0x20-byte
+  records — +0 the unit's id (Unit +0x100), +4 / +8 two unit fields
+  (+0xcf0, +0xc90), +0xc the age, +0x10 its plot (x, y), +0x18 / +0x1c the
+  plot's two map ids (the second its area). 0x5e9530 (from 0x5f0440) finds
+  the unit's id in its type's list: found, age 0 and the plot rewritten;
+  else a record appended. The ARMY log line (0x5eceb0, "%s %d %d,") prints
+  per type the list's size and its oldest age; the counts 0x5eb650 reads
+  (the unit production table's) are those sizes over every player, the
+  player's own included.
+- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on
+  player signal +0x1f8): every record's age + 1; one whose age before the
+  step was above 0x14 is erased (0x5f09b0) — a record lives through age 21
+  (runs/h1_duelv1124 minor 3's dead Warrior 131073: on its ARMY line from
+  t17 to t38, gone at t39).
+- THE LOOK (0x7877e0, Targets.cpp, "Invalid unit when updating AI knowledge
+  base"; after the ageing in 0x785f30 and again on player signal +0x228):
+  over every plot the player's visibility count (+0x290) holds above 0 —
+  a city -> the known cities (0x5f0280), a district -> 0x5f0490 — each unit
+  on it (0x75ce0's list), one hidden (+0x15f0, not +0x1650) only where
+  0x5033a0 lets the player see it, through 0x5f0440 into its owner's list;
+  a barbarian camp improvement (plot +0x44 the barbarians') -> 0x5f0110.
+  Player signal +0xc0 (0x7874a0) and game signal +0x2e8 (0x7838a0 ->
+  0x783570) refresh one unit outside the look.
+- MEASURED (the lab's update over the five verbose duels in turn order —
+  the players before the minor where the next record has them, its own
+  units made this turn, its turn's end with its units where the next
+  record has them): the unit table on these counts and the logged Combat
+  Desire takes 32,838 of the 57,247 UNITS values both value (32,988 on
+  AI_Knowledge.csv's own counts); every type's count as logged on 1,940 of 3,600 minor-turns. The
+  residue is the lab's: a unit made and lost between two records.
+- THE COMBAT DESIRE (the military AI's turn 0x71fb80, a city-state from
+  0x7204bc): the yardstick B = max(1, PlayerUnits +0xf0 (the best melee
+  Combat made), 0x4bd030 = max(+0x150, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH));
+  per player in the players list (0x483b50 +0x50) the strength summed over
+  the military AI's area list (+0x1290 +0x2f0) of the records 0x5eb430
+  returns (the record's +0x1c the area's id, age at most 2), each unit's
+  max(Combat, RangedCombat) where it plus 20 exceeds B; the player itself
+  adds each city's unit at the head of its queue (0x179860 on city +0x2170)
+  of such strength — Regional (+0x398); a player at war (0x469cd0) or
+  flagged (+0xd18) gives Enemy (+0x3f8) its max and, not a tribe
+  (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any
+  other gives Other (+0x458) its max and, flagged at +0xc58, raises M by
+  0.25 (0xd2f324). Then (0x721302) the desire W := 0; Regional below Enemy:
+  (Enemy - Regional) x 0.05 (0xd55ff0); else below the target, the cities
+  (player +0x12f0 +0xc0) times B: (target - Regional) / B, whole; else
+  Regional - 20 above Enemy: where Regional + 60 is below Other,
+  (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy -
+  max(Other - 60, Regional)) x 0.025 capped at 3.0. W below -M is 0, else
+  at least M; with no war footing (+0x4b8) and no city's CityBuildAI +0x1b8
+  at or above 0 at most 2.0; plus PSEUDOYIELD_STANDING_ARMY_VALUE (@0xf2e2b4,
+  0x7a60d0, DefaultValue 0.1) of the cities' CityBuildAI +0x2d8 summed.
+  runs/h1_duelv1124 minor 3: t43 20/30 -> 0.5 + 0.2 = 0.7, t50 20/50 -> 1.7,
+  t56 0/0 -> 1.0 + 0.2.
+- MEASURED (`cityBuildLab.ts --enginekb --ourdesire`, the five duels): the
+  three strengths as logged 3,166 / 3,493 / 3,172 of 3,600 minor-turns; the
+  desire exact on 1,778 and off by the standing-army term alone (0.1 to 0.3)
+  on 1,659; the UNITS values 29,397 of 57,247 within 0.005 (28,586 with no
+  desire, 32,838 on the logged desire).
+- PARTLY READ: the standing-army count CityBuildAI +0x2d8 (a tracked int at
+  +0x280; no writer found through its offsets — taken as 0), the +0xd18 /
+  +0xc58 flags, the city's threat +0x1b8 (taken as none), and what the
+  signals +0xc0 / +0x2e8 refresh outside the turn's two looks.
+
+## C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)
+
+`resourceValue` in `cpu/core/aiResource.ts`; `minorResourceCounts`,
+`minorResourceFacts`, `minorResearchResources` in `cpu/core/minorBuild.ts`;
+the tables `AI_RESOURCES` / `AI_IMPROVEMENTS` in `cpu/data/aiBuildTables.ts`
+(tools/install/ai_tables.py).
+
+- THE CALL (the research value 0x7b3e50, 0x7b556f..0x7b5758): per
+  improvement of the technology's list (row +0xd0..+0xd8, the
+  improvements it unlocks in table order) the player may build (0x35f100:
+  the improvement's trait against the player's civilization and leader),
+  per resource of its valid list (+0x1e8, Improvement_ValidResources): the
+  copies its cities count (CityBuildAI +0x978 through 0x5d45c0, summed over
+  the player's cities); where above 0, `resourceValue(player, resource, 1,
+  &rate, turns, H)` added to the row's value.
+- THE COUNTS (0x5c9700, the city's full update): +0x978[r] = the city's plot
+  evaluations (+0xcf8, the 37 plots within three of the centre the PLOT
+  ANALYSIS LOG lists) whose resource (+0, the plot's resource where the
+  player sees it, 0x4ab4b0 -> the resource's condition 0x4ac140) is r,
+  owned by the player (+0x5a: the plot's owner the evaluation's player) and
+  unimproved (+0x50: the plot's improvement +0x44 set).
+- THE VALUE (0x7a21e0, out, player, resource, count, &rate, T, H): no
+  resource 0. BONUS 0. LUXURY: v = PSEUDOYIELD_RESOURCE_LUXURY of 1.0 from T
+  to H (0x7a2140); where the player holds it (0x4abfe0: Player_Resources
+  +0x598[r] > 0) and count > 0, 0; else for a full civilization (0x469db0)
+  or a city-state (0x469de0) the amenities a copy gives (0x527a50: Resources
+  Happiness, its PeakEra's chronology against the era's times
+  LUXURY_HAPPINESS_LOSS_PER_ERA off, at least LUXURY_HAPPINESS_MINIMUM —
+  the greater at the player's era and the next, the last era's own at the
+  end), the player's cities with their amenities less those required
+  (0x5275a0) sorted (0x79ea80), the first min(cities, amenities) (the last
+  for a negative count) each one Amenity more from T to H (0x79f7c0), at
+  least v; at most 200.0. STRATEGIC: the need, the most of ResourceCost +
+  10 x ResourceMaintenanceAmount (Units_XP2) over the resource's units in
+  the military AI's production table (0x79d340); have = 0x4a93c0(r, 1);
+  where have is below twice the need, T = H (or H = 0) and count is not
+  positive, FX(-9999); a positive count is held to twice the need less
+  have, at least 0; with a unit asking it, each copy is worth the era's
+  chronology x 25.0 over the need (x2 with none had), discounted to T
+  (0x7a1240), times the copies. At most 800.0. ARTIFACT and LEY_LINE 0.
+- PARTLY READ: the strategic stockpile terms — Player_Resources +0x350
+  (0x4aa700) against 0x4ab270 (the player's +0x12e8 +0x1168) where their
+  difference is negative, the cap 0x4aabe0 less the stockpile 0x4aa790 at T
+  = H, +50.0 for a resource with a +0xd0 list — and 0x79ea80's sort order;
+  a city-state's held / have read as its owned plots that hand the resource
+  over (`extractsResource`).
+- MEASURED: the replay's research tallies (`cpu/harness/replay.ts`, "The
+  research AI"), the five seeds before and after (AUDIT C-96).
+
+## C-96: the project value — PARTLY READ (the structure), unported
+
+0x7b28c0 (out, project, &rate, T, H, player, city, ...), the city build
+AI's PROJECTS table (0x5ce970) and the research value's projects.
+
+- T at or past H: FX(-9999). A row with MaxPlayerInstances (+0x30 / +0x34)
+  the player has completed (0x4be7b0): FX(-9999).
+- Its prerequisite projects (+0xf0..+0xf8): each valued recursively at T
+  plus its build turns (0x17b890), at least 200.0, summed; a WMD one
+  (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON terms (one at @0xd71c24, the
+  difference of 1000.0's at the player and none).
+- SpaceRace (+0xe8 bit 2): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and
+  1.0 per space-race project the player has completed.
+- Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield
+  (+0x40 -> +0x90 -> +0x14) of its Points through the progression 0x5267a0
+  (the model +0x1c, param +0x20, the player's techs or civics held, the
+  greater), x4.
+- OuterDefenseRepair (+0xe8 bit 1), where the city's +0x1880 count is
+  above 0: that count x the population (+0x588) x 0x1ae8f0 x 10.0.
+- A diplomatic-victory row (+0xe8 bit 4, or the Projects_XP2 row's +0x60
+  bit 1, with 0x25afc0): per its rows PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT
+  of the era's points.
+- The sum is paid once, discounted to T (0x7a1240). Then the Projects_XP2
+  row's +0x1c (a float) times the population from T to H where the city's
+  +0x2a78 check is negative; the row's CreateBuilding (+0x40, +0x48, +0x80)
+  through the building value 0x7a7590 less the value of each +0x68 building
+  the city holds (FX(-9999) where they are all held); the project's
+  modifiers (GlobalAI +0x3a38) through 0x7a4b20.
+- Logged at the city-states (the five verbose duels): Repair Outer Defenses
+  0 or 3255.0 / 4708.13 / 10656.25 held turn after turn while the walls are
+  down (runs/h1_duelv1124 minor 2 t86..t89, t104..t107, t155..t158); the
+  district projects 0..148 moving with the city's yields (Industrial Zone
+  50.86..87.0); Manhattan 337.7..8884.5; the nuclear device 134..379.
+
 ## H-1: the research AI — READ (the choice), PARTLY READ (the value)
 
 AI/Research.cpp. The object (the player's +0x12a8) keeps one 0x50-byte entry

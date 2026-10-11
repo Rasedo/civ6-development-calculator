@@ -317,6 +317,15 @@ class SimInit:
         self.citystate_builder_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_army_seen = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_loss_turn = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        # the knowledge base's army records (`armyKnown`, `_minor_knowledge`):
+        # per record the unit's pool slot (-1 once the slot is reclaimed, -2 an
+        # empty record), its owner seat, type, and the turn and plot last seen
+        _kb = (B, s_pad, simbase.KB_RECORDS)
+        self.citystate_kb_slot = torch.full(_kb, -2, dtype=torch.int16, device=device)
+        self.citystate_kb_owner = torch.full(_kb, -1, dtype=torch.int16, device=device)
+        self.citystate_kb_type = torch.full(_kb, -1, dtype=torch.int16, device=device)
+        self.citystate_kb_seen = torch.full(_kb, -1, dtype=torch.int16, device=device)
+        self.citystate_kb_plot = torch.full(_kb, -1, dtype=torch.int16, device=device)
         # its last turn's Production went toward a `fullyPowered` project
         # still running — the queue head `_minor_power` reads (`fullyPowered`)
         self.citystate_full_power = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
@@ -3518,6 +3527,8 @@ class SimInit:
         self._gov_in_memo: dict = {}
         # row -> (plane stamp, answer) — `_res_hidden`
         self._res_hidden_cache: dict = {}
+        # the amenity balance `_seat_amenity` last computed, per row
+        self._amen_balance_of: dict = {}
         # row -> (turn, plane stamp, answer) — `_adopted_gov`
         self._adopted_gov_cache: dict = {}
         self._world_era_cache = None  # (plane stamp, answer) — `_world_era`

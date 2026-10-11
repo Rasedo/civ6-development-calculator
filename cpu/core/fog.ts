@@ -204,6 +204,35 @@ function seatSeesPlot(state: GameState, seat: number, t: Tile): boolean {
   return false;
 }
 
+/** THE PLOTS A CITY-STATE SEES NOW (its visibility count above 0, the
+ *  plots the knowledge base's update walks, 0x7877e0 over player +0x290):
+ *  `seatSeesPlot`'s eyes for the minor alone — its plots and those beside
+ *  them, the plots within two of its centre, and each of its units' look
+ *  (`unitSight`, cut by `canSee`). */
+export function cityStateSight(state: GameState, seat: number): Uint8Array {
+  const { map } = state;
+  const out = new Uint8Array(map.tiles.length);
+  for (const t of map.tiles) {
+    if (tileSeat(t) !== seat) continue;
+    out[t.index] = 1;
+    for (const n of neighbors(map, t)) out[n.index] = 1;
+  }
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  if (cs && cs.centerIndex >= 0) {
+    const c = map.tiles[cs.centerIndex];
+    for (const n of tilesWithin(map, c.col, c.row, 2)) out[n.index] = 1;
+  }
+  for (const u of state.units) {
+    if (u.seat !== seat) continue;
+    const from = map.tiles[u.tileIndex];
+    const through = unitSeesThrough(u);
+    for (const n of tilesWithin(map, from.col, from.row, unitSight(u, state))) {
+      if (!out[n.index] && canSee(map, from, n, through)) out[n.index] = 1;
+    }
+  }
+  return out;
+}
+
 export function fogActive(state: GameState): boolean {
   return state.unitsMode && state.fogOfWar;
 }

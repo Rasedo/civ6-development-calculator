@@ -35,13 +35,110 @@ class SimMinors:
             self._minor_plan(s)
             self._minor_build(s, self._minor_production(s))
             self._minor_growth(s)
+            self._minor_knowledge(s, True)
             self._minor_upgrades(s, gained)
             self._minor_purchases(s)
             self._minor_builders(s)
             self._minor_trade(s)
             self._city_strikes(self._CITY_MINOR0 + s, col0, alive)
             self._minor_tactics(s)
+            self._minor_knowledge(s, False)
             self.citystate_army_seen[:, s] = torch.where(alive, self._minor_military_count(s), seen)
+
+    def _minor_sight(self, s: int) -> torch.Tensor:
+        """[B, T] bool — `cityStateSight`: the plots minor `s` sees now — its
+        plots and those beside them, the plots within two of its centre, and
+        each of its units' look (`_unit_sight`, cut by `_los_disk`)."""
+        B, T = self.B, self.T
+        seat = 100 + s
+        if getattr(self, "_ring1", None) is None:
+            # each plot and the plots beside it, padded with -1
+            near = self.pair_dist.to(torch.long) <= 1
+            w = int(near.sum(dim=1).max())
+            order = torch.argsort((~near).to(torch.int8), dim=1, stable=True)[:, :w]
+            self._ring1 = torch.where(near.gather(1, order), order, torch.full_like(order, -1))
+        ring = self._ring1
+        own = self.tile_seat == seat
+        seen = (own.gather(1, ring.clamp(min=0).reshape(1, -1).expand(B, -1)).reshape(B, T, -1)
+                & (ring >= 0).unsqueeze(0)).any(dim=2)
+        centre = self.citystate_center[:, s]
+        seen = seen | ((self.pair_dist[centre.clamp(min=0)].to(torch.long) <= 2) & (centre >= 0).unsqueeze(1))
+        mine = self.unit_alive & (self.unit_seat == seat)
+        for j in mine.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+            k = mine[:, j].nonzero(as_tuple=True)[0]
+            utp = self.unit_type[k, j]
+            upr = self.unit_promos[k, j]
+            rad = self._unit_sight(utp, upr, self.unit_seat[k, j], k)
+            seen[k] = seen[k] | self._los_disk(k, self.unit_tile[k, j].clamp(min=0), rad, self._sees_through(utp, upr))
+        return seen
+
+    def _minor_knowledge(self, s: int, age: bool) -> None:
+        """`minorKnowledge` — the knowledge base's army records of minor `s`
+        (CivKnowledge 0x5e9530). `age`: the minor's turn (0x785f30) — every
+        record ages and one past 21 turns drops — then the look; else the
+        look alone (its turn's end). The look: each unit on a plot the minor
+        sees (`_minor_sight`; a hidden stealth unit or another's Spy not)
+        refreshes its record — the one of its pool slot, owner and type —
+        with the turn and its plot, or takes a free record. A record's slot
+        is -1 once the pool reclaims it (its unit long dead), -2 a free one."""
+        alive = self.citystate_alive[:, s]
+        if not bool(alive.count_nonzero()):
+            return
+        B, dev = self.B, self.device
+        seat = 100 + s
+        turn = int(self.turn)
+        slot = self.citystate_kb_slot[:, s]
+        owner = self.citystate_kb_owner[:, s]
+        typ = self.citystate_kb_type[:, s]
+        seen_t = self.citystate_kb_seen[:, s]
+        plot = self.citystate_kb_plot[:, s]
+        K = slot.shape[1]
+        if age:
+            drop = (slot != -2) & (turn - seen_t.long() > 21) & alive.unsqueeze(1)
+            if bool(drop.count_nonzero()):
+                slot[drop] = -2
+                for p in (owner, typ, seen_t, plot):
+                    p[drop] = -1
+        sight = self._minor_sight(s)
+        tile = self.unit_tile.clamp(min=0)
+        vis = self.unit_alive & (self.unit_tile >= 0) & sight.gather(1, tile) & alive.unsqueeze(1)
+        if self._stealth_live:
+            ut = self.unit_type.clamp(min=0, max=self.NU - 1)
+            stealthy = self._type_stealth.take(ut) | self._promo_flag(ut, self.unit_promos, "STEALTH")
+            vis = vis & ~(stealthy & self._stealth_hidden(seat).gather(1, tile) & (self.unit_seat != seat))
+        if self._spy_idx >= 0:
+            vis = vis & ~((self.unit_type == self._spy_idx) & (self.unit_seat != seat))
+        if not bool(vis.count_nonzero()):
+            return
+        U = vis.shape[1]
+        sl = slot.long()
+        cur_t = self.unit_type.gather(1, sl.clamp(min=0))
+        cur_o = self.unit_seat.gather(1, sl.clamp(min=0))
+        match = (sl >= 0) & (typ.long() == cur_t) & (owner.long() == cur_o)
+        rec = torch.full((B, U + 1), -1, dtype=torch.long, device=dev)
+        rec.scatter_(1, torch.where(match, sl, torch.full_like(sl, U)),
+                     torch.arange(K, device=dev).unsqueeze(0).expand(B, -1).contiguous())
+        rec = rec[:, :U]
+        hit = vis & (rec >= 0)
+        if bool(hit.count_nonzero()):
+            b, u = hit.nonzero(as_tuple=True)
+            k = rec[b, u]
+            seen_t[b, k] = turn
+            plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
+        new = vis & (rec < 0)
+        if bool(new.count_nonzero()):
+            free = slot == -2
+            if bool((new.sum(dim=1) > free.sum(dim=1)).any()):
+                raise RuntimeError(f"_minor_knowledge: more than KB_RECORDS={K} army records")
+            pos = torch.argsort((~free).to(torch.int8), dim=1, stable=True)
+            rank = new.long().cumsum(dim=1) - 1
+            b, u = new.nonzero(as_tuple=True)
+            k = pos[b, rank[b, u]]
+            slot[b, k] = u.to(slot.dtype)
+            owner[b, k] = self.unit_seat[b, u].to(owner.dtype)
+            typ[b, k] = self.unit_type[b, u].to(typ.dtype)
+            seen_t[b, k] = turn
+            plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
 
     def _minor_levy_return(self, s: int) -> None:
         """`minorLevyReturn` — CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):

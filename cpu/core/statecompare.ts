@@ -811,6 +811,9 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorProdOverflow: overCityStates((cityState) => cityState.prodOverflow ?? 0),
   minorProdKept: overCityStates((cityState) => Object.entries(cityState.prodRetained ?? {})
     .map(([k, v]) => [minorItemIdx(k), v] as const).sort((a, b) => a[0] - b[0]).flat()),
+  minorArmyKnown: overCityStates((cityState) => (cityState.armyKnown ?? [])
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]).flat()),
   minorProjectYield: overCityStates((cityState) => projectYieldCols(cityState.projectYield)),
   minorTreasury: overCityStates((cityState) => cityState.treasury),
   minorShortfall: overCityStates((cityState) => cityState.goldShortfall),

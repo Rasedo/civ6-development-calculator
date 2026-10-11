@@ -1068,6 +1068,17 @@ export interface CityStateQuest {
   target: string | number | null;
 }
 
+/** a knowledge base's record of one unit (CivKnowledge's 0x20-byte army
+ *  entry: the unit's id, its age, its plot) */
+export interface ArmyRecord {
+  id: number;
+  owner: number;
+  type: string;
+  seen: number;
+  /** the plot it was last seen on */
+  plot: number;
+}
+
 export interface CityState extends Seat {
   id: number;
   name: string;
@@ -1082,6 +1093,10 @@ export interface CityState extends Seat {
    *  while no one holds it. */
   levySeat?: number;
   levyEnds?: number;
+  /** THE KNOWLEDGE BASE'S ARMY RECORDS (`minorKnowledge`): one per unit the
+   *  minor has seen — its id, owner and unit type, the
+   *  turn and plot last seen; a record drops 22 turns after. Absent = none. */
+  armyKnown?: ArmyRecord[];
   /** the turn the minor's city last took a hit — the quiet the repair
    *  project waits on (`City.lastHitTurn`) */
   lastHitTurn?: number;

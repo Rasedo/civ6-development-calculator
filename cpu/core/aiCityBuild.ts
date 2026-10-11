@@ -361,7 +361,7 @@ const levelPct = (balance: number): number => Math.round((amenityTier(balance).y
  *  1 where its happiness level holds; else of the levels it climbs, plus per
  *  yield but Food the level's NonFoodYieldModifier change on the city's
  *  yield at the player's weight, at least the Amenity's own 1 */
-function amenityPerTurn(f: CityBuildFacts, c: AmenityCity): number {
+export function amenityPerTurn(f: { view: CityBuildFacts['view'] | null; seat: number }, c: AmenityCity): number {
   const before = AMENITY_TIERS.length - 1 - AMENITY_TIERS.indexOf(amenityTier(c.balance) as never);
   const after = AMENITY_TIERS.length - 1 - AMENITY_TIERS.indexOf(amenityTier(c.balance + 1) as never);
   if (before === after) return pseudoYieldValue(f.view, f.seat, FX, 'PSEUDOYIELD_HAPPINESS');

@@ -32,6 +32,7 @@
   impl: [cpu/data/aiValue.ts:AI_UNLOCK_SHARE]
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: imported
@@ -62,6 +63,7 @@
   status: PARTLY
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - ...h twice the cost in hand; then the heroes) gets a contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes...
   review: imported
@@ -84,6 +86,7 @@
       value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - "..._Military.csv's Regional / Enemy / Other Strength) — below the enemy's (enemy - own) x @0xd55ff0, below a target (target - own) / +0xd8, 20 past the enemy a negative term toward the ot..."
   review: imported
@@ -108,6 +111,20 @@
   context:
     - "...HE ANALYSIS, the \"Civic Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns := -1, value := 0, next := row; a non-rep..."
   review: imported
+- addr: 0xd5fed0
+  kind: global
+  name: desireFloor
+  semantics: -0.5f, the Combat Desire's floor M before the at-war and flagged players raise it
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 43
+      value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+  context:
+    - ...ives Enemy (+0x3f8) its max and, not a tribe (0x469ce0), raises the floor M (from -0.5, 0xd5fed0) by 0.5 (0xd20458); any other gives Other (+0x458) its max and, flagged at +0xc58, rais...
+  review: reviewed
 - addr: 0xd63400
   kind: global
   status: PARTLY
@@ -127,6 +144,20 @@
   context:
     - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
   review: imported
+- addr: 0xd6ced0
+  kind: global
+  name: desireOtherStep
+  semantics: 0.025f, the Combat Desire's step toward the others' strength
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 43
+      value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+  context:
+    - "...- 20 above Enemy: where Regional + 60 is below Other, (Other - Regional - 60) x 0.025 (0xd6ced0) capped at 2.0, else (Enemy - max(Other - 60, Regional)) x 0.025 capped at 3.0. W below..."
+  review: reviewed
 - addr: 0xd70c98
   kind: global
   status: PARTLY
@@ -137,6 +168,13 @@
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
   context:
     - ...th N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's...
+  review: imported
+- addr: 0xd71c24
+  kind: global
+  status: PARTLY
+  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  context:
+    - ...least 200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON terms (one at @0xd71c24, the difference of 1000.0's at the player and none).
   review: imported
 - addr: 0xd71c30
   kind: global
@@ -1174,6 +1212,8 @@
   kind: global
   name: PSEUDOYIELD_STANDING_ARMY_VALUE
   status: PARTLY
+  readings:
+    - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e2b8

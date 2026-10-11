@@ -11,7 +11,12 @@
  * --logtech takes the research AI's turns from the game's AI_Research.csv
  * (the entry of the turn plus the turns its research in hand had left as its
  * turn before set them), so the tables measure the value apart from the
- * imported research.
+ * imported research. The unit table's inputs: --kb -1 the knowledge base of
+ * AI_Knowledge.csv's ARMY lines a turn back, --enginekb the engine's own
+ * (`minorKnowledge` run over the records in the players' turn order, the
+ * record's unit ids, tallied against the ARMY lines); the Combat Desire
+ * AI_Military.csv's, --ourdesire the engine's (`minorCombatDesire`, tallied
+ * against the log's strengths and desire), --nodesire none.
  *
  * Per item family and item: the log's valid values, ours valid where the
  * log's are and the reverse, the values within 0.005, and the heaviest
@@ -20,15 +25,17 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory } from './import';
-import type { CityState, GameState } from '../core/types';
+import type { ArmyRecord, CityState, GameState } from '../core/types';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue, unitTable, unitTurns, unitValue } from '../core/aiCityBuild';
 import { AI_UNITS } from '../data/aiBuildTables';
-import { minorBuildFacts, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { minorBuildFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
+import { isCiv } from '../core/seats';
+import { UNITS } from '../data/units';
 import { FX_MIN, fxConst } from '../core/aiValue';
 import { loadCityBuildCentre, loadCityBuildPicks, loadCityBuildTables, loadKnownUnits, newCityBuildTally, tallyBuildings, tallyRow, type CityBuildTally } from './cityBuildLog';
 
@@ -117,12 +124,17 @@ const zero = args.includes('--zero') ? args[args.indexOf('--zero') + 1].split(',
 /** AI_Military.csv's Combat Desire (the military AI's PSEUDOYIELD_UNIT_COMBAT
  *  weight), by `${turn}:${player}` */
 const desire = new Map<string, number>();
+/** AI_Military.csv's Regional, Enemy and Other Strength */
+const strengths = new Map<string, number[]>();
 {
   const path = dump.replace(/\.jsonl$/, '.logs/AI_Military.csv');
   if (existsSync(path)) {
     for (const line of readFileSync(path, 'utf8').split('\n')) {
       const p = line.split(',').map((x) => x.trim());
-      if (/^\d+$/.test(p[0] ?? '') && p.length >= 9) desire.set(`${p[0]}:${p[1]}`, Number(p[8]));
+      if (/^\d+$/.test(p[0] ?? '') && p.length >= 9) {
+        desire.set(`${p[0]}:${p[1]}`, Number(p[8]));
+        strengths.set(`${p[0]}:${p[1]}`, [Number(p[2]), Number(p[3]), Number(p[4])]);
+      }
     }
   }
 }
@@ -149,15 +161,92 @@ const per = new Map<string, CityBuildTally>();
 /** per building, the logged values our value prints at another T */
 const anyT = new Map<string, number>();
 const rows: unknown[] = [];
+/** the knowledge base's army records by player after the latest update, and the import of the turn it waits for */
+const kbStore = new Map<number, ArmyRecord[]>();
+let prevImp: ReturnType<typeof importTurn> | null = null;
+const kbTally = { n: 0, ok: 0, miss: [] as string[] };
+const desireTally = { n: 0, exact: 0, sa: 0, str: [0, 0, 0], miss: [] as string[] };
+/** the record's unit ids, which the knowledge base's records key on (the
+ *  import numbers its units afresh): the imported units follow the record's
+ *  order, each on its recorded plot */
+function recordIds(rec: TurnRecord, state: GameState): void {
+  let j = 0;
+  for (const ru of rec.units) {
+    const u = state.units[j];
+    if (u && u.tileIndex === ru.y * rec.head.W + ru.x) {
+      u.id = ru.id;
+      j++;
+    }
+  }
+}
+/** the knowledge base's updates of the turn of `imp`, the players in turn
+ *  order: at the minor's start (the ageing and the look, 0x785f30) each
+ *  player before it in the order stands where the next record has it, the
+ *  minor itself and those after it where this record has them, with the
+ *  units the minor's own turn made (the next record's, absent here); the
+ *  ARMY line is printed then. At its turn's end (player signal +0x228, the
+ *  look again with no ageing) its own units stand where the next record has
+ *  them. */
+function kbUpdate(imp: ReturnType<typeof importTurn>, next: GameState): void {
+  const base = imp.state.units;
+  const ids = new Set(base.map((u) => u.id));
+  const nextIds = new Set(next.units.map((u) => u.id));
+  // the chassis a vanished unit upgrades into: a unit of it the next record
+  // holds afresh is the upgrade, made after the minor's look
+  const upgraded = new Set(base.filter((u) => !nextIds.has(u.id)).map((u) => UNITS[u.type]?.upgradesTo).filter((x): x is string => !!x));
+  for (const [player, cs] of imp.minorOfPlayer) {
+    const before = (s: number) => isCiv(s) || (s >= 100 && s < cs.seat);
+    cs.armyKnown = (kbStore.get(player) ?? []).map((r) => ({ ...r }));
+    imp.state.units = [...base.filter((u) => !before(u.seat)), ...next.units.filter((u) => before(u.seat) || (u.seat === cs.seat && !ids.has(u.id) && !upgraded.has(u.type)))];
+    minorKnowledge(imp.state, cs, true);
+    const want = knownUnits.get(`${imp.state.turn}:${player}`);
+    if (want) {
+      const ours = minorKnownUnits(cs);
+      const types = new Set([...want.keys(), ...AI_UNITS.map((u) => u.type).filter((t) => ours(t) > 0)]);
+      kbTally.n += 1;
+      if ([...types].every((t) => (want.get(t) ?? 0) === ours(t))) kbTally.ok += 1;
+      else if (kbTally.miss.length < 25) kbTally.miss.push(`t${imp.state.turn} p${player} ${[...types].filter((t) => (want.get(t) ?? 0) !== ours(t)).map((t) => `${t} log ${want.get(t) ?? 0} ours ${ours(t)}`).join(', ')}`);
+    }
+    imp.state.units = [...imp.state.units.filter((u) => u.seat !== cs.seat), ...next.units.filter((u) => u.seat === cs.seat)];
+    minorKnowledge(imp.state, cs, false);
+    imp.state.units = base;
+    kbStore.set(player, cs.armyKnown ?? []);
+  }
+}
 for (let i = 0; i + 1 < recs.length; i++) {
   const b = recs[i + 1];
-  if (i === 0) advanceHistory(history, recs[0], cat);
+  if (i === 0) {
+    advanceHistory(history, recs[0], cat);
+    prevImp = importTurn(recs[0], cat, history);
+    recordIds(recs[0], prevImp.state);
+  }
   advanceHistory(history, b, cat);
   const turn = recs[i].turn;
   const imp = importTurn(b, cat, history);
   const state = imp.state;
+  recordIds(b, state);
   for (const [player, cs] of imp.minorOfPlayer) {
+    // the knowledge base the turn's analysis reads: its update of the turn
+    // before (the military AI's table is built before the tactical turn's
+    // update, AI_Knowledge.csv's ARMY lines one turn back)
+    cs.armyKnown = (kbStore.get(player) ?? []).map((r) => ({ ...r }));
     if (onlyPlayer !== null && player !== onlyPlayer) continue;
+    // the military AI's turn: its strengths and Combat Desire against
+    // AI_Military.csv's (the records as its last update aged them)
+    const ourDesire = minorCombatDesire(state, cs, turn - 1);
+    const wantS = strengths.get(`${turn}:${player}`);
+    if (wantS) {
+      const t = desireTally;
+      t.n += 1;
+      const s = [ourDesire.regional, ourDesire.enemy, ourDesire.other];
+      s.forEach((x, k) => { if (x === wantS[k]) t.str[k] += 1; });
+      const d = desire.get(`${turn}:${player}`)!;
+      const o = ourDesire.desire / 256;
+      if (Math.abs(o - d) < 0.051) t.exact += 1;
+      // the standing-army term unread: 0.1 a count
+      else if ([0.1, 0.2, 0.3].some((sa) => Math.abs(o + sa - d) < 0.051)) t.sa += 1;
+      else if (t.miss.length < 30) t.miss.push(`t${turn} p${player} log ${wantS.join('/')}=${d} ours ${s.join('/')}=${o.toFixed(3)}`);
+    }
     const logged = tables.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`);
     if (!logged) continue;
     const stats = computeCityStats(state, minorCity(cs));
@@ -165,7 +254,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, stats.total.culture);
     const kb = knownUnits.get(`${turn + kbShift}:${player}`);
-    const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(state, cs) : (u) => kb?.get(u) ?? 0);
+    const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(cs) : (u) => kb?.get(u) ?? 0);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
     // pseudo-yields whose weights are not read set to -1.0 (factor 0)
@@ -175,6 +264,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       facts.view = Object.assign(Object.create(v0) as typeof v0, {
         tradeKnowledge: (s: number) => (s === cs.seat && k !== undefined ? Math.round(k * 256) : v0.tradeKnowledge(s)),
         pseudoYieldWeight: (s: number, p: string) => (zero.includes(p) ? -256
+          : args.includes('--ourdesire') && p === 'PSEUDOYIELD_UNIT_COMBAT' && s === cs.seat ? ourDesire.desire
           : !args.includes('--nodesire') && p === 'PSEUDOYIELD_UNIT_COMBAT' && s === cs.seat && desire.has(`${turn + desireShift}:${player}`) ? fxConst(desire.get(`${turn + desireShift}:${player}`)!)
             : v0.pseudoYieldWeight(s, p)),
       });
@@ -263,6 +353,8 @@ for (let i = 0; i + 1 < recs.length; i++) {
       });
     }
   }
+  kbUpdate(prevImp!, state);
+  prevImp = imp;
 }
 for (const [tag, t] of Object.entries(pickTally)) {
   console.log(`DEFAULT SPECIALIZATION (${tag} buildings table): ${t.ok} / ${t.n} as logged`);
@@ -284,3 +376,7 @@ for (const [type, t] of [...unitsPer].sort((a, b) => b[1].log - a[1].log)) {
     + ` onlyLog ${String(t.onlyLog).padStart(4)} onlyOurs ${String(t.onlyOurs).padStart(4)}  ${f ? `t${f.turn} p${f.player} log ${f.log} ours ${f.ours}` : ''}`);
 }
 console.log(`UNITS TOTAL log ${unitsAll.log} both ${unitsAll.both} exact ${unitsAll.exact} onlyLog ${unitsAll.onlyLog} onlyOurs ${unitsAll.onlyOurs}`);
+console.log(`KNOWLEDGE BASE: ${kbTally.ok} / ${kbTally.n} turn-player army counts as logged`);
+for (const m of kbTally.miss) console.log(`  ${m}`);
+console.log(`COMBAT DESIRE: ${desireTally.exact} exact, ${desireTally.sa} but the standing army, of ${desireTally.n}; strengths R ${desireTally.str[0]} E ${desireTally.str[1]} O ${desireTally.str[2]}`);
+for (const m of desireTally.miss) console.log(`  ${m}`);

@@ -2091,6 +2091,21 @@
           ]
         },
         {
+          "name": "minorArmyKnown",
+          "compare": "exact",
+          "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot): the unit's identity (TS id, GPU pool slot) is not compared",
+          "covers": [
+            "CityState.armyKnown"
+          ],
+          "planes": [
+            "citystate_kb_slot",
+            "citystate_kb_owner",
+            "citystate_kb_type",
+            "citystate_kb_seen",
+            "citystate_kb_plot"
+          ]
+        },
+        {
           "name": "minorProjectYield",
           "compare": "milli",
           "covers": [

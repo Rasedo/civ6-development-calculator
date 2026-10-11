@@ -17,6 +17,14 @@
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
   review: imported
+- addr: 0x1ae8f0
+  final: 0x11eb20
+  kind: function
+  status: PARTLY
+  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  context:
+    - "...t 1), where the city's +0x1880 count is above 0: that count x the population (+0x588) x 0x1ae8f0 x 10.0."
+  review: imported
 - addr: 0x1aec20
   final: 0x11ee20
   kind: function

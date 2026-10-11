@@ -3145,6 +3145,16 @@ class SimPhase:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))
         lo, hi = self.POOL_LO[prefix], self.POOL_HI[prefix]
+        # the city-states' army records name a slot: a living unit's moves with
+        # it, a dead one's record keeps its turn and plot with no slot (-1)
+        kb = self.citystate_kb_slot
+        kbl = kb.long().reshape(B, -1)
+        mine_kb = (kbl >= lo) & (kbl < hi)
+        if bool(mine_kb.count_nonzero()):
+            moved = inv.gather(1, (kbl - lo).clamp(min=0, max=U - 1))
+            live = moved < getattr(self, counter).unsqueeze(1)
+            kbl = torch.where(mine_kb, torch.where(live, moved + lo, torch.full_like(kbl, -1)), kbl)
+            kb.copy_(kbl.reshape(kb.shape).to(kb.dtype))
         for m in ("military_at", "civilian_at", "support_at", "embarked_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)
