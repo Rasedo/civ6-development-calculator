@@ -27,12 +27,16 @@
 - addr: 0x66b490
   final: 0x440ea0
   kind: function
+  semantics: "The action record's cost (+0x68): the state's DiplomaticStateActions Cost less the price's Gold value (0x671650) less the trust term (0x671b80); solved on the logged rows Cost - 0.5 x price x (1 + w_gold) - T."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
-      value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+      turn: 68
+      value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
+  impl: [ai/major/diploState.ts:answerAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...ion rows print \", %3.1f:%3.1f\" = FIRST 0x66cc40 (record +0x48, \"Desired\", the PICK's score), SECOND 0x66b490 (record +0x68, \"Cost\"). 0.0:0.0 = attempt turn. Threat row \"threat:n:trust\" = +0x6560[p] : 0x650550..."
     - ".claude/scratchpad/dp2/NOTES.md: ...:   action must be in receiver's state lists (+0x2f58[from] +0x20 or +0x40) else reject(2);   value 0x66b490 on +0xca8[from] record: >0 -> reject (2), <=0 -> accept (1).   EMPIRICAL 20/20 (accept.py): accept..."
@@ -41,7 +45,7 @@
   context:
     - "...aluation record's +0x48 vector, \"Desired\" in the record's own dump 0x676510) and SECOND 0x66b490 (+0x68, \"Cost\") of the record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88). The rec..."
     - "...0x653f60: an action outside its state's lists toward the sender refuses; else the value 0x66b490 of its incoming record (+0xca8[sender]) above 0 refuses, at or below 0 accepts. On acce..."
-  review: imported
+  review: reviewed
 - addr: 0x66b590
   kind: function
   status: PARTLY
@@ -186,14 +190,20 @@
   kind: function
   name: stateCost
   status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 68
+      value: Rome's logged cost toward China 58.0 (Delegation) / 72.5 (Embassy) in Unfriendly = 75 / 100 - 0.5 x 10 / 25 x 1.4 - 10
+  impl: [ai/major/diploState.ts:answerAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...tion 0x666620 (delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (con..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...ation @f2e58c, Declare Friendship @f2e594, Propose Trade @f2e5d4). - STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row   of the owner's state toward p for the action (Worth +0x24, Cost..."
   context:
     - "- STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row of the owner's state toward p for the action (Worth +0..."
-  review: imported
+  review: reviewed
 - addr: 0x6718a0
   final: 0x445e00
   kind: function
@@ -211,8 +221,10 @@
 - addr: 0x671b80
   kind: function
   status: PARTLY
+  impl: [ai/major/diploState.ts:answerAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...(delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +..."
     - ".claude/scratchpad/dp2/NOTES.md: ...0 direction, minus gold cost x 0x7a6690 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0x650550(p), L=trunc(+0x6420 x 0.25) (mode 0), T=10*(L-n+1)/L   if n<=..."

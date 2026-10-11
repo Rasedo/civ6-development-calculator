@@ -801,6 +801,7 @@ SEAT = {
         [int(x) for x in sim.civ_gp_lux_copies[b, c, : sim._n_lux].tolist()] for c in rows
     ],
     "beliefPantheon": _civ_scalar("civ_pantheon"),
+    "religionType": _civ_scalar("civ_religion_type"),
     "beliefFollower": _civ_scalar("civ_follower"),
     "beliefFounder": _civ_scalar("civ_founder"),
     "beliefWorship": _civ_scalar("civ_worship"),

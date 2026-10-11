@@ -34,12 +34,13 @@
       value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
     - recording: h1_duelw1110
       value: "Player 0 of   runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234   and Charismatic Leader 18: its agenda's Influence row at 1.25 (the   pseudo-yield weight above)."
-  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON]
+  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON, cpu/data/seats.ts:missionPrice]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: the upgrade's gold — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   context:
     - "...VEST_IMPROVED_DEGRADATION 50 − 30 more pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08, t..."
     - "..., \"iNetProduction >= 0\"), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUC..."
@@ -188,14 +189,27 @@
 - addr: 0x527610
   final: 0x370fb0
   kind: function
-  status: PARTLY
+  name: diploActionPrice
+  signature: int price(player, DiplomaticActionType)
+  semantics: "The diplomatic action's gold price: the DiplomaticActions row's Cost (+0x20) through the game speed (0x525400) as fixed point, less its remainder by GlobalParameters PURCHASE_DIVISOR (+0x5b0, 5): Delegation 10, Resident Embassy 25 online."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 79
+      value: Rome's treasury 559 -> 575 after China's Delegation (+10 beside its yield 6); 1341 -> 1371 after the Embassy at t191 (+25)
+  impl:
+    - cpu/data/seats.ts:DELEGATION_COST
+    - cpu/data/seats.ts:EMBASSY_COST
+    - cpu/data/seats.ts:missionPrice
+    - ai/major/diploState.ts:answerAction
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/readings_dp2.md: ...action (Worth +0x24, Cost +0x18),   less the action's gold cost valued at the owner's Gold weight (0x527610 ->   0x7a6690), both sign-clipped by the owner's preference of the action   (+0x6240, the AiFavored..."
   context:
     - ...orth +0x24, Cost +0x18), less the action's gold cost valued at the owner's Gold weight (0x527610 -> 0x7a6690), both sign-clipped by the owner's preference of the action (+0x6240, the...
-  review: imported
+  review: reviewed
 - addr: 0x5276c0
   final: 0x371060
   kind: function

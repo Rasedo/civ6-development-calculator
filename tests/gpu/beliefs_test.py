@@ -80,10 +80,11 @@ def ready(sim, row: int, prophets: int = 1) -> int:
     return j
 
 
-def adopt(sim, row: int, picks: list) -> None:
-    """the record's BELIEF arm, exactly as the step applies it"""
+def adopt(sim, row: int, picks: list, religion: int = 0) -> None:
+    """the record's BELIEF arm, exactly as the step applies it — a founding
+    names its religion beside the beliefs"""
     t = torch.tensor(picks, dtype=torch.long).reshape(1, -1, 2) if picks else torch.full((1, 1, 2), -1)
-    sim.apply_seat_actions(row, beliefs=t)
+    sim.apply_seat_actions(row, beliefs=t, religion=torch.tensor([religion], dtype=torch.long))
     sim._seat_record_apply(row, ONES)
 
 
@@ -113,10 +114,18 @@ def test_founding(rules, path) -> None:
     adopt(sim, ROW, [[FOL, 2], [ENH, 0]])
     assert not bool(sim.civ_religion_done[B0, ROW]), "founded with no prophet"
     sim.civ_prophets[B0, ROW] = 1
+    # the founding names a religion no seat has founded
+    other = next(r for r in range(sim.n_majors) if r != ROW)
+    sim.civ_religion_type[B0, other] = 4
+    for bad_rel in (-1, sim._religion_types, 4):
+        adopt(sim, ROW, [[FOL, 2], [ENH, 0]], religion=bad_rel)
+        assert not bool(sim.civ_religion_done[B0, ROW]), f"founded religion {bad_rel}"
+    sim.civ_religion_type[B0, other] = -1
     # an Enhancer is as good a second belief as a Founder or a Worship one
     press0 = int(sim.city_pressure[B0, ROW, j, ROW])
-    adopt(sim, ROW, [[FOL, 2], [ENH, 0]])
+    adopt(sim, ROW, [[FOL, 2], [ENH, 0]], religion=4)
     assert bool(sim.civ_religion_done[B0, ROW]), "the founding was refused"
+    assert int(sim.civ_religion_type[B0, ROW]) == 4, "the founding's religion"
     assert held(sim, ROW) == [2, -1, -1, 0], f"held {held(sim, ROW)}"
     assert int(sim.civ_beliefs_earned[B0, ROW]) == sim._religion_initial_beliefs == 2, "the founding's beliefs earned"
     assert int(sim._belief_picks(ROW)[B0]) == 0, "the founding left a belief to adopt"
@@ -289,6 +298,44 @@ def test_mosque_and_dar_e_mehr(rules, path) -> None:
     print("  4 Mosque +1 spread, Dar-e Mehr disaster-proof OK")
 
 
+def test_pantheon(rules, path) -> None:
+    """The PANTHEON is the record's action (`foundPantheon`): the row it
+    names, paid from the seat's Faith once the turn's is in; a row another
+    seat holds, a seat with one, or a short purse is refused; the driver's
+    draw names an open row and the record carries it."""
+    sim = build(rules, path)
+    pfc = float(sim.rules.seats["pantheonFaithCost"])
+    ext = sim.seat_ext[:, ROW].clone()
+    sim.seat_ext[:, ROW] = True
+    sim.civ_pantheon_done[B0, ROW] = False
+    sim.civ_pantheon[B0, ROW] = -1
+    sim.pan_claimed[B0] = False
+
+    def pick(p: int) -> None:
+        sim.apply_seat_actions(ROW, pantheon=torch.tensor([p], dtype=torch.long))
+        sim._seat_pantheon_pick(ROW, ONES)
+
+    sim.civ_faith[B0, ROW] = pfc - 1
+    pick(3)
+    assert int(sim.civ_pantheon[B0, ROW]) == -1, "a short purse founded a pantheon"
+    sim.civ_faith[B0, ROW] = pfc + 5
+    sim.pan_claimed[B0, 3] = True
+    pick(3)
+    assert int(sim.civ_pantheon[B0, ROW]) == -1, "a held pantheon was founded twice"
+    sim.pan_claimed[B0, 3] = False
+    ob = neutral.seat_obs(sim, ROW)
+    assert ob[B0]["belief"]["pantheon_due"] and 3 in ob[B0]["belief"]["pantheon"], f"{ob[B0]['belief']}"
+    pa = drive._decide_pantheon(ob, ROW, [42], 0, sim.device)
+    assert pa is not None and int(pa[B0]) in ob[B0]["belief"]["pantheon"], f"the driver's pantheon {pa}"
+    pick(3)
+    assert int(sim.civ_pantheon[B0, ROW]) == 3 and bool(sim.pan_claimed[B0, 3]), "the named pantheon"
+    assert abs(float(sim.civ_faith[B0, ROW]) - 5.0) < 1e-9, "the price"
+    pick(4)
+    assert int(sim.civ_pantheon[B0, ROW]) == 3, "a second pantheon"
+    sim.seat_ext[:, ROW] = ext
+    print("  6 pantheon OK — the named row, the price, a held row and a short purse refused, the driver's draw")
+
+
 def test_obs_driver_record(rules, path) -> None:
     sim = build(rules, path)
     ready(sim, ROW)
@@ -303,12 +350,15 @@ def test_obs_driver_record(rules, path) -> None:
         nobs = neutral.seat_obs(sim, ROW)
         dec = drive._decide_beliefs(nobs, ROW, [42], turn, sim.device)
         assert dec is not None, "the driver skipped an open founding"
+        rel = drive._decide_religion(nobs, dec, ROW, [42], turn, sim.device)
+        assert rel is not None and int(rel[B0]) in nobs[B0]["belief"]["religion"], f"the driver's religion {rel}"
         # every decision slot by NAME, the others empty
         kw = {name: None for name in inspect.signature(records.extract_record).parameters}
         kw.update(sim=sim, row=ROW, b=B0, prod=(torch.full((1, 1), -1), torch.full((1, 1), -1)),
-                  seq=torch.full((1, 1, 1), -1), beliefs=dec)
+                  seq=torch.full((1, 1, 1), -1), beliefs=dec, religion=rel)
         rec = records.extract_record(**kw)
         assert rec["beliefs"] == dec[B0].tolist(), f"the record wrote {rec['beliefs']}"
+        assert rec["religion"] == int(rel[B0]), f"the record wrote religion {rec.get('religion')}"
         records.replay_seat(sim, ROW, rec)
         sim._seat_record_apply(ROW, ONES)
         assert bool(sim.civ_religion_done[B0, ROW]), f"the driver's founding {rec['beliefs']} was refused"
@@ -339,6 +389,7 @@ def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
     test_founding(rules, path)
+    test_pantheon(rules, path)
     test_enhancing(rules, path)
     test_worship_building(rules, path)
     test_mosque_and_dar_e_mehr(rules, path)

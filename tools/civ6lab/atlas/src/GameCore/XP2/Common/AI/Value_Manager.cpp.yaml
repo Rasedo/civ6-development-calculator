@@ -220,7 +220,7 @@
   kind: function
   name: yieldValue
   status: PARTLY
-  impl: [cpu/core/aiValue.ts:yieldValue]
+  impl: [cpu/core/aiValue.ts:yieldValue, ai/major/diploState.ts:answerAction]
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -228,6 +228,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"

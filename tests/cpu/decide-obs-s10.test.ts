@@ -12,7 +12,7 @@ import { SEAT_GROUPS } from '../../cpu/core/decideObsSeat';
 import { congressSessionDue, specialSessionDue, CONGRESS_CUR_FAITH } from '../../cpu/core/congress';
 import { EMG_CALLED } from '../../cpu/core/emergency';
 import { GP_CLASSES, GREAT_PEOPLE } from '../../cpu/data/greatPeople';
-import { BELIEF_CATALOGS } from '../../cpu/data/religion';
+import { BELIEF_CATALOGS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES } from '../../cpu/data/religion';
 import { TECHS, ERAS } from '../../cpu/data/techs';
 import {
   CONGRESS_BORDER_CONTROL, CONGRESS_INTERVAL, CONGRESS_MERCENARY, CONGRESS_MIGRATION,
@@ -77,6 +77,8 @@ describe('seat scalar groups', () => {
     expect(SEAT_GROUPS.belief(state, 0)).toEqual({
       found: false, enhance: 0, held: [-1, -1, -1, -1],
       follower: all(0), worship: all(1), founder: all(2), enhancer: all(3),
+      pantheon_due: (state.seats[0].faith ?? 0) >= PANTHEON_FAITH_COST, pantheon: PANTHEON_IDS.map((_id, i) => i),
+      religion: RELIGION_TYPES.map((_t, i) => i),
     });
     // a pantheon, a completed Holy Site, an activated prophet: founding opens
     const s = state.seats[0];
@@ -102,6 +104,13 @@ describe('seat scalar groups', () => {
     expect(g.worship).toEqual(all(1).filter((i) => worship[i] !== 'MOSQUE'));
     s.gpActivated.push(GREAT_PEOPLE.PROPHET[1].id);
     expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(0);
+    // the pantheon held and the religion founded leave their pools
+    state.claimedPantheons.push('GOD_OF_THE_SEA');
+    s.religion.type = RELIGION_TYPES[3];
+    const g2 = SEAT_GROUPS.belief(state, 0) as Record<string, unknown>;
+    expect(g2.pantheon_due).toBe(false);
+    expect(g2.pantheon).toEqual(PANTHEON_IDS.flatMap((id, i) => (id === 'GOD_OF_THE_SEA' ? [] : [i])));
+    expect(g2.religion).toEqual(RELIGION_TYPES.flatMap((_t, i) => (i === 3 ? [] : [i])));
     s.religion.beliefsEarned = 3;
     expect((SEAT_GROUPS.belief(state, 0) as Record<string, unknown>).enhance).toBe(1);
   });

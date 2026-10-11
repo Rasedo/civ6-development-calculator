@@ -473,6 +473,9 @@ export const PANTHEONS: Record<string, BeliefDef> = Object.fromEntries(
   ].map((b) => [b.id, b]),
 );
 
+/** the pantheon catalog's rows, in data order: the record's `pantheon` */
+export const PANTHEON_IDS: readonly string[] = Object.keys(PANTHEONS);
+
 export const FOLLOWER_BELIEFS: Record<string, BeliefDef> = Object.fromEntries(
   [
     B('WORK_ETHIC', 'Work Ethic', 'Holy Site adjacency bonus also provides production.', {
@@ -652,10 +655,26 @@ export function worshipBuildingOf(beliefId: string | null | undefined): string |
   return beliefId ? WORSHIP_BELIEFS[beliefId]?.effects.worshipBuilding : undefined;
 }
 
-export const RELIGION_NAMES = [
-  'Buddhism', 'Catholicism', 'Confucianism', 'Hinduism', 'Islam', 'Judaism',
-  'Orthodoxy', 'Protestantism', 'Shinto', 'Sikhism', 'Taoism', 'Zoroastrianism',
-];
+/** THE RELIGIONS a founding may take (Religions.xml, table order, RELIGION_
+ *  stripped): every row but the pantheon's and those that require a custom
+ *  name (RELIGION_CUSTOM_*, a human's own naming). The game names a religion
+ *  by its type (Religions.Name); which type a founding takes is the founder's
+ *  decision — the record's `religion` — and no two seats hold one. */
+export const RELIGION_TYPES: readonly string[] = srcConst('religion.types', [
+  'BUDDHISM', 'CATHOLICISM', 'CONFUCIANISM', 'HINDUISM', 'ISLAM', 'JUDAISM',
+  'ORTHODOXY', 'PROTESTANTISM', 'SHINTO', 'SIKHISM', 'TAOISM', 'ZOROASTRIANISM',
+], {
+  derived: 'the Religions rows with Pantheon not true and RequiresCustomName false, in the table order, RELIGION_ prefix stripped',
+  inputs: [xml('Religions', 'ReligionType=RELIGION_PANTHEON', 'Pantheon', { expect: true }),
+    xml('Religions', 'ReligionType=RELIGION_BUDDHISM', 'RequiresCustomName', { expect: false }),
+    xml('Religions', 'ReligionType=RELIGION_ZOROASTRIANISM', 'RequiresCustomName', { expect: false }),
+    xml('Religions', 'ReligionType=RELIGION_CUSTOM_1', 'RequiresCustomName', { expect: true })],
+});
+
+/** a religion type's name as the game shows it */
+export function religionName(type: string | null | undefined): string {
+  return type ? type.charAt(0) + type.slice(1).toLowerCase() : 'no religion';
+}
 
 /** CIV6 (RELIGION_PANTHEON_MIN_FAITH 25): the Faith a pantheon costs, through
  *  the game speed at setup (DLL 0x340c90 -> 0x5254d0, CostMultiplier / 100

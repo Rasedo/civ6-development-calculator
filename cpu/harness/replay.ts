@@ -37,8 +37,8 @@ import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, uni
   buyWorshipBuilding, purchaseBuildingWithFaith, purchaseCivilianWithFaith, purchaseReligiousUnit, purchaseUnitWithFaith,
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize } from '../core/game';
-import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, sendMission, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
+import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, foundPantheon, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
+  placeSeatDistrict, putOffer, answerOffer, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
@@ -71,7 +71,9 @@ import { PROJECTS } from '../data/projects';
 import { TECHS } from '../data/techs';
 import { CIVICS } from '../data/civics';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST } from '../data/policies';
-import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_FAITH_COST, gainPopulationPressure } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, PANTHEONS, PANTHEON_IDS, RELIGION_TYPES, gainPopulationPressure } from '../data/religion';
+import { missionOf, missionPayable } from '../core/deals';
+import { DEAL_MISSION } from '../data/seats';
 import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
@@ -1016,41 +1018,62 @@ function turnStartCompletions(ctx: Ctx, b: TurnRecord, turn: number): Map<number
   return out;
 }
 
-/** a Delegation or Resident Embassy the game's diplomacy log names: the
- *  sender and the receiver (player ids) */
-interface MissionEvent { kind: 'delegation' | 'embassy'; from: number; to: number }
+/** a Delegation or Resident Embassy a major proposed — DiplomacyManager.csv's
+ *  SET_DELEGATION / SET_EMBASSY ("Processing Action From AI to AI") — and
+ *  the receiver's answer: accepted where DiplomacySummary.csv names the
+ *  mission that turn (player ids) */
+interface MissionEvent { kind: 'delegation' | 'embassy'; from: number; to: number; accepted: boolean }
 
-/** DiplomacySummary.csv's missions by the turn they were sent: the majors'
- *  diplomatic actions, decisions the replay carries out */
+/** the logs' mission proposals and answers by the turn they were made */
 function readMissions(dumpPath: string): Map<number, MissionEvent[]> {
   const out = new Map<number, MissionEvent[]>();
-  const path = dumpPath.replace(/\.jsonl$/, '.logs/') + 'DiplomacySummary.csv';
-  if (!existsSync(path)) return out;
-  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
-    const c = line.split(',').map((x) => x.trim());
-    if (c[3] !== 'Delegation' && c[3] !== 'Embassy') continue;
+  const base = dumpPath.replace(/\.jsonl$/, '.logs/');
+  if (!existsSync(base + 'DiplomacyManager.csv') || !existsSync(base + 'DiplomacySummary.csv')) return out;
+  const rows = (f: string) => readFileSync(base + f, 'utf8').split('\n').slice(1).map((l) => l.split(',').map((x) => x.trim()));
+  const accepted = new Set<string>();
+  for (const c of rows('DiplomacySummary.csv')) {
+    if (c[3] === 'Delegation' || c[3] === 'Embassy') accepted.add(`${c[0]}:${c[1]}:${c[2]}:${c[3] === 'Delegation' ? 'delegation' : 'embassy'}`);
+  }
+  for (const c of rows('DiplomacyManager.csv')) {
+    if (c[4] !== 'SET_DELEGATION' && c[4] !== 'SET_EMBASSY') continue;
     const t = Number(c[0]);
+    const kind = c[4] === 'SET_DELEGATION' ? 'delegation' : 'embassy';
     if (!out.has(t)) out.set(t, []);
-    out.get(t)!.push({ kind: c[3] === 'Delegation' ? 'delegation' : 'embassy', from: Number(c[1]), to: Number(c[2]) });
+    out.get(t)!.push({ kind, from: Number(c[1]), to: Number(c[2]), accepted: accepted.has(`${t}:${c[1]}:${c[2]}:${kind}`) });
   }
   return out;
 }
 
-/** the turn's missions: the engine's own verb (`sendMission`), else laid as
- *  the log names them */
-function imposeMissions(ctx: Ctx, events: readonly MissionEvent[]): void {
+/** THE TURN'S MISSIONS as the two majors' actions on the engine's table: the
+ *  sender's offer of its MISSION (`putOffer`), then the receiver's answer —
+ *  its acceptance (`answerOffer`) where the record's receiver accepted, none
+ *  where it refused (the offer lapses). The receiver's own AI answers beside
+ *  it (`DiplomacyProbe.answer`). What the engine's table cannot carry is laid
+ *  as the record holds it. */
+function applyMissions(ctx: Ctx, events: readonly MissionEvent[], probe: DiplomacyProbe): void {
+  const { state } = ctx;
   for (const e of events) {
     const a = seatOfP(ctx, e.from);
     const b = seatOfP(ctx, e.to);
-    const actor = seatOf(ctx.state, a) as Seat | undefined;
-    if (!actor || !isCiv(a) || !isCiv(b)) {
-      count(ctx, 'diplo:mission', 'refused', e.from);
+    const sender = seatOf(state, a) as Seat | undefined;
+    const receiver = seatOf(state, b) as Seat | undefined;
+    if (!sender || !receiver || !isCiv(a) || !isCiv(b)) {
+      count(ctx, 'diplo:missionOffer', 'refused', e.from);
       continue;
     }
     const want = e.kind === 'embassy' ? MISSION_EMBASSY : MISSION_DELEGATION;
-    const ok = sendMission(ctx.state, actor, b) && delegationWith(ctx.state, a, b) === want;
-    if (!ok) setDelegationWith(ctx.state, a, b, want);
-    count(ctx, 'diplo:mission', ok ? 'applied' : 'fallback', e.from, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
+    probe.answer(state, b, a, want, e.accepted);
+    const why = missionOf(state, a) !== want ? `the sender's mission is the other kind`
+      : !missionPayable(state, a, b) ? `not payable: held ${delegationWith(state, a, b)} treasury ${Math.round(sender.treasury ?? 0)}` : undefined;
+    const offered = !why && putOffer(state, sender, [b, [[DEAL_MISSION, 0, 0]], []]);
+    count(ctx, 'diplo:missionOffer', offered ? 'applied' : 'fallback', e.from, offered ? undefined : `${e.kind} ${e.from}->${e.to} ${why ?? 'no table'}`);
+    if (!e.accepted) {
+      count(ctx, 'diplo:missionAnswer', 'applied');
+      continue;
+    }
+    const ok = offered && answerOffer(state, receiver, a) && delegationWith(state, a, b) === want;
+    if (!ok) setDelegationWith(state, a, b, want);
+    count(ctx, 'diplo:missionAnswer', ok ? 'applied' : 'fallback', e.to, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
   }
 }
 
@@ -1637,19 +1660,23 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         if (!s || !id) { count(ctx, 'pantheon', 'refused', d.player); break; }
         const had = s.religion.pantheon;
         if (had === id) { count(ctx, 'pantheon', 'applied'); break; }
-        if (had) state.claimedPantheons = state.claimedPantheons.filter((x) => x !== had);
-        const paid = !had && (s.faith ?? 0) >= PANTHEON_FAITH_COST;
-        if (paid) {
-          s.faith -= PANTHEON_FAITH_COST;
-          pantheonMoment(state, s.seat);
+        // the player's pick as its action (`foundPantheon`, the record's
+        // `pantheon` row), else laid as the record holds it
+        const res = had ? { ok: false, reason: `a pantheon ${had} stands` } : foundPantheon(state, s.seat, PANTHEON_IDS.indexOf(id));
+        if (res.ok) {
+          matchNewUnits(ctx, b);
+          count(ctx, 'pantheon', 'applied');
+          break;
         }
+        if (had) state.claimedPantheons = state.claimedPantheons.filter((x) => x !== had);
+        if (!had) pantheonMoment(state, s.seat);
         s.religion.pantheon = id;
         if (!state.claimedPantheons.includes(id)) state.claimedPantheons.push(id);
         if (!had) {
           grantPantheonUnit(state, s.seat, id);
           matchNewUnits(ctx, b);
         }
-        count(ctx, 'pantheon', paid ? 'applied' : 'fallback', d.player);
+        count(ctx, 'pantheon', 'fallback', d.player, res.reason);
         break;
       }
       case 'religion': {
@@ -1682,7 +1709,9 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
             activateGreatPerson(state, prophet);
           }
         }
-        const adopted = picks.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, picks, holyAt) : { ok: false, reason: 'no belief to adopt' };
+        // the founding's religion, the player's choice (the record's type)
+        const religion = r.type ? RELIGION_TYPES.indexOf(r.type) : -1;
+        const adopted = picks.length && (s.religion.founded || r.founded) ? adoptBeliefs(state, seat, picks, religion, holyAt) : { ok: false, reason: 'no belief to adopt' };
         if (adopted.ok) { count(ctx, 'religion', 'applied'); break; }
         const founding = !s.religion.founded && r.founded;
         // the founding's moment, as the engine's own founding pays it
@@ -2998,12 +3027,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       takeBarbs(st, false);
     });
     const tribesBefore = state.barbTribes?.length ?? 0;
-    // A PANTHEON is its player's decision (`pantheon`), which the game's AI
-    // takes when it will, not on the first turn its faith covers the price
-    // (runs/h1_duelw1118 China: 12 Faith at t28, founded at t29): the
-    // engine's own race finds none open in the turn
-    const claimed = state.claimedPantheons;
-    state.claimedPantheons = Object.keys(PANTHEONS);
     const rosters = new Map(state.seats.map((s) => [s.seat, structuredClone(governorsOf(s))]));
     // THE ACTIVE PLAYER'S START runs first in the engine's turn, and in the
     // game after the city-states' starts the record's pair holds (record
@@ -3025,8 +3048,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     } catch (e) {
       report.stopped = `endTurn threw at turn ${a.turn}: ${(e as Error).message}`;
       break;
-    } finally {
-      state.claimedPantheons = claimed;
     }
     holdMinorCatchUp(null);
     undoGovernorScript(state, rosters);
@@ -3042,7 +3063,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
-    imposeMissions(ctx, missions.get(a.turn) ?? []);
+    applyMissions(ctx, missions.get(a.turn) ?? [], diplomacy);
     operationsAi.postTurn(b);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);

@@ -11,7 +11,7 @@ import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
-import { atRngPoint, randRange, randWeighted } from './rand';
+import { atRngPoint, randWeighted } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
 import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
@@ -45,7 +45,7 @@ import { RESOURCES } from '../../world/resources';
 import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
 import { availableBuildings, buildingCompletable, buildingCostIn, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
-import { PANTHEONS, PANTHEON_FAITH_COST } from '../data/religion';
+import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
 import { CITY_WORK_RADIUS, scaleByGameSpeed, GOLD_PURCHASE_MULT, MP_SCALE, RAILROAD_TECH, borderGrowthCost, FAITH_PURCHASE_MULT, amenityTierIndex } from '../data/constants';
 import { cityDistrictSum, darkBuildings, stampBuildingEra } from './yields';
 import type { CityStats } from './city';
@@ -108,15 +108,15 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { AGREEMENT_TURNS, ALLIANCE_CIVIC, ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, CIV_LEADERS, MAX_CITIES_PER_SEAT, OPEN_BORDERS_CIVIC, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_WEIGHTS, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
-import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, grievanceWith, settlePromises } from './grievance';
+import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarDeclared, settlePromises } from './grievance';
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
 import { improvementMoment } from './moments';
 import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, MISSION_DELEGATION, MISSION_EMBASSY, setPeaceTurnWith } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat, leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
@@ -158,6 +158,30 @@ export function grantPantheonUnit(state: GameState, seat: number, pantheon: stri
   if (!unit || !cap || !s || !spawnUnit(state, unit, cap.centerIndex, seat)) return;
   if (unit === 'SETTLER') s.settlersTrained = (s.settlersTrained ?? 0) + 1;
   if (unit === 'BUILDER') s.buildersTrained += 1;
+}
+
+/**
+ * `seat` FOUNDS THE PANTHEON at row `index` of the catalog — the record's
+ * `pantheon`, `_seat_pantheon_pick`'s twin. CIV6
+ * (RELIGION_PANTHEON_MIN_FAITH): a seat with no pantheon, the price in its
+ * Faith, a belief no pantheon holds. The price is paid, the era moment
+ * scored, the belief claimed and its capital unit granted.
+ */
+export function foundPantheon(state: GameState, seat: number, index: number): RuleResult {
+  const actor = seatOf(state, seat) as Seat | undefined;
+  const pick = Number.isInteger(index) ? PANTHEON_IDS[index] : undefined;
+  if (!actor || !isCiv(seat)) return { ok: false, reason: 'No such major.' };
+  if (!pick) return { ok: false, reason: 'No such pantheon.' };
+  if (actor.religion.pantheon !== null) return { ok: false, reason: 'A pantheon is founded already.' };
+  if (state.claimedPantheons.includes(pick)) return { ok: false, reason: 'Another seat holds that pantheon.' };
+  if ((actor.faith ?? 0) < PANTHEON_FAITH_COST) return { ok: false, reason: 'Not enough Faith.' };
+  actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
+  state.claimedPantheons.push(pick);
+  pantheonMoment(state, seat);
+  actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
+  grantPantheonUnit(state, seat, pick);
+  state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
+  return { ok: true };
 }
 
 export function nextCityName(actor: Seat): string {
@@ -1719,7 +1743,7 @@ export function applySeatActionRecord(state: GameState, actor: Seat, rec: SeatAc
   if (rec.gpPass !== undefined && rec.gpPass >= 0) passGreatPerson(state, actor.seat, rec.gpPass);
   // The BELIEFS the seat's religion adopts: founding or enhancing, validated
   // whole by `adoptBeliefs` and refused whole.
-  if (rec.beliefs?.length) adoptBeliefs(state, actor.seat, rec.beliefs);
+  if (rec.beliefs?.length) adoptBeliefs(state, actor.seat, rec.beliefs, rec.religion);
   for (const [centre, aCol, aTile] of prodPairs) {
     const civCity = actor.cities.find((c) => c.centerIndex === centre);
     if (!civCity) continue;                          // centre not this engine's city (drifted state)
@@ -2410,40 +2434,39 @@ export function healCities(state: GameState): void {
   }
 }
 
-/**
- * A MISSION `actor` sends to major `tj`, true where it is sent. CIV6
- * (DiplomaticActions): the Delegation (NoCurrentDelegation, obsolete for the
- * sender with Diplomatic Service) before the civic, the Resident Embassy
- * (NoCurrentEmbassy, its prerequisite) after it — an Embassy takes a standing
- * Delegation's place; to a major met, with a city, the cost in the treasury.
- * A rival worse than Neutral turns the mission away, which this model reads
- * as the two states it can name: a war, or a denouncement either way.
- */
-export function sendMission(state: GameState, actor: Seat, tj: number): boolean {
+/** THE OFFER `actor` puts on the table — [the other seat, what it GIVES,
+ *  what it ASKS] — to a major it has met that holds a city, within
+ *  DEAL_ITEMS a side; true where it stands. It moves nothing: the other
+ *  seat's acceptance does (`answerOffer`). */
+export function putOffer(state: GameState, actor: Seat, offer: NonNullable<SeatActionRecord['offer']>): boolean {
+  const [tj, give, ask] = offer;
   const target = seatOf(state, tj);
-  if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) return false;
-  const embassy = actor.research.civics.includes(EMBASSY_CIVIC);
-  const held = delegationWith(state, actor.seat, target.seat);
-  if (embassy ? held === MISSION_EMBASSY : held > 0) return false;
-  const cost = embassy ? EMBASSY_COST : DELEGATION_COST;
-  if ((actor.treasury ?? 0) < cost) return false;
-  if (civsAtWar(state, actor.seat, target.seat)) return false;
-  if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) return false;
-  // "...which is paid to the other leader."
-  actor.treasury = (actor.treasury ?? 0) - cost;
-  target.treasury = (target.treasury ?? 0) + cost;
-  setDelegationWith(state, actor.seat, target.seat, embassy ? MISSION_EMBASSY : MISSION_DELEGATION);
-  state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
+  if (!target || !isCiv(tj) || tj === actor.seat || target.cities.length === 0 || !majorsMet(state, actor.seat, tj)
+      || give.length > DEAL_ITEMS || ask.length > DEAL_ITEMS) return false;
+  setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
+  return true;
+}
+
+/** `actor` presses Accept Deal on `fj`'s standing offer; true where the
+ *  table clears. CIV6 (Ending a War): "the peaceful resolution of a war
+ *  involves diplomatic negotiations" — a table between two seats at war IS
+ *  the peace deal, so confirming it is what ends the war. */
+export function answerOffer(state: GameState, actor: Seat, fj: number): boolean {
+  const wasWar = civsAtWar(state, fj, actor.seat);
+  const from = seatOf(state, fj);
+  if (!from || !majorsMet(state, fj, actor.seat) || !acceptDeal(state, fj, actor.seat)) return false;
+  if (wasWar) makePeace(state, from, actor.seat);
+  state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
   return true;
 }
 
 /**
  * ONE SEAT'S DIPLOMACY, at the tail of its own turn: the record's
- * agreements in the GPU's arm order — denounce, friendship, the alliance
- * friendship unlocks, the delegation, the border grant, the gifts — then its
- * offer on the table and its answers to the offers standing there, then its
- * promise asks, each answered at once by the promiser's own record (a keep
- * made, else a refusal). Every arm is re-validated here — the record only
+ * denouncements and gifts in the GPU's arm order, then its offer on the
+ * table — a mission, a friendship, an alliance, open borders and every trade
+ * are PROPOSALS the other seat answers (`dealItemPayable`) — and its answers
+ * to the offers standing there, then its promise asks, each answered at once
+ * by the promiser's own record (a keep made, else a refusal). Every arm is re-validated here — the record only
  * names the target, a major the seat has met (`majorsMet`). A seat with no
  * city takes no diplomacy.
  */
@@ -2461,51 +2484,6 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
     actor.denounced[target.seat] = state.turn;
     grievanceDenounce(state, actor.seat, target.seat);
     state.eventLog.push(`${actor.name} denounces ${target.name}.`);
-  }
-  for (const tj of recG?.friend ?? []) {
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
-    if (civsAtWar(state, actor.seat, target.seat)) continue;
-    if (seatsFriends(state, actor.seat, target.seat)) continue;
-    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-    // CIV6 (Alliance): "A leader you've offended (or who has many Grievances
-    // against you in Gathering Storm) will not want to become Declared
-    // Friends with you." Either side's outstanding balance refuses.
-    if (grievanceWith(state, actor.seat, target.seat) !== 0) continue;
-    setFriendTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
-    state.eventLog.push(`${actor.name} and ${target.name} declare friendship.`);
-  }
-  const allyList = recG?.ally ?? [];
-  for (let tk = 0; tk < allyList.length; tk++) {
-    const tj = allyList[tk];
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
-    // CIV6 (Alliance): "Alliances become possible after developing the Civil
-    // Service civic. You can only enter into an Alliance with a
-    // civilization if you and its leader are Declared Friends."
-    if (!actor.research.civics.includes(ALLIANCE_CIVIC)) continue;
-    if (!seatsFriends(state, actor.seat, target.seat)) continue;
-    if (civsAtWar(state, actor.seat, target.seat) || seatsAllied(state, actor.seat, target.seat)) continue;
-    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-    setAllyTurnsWith(state, actor.seat, target.seat, AGREEMENT_TURNS);
-    // The record names the TYPE beside the target; an absent column reads
-    // RESEARCH, the wire's one default (the GPU replay parser matches).
-    setAllianceTypeWith(state, actor.seat, target.seat, recG?.allyType?.[tk] ?? 0);
-    state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
-  }
-  for (const tj of recG?.delegation ?? []) sendMission(state, actor, tj);
-  for (const tj of recG?.borders ?? []) {
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
-    // CIV6 (Open Borders): the agreement "becomes available" once the
-    // GRANTOR has Early Empire — the civic that closed the border in the
-    // first place. "Open Borders cannot be offered to or requested from a
-    // leader who has Denounced you, or whom you have Denounced."
-    if (!actor.research.civics.includes(OPEN_BORDERS_CIVIC)) continue;
-    if (civsAtWar(state, actor.seat, target.seat)) continue;
-    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-    setBorderTurnsFrom(state, actor.seat, target.seat, AGREEMENT_TURNS);
-    state.eventLog.push(`${actor.name} opens its borders to ${target.name}.`);
   }
   for (const [kind, tj] of recG?.gift ?? []) {
     // CIV6 (Trading): "You may trade almost anything in the game, including
@@ -2531,24 +2509,8 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
   }
   // THE TABLE: this seat's offer goes down, then its answers to the offers
   // standing — an offer nobody takes stands until `dealPhase` sweeps it.
-  if (recG?.offer) {
-    const [tj, give, ask] = recG.offer;
-    const target = seatOf(state, tj);
-    if (target && isCiv(tj) && tj !== actor.seat && target.cities.length > 0 && majorsMet(state, actor.seat, tj)
-        && give.length <= DEAL_ITEMS && ask.length <= DEAL_ITEMS) {
-      setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
-    }
-  }
-  for (const fj of recG?.accept ?? []) {
-    // CIV6 (Ending a War): "the peaceful resolution of a war involves
-    // diplomatic negotiations" — a table between two seats at war IS the
-    // peace deal, so confirming it is what ends the war.
-    const wasWar = civsAtWar(state, fj, actor.seat);
-    const from = seatOf(state, fj);
-    if (!from || !majorsMet(state, fj, actor.seat) || !acceptDeal(state, fj, actor.seat)) continue;
-    if (wasWar) makePeace(state, from, actor.seat);
-    state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
-  }
+  if (recG?.offer) putOffer(state, actor, recG.offer);
+  for (const fj of recG?.accept ?? []) answerOffer(state, actor, fj);
   // THE PROMISES this seat asks: each settles at once against the promiser's
   // own record — kept where that record keeps it, refused otherwise
   // (`settlePromises`).
@@ -3016,24 +2978,9 @@ export function seatPhase(state: GameState): void {
 
     advanceGreatPeople(state, actor.seat);
 
-    // The PANTHEON RACE — an eager rule for EVERY seat row: the pick is ONE
-    // integer draw over the open pool in data order (Civ 6's AI picks its
-    // belief with no draw of the game's; the gate and the draw mirror the
-    // GPU's row-generic `_seat_pantheon_race`). A religion's own beliefs are
-    // the record's `beliefs` arm (`adoptBeliefs`). Pantheon: costs
-    // PANTHEON_FAITH_COST from this seat's own faith.
-    if (actor.religion.pantheon === null && (actor.faith ?? 0) >= PANTHEON_FAITH_COST) {
-      const open = Object.keys(PANTHEONS).filter((id) => !state.claimedPantheons.includes(id));
-      if (open.length > 0) {
-        actor.faith = (actor.faith ?? 0) - PANTHEON_FAITH_COST;
-        const pick = open[randRange(state, open.length, 'Engine: pantheon')];
-        state.claimedPantheons.push(pick);
-        pantheonMoment(state, actor.seat);
-        actor.religion.pantheon = pick; // the id IS the claim; effects apply via getModifiers
-        grantPantheonUnit(state, actor.seat, pick);
-        state.eventLog.push(`${actor.name} founded a pantheon (${PANTHEONS[pick].name} is taken).`);
-      }
-    }
+    // THE PANTHEON the record names, once the turn's Faith is in (the AI
+    // turn picks it after the start's yields: AI::Religious 0x74e2b0).
+    if (rec?.pantheon !== null && rec?.pantheon !== undefined) foundPantheon(state, actor.seat, rec.pantheon);
 
     // its religion, if it founded one, spreads with its faith, before its
     // cities (PlayerReligion 0x4967f0: the faith, then the spread 0x498570;

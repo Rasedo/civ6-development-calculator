@@ -43,7 +43,7 @@ import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { governorFlag, governorSum, governorTileMult } from './governors';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { ERAS } from '../data/techs';
-import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_NAMES, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
+import { ENHANCER_BELIEFS, colonizeFoundingPressure, BELIEF_CATALOGS, BELIEF_CLASS_FOLLOWER, BELIEF_SLOTS, RELIGION_INITIAL_BELIEFS, beliefIdAt, RELIGION_TYPES, religionName, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, followedReligionOf, unconvertedOf, gainPopulationPressure, ATHEISM_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, MISSIONARY_CAP, APOSTLE_CAP, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, LAUNCH_INQUISITION_CHARGES, REMOVE_HERESY_PCT, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING } from '../data/religion';
 import { PROJECTS, SPACE_FLIGHT_LY, type ProjectDef } from '../data/projects';
 import { CITY_NAMES, CITY_NAME_DRAW, GOLD_PURCHASE_MULT, FAITH_PURCHASE_MULT, scaleByGameSpeed, gameProgressPct, gameProgressK, progressCost, plotPrice } from '../data/constants';
 import { randRange } from './rand';
@@ -2116,7 +2116,7 @@ export function evangelizeBelief(state: GameState, unit: Unit, actor: Seat): Rul
   if (!evangelizeOk(state, unit, actor.seat)) return { ok: false, reason: 'No belief left to evangelize.' };
   actor.religion.beliefsEarned = (actor.religion.beliefsEarned ?? 0) + 1;
   disbandUnit(state, unit.id);
-  state.eventLog.push(`${actor.name} evangelized a belief of ${actor.religion.name}.`);
+  state.eventLog.push(`${actor.name} evangelized a belief of ${religionName(actor.religion.type)}.`);
   return { ok: true };
 }
 
@@ -2145,9 +2145,11 @@ export function enhanceableClasses(state: GameState, seat: number): number[] {
  * religion still lacks that has a belief left. Every pick names a belief no
  * religion holds. A set that does not fit is refused entire. The holy city is
  * the seat's city at `holyTile` (where its Great Prophet founded), else its
- * capital.
+ * capital. A founding takes `religion`, the `RELIGION_TYPES` row the founder
+ * chose (AI::Religious 0x750fe0), one no seat has founded.
  */
-export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[], holyTile?: number): RuleResult {
+export function adoptBeliefs(state: GameState, seat: number, picks: readonly (readonly [number, number])[],
+                             religion?: number | null, holyTile?: number): RuleResult {
   const sx = seatOf(state, seat);
   if (!sx) return { ok: false, reason: 'No such seat.' };
   const rel = sx.religion;
@@ -2164,6 +2166,10 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
     if (picks.length !== RELIGION_INITIAL_BELIEFS || cls[0] !== BELIEF_CLASS_FOLLOWER) {
       return { ok: false, reason: 'Founding takes the Follower belief, then one belief of another class.' };
     }
+    const type = Number.isInteger(religion) ? RELIGION_TYPES[religion!] : undefined;
+    if (!type || state.seats.some((o) => o.religion.type === type)) {
+      return { ok: false, reason: 'Founding names a religion no seat has founded.' };
+    }
   } else {
     const check = canEnhanceReligion(state, seat);
     if (!check.ok) return check;
@@ -2179,13 +2185,13 @@ export function adoptBeliefs(state: GameState, seat: number, picks: readonly (re
   if (founding) {
     rel.founded = true;
     rel.beliefsEarned = RELIGION_INITIAL_BELIEFS;
-    rel.name = RELIGION_NAMES[seat % RELIGION_NAMES.length];
+    rel.type = RELIGION_TYPES[religion!];
     religionMoment(state, seat);
     rel.holyTile = (sx.cities.find((c) => c.centerIndex === holyTile) ?? sx.cities.find((c) => c.isCapital) ?? sx.cities[0])?.centerIndex ?? null;
     grantFoundingPressure(state, seat);
-    state.eventLog.push(`${sx.name} founded ${rel.name}.`);
+    state.eventLog.push(`${sx.name} founded ${religionName(rel.type)}.`);
   } else {
-    state.eventLog.push(`${sx.name} enhanced ${rel.name}.`);
+    state.eventLog.push(`${sx.name} enhanced ${religionName(rel.type)}.`);
   }
   return { ok: true };
 }

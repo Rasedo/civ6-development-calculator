@@ -190,7 +190,13 @@ def controlled_pair(rules, path, extra_for_a: bool = True, slot: int = 0):
 def want(sim, row: int, verb: str, target: int, kind: int | None = None):
     """Hand ONE want-mask to the engine arm and let it re-validate. The driver
     decides these; a poke names the pair directly so the RULE is what is under
-    test, never the scan that proposed it."""
+    test, never the scan that proposed it. The agreements and the mission are
+    PROPOSALS: `deal` puts the item on the table and the target accepts it."""
+    item = {"friend": sim._deal_k_friend, "ally": sim._deal_k_alliance, "borders": sim._deal_k_borders,
+            "delegation": sim._deal_k_mission}.get(verb)
+    if item is not None:
+        deal(sim, row, target, [[item, 0 if kind is None else kind, 0]], [])
+        return
     if kind is None:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=sim.device)
         m[:, target] = True
@@ -855,9 +861,11 @@ def poke_deal(rules, path):
         assert int(sim.civ_stockpile[0, b, 0]) == 0
         assert int(sim.civ_stockpile[0, a, 0]) == 20, "the lump never came home"
 
-    # An OPEN BORDERS grant rides the border clock, never a deal term.
+    # An OPEN BORDERS grant rides the border clock, never a deal term — the
+    # grantor's Early Empire opens it.
     clear_pairs(sim)
     sim.civ_treasury[:] = 1000.0
+    sim.civ_civics[:, a, sim._open_borders_civic] = True
     deal(sim, a, b, [[K._deal_k_borders, 0, 0]], [[K._deal_k_gold, 20, 0]])
     assert int(sim.seat_borders_turns[0, a, b]) == int(sim._agreement_turns)
     assert int(sim.seat_borders_turns[0, b, a]) == 0, "the grant is DIRECTED"

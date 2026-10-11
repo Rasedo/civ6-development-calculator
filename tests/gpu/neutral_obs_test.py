@@ -263,7 +263,8 @@ def check_static(sim, st, twin) -> None:
         "delegation_cost": sim._deleg_cost, "deal_items": sim._deal_items, "comp_aid": sim._comp_aid,
         "deal_kind": {"GOLD": sim._deal_k_gold, "FAVOR": sim._deal_k_favor, "RESOURCE": sim._deal_k_res,
                       "SPY": sim._deal_k_spy, "OPEN_BORDERS": sim._deal_k_borders, "JOINT_WAR": sim._deal_k_joint,
-                      "LUXURY": sim._deal_k_lux},
+                      "LUXURY": sim._deal_k_lux, "MISSION": sim._deal_k_mission,
+                      "FRIENDSHIP": sim._deal_k_friend, "ALLIANCE": sim._deal_k_alliance},
         "scaffold": [sim.districts_cat[di].get("id") for di, *_r in sim._scaffold],
     }
     for f, w in want.items():

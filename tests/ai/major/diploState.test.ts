@@ -2,7 +2,7 @@
 // start state, the required transitions' bounds, the war and peace triggers,
 // and an allowed row left untaken while its desires are unread.
 import { describe, expect, it } from 'vitest';
-import { diploState, diploStateTurn, newDiploStateGaps, newDiploStateMemory } from '../../../ai/major/diploState';
+import { answerAction, diploState, diploStateTurn, newDiploStateGaps, newDiploStateMemory } from '../../../ai/major/diploState';
 import type { MajorView } from '../../../ai/major/view';
 
 function view(turn: number, war = false): MajorView {
@@ -43,5 +43,20 @@ describe('the diplomatic state turn (0x67b6e0)', () => {
     expect(diploState(mem, 0, 1)).toBe('DIPLO_STATE_UNFRIENDLY');
     diploStateTurn(view(4, false), mem, 0, () => 30, gaps);
     expect(diploState(mem, 0, 1)).toBe('DIPLO_STATE_NEUTRAL');
+  });
+});
+
+describe('the receiver\'s answer (0x653f60)', () => {
+  // a Gold weight of 0.4 (runs/h1_duelv1127 t68 / t79: 0.5 x gold x 1.4)
+  const v = { yieldWeight: () => Math.round(0.4 * 256) } as unknown as MajorView;
+  it('accepts a mission in Neutral, where the gold it is paid outweighs the state\'s cost', () => {
+    // Embassy: 15 - 25 x 0.5 x 1.4 = -2.5
+    expect(answerAction(v, 'DIPLO_STATE_NEUTRAL', 0, 'DIPLOACTION_RESIDENT_EMBASSY', 25)).toBe(true);
+  });
+  it('refuses in Unfriendly (Cost 75 / 100), and an action its state does not list', () => {
+    expect(answerAction(v, 'DIPLO_STATE_UNFRIENDLY', 0, 'DIPLOACTION_DIPLOMATIC_DELEGATION', 10)).toBe(false);
+    expect(answerAction(v, 'DIPLO_STATE_UNFRIENDLY', 0, 'DIPLOACTION_RESIDENT_EMBASSY', 25)).toBe(false);
+    expect(answerAction(v, 'DIPLO_STATE_WAR', 0, 'DIPLOACTION_RESIDENT_EMBASSY', 25)).toBe(false);
+    expect(answerAction(v, null, 0, 'DIPLOACTION_RESIDENT_EMBASSY', 25)).toBe(false);
   });
 });

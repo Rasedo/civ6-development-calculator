@@ -9,11 +9,16 @@
   cases:
     - recording: h1_duelv1127
       value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+  impl:
+    - cpu/core/deals.ts:missionPayable
+    - gpu/core/sim_deals.py:_mission_ok
+    - ai/major/diploState.ts:answerAction
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...0x674900 on +0x2238[target]; done[target]=1; reset; rescan. One action per target/turn. - Receiver (0x237c60 delegation handler): if receiver not human: r = 0x653f60 (receiver AI):   action must be in receive..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...rflow from   slot 0, and lowers the balance by the amount. - THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):   an AI receiver answers by 0x653f60: an action outside its state's lists..."
   context:
     - "- THE RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330): an AI receiver answers by 0x653f60: an action outside its sta..."
-  review: imported
+  review: reviewed

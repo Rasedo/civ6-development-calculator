@@ -82,6 +82,9 @@ def build(rules, path):
         sim.seat_ally_turns[:, :nrow, :nrow] = 0
         sim.treaty_turns[:, :nrow, :nrow] = 0
         sim.civ_grievance.zero_()
+        # every major has met every other: a declaration needs the meeting
+        off = ~torch.eye(nrow, dtype=torch.bool, device=sim.device)
+        sim.seat_met_turn[:, :nrow, :nrow] = torch.where(off, 1, sim.seat_met_turn[:, :nrow, :nrow])
         return sim
     return warm_base(str(path), make, _STATIC, _ATTRS)
 

@@ -26,6 +26,9 @@ policy knew. Per turn, per driven seat:
                                  class catalog row); absent = none
         "government": g        the government roster position the seat adopts;
                                  absent = no decision, the standing one holds
+        "pantheon": p          the pantheon row the seat founds; absent = none
+        "religion": r          the RELIGION_TYPES row a founding takes, beside
+                                 its "beliefs"; absent = none
     }}
 plus the optional fields the extractors below document (war, warKind, envoys,
 buy, buyFaith, levy, and the geo intents). Codes are the MASK layouts
@@ -123,7 +126,8 @@ def apply_decisions(sim, row: int, dec: dict) -> None:
                            nat=by_slot.get("nat"), cls=by_slot.get("cls"), ucls=by_slot.get("ucls"),
                            pat=dec["pat"], band=by_slot.get("band"), dist=dec["dist"], route=dec["route"], nuke=dec["nuke"],
                            spec=spec, lock=dec["lock"], swap=dec["swap"], vote=dec["vote"],
-                           gp_pass=dec["gp_pass"], beliefs=dec["beliefs"], government=dec["government"])
+                           gp_pass=dec["gp_pass"], beliefs=dec["beliefs"], government=dec["government"],
+                           pantheon=dec["pantheon"], religion=dec["religion"])
 
 
 def stash_units(sim, row: int, seq: torch.Tensor) -> None:
@@ -163,29 +167,23 @@ def geo_decide_and_apply(sim, st, geos: list, seeds=None):
     table (`geos`, one `neutral.geo_obs` per game) and stashed for
     `_geo_agreements`."""
     geo = drive.decide_geo(st, geos, seeds)
-    den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p = geo
+    den, gift, off, acc, ask_p, keep_p = geo
     for row in range(sim.n_majors):
-        sim.apply_geo(row, denounce=den[:, row], friend=frd[:, row], ally=ally[:, row],
-                      ally_type=ally_ty[:, row], borders=bord[:, row], gift=gift[:, :, row],
-                      delegation=deleg[:, row], offer=off[:, row], accept=acc[:, row],
+        sim.apply_geo(row, denounce=den[:, row], gift=gift[:, :, row], offer=off[:, row], accept=acc[:, row],
                       ask_promise=ask_p[:, row], keep_promise=keep_p[:, row])
     return geo
 
 
 def extract_geo(geo, row: int, b: int) -> dict:
-    den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p = geo
+    den, gift, off, acc, ask_p, keep_p = geo
     out = {}
     for name, want in (("askPromise", ask_p), ("keepPromise", keep_p)):
         pl = [[int(j), int(k)] for j, k in want[b, row].nonzero(as_tuple=False).tolist()]
         if pl:
             out[name] = pl
-    for name, want in (("denounce", den), ("friend", frd), ("ally", ally), ("borders", bord),
-                       ("delegation", deleg)):
-        tl = want[b, row].nonzero(as_tuple=True)[0].tolist()
-        if tl:
-            out[name] = tl
-    if "ally" in out:
-        out["allyType"] = [int(ally_ty[b, row, j]) for j in out["ally"]]
+    tl = den[b, row].nonzero(as_tuple=True)[0].tolist()
+    if tl:
+        out["denounce"] = tl
     gl = [[int(k), int(j)] for k, j in gift[b, :, row].nonzero(as_tuple=False).tolist()]
     if gl:
         out["gift"] = gl
@@ -209,7 +207,7 @@ def extract_geo(geo, row: int, b: int) -> dict:
     return out
 
 
-def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, beliefs, government, b: int) -> dict:
+def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_seq, seq, buy, worship, relig, levy, monu, nat, cls, ucls, pat, band, dist, route, nuke, spec, lock, swap, vote, gp_pass, policies, beliefs, government, pantheon, religion, b: int) -> dict:
     nS = 0 if dtile is None else int(dtile.shape[2])
     prod_pairs = []
     for k, (centre, col) in enumerate(zip(prod[0][b].tolist(), prod[1][b].tolist())):
@@ -264,6 +262,10 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
             rec["beliefs"] = picks
     if government is not None and int(government[b]) >= 0:
         rec["government"] = int(government[b])
+    if pantheon is not None and int(pantheon[b]) >= 0:
+        rec["pantheon"] = int(pantheon[b])
+    if religion is not None and int(religion[b]) >= 0:
+        rec["religion"] = int(religion[b])
     return rec
 
 
@@ -459,13 +461,17 @@ def replay_seat(sim, row: int, rec: dict) -> None:
                if _blv else None)
     _gv = rec.get("government")
     government = None if _gv is None else torch.full((sim.B,), int(_gv), dtype=torch.long, device=dev)
+    _pv = rec.get("pantheon")
+    pantheon = None if _pv is None else torch.full((sim.B,), int(_pv), dtype=torch.long, device=dev)
+    _rv = rec.get("religion")
+    religion = None if _rv is None else torch.full((sim.B,), int(_rv), dtype=torch.long, device=dev)
     apply_decisions(sim, row, {
         "prod": prod, "dtile": dtile, "tech": tech, "civic": civic, "policies": policies,
         "war": war, "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
         "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
         "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
         "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "beliefs": beliefs,
-        "government": government})
+        "government": government, "pantheon": pantheon, "religion": religion})
 
     def _geo_mask(seats) -> torch.Tensor:
         m = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool, device=dev)
@@ -475,17 +481,9 @@ def replay_seat(sim, row: int, rec: dict) -> None:
         return m
 
     geo_kwargs = {}
-    for _name in ("denounce", "friend", "ally", "delegation", "borders", "accept"):
+    for _name in ("denounce", "accept"):
         if rec.get(_name):
             geo_kwargs[_name] = _geo_mask(rec[_name])
-    if rec.get("ally"):
-        _tyl = rec.get("allyType") or []
-        _ty = torch.full((sim.B, sim.n_majors), -1, dtype=torch.long, device=dev)
-        for _k, _j in enumerate(rec["ally"]):
-            if 0 <= int(_j) < sim.n_majors:
-                # the wire's ONE default: an absent type column reads RESEARCH
-                _ty[:, int(_j)] = int(_tyl[_k]) if _k < len(_tyl) else 0
-        geo_kwargs["ally_type"] = _ty
     if rec.get("offer"):
         _to, _give, _ask = rec["offer"]
         _di = sim._deal_items

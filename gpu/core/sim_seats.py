@@ -455,6 +455,8 @@ class SimSeats:
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
         beliefs: torch.Tensor | None = None,  # [B, K, 2] (class, index) beliefs the religion adopts; -1 = padding
         government: torch.Tensor | None = None,  # [B] the government roster position to adopt; -1/None = no decision
+        pantheon: torch.Tensor | None = None,  # [B] the pantheon row the seat founds; -1/None = none
+        religion: torch.Tensor | None = None,  # [B] the RELIGION_TYPES row a founding takes; -1/None = none
     ) -> None:
         """Write seat ROW `row`'s choices BEFORE step(). Codes use the
         seat_masks layout; -1 = no action. Queue writes mirror the picker's exact
@@ -495,6 +497,10 @@ class SimSeats:
             self._driven_gp_pass[row] = gp_pass
         if beliefs is not None:
             self._driven_beliefs[row] = beliefs
+        if religion is not None:
+            self._driven_religion[row] = religion
+        if pantheon is not None:
+            self._driven_pantheon[row] = pantheon
         if government is not None:
             self._driven_government[row] = government
 
@@ -1048,6 +1054,7 @@ class SimSeats:
         vote = self._driven_vote.pop(row, None)
         gp_pass = self._driven_gp_pass.pop(row, None)
         beliefs = self._driven_beliefs.pop(row, None)
+        religion = self._driven_religion.pop(row, None)
         production, pref, dtile = self._driven_picks.pop(row, (None, None, None))
         if not bool(active.count_nonzero()):
             return
@@ -1148,7 +1155,7 @@ class SimSeats:
         if beliefs is not None:
             # the BELIEFS the seat's religion adopts: founding or enhancing,
             # validated whole and refused whole (`adoptBeliefs`)
-            self._apply_beliefs(row, active & ext, beliefs)
+            self._apply_beliefs(row, active & ext, beliefs, religion)
         if pref is not None:
             self._apply_seat_pref(row, pref, dtile)
         elif production is not None:
@@ -16493,11 +16500,11 @@ class SimSeats:
 
     def _geo_agreements(self, row: int) -> None:
         """ONE SEAT'S DIPLOMACY, at the tail of row `row`'s own turn — the
-        `seatDiplomacy` twin, in the TS arm order: denounce, friendship, the
-        alliance friendship unlocks, the delegation, the border grant, the
-        gift, then its offer on the table and its answers to the offers
-        standing, then its promise asks, each answered at once by the
-        promiser's own record. Every want-mask is re-validated here — the
+        `seatDiplomacy` twin, in the TS arm order: denounce, the gift, then
+        its offer on the table (a mission, a friendship, an alliance, open
+        borders and every trade are PROPOSALS the other seat answers,
+        `_deal_kind_ok`) and its answers to the offers standing, then its
+        promise asks, each answered at once by the promiser's own record. Every want-mask is re-validated here — the
         record only names the target, a major the seat has met. The keeps stay stashed for the phase:
         every asker's settlement reads them."""
         stashes = self._driven_geo
@@ -16506,7 +16513,6 @@ class SimSeats:
         nrow = self.n_majors
         n_c = self.city_alive[:, :nrow].sum(dim=2)
         alive_row = self.civ_alive[:, :nrow] & (n_c > 0)
-        term = self._agreement_turns
 
         def pairs(verb):
             stash = stashes[verb]
@@ -16531,84 +16537,6 @@ class SimSeats:
                 self.seat_denounced[:, a, b] = torch.where(
                     den, torch.full_like(self.seat_denounced[:, a, b], int(self.turn)),
                     self.seat_denounced[:, a, b])
-
-        for a, b, ok in pairs("friend"):
-            # CIV6 (Alliance): "A leader you've offended (or who has many
-            # Grievances against you in Gathering Storm) will not want to
-            # become Declared Friends with you." Either side's outstanding
-            # balance refuses.
-            frd = (ok & ~self.war[:, a, b] & (self.seat_friend_turns[:, a, b] == 0)
-                   & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
-                   & (self._grievance_with(a, b) == 0))
-            if bool(frd.count_nonzero()):
-                for _x, _y in ((a, b), (b, a)):
-                    self.seat_friend_turns[:, _x, _y] = torch.where(
-                        frd, torch.full_like(self.seat_friend_turns[:, _x, _y], term),
-                        self.seat_friend_turns[:, _x, _y])
-
-        for a, b, ok in pairs("ally"):
-            # CIV6 (Alliance): "Alliances become possible after developing the
-            # Civil Service civic. You can only enter into an Alliance with a
-            # civilization if you and its leader are Declared Friends."
-            civic = (self.civ_civics[:, a, self._alliance_civic] if self._alliance_civic >= 0
-                     else torch.zeros_like(ok))
-            form = (ok & civic & (self.seat_friend_turns[:, a, b] > 0)
-                    & ~self.war[:, a, b] & (self.seat_ally_turns[:, a, b] == 0)
-                    & ~self._denounce_active(a, b) & ~self._denounce_active(b, a))
-            if bool(form.count_nonzero()):
-                self._eff_version += 1
-                tyv = stashes["ally_type"].get(a)
-                ty = (tyv[:, b].clamp(min=0, max=4) if tyv is not None
-                      else torch.zeros(self.B, dtype=torch.long, device=self.device))
-                for _x, _y in ((a, b), (b, a)):
-                    self.seat_ally_turns[:, _x, _y] = torch.where(
-                        form, torch.full_like(self.seat_ally_turns[:, _x, _y], term),
-                        self.seat_ally_turns[:, _x, _y])
-                    # the TYPE rides the same write; the POINTS are the
-                    # pair's own and persist across formations
-                    self.seat_alliance_type[:, _x, _y] = torch.where(
-                        form, ty, self.seat_alliance_type[:, _x, _y])
-
-        stashes["ally_type"].pop(row, None)
-
-        for a, b, ok in pairs("delegation"):
-            # CIV6 (DiplomaticActions): the Delegation (NoCurrentDelegation,
-            # obsolete for the sender with Diplomatic Service) before the
-            # civic, the Resident Embassy (NoCurrentEmbassy, its prerequisite)
-            # after it — an Embassy takes a standing Delegation's place. A
-            # rival worse than Neutral turns it away, which this model reads
-            # as the two states it can name: a war, or a denouncement either way.
-            emb = (self.civ_civics[:, a, self._embassy_civic]
-                   if 0 <= self._embassy_civic < self.civ_civics.shape[2]
-                   else torch.zeros_like(ok))
-            held = self.seat_delegation[:, a, b]
-            cost = torch.where(emb, torch.full_like(self.civ_treasury[:, a], self._embassy_cost),
-                               torch.full_like(self.civ_treasury[:, a], self._deleg_cost))
-            send = (ok & torch.where(emb, held != 2, held == 0) & ~self.war[:, a, b]
-                    & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
-                    & (self.civ_treasury[:, a] >= cost))
-            if bool(send.count_nonzero()):
-                z = torch.zeros_like(cost)
-                paid = torch.where(send, cost, z)
-                # "...which is paid to the other leader."
-                self.civ_treasury[:, a] = self.civ_treasury[:, a] - paid
-                self.civ_treasury[:, b] = self.civ_treasury[:, b] + paid
-                self.seat_delegation[:, a, b] = torch.where(
-                    send, torch.where(emb, torch.full_like(held, 2), torch.ones_like(held)), held)
-
-        for a, b, ok in pairs("borders"):
-            # CIV6 (Open Borders): the agreement "becomes available" once the
-            # GRANTOR has Early Empire - the civic that closed the border in
-            # the first place. "Open Borders cannot be offered to or requested
-            # from a leader who has Denounced you, or whom you have Denounced."
-            civic = (self.civ_civics[:, a, self._open_borders_civic] if self._open_borders_civic >= 0
-                     else torch.zeros_like(ok))
-            grant = (ok & civic & ~self.war[:, a, b]
-                     & ~self._denounce_active(a, b) & ~self._denounce_active(b, a))
-            if bool(grant.count_nonzero()):
-                self.seat_borders_turns[:, a, b] = torch.where(
-                    grant, torch.full_like(self.seat_borders_turns[:, a, b], term),
-                    self.seat_borders_turns[:, a, b])
 
         want = stashes["gift"].pop(row, None)
         if want is not None:

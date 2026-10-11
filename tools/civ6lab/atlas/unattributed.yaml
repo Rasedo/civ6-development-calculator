@@ -1971,7 +1971,11 @@
   final: 0x4eebd0
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:religionBeliefPick, ai/major/religion.ts:foundingBeliefs]
+  impl:
+    - ai/major/religion.ts:religionBeliefPick
+    - ai/major/religion.ts:foundingBeliefs
+    - ai/major/religion.ts:foundingRecord
+    - ai/major/religion.ts:enhanceRecord
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:

@@ -971,8 +971,10 @@ def _geo_civic(st, geos: list, civic: int) -> torch.Tensor:
 
 
 def decide_geo(st, geos: list, seeds=None):
-    """The five DIPLOMATIC want-masks, the deal tables and the promises, every seat at once,
-    off `geos` (one diplomatic table per game, `neutral.geo_obs`).
+    """The denouncements and gifts, the deal tables and the promises, every
+    seat at once, off `geos` (one diplomatic table per game, `neutral.geo_obs`).
+    A mission, a friendship, an alliance and an open-borders grant are
+    PROPOSALS on the table (`_deal_turn`), answered by the other seat.
 
     TWO STYLES, drawn once per (game seed, seat) and fixed for the game, the
     research draw's discipline: a DIPLOMAT courts — friendship, then the
@@ -995,7 +997,7 @@ def decide_geo(st, geos: list, seeds=None):
     ask_p = torch.zeros(B, nrow, nrow, len(st.promise_cost), dtype=torch.bool, device=dev)
     keep_p = torch.zeros_like(ask_p)
     if nrow < 2:
-        return den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p
+        return den, gift, off, acc, ask_p, keep_p
     g = {f: _geo_t(geos, f, dev) for f in (
         "alive", "cities", "strength", "treasury", "war", "denounce", "friend_turns", "ally_turns",
         "borders_turns", "delegation", "grievance", "proximity", "great_works")}
@@ -1060,9 +1062,10 @@ def decide_geo(st, geos: list, seeds=None):
             trusted = (friend[:, a, b] > 0) | (ally_t[:, a, b] > 0)
             for kind in range(ladder.GW_KINDS):
                 gift[:, kind, a, b] = quiet & diplo[:, a] & trusted & (gw[:, a, kind] > gw[:, b, kind])
-    _deal_turn(st, geos, g, off, acc, alive_row, rstr, prox, prox_max)
+    courts = {"mission": deleg, "friend": frd, "ally": ally, "ally_ty": ally_ty, "borders": bord}
+    _deal_turn(st, geos, g, off, acc, alive_row, rstr, prox, prox_max, courts)
     _promise_turn(st, geos, g, ask_p, keep_p, alive_row, rstr)
-    return den, frd, ally, bord, gift, deleg, off, acc, ally_ty, ask_p, keep_p
+    return den, gift, off, acc, ask_p, keep_p
 
 
 # the city-to-city distance at which a seat asks a rival not to settle near
@@ -1117,12 +1120,13 @@ DEAL_BORDERS_PRICE = 20
 DEAL_AID_GIFT = 50      # what a member of an Aid Request sends its target
 
 
-def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_max) -> None:
+def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_max, courts: dict) -> None:
     """WHAT EACH SEAT PUTS ON THE TABLE, and what it takes off one.
 
-    One offer per seat per turn, to the lowest-numbered rival that qualifies,
-    and one rule behind it: sell what you have most of and ask gold for it —
-    except at war, where the only thing worth proposing is peace."""
+    One offer per seat per turn, to the lowest-numbered rival that qualifies:
+    at war, peace; else the courting `decide_geo` wants (`courts`: a mission,
+    a friendship, an alliance, an open-borders grant, each given for
+    nothing), then one rule: sell what you have most of and ask gold for it."""
     B, dev, nrow = len(geos), st.device, st.n_majors
     _di = st.deal_items
     kd = st.deal_kind
@@ -1185,6 +1189,12 @@ def _deal_turn(st, geos: list, g: dict, off, acc, alive_row, rstr, prox, prox_ma
             _put(a, b, losing, [_item(k_gold, DEAL_TRIBUTE)], [])
             quiet = (pair & ~war[:, a, b] & ~dn[:, a, b]
                      & ~dn[:, b, a] & (offer_left[:, a, b] == 0))
+            # THE COURTING, each a proposal the rival answers
+            _put(a, b, quiet & courts["mission"][:, a, b], [_item(kd["MISSION"])], [])
+            _put(a, b, quiet & courts["friend"][:, a, b], [_item(kd["FRIENDSHIP"])], [])
+            _put(a, b, quiet & courts["ally"][:, a, b],
+                 [(_lit(kd["ALLIANCE"]), courts["ally_ty"][:, a, b].clamp(min=0), _lit(0))], [])
+            _put(a, b, quiet & courts["borders"][:, a, b], [_item(kd["OPEN_BORDERS"])], [])
             # AID: while an Aid Request runs, a member with a purse to spare
             # gifts the victim gold — the only one-sided table on the list
             if st.comp_aid >= 0:
@@ -1381,6 +1391,42 @@ def _decide_beliefs(nobs: list, row: int, seeds, turn, device) -> torch.Tensor |
     return out.to(device)
 
 
+def _decide_pantheon(nobs: list, row: int, seeds, turn, device) -> torch.Tensor | None:
+    """[B] — the pantheon row the seat founds this turn, -1 none: where the
+    observation's `pantheon_due` holds, a draw (salt 26) over the open rows
+    (`pantheon`), so every pantheon is reachable; the applier re-validates."""
+    if seeds is None:
+        return None
+    obs = [ob["belief"] for ob in nobs]
+    if not any(o["pantheon_due"] and o["pantheon"] for o in obs):
+        return None
+    r = _policy_rng(device, seeds, turn, row, 26).tolist()
+    out = torch.full((len(obs),), -1, dtype=torch.long)
+    for b, o in enumerate(obs):
+        rows = o["pantheon"]
+        if o["pantheon_due"] and rows:
+            out[b] = rows[min(int(r[b] * len(rows)), len(rows) - 1)]
+    return out.to(device)
+
+
+def _decide_religion(nobs: list, beliefs, row: int, seeds, turn, device) -> torch.Tensor | None:
+    """[B] — the RELIGION_TYPES row a founding takes, beside the founding's
+    beliefs: a draw (salt 27) over the observation's open rows (`religion`),
+    -1 where the seat founds nothing this turn."""
+    if seeds is None or beliefs is None:
+        return None
+    obs = [ob["belief"] for ob in nobs]
+    r = _policy_rng(device, seeds, turn, row, 27).tolist()
+    out = torch.full((len(obs),), -1, dtype=torch.long)
+    for b, o in enumerate(obs):
+        rows = o["religion"]
+        if o["found"] and rows and int(beliefs[b, 0, 0]) >= 0:
+            out[b] = rows[min(int(r[b] * len(rows)), len(rows) - 1)]
+    if not bool((out >= 0).count_nonzero()):
+        return None
+    return out.to(device)
+
+
 def _decide_government(st, nobs: list, row: int, seeds, t: int, device) -> torch.Tensor | None:
     """[B] — the government roster position the seat adopts, -1 where it
     names none (in Anarchy nothing is open). The seat's STYLE is one draw per
@@ -1426,7 +1472,7 @@ DECIDE_FIELDS = (
     "prod", "dtile", "tech", "civic", "war", "war_kind", "env_seq", "seq",
     "buy", "worship", "relig", "levy", "monu", "nat", "cls", "ucls", "pat",
     "band", "dist", "route", "nuke", "spec", "lock", "swap", "vote", "gp_pass",
-    "policies", "beliefs", "government",
+    "policies", "beliefs", "government", "pantheon", "religion",
 )
 
 
@@ -1513,13 +1559,15 @@ def decide_seat(st, row: int, nobs: list, roster: dict, classes: dict, seeds=Non
     vote = _decide_vote(nobs, row, dev)
     gp_pass = _decide_gp_pass(nobs, row, seeds, t, dev)
     beliefs = _decide_beliefs(nobs, row, seeds, t, dev)
+    religion = _decide_religion(nobs, beliefs, row, seeds, t, dev)
+    pantheon = _decide_pantheon(nobs, row, seeds, t, dev)
     government = _decide_government(st, nobs, row, seeds, t, dev)
     return {"prod": (cities["centre"], prod), "dtile": dtile, "tech": tech, "civic": civic, "war": war,
             "war_kind": war_kind, "env_seq": env_seq, "buy": buy, "worship": worship,
             "relig": relig, "levy": levy, "monu": monu, "nat": nat, "cls": cls, "ucls": ucls,
             "pat": pat, "band": band, "dist": dist, "route": route, "nuke": nuke, "spec": spec,
             "lock": lock, "swap": swap, "vote": vote, "gp_pass": gp_pass, "policies": policies,
-            "beliefs": beliefs, "government": government}
+            "beliefs": beliefs, "government": government, "pantheon": pantheon, "religion": religion}
 
 
 def plan_units(st, row: int, nobs: list, max_steps: int = 4) -> torch.Tensor:

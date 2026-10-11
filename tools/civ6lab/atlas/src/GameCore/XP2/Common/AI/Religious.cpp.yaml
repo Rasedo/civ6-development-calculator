@@ -7,12 +7,16 @@
   final: 0x4ec000
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:pantheonPick]
+  impl:
+    - ai/major/religion.ts:pantheonPick
+    - ai/major/religion.ts:pantheonRecord
+    - cpu/core/phase.ts:seatPhase
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   context:
     - "- THE PICKS. The pantheon (0x74e2b0, from the AI turn while m_mustFoundPantheon holds, then 0x33fb70): the first strictly h..."
-  review: imported
+  review: reviewed
 - addr: 0x74e390
   final: 0x4ec0a0
   kind: function
@@ -122,10 +126,15 @@
   final: 0x4ee820
   kind: function
   status: PARTLY
-  impl: [ai/major/religion.ts:foundingBeliefs, ai/major/religion.ts:religionChoice]
+  impl:
+    - ai/major/religion.ts:foundingBeliefs
+    - ai/major/religion.ts:religionChoice
+    - ai/major/religion.ts:foundingRecord
+    - cpu/core/game.ts:adoptBeliefs
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   context:
     - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civ..."
     - "...ss whatever it scores, and once one stands only a better Follower does. The founding (0x750fe0, after waiting for the job): the leader's FavoredReligions, then the civilization's, th..."
-  review: imported
+  review: reviewed

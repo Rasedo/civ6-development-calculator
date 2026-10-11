@@ -918,8 +918,7 @@ SPEC_KEEP = -2
 
 # The DIPLOMATIC verbs, in the order both engines apply them. `apply_geo`
 # stashes by these names and `_geo_agreements` drains them in this order.
-GEO_VERBS = ("denounce", "friend", "ally", "ally_type", "delegation", "borders", "gift", "offer", "accept",
-             "ask_promise", "keep_promise")
+GEO_VERBS = ("denounce", "gift", "offer", "accept", "ask_promise", "keep_promise")
 XP_PER_LEVEL = 15
 MAX_LEVEL = 8
 PROMOTE_HEAL = 50
@@ -1163,7 +1162,7 @@ _MUTABLE = [
     "unit_escorted", "military_at", "civilian_at", "support_at", "embarked_at", "war", "ww", "ww_turn",
     "civ_best_melee", "civ_best_ranged", "civ_builders_trained", "civ_settlers_trained", "civ_discount_districts", "civ_relic_reserve", "civ_civic_prog", "civ_cur_civic", "civ_cur_tech", "civ_diplo_favor", "civ_diplo_points", "civ_envoys_avail", "civ_granted_titles", "civ_research_project_pct", "civ_influence", "civ_tech_prog", "civ_tech_ovf", "civ_civic_ovf", "civ_treasury", "civ_techs", "civ_civics", "civ_tech_boosted", "civ_civic_boosted", "civ_tech_retain", "civ_civic_retain",
     "civ_enhancer", "civ_beliefs_earned", "civ_follower", "civ_founder", "civ_worship", "civ_next_city_id",
-    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_inquisition", "civ_first_imp_tech",
+    "civ_pantheon", "civ_pantheon_done", "civ_prophets", "civ_religion_done", "civ_religion_type", "civ_inquisition", "civ_first_imp_tech",
     "seat_citystate_met", "seat_citystate_envoys", "seat_citystate_quest", "seat_citystate_quest_target", "seat_citystate_quest_last",
     "citystate_suzerain", "citystate_techs", "citystate_civics", "citystate_tech_prog", "citystate_civic_prog", "citystate_prod",
     "citystate_cur_tech", "citystate_cur_civic", "citystate_tech_retain", "citystate_civic_retain",  # the minor's research in hand and kept

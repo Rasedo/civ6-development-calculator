@@ -102,7 +102,10 @@
       ["follower", "list", "the Follower catalog rows no religion holds, ascending"],
       ["worship", "list", "the Worship catalog rows no religion holds, ascending"],
       ["founder", "list", "the Founder catalog rows no religion holds, ascending"],
-      ["enhancer", "list", "the Enhancer catalog rows no religion holds, ascending"]
+      ["enhancer", "list", "the Enhancer catalog rows no religion holds, ascending"],
+      ["pantheon_due", "bool", "the seat may found a pantheon now (`foundPantheon`): none yet and the price in its Faith"],
+      ["pantheon", "list", "the pantheon catalog rows no pantheon holds, ascending (the record's `pantheon`)"],
+      ["religion", "list", "the RELIGION_TYPES rows no seat has founded, ascending (the founding's `religion`)"]
     ]
   },
   "city": [

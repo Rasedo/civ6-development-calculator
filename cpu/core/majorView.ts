@@ -40,11 +40,11 @@ import { civEraIndex, computeCityStats } from './city';
 import { scoreLines } from './score';
 import { domesticTourists, touristsDrawn } from './seatTurn';
 import { PROJECTS } from '../data/projects';
-import { BELIEF_SLOTS } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES, beliefClassOf } from '../data/religion';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { itemCost, settlerCost, unitProdCost } from './game';
+import { beliefPicks, canFoundReligion, itemCost, settlerCost, unitProdCost } from './game';
 
 /** What the view takes from the majors' AI itself: per major the strategies
  *  it follows (ai/major/strategies.ts), which its weights and its civic list
@@ -365,6 +365,21 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const id = govId(type);
       return id ? GOVERNMENT_LIST.findIndex((g) => g.id === id) : -1;
     },
+    pantheonColumn: (type) => PANTHEON_IDS.indexOf(type.replace(/^BELIEF_/, '')),
+    beliefColumn: (type) => {
+      const id = type.replace(/^BELIEF_/, '');
+      const c = beliefClassOf(id);
+      return c >= 0 ? [c, Object.keys(BELIEF_CATALOGS[c]).indexOf(id)] as const : null;
+    },
+    religionColumn: (type) => RELIGION_TYPES.indexOf(type.replace(/^RELIGION_/, '')),
+    religionsFounded: () => new Set(state.seats.flatMap((s) => (s.religion.type ? [`RELIGION_${s.religion.type}`] : []))),
+    pantheonOpen: (i) => {
+      const s = seatOf(state, i);
+      return !!s && isCiv(i) && s.religion.pantheon === null && (s.faith ?? 0) >= PANTHEON_FAITH_COST
+        && PANTHEON_IDS.some((id) => !state.claimedPantheons.includes(id));
+    },
+    religionOpen: (i) => canFoundReligion(state, i).ok,
+    beliefPicks: (i) => beliefPicks(state, i),
     majors: () => state.seats.filter((s) => isCiv(s.seat) && (s.cities.length > 0 || unitsOf(state, s.seat).length > 0)).map((s) => s.seat),
     leader: (i) => {
       const l = leaderOf(state, i);

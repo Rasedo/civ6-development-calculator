@@ -33,7 +33,7 @@ import {
 } from '../../../cpu/core/seats';
 import {
   VISIBILITY_CS_PER_LEVEL, VISIBILITY_LEVELS, VISIBILITY_MAX, VISIBILITY_TECH,
-  DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC,
+  DELEGATION_COST, EMBASSY_COST, EMBASSY_CIVIC, DEAL_ALLIANCE, DEAL_FRIENDSHIP, DEAL_MISSION, DEAL_OPEN_BORDERS,
 } from '../../../cpu/data/seats';
 import { SPY_M_LISTENING_POST, SPY_SECRET_AGENT_LEVEL, SPY_UNIT } from '../../../cpu/data/espionage';
 import { defenderCS } from '../../../cpu/core/combat';
@@ -95,10 +95,21 @@ function play(state: GameState, recs: Record<number, Partial<SeatActionRecord>>)
   seatPhase(state);
 }
 
+/** `from` proposes one item to `to`, which accepts it in its own turn: the
+ *  same turn where `to` moves after `from`, else the next */
+function agree(state: GameState, from: number, to: number, kind: number, a = 0): void {
+  if (to > from) {
+    play(state, { [from]: { offer: [to, [[kind, a, 0]], []] }, [to]: { accept: [from] } });
+    return;
+  }
+  play(state, { [from]: { offer: [to, [[kind, a, 0]], []] } });
+  play(state, { [to]: { accept: [from] } });
+}
+
 describe('the agreements run on one 30-turn clock', () => {
   it('a Declaration of Friendship is symmetric and blocks the hostile verbs', () => {
     const state = table();
-    play(state, { 1: { friend: [2] } });
+    agree(state, 1, 2, DEAL_FRIENDSHIP);
     expect(friendTurnsWith(state, 1, 2)).toBe(SIGNED);
     expect(friendTurnsWith(state, 2, 1)).toBe(SIGNED);
 
@@ -112,15 +123,15 @@ describe('the agreements run on one 30-turn clock', () => {
 
   it('an alliance needs the civic AND a Declared Friend, and pays favor', () => {
     const state = table();
-    play(state, { 1: { ally: [2] } });
+    agree(state, 1, 2, DEAL_ALLIANCE, ALLIANCE_RESEARCH);
     expect(seatsAllied(state, 1, 2)).toBe(false);
 
     setFriendTurnsWith(state, 1, 2, AGREEMENT_TURNS);
-    play(state, { 1: { ally: [2] } });
+    agree(state, 1, 2, DEAL_ALLIANCE, ALLIANCE_RESEARCH);
     expect(seatsAllied(state, 1, 2)).toBe(false); // still no Civil Service
 
     state.seats[1].research.civics.push(ALLIANCE_CIVIC);
-    play(state, { 1: { ally: [2] } });
+    agree(state, 1, 2, DEAL_ALLIANCE, ALLIANCE_RESEARCH);
     expect(allyTurnsWith(state, 1, 2)).toBe(SIGNED);
     expect(allyTurnsWith(state, 2, 1)).toBe(SIGNED);
 
@@ -158,11 +169,11 @@ describe('the agreements run on one 30-turn clock', () => {
 
   it('the border grant is DIRECTED, needs the grantor’s civic, and dies with the peace', () => {
     const state = table();
-    play(state, { 1: { borders: [2] } });
+    agree(state, 1, 2, DEAL_OPEN_BORDERS);
     expect(borderTurnsFrom(state, 1, 2)).toBe(0);
 
     state.seats[1].research.civics.push(OPEN_BORDERS_CIVIC);
-    play(state, { 1: { borders: [2] } });
+    agree(state, 1, 2, DEAL_OPEN_BORDERS);
     expect(borderTurnsFrom(state, 1, 2)).toBe(SIGNED);
     expect(borderTurnsFrom(state, 2, 1)).toBe(0);
 
@@ -207,6 +218,17 @@ describe('the agreements run on one 30-turn clock', () => {
 });
 
 describe('the delegation and the resident embassy', () => {
+  it('is a proposal: nothing moves until the target accepts', () => {
+    const state = table();
+    for (const s of state.seats) s.treasury = 1000;
+    play(state, { 1: { offer: [2, [[DEAL_MISSION, 0, 0]], []] } });
+    expect(delegationWith(state, 1, 2)).toBe(0);
+    expect(state.seats[1].treasury).toBe(1000);
+    play(state, { 2: { accept: [1] } });
+    expect(delegationWith(state, 1, 2)).toBe(1);
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
+  });
+
   const rich = (state: GameState) => {
     for (const s of state.seats) s.treasury = 1000;
   };
@@ -214,10 +236,10 @@ describe('the delegation and the resident embassy', () => {
   it('costs the sender, pays the target, and buys a level of visibility', () => {
     // CIV6 (Delegations and Embassies): "Delegations cost 10 Gold and
     // Embassies cost 25 Gold, which is paid to the other leader", each worth
-    // "1 level of Diplomatic Visibility".
+    // "1 level of Diplomatic Visibility" — a proposal the target accepts.
     const state = table();
     rich(state);
-    play(state, { 1: { delegation: [2] } });
+    agree(state, 1, 2, DEAL_MISSION);
     expect(delegationWith(state, 1, 2)).toBe(1);
     expect(delegationWith(state, 2, 1)).toBe(0);
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
@@ -229,8 +251,8 @@ describe('the delegation and the resident embassy', () => {
   it('is one mission per pair, and the embassy is what replaces it', () => {
     const state = table();
     rich(state);
-    play(state, { 1: { delegation: [2] } });
-    play(state, { 1: { delegation: [2] } });
+    agree(state, 1, 2, DEAL_MISSION);
+    agree(state, 1, 2, DEAL_MISSION);
     // "Once Embassies are available, establishing an Embassy will replace
     // this" — one fact, so a second send buys nothing and costs nothing.
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
@@ -239,13 +261,13 @@ describe('the delegation and the resident embassy', () => {
     // (DiplomaticActions: the Delegation obsolete with Diplomatic Service,
     // the Resident Embassy its successor, one per pair)
     state.seats[1].research.civics.push(EMBASSY_CIVIC);
-    play(state, { 1: { delegation: [0] } });
+    agree(state, 1, 0, DEAL_MISSION);
     expect(delegationWith(state, 1, 0)).toBe(MISSION_EMBASSY);
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - EMBASSY_COST);
-    play(state, { 1: { delegation: [2] } });
+    agree(state, 1, 2, DEAL_MISSION);
     expect(delegationWith(state, 1, 2)).toBe(MISSION_EMBASSY);
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - 2 * EMBASSY_COST);
-    play(state, { 1: { delegation: [2] } });
+    agree(state, 1, 2, DEAL_MISSION);
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - 2 * EMBASSY_COST);
   });
 
@@ -254,19 +276,19 @@ describe('the delegation and the resident embassy', () => {
     rich(state);
     play(state, { 1: { denounce: [2] } });
     expect(denounceActive(state, 1, 2)).toBe(true);
-    play(state, { 1: { delegation: [2] } });
+    agree(state, 1, 2, DEAL_MISSION);
     expect(delegationWith(state, 1, 2)).toBe(0);
     expect(state.seats[1].treasury).toBe(1000);
     // ...and the same refusal reads the other direction
     const other = table();
     rich(other);
     play(other, { 2: { denounce: [1] } });
-    play(other, { 1: { delegation: [2] } });
+    agree(other, 1, 2, DEAL_MISSION);
     expect(delegationWith(other, 1, 2)).toBe(0);
 
     const broke = table();
     for (const s of broke.seats) s.treasury = DELEGATION_COST - 1;
-    play(broke, { 1: { delegation: [2] } });
+    agree(broke, 1, 2, DEAL_MISSION);
     expect(delegationWith(broke, 1, 2)).toBe(0);
   });
 
@@ -275,7 +297,8 @@ describe('the delegation and the resident embassy', () => {
     // out, so you lose that level of diplomatic visibility."
     const state = table();
     rich(state);
-    play(state, { 1: { delegation: [2] }, 2: { delegation: [1] } });
+    agree(state, 1, 2, DEAL_MISSION);
+    agree(state, 2, 1, DEAL_MISSION);
     expect(delegationWith(state, 1, 2)).toBe(1);
     expect(delegationWith(state, 2, 1)).toBe(1);
     play(state, { 1: { war: 1 } });

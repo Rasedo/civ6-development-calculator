@@ -96,18 +96,18 @@ describe('founding a religion', () => {
     const { state } = ready();
     const rel = seatOf(state, 0)!.religion;
     // the order, the count and the classes are the rule
-    expect(adoptBeliefs(state, 0, [pick('TITHE'), pick('CHORAL_MUSIC')]).ok).toBe(false);
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('FEED_THE_WORLD')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('TITHE'), pick('CHORAL_MUSIC')], 0).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('FEED_THE_WORLD')], 0).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC')]).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE'), pick('MOSQUE')]).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [[0, 99], pick('TITHE')]).ok).toBe(false);
     // a belief another religion holds is out of the pool
     state.claimedBeliefs.push('JUST_WAR');
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('JUST_WAR')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('JUST_WAR')], 0).ok).toBe(false);
     expect(rel.founded).toBe(false);
     expect(state.claimedBeliefs).toEqual(['JUST_WAR']);
     // an Enhancer is as good a second belief as a Founder or a Worship one
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('SCRIPTURE')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('SCRIPTURE')], 0).ok).toBe(true);
     expect(rel.founded).toBe(true);
     expect(rel.follower).toBe('CHORAL_MUSIC');
     expect(rel.enhancer).toBe('SCRIPTURE');
@@ -124,7 +124,7 @@ describe('founding a religion', () => {
   it('an Apostle evangelizes a belief, and the religion adopts one class a time to four', () => {
     const { state, city } = ready();
     const s = seatOf(state, 0)!;
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')], 0).ok).toBe(true);
     state.sandbox = false;
     // the founding earned two and the religion holds two: nothing to adopt
     expect(beliefPicks(state, 0)).toBe(0);
@@ -142,7 +142,7 @@ describe('founding a religion', () => {
     expect(beliefPicks(state, 0)).toBe(1);
     expect(enhanceableClasses(state, 0)).toEqual([1, 3]);
     // one belief, of a class the religion lacks: not two, not a held class
-    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER'), pick('PAGODA')]).ok).toBe(false);
+    expect(adoptBeliefs(state, 0, [pick('HOLY_ORDER'), pick('PAGODA')], 0).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('PILGRIMAGE')]).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('FEED_THE_WORLD')]).ok).toBe(false);
     expect(adoptBeliefs(state, 0, [pick('PAGODA')]).ok).toBe(true);
@@ -166,7 +166,7 @@ describe('founding a religion', () => {
   it('the evangelize column is the Apostle\'s, and the record adopts through the same verb', () => {
     const { state, city } = ready();
     const s = seatOf(state, 0)!;
-    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]);
+    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')], 0);
     state.sandbox = false;
     const a = apostle(state, city);
     const col = unitActionIndex(IMPROVEMENT_IDS).EVANGELIZE_BELIEF;
@@ -181,7 +181,7 @@ describe('founding a religion', () => {
   it('a class whose pool ran dry caps what an Apostle may earn', () => {
     const { state, city } = ready();
     const s = seatOf(state, 0)!;
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')], 0).ok).toBe(true);
     state.sandbox = false;
     // every Worship belief is another religion's
     state.claimedBeliefs.push(...Object.keys(WORSHIP_BELIEFS));
@@ -198,7 +198,7 @@ describe('founding a religion', () => {
     const { state } = ready();
     const s = seatOf(state, 0)!;
     applySeatActionRecord(state, s, { production: [], tech: null, civic: null, units: [],
-      beliefs: [pick('CHORAL_MUSIC'), pick('GURDWARA')] });
+      beliefs: [pick('CHORAL_MUSIC'), pick('GURDWARA')], religion: 0 });
     expect(s.religion.founded).toBe(true);
     expect(s.religion.worship).toBe('GURDWARA');
   });
@@ -206,7 +206,7 @@ describe('founding a religion', () => {
   it('beliefs and the worship building take effect', () => {
     const { state, city } = ready();
     const before = computeCityStats(state, city);
-    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('GURDWARA')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('GURDWARA')], 0).ok).toBe(true);
 
     // FOLLOWER beliefs act per-city on the religion the CITY follows. The
     // holy city follows seat 0's religion (id 0) once pressure spreads from
@@ -225,7 +225,7 @@ describe('founding a religion', () => {
     // Tithe (GS, TITHE_GOLD_CITY_MODIFIER): +3 gold per CITY following the
     // religion — the Founder belief, added by the enhancement; the player's
     // income, in no city
-    expect(adoptBeliefs(state, 0, [pick('TITHE'), pick('ITINERANT_PREACHERS')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('TITHE'), pick('ITINERANT_PREACHERS')], 0).ok).toBe(true);
     expect(beliefSeatYields(state, 0, getModifiers(state, 0)).gold).toBeGreaterThanOrEqual(3);
   });
 
@@ -239,7 +239,7 @@ describe('founding a religion', () => {
     for (const b of Object.values(WORSHIP_BELIEFS)) expect(BUILDINGS[b.effects.worshipBuilding!]?.worship).toBe(true);
     expect(Object.values(BUILDINGS).filter((b) => b.worship).length).toBe(Object.keys(WORSHIP_BELIEFS).length);
     const { state, city } = ready();
-    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('PAGODA')]);
+    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('PAGODA')], 0);
     const favor0 = seatBuildingSum(state, 0, 'favorPerTurn');
     city.buildings.push('PAGODA');
     expect(seatBuildingSum(state, 0, 'favorPerTurn') - favor0).toBe(1);
@@ -248,10 +248,10 @@ describe('founding a religion', () => {
   it('the worship faith-buy takes the Worship belief\'s building off the queue', () => {
     const { state, city } = ready();
     expect(buyWorshipBuilding(state, city.id, 0).ok).toBe(false); // no religion
-    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')]);
+    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('TITHE')], 0);
     expect(buyWorshipBuilding(state, city.id, 0).ok).toBe(false); // no Worship belief
     state.sandbox = true;
-    adoptBeliefs(state, 0, [pick('WAT'), pick('HOLY_ORDER')]);
+    adoptBeliefs(state, 0, [pick('WAT'), pick('HOLY_ORDER')], 0);
     state.sandbox = false;
     city.followedReligion = 0;
     city.queue.push({ kind: 'building', building: 'WAT', progress: 30 });
@@ -265,7 +265,7 @@ describe('founding a religion', () => {
 
   it('a Mosque adds a spread charge to the Missionaries bought in its city', () => {
     const { state, city } = ready();
-    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('MOSQUE')]);
+    adoptBeliefs(state, 0, [pick('CHORAL_MUSIC'), pick('MOSQUE')], 0);
     city.followedReligion = 0;
     seatOf(state, 0)!.faith = 10000;
     expect(purchaseReligiousUnit(state, city.id, 'MISSIONARY', 0).ok).toBe(true);
@@ -277,7 +277,7 @@ describe('founding a religion', () => {
 
   it('Religious Community pays international routes per worship building of the ORIGIN', () => {
     const { state, city } = ready();  // a complete Holy Site, a Shrine, a Temple
-    expect(adoptBeliefs(state, 0, [pick('RELIGIOUS_COMMUNITY'), pick('GURDWARA')]).ok).toBe(true);
+    expect(adoptBeliefs(state, 0, [pick('RELIGIOUS_COMMUNITY'), pick('GURDWARA')], 0).ok).toBe(true);
     // a city NOT following the religion pays nothing
     city.followedReligion = null;
     expect(religiousCommunityGold(state, 0, city)).toBe(0);
@@ -297,7 +297,7 @@ describe('founding a religion', () => {
     tileAtCoords(state.map, 11, 9).elevation = 'MOUNTAIN'; // next to the holy site
     // PILGRIMAGE stands in for the deleted CHURCH_PROPERTY: the same
     // `perCity` effect shape, and this lane asserts on Work Ethic alone.
-    adoptBeliefs(state, 0, [pick('WORK_ETHIC'), pick('PILGRIMAGE')]);
+    adoptBeliefs(state, 0, [pick('WORK_ETHIC'), pick('PILGRIMAGE')], 0);
     // Work Ethic is a FOLLOWER belief — it applies to the city that
     // follows the religion (the holy city, id 0, once pressure spreads).
     city.followedReligion = 0;

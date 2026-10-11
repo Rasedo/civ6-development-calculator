@@ -39,6 +39,8 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     districtBuildingYields: () => [],
     policyColumn: () => -1,
     governmentColumn: () => -1,
+    pantheonColumn: () => -1, beliefColumn: () => null, religionColumn: () => -1, religionsFounded: () => new Set(),
+    pantheonOpen: () => false, religionOpen: () => false, beliefPicks: () => 0,
     majors: () => [0],
     leader: () => null,
     metTurn: () => null,

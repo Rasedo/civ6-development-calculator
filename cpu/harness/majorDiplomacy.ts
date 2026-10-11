@@ -19,8 +19,10 @@ import {
   type DiplomacyMemory,
 } from '../../ai/major/diplomacy';
 import {
-  diploState, diploStateTurn, newDiploStateGaps, newDiploStateMemory, type DiploStateGaps, type DiploStateMemory,
+  answerAction, diploState, diploStateTurn, newDiploStateGaps, newDiploStateMemory, type DiploStateGaps, type DiploStateMemory,
 } from '../../ai/major/diploState';
+import { DELEGATION_COST, EMBASSY_COST } from '../data/seats';
+import { MISSION_EMBASSY } from '../core/seats';
 import { majorView } from '../core/majorView';
 import type { GameState } from '../core/types';
 import type { LoggedDraw, RandLog } from './randLog';
@@ -100,6 +102,13 @@ export interface DiplomacyLaneTally {
   onLogLines: number;
   onLogEqual: number;
   onLogMisses: string[];
+  /** the receiver's answers to the record's mission proposals: the port's
+   *  answer (ai/major/diploState `answerAction`) in the port's state, and in
+   *  the state the state turn reaches on the log's own opinions */
+  answers: number;
+  answersEqual: number;
+  answersOnLogEqual: number;
+  answerMisses: string[];
 }
 
 /** the port on the record's own state (its logic alone), and on the
@@ -111,7 +120,8 @@ export interface DiplomacyTally {
 
 const laneTally = (): DiplomacyLaneTally => ({ lines: 0, equal: 0, misses: [], byOwner: {}, agendas: {}, drawMisses: [],
   gapRequirements: {}, gapModifierTypes: {}, stateLines: 0, stateEqual: 0, stateMisses: [], stateMoves: {}, gapChecks: {},
-  gapAllowed: {}, onLogLines: 0, onLogEqual: 0, onLogMisses: [] });
+  gapAllowed: {}, onLogLines: 0, onLogEqual: 0, onLogMisses: [], answers: 0, answersEqual: 0, answersOnLogEqual: 0,
+  answerMisses: [] });
 
 class Lane {
   mem: DiplomacyMemory | null = null;
@@ -162,6 +172,32 @@ export class DiplomacyProbe {
     for (const lane of Object.values(this.lanes)) {
       lane.feed = new LogFeed(randLog?.draws ?? []);
       lane.mem = diplomacySetup(this.view(state), slots, lane.feed.draw(1));
+    }
+  }
+
+  /** the receiver's answer to a mission the record's sender proposed: the
+   *  port's (`answerAction`) on the engine's lane, in the state the port
+   *  holds and in the one it reaches on the log's opinions, against the
+   *  record's `accepted` */
+  answer(state: GameState, receiver: number, sender: number, mission: number, accepted: boolean): void {
+    if (!this.log) return;
+    const lane = this.lanes.engine;
+    const t = lane.tally;
+    const view = this.view(state);
+    const embassy = mission === MISSION_EMBASSY;
+    const action = embassy ? 'DIPLOACTION_RESIDENT_EMBASSY' : 'DIPLOACTION_DIPLOMATIC_DELEGATION';
+    const gold = embassy ? EMBASSY_COST : DELEGATION_COST;
+    const ours = diploState(lane.states, receiver, sender);
+    const onLog = diploState(lane.onLog, receiver, sender);
+    const port = answerAction(view, ours, receiver, action, gold);
+    const portOnLog = answerAction(view, onLog, receiver, action, gold);
+    t.answers++;
+    if (port === accepted) t.answersEqual++;
+    if (portOnLog === accepted) t.answersOnLogEqual++;
+    if ((port !== accepted || portOnLog !== accepted) && t.answerMisses.length < 40) {
+      t.answerMisses.push(`t${state.turn} ${receiver}<-${sender} ${embassy ? 'Embassy' : 'Delegation'}: game ${accepted ? 'accepts' : 'refuses'}, `
+        + `ours ${port ? 'accepts' : 'refuses'} in ${short(ours)}, on the log's opinions ${portOnLog ? 'accepts' : 'refuses'} in ${short(onLog)}, `
+        + `gold weight ${(view.yieldWeight(receiver, 'YIELD_GOLD') / 256).toFixed(2)}`);
     }
   }
 
@@ -263,6 +299,8 @@ function laneMarkdown(name: string, t: DiplomacyLaneTally): string[] {
     `- The log's state changes the port followed / missed: ${Object.entries(t.stateMoves).map(([k, [a, b]]) => `${k} ${a} / ${b}`).join(', ') || 'none'}.`,
     `- Not read yet: checks ${JSON.stringify(t.gapChecks)}; allowed rows weighed on unread desires ${JSON.stringify(t.gapAllowed)}.`,
     `- The state turn alone, on the log's own opinions: ${t.onLogEqual} / ${t.onLogLines} lines.`,
+    ...(t.answers ? [`- The receivers' answers to the record's missions (ai/major/diploState answerAction): ${t.answers}; as the game's in the port's state ${t.answersEqual}, in the state on the log's opinions ${t.answersOnLogEqual}.`,
+      '', 'Answer misses:', '', ...t.answerMisses.map((m) => `- ${m}`), ''] : []),
     '', 'State misses:', '', ...t.stateMisses.map((m) => `- ${m}`), '',
     'State misses on the log\'s opinions:', '', ...t.onLogMisses.map((m) => `- ${m}`), ''];
 }

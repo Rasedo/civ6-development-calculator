@@ -82,7 +82,7 @@ import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
 import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/cityStates';
-import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, unconvertedOf } from '../data/religion';
+import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, RELIGION_TYPES, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
 import { BARB_TRIBES } from '../data/barbarians';
@@ -702,6 +702,7 @@ const SEAT: Record<string, Extractor> = {
   gpLuxuries: overSeats((s) => [...(s.gpLuxuries ?? [])]),
   gpLuxCopies: overSeats((s) => LUXURY_IDS.map((_r, i) => s.gpLuxCopies?.[i] ?? 0)),
   beliefPantheon: overSeats((s) => idx(PANTHEON_IDX, s.religion.pantheon)),
+  religionType: overSeats((s) => (s.religion.type ? RELIGION_TYPES.indexOf(s.religion.type) : -1)),
   beliefFollower: overSeats((s) => idx(FOLLOWER_IDX, s.religion.follower)),
   beliefFounder: overSeats((s) => idx(FOUNDER_IDX, s.religion.founder)),
   beliefWorship: overSeats((s) => idx(WORSHIP_IDX, s.religion.worship)),

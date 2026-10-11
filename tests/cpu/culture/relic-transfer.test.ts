@@ -47,7 +47,7 @@ function addCiv(state: GameState, col: number, row: number, name: string): Seat 
     buildersTrained: 0,
     bestMeleeCS: 0,
     projectsDone: [],
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
+    religion: { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   } as Seat;
   const city: City = {
     id: civ.nextCityId++,

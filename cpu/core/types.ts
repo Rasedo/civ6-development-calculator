@@ -297,21 +297,11 @@ export interface SeatActionRecord {
    * unit's own column instead. Both engines re-validate the named pair. */
   nuke?: [number, number] | null;
   denounce?: number[];
-  ally?: number[];
-  /** the alliance TYPE formed with each `ally` entry, parallel to it. */
-  allyType?: number[];
-  /** DECLARATION OF FRIENDSHIP: the seats this one offers friendship to.
-   *  Symmetric and instant — the prerequisite an Alliance asks for. */
-  friend?: number[];
-  /** OPEN BORDERS: the seats this one GRANTS passage to. Directed. */
-  borders?: number[];
-  /** DELEGATION / RESIDENT EMBASSY: the seats this one sends a mission to.
-   *  Directed, one per pair, and the sender pays for it. */
-  delegation?: number[];
   /** THE DEAL PUT ON THE TABLE this turn: [the other seat, what this seat
    *  GIVES, what it ASKS]. An offer alone moves nothing — the other seat's
    *  `accept` is the "Accept Deal" button, and both engines re-validate every
-   *  item then. */
+   *  item then. A mission, a friendship, an alliance and open borders are
+   *  items of it (`DEAL_ITEM_KINDS`): proposals the other seat answers. */
   offer?: [number, DealItem[], DealItem[]];
   /** THE SEATS whose standing offer this one accepts. */
   accept?: number[];
@@ -346,6 +336,12 @@ export interface SeatActionRecord {
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
+  /** the PANTHEON this seat founds this turn, a `PANTHEONS` row (data
+   *  order); absent = none. Paid from its Faith where it banks the turn's. */
+  pantheon?: number | null;
+  /** the RELIGION this seat founds, a `RELIGION_TYPES` row — the founding's
+   *  choice beside its `beliefs`; a founding names one no seat has founded */
+  religion?: number | null;
   /** the BELIEFS this seat's religion adopts this turn, as [class, index]
    *  pairs (`BELIEF_CLASSES` code, the class catalog's row): founding names
    *  the Follower and then one other class, enhancing every class the
@@ -1038,7 +1034,9 @@ export interface ReligionState {
   inquisition?: boolean;
   pantheon: string | null;
   founded: boolean;
-  name: string | null;
+  /** the religion founded, a `RELIGION_TYPES` id (the game names the
+   *  religion by its type), null before the founding */
+  type: string | null;
   /** the religion's belief of each class (`BELIEF_CLASSES`), null until
    *  adopted — founding takes the Follower and one other, each Evangelize
    *  Belief one more. `worship` is the Worship BELIEF, which names the

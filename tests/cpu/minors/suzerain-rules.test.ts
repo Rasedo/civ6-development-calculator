@@ -152,7 +152,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
       completeDistrict(state, hsCity, 'HOLY_SITE', 11, 5);
       state.seats.push(emptySeat(1));
       const target = settleAt(state, tileAtCoords(state.map, 16, 5).index, 1); // >10 from the Holy City, <=10 from hsCity
-      seatOf(state, 0)!.religion = { pantheon: null, founded: true, name: 'Test', follower: null, founder: null, worship: null, enhancer: null, holyTile: holyCity.centerIndex };
+      seatOf(state, 0)!.religion = { pantheon: null, founded: true, type: 'BUDDHISM', follower: null, founder: null, worship: null, enhancer: null, holyTile: holyCity.centerIndex };
       // a city presses only the religion it FOLLOWS; the Holy Site city x2, and
       // under Jerusalem's suzerain "as if it were a Holy City" x4 in its place
       holyCity.followedReligion = 0;
@@ -171,7 +171,7 @@ describe('suzerain rules (the `suz`-coded perks)', () => {
     completeDistrict(state, holyCity, 'HOLY_SITE', 6, 5);
     state.seats.push(emptySeat(1));
     const target = settleAt(state, tileAtCoords(state.map, 10, 5).index, 1);
-    seatOf(state, 0)!.religion = { pantheon: null, founded: true, name: 'Test', follower: null, founder: null, worship: null, enhancer: null, holyTile: holyCity.centerIndex };
+    seatOf(state, 0)!.religion = { pantheon: null, founded: true, type: 'BUDDHISM', follower: null, founder: null, worship: null, enhancer: null, holyTile: holyCity.centerIndex };
     holyCity.followedReligion = 0;
     addNamedCs(state, 'Jerusalem', 'religious', 27, 2, { 0: 3 });
     endTurn(state);

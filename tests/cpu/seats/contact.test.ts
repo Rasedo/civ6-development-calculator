@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { emptySeat, majorsMet, metTurnWith, delegationWith, MISSION_DELEGATION } from '../../../cpu/core/seats';
-import { declareWar, sendMission } from '../../../cpu/core/phase';
+import { answerOffer, declareWar, putOffer } from '../../../cpu/core/phase';
+import { DEAL_MISSION } from '../../../cpu/data/seats';
 import { meetMajors, revealAround } from '../../../cpu/core/fog';
 import { placeCityStateAt } from '../../../cpu/core/cityStates';
 import { spawnUnit } from '../../../cpu/core/units';
@@ -28,10 +29,11 @@ describe("the majors' meeting", () => {
     const state = twoMajors();
     expect(majorsMet(state, 0, 1)).toBe(false);
     expect(declareWar(state, 0, 1).ok).toBe(false);
-    expect(sendMission(state, state.seats[0], 1)).toBe(false);
+    expect(putOffer(state, state.seats[0], [1, [[DEAL_MISSION, 0, 0]], []])).toBe(false);
     expect(delegationWith(state, 0, 1)).toBe(0);
     meetMajors(state, 0, 1);
-    expect(sendMission(state, state.seats[0], 1)).toBe(true);
+    expect(putOffer(state, state.seats[0], [1, [[DEAL_MISSION, 0, 0]], []])).toBe(true);
+    expect(answerOffer(state, state.seats[1], 0)).toBe(true);
     expect(delegationWith(state, 0, 1)).toBe(MISSION_DELEGATION);
     expect(declareWar(state, 0, 1).ok).toBe(true);
   });

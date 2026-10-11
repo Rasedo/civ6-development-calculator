@@ -206,7 +206,8 @@ def _static(rules, width: int, height: int, wrap_x: bool, n_majors: int, n_citys
         embassy_civic=int(rules.eras["embassyCivic"]), joint_war_civic=int(seats["jointWarCivic"]),
         embassy_cost=_whole(rules.eras["embassyCost"]), delegation_cost=_whole(rules.eras["delegationCost"]),
         deal_items=int(rules.eras["dealItems"]),
-        deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR", "LUXURY")},
+        deal_kind={k: kinds.index(k) for k in ("GOLD", "FAVOR", "RESOURCE", "SPY", "OPEN_BORDERS", "JOINT_WAR", "LUXURY",
+                                                "MISSION", "FRIENDSHIP", "ALLIANCE")},
         comp_aid=comps.index("AID_REQUEST") if "AID_REQUEST" in comps else -1,
         promise_cost=[_whole(p[0]) for p in rules.eras["promises"]],
         gov_tier=[int(g["tier"]) for g in rules.governments],
@@ -386,13 +387,21 @@ def _columns(sim, row: int) -> dict:
 def _beliefs(sim, row: int) -> dict:
     """The `belief` group: whether the seat may found its religion now, how
     many beliefs an enhancement adopts now (`_belief_picks`), the class
-    catalog row it holds per class (-1 none), and each class's open beliefs
-    as membership rows (`_INDEX_LISTS`)."""
+    catalog row it holds per class (-1 none), each class's open beliefs as
+    membership rows (`_INDEX_LISTS`), whether it may found a pantheon now, and
+    the open pantheons and religions."""
     out = {("belief", "found"): sim._can_found(row), ("belief", "enhance"): sim._belief_picks(row)}
     pools = sim._bel_pools()
     out["belief", "held"] = torch.stack([ids[:, row] for _m, ids, _n in pools], dim=1)
     for name, (m, _ids, n) in zip(("follower", "worship", "founder", "enhancer"), pools):
         out["belief", name] = ~m[:, :n]
+    pfc = float(sim.rules.seats["pantheonFaithCost"])
+    pool = int(sim.rules.seats["pantheonPool"])
+    out["belief", "pantheon_due"] = ~sim.civ_pantheon_done[:, row] & (sim.civ_faith[:, row] >= pfc)
+    out["belief", "pantheon"] = ~sim.pan_claimed[:, :pool]
+    nr = sim._religion_types
+    held = sim.civ_religion_type[:, :sim.n_majors].unsqueeze(2) == torch.arange(nr, device=sim.device)
+    out["belief", "religion"] = ~held.any(dim=1)
     return out
 
 
@@ -419,7 +428,8 @@ def _congress(sim, row: int) -> dict:
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense
 _INDEX_LISTS = {("policy", "unlocked"), ("policy", "gov_open"), ("war", "declare"), ("war", "sue"),
-                ("belief", "follower"), ("belief", "worship"), ("belief", "founder"), ("belief", "enhancer")}
+                ("belief", "follower"), ("belief", "worship"), ("belief", "founder"), ("belief", "enhancer"),
+                ("belief", "pantheon"), ("belief", "religion")}
 
 
 def _city_rows(sim, row: int) -> list:

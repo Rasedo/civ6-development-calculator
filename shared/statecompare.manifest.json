@@ -1435,6 +1435,16 @@
           ]
         },
         {
+          "name": "religionType",
+          "compare": "exact",
+          "covers": [
+            "ReligionState.type"
+          ],
+          "planes": [
+            "civ_religion_type"
+          ]
+        },
+        {
           "name": "beliefFollower",
           "compare": "exact",
           "covers": [
@@ -3796,10 +3806,6 @@
       {
         "path": "Seat.research",
         "why": "the container; its fields are covered one by one."
-      },
-      {
-        "path": "ReligionState.name",
-        "why": "presentation."
       },
       {
         "path": "City.id",

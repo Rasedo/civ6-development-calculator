@@ -83,11 +83,17 @@ def test_formation_and_expiry(rules, path) -> None:
     sim.seat_friend_turns[B0, 1, 0] = 10
     if civ >= 0:
         sim.civ_civics[B0, 0, civ] = True
+    # the alliance is a PROPOSAL on the table, its TYPE the item's argument;
+    # the other seat, met, accepts it
+    sim.seat_met_turn[:, 0, 1] = sim.seat_met_turn[:, 1, 0] = 1
+    di = sim._deal_items
+    blob = torch.full((sim.B, 1 + 2 * di * 3), -1, dtype=torch.long)
+    blob[:, 0] = 1
+    blob[:, 1:4] = torch.tensor([sim._deal_k_alliance, MILITARY, 0])
+    sim.apply_geo(0, offer=blob)
     want = torch.zeros(sim.B, sim.n_majors, dtype=torch.bool)
-    want[B0, 1] = True
-    ty = torch.full((sim.B, sim.n_majors), -1, dtype=torch.long)
-    ty[B0, 1] = MILITARY
-    sim.apply_geo(0, ally=want, ally_type=ty)
+    want[B0, 0] = True
+    sim.apply_geo(1, accept=want)
     every_seat_diplomacy(sim)
     assert int(sim.seat_ally_turns[B0, 0, 1]) == int(sim._agreement_turns), "the clock did not start"
     assert int(sim.seat_alliance_type[B0, 0, 1]) == MILITARY, "the type was not stamped"

@@ -38,7 +38,7 @@ function addCiv(state: GameState, col: number, row: number): Seat {
     research: { tech: null, techProgress: 0, civic: null, civicProgress: 0, techs: [], civics: [], boosted: [], techRetained: {}, civicRetained: {} },
     gpp: {}, gpEarned: [], buildersTrained: 0, bestMeleeCS: 0,
     projectsDone: [],
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
+    religion: { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null },
   };
   const city: City = {
     id: civ.nextCityId++, name: 'Roma', seat: civ.seat, centerIndex: tile.index,

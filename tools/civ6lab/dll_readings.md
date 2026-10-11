@@ -5437,6 +5437,51 @@ m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv
   faith boost's unit choice, the religious units' targets (0x74ea60's list
   +0x4a0, 0x74cf50 / 0x74d320) and moves, the faith purchases.
 
+## C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term
+
+Ports: the missions, the friendship, the alliance and open borders are deal
+items (`cpu/core/deals.ts` MISSION / FRIENDSHIP / ALLIANCE, `sim_deals.py`),
+put on the table by the proposer's `offer` and answered by the receiver's
+`accept`; the receiver's AI answer is `ai/major/diploState.ts` answerAction;
+the pantheon, the religion founded and its beliefs are the record's
+`pantheon`, `religion` and `beliefs` (`foundPantheon`, `adoptBeliefs`;
+`ai/major/religion.ts` pantheonRecord / foundingRecord / enhanceRecord).
+
+- THE PRICE (0x527610, from the handlers 0x237c60 / 0x238330 and the
+  evaluator): the DiplomaticActions row's Cost (+0x20) through the game speed
+  (0x525400), then less its remainder by GlobalParameters PURCHASE_DIVISOR
+  (+0x5b0, 5): the Delegation 25 -> 12 -> 10 online, the Resident Embassy
+  50 -> 25. Confirmed: runs/h1_duelv1127 Player_Stats — Rome's treasury
+  559 -> 575 the turn after China's Delegation at t79 (its own yield 6, +10),
+  1341 -> 1371 after the Embassy at t191 (yield 5, +25).
+- THE RECEIVER'S VALUE (0x66b490 = 0x671650 - 0x671b80), solved on the
+  receiver's logged rows (AI_Diplomacy.csv, Rome toward China, runs/
+  h1_duelv1127; Delegation and Embassy on one turn give two equations):
+  Cost(state) - 0.5 x price x (1 + w_gold) - T. t68 (Unfriendly) 58.0 /
+  72.5: 1 + w = 1.4, T = 10; t79 (Neutral) -7.0 / -12.5: 1.4, 10; t117
+  (Unfriendly) 68.0 / 82.5: 1.4, 0; t191 (Neutral) 2.3 / -4.3: 1.547, 0 —
+  the price the 10 / 25 above at the Gold yield's value 0x7a6690. T is
+  non-zero on exactly the turns the "Threat and Trust" row's first cell
+  toward the sender is (10.16 at t68 and t79, 0.00 at t117 and t191).
+- PARTLY READ: the trust term's input (+0x6480, the writer unread): the port
+  holds T at 0. The sender's side (the pick 0x64ba90, its desires, the
+  savings slot 2 and AI_TURNS_BETWEEN_PEACE_OFFERS can-do) is read above and
+  not wired: the replay takes the record's proposals.
+- THE RELIGION'S NAME: a founding takes a ReligionType (0x750fe0); the game
+  names it by Religions.Name; the RequiresCustomName rows are a human's own
+  naming, which the AI's choice passes over. The engines carry the type
+  (`RELIGION_TYPES`, `civ_religion_type`), no name of their own.
+- Measured (the action replay, runs/h1_duelw1117 / 1121 / 1124 / 1127 /
+  1128): the record's 26 mission proposals (DiplomacyManager.csv
+  SET_DELEGATION / SET_EMBASSY), 7 accepted (DiplomacySummary.csv). The
+  port's answer equals the game's on 20 / 26, in the port's state and in the
+  state on the log's opinions alike: the 19 refusals (Unfriendly) all, and 1
+  of the 7 acceptances (Neutral) — the port's Gold weight reads
+  0.2 where the logged rows give 0.4 - 0.55, and T stands at 0 (a
+  Delegation at 10 Gold needs T or a weight of 1.0 to clear Neutral's 10).
+  The founding's religion (`religionChoice`) names the record's on 5 / 5
+  (Qin's favoured Taoism).
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

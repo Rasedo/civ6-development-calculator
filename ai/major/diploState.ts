@@ -26,6 +26,7 @@
  */
 import { DIPLO_STATE_ACTIONS, DIPLO_TRANSITIONS } from './diplomacyTables';
 import type { MajorView } from './view';
+import { FX, yieldValue } from '../../cpu/core/aiValue';
 
 export const START_STATE = 'DIPLO_STATE_NEUTRAL';
 export const WAR_STATE = 'DIPLO_STATE_WAR';
@@ -150,4 +151,24 @@ export function diploStateTurn(view: MajorView, mem: DiploStateMemory, owner: nu
       if (moved.length > 0) bump(gaps.allowed, `${t.from.replace('DIPLO_STATE_', '')}>${t.to.replace('DIPLO_STATE_', '')}`);
     }
   }
+}
+
+/**
+ * THE RECEIVER'S ANSWER to a proposal (the Delegation's handler 0x237c60,
+ * the Embassy's 0x238330; the AI's answer 0x653f60): an action its state
+ * toward the sender (`state`, null before they meet) lists no row for is
+ * refused; else the cost its evaluator gives the incoming action (0x66b490 —
+ * the state's DiplomaticStateActions Cost less the gold the action pays the
+ * receiver valued at its Gold weight, 0x671650 through 0x7a6690, less the
+ * trust term) above 0 refuses, at or below 0 accepts. `gold` is the price
+ * the action pays (0x527610: the row's Cost through the game speed). The
+ * trust term (0x671b80) reads the receiver's trust of the sender, whose
+ * writer is unread: it stands at 0 here.
+ */
+export function answerAction(view: MajorView, state: string | null, receiver: number, action: string, gold: number): boolean {
+  if (state === null) return false;
+  const row = DIPLO_STATE_ACTIONS.find((r) => r.state === state && r.action === action && !r.to);
+  if (!row) return false;
+  const cost = row.cost * FX - yieldValue(view, receiver, gold * FX, 'YIELD_GOLD');
+  return cost <= 0;
 }

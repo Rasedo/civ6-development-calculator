@@ -1,7 +1,7 @@
 import type { DistrictId } from '../core/types';
 import type { GpPermKey } from './greatPeople';
 import { srcConst, xml, type SrcMap } from './provenance';
-import { speedTurns, speedTurnsSrc } from './constants';
+import { PURCHASE_DIVISOR, scaleByGameSpeed, speedTurns, speedTurnsSrc } from './constants';
 
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
@@ -1555,16 +1555,27 @@ export const COMPETITION_AID_REQUEST = 4;
 export const VISIBILITY_LEVELS = ['NONE', 'LIMITED', 'OPEN', 'SECRET', 'TOP_SECRET'] as const;
 export const VISIBILITY_MAX = srcConst('eras.visibilityMax', VISIBILITY_LEVELS.length - 1,
   { derived: 'VISIBILITY_LEVELS.length - 1 — CIV6 (Diplomatic Visibility and Gossip) names five levels: None, Limited, Open, Secret, Top Secret' });
-/** CIV6 (Delegations and Embassies): DiplomaticActions.Cost prices the
- *  Delegation at 25 Gold and the Resident Embassy at 50, "which is paid to the
- *  other leader", each worth "1 level of Diplomatic Visibility". The Resident
+/** CIV6 (Delegations and Embassies): a mission is paid "to the other
+ *  leader", each worth "1 level of Diplomatic Visibility". The Resident
  *  Embassy "replaces" the Delegation once its civic is in, so a seat holds ONE
  *  mission with another and pays whatever its own civics make that mission
- *  cost. */
-export const DELEGATION_COST = srcConst('eras.delegationCost', 25,
-  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DIPLOMATIC_DELEGATION', 'Cost'));
-export const EMBASSY_COST = srcConst('eras.embassyCost', 50,
-  xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_RESIDENT_EMBASSY', 'Cost'));
+ *  cost. The price (GameCore_XP2 0x527610) is the DiplomaticActions row's
+ *  Cost through the game speed (0x525400), rounded DOWN to a multiple of
+ *  PURCHASE_DIVISOR: 10 and 25 Gold online (runs/h1_duelv1127: Rome's
+ *  treasury +10 the turn after China's Delegation at t79, +25 after its
+ *  Embassy at t191, beside its own +6 and +5). */
+const missionPrice = (cost: number): number => {
+  const c = scaleByGameSpeed(cost);
+  return c - (c % PURCHASE_DIVISOR);
+};
+export const DELEGATION_COST = srcConst('eras.delegationCost', missionPrice(25), {
+  derived: 'DiplomaticActions.Cost through the game speed, rounded down to a multiple of PURCHASE_DIVISOR (0x527610)',
+  inputs: [xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_DIPLOMATIC_DELEGATION', 'Cost'), gp('PURCHASE_DIVISOR')],
+});
+export const EMBASSY_COST = srcConst('eras.embassyCost', missionPrice(50), {
+  derived: 'DiplomaticActions.Cost through the game speed, rounded down to a multiple of PURCHASE_DIVISOR (0x527610)',
+  inputs: [xml('DiplomaticActions', 'DiplomaticActionType=DIPLOACTION_RESIDENT_EMBASSY', 'Cost'), gp('PURCHASE_DIVISOR')],
+});
 export const EMBASSY_CIVIC = srcConst('eras.embassyCivic', 'DIPLOMATIC_SERVICE',
   xml('Civics', 'CivicType=CIVIC_DIPLOMATIC_SERVICE', 'CivicType', { expect: 'CIVIC_DIPLOMATIC_SERVICE' }));
 
@@ -1586,6 +1597,16 @@ export const DEAL_ITEM_KINDS = [
    *  `LUXURY_IDS` index; the receiver holds it, the giver holds one fewer
    *  (`luxuryHoldings`) */
   'LUXURY',
+  /** CIV6 (DIPLOACTION_DIPLOMATIC_DELEGATION / _RESIDENT_EMBASSY): the GIVER
+   *  sends its mission to the receiver — the Delegation, or the Resident
+   *  Embassy once the giver has its civic — and pays its cost to the
+   *  receiver; the receiver's acceptance is the answer the game asks of it */
+  'MISSION',
+  /** CIV6 (DIPLOACTION_DECLARE_FRIENDSHIP): the pair declares friendship */
+  'FRIENDSHIP',
+  /** CIV6 (DIPLOACTION_ALLIANCE_*): the pair forms an alliance — `a` is its
+   *  TYPE (`ALLIANCE_TYPES` order) */
+  'ALLIANCE',
 ] as const;
 export const DEAL_GOLD = DEAL_ITEM_KINDS.indexOf('GOLD');
 export const DEAL_GOLD_PER_TURN = DEAL_ITEM_KINDS.indexOf('GOLD_PER_TURN');
@@ -1597,17 +1618,25 @@ export const DEAL_SPY = DEAL_ITEM_KINDS.indexOf('SPY');
 export const DEAL_OPEN_BORDERS = DEAL_ITEM_KINDS.indexOf('OPEN_BORDERS');
 export const DEAL_JOINT_WAR = DEAL_ITEM_KINDS.indexOf('JOINT_WAR');
 export const DEAL_LUXURY = DEAL_ITEM_KINDS.indexOf('LUXURY');
+export const DEAL_MISSION = DEAL_ITEM_KINDS.indexOf('MISSION');
+export const DEAL_FRIENDSHIP = DEAL_ITEM_KINDS.indexOf('FRIENDSHIP');
+export const DEAL_ALLIANCE = DEAL_ITEM_KINDS.indexOf('ALLIANCE');
+
+/** the AGREEMENTS: each runs on its own clock (the border, friendship and
+ *  alliance turns), so a deal carrying one leaves no term behind */
+export const DEAL_OWN_CLOCK: readonly boolean[] = DEAL_ITEM_KINDS.map(
+  (k) => k === 'OPEN_BORDERS' || k === 'FRIENDSHIP' || k === 'ALLIANCE');
 
 /**
  * CIV6: "Sums of Gold, Great Works, Relics, Artifacts, and captured Spies are
  * all permanent trades—once you give those items away, you have to trade again
  * to get them back. Resources and gold per turn, however, are temporary, and
  * once the deal has run its course you will get them back." A city changes
- * hands for good, and an agreement runs on the same 30-turn clock every other
- * agreement here does.
+ * hands for good, a mission stays until a war sends it home, and an agreement
+ * runs on its own clock (`DEAL_OWN_CLOCK`).
  */
 export const DEAL_PERMANENT: readonly boolean[] = DEAL_ITEM_KINDS.map(
-  (k) => k !== 'GOLD_PER_TURN' && k !== 'RESOURCE' && k !== 'OPEN_BORDERS' && k !== 'LUXURY');
+  (k, i) => k !== 'GOLD_PER_TURN' && k !== 'RESOURCE' && k !== 'LUXURY' && !DEAL_OWN_CLOCK[i]);
 
 /** CIV6: "All Deals, Demands, and Promises last for 30 turns, at which point
  *  they need to be renewed" — the clock every other agreement runs on. */

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MP_SCALE } from '../../../cpu/data/constants';
 import { MAX_CITIES_PER_SEAT } from '../../../cpu/data/seats';
+import { PANTHEON_IDS } from '../../../cpu/data/religion';
 import { IMPROVEMENT_IDS, unitActionIndex } from '../../../cpu/core/unitActions';
 
 const A_PILLAGE = unitActionIndex(IMPROVEMENT_IDS).PILLAGE;
@@ -52,7 +53,7 @@ function addCiv(
     buildersTrained: 0,
     bestMeleeCS: 0,
     projectsDone: [],
-    religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, // opt out of belief races unless a test opts in
+    religion: { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, // opt out of belief races unless a test opts in
     ...opts,
   };
   addCivCity(state, civ, col, row);
@@ -190,25 +191,33 @@ describe('races', () => {
     expect(state.eventLog.some((e) => e.includes('claimed'))).toBe(true);
   });
 
-  it('civ pantheons leave the pool', () => {
-    // The pantheon costs the civ 25 of its OWN faith.
+  it('a pantheon is the seat\'s action: the row it names, paid from its own faith', () => {
     const state = makeState();
-    const civ = addCiv(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 25 });
+    const empty = { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null };
+    const civ = addCiv(state, 6, 6, { religion: { ...empty }, faith: 25 });
+    const act = (seat: number, pantheon: number) => {
+      state.seatActions = { [state.turn - 1]: { [seat]: { production: [], tech: null, civic: null, units: [], pantheon } } };
+    };
     seatPhase(state);
-    expect(state.claimedPantheons.length).toBe(1);
+    expect(state.claimedPantheons.length).toBe(0); // no action, no pantheon
+    act(civ.seat, 3);
+    seatPhase(state);
+    expect(civ.religion.pantheon).toBe(PANTHEON_IDS[3]);
     expect(civ.faith ?? 0).toBeLessThan(25); // the claim spent it
-    const taken = state.claimedPantheons[0];
-    const next = addCiv(state, 2, 2, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 25 });
+    const next = addCiv(state, 2, 2, { religion: { ...empty }, faith: 25 });
+    act(next.seat, 3);
     seatPhase(state);
-    expect(state.claimedPantheons.length).toBe(2);
-    expect(next.religion.pantheon).not.toBe(null);
-    expect(next.religion.pantheon).not.toBe(taken);
+    expect(next.religion.pantheon).toBe(null); // another seat holds it
+    act(next.seat, 4);
+    seatPhase(state);
+    expect(next.religion.pantheon).toBe(PANTHEON_IDS[4]);
   });
 
-  it('a broke civ claims no pantheon', () => {
+  it('a broke civ founds no pantheon', () => {
     const state = makeState();
-    addCiv(state, 6, 6, { religion: { pantheon: null, founded: false, name: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 0 });
+    const civ = addCiv(state, 6, 6, { religion: { pantheon: null, founded: false, type: null, follower: null, founder: null, worship: null, enhancer: null, holyTile: null }, faith: 0 });
     state.turn = 30;
+    state.seatActions = { [state.turn - 1]: { [civ.seat]: { production: [], tech: null, civic: null, units: [], pantheon: 0 } } };
     seatPhase(state);
     expect(state.claimedPantheons.length).toBe(0);
   });

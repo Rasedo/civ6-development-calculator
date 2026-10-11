@@ -25,6 +25,8 @@ class SimPhase:
         # a promise's keep answers every asker's settlement this phase, and is
         # for THIS turn alone
         self._driven_geo["keep_promise"].clear()
+        # ...and so is the pantheon a record names
+        self._driven_pantheon.clear()
         self._seat_route_cache = None
 
     def _seat_unit_walk(self, row: int) -> None:
@@ -2509,7 +2511,7 @@ class SimPhase:
                     f" purse{float(self.civ_treasury[_b, row]):.6f}")
         bank(self.civ_faith, faith_sum)
         self._advance_great_people(row, active)
-        self._seat_pantheon_race(row, active)
+        self._seat_pantheon_pick(row, active)
         return sci_turn
 
     def _gp_cost(self, cls: int, at: torch.Tensor, world_era: torch.Tensor) -> torch.Tensor:
@@ -2865,27 +2867,29 @@ class SimPhase:
                          gp_at=at_c.clamp(max=maxN - 1))
         self._gen_ver += 1
 
-    def _seat_pantheon_race(self, row: int, active: torch.Tensor) -> None:
-        """The PANTHEON RACE for ONE seat row, at the loop position right
-        after the GP race. The pick's IDENTITY matters: the effects apply to
-        this seat. ONE integer draw over the open pool takes the k-th OPEN id
-        in data order (TS `open[randRange(open.length)]`). The pantheon costs
-        pantheonFaithCost from this seat's own faith (deducted only when a
-        pick lands). The draw advances only where its own open-mask fires, so
-        the RNG stream stays aligned with the TS block turn by turn. A
-        religion's own beliefs are the record's BELIEF arm (`_apply_beliefs`)."""
+    def _seat_pantheon_pick(self, row: int, active: torch.Tensor) -> None:
+        """THE PANTHEON the record names for ONE seat row (`foundPantheon`'s
+        twin), at the loop position right after the GP race, once the turn's
+        Faith is in: a seat with no pantheon, the price in its own Faith, a
+        catalog row no pantheon holds. The price is paid, the belief claimed,
+        the era moment scored and the capital unit granted."""
+        pick = self._driven_pantheon.pop(row, None)
+        if pick is None:
+            return
         rr = self.rules.seats
         pfc = float(rr["pantheonFaithCost"])
-        pdue = active & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc)
-        popen = pdue & (self.pantheon_claimed_n < rr["pantheonPool"])
-        k = self._rand_range(popen, int(rr["pantheonPool"]) - self.pantheon_claimed_n)
-        if bool(popen.count_nonzero()) and self._bel_any:
-            cum = (~self.pan_claimed).long().cumsum(dim=1)
-            sel = (~self.pan_claimed) & (cum == (k + 1).unsqueeze(1))
-            pid = sel.long().argmax(dim=1)
+        pool = int(rr["pantheonPool"])
+        p = pick.to(device=self.device, dtype=torch.long)
+        pc = p.clamp(min=0, max=max(pool - 1, 0))
+        free = (~self.pan_claimed.gather(1, pc.unsqueeze(1)).squeeze(1)) if self._bel_any else torch.zeros_like(active)
+        popen = (active & self.seat_ext[:, row] & (p >= 0) & (p < pool) & free
+                 & ~self.civ_pantheon_done[:, row] & (self.civ_faith[:, row] >= pfc))
+        if not bool(popen.count_nonzero()):
+            return
+        if self._bel_any:
             prow = popen.nonzero(as_tuple=True)[0]
-            self.pan_claimed[prow, pid[prow]] = True
-            self.civ_pantheon[prow, row] = pid[prow]
+            self.pan_claimed[prow, pc[prow]] = True
+            self.civ_pantheon[prow, row] = pc[prow]
             self._bel_version += 1
         self.civ_faith[:, row] = torch.where(popen, self.civ_faith[:, row] - pfc, self.civ_faith[:, row])
         self.pantheon_claimed_n.add_(popen.long())
@@ -2988,7 +2992,8 @@ class SimPhase:
             cols.append((ids[:, row] < 0) & left)
         return torch.stack(cols, dim=1)
 
-    def _apply_beliefs(self, row: int, act: torch.Tensor, beliefs: torch.Tensor) -> None:
+    def _apply_beliefs(self, row: int, act: torch.Tensor, beliefs: torch.Tensor,
+                       religion: torch.Tensor | None = None) -> None:
         """`adoptBeliefs`' twin — the record's BELIEF arm. `beliefs` [B, K, 2]
         holds (class, index) pairs (`BELIEF_CLASSES` code, the class catalog's
         row), (-1, -1) padding. FOUNDING (`_can_found`): RELIGION_INITIAL_BELIEFS
@@ -2996,9 +3001,10 @@ class SimPhase:
         (`_can_enhance`): `_belief_picks` beliefs, each of a different class
         the religion still lacks that has a belief left (`_enhanceable`).
         Every pick names a belief no religion holds; a set that does not fit
-        is refused entire. The founding writes the beliefs earned, the era
-        score, the holy tile and the Holy City's founding pressure, in
-        `adoptBeliefs`' order."""
+        is refused entire. A founding names `religion`, the RELIGION_TYPES row
+        no seat has founded. The founding writes the beliefs earned, the
+        religion's type, the era score, the holy tile and the Holy City's
+        founding pressure, in `adoptBeliefs`' order."""
         if row >= self.n_majors or not any(self._bel_class_n):
             return
         B, dev = self.B, self.device
@@ -3024,7 +3030,11 @@ class SimPhase:
         cnt = ohc.long().sum(dim=1)                                                  # [B, 4]
         first = cls[:, 0] if K > 0 else torch.full((B,), -1, dtype=torch.long, device=dev)
         once = (cnt <= 1).all(dim=1)                  # one belief of each class
-        found_ok = (act & self._can_found(row) & all_valid & once
+        rel = (religion.to(device=dev, dtype=torch.long) if religion is not None
+               else torch.full((B,), -1, dtype=torch.long, device=dev))
+        taken = (self.civ_religion_type[:, :self.n_majors] == rel.unsqueeze(1)).any(dim=1)
+        rel_ok = (rel >= 0) & (rel < self._religion_types) & ~taken
+        found_ok = (act & self._can_found(row) & all_valid & once & rel_ok
                     & (npick == self._religion_initial_beliefs) & (first == 0))
         enh_ok = (act & self._can_enhance(row) & all_valid & once
                   & (npick == self._belief_picks(row))
@@ -3046,6 +3056,7 @@ class SimPhase:
         # a Worship belief puts its building on the buildable list
         self._eff_version += 1
         self.civ_religion_done[:, row] = self.civ_religion_done[:, row] | found_ok
+        self.civ_religion_type[:, row] = torch.where(found_ok, rel, self.civ_religion_type[:, row])
         self.civ_beliefs_earned[:, row] = torch.where(
             found_ok, torch.full_like(self.civ_beliefs_earned[:, row], self._religion_initial_beliefs),
             self.civ_beliefs_earned[:, row])

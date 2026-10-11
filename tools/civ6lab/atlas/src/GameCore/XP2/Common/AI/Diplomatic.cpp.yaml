@@ -8,6 +8,7 @@
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ....25) (mode 0), T=10*(L-n+1)/L   if n<=L else 0; flag arg 1 -> +T. mode1 x0.5 / 20; mode2 40. - Pick 0x64ba90 (per turn): done[64]; loop { for each player p (players list): skip done/invalid   (+0x6168[p]+0x18..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...owledge base and the owner's, +10 where +0x6780 names p.   The cost functors: Cost - T. - THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first;   then, repeatedly, every met player p not ye..."
@@ -80,18 +81,22 @@
 - addr: 0x653f60
   final: 0x434a70
   kind: function
+  name: answerAction
+  semantics: "An AI receiver's answer to an incoming diplomatic action: refused when its state toward the sender lists no row for the action; else the incoming record's cost 0x66b490 above 0 refuses, at or below 0 accepts."
   status: PARTLY
   cases:
     - recording: h1_duelv1127
       value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+  impl: [ai/major/diploState.ts:answerAction]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...n. One action per target/turn. - Receiver (0x237c60 delegation handler): if receiver not human: r = 0x653f60 (receiver AI):   action must be in receiver's state lists (+0x2f58[from] +0x20 or +0x40) else rejec..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...E RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):   an AI receiver answers by 0x653f60: an action outside its state's lists   toward the sender refuses; else the value 0x66b490 of its in..."
   context:
     - "...(the Delegation's handler 0x237c60, the Embassy's 0x238330): an AI receiver answers by 0x653f60: an action outside its state's lists toward the sender refuses; else the value 0x66b490..."
-  review: imported
+  review: reviewed
 - addr: 0x6543a0
   final: 0x434db0
   kind: function

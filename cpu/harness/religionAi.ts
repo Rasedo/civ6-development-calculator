@@ -15,7 +15,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { AI_BELIEFS } from '../../ai/major/tables';
-import { BELIEF_TAKEN, beliefClassIndex, beliefScores, evaluationReligion, pantheonPick, religionBeliefPick, type BeliefScores } from '../../ai/major/religion';
+import { BELIEF_TAKEN, beliefClassIndex, beliefScores, evaluationReligion, pantheonPick, religionBeliefPick, religionChoice, type BeliefScores } from '../../ai/major/religion';
 import type { KnownCity } from '../../ai/major/knowledge';
 import { modifierValue, type AiCitySubject, type ValueTerms } from '../core/aiModifiers';
 import { AI_RATE } from '../core/aiValue';
@@ -70,6 +70,10 @@ export interface PickTally {
    *  pick names */
   beliefs: number;
   beliefsEqual: number;
+  /** religions founded, and those whose type the founding's choice names
+   *  (`religionChoice`; a draw it would take is a miss) */
+  religions: number;
+  religionsEqual: number;
   firstMiss?: string;
   misses: string[];
 }
@@ -92,7 +96,7 @@ export interface ReligionAiTally {
   scoreByBelief: Record<string, [number, number]>;
 }
 
-const pickTally = (): PickTally => ({ pantheons: 0, pantheonsEqual: 0, beliefs: 0, beliefsEqual: 0, misses: [] });
+const pickTally = (): PickTally => ({ pantheons: 0, pantheonsEqual: 0, beliefs: 0, beliefsEqual: 0, religions: 0, religionsEqual: 0, misses: [] });
 
 export class ReligionProbe {
   private readonly scores: Map<string, Map<string, number>> | null;
@@ -131,6 +135,9 @@ export class ReligionProbe {
     if (ev.kind === 'pantheon') {
       t.pantheons++;
       if (ok) t.pantheonsEqual++;
+    } else if (ev.kind === 'found') {
+      t.religions++;
+      if (ok) t.religionsEqual++;
     } else {
       t.beliefs++;
       if (ok) t.beliefsEqual++;
@@ -143,10 +150,20 @@ export class ReligionProbe {
   }
 
   /** the picks of the turn's events on one source of scores */
-  private picks(t: PickTally, turn: number, player: number, seat: number, scores: BeliefScores, evs: readonly ReligionEvent[]): void {
+  private picks(t: PickTally, turn: number, player: number, seat: number, scores: BeliefScores, evs: readonly ReligionEvent[],
+                state: GameState): void {
     const held = new Set(this.classes.get(seat) ?? []);
     for (const ev of evs) {
-      if (ev.kind === 'found') continue;
+      if (ev.kind === 'found') {
+        // the religions the others had founded; a draw the choice would take
+        // names none
+        const view = majorView(state);
+        const others = new Set(state.seats.filter((s) => s.seat !== seat && s.religion.type).map((s) => `RELIGION_${s.religion.type}`));
+        let drew = false;
+        const ours = religionChoice(view, seat, others, () => { drew = true; return 0; });
+        this.pick(t, turn, player, ev, drew ? null : ours);
+        continue;
+      }
       const ours = ev.kind === 'pantheon' ? pantheonPick(scores) : religionBeliefPick(scores, held);
       this.pick(t, turn, player, ev, ours);
       const b = AI_BELIEFS.find((x) => x.type === ev.belief);
@@ -195,8 +212,8 @@ export class ReligionProbe {
       if (all) t.turnsEqual++;
       const evs = this.events.get(`${turn}:${player}`) ?? [];
       if (evs.length) {
-        this.picks(t.ported, turn, player, seat, ours, evs);
-        this.picks(t.logged, turn, player, seat, logged, evs);
+        this.picks(t.ported, turn, player, seat, ours, evs, state);
+        this.picks(t.logged, turn, player, seat, logged, evs, state);
         const cls = this.classes.get(seat) ?? new Set<number>();
         for (const ev of evs) {
           const b = AI_BELIEFS.find((x) => x.type === ev.belief);
@@ -209,7 +226,7 @@ export class ReligionProbe {
 }
 
 const pickLine = (name: string, p: PickTally): string =>
-  `${name}: pantheons ${p.pantheonsEqual} / ${p.pantheons}, religion beliefs ${p.beliefsEqual} / ${p.beliefs}; first miss: ${p.firstMiss ?? '-'}.`;
+  `${name}: pantheons ${p.pantheonsEqual} / ${p.pantheons}, religions founded ${p.religionsEqual} / ${p.religions}, religion beliefs ${p.beliefsEqual} / ${p.beliefs}; first miss: ${p.firstMiss ?? '-'}.`;
 
 /** the tally as the replay report's section */
 export function religionAiMarkdown(t: ReligionAiTally): string[] {

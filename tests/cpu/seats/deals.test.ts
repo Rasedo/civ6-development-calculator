@@ -33,7 +33,7 @@ import {
 } from '../../../cpu/core/deals';
 import {
   AGREEMENT_TURNS, DEAL_CITY, DEAL_FAVOR, DEAL_GOLD, DEAL_GOLD_PER_TURN, DEAL_GREAT_WORK,
-  DEAL_OPEN_BORDERS, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS, DEAL_JOINT_WAR, JOINT_WAR_CIVIC,
+  DEAL_OPEN_BORDERS, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS, DEAL_JOINT_WAR, JOINT_WAR_CIVIC, OPEN_BORDERS_CIVIC,
 } from '../../../cpu/data/seats';
 import { WAR_KIND_JOINT } from '../../../cpu/data/warKinds';
 import { STRATEGIC_IDS } from '../../../cpu/data/constants';
@@ -199,6 +199,7 @@ describe('permanent and temporary', () => {
 
   it('an open-borders grant rides the border clock, not a deal term', () => {
     const state = table();
+    state.seats[1].research.civics.push(OPEN_BORDERS_CIVIC);
     play(state, {
       1: { offer: [2, [[DEAL_OPEN_BORDERS, 0, 0]], [[DEAL_GOLD, 20, 0]]] },
       2: { accept: [1] },

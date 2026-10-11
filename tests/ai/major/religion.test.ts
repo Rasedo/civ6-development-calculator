@@ -2,7 +2,7 @@
 // the pantheon's first highest, a religion's Follower belief first, the
 // favored religion before a draw.
 import { describe, expect, it } from 'vitest';
-import { BELIEF_TAKEN, pantheonPick, religionBeliefPick, religionChoice, type BeliefScores } from '../../../ai/major/religion';
+import { BELIEF_TAKEN, foundingRecord, pantheonPick, pantheonRecord, religionBeliefPick, religionChoice, type BeliefScores } from '../../../ai/major/religion';
 import { AI_BELIEFS } from '../../../ai/major/tables';
 import type { MajorView } from '../../../ai/major/view';
 
@@ -48,5 +48,27 @@ describe('the religion founded (0x750fe0)', () => {
     expect(n).toBeGreaterThan(0);
     expect(r).not.toBe('RELIGION_TAOISM');
     expect(r).not.toBe('RELIGION_PANTHEON');
+  });
+});
+
+describe('the picks as the seat\'s actions', () => {
+  // the engine's columns: rows of the action record
+  const cols = {
+    pantheonColumn: (t: string) => (t === 'BELIEF_DESERT_FOLKLORE' ? 7 : -1),
+    beliefColumn: (t: string) => (t === 'BELIEF_CHORAL_MUSIC' ? [0, 2] as const : t === 'BELIEF_CATHEDRAL' ? [1, 4] as const : null),
+    religionColumn: (t: string) => (t === 'RELIGION_TAOISM' ? 10 : -1),
+    religionsFounded: () => new Set<string>(),
+    leaderType: () => 'LEADER_QIN', civilizationType: () => 'CIVILIZATION_CHINA',
+  };
+  it('names the pantheon row, and nothing while the seat may found none', () => {
+    const s = scores({ BELIEF_DESERT_FOLKLORE: 198 });
+    expect(pantheonRecord({ ...cols, pantheonOpen: () => true } as unknown as MajorView, 1, s)).toEqual({ pantheon: 7 });
+    expect(pantheonRecord({ ...cols, pantheonOpen: () => false } as unknown as MajorView, 1, s)).toEqual({});
+  });
+  it('names the founding\'s religion and its beliefs, the Follower first', () => {
+    const s = scores({ BELIEF_CHORAL_MUSIC: 75, BELIEF_CATHEDRAL: 483 });
+    const v = { ...cols, religionOpen: () => true } as unknown as MajorView;
+    expect(foundingRecord(v, 1, s, 2, () => 0)).toEqual({ religion: 10, beliefs: [[0, 2], [1, 4]] });
+    expect(foundingRecord({ ...v, religionOpen: () => false } as unknown as MajorView, 1, s, 2, () => 0)).toEqual({});
   });
 });

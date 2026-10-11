@@ -10,7 +10,7 @@ import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_STEP } from '../data/seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
 import { beliefPicks, canFoundReligion, openBeliefs } from './game';
-import { BELIEF_CATALOGS, BELIEF_SLOTS } from '../data/religion';
+import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES } from '../data/religion';
 
 /**
  * THE SEAT SCALARS (the silo launch, envoys, congress, the Great Person pass,
@@ -90,7 +90,8 @@ function gpGroup(state: GameState, seat: number): Record<string, number[]> {
 /** The `belief` group: whether the seat may found its religion now
  *  (`canFoundReligion`), how many beliefs an enhancement adopts now
  *  (`beliefPicks`), the class catalog row its religion holds per class (-1
- *  none), and each class's open beliefs. */
+ *  none), each class's open beliefs, whether it may found a pantheon now and
+ *  the pantheons and religions still open. */
 function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
   const rel = seatOf(state, seat)?.religion;
   const open = (c: number) => {
@@ -108,6 +109,9 @@ function beliefGroup(state: GameState, seat: number): Record<string, unknown> {
     worship: open(1),
     founder: open(2),
     enhancer: open(3),
+    pantheon_due: !!rel && rel.pantheon === null && (seatOf(state, seat)?.faith ?? 0) >= PANTHEON_FAITH_COST,
+    pantheon: PANTHEON_IDS.flatMap((id, i) => (state.claimedPantheons.includes(id) ? [] : [i])),
+    religion: RELIGION_TYPES.flatMap((t, i) => (state.seats.some((o) => o.religion.type === t) ? [] : [i])),
   };
 }
 

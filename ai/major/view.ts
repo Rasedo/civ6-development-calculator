@@ -193,6 +193,24 @@ export interface MajorView extends AiValueView {
    *  one the engine does not carry */
   policyColumn(type: string): number;
   governmentColumn(type: string): number;
+  /** the action record's pantheon row for a pantheon BeliefType, -1 for one
+   *  the engine does not carry */
+  pantheonColumn(type: string): number;
+  /** the action record's [class, catalog row] for a religion's BeliefType,
+   *  null for one the engine does not carry */
+  beliefColumn(type: string): readonly [number, number] | null;
+  /** the action record's religion row for a ReligionType, -1 for one the
+   *  engine does not carry */
+  religionColumn(type: string): number;
+  /** the ReligionTypes some seat has founded */
+  religionsFounded(): ReadonlySet<string>;
+  /** the seat may found a pantheon now: none yet, the price in its Faith, a
+   *  pantheon belief left */
+  pantheonOpen(seat: number): boolean;
+  /** the seat may found its religion now (`canFoundReligion`) */
+  religionOpen(seat: number): boolean;
+  /** the beliefs an enhancement of the seat's religion adopts now */
+  beliefPicks(seat: number): number;
 
   // THE DIPLOMATIC VIEW (ai/major/diplomacy.ts). Seats are the engine's: a
   // major's seat, a city-state's seat, the Free Cities' and the barbarians'.

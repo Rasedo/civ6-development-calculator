@@ -16,10 +16,16 @@
  * a Follower belief before any other. The religion founded (0x750fe0): the
  * leader's favored religion, then the civilization's, the first no one has
  * founded; else a draw over the religions left ("Random Religion Choice").
+ *
+ * THE ACTIONS. Each pick goes on the seat's action record, the format an RL
+ * agent emits too: the pantheon's row (`pantheon`), the founding's religion
+ * and beliefs (`religion`, `beliefs`), an enhancement's beliefs; the engine
+ * re-validates and applies them.
  */
 import { AI_BELIEFS, AI_FAVORED_RELIGIONS_BY_CIV, AI_FAVORED_RELIGIONS_BY_LEADER, AI_RELIGIONS } from './tables';
 import type { AiBelief } from './types';
 import type { MajorView } from './view';
+import type { SeatActionRecord } from '../../cpu/core/types';
 import { AI_BELIEF_HORIZON } from '../../cpu/data/aiValue';
 import { AI_RATE, FX_MIN } from '../../cpu/core/aiValue';
 import { modifiersValue, type AiCitySubject, type ValueTerms } from '../../cpu/core/aiModifiers';
@@ -166,4 +172,54 @@ export function religionChoice(view: MajorView, seat: number, founded: ReadonlyS
   }
   const left = AI_RELIGIONS.filter((r, i) => i !== 0 && !r.customName && !founded.has(r.type));
   return left.length ? left[draw(left.length)].type : null;
+}
+
+/** the pantheon pick as the seat's action record, nothing where the seat may
+ *  found none now or the pick names no row the engine carries */
+export function pantheonRecord(view: MajorView, seat: number, scores: BeliefScores): Pick<SeatActionRecord, 'pantheon'> {
+  if (!view.pantheonOpen(seat)) return {};
+  const b = pantheonPick(scores);
+  const col = b ? view.pantheonColumn(b) : -1;
+  return col >= 0 ? { pantheon: col } : {};
+}
+
+/** beliefs as the record's [class, row] pairs, the Follower first (the
+ *  order a founding names them in) */
+function beliefPairs(view: MajorView, beliefs: readonly string[]): [number, number][] | null {
+  const out: [number, number][] = [];
+  for (const b of beliefs) {
+    const col = view.beliefColumn(b);
+    if (!col) return null;
+    out.push([col[0], col[1]]);
+  }
+  return out;
+}
+
+/**
+ * THE FOUNDING as the seat's action record (0x750fe0): the religion
+ * (`religionChoice`, `draw` the game's "Random Religion Choice") and the
+ * beliefs the founding grants, each 0x751430 on the scores; nothing where
+ * the seat may not found now or a pick names no row the engine carries.
+ */
+export function foundingRecord(view: MajorView, seat: number, scores: BeliefScores, initial: number,
+                               draw: (n: number) => number): Pick<SeatActionRecord, 'religion' | 'beliefs'> {
+  if (!view.religionOpen(seat)) return {};
+  const r = religionChoice(view, seat, view.religionsFounded(), draw);
+  const col = r ? view.religionColumn(r) : -1;
+  const pairs = beliefPairs(view, foundingBeliefs(scores, new Set(), initial));
+  if (col < 0 || !pairs || pairs.length !== initial) return {};
+  return { religion: col, beliefs: pairs };
+}
+
+/** the beliefs an enhancement adds as the seat's action record (each
+ *  0x751430 on the classes the religion holds) */
+export function enhanceRecord(view: MajorView, seat: number, scores: BeliefScores): Pick<SeatActionRecord, 'beliefs'> {
+  const n = view.beliefPicks(seat);
+  if (n <= 0) return {};
+  const held = new Set(view.religionBeliefs(seat).flatMap((b) => {
+    const x = AI_BELIEFS.find((y) => y.type === b);
+    return x ? [beliefClassIndex(x)] : [];
+  }));
+  const pairs = beliefPairs(view, foundingBeliefs(scores, held, n));
+  return pairs && pairs.length === n ? { beliefs: pairs } : {};
 }

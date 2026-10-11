@@ -2205,7 +2205,7 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     religionSeat.set(r.Religion, founder);
     const rel = state.seats[founder].religion;
     rel.founded = true;
-    rel.name = strip(cat.religions[r.Religion] ?? '', 'RELIGION_');
+    rel.type = strip(cat.religions[r.Religion] ?? '', 'RELIGION_') || null;
     ctx.scopeSeat = founder;
     for (const b of r.Beliefs ?? []) beliefInto(ctx, b, rel);
     ctx.scopeSeat = undefined;

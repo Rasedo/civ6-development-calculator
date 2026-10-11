@@ -103,7 +103,31 @@ class SimDeals:
             # The giver is the CAPTOR: it lets one of the taker's own spies go.
             return self.seat_spy_held[:, taker, giver].sum(dim=1) > 0
         if kind == self._deal_k_borders:
-            return ~z
+            # CIV6 (Open Borders): the agreement "becomes available" once the
+            # GRANTOR has Early Empire; it "cannot be offered to or requested
+            # from a leader who has Denounced you, or whom you have Denounced."
+            civic = (self.civ_civics[:, giver, self._open_borders_civic] if self._open_borders_civic >= 0
+                     else z)
+            return civic & ~self._denounce_active(giver, taker) & ~self._denounce_active(taker, giver)
+        if kind == self._deal_k_mission:
+            return self._mission_ok(giver, taker)
+        if kind == self._deal_k_friend:
+            # CIV6 (DIPLOACTION_DECLARE_FRIENDSHIP): at peace, not friends
+            # already, no denouncement either way, and no grievance either
+            # side holds. `friendshipPayable`'s twin.
+            return (~self.war[:, giver, taker] & (self.seat_friend_turns[:, giver, taker] == 0)
+                    & ~self._denounce_active(giver, taker) & ~self._denounce_active(taker, giver)
+                    & (self._grievance_with(giver, taker) == 0))
+        if kind == self._deal_k_alliance:
+            # CIV6 (Alliance): the giver's Civil Service, a type of the roster,
+            # Declared Friends, at peace, not allied already, no denouncement.
+            # `alliancePayable`'s twin.
+            civic = (self.civ_civics[:, giver, self._alliance_civic] if self._alliance_civic >= 0
+                     else z)
+            return ((va >= 0) & (va < self._n_alliance_types) & civic
+                    & (self.seat_friend_turns[:, giver, taker] > 0) & ~self.war[:, giver, taker]
+                    & (self.seat_ally_turns[:, giver, taker] == 0)
+                    & ~self._denounce_active(giver, taker) & ~self._denounce_active(taker, giver))
         if kind == self._deal_k_joint:
             # CIV6 (DIPLOACTION_JOINT_WAR): the GIVER's Foreign Trade, a third
             # living major as the target, and both parties still free to
@@ -121,6 +145,31 @@ class SimDeals:
                             & self._joint_war_open(giver, x) & self._joint_war_open(taker, x))
             return out
         return z
+
+    def _mission_embassy(self, sender: int) -> torch.Tensor:
+        """[B] — the sender's mission is the Resident Embassy (it has the
+        civic), else the Delegation. `missionOf`'s twin."""
+        if 0 <= self._embassy_civic < self.civ_civics.shape[2]:
+            return self.civ_civics[:, sender, self._embassy_civic]
+        return torch.zeros(self.B, dtype=torch.bool, device=self.device)
+
+    def _mission_cost(self, sender: int) -> torch.Tensor:
+        """[B] — what that mission costs its sender. `missionCost`'s twin."""
+        t = self.civ_treasury[:, sender]
+        return torch.where(self._mission_embassy(sender), torch.full_like(t, self._embassy_cost),
+                           torch.full_like(t, self._deleg_cost))
+
+    def _mission_ok(self, giver: int, taker: int) -> torch.Tensor:
+        """[B] — CIV6 (DiplomaticActions): the mission `giver` may send — not
+        one it holds (an Embassy takes a standing Delegation's place), the
+        price in its treasury, neither at war nor denounced either way.
+        `missionPayable`'s twin."""
+        held = self.seat_delegation[:, giver, taker]
+        emb = self._mission_embassy(giver)
+        return (torch.where(emb, held != 2, held == 0)
+                & (self.civ_treasury[:, giver] >= self._mission_cost(giver))
+                & ~self.war[:, giver, taker]
+                & ~self._denounce_active(giver, taker) & ~self._denounce_active(taker, giver))
 
     def _joint_war_open(self, p: int, x: int) -> torch.Tensor:
         """[B] — may `p` still declare on `x` at all? `declareWar`'s own early
@@ -178,6 +227,30 @@ class SimDeals:
             self.seat_borders_turns[:, giver, taker] = torch.where(
                 ok, torch.full_like(self.seat_borders_turns[:, giver, taker], self._agreement_turns),
                 self.seat_borders_turns[:, giver, taker])
+        elif kind == self._deal_k_mission:
+            # "...which is paid to the other leader."
+            cost = self._mission_cost(giver)
+            emb = self._mission_embassy(giver)
+            paid = torch.where(ok, cost, torch.zeros_like(cost))
+            self.civ_treasury[:, giver] = self.civ_treasury[:, giver] - paid
+            self.civ_treasury[:, taker] = self.civ_treasury[:, taker] + paid
+            held = self.seat_delegation[:, giver, taker]
+            self.seat_delegation[:, giver, taker] = torch.where(
+                ok, torch.where(emb, torch.full_like(held, 2), torch.ones_like(held)), held)
+        elif kind == self._deal_k_friend:
+            for _x, _y in ((giver, taker), (taker, giver)):
+                self.seat_friend_turns[:, _x, _y] = torch.where(
+                    ok, torch.full_like(self.seat_friend_turns[:, _x, _y], self._agreement_turns),
+                    self.seat_friend_turns[:, _x, _y])
+        elif kind == self._deal_k_alliance:
+            self._eff_version += 1
+            for _x, _y in ((giver, taker), (taker, giver)):
+                self.seat_ally_turns[:, _x, _y] = torch.where(
+                    ok, torch.full_like(self.seat_ally_turns[:, _x, _y], self._agreement_turns),
+                    self.seat_ally_turns[:, _x, _y])
+                # the TYPE rides the same write; the POINTS are the pair's
+                # own and persist across formations
+                self.seat_alliance_type[:, _x, _y] = torch.where(ok, va, self.seat_alliance_type[:, _x, _y])
         elif kind == self._deal_k_joint:
             # CIV6 (Joint War): the war begins as the deal is accepted — BOTH
             # parties declare on the target now, the giver first, under the
@@ -273,13 +346,14 @@ class SimDeals:
         go = self._deal_bundle_ok(b, a, ask, go)
         if not bool(go.count_nonzero()):
             return z
+        allied = self.seat_ally_turns[:, a, b] > 0
         self._deal_move_bundle(a, b, give, go)
         self._deal_move_bundle(b, a, ask, go)
         self._deal_set_term(a, b, give, go)
         self._deal_set_term(b, a, ask, go)
         # CIV6 (ALLIANCE_POINTS_FOR_DEAL 2): a table that clears between two
         # ALLIES pays the pair, over and above the turn's own tick.
-        _al = (go & (self.seat_ally_turns[:, a, b] > 0)).long() * self._al_qp_deal
+        _al = (go & allied).long() * self._al_qp_deal
         self.seat_alliance_pts[:, a, b] += _al
         self.seat_alliance_pts[:, b, a] += _al
         self.deal_offer_left[:, a, b] = torch.where(
@@ -288,8 +362,8 @@ class SimDeals:
 
     def _deal_set_term(self, giver: int, taker: int, bundle: torch.Tensor, go: torch.Tensor) -> None:
         """What the giver still owes after the table clears: only the TEMPORARY
-        kinds, on the 30-turn clock. An OPEN BORDERS grant runs on the border
-        clock it already has, so it leaves nothing here."""
+        kinds, on the 30-turn clock. An agreement (open borders, friendship,
+        alliance) runs on its own clock, so it leaves nothing here."""
         keep = torch.zeros_like(bundle)
         keep[:] = -1
         any_kept = torch.zeros(self.B, dtype=torch.bool, device=self.device)
@@ -297,7 +371,7 @@ class SimDeals:
             kind = bundle[:, s, 0]
             temp = torch.zeros(self.B, dtype=torch.bool, device=self.device)
             for k in range(len(self._deal_kinds)):
-                if self._deal_permanent[k] or k == self._deal_k_borders:
+                if self._deal_permanent[k] or self._deal_own_clock[k]:
                     continue
                 temp |= kind == k
             sel = go & temp

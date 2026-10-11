@@ -657,6 +657,9 @@ class SimInit:
             ("next_city_id", torch.long, 0), ("pantheon", torch.long, -1),
             ("pantheon_done", torch.bool, 0), ("prophets", torch.long, 0),
             ("religion_done", torch.bool, 0),
+            # the religion founded, a RELIGION_TYPES row (-1 none) - the
+            # founder's choice beside its beliefs
+            ("religion_type", torch.long, -1),
             ("inquisition", torch.bool, 0),
             # a `firstBuildTechs` row (the Mahavihara) has paid its techs
             ("first_imp_tech", torch.bool, 0),
@@ -909,6 +912,8 @@ class SimInit:
         self._embassy_civic = int(_er2["embassyCivic"])
         self._deal_kinds = [str(k) for k in _er2["dealItemKinds"]]
         self._deal_permanent = [bool(v) for v in _er2["dealPermanent"]]
+        self._deal_own_clock = [bool(v) for v in _er2["dealOwnClock"]]
+        self._n_alliance_types = int(_er2["allianceTypes"])
         self._deal_k_gold = self._deal_kinds.index("GOLD")
         self._deal_k_gpt = self._deal_kinds.index("GOLD_PER_TURN")
         self._deal_k_favor = self._deal_kinds.index("FAVOR")
@@ -919,6 +924,9 @@ class SimInit:
         self._deal_k_borders = self._deal_kinds.index("OPEN_BORDERS")
         self._deal_k_joint = self._deal_kinds.index("JOINT_WAR")
         self._deal_k_lux = self._deal_kinds.index("LUXURY")
+        self._deal_k_mission = self._deal_kinds.index("MISSION")
+        self._deal_k_friend = self._deal_kinds.index("FRIENDSHIP")
+        self._deal_k_alliance = self._deal_kinds.index("ALLIANCE")
         self._comp_turns = int(_er2["competitionTurns"])
         self._comp_silver_pct = int(_er2["competitionSilverPct"])
         self._comp_bronze_pct = int(_er2["competitionBronzePct"])
@@ -1580,6 +1588,8 @@ class SimInit:
         # CIV6 (RELIGION_INITIAL_BELIEFS): the beliefs a founding earns; each
         # Evangelize Belief earns one more
         self._religion_initial_beliefs = int(_bl["religionInitialBeliefs"])
+        # the religions a founding may take (`RELIGION_TYPES`)
+        self._religion_types = int(rules.seats["religionTypes"])
         # CIV6 (GreatPersonClasses): the Great Prophet's MaxPlayerInstances
         self._prophet_max = int(_bl["prophetMaxPlayerInstances"])
         self._condemn_range = int(_bl["condemnPressureRange"])
@@ -4760,6 +4770,8 @@ class SimInit:
         self._driven_vote: dict = {}
         self._driven_gp_pass: dict = {}
         self._driven_beliefs: dict = {}
+        self._driven_religion: dict = {}
+        self._driven_pantheon: dict = {}
         self._driven_buy_nat: dict = {}
         self._driven_buy_cls: dict = {}
         self._driven_buy_ucls: dict = {}

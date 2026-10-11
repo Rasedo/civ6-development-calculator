@@ -201,7 +201,7 @@ def main() -> int:
     assert torch.equal(picks, again), "the style draw does not hold for its window"
     later = drive._decide_government(st, [nob] * 64, ROW, list(range(64)), drive.ladder.GOV_STYLE_TURNS, "cpu")
     assert not torch.equal(picks, later), "the style draw never changes, so no seat returns"
-    assert "government" == drive.DECIDE_FIELDS[-1], "the government field is not appended at the end"
+    assert "government" in drive.DECIDE_FIELDS, "the government field is not on the record"
     print("  4 the wire OK - the record round-trips, the observation and the compare carry it, the driver reaches every tier-mate")
     print("BATTERY OK government_choice")
     return 0

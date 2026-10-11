@@ -18,7 +18,8 @@ import {
   DEAL_GREAT_WORK, DEAL_ITEMS, DEAL_ITEM_KINDS, DEAL_OPEN_BORDERS,
   ALLIANCE_QP_DEAL,
   DEAL_PERMANENT, DEAL_RESOURCE, DEAL_SPY, DEAL_TURNS, WAR_MIN_TURNS,
-  DEAL_JOINT_WAR, DEAL_LUXURY, JOINT_WAR_CIVIC,
+  DEAL_JOINT_WAR, DEAL_LUXURY, JOINT_WAR_CIVIC, DEAL_MISSION, DEAL_FRIENDSHIP, DEAL_ALLIANCE,
+  DEAL_OWN_CLOCK, ALLIANCE_CIVIC, ALLIANCE_TYPES, OPEN_BORDERS_CIVIC, EMBASSY_CIVIC, DELEGATION_COST, EMBASSY_COST,
 } from '../data/seats';
 import { WAR_KIND_JOINT } from '../data/warKinds';
 import { STRATEGIC_IDS } from '../data/constants';
@@ -30,13 +31,14 @@ import { SPY_UNIT } from '../data/espionage';
 import { gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { outerPool, wallsMax } from './rules';
 import {
-  alliancePtsWith, civsAtWar, grantKey, isCiv, seatOf, seatsAllied, seatsFriends,
-  setAlliancePtsWith, setBorderTurnsFrom, treatyTurnsWith, warTurnsWith,
+  alliancePtsWith, civsAtWar, delegationWith, denounceActive, grantKey, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, seatOf,
+  seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom,
+  setDelegationWith, setFriendTurnsWith, treatyTurnsWith, warTurnsWith,
 } from './seats';
 import { grantStockpile, spendStockpile, stockOf, stockpileCap } from './stockpile';
 import { spawnUnit } from './units';
 import { declareWar, transferCity } from './phase';
-import { tickPromises } from './grievance';
+import { grievanceWith, tickPromises } from './grievance';
 
 /** The offer `from` has standing with `to`, if any. */
 export function dealOfferOf(state: GameState, from: number, to: number): DealOffer | undefined {
@@ -139,6 +141,53 @@ export function jointWarPayable(state: GameState, giver: number, receiver: numbe
     && !seatsFriends(state, p, target) && treatyTurnsWith(state, p, target) === 0);
 }
 
+/** the mission `sender` sends now: the Resident Embassy once it has the
+ *  civic (DIPLOACTION_RESIDENT_EMBASSY InitiatorPrereqCivic, the Delegation's
+ *  InitiatorObsoleteCivic), else the Delegation */
+export function missionOf(state: GameState, sender: number): number {
+  return seatOf(state, sender)?.research.civics.includes(EMBASSY_CIVIC) ? MISSION_EMBASSY : MISSION_DELEGATION;
+}
+
+/** what that mission costs its sender, paid to the receiver */
+export function missionCost(state: GameState, sender: number): number {
+  return missionOf(state, sender) === MISSION_EMBASSY ? EMBASSY_COST : DELEGATION_COST;
+}
+
+/** CIV6 (DiplomaticActions): the mission `giver` may send `receiver` — not
+ *  one it holds already (NoCurrentDelegation; NoCurrentEmbassy, an Embassy
+ *  taking a standing Delegation's place), the price in its treasury, and a
+ *  diplomatic state that lists the action: neither at war nor denounced
+ *  either way. The receiver's acceptance is its own decision. */
+export function missionPayable(state: GameState, giver: number, receiver: number): boolean {
+  const gs = seatOf(state, giver);
+  if (!gs) return false;
+  const want = missionOf(state, giver);
+  const held = delegationWith(state, giver, receiver);
+  if (want === MISSION_EMBASSY ? held === MISSION_EMBASSY : held > 0) return false;
+  if ((gs.treasury ?? 0) < missionCost(state, giver)) return false;
+  return !civsAtWar(state, giver, receiver) && !denounceActive(state, giver, receiver) && !denounceActive(state, receiver, giver);
+}
+
+/** CIV6 (DIPLOACTION_DECLARE_FRIENDSHIP): two majors at peace, not friends
+ *  already, neither denouncing the other; "A leader you've offended (or who
+ *  has many Grievances against you in Gathering Storm) will not want to become
+ *  Declared Friends with you" — either side's outstanding balance refuses. */
+export function friendshipPayable(state: GameState, a: number, b: number): boolean {
+  return !civsAtWar(state, a, b) && !seatsFriends(state, a, b)
+    && !denounceActive(state, a, b) && !denounceActive(state, b, a) && grievanceWith(state, a, b) === 0;
+}
+
+/** CIV6 (Alliance): "Alliances become possible after developing the Civil
+ *  Service civic. You can only enter into an Alliance with a civilization if
+ *  you and its leader are Declared Friends." The giver's civic, a type of
+ *  the roster, friends, at peace, not allied already, no denouncement. */
+export function alliancePayable(state: GameState, giver: number, receiver: number, type: number): boolean {
+  if (!Number.isInteger(type) || type < 0 || type >= ALLIANCE_TYPES.length) return false;
+  if (!seatOf(state, giver)?.research.civics.includes(ALLIANCE_CIVIC)) return false;
+  return seatsFriends(state, giver, receiver) && !civsAtWar(state, giver, receiver) && !seatsAllied(state, giver, receiver)
+    && !denounceActive(state, giver, receiver) && !denounceActive(state, receiver, giver);
+}
+
 /** Can `giver` actually hand `receiver` this one thing, right now? */
 export function dealItemPayable(state: GameState, giver: number, receiver: number, it: DealItem): boolean {
   const [kind, a, b] = it;
@@ -174,9 +223,19 @@ export function dealItemPayable(state: GameState, giver: number, receiver: numbe
       // The giver is the CAPTOR: it lets one of the receiver's own spies go.
       return spyHeldWith(state, receiver, giver) > 0;
     case DEAL_OPEN_BORDERS:
-      return true;
+      // CIV6 (Open Borders): the agreement "becomes available" once the
+      // GRANTOR has Early Empire; it "cannot be offered to or requested from
+      // a leader who has Denounced you, or whom you have Denounced."
+      return gs.research.civics.includes(OPEN_BORDERS_CIVIC)
+        && !denounceActive(state, giver, receiver) && !denounceActive(state, receiver, giver);
     case DEAL_JOINT_WAR:
       return jointWarPayable(state, giver, receiver, a);
+    case DEAL_MISSION:
+      return missionPayable(state, giver, receiver);
+    case DEAL_FRIENDSHIP:
+      return friendshipPayable(state, giver, receiver);
+    case DEAL_ALLIANCE:
+      return alliancePayable(state, giver, receiver, a);
     default:
       return false;
   }
@@ -242,6 +301,24 @@ function moveDealItem(state: GameState, giver: number, receiver: number, it: Dea
       declareWar(state, giver, a, WAR_KIND_JOINT, true);
       declareWar(state, receiver, a, WAR_KIND_JOINT, true);
       break;
+    case DEAL_MISSION: {
+      // "...which is paid to the other leader."
+      const cost = missionCost(state, giver);
+      gs.treasury -= cost;
+      rs.treasury += cost;
+      setDelegationWith(state, giver, receiver, missionOf(state, giver));
+      state.eventLog.push(`${gs.name} sends a mission to ${rs.name}.`);
+      break;
+    }
+    case DEAL_FRIENDSHIP:
+      setFriendTurnsWith(state, giver, receiver, AGREEMENT_TURNS);
+      state.eventLog.push(`${gs.name} and ${rs.name} declare friendship.`);
+      break;
+    case DEAL_ALLIANCE:
+      setAllyTurnsWith(state, giver, receiver, AGREEMENT_TURNS);
+      setAllianceTypeWith(state, giver, receiver, a);
+      state.eventLog.push(`${gs.name} and ${rs.name} form an alliance.`);
+      break;
     default:
       break;
   }
@@ -255,7 +332,7 @@ function dealBundleOk(state: GameState, giver: number, receiver: number, items: 
 }
 
 function temporaryOf(items: DealItem[]): DealItem[] {
-  return items.filter((it) => !DEAL_PERMANENT[it[0]] && it[0] !== DEAL_OPEN_BORDERS);
+  return items.filter((it) => !DEAL_PERMANENT[it[0]] && !DEAL_OWN_CLOCK[it[0]]);
 }
 
 /**
@@ -277,6 +354,7 @@ export function acceptDeal(state: GameState, from: number, to: number): boolean 
   if (war && warTurnsWith(state, from, to) < WAR_MIN_TURNS) return false;
   if (!dealBundleOk(state, from, to, o.give)) return false;
   if (!dealBundleOk(state, to, from, o.ask)) return false;
+  const allied = seatsAllied(state, from, to);
   for (const it of o.give) moveDealItem(state, from, to, it);
   for (const it of o.ask) moveDealItem(state, to, from, it);
   const give = temporaryOf(o.give);
@@ -285,7 +363,7 @@ export function acceptDeal(state: GameState, from: number, to: number): boolean 
   if (ask.length > 0) (state.dealTerms ??= {})[grantKey(to, from)] = { left: DEAL_TURNS, items: ask };
   // CIV6 (ALLIANCE_POINTS_FOR_DEAL 2): a table that clears between two ALLIES
   // pays the pair, over and above the turn's own tick.
-  if (seatsAllied(state, from, to)) {
+  if (allied) {
     setAlliancePtsWith(state, from, to, alliancePtsWith(state, from, to) + ALLIANCE_QP_DEAL);
   }
   clearDealOffer(state, from, to);
