@@ -56,7 +56,7 @@ import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
 import { barbarianTactics, cityStateTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
-import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
+import { barbSlots, barbSlotsDying, barbarianScouts, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
 import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeDestCenter, routeOriginCenter } from '../core/trade';
@@ -510,7 +510,7 @@ function campsTaken(ctx: Ctx, b: TurnRecord, turn: number): void {
  * does not stands where the record holds it (`barb:move`, imposed). The AI
  * runs on a copy of the state, so a move it took that the game did not (a
  * blow, a pillage) leaves no trace: the record's battles and pillages are the
- * pair's. Their operations then take their turn (`barbarianOps`: the scouts'
+ * pair's. Their operations then take their turn (`barbarianScouts`: the scouts'
  * reports, the raids' recruits).
  */
 function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
@@ -558,7 +558,7 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   }
   barbSlots(state);
   barbarianAi(ctx, b, closing, before, from);
-  barbarianOps(state);
+  barbarianScouts(state);
   barbSlotsDying(state);
   // the barbarians' units look round where the record holds them (their
   // moves are the record's, set without a step)
@@ -635,6 +635,16 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
     traceTactics(null);
     holdRng(held);
   }
+  // the operations' trees ran on the copy: their state (the recruit's asks,
+  // the raids' progress, the cities a raid's end lists) is the tribes'
+  (copy.barbTribes ?? []).forEach((c, i) => {
+    const tr = state.barbTribes?.[i];
+    if (!tr) return;
+    tr.op = c.op;
+    tr.queue = c.queue;
+    tr.every = c.every;
+    tr.assaultTargets = c.assaultTargets;
+  });
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
   tallyTactics(ctx, b, closing, moves, ended, danger);

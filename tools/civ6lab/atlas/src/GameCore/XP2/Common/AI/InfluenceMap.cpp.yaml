@@ -13,11 +13,12 @@
       value: "Case:   1121 camp (3,19): its Scout reports at t23, takes 47 from China's   Warrior at t24, stands home at t25 three plots from it and raises no   raid (none at boldness 10 on t26 either);"
   impl: [cpu/core/tactical.ts:heal, cpu/core/tactical.ts:dangerPlane]
   readings:
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the raids — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "H-1: the raids — READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   moves: a unit not of the sea domain (+0x650: 0 sea, 1 air,..."
     - ".claude/scratchpad/st1/reading.md: ...water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence map below, 0x716a90); the Loyalty   pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another   player..."
@@ -26,15 +27,28 @@
     - "...mage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's moves: a unit not of the sea domain (+0x650: 0 se..."
     - "...82c20); the nearest own city (a min, 0 with none); the danger (the influence map below, 0x716a90); the Loyalty pressure (0x19d470 >> 8); and per ring plot revealed: one owned by anothe..."
   review: imported
+- addr: 0x716b10
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...== 1: a land unit). A unit of religious strength (+0x1ce8 > 0) adds the religious map (0x716b10) to the danger: no party on the tactical core holds one. A goal plot argument (0x497d20..."
+  review: imported
 - addr: 0x716b90
   final: 0x4c59b0
   kind: function
   name: safePlot
-  semantics: "the safe plot over the planning reach of this turn: safe over dangerous, own territory, less Movement left, lower danger, farther; the skip set 0x2d2100 and own-city flag +0x58 unread"
-  status: PARTLY
+  semantics: "the safe plot over the planning reach of this turn: no fallout (0x2d2100); a fort (own plot, district with HitPoints, DistrictInfo +0x58) first, safe over dangerous, own territory, less Movement left, lower danger, farther"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "HL: Move To Safety ends 184 of 371"
   impl: [cpu/core/tactical.ts:safePlot, gpu/core/sim_tactics.py:_tac_safe_plot]
   readings:
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn (+0x8 <= 1), none taken already, none (0..."

@@ -181,7 +181,7 @@ def main() -> None:
         f"(start {start}, mid {_mid}, alive {bool(sim.barb_unit_alive[0, slot])})")
     print("  a Free City's district is a raid target — the raider walked onto it")
 
-    # THE RAID (`barbarianOps`, the TS twin's "a barbarian raid"): a scout
+    # THE RAID (`barbarianScouts`, `raidTick`'s recruit, the TS twin's "a barbarian raid"): a scout
     # beside its camp sees a major's plot, so it reports at once; at
     # RaidingBoldness the raid starts and asks for its force, melee first,
     # raised one a turn, a unit raised in a turn not the raid's until the next
@@ -199,7 +199,7 @@ def main() -> None:
     sim._tile_owner_ver += 1
     sim.tribe_bold[0, k] = 10
     sim.barb_spot_next[0, :] = 0  # no earlier report throttles the major
-    sim._barbarian_ops()
+    sim._barbarian_scouts()
     melee = int(sim._barb_unit_for()[0, int(tribes[2][6])])
     ranged = int(sim._barb_unit_for()[0, int(tribes[2][7])])
     assert int(sim.tribe_op[0, k]) == 1 and int(sim.tribe_home_slot[0, k]) == -1, "the scout's report started no raid"
@@ -214,7 +214,8 @@ def main() -> None:
         sim._barb_tribe_turn(k)
         raised += [int(sim.barb_unit_type[0, s]) for s in sim.barb_unit_alive[0].nonzero(as_tuple=True)[0].tolist()
                    if s not in before]
-        sim._barbarian_ops()
+        # the raid's tree's recruit (its tick opens the barbarians' units' AI)
+        sim._barb_op_turn((sim.tribe_op[:, k] == 1) & ~sim.tribe_op_rec[:, k], k)
     assert raised == [melee, melee, melee, ranged, ranged], f"the raid raised {raised}"
     assert bool(sim.tribe_op_rec[0, k]) and int(sim.tribe_every[0, k]) == -1, "the force taken, the clock not the tribe's"
     assert int((sim.barb_unit_op[0] & (sim.barb_unit_tribe[0] == k)).sum()) == 3, "the raid took no force of three"
@@ -244,12 +245,12 @@ def main() -> None:
     far = sim.unit_tile[0, foe].item()
     sim.unit_alive[0, foe] = True
     sim.unit_tile[0, foe] = [n for n in range(sim.T) if int(sim.pair_dist[st, n]) == 2][0]
-    sim._barbarian_ops()
+    sim._barbarian_scouts()
     assert int(sim.tribe_op[0, k]) == 0 and int(sim.tribe_home_slot[0, k]) == sc, \
         "a hurt scout an enemy can strike reported"
     sim.unit_tile[0, foe] = far if int(sim.pair_dist[far, st]) > int(reach[foe]) else \
         [n for n in range(sim.T) if int(sim.pair_dist[st, n]) > int(reach[foe])][0]
-    sim._barbarian_ops()
+    sim._barbarian_scouts()
     assert int(sim.tribe_op[0, k]) == 1 and int(sim.tribe_home_slot[0, k]) == -1, \
         "the hurt scout, the threat gone, started no raid"
     print("  a hurt scout holds its report while an enemy can strike it")

@@ -7,7 +7,7 @@
   final: 0x35a7f0
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."

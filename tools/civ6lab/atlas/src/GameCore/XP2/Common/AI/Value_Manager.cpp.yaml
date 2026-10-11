@@ -479,6 +479,16 @@
     - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
     - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."
   review: imported
+- addr: 0x7b5d70
+  final: 0x532f00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x716b90 with the target), \"Operation Protect Units, Move\"; then the hurt: a promotion (0x7b5d70, \"Promote\"), a plunder, a safe plot afloat."
+  review: imported
 - addr: 0x7b62c0
   final: 0x533190
   kind: function

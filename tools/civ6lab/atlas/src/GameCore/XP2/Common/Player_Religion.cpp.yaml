@@ -128,6 +128,15 @@
   context:
     - "...the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0x6d27a0 (no religion: held; else 0x497cc0). A requirement the registry lacks (PLAYER_HAS_AT_LEAST_NUMBER_CITIES) is left out of t..."
   review: imported
+- addr: 0x497d20
+  final: 0x315b80
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x716b10) to the danger: no party on the tactical core holds one. A goal plot argument (0x497d20 valid) puts the nearer to it first off its own territory: both callers pass none."
+  review: imported
 - addr: 0x497d40
   final: 0x315ba0
   kind: function

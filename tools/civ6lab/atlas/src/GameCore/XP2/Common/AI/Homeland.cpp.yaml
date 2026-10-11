@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x70a370
+  final: 0x4bb0c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tree ticks) — then a second — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The operations' trees tick after the tribes' turn and before the tactical pass, on t..."
+  review: imported
 - addr: 0x70a440
   final: 0x4bb190
   kind: function
@@ -120,8 +130,7 @@
       turn: all
       value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
   impl: [cpu/core/tactical.ts:homelandSafety]
-  readings:
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the hurt, the danger abov..."
@@ -175,8 +184,7 @@
     - cpu/core/tactical.ts:homelandSafety
     - gpu/core/sim_tactics.py:_tac_move_to_safety
     - cpu/core/tactical.ts:flees
-  readings:
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the h..."

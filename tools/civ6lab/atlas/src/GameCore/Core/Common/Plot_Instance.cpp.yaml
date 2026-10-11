@@ -43,6 +43,7 @@
     - "C-74: the event draw, the volcanoes, the drought"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: Coastal Raid — READ, ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
   context:
@@ -136,7 +137,7 @@
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...

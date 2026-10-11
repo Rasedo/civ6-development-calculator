@@ -1713,9 +1713,9 @@ while no region holds it. The camp step admits a region of more than 10
 plots or on an area (m_area, looked up at the game's time) of more than 10
 (0x153290).
 
-## H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)
+## H-1: the raids — READ
 
-`barbarianOps` / `opTurn` / `barbScoutLook` / `barbBattleBoldness` in
+`barbarianScouts` / `opTurn` / `barbScoutLook` / `barbBattleBoldness` in
 cpu/core/barbarians.ts; `_barbarian_ops` & co in gpu/core/sim_barb.py.
 
 - Boldness (tribe +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn
@@ -1765,10 +1765,10 @@ camp (9,24): home at t9, t10 W (no roll), t11 W, t12 W, t13 S, t14 S, the
 clock at t21 with its roll; 1124 camp (41,7): home at t22, t23 W, t24 W, t25
 W, t26 S, t27 S, the clock at t34. StandardRaid (2 melee, 1 ranged) fits all
 three only if a unit raised in the turn is not yet recruitable (W at t7
-recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is
-unread. The raid operation's own end (its tree's last Notify Owner, which
-opens the city assault) is unread: the engines end an operation once the
-units it took are gone (ASK in docs/AUDIT.md C-94).
+recruited at t8, the t9 W not at t9): LAB — the recruit's list (0x60a8c0,
+unread) taken by the player's first job (0x5c2650, before the tribes' turn in
+0x6096c0) would not hold a unit raised in the turn. The raid's end: "C-95: the
+barbarians' raid" (its tree's Notify Owner lists the city for the assault).
 
 - The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at
   signals +0x10c8, which the unit sight update 0x58aa90 raises per plot
@@ -4345,7 +4345,7 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   (`_GameRows`: each job a game, the per-game planes taken by rows), the
   strength routines unchanged.
 
-## C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)
+## C-95: the danger map and Move to Safety — READ, ported
 
 `dangerPlane`, `flees`, `safePlot`, `moveToSafety`, `homelandSafety` in cpu/core/tactical.ts; `_danger_plane`, `_tac_flees`, `_tac_safe_plot`, `_tac_move_to_safety` in gpu/core/sim_tactics.py. The barbarians' lists take Move to Safety after Attack Medium Priority and in their homeland; the city-states' after Attack High Priority and in their homeland; the Free Cities' after Attack Medium Priority.
 
@@ -4389,18 +4389,25 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   turn takes its safe plot (0x962030, "Move To") or, a barbarian with none,
   fortifies (0x95eae0, "Fortify in place").
 - THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn
-  (+0x8 <= 1), none taken already, none (0x585eb0) with a unit of its own
-  stacking with it (itself counted), none with a unit at war (0x5861f0);
-  against the best so far, the first taken — of no danger over one of
-  danger; of two of no danger the player's own territory, else less Movement
-  left (+0xc); of two of danger on its own territory its own over another's,
-  the lower danger, then less Movement left; off it the lower danger, then
-  the farther (0x1deb0) from the unit. A unit with no combat strength skips a
-  water plot (0x834d0: terrain 15/16) of danger while the best is ashore.
-  PARTLY READ: a plot the global set 0x2d2100 counts above 0 is skipped (not
-  carried); a plot of the player's own city with the city flag +0x58 beats
-  all (not carried: no barbarian holds one); the planning's +0x738 in the
-  water test (taken as any unit).
+  (+0x8 <= 1), none taken already, none with fallout (0x2d2100, HasFallout,
+  on the plot index), none (0x585eb0) with a unit of its own stacking with
+  it (itself counted), none with a unit at war (0x5861f0). A FORT (r12b):
+  the plot's owner (+0x1c) is the unit's owner (+0x2e0) and its district
+  (0x810d0) has DistrictInfo +0x58 set — the HitPoints column (0xabfc20,
+  Districts column 0x16; the install: CITY_CENTER 200, ENCAMPMENT 100,
+  IKANDA 100). Against the best so far, the first taken — a fort over any
+  but a fort, of two forts the lower danger (equal keeps); then of no danger
+  over one of danger while the best is no fort; of two of no danger the
+  player's own territory, else less Movement left (+0xc); of two of danger
+  (or the best a fort) on its own territory: a fort or plot of no danger
+  kept, its own over another's, the lower danger, then less Movement left;
+  off it the lower danger, then the farther (0x1deb0) from the unit. A unit
+  with no combat strength (0x56dc90(1) == 0) skips a water plot (0x834d0:
+  terrain 15/16) of danger while the best is ashore (the planning's +0x738
+  == 1: a land unit). A unit of religious strength (+0x1ce8 > 0) adds the
+  religious map (0x716b10) to the danger: no party on the tactical core
+  holds one. A goal plot argument (0x497d20 valid) puts the nearer to it
+  first off its own territory: both callers pass none.
 - MEASURED: the replay's barbarian "Current Danger" rows (5 seeds, the map
   as the barbarians' turn opens on the copy) 114 of 240 equal; the misses
   are mostly +1 to +3 (a no-strike city at distance 2 would explain them: a
@@ -4455,6 +4462,170 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
 - MEASURED (the action replay, 5 seeds): the barbarians' "HL: Explore" rows
   end on the game's plot 407 of 1,056 (128 with the stand-in); barb:move
   applied 13,702 against 12,592 on the base engine.
+
+## C-95: the barbarians' raid — READ ("Raid City"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)
+
+`raidTick`, `moveUpdate`, `moveExec`, `opAttackExec`, `opPillageExec`,
+`barbarianOpTrees` in cpu/core/tactical.ts; `_barb_op_trees`,
+`_barb_move_update`, `_barb_move_exec`, `_barb_op_attack`, `_barb_op_pillage`
+in gpu/core/sim_tactics.py; the score `barbPillageScore` (cpu/core/barbarians.ts)
+/ `_barb_pillage_score` (gpu/core/sim_orders.py).
+
+- THE TURN (0x6096c0, the player AI's jobs): a first list — the unit
+  evaluator 0x5c2650, the barbarian manager's turn 0x1514a0 (barbarians
+  only), the planning 0x791b20, the target list 0x785f30, ..., the operation
+  manager 0x722690 (0x727510: each operation's tree ticks) — then a second
+  — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The
+  operations' trees tick after the tribes' turn and before the tactical
+  pass, on the plannings and the target list the pass then reads; an
+  operation's units leave the pass. The engines keep a scout's report (its
+  tree "Barbarian Found City") after the pass (`scoutReports`), the new
+  raid's first recruit at once.
+- THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's
+  functions under the id the registration 0x7db850 gives it, the k-th id
+  stored the k-th name, @d5b198 one unnamed): Operation Move update 0x81a130
+  / execution 0x816cb0; Operation Attack Units 0x80ecf0 / 0x80ceb0;
+  Operation Defend Units 0x80ee70 / 0x80d790; Operation Pillage 0x8134a0 /
+  0x811390; Operation Siege City 0x8136a0 / 0x811e80; Operation Attack City
+  0x813250 / 0x8109e0; Barbarian Raid Check 0x7c7330; Barbarian Recruit
+  0x7c7580; Barbarian Spawn Change 0x7c7b70 / 0x7c6e50; Notify Owner
+  0x7c6fa0; In Difficulty Range 0x7f1d70; Make Formation 0x7efd70 /
+  0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0;
+  Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
+- "RAID CITY" under the interpreter (0x7d3a00): the root Sequence resumes at
+  the child that RAN — the recruit (2: Spawn Change, the Turn Limiter over
+  Barbarian Recruit), the march (Concurrent 9: Attack Units 10, Operation
+  Move 11 to the target, range 2, unit distance 0), the raid (Priority 12:
+  Barbarian Raid Check 13, else the Turn Limiter 14 — 10 turns, Limit Is Min,
+  Fail at Limit false — over Concurrent 15: Attack Units 16, Operation
+  Pillage 17, In Difficulty Range 18 over Operation Attack City 19,
+  Operation Defend Units 20, Operation Move 21 to the target, range 3), the
+  way home (Concurrent 22: Attack Units 23, Operation Move 24 to the rally,
+  range 1, unit distance 4), Notify Owner 25. A child that SUCCEEDS hands on
+  in the same tick (the recruit's last turn marches; a march arrived raids);
+  every node of the walk that SUCCEEDED or RUNS executes after it, in node
+  order. A Concurrent's FAILURE skips its later children. The Turn Limiter
+  (Limit Is Min): RUNNING while its turns since it first ran are at most 10,
+  then SUCCESS once its child RUNS past 10 x the speed's percent.
+- OPERATION ATTACK UNITS. Update: the target gone (0x73a8e0: no city on its
+  plot) SUCCESS, else SUCCESS (RUNNING under Always Running); FAILURE where
+  a team is in battle (+0x90, the team update's battle points 0x738f20) and
+  the operation holds no unit — a team in battle has a member, so never in
+  a turn. Execution (0x80ceb0): per team its members alive, not done, able
+  to act (0x56c690), on land (+0x738 == 1), a bombard unit only against a
+  city of another player or as a DEFENDER (+0x1c0 == 4); the targets: the
+  list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those
+  near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or
+  the operation's enemy — a civilian of anyone —, within max(2, Movement
+  left) of a member); every barbarian node asks Attack Nearby Units, so the
+  march's 0x80be90 and the near-target 0x80bb50 never run. The assignment
+  0x776140 with its fifth argument (the exchange filter) where the node
+  allows no unequal attacks and the team is one unit, its sixth (the
+  survival filter) always, a HIGH target dropping neither; carried out by
+  0x771f80 ("Operation Attack Units, %s, At, Move, Attack").
+- OPERATION MOVE'S UPDATE (0x81a130). Per team (the first one only for the
+  head's test): a team the 0x73ab20 check passes with no member skipped; the
+  goal its slot (Move To: 0 the rally +0xe8, 1 the target +0xf0); the node
+  keeps a list per team (the member storage 0x737920, slots +0x78 and
+  +0x74, made on its first tick) with the goal it was kept for (0x739f60):
+  the list the store while the goal holds, else empty, the team's +0x48
+  units added unless Validate new units. The members not listed, nearest the
+  goal first (the stable sort 0x814d10): the nearest within Range to goal
+  has the team arrived (+0x70); else its planning reaching a plot at the
+  range this turn with Movement left (0x791300: 1 turn, the flag set) counts
+  as arrived for the success test; else a listed member within the range
+  arrives, joining the others. No member unlisted: the nearest listed one
+  joins them. Arrived (or reaching) with the target the goal: SUCCESS.
+  Else, Unit distance (default 1) above 0: the members within it of the
+  goal, then each next one within it of one of those (0x814930, 0x815a10,
+  0x814840 grow the run in the sorted order), the rest strays — two strays
+  or more for each member counted and arrived is cleared; the listed members
+  within the unit distance of the others (0x8160a0) leave the list, one
+  within the range arriving; the list stored with the goal. The status:
+  SUCCESS arrived, else RUNNING (AlwaysRunning: RUNNING).
+- OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams
+  gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update
+  found it arrived; per team its members listed at +0x74 "Nonmoving" (their
+  turn ends; the update clears the list each tick), the others with
+  Movement, nearest the goal first: the radius the smaller of Range to goal
+  and its attack range (0 in a formation or carrying the Leader Tag); at
+  least 1 where the goal is barred (0x586360 no path, 0x5862e0 a unit at
+  war, 0x585eb0 its own stacking); its planning of two turns at the radius
+  (0x791300, no Movement asked; 0x78fa10: a plot exactly the radius away,
+  none of its own stacking there but its own plot) where that plot lies in
+  the goal's region; else the ring walk 0x6aef0 (the test 0x815d50: one in
+  the goal's region before one outside, then strictly nearer, its own plot
+  or one with none of its own and a path); none, the goal with flag 0x10.
+  The unit's turn ends (0x570b40) and its MoveTo (0x962030) runs at once
+  ("Operation Move, %s, at, goal, after").
+- BARBARIAN RAID CHECK (0x7c7330): SUCCESS where the tribe's score
+  (0x152c00: +0x78 + +0x7c) reaches Score, else FAILURE; Signal At Start
+  links a game signal for the target. The score: the game signal +0x8d0 —
+  raised by the pillage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and
+  a district's pillage in combat 0x20bae0 — runs 0x154b80: a barbarian unit
+  of a tribe adds 5 to its +0x78 (+0x7c has no writer but the serializer).
+- OPERATION PILLAGE. Update (0x8134a0): the target gone SUCCESS; the
+  operation holding a unit SUCCESS, else FAILURE (no flag set: ERROR).
+  Execution (0x811390): each IMPROVEMENT (unpillaged), PASSIVE_DISTRICT
+  (pillageable) or GOODY_HUT entry of the list on the ground of the target's
+  city, a member standing on it with Movement left, on land, no bombard
+  strength, pillages it (0x963190; "Operation Pillage City").
+- IN DIFFICULTY RANGE (0x7f1d70): the opponent's handicap (Apply to
+  opponent) below Low or above High: the child skipped, SUCCESS (FAILURE
+  with Fail if Outside). The duels' Prince and Warlord: Operation Attack City
+  never runs in a raid.
+- OPERATION DEFEND UNITS. Update (0x80ee70): SUCCESS; marks the node where a
+  team lists endangered units (+0xb0), a member is hurt past AutoProtect
+  Percentage (default 33), or one fortified (+0x650 == 2) stands in danger.
+  Execution (0x80d790): each endangered member (+0xa0 list) off the target
+  (Protect Outside Range), no bombard strength, not in a city, to its safe
+  plot (0x716b90 with the target), "Operation Protect Units, Move"; then the
+  hurt: a promotion (0x7b5d70, "Promote"), a plunder, a safe plot afloat.
+- NOTIFY OWNER (0x7c6fa0 -> the player signals +0x288 -> 0x148270): the
+  tree's tribe; the raid's tree (+0x3c) offers its city to the city assault
+  (0x1497d0), which refuses while the raid stands (+0x3c or +0x40 set): the
+  city to the assault list (+0x60), the tribe's next turn starting it at
+  CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone
+  and the manager ends it ("Operation complete", 0x725000 -> 0x7353d0).
+- AN OPERATION THAT LOSES ITS UNITS: in the raid Operation Pillage FAILS and
+  the tree ends; in the march or the way home nothing FAILS and the
+  operation stands with none (runs/h1_duelw1124: the t22 raid empty for 444
+  turns; h1_duelw1128: the t78 raid at home empty from t143) — its tribe
+  starts no other.
+- LAB (the engines): the rally is the tribe's camp (the staging plot the
+  operation's candidate names, player +0x12b8 +0xb58, unread); a member
+  killed stays a member off the map, a stray of the way home (the lone
+  Crossbowman of runs/h1_duelw1128 at its rally t90-t142, its team three);
+  the execution's gathering test is the update's arrival (the team's
+  readiness +0x11, 0x73fba0's strength advantage, unread); the team's +0x48
+  units are none; ties go by the pool slot.
+- MEASURED (the action replay, 5 seeds, the operations' units on the tree):
+  barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096, 1124 1,061 ->
+  1,043, 1128 856 -> 778, 1127 537 -> 536; the "Operation" rows end on the
+  game's plot 416 of 1,265 (400 on the stand-in) — the rest the Builder
+  Capture's escorts, the city assaults and the scouts' trees still off it.
+  barb:unit rises in 1117 (78 -> 94) and 1128 (117 -> 138); 1117's: a scout's report the game
+  never makes (the camp at plot 687, t34; the scout's tree unported)
+  starts a raid whose Notify Owner lists the city, an assault recruiting
+  from t65.
+
+## C-95: Coastal Raid — READ, ported
+
+`coastalRaids` in cpu/core/tactical.ts (the raid `coastalRaid`,
+cpu/core/combat.ts); `_tac_coastal_raid` in gpu/core/sim_tactics.py
+(`_barb_coastal_raid`, gpu/core/sim_orders.py).
+
+- 0x7794b0: each IMPROVEMENT, then PASSIVE_DISTRICT entry of the list on
+  coastal land (0x82a10), each unit of the move's list alive, +0x650 == 0,
+  CanRaid (+0x18bd) whose planning of two turns holds a plot at range 1
+  (0x791300) is queued with it (0x7803d0, "Coastal Raid"); the queue
+  carried out (0x7735d0): each queued unit that can act moves to its plot
+  (0x962190, flag 0x10) and raids the target where it may (0x95b100 ->
+  0x95b7c0). The raid wrecks the plot's improvement, else its district, 3
+  Movement spent (none for a raider that raids free); the pillage signal
+  scores the tribe.
+- MEASURED: 9 of 9 Coastal Raid rows take the move (0 on the base), 5 end
+  on the game's plot.
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

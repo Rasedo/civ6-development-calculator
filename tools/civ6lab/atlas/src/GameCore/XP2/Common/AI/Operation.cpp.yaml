@@ -3,6 +3,23 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x737920
+  final: 0x4db820
+  kind: function
+  name: teamMemberStorage
+  semantics: a team's member storage slot (two the first time), its list and plot
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl: [cpu/core/tactical.ts:moveUpdate]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...he rally +0xe8, 1 the target +0xf0); the node keeps a list per team (the member storage 0x737920, slots +0x78 and +0x74, made on its first tick) with the goal it was kept for (0x739f60...
+  review: reviewed
 - addr: 0x737f90
   final: 0x4dbea0
   kind: function
@@ -24,6 +41,26 @@
   status: PARTLY
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x738f20
+  kind: function
+  name: teamUpdate
+  semantics: "a team's update: strengths, endangered list, battle points and line (+0x90 in battle)"
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
+  review: reviewed
+- addr: 0x739f60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x737920, slots +0x78 and +0x74, made on its first tick) with the goal it was kept for (0x739f60): the list the store while the goal holds, else empty, the team's +0x48 units added u..."
+  review: imported
 - addr: 0x73a120
   final: 0x4ddd60
   kind: function
@@ -34,14 +71,54 @@
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
   review: imported
+- addr: 0x73a840
+  final: 0x4de360
+  kind: function
+  name: operationValid
+  semantics: an operation stands while its tree does
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 22-250
+      value: a raid whose units died on its march stands with no member for 444 turns
+  impl: [cpu/core/tactical.ts:barbarianOpTrees]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t list (+0x60), the tribe's next turn starting it at CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000..."
+  review: reviewed
 - addr: 0x73a8e0
   final: 0x4de400
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:targetGone]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  impl: [ai/major/operations/nodes.ts:targetGone, cpu/core/tactical.ts:raidTargetGone]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - ...peration Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operation Attack Units 0x80ecf0 (target gone SUCCES...
+  review: imported
+- addr: 0x73aa60
+  final: 0x4de580
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update found it arrived; per team its mem..."
+  review: imported
+- addr: 0x73ab20
+  final: 0x4de640
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...MOVE'S UPDATE (0x81a130). Per team (the first one only for the head's test): a team the 0x73ab20 check passes with no member skipped; the goal its slot (Move To: 0 the rally +0xe8, 1 t..."
+    - "...x816cb0): none where the operation's teams gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update found it arrived; per team its members listed at +0x74 \"Nonmoving\" (the..."
   review: imported
 - addr: 0x73abf0
   final: 0x4de710
@@ -141,5 +218,7 @@
   kind: function
   status: PARTLY
   impl: [ai/major/operations/operation.ts:OpTeam, ai/major/operations/operation.ts:memberStrength]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported

@@ -3130,6 +3130,10 @@ class SimPhase:
                    and getattr(self, n).dim() >= 2 and tuple(getattr(self, n).shape[:2]) == (B, U)]
         # the planes that hold one of this pool's slot numbers, remapped by value
         maps: list = ["tribe_home_slot", "tribe_defender"] if prefix == "barb" else []
+        if prefix == "barb":
+            # an operation's members killed stay its members, off the map:
+            # counted before their slots go
+            self._barb_op_bury()
         perm = torch.argsort((~alive).long(), dim=1, stable=True)
         inv = torch.empty_like(perm)
         inv.scatter_(1, perm, torch.arange(U, device=alive.device).unsqueeze(0).expand(B, -1))
@@ -3141,6 +3145,9 @@ class SimPhase:
             t.copy_(t.gather(1, perm))
         alive.copy_(alive.gather(1, perm))
         getattr(self, counter).copy_(alive.sum(dim=1))
+        if prefix == "barb":
+            st = self.tribe_store
+            st.copy_(st.gather(3, perm.view(B, 1, 1, U).expand(st.shape)))
         for m in maps:
             at = getattr(self, m)
             at.copy_(torch.where(at >= 0, inv.gather(1, at.clamp(min=0)), at))

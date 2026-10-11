@@ -6,7 +6,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 
 ## GameCore_XP2_Release.dll
 
-49984 functions, 35641 matched to the FinalRelease DLL, 19797 with a source file, 4663 named by the binary; READ 421, PARTLY 1026, UNREAD 48537, ported 684.
+49984 functions, 35641 matched to the FinalRelease DLL, 19797 with a source file, 4663 named by the binary; READ 444, PARTLY 1028, UNREAD 48512, ported 729.
 
 | source file | functions | READ | PARTLY | UNREAD | ported |
 |---|---:|---:|---:|---:|---:|
@@ -95,7 +95,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/Core/Common/Player_Operations_StartObserverMode.cpp | 1 | 0 | 0 | 1 | 0 |
 | GameCore/Core/Common/Player_Processor.cpp | 34 | 0 | 2 | 32 | 1 |
 | GameCore/Core/Common/Plot_CityAttributes.h | 2 | 0 | 0 | 2 | 0 |
-| GameCore/Core/Common/Plot_Instance.cpp | 61 | 4 | 3 | 54 | 0 |
+| GameCore/Core/Common/Plot_Instance.cpp | 61 | 5 | 3 | 53 | 0 |
 | GameCore/Core/Common/Route_Instance.cpp | 33 | 0 | 0 | 33 | 0 |
 | GameCore/Core/Common/Rules_Manager.cpp | 8 | 0 | 0 | 8 | 0 |
 | GameCore/Core/Common/UnitCommands/Unit_Commands_Manager.cpp | 15 | 0 | 0 | 15 | 0 |
@@ -337,7 +337,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/Shared/Lua_IWorldBuilderCityManager.cpp | 1 | 0 | 0 | 1 | 0 |
 | GameCore/Shared/Lua_IWorldBuilderMapManager.cpp | 17 | 0 | 0 | 17 | 0 |
 | GameCore/Shared/Lua_IWorldBuilderPlayerManager.cpp | 16 | 0 | 0 | 16 | 0 |
-| GameCore/Shared/MathAlgorithm_GeneralizedAssignmentProblem.cpp | 1 | 0 | 1 | 0 | 0 |
+| GameCore/Shared/MathAlgorithm_GeneralizedAssignmentProblem.cpp | 1 | 1 | 0 | 0 | 1 |
 | GameCore/Shared/Random.cpp | 6 | 0 | 1 | 5 | 1 |
 | GameCore/Shared/Reporting_Event.cpp | 6 | 0 | 0 | 6 | 0 |
 | GameCore/Shared/Reporting_Strings.cpp | 1 | 0 | 0 | 1 | 0 |
@@ -573,8 +573,8 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/AI/Control_Manager.cpp | 37 | 1 | 1 | 35 | 1 |
 | GameCore/XP2/Common/AI/Culture_GreatWorks.cpp | 21 | 0 | 0 | 21 | 0 |
 | GameCore/XP2/Common/AI/CultureAi.cpp | 71 | 1 | 13 | 57 | 8 |
-| GameCore/XP2/Common/AI/Diplomatic.cpp | 72 | 0 | 8 | 64 | 0 |
-| GameCore/XP2/Common/AI/DiplomaticActions.cpp | 123 | 0 | 30 | 93 | 0 |
+| GameCore/XP2/Common/AI/Diplomatic.cpp | 72 | 0 | 8 | 64 | 1 |
+| GameCore/XP2/Common/AI/DiplomaticActions.cpp | 123 | 0 | 30 | 93 | 3 |
 | GameCore/XP2/Common/AI/DiplomaticActions.h | 23 | 0 | 0 | 23 | 0 |
 | GameCore/XP2/Common/AI/DiplomaticState.cpp | 3 | 0 | 1 | 2 | 1 |
 | GameCore/XP2/Common/AI/DiplomaticSupport.cpp | 34 | 0 | 1 | 33 | 1 |
@@ -587,8 +587,8 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/AI/GlobalAi.cpp | 179 | 1 | 9 | 169 | 4 |
 | GameCore/XP2/Common/AI/Governors.cpp | 21 | 0 | 1 | 20 | 0 |
 | GameCore/XP2/Common/AI/GrandStrategic.cpp | 1 | 0 | 0 | 1 | 0 |
-| GameCore/XP2/Common/AI/Homeland.cpp | 49 | 0 | 3 | 46 | 2 |
-| GameCore/XP2/Common/AI/InfluenceMap.cpp | 3 | 0 | 1 | 2 | 1 |
+| GameCore/XP2/Common/AI/Homeland.cpp | 49 | 6 | 6 | 37 | 12 |
+| GameCore/XP2/Common/AI/InfluenceMap.cpp | 3 | 0 | 2 | 1 | 2 |
 | GameCore/XP2/Common/AI/Military.cpp | 1 | 0 | 0 | 1 | 0 |
 | GameCore/XP2/Common/AI/Operation.cpp | 81 | 0 | 16 | 65 | 12 |
 | GameCore/XP2/Common/AI/OperationEvaluator.cpp | 1 | 0 | 1 | 0 | 1 |
@@ -597,9 +597,9 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/AI/Research.cpp | 38 | 0 | 9 | 29 | 6 |
 | GameCore/XP2/Common/AI/SiteEvaluator.cpp | 12 | 0 | 2 | 10 | 2 |
 | GameCore/XP2/Common/AI/SiteEvaluator.h | 1 | 0 | 1 | 0 | 0 |
-| GameCore/XP2/Common/AI/Tactical.cpp | 67 | 5 | 28 | 34 | 21 |
-| GameCore/XP2/Common/AI/Targets.cpp | 52 | 3 | 2 | 47 | 4 |
-| GameCore/XP2/Common/AI/UnitPlanning_Manager.cpp | 30 | 0 | 8 | 22 | 5 |
+| GameCore/XP2/Common/AI/Tactical.cpp | 67 | 14 | 24 | 29 | 31 |
+| GameCore/XP2/Common/AI/Targets.cpp | 52 | 3 | 3 | 46 | 4 |
+| GameCore/XP2/Common/AI/UnitPlanning_Manager.cpp | 30 | 3 | 5 | 22 | 7 |
 | GameCore/XP2/Common/AI/UnitProduction.cpp | 14 | 0 | 7 | 7 | 2 |
 | GameCore/XP2/Common/AI/Utilities_ListManagement.cpp | 4 | 0 | 0 | 4 | 0 |
 | GameCore/XP2/Common/AI/Utilities_ListManagement.h | 9 | 0 | 2 | 7 | 1 |
@@ -640,9 +640,9 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | gamecore/xp2/common/definitions/Definition_Infrastructure.h | 172 | 0 | 0 | 172 | 0 |
 | GameCore/XP2/Common/Diplomacy_Action_RenewAlliance.cpp | 2 | 0 | 0 | 2 | 0 |
 | GameCore/XP2/Common/Diplomacy_Action_SetAllied.cpp | 2 | 0 | 0 | 2 | 0 |
-| GameCore/XP2/Common/Diplomacy_Action_SetDelegation.cpp | 4 | 0 | 1 | 3 | 0 |
+| GameCore/XP2/Common/Diplomacy_Action_SetDelegation.cpp | 4 | 0 | 1 | 3 | 1 |
 | GameCore/XP2/Common/Diplomacy_Action_SetDenounced.cpp | 2 | 0 | 0 | 2 | 0 |
-| GameCore/XP2/Common/Diplomacy_Action_SetEmbassy.cpp | 3 | 0 | 1 | 2 | 0 |
+| GameCore/XP2/Common/Diplomacy_Action_SetEmbassy.cpp | 3 | 0 | 1 | 2 | 1 |
 | GameCore/XP2/Common/Diplomacy_Action_SetFriend.cpp | 2 | 0 | 0 | 2 | 0 |
 | GameCore/XP2/Common/Diplomacy_Action_SetOpenBorders.cpp | 4 | 0 | 0 | 4 | 0 |
 | GameCore/XP2/Common/Diplomacy_Action_SetPromise.cpp | 2 | 0 | 0 | 2 | 0 |
@@ -678,7 +678,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/DiplomacyDeals/Deal_Item_Instance.cpp | 12 | 0 | 0 | 12 | 0 |
 | GameCore/XP2/Common/DiplomacyDeals/Deal_Item_Resources.cpp | 22 | 0 | 0 | 22 | 0 |
 | GameCore/XP2/Common/DiplomacyDeals/Deal_Manager.cpp | 52 | 0 | 0 | 52 | 0 |
-| GameCore/XP2/Common/District_Instance.cpp | 83 | 13 | 3 | 67 | 7 |
+| GameCore/XP2/Common/District_Instance.cpp | 83 | 13 | 3 | 67 | 8 |
 | GameCore/XP2/Common/Emergency_Manager.cpp | 58 | 0 | 0 | 58 | 0 |
 | GameCore/XP2/Common/Exports/Export_Context.cpp | 41 | 0 | 0 | 41 | 0 |
 | GameCore/XP2/Common/Exports/Export_Game.cpp | 33 | 0 | 0 | 33 | 0 |
@@ -696,7 +696,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Exports/Export_Unit.cpp | 9 | 0 | 0 | 9 | 0 |
 | GameCore/XP2/Common/Exports/Export_UnitExperience.cpp | 1 | 0 | 0 | 1 | 0 |
 | GameCore/XP2/Common/Formation_Instance.cpp | 49 | 0 | 1 | 48 | 0 |
-| GameCore/XP2/Common/Formation_Movement.cpp | 34 | 3 | 12 | 19 | 6 |
+| GameCore/XP2/Common/Formation_Movement.cpp | 34 | 3 | 13 | 18 | 7 |
 | GameCore/XP2/Common/FreeCities_Manager.cpp | 9 | 0 | 0 | 9 | 0 |
 | GameCore/XP2/Common/Game_Archaeology.cpp | 38 | 4 | 0 | 34 | 3 |
 | GameCore/XP2/Common/Game_Calendar.cpp | 6 | 0 | 0 | 6 | 0 |
@@ -805,7 +805,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Rules_Combat.cpp | 50 | 5 | 5 | 40 | 5 |
 | GameCore/XP2/Common/Rules_Diplomacy.cpp | 2 | 0 | 0 | 2 | 0 |
 | GameCore/XP2/Common/Rules_Districts.cpp | 2 | 0 | 0 | 2 | 0 |
-| GameCore/XP2/Common/Rules_Economic.cpp | 37 | 7 | 9 | 21 | 7 |
+| GameCore/XP2/Common/Rules_Economic.cpp | 37 | 8 | 8 | 21 | 8 |
 | GameCore/XP2/Common/Rules_Era.cpp | 2 | 0 | 0 | 2 | 0 |
 | GameCore/XP2/Common/Rules_Espionage.cpp | 47 | 0 | 13 | 34 | 13 |
 | GameCore/XP2/Common/Rules_Governments.cpp | 1 | 0 | 0 | 1 | 0 |
@@ -827,9 +827,9 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Unit_Experience.cpp | 5 | 0 | 0 | 5 | 0 |
 | GameCore/XP2/Common/Unit_GreatPerson.cpp | 32 | 0 | 0 | 32 | 0 |
 | GameCore/XP2/Common/Unit_Hero.cpp | 8 | 0 | 0 | 8 | 0 |
-| GameCore/XP2/Common/Unit_Instance.cpp | 147 | 5 | 7 | 135 | 3 |
+| GameCore/XP2/Common/Unit_Instance.cpp | 147 | 5 | 8 | 134 | 8 |
 | GameCore/XP2/Common/Unit_Instance.h | 2 | 0 | 0 | 2 | 0 |
-| GameCore/XP2/Common/Unit_Placement.cpp | 12 | 3 | 4 | 5 | 6 |
+| GameCore/XP2/Common/Unit_Placement.cpp | 12 | 3 | 5 | 4 | 7 |
 | GameCore/XP2/Common/Unit_Religion.cpp | 2 | 0 | 0 | 2 | 0 |
 | GameCore/XP2/Common/Unit_RockBand.cpp | 11 | 0 | 0 | 11 | 0 |
 | GameCore/XP2/Common/Unit_Sight.cpp | 7 | 0 | 1 | 6 | 1 |
@@ -893,9 +893,9 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | Libs/Types/Types_Array.h | 279 | 0 | 1 | 278 | 0 |
 | Libs/Types/Types_BlockAllocator.h | 146 | 0 | 0 | 146 | 0 |
 | Libs/Types/Types_HashTable.h | 13 | 0 | 0 | 13 | 0 |
-| Libs/Types/Types_Vector.h | 893 | 1 | 24 | 868 | 14 |
+| Libs/Types/Types_Vector.h | 893 | 3 | 22 | 868 | 15 |
 | Libs/XML/XML.cpp | 16 | 0 | 0 | 16 | 0 |
-| SDKSources/EASTL/EASTL/allocator.h | 194 | 0 | 1 | 193 | 0 |
+| SDKSources/EASTL/EASTL/allocator.h | 194 | 0 | 2 | 192 | 1 |
 | SDKSources/EASTL/EASTL/internal/hashtable.h | 13 | 0 | 0 | 13 | 0 |
 | SDKSources/EASTL/EASTL/internal/red_black_tree.h | 49 | 0 | 0 | 49 | 0 |
 | SDKSources/EASTL/EASTL/list.h | 2 | 0 | 0 | 2 | 0 |
@@ -906,11 +906,11 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | SDKSources/EASTL/src/fixed_pool.cpp | 1 | 0 | 0 | 1 | 0 |
 | sdksources/havokscript/source/virtualMachine/lua_impl.inl | 109 | 0 | 0 | 109 | 0 |
 | sdksources/havokscript/source/virtualMachine/lua_impl_struct.inl | 22 | 0 | 0 | 22 | 0 |
-| (no source file) | 30187 | 73 | 204 | 29910 | 114 |
+| (no source file) | 30187 | 73 | 208 | 29906 | 118 |
 
 ## GameCore_XP2_FinalRelease.dll
 
-43730 functions, 35641 matched to the Release DLL, 13267 with a source file, 4643 named by the binary; READ 354, PARTLY 843, UNREAD 42533, ported 554.
+43730 functions, 35641 matched to the Release DLL, 13267 with a source file, 4643 named by the binary; READ 370, PARTLY 847, UNREAD 42513, ported 586.
 
 | source file | functions | READ | PARTLY | UNREAD | ported |
 |---|---:|---:|---:|---:|---:|
@@ -921,7 +921,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/Core/Common/Messages/Messages_CivicsCommand.cpp | 1 | 0 | 1 | 0 | 0 |
 | GameCore/Core/Common/Pathfinder_Instance.cpp | 18 | 0 | 6 | 12 | 3 |
 | GameCore/Core/Common/Player_Processor.cpp | 33 | 0 | 2 | 31 | 1 |
-| GameCore/Core/Common/Plot_Instance.cpp | 59 | 4 | 3 | 52 | 0 |
+| GameCore/Core/Common/Plot_Instance.cpp | 59 | 5 | 3 | 51 | 0 |
 | GameCore/Interfaces/GameCore_ParentPtr.h | 29 | 0 | 2 | 27 | 0 |
 | GameCore/Shared/Base/BarbarianClans_Manager.cpp | 91 | 0 | 1 | 90 | 0 |
 | GameCore/Shared/Base/Cache/Cache_Lua_ICityDistricts.cpp | 7 | 0 | 1 | 6 | 0 |
@@ -932,7 +932,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/Shared/Base/UnitCommands/Unit_Commands_PlunderTradeRoute.cpp | 3 | 0 | 1 | 2 | 0 |
 | GameCore/Shared/Base/UnitOperations/Unit_Operations_MoveTo.cpp | 6 | 0 | 2 | 4 | 1 |
 | GameCore/Shared/Base/UnitOperations/Unit_Operations_RangeAttack.cpp | 4 | 0 | 1 | 3 | 0 |
-| GameCore/Shared/MathAlgorithm_GeneralizedAssignmentProblem.cpp | 1 | 0 | 1 | 0 | 0 |
+| GameCore/Shared/MathAlgorithm_GeneralizedAssignmentProblem.cpp | 1 | 1 | 0 | 0 | 1 |
 | GameCore/Shared/Random.cpp | 6 | 0 | 1 | 5 | 1 |
 | GameCore/Shared/XP2/UnitOperations/XP2_Unit_Operations_BuildImprovement.cpp | 5 | 1 | 0 | 4 | 0 |
 | GameCore/Shared/XP2/UnitOperations/XP2_Unit_Operations_BuildImprovementAdjacent.cpp | 11 | 1 | 0 | 10 | 0 |
@@ -954,8 +954,8 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/AI/Contracts.cpp | 20 | 0 | 2 | 18 | 0 |
 | GameCore/XP2/Common/AI/Control_Manager.cpp | 19 | 0 | 1 | 18 | 0 |
 | GameCore/XP2/Common/AI/CultureAi.cpp | 35 | 1 | 8 | 26 | 5 |
-| GameCore/XP2/Common/AI/Diplomatic.cpp | 55 | 0 | 6 | 49 | 0 |
-| GameCore/XP2/Common/AI/DiplomaticActions.cpp | 87 | 0 | 25 | 62 | 0 |
+| GameCore/XP2/Common/AI/Diplomatic.cpp | 55 | 0 | 6 | 49 | 1 |
+| GameCore/XP2/Common/AI/DiplomaticActions.cpp | 87 | 0 | 25 | 62 | 2 |
 | GameCore/XP2/Common/AI/DiplomaticState.cpp | 3 | 0 | 1 | 2 | 1 |
 | GameCore/XP2/Common/AI/DiplomaticSupport.cpp | 23 | 0 | 1 | 22 | 1 |
 | GameCore/XP2/Common/AI/Economic.cpp | 23 | 0 | 2 | 21 | 1 |
@@ -965,17 +965,17 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/AI/GameRequirementAnalyzers.cpp | 126 | 0 | 9 | 117 | 9 |
 | GameCore/XP2/Common/AI/GlobalAi.cpp | 142 | 1 | 9 | 132 | 4 |
 | GameCore/XP2/Common/AI/Governors.cpp | 15 | 0 | 1 | 14 | 0 |
-| GameCore/XP2/Common/AI/Homeland.cpp | 34 | 0 | 2 | 32 | 2 |
-| GameCore/XP2/Common/AI/InfluenceMap.cpp | 2 | 0 | 1 | 1 | 1 |
+| GameCore/XP2/Common/AI/Homeland.cpp | 34 | 3 | 4 | 27 | 7 |
+| GameCore/XP2/Common/AI/InfluenceMap.cpp | 2 | 0 | 2 | 0 | 2 |
 | GameCore/XP2/Common/AI/Operation.cpp | 48 | 0 | 11 | 37 | 8 |
 | GameCore/XP2/Common/AI/OperationEvaluator.cpp | 1 | 0 | 1 | 0 | 1 |
 | GameCore/XP2/Common/AI/Religious.cpp | 16 | 0 | 12 | 4 | 3 |
 | GameCore/XP2/Common/AI/Research.cpp | 26 | 0 | 6 | 20 | 3 |
 | GameCore/XP2/Common/AI/SiteEvaluator.cpp | 10 | 0 | 2 | 8 | 2 |
 | GameCore/XP2/Common/AI/SiteEvaluator.h | 1 | 0 | 1 | 0 | 0 |
-| GameCore/XP2/Common/AI/Tactical.cpp | 53 | 4 | 26 | 23 | 20 |
+| GameCore/XP2/Common/AI/Tactical.cpp | 53 | 8 | 24 | 21 | 25 |
 | GameCore/XP2/Common/AI/Targets.cpp | 41 | 3 | 1 | 37 | 4 |
-| GameCore/XP2/Common/AI/UnitPlanning_Manager.cpp | 21 | 0 | 5 | 16 | 2 |
+| GameCore/XP2/Common/AI/UnitPlanning_Manager.cpp | 21 | 3 | 2 | 16 | 4 |
 | GameCore/XP2/Common/AI/UnitProduction.cpp | 9 | 0 | 5 | 4 | 1 |
 | GameCore/XP2/Common/AI/Utilities_ListManagement.h | 3 | 0 | 1 | 2 | 1 |
 | GameCore/XP2/Common/AI/Value_Manager.cpp | 36 | 7 | 16 | 13 | 15 |
@@ -1000,7 +1000,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Combat_Manager.cpp | 95 | 9 | 4 | 82 | 8 |
 | GameCore/XP2/Common/District_Instance.cpp | 58 | 13 | 2 | 43 | 7 |
 | GameCore/XP2/Common/Formation_Instance.cpp | 34 | 0 | 1 | 33 | 0 |
-| GameCore/XP2/Common/Formation_Movement.cpp | 29 | 2 | 10 | 17 | 4 |
+| GameCore/XP2/Common/Formation_Movement.cpp | 29 | 2 | 11 | 16 | 4 |
 | GameCore/XP2/Common/Game_Archaeology.cpp | 21 | 3 | 0 | 18 | 2 |
 | GameCore/XP2/Common/Game_Climate.cpp | 114 | 28 | 6 | 80 | 23 |
 | GameCore/XP2/Common/Game_Eras.cpp | 172 | 0 | 22 | 150 | 6 |
@@ -1052,7 +1052,7 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Rules_Appeal.cpp | 2 | 1 | 0 | 1 | 1 |
 | GameCore/XP2/Common/Rules_Cities.cpp | 26 | 0 | 1 | 25 | 1 |
 | GameCore/XP2/Common/Rules_Combat.cpp | 42 | 2 | 3 | 37 | 2 |
-| GameCore/XP2/Common/Rules_Economic.cpp | 31 | 7 | 9 | 15 | 7 |
+| GameCore/XP2/Common/Rules_Economic.cpp | 31 | 8 | 8 | 15 | 8 |
 | GameCore/XP2/Common/Rules_Espionage.cpp | 25 | 0 | 7 | 18 | 7 |
 | GameCore/XP2/Common/Rules_Movement.cpp | 16 | 1 | 5 | 10 | 3 |
 | GameCore/XP2/Common/Rules_Player.cpp | 9 | 1 | 0 | 8 | 1 |
@@ -1061,16 +1061,16 @@ naming an engine symbol). FinalRelease functions take their own record or their 
 | GameCore/XP2/Common/Trade_Graph.cpp | 69 | 2 | 0 | 67 | 0 |
 | GameCore/XP2/Common/Trade_Manager.cpp | 73 | 4 | 5 | 64 | 3 |
 | GameCore/XP2/Common/Trade_Movement.cpp | 9 | 3 | 6 | 0 | 5 |
-| GameCore/XP2/Common/Unit_Instance.cpp | 122 | 5 | 7 | 110 | 3 |
-| GameCore/XP2/Common/Unit_Placement.cpp | 11 | 3 | 4 | 4 | 6 |
+| GameCore/XP2/Common/Unit_Instance.cpp | 122 | 5 | 8 | 109 | 8 |
+| GameCore/XP2/Common/Unit_Placement.cpp | 11 | 3 | 5 | 3 | 7 |
 | GameCore/XP2/Common/Unit_Sight.cpp | 7 | 0 | 1 | 6 | 1 |
 | Libs/Math/Common/Math_FixedPointT.h | 94 | 4 | 11 | 79 | 9 |
-| Libs/Platform/Common/Platform_Allocators.h | 418 | 5 | 19 | 394 | 12 |
+| Libs/Platform/Common/Platform_Allocators.h | 418 | 8 | 19 | 391 | 15 |
 | Libs/Types/Types_Array.h | 93 | 0 | 1 | 92 | 0 |
 | Libs/Types/Types_Vector.h | 339 | 1 | 13 | 325 | 9 |
-| SDKSources/EASTL/EASTL/allocator.h | 177 | 0 | 1 | 176 | 0 |
+| SDKSources/EASTL/EASTL/allocator.h | 177 | 0 | 2 | 175 | 1 |
 | SDKSources/EASTL/EASTL/string.h | 78 | 0 | 3 | 75 | 0 |
-| (no source file) | 30463 | 68 | 175 | 30220 | 97 |
+| (no source file) | 30463 | 68 | 179 | 30216 | 101 |
 
 (FinalRelease: only the source files holding a curated record are listed.)
 

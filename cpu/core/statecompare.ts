@@ -474,10 +474,14 @@ const GAME: Record<string, Extractor> = {
       // city owner, the operation (kind, owner, turns, force taken, its units)
       t.boldness ?? 0, t.every ?? -1, (t.queue ?? []).length, ...(t.queue ?? []).map(uidx),
       (t.raidTargets ?? []).length, ...(t.raidTargets ?? []).map((x) => x.seat), ...(t.raidTargets ?? []).map((x) => x.plot),
-      (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat),
+      (t.assaultTargets ?? []).length, ...(t.assaultTargets ?? []).map((x) => x.seat), ...(t.assaultTargets ?? []).map((x) => x.plot),
       t.homing ? t.homing.target.seat : -1,
       t.op ? (t.op.assault ? 2 : 1) : 0, t.op?.target.seat ?? -1, t.op?.turns ?? 0, t.op?.recruited ? 1 : 0,
       t.op ? t.op.units.filter((id) => live.has(id)).length : 0,
+      // the raid's score and its tree: its target and rally, the child it
+      // resumes at, the turn its raid began, ended, its members killed
+      t.score ?? 0, t.op?.target.plot ?? -1, t.op?.rally ?? -1, t.op ? (t.op.resume ?? 2) : 0, t.op?.raidFrom ?? -1,
+      t.op?.done ? 1 : 0, t.op ? t.op.units.filter((id) => !live.has(id)).length : 0,
       // the player its units rampage against, its camp taken
       t.rampage ?? -1]),
     ...s.seats.map((x) => s.barbSpotNext?.[x.seat] ?? 0),

@@ -66,7 +66,7 @@ import { unitKillEvent, campMoment } from './eras';
 import { boostOnEvent } from './boosts';
 
 import { gpPermOf } from '../data/greatPeople';
-import { barbBattleBoldness, barbHomingCamp, tribeDies } from './barbarians';
+import { barbBattleBoldness, barbPillageScore, tribeDies } from './barbarians';
 import { questCampCleared } from './quests';
 const ok: RuleResult = { ok: true };
 const no = (reason: string): RuleResult => ({ ok: false, reason });
@@ -3019,14 +3019,6 @@ export function hostileUnitAct(state: GameState, unit: Unit): void {
   const seat = unit.seat;
   const map = state.map;
   const tile = () => map.tiles[unit.tileIndex];
-  // a barbarian scout carrying a city home walks to its camp and nothing
-  // else ("Barbarian Found City"), stopping beside it
-  const home = barbHomingCamp(state, unit);
-  if (home !== undefined) {
-    marchOn(state, unit, map.tiles[home], false);
-    return;
-  }
-
   const targets = attackTargets(state, unit);
   if (targets.length > 0) {
     if (UNITS[unit.type]?.ranged) hostileRangedStrike(state, unit, targets[0]);
@@ -3122,6 +3114,7 @@ export function hostilePillage(state: GameState, unit: Unit): boolean {
     here.pillaged = true;
     pillagePlunder(state, unit, IMPROVEMENTS[here.improvement as ImprovementId]?.plunder, false, here.improvement ?? undefined, tileSeat(here));
     unit.movesLeft = 0;
+    barbPillageScore(state, unit);
     return true;
   }
   // CIV6: the Encampment "cannot be pillaged normally" — it is conquered by a
@@ -3138,6 +3131,41 @@ export function hostilePillage(state: GameState, unit: Unit): boolean {
     pillagePlunder(state, unit, DISTRICTS[here.district].plunder, true);
     displaceAirFrom(state, here.index);
     unit.movesLeft = 0;
+    barbPillageScore(state, unit);
+    return true;
+  }
+  return false;
+}
+
+/** A BARBARIAN'S COASTAL RAID (the raid mission 0x95b7c0, its test
+ *  0x95b100) on a land plot beside its ship: a raider with 3 Movement left
+ *  (none for a raider that raids free) wrecks the plot's unpillaged
+ *  improvement of a player hostile to it, else its complete district (not a
+ *  centre, not an Encampment) — the seat action's raid, one plot. */
+export function coastalRaid(state: GameState, unit: Unit, plot: number): boolean {
+  const def = UNITS[unit.type];
+  const here = state.map.tiles[unit.tileIndex];
+  const t = state.map.tiles[plot];
+  if (!def?.raider || !isWater(here) || isWater(t)) return false;
+  if (hexDistance(state.map, here.col, here.row, t.col, t.row) !== 1) return false;
+  if (!def.raidFreeMoves && unit.movesLeft < 3 * MP_SCALE) return false;
+  if (!isTerritorial(tileSeat(t)) || !unitsHostile(state, unit, { seat: tileSeat(t) })) return false;
+  const spend = () => {
+    if (!def.raidFreeMoves) unit.movesLeft = Math.max(0, unit.movesLeft - 3 * MP_SCALE);
+  };
+  if (t.improvement && !t.pillaged && !IMPROVEMENTS[t.improvement as ImprovementId]?.noPillage) {
+    t.pillaged = true;
+    pillagePlunder(state, unit, IMPROVEMENTS[t.improvement as ImprovementId]?.plunder, false, t.improvement ?? undefined, tileSeat(t));
+    spend();
+    barbPillageScore(state, unit);
+    return true;
+  }
+  if (t.district !== null && t.district !== 'CITY_CENTER' && t.district !== 'ENCAMPMENT' && t.districtComplete && !t.districtPillaged) {
+    t.districtPillaged = true;
+    pillagePlunder(state, unit, DISTRICTS[t.district].plunder, true);
+    displaceAirFrom(state, t.index);
+    spend();
+    barbPillageScore(state, unit);
     return true;
   }
   return false;

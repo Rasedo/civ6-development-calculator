@@ -13,19 +13,32 @@
   review: imported
 - addr: 0x80ceb0
   kind: function
-  status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: opAttackUnits
+  semantics: "Operation Attack Units' execution: the team's land members that can act, the list's unit targets near them (Attack Nearby Units), the assignment with the exchange filter for a team of one and the survival filter, carried out"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl: [cpu/core/tactical.ts:opAttackExec, gpu/core/sim_tactics.py:_barb_op_attack]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - "...s of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore..."
-  review: imported
+  review: reviewed
 - addr: 0x80d790
   final: 0x56d9c0
   kind: function
+  name: opDefendUnits
+  semantics: "Operation Defend Units' execution: the endangered members to their safe plots, then the hurt's promotion, plunder and safety afloat; unported"
   status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - "...0c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval P..."
-  review: imported
+  review: reviewed
 - addr: 0x80ec10
   final: 0x56ed80
   kind: function
@@ -38,17 +51,34 @@
 - addr: 0x80ecf0
   final: 0x56ee20
   kind: function
-  status: PARTLY
-  impl: [ai/major/operations/nodes.ts:operationAttackUnits]
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: opAttackUnitsUpdate
+  semantics: "Operation Attack Units' update: the target gone SUCCESS; Always Running RUNNING; a team in battle with no unit FAILURE; else SUCCESS"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl: [cpu/core/tactical.ts:raidTick, ai/major/operations/nodes.ts:operationAttackUnits]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - "...the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operation Attack Units 0x80ecf0 (target gone SUCCESS; Always Running RUNNING; else SUCCESS — the team flag +0x90 with n..."
-  review: imported
+  review: reviewed
 - addr: 0x80ee70
   final: 0x56ef70
   kind: function
-  status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: opDefendUnitsUpdate
+  semantics: "Operation Defend Units' update: SUCCESS; marks endangered, hurt past AutoProtect Percentage, or fortified in danger"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl: [cpu/core/tactical.ts:raidTick]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - ...val Pillage 0x803880 (RUNNING with units, else FAILURE); Operation Defend Units' update 0x80ee70 (SUCCESS; marks a member wounded past AutoProtect Percentage).
-  review: imported
+  review: reviewed

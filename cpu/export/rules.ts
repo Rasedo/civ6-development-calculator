@@ -323,6 +323,7 @@ import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CA
   BARB_CAMP_FEATURES, BARB_FREE_TECHS, BARB_TAG_UNITS, BARB_TRIBES, barbNameRangedPct, type BarbTag,
   BARB_BOLD_TURN, BARB_BOLD_KILL, BARB_BOLD_UNIT_LOST, BARB_BOLD_SCOUT_LOST, BARB_RAID_BOLDNESS, BARB_ASSAULT_BOLDNESS,
   BARB_SPOT_THROTTLE, BARB_SPOT_THROTTLE_PER_LEVEL, BARB_HOME_RANGE, BARB_PROTECT_DAMAGE, BARB_RAID_RECRUIT_TURNS, BARB_ASSAULT_RECRUIT_TURNS,
+  BARB_PILLAGE_SCORE, RAID_MARCH_RANGE, RAID_MARCH_SPREAD, RAID_RANGE, RAID_HOME_RANGE, RAID_HOME_SPREAD, RAID_SCORE, RAID_TURNS,
   DEFAULT_HANDICAP, barbForce, barbNameRaidBoldness } from '../data/barbarians';
 const BARB_TAGS = Object.keys(BARB_TAG_UNITS) as BarbTag[];
 import { CHOP_ROWS, techList, civicList, techIdx, civicIdx, centerBuildings, buildingIdx, buildingUnlockTech, buildingUnlockCivic, FEAT_IDS, featIdx, TERRAIN_IDS, RESOURCE_IDS, BUILT_WONDER_LIST, LUXURY_IDS, wonderBit } from './catalog';
@@ -1971,7 +1972,7 @@ export function buildRules() {
         tribes: BARB_TRIBES.map((d) => [d.coastal ? 1 : 0, d.resource ? RESOURCE_IDS.indexOf(d.resource) : -1, d.resourceRange,
           d.rangedPct, d.spawnEvery, BARB_TAGS.indexOf(d.scoutTag), BARB_TAGS.indexOf(d.meleeTag), BARB_TAGS.indexOf(d.rangedTag),
           BARB_TAGS.indexOf(d.defenderTag)]),
-        // the raids and the city assaults (`barbarianOps`): per tribe kind,
+        // the raids and the city assaults (`opTurn`, `raidTick`): per tribe kind,
         // raid then assault, the force a city of the AI's handicap draws —
         // [SpawnRate at the speed, [tag, count] ...] (the engines' seats
         // carry no handicap of their own)
@@ -1993,6 +1994,18 @@ export function buildRules() {
         protectDamage: BARB_PROTECT_DAMAGE,
         raidRecruitTurns: BARB_RAID_RECRUIT_TURNS,
         assaultRecruitTurns: BARB_ASSAULT_RECRUIT_TURNS,
+        // "Raid City"'s data (`raidTick`): the march's, the raid's and the way
+        // home's Operation Move range and unit distance, the raid's score and
+        // its turns, the score a pillage adds, the speed's percent
+        raidMarchRange: RAID_MARCH_RANGE,
+        raidMarchSpread: RAID_MARCH_SPREAD,
+        raidRange: RAID_RANGE,
+        raidHomeRange: RAID_HOME_RANGE,
+        raidHomeSpread: RAID_HOME_SPREAD,
+        raidScore: RAID_SCORE,
+        raidTurns: RAID_TURNS,
+        pillageScore: BARB_PILLAGE_SCORE,
+        costPct: COST_MULTIPLIER_PCT,
       },
       // the civic a camp's clear inspires (BOOST_TRIGGER_CLEAR_CAMP)
       // COMBAT: the single-precision factor e^(x/256) per exponent x in

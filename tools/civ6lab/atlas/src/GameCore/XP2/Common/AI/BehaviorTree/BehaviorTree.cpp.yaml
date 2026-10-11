@@ -7,9 +7,20 @@
   final: 0x53ffe0
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:BT_OK]
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - ...SUCCESS, RUNNING or FAILURE every node left SUCCESS or RUNNING executes in node order (0x7cb3d0); a root RUNNING or FRESH resets the tree for the next turn, else the tree is done (the...
+  review: imported
+- addr: 0x7cbca0
+  final: 0x5405c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th..."
   review: imported
 - addr: 0x7d15e0
   final: 0x543210
@@ -29,11 +40,23 @@
 - addr: 0x7d3a00
   final: 0x544360
   kind: function
-  status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  name: btTick
+  semantics: "one tick of a behaviour tree: the walk, then each SUCCESS / RUNNING action executed in node order"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl:
+    - cpu/core/tactical.ts:raidTick
+    - gpu/core/sim_tactics.py:_barb_op_trees
+    - cpu/core/tactical.ts:BT_OK
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   context:
     - "- The tick 0x7d3a00 runs where the root is FRESH or SKIPPED: each node in order is updated (0x7d3d30; a SKI..."
-  review: imported
+  review: reviewed
 - addr: 0x7d3d30
   final: 0x544530
   kind: function

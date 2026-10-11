@@ -12,6 +12,30 @@
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
   review: imported
+- addr: 0x6096c0
+  final: 0x401fa0
+  kind: function
+  name: aiTurnJobs
+  semantics: "the player AI's turn: three job lists — the unit evaluator, the barbarian manager, the planning, the targets, ..., the operation manager; then the targets' update and the tactical pass; then the homeland"
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 8
+      value: "Cases (the log's rolls tell a queue spawn from a clock one): 1124 camp (40,21): its scout home at t8's pass, then t9 W, t10 W, t11 S, t12 S with no \"Barbarian Ranged unit roll\" for them, the clock bac"
+    - recording: 1117
+      turn: 9
+      value: "1117 camp (9,24): home at t9, t10 W (no roll), t11 W, t12 W, t13 S, t14 S, the clock at t21 with its roll;"
+    - recording: 1124
+      turn: 22
+      value: "1124 camp (41,7): home at t22, t23 W, t24 W, t25 W, t26 S, t27 S, the clock at t34."
+  impl: [cpu/core/tactical.ts:barbarianPhase, cpu/core/tactical.ts:barbarianTactics]
+  readings:
+    - "H-1: the raids — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  context:
+    - "...(0x60a8c0, unread) taken by the player's first job (0x5c2650, before the tribes' turn in 0x6096c0) would not hold a unit raised in the turn. The raid's end: \"C-95: the barbarians' raid\" (..."
+    - "- THE TURN (0x6096c0, the player AI's jobs): a first list — the unit evaluator 0x5c2650, the barbarian manag..."
+  review: reviewed
 - addr: 0x60a8c0
   final: 0x403190
   kind: function
@@ -28,9 +52,10 @@
       value: "1124 camp (41,7): home at t22, t23 W, t24 W, t25 W, t26 S, t27 S, the clock at t34."
   impl: [ai/major/operations/nodes.ts:recruitUnits, ai/major/operations/nodes.ts:before]
   readings:
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the raids — READ"
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "H-1: the raids — READ"
   context:
     - "...is not yet recruitable (W at t7 recruited at t8, the t9 W not at t9): LAB — the evaluator 0x60a8c0 is unread. The raid operation's own end (its tree's last Notify Owner, which opens the ci..."
     - "...71530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tact..."

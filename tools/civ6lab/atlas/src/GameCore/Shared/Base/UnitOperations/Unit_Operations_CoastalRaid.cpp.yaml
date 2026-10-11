@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x95b7c0
+  final: 0x666ce0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/combat.ts:coastalRaid, cpu/core/tactical.ts:coastalRaids]
+  readings: ["C-95: Coastal Raid — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...oves to its plot (0x962190, flag 0x10) and raids the target where it may (0x95b100 -> 0x95b7c0). The raid wrecks the plot's improvement, else its district, 3 Movement spent (none for...
+  review: imported
+- addr: 0x95ba10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ".... The score: the game signal +0x8d0 — raised by the pillage 0x9633c0, the coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — runs 0x154b80: a barbarian uni..."
+  review: imported

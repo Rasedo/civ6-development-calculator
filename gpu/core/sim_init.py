@@ -3964,7 +3964,7 @@ class SimInit:
         self.barb_civics = torch.zeros(B, len(rules.c_cost), dtype=torch.bool, device=device)
         self.barb_unit_tribe = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=device)
         self.barb_unit_scout = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
-        # THE RAIDS AND CITY ASSAULTS (`barbarianOps`): each tribe's Boldness,
+        # THE RAIDS AND CITY ASSAULTS (`barbarianScouts`): each tribe's Boldness,
         # the spawn interval its operation set (-1 its own), the unit types it
         # asked for (-1 empty), the owners of the cities its raid and its
         # assault wait for, its homing scout's slot and city owner, the owned
@@ -4020,6 +4020,22 @@ class SimInit:
         self.tribe_ramp = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
         self.tribe_raidp = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
         self.tribe_home_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        # THE RAID'S TREE (`raidTick`): the cities the assault waits for by
+        # their centres; each tribe's raid score (its units' pillages); its
+        # operation's target plot and rally, the root's child it resumes at
+        # (2 the recruit, 9 the march, 12 the raid, 22 the way home), the turn
+        # its raid began (-1 not yet), its tree ended, its members killed;
+        # each Operation Move node's (11, 21, 24) stored members and goal
+        self.tribe_assp = torch.full((B, self.KT, self.TL), -1, dtype=torch.long, device=device)
+        self.tribe_score = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_op_plot = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_rally = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_op_resume = torch.full((B, self.KT), 2, dtype=torch.long, device=device)
+        self.tribe_raid_from = torch.full((B, self.KT), -1, dtype=torch.long, device=device)
+        self.tribe_op_done = torch.zeros(B, self.KT, dtype=torch.bool, device=device)
+        self.tribe_op_dead = torch.zeros(B, self.KT, dtype=torch.long, device=device)
+        self.tribe_store = torch.zeros(B, self.KT, 3, simbase.BARB_POOL_MAX, dtype=torch.bool, device=device)
+        self.tribe_store_goal = torch.full((B, self.KT, 3), -1, dtype=torch.long, device=device)
         self.barb_spot_next = torch.zeros(B, max(self.n_majors, 1), dtype=torch.long, device=device)
         # the plots three rings round each plot in the game's ring order
         # (`ringPlots`, 0x69010), -1 past the map's edge

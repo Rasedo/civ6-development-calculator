@@ -238,3 +238,30 @@ export const BARB_RAID_RECRUIT_TURNS = srcConst('barb.raidRecruitTurns', 10,
   xml('TreeData', 'TreeName=Raid City&NodeId=5&DefnId=0', 'DefaultData'));
 export const BARB_ASSAULT_RECRUIT_TURNS = srcConst('barb.assaultRecruitTurns', 15,
   xml('TreeData', 'TreeName=Barbarian City Attack&NodeId=7&DefnId=0', 'DefaultData'));
+/** "Raid City": the march's Operation Move (node 11) to the target, its
+ *  range and unit distance */
+export const RAID_MARCH_RANGE = srcConst('barb.raid.marchRange', 2,
+  xml('TreeData', 'TreeName=Raid City&NodeId=11&DefnId=1', 'DefaultData'));
+export const RAID_MARCH_SPREAD = srcConst('barb.raid.marchSpread', 0,
+  xml('TreeData', 'TreeName=Raid City&NodeId=11&DefnId=3', 'DefaultData'));
+/** "Raid City": Barbarian Raid Check (node 13): the tribe's score that ends
+ *  the raid */
+export const RAID_SCORE = srcConst('barb.raid.score', 10,
+  xml('TreeData', 'TreeName=Raid City&NodeId=13&DefnId=1', 'DefaultData'));
+/** "Raid City": the raid's Turn Limiter (node 14, Limit Is Min) */
+export const RAID_TURNS = srcConst('barb.raid.turns', 10,
+  xml('TreeData', 'TreeName=Raid City&NodeId=14&DefnId=0', 'DefaultData'));
+/** "Raid City": the raid's Operation Move (node 21) about the target */
+export const RAID_RANGE = srcConst('barb.raid.range', 3,
+  xml('TreeData', 'TreeName=Raid City&NodeId=21&DefnId=1', 'DefaultData'));
+/** "Raid City": the way home's Operation Move (node 24) to the rally, its
+ *  range and unit distance */
+export const RAID_HOME_RANGE = srcConst('barb.raid.homeRange', 1,
+  xml('TreeData', 'TreeName=Raid City&NodeId=24&DefnId=1', 'DefaultData'));
+export const RAID_HOME_SPREAD = srcConst('barb.raid.homeSpread', 4,
+  xml('TreeData', 'TreeName=Raid City&NodeId=24&DefnId=3', 'DefaultData'));
+/** a tribe's raid score: each pillage by a unit of it (the pillage signal's
+ *  handler 0x154b80) */
+export const BARB_PILLAGE_SCORE = srcConst('barb.pillageScore', 5, {
+  lab: 'tools/civ6lab/dll_readings.md C-95: the barbarians raid (0x154b80: tribe +0x78 += 5)',
+});

@@ -1078,7 +1078,7 @@ _MUTABLE = [
     # their units was raised by (`cpu/core/barbarians.ts`)
     "tribe_plot", "tribe_alive", "tribe_kind", "tribe_name", "tribe_spawn", "tribe_scoutc", "n_tribes",
     "barb_camps_begun", "barb_techs", "barb_civics", "barb_unit_tribe", "barb_unit_scout",
-    # their raids and city assaults (`barbarianOps`)
+    # their raids and city assaults (`tribeTurn`, `opTurn`, `raidTick`, `barbarianScouts`)
     "tribe_bold", "tribe_every", "tribe_queue", "tribe_raidq", "tribe_assq", "tribe_home_slot", "tribe_home_seat",
     "tribe_saw", "tribe_op", "tribe_op_seat", "tribe_op_turns", "tribe_op_rec", "barb_unit_op", "barb_unit_fresh",
     "barb_spot_next",
@@ -1088,6 +1088,9 @@ _MUTABLE = [
     "seat_pool_size", "seat_pool_free", "seat_pool_nfree", "seat_pool_dying",
     # the player each dead tribe rampages against, the cities its raids wait for (`BarbTribe.rampage`, `raidTargets`)
     "tribe_ramp", "tribe_raidp", "tribe_home_plot",
+    # the raid's tree (`raidTick`)
+    "tribe_assp", "tribe_score", "tribe_op_plot", "tribe_rally", "tribe_op_resume", "tribe_raid_from", "tribe_op_done",
+    "tribe_op_dead", "tribe_store", "tribe_store_goal",
     "victory_type", "victory_row", "project_done",  # one-time project ledger
     "civ_citizen_names",  # the citizen names each major has given (its Spies, its Archaeologists, its storms)
     "civ_goody_kinds",  # the villages each major has had of each kind (the kind draw halves on them)

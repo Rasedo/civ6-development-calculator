@@ -19,6 +19,7 @@
     - cpu/core/tactical.ts:ATTACK_KILL
     - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
     - gpu/core/sim_tactics.py:gain
+    - cpu/core/tactical.ts:assignTo
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -45,7 +46,10 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
-  impl: [cpu/core/tactical.ts:assignAttacks, gpu/core/sim_tactics.py:claim]
+  impl:
+    - cpu/core/tactical.ts:assignAttacks
+    - gpu/core/sim_tactics.py:claim
+    - cpu/core/tactical.ts:assignTo
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -102,7 +106,9 @@
   name: TacticalAI
   status: PARTLY
   impl: [cpu/core/tactical.ts:cityStateTactics, cpu/core/tactical.ts:barbarianTactics]
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a..."
@@ -130,8 +136,13 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
-  impl: [cpu/core/tactical.ts:carryOut, gpu/core/sim_tactics.py:_tac_carry_out]
-  readings: ["C-95: Attack Units — READ, ported"]
+  impl:
+    - cpu/core/tactical.ts:carryOut
+    - gpu/core/sim_tactics.py:_tac_carry_out
+    - cpu/core/tactical.ts:opAttackExec
+  readings:
+    - "C-95: Attack Units — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
@@ -160,6 +171,22 @@
   context:
     - "...her unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a..."
   review: imported
+- addr: 0x7735d0
+  final: 0x5055c0
+  kind: function
+  name: coastalRaidCarryOut
+  semantics: "the queue carried out: each queued unit that can act to its plot (attack flag), then the raid"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: 9 of 9 Coastal Raid rows take the move
+  impl: [cpu/core/tactical.ts:coastalRaids, gpu/core/sim_tactics.py:_tac_coastal_raid]
+  readings: ["C-95: Coastal Raid — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nge 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves to its plot (0x962190, flag 0x10) and raids the t..."
+  review: reviewed
 - addr: 0x7737c0
   final: 0x5057b0
   kind: function
@@ -179,7 +206,7 @@
   impl: [cpu/core/tactical.ts:moveToSafety]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
@@ -196,7 +223,7 @@
   impl: [cpu/core/tactical.ts:moveToSafety, gpu/core/sim_tactics.py:_tac_move_to_safety]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   context:
     - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
   review: reviewed
@@ -310,7 +337,11 @@
     - gpu/core/sim_tactics.py:_tac_assign
     - cpu/core/tactical.ts:ATTACK_TARGETS_RANGE
     - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
-  readings: ["C-95: Attack Units — READ, ported"]
+    - cpu/core/tactical.ts:assignTo
+    - cpu/core/tactical.ts:opAttackExec
+  readings:
+    - "C-95: Attack Units — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
@@ -386,14 +417,22 @@
 - addr: 0x7794b0
   final: 0x50b3d0
   kind: function
-  status: PARTLY
+  name: coastalRaid
+  semantics: "Coastal Raid: each improvement or passive district target on coastal land, each raider whose planning holds a plot beside it queued"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: 9 of 9 Coastal Raid rows take the move
+  impl: [cpu/core/tactical.ts:coastalRaids, gpu/core/sim_tactics.py:_tac_coastal_raid]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: Coastal Raid — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
-  review: imported
+  review: reviewed
 - addr: 0x779a70
   final: 0x50b990
   kind: function
@@ -435,7 +474,7 @@
     - gpu/core/sim_tactics.py:_tac_move_to_safety
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its figh..."

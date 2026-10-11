@@ -29,7 +29,7 @@
   final: 0xe2220
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ing the target owner's handicap) sets the spawn interval to its SpawnRate at the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the tribe's own). Barbarian Recruit (0x7c7580) under a T..."
@@ -59,7 +59,9 @@
   final: 0xe30f0
   kind: function
   status: PARTLY
-  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
   review: imported
@@ -104,6 +106,22 @@
   context:
     - "...camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to it, 0 when empty — every camp ever raised, so the ne..."
   review: imported
+- addr: 0x152c00
+  kind: function
+  name: tribeScore
+  semantics: "a tribe's raid score: +0x78 + +0x7c"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl: [cpu/core/barbarians.ts:barbPillageScore, gpu/core/sim_orders.py:_barb_pillage_score]
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- BARBARIAN RAID CHECK (0x7c7330): SUCCESS where the tribe's score (0x152c00: +0x78 + +0x7c) reaches Score, else FAILURE; Signal At Start links a game signal for th..."
+  review: reviewed
 - addr: 0x152df0
   final: 0xe40d0
   kind: function
@@ -147,7 +165,7 @@
   final: 0xe4970
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per..."
@@ -170,7 +188,7 @@
   final: 0xe50f0
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a..."
@@ -183,7 +201,7 @@
     - cpu/core/barbarians.ts:barbScoutLook
     - cpu/core/types.ts:GameState
     - cpu/data/barbarians.ts:BARB_SPOT_THROTTLE
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
@@ -194,7 +212,7 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/barbarians.ts:barbBattleBoldness]
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER..."
@@ -234,6 +252,26 @@
     - ...uts EXPLORE, the rest COMBAT; a camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
     - "...(0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830); each of their units, in pool order, takes of the planning's targets of that player th..."
   review: imported
+- addr: 0x154b80
+  final: 0xe5be0
+  kind: function
+  name: tribePillageScore
+  semantics: "the pillage signal's handler: a barbarian unit of a tribe adds 5 to its score"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
+  impl:
+    - cpu/core/barbarians.ts:barbPillageScore
+    - gpu/core/sim_orders.py:_barb_pillage_score
+    - cpu/data/barbarians.ts:BARB_PILLAGE_SCORE
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...he coastal raids 0x95ba10 / 0xa4fbc0 and a district's pillage in combat 0x20bae0 — runs 0x154b80: a barbarian unit of a tribe adds 5 to its +0x78 (+0x7c has no writer but the serialize..."
+  review: reviewed
 - addr: 0x155920
   final: 0xe6260
   kind: function
@@ -253,7 +291,7 @@
   final: 0xe6490
   kind: function
   status: PARTLY
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e70); the units it finds join, success; else the missing units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs again next turn. Success or the limiter's end: Spawn Ch..."

@@ -1962,15 +1962,15 @@ class SimOrders:
         """`barbarianPhase`: the barbarians' unit pool (`_barb_slots`), the
         game's rules for them (`_barbarian_rules`: their techs, the camp step,
         each tribe's turn), their units' AI (`_barbarian_tactics`) for the
-        units that stood before their camps raised this turn's, then their
-        operations (`_barbarian_ops`)."""
+        units that stood before their camps raised this turn's (their operations'
+        trees first), then their scouts (`_barbarian_scouts`)."""
         self._barb_slots()
         acting = self.barb_unit_alive & (self.barb_unit_seat == BARB_SEAT)
         self._barbarian_rules()
         self._barb_slots()
         self._barb_reset_mp()  # barbarianPhase's own movesLeft reset
         self._barbarian_tactics(acting)
-        self._barbarian_ops()
+        self._barbarian_scouts()
         self._barb_slots_dying()
 
     def _barb_stand_in(self, live, pick) -> torch.Tensor:
@@ -2008,16 +2008,6 @@ class SimOrders:
         _rng_val = torch.zeros(0, dtype=torch.long, device=dev)
         _rng_pfp = torch.zeros(0, dtype=self.barb_unit_promos.dtype, device=dev)
         _rng_tfp = torch.zeros(0, dtype=self.barb_unit_type.dtype, device=dev)
-        # a scout carrying a city home walks to its camp and nothing else
-        # (`barbHomingCamp`): the slot each living tribe waits on, and its camp
-        _homing = torch.zeros(B, simbase.BARB_POOL_MAX, dtype=torch.bool, device=dev)
-        _home_camp = torch.full((B, simbase.BARB_POOL_MAX), -1, dtype=torch.long, device=dev)
-        _hs = self.tribe_home_slot
-        _hok = (_hs >= 0) & self.tribe_alive
-        if bool(_hok.count_nonzero()):
-            _hb, _hk = _hok.nonzero(as_tuple=True)
-            _homing[_hb, _hs[_hb, _hk]] = True
-            _home_camp[_hb, _hs[_hb, _hk]] = self.tribe_plot[_hb, _hk]
         for u in u_live:
             act = _barbs()[:, u]
             # a pick that reads no target takes its units before the scan
@@ -2026,7 +2016,6 @@ class SimOrders:
                 act = act & early
             if not bool(act.count_nonzero()):
                 continue
-            hm = act & _homing[:, u]
             here = self.barb_unit_tile[:, u]
             nb = self.neigh[here]
             nbc = nb.clamp(min=0)
@@ -2097,9 +2086,8 @@ class SimOrders:
             act = act & pick(u, target_tile)
             if not bool(act.count_nonzero()):
                 continue
-            hm = hm & act
             acted[:, u] = act
-            attack = act & ~hm & (target_tile <= T)
+            attack = act & (target_tile <= T)
             ttc = target_tile.clamp(max=T - 1)
             self._barb_melee_at(attack & ~rngd, u, ttc)
             # A RANGED raider strikes instead: hostileUnitAct routes any
@@ -2114,7 +2102,7 @@ class SimOrders:
                 self._hostile_ranged_strike(rng_att, ttc, "barb", u)
 
             # `hostilePillage` where it stands
-            pillage = act & ~hm & ~attack
+            pillage = act & ~attack
             pillage = self._barb_pillage_here(pillage, torch.full_like(here, u))
             march = act & ~attack & ~pillage
             if not bool(march.count_nonzero()):
@@ -2149,9 +2137,8 @@ class SimOrders:
             city_tgt = torch.where(ckey_min < 10**18,
                                    _cc.gather(1, _cwin.unsqueeze(1)).squeeze(1),
                                    here.clamp(min=0))
-            has_imp = has_imp & ~hm
-            tgt = torch.where(hm, _home_camp[:, u].clamp(min=0), torch.where(has_imp, imp_tgt, city_tgt))
-            has_tgt = hm | has_imp | (ckey_min < 10**18)
+            tgt = torch.where(has_imp, imp_tgt, city_tgt)
+            has_tgt = has_imp | (ckey_min < 10**18)
             d_here = self.pair_dist[here, tgt].to(torch.long)
             cur = here.clone()
             d_cur = d_here.clone()
@@ -2314,5 +2301,65 @@ class SimOrders:
             self._eff_version += 1  # district yields just dropped
         if bool((pillage | dist_pillage).count_nonzero()):
             self._tac_cost_held = None  # a pillaged improvement's Movement is the plot's again
+            self._barb_pillage_score(pillage | dist_pillage, us)
         return pillage | dist_pillage
+
+    def _barb_coastal_raid(self, act: torch.Tensor, us: torch.Tensor, plot: torch.Tensor) -> torch.Tensor:
+        """`coastalRaid` for the barbarian at local slot `us` [B] on the land
+        `plot` [B] in the games `act`: a raider afloat beside it with 3
+        Movement left (none for one that raids free) wrecks its unpillaged
+        improvement on territorial ground, else its complete district (not a
+        centre, not an Encampment); a HEAL plunder heals it; its Movement
+        spent; the tribe's score. Returns [B] where it raided."""
+        B = self.B
+        bidx = torch.arange(B, device=self.device)
+        u1 = us.unsqueeze(1)
+        ut = self.barb_unit_type.gather(1, u1).squeeze(1).clamp(min=0, max=self.NU - 1)
+        here = self.barb_unit_tile.gather(1, u1).squeeze(1).clamp(min=0)
+        pc = plot.clamp(min=0)
+        free = self._type_raid_free[ut]
+        mp = self.barb_unit_mp[bidx, us]
+        ok = (act & (plot >= 0) & self._type_raider[ut] & self.water[bidx, here] & ~self.water[bidx, pc]
+              & (self.pair_dist[here, pc].to(torch.long) == 1) & (free | (mp >= 3 * self._mp_scale)))
+        own = self.tile_seat[bidx, pc]
+        ok &= (own >= 0) & ((own < BARB_SEAT) | (own == FREE_SEAT))
+        imp = self.improvement[bidx, pc]
+        do_i = ok & (imp >= 0) & ~self.pillaged[bidx, pc] & ~self._imp_no_pillage[imp.clamp(min=0)]
+        dd = self.district[bidx, pc]
+        do_d = (ok & ~do_i & (dd >= 0) & (dd != self._encamp_didx) & self.district_complete[bidx, pc]
+                & ~self.district_pillaged[bidx, pc])
+        did = do_i | do_d
+        if not bool(did.count_nonzero()):
+            return did
+        hp_cap = self.rules.combat["unitHp"]
+        ri = do_i.nonzero(as_tuple=True)[0]
+        if ri.numel():
+            iv = imp[ri].clamp(min=0)
+            heal = torch.where(self._imp_plun_kind[iv] == 1, self._imp_plun_amt[iv], torch.zeros_like(iv))
+            self.pillaged[ri, pc[ri]] = True
+            self.barb_unit_hp[ri, us[ri]] = (self.barb_unit_hp[ri, us[ri]] + heal).clamp(max=hp_cap)
+        rd = do_d.nonzero(as_tuple=True)[0]
+        if rd.numel():
+            dv = dd[rd].clamp(min=0)
+            heal = torch.where(self._d_plun_kind[dv] == 1, self._d_plun_amt[dv], torch.zeros_like(dv))
+            self.district_pillaged[rd, pc[rd]] = True
+            self._air_scatter_from(rd, pc[rd])
+            self.barb_unit_hp[rd, us[rd]] = (self.barb_unit_hp[rd, us[rd]] + heal).clamp(max=hp_cap)
+        spend = did & ~free
+        rs = spend.nonzero(as_tuple=True)[0]
+        self.barb_unit_mp[rs, us[rs]] = (self.barb_unit_mp[rs, us[rs]] - 3 * self._mp_scale).clamp(min=0)
+        self._eff_version += 1
+        self._tac_cost_held = None
+        self._barb_pillage_score(did, us)
+        return did
+
+    def _barb_pillage_score(self, did: torch.Tensor, us: torch.Tensor) -> None:
+        """`barbPillageScore`: a pillage by a tribe's barbarian at local slot
+        `us` [B] in the games `did` adds to its tribe's raid score."""
+        u1 = us.unsqueeze(1)
+        tr = self.barb_unit_tribe.gather(1, u1).squeeze(1)
+        m = did & (self.barb_unit_seat.gather(1, u1).squeeze(1) == BARB_SEAT) & (tr >= 0)
+        rows = m.nonzero(as_tuple=True)[0]
+        if rows.numel():
+            self.tribe_score[rows, tr[rows]] += int(self._bb["pillageScore"])
 

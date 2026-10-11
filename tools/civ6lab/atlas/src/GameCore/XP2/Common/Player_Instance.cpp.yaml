@@ -107,9 +107,9 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
   context:
@@ -140,8 +140,8 @@
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ..., +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of the player's own: its cit..."
@@ -189,7 +189,7 @@
   impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/aiResource.ts:ResourceFacts]
   readings:
     - "C-94: the game era, the ages and the founding moments — READ"
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the raids — READ"
     - "H-1: a city's name, a citizen's name — READ"
     - "H-1: a minor's research catch-up — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"

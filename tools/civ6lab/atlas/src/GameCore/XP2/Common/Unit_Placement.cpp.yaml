@@ -55,11 +55,13 @@
     - ai/major/operations/nodes.ts:moveDest
     - ai/major/operations/nodes.ts:barred
     - cpu/core/tactical.ts:safePlot
+    - cpu/core/tactical.ts:moveBarred
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
   context:
@@ -72,8 +74,7 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/tactical.ts:safePlot]
-  readings:
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  readings: ["C-95: the danger map and Move to Safety — READ, ported"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...eb0) with a unit of its own stacking with it (itself counted), none with a unit at war (0x5861f0); against the best so far, the first taken — of no danger over one of danger; of two..."
@@ -93,10 +94,12 @@
     - cpu/core/tactical.ts:wanderNearCamp
     - cpu/core/tactical.ts:wanderNearCity
     - ai/major/operations/nodes.ts:barred
+    - cpu/core/tactical.ts:moveBarred
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...its planning reach   the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60,..."
   context:
@@ -112,12 +115,16 @@
     - recording: 1124
       turn: 17
       value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
-  impl: [cpu/core/tactical.ts:alternateLocation, ai/major/operations/nodes.ts:barred]
+  impl:
+    - cpu/core/tactical.ts:alternateLocation
+    - ai/major/operations/nodes.ts:barred
+    - cpu/core/tactical.ts:moveBarred
   readings:
     - "H-1: a civilian stepped on — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
@@ -154,8 +161,9 @@
   status: PARTLY
   impl: [cpu/core/fog.ts:majorLookMeets]
   readings:
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the raids — READ"
     - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+    - "H-1: the raids — READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."

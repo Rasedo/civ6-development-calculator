@@ -48,6 +48,16 @@
     - "- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians, Plunder Trader, Chase Target, Attack Units and Move to Safety: the..."
     - "- THE TARGET LIST (0x783980): the plots in index order, a plot the player sees (the word plane +0x290 > 0) giving,..."
   review: imported
+- addr: 0x785ec0
+  final: 0x514670
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...operation manager 0x722690 (0x727510: each operation's tree ticks) — then a second — 0x785ec0, the tactical pass 0x771530 — then the homeland 0x70a370. The operations' trees tick af..."
+  review: imported
 - addr: 0x785f30
   final: 0x5146e0
   kind: function
@@ -63,6 +73,7 @@
     - cpu/harness/cityBuildLab.ts:kbUpdate
     - gpu/core/sim_minors.py:_minor_knowledge
   readings:
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
     - "- THE AGEING (0x5ebb30, the first step of the tactical AI's turn 0x785f30 on player signal +0x1f8): every record's age + 1; one whose age before the step was a..."

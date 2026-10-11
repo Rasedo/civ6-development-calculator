@@ -825,6 +825,7 @@ def _main() -> int:
                 ("martyr", [py, "tests/gpu/martyr_test.py"], 2),  # the relic rides the MARTYR promotion, and the death draws nothing
                 ("barb_camps", [py, "tests/gpu/barb_camps_test.py"], 2),  # a camp's class is its ground; ranged is nobody's class
                 ("barb_tactics", [py, "tests/gpu/barb_tactics_test.py"], 2),  # the pathfinder's order, the pool, defend, pillage, wander
+                ("barb_raid", [py, "tests/gpu/barb_raid_test.py"], 2),  # the raid's tree: march, raid, score, home, the assault list
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the seven suz-coded perks, strict-suzerain-only
                 ("minor_record", [py, "tests/gpu/minor_record_test.py"], 2),  # the resolved suzerain, the minor's research, its border, Containment, conversion
                 ("research_ai", [py, "tests/gpu/research_ai_test.py"], 2),  # the research AI: its value, its walk, its choice

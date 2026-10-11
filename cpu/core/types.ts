@@ -612,6 +612,8 @@ export interface BarbTribe {
   fresh?: number[];
   /** its Boldness: the raid and the assault wait for it */
   boldness?: number;
+  /** its raid score: its units' pillages (Barbarian Raid Check) */
+  score?: number;
   /** the cities its raid and its assault wait to go after */
   raidTargets?: BarbTarget[];
   assaultTargets?: BarbTarget[];
@@ -643,7 +645,20 @@ export interface BarbOp {
   /** the turns it has recruited; done once it took its force */
   turns: number;
   recruited: boolean;
+  /** its team's members in the order they joined; a member killed keeps
+   *  its place, off the map */
   units: number[];
+  /** the plot its way home goes to (the rally) */
+  rally?: number;
+  /** its tree's root Sequence: the child it resumes at */
+  resume?: number;
+  /** the turn its raid's Turn Limiter first ran */
+  raidFrom?: number;
+  /** each Operation Move node's stored units and the goal they were
+   *  stored for */
+  store?: Record<number, { list: number[]; goal: number }>;
+  /** its tree ended: the tribe forgets it at its next turn */
+  done?: boolean;
 }
 
 export interface Unit {

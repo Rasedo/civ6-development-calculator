@@ -314,13 +314,21 @@ def _barb_tribes_row(sim, b: int) -> list[int]:
         raidq = [int(x) for x in sim.tribe_raidq[b, k].tolist() if x >= 0]
         raidp = [int(p) for x, p in zip(sim.tribe_raidq[b, k].tolist(), sim.tribe_raidp[b, k].tolist()) if x >= 0]
         assq = [int(x) for x in sim.tribe_assq[b, k].tolist() if x >= 0]
+        assp = [int(p) for x, p in zip(sim.tribe_assq[b, k].tolist(), sim.tribe_assp[b, k].tolist()) if x >= 0]
         op = int(sim.tribe_op[b, k])
         opu = sum(1 for a, t, o in zip(alive, tribe, sim.barb_unit_op[b].tolist()) if a and t == k and o)
+        dead = int(sim.tribe_op_dead[b, k]) + sum(1 for a, t, o in zip(alive, tribe, sim.barb_unit_op[b].tolist())
+                                                  if not a and t == k and o)
         row += [int(sim.tribe_bold[b, k]), int(sim.tribe_every[b, k]), len(queue), *queue,
-                len(raidq), *raidq, *raidp, len(assq), *assq,
+                len(raidq), *raidq, *raidp, len(assq), *assq, *assp,
                 int(sim.tribe_home_seat[b, k]) if int(sim.tribe_home_slot[b, k]) != -1 else -1,
                 op, int(sim.tribe_op_seat[b, k]) if op else -1, int(sim.tribe_op_turns[b, k]) if op else 0,
-                int(sim.tribe_op_rec[b, k]) if op else 0, opu if op else 0, int(sim.tribe_ramp[b, k])]
+                int(sim.tribe_op_rec[b, k]) if op else 0, opu if op else 0,
+                # the raid's score and its tree
+                int(sim.tribe_score[b, k]), int(sim.tribe_op_plot[b, k]) if op else -1, int(sim.tribe_rally[b, k]) if op else -1,
+                int(sim.tribe_op_resume[b, k]) if op else 0, int(sim.tribe_raid_from[b, k]) if op else -1,
+                int(sim.tribe_op_done[b, k]) if op else 0, dead if op else 0,
+                int(sim.tribe_ramp[b, k])]
     row += [int(x) for x in sim.barb_spot_next[b, : sim.n_majors].tolist()]
     techs = sim.barb_techs[b].nonzero().flatten().tolist()
     civics = sim.barb_civics[b].nonzero().flatten().tolist()

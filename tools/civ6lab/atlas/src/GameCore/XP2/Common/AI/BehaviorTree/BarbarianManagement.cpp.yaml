@@ -8,7 +8,10 @@
   kind: function
   status: PARTLY
   impl: [cpu/core/barbarians.ts:opTurn]
-  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the tribe's own). Barbarian Recruit (0x7c7580) under a Turn Limiter (10 / 15): the force's counts (0x144610, each class the barbarian..."

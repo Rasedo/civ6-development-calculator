@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { BARB_SEAT, FREE_SEAT, isBarbSeat, setTileOwner } from '../../../cpu/core/seats';
-import { makeMap, makeState, tileAtCoords } from '../helpers';
+import { makeMap, makeState, settleAt, tileAtCoords } from '../helpers';
 import { deriveAreas } from '../../../world/query';
 import { hostileUnitAct } from '../../../cpu/core/combat';
 import { spawnUnit } from '../../../cpu/core/units';
-import { barbarianOps, barbarianRules, barbarianTechs, barbUnitFor, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
+import { barbarianScouts, barbarianRules, barbarianTechs, barbSlots, barbUnitFor, opTurn, raiseCamp, ringPlots, tribeKindAt } from '../../../cpu/core/barbarians';
+import { barbarianTactics, plotDistance, refreshBarbarians } from '../../../cpu/core/tactical';
 import { BARB_TRIBES } from '../../../cpu/data/barbarians';
-import type { GameState } from '../../../cpu/core/types';
+import type { GameState, Unit } from '../../../cpu/core/types';
 
 function land(): GameState {
   const state = makeState(makeMap(20, 20));
@@ -144,7 +145,7 @@ describe('a barbarian raid', () => {
     setTileOwner(tileAtCoords(state.map, 8, 6), 0);
     const tribe = state.barbTribes![0];
     tribe.boldness = 10;
-    barbarianOps(state);
+    barbarianScouts(state);
     expect(tribe.op).toMatchObject({ assault: false, target: { seat: 0 }, recruited: false });
     expect(tribe.every).toBe(1);
     expect(tribe.queue).toEqual(['WARRIOR', 'WARRIOR', 'SLINGER']);
@@ -154,7 +155,8 @@ describe('a barbarian raid', () => {
       barbarianRules(state, state.turn);
       raised.push(...state.units.filter((u) => !before.has(u.id) && isBarbSeat(u.seat)).map((u) => u.type));
       state.barbSeat.camps = [camp.index];
-      barbarianOps(state);
+      // the raid's tree's recruit (its tick opens the barbarians' units' AI)
+      opTurn(state, tribe, tribe.op!);
     }
     // the unit raised in a turn joins the next: W, W, W, S, S
     expect(raised).toEqual(['WARRIOR', 'WARRIOR', 'WARRIOR', 'SLINGER', 'SLINGER']);
@@ -177,13 +179,75 @@ describe('a barbarian raid', () => {
     // a Warrior (2 moves, reach 1) three plots from the scout
     const at = state.map.tiles[scout.tileIndex];
     const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, at.col, at.row + 3).index, 0)!;
-    barbarianOps(state);
+    barbarianScouts(state);
     expect(tribe.op).toBeUndefined();
     expect(tribe.homing).toBeDefined();
     // the Warrior gone, the report lands
     state.units = state.units.filter((u) => u !== foe);
-    barbarianOps(state);
+    barbarianScouts(state);
     expect(tribe.op).toMatchObject({ assault: false, target: { seat: 0 } });
+  });
+});
+
+// THE RAID'S TREE ("Raid City"; tools/civ6lab/dll_readings.md "C-95: the
+// barbarians' raid"): the march to the target, the raid there until the
+// tribe's score ends it, the way home, the city to the assault list; a raid
+// whose units are all gone ends.
+describe("a raid's tree", () => {
+  function scene() {
+    const state = land();
+    barbarianTechs(state);
+    const camp = tileAtCoords(state.map, 4, 10);
+    raiseCamp(state, camp.index);
+    const city = settleAt(state, tileAtCoords(state.map, 15, 10).index, 0);
+    const tribe = state.barbTribes![0];
+    const w = [tileAtCoords(state.map, 5, 10), tileAtCoords(state.map, 5, 11)].map((t) => spawnUnit(state, 'WARRIOR', t.index, BARB_SEAT)!);
+    tribe.units.push(...w.map((u) => u.id));
+    tribe.op = { assault: false, target: { seat: 0, plot: city.centerIndex }, turns: 1, recruited: true,
+      units: w.map((u) => u.id), rally: camp.index };
+    const tick = () => {
+      barbSlots(state);
+      refreshBarbarians(state);
+      barbarianTactics(state, new Set(state.units.filter((u) => isBarbSeat(u.seat)).map((u) => u.id)));
+    };
+    const to = (u: Unit, col: number, row: number) => { u.tileIndex = tileAtCoords(state.map, col, row).index; };
+    return { state, camp, city, tribe, w, tick, to };
+  }
+
+  it('marches on the target, raids there, goes home and lists the city', () => {
+    const { state, camp, city, tribe, w, tick, to } = scene();
+    const dist = (u: Unit) => plotDistance(state, u.tileIndex, city.centerIndex);
+    const before = w.map(dist);
+    tick();
+    expect(tribe.op!.resume).toBe(9);
+    w.forEach((u, i) => expect(dist(u)).toBeLessThan(before[i]));
+    // within the march's range of the target: the raid begins
+    to(w[0], 13, 10);
+    to(w[1], 13, 11);
+    tick();
+    expect(tribe.op!.resume).toBe(12);
+    expect(tribe.op!.raidFrom).toBe(state.turn);
+    // the score reached: home to the rally
+    tribe.score = 10;
+    tick();
+    expect(tribe.op!.resume).toBe(22);
+    // home: Notify Owner lists the city, the tree ends
+    to(w[0], 5, 10);
+    to(w[1], 4, 11);
+    tick();
+    expect(tribe.op!.done).toBe(true);
+    expect(tribe.assaultTargets).toEqual([{ seat: 0, plot: city.centerIndex }]);
+    expect(plotDistance(state, w[0].tileIndex, camp.index)).toBeLessThanOrEqual(1);
+  });
+
+  it('ends once no unit of it lives through its raid', () => {
+    const { state, tribe, w, tick } = scene();
+    tribe.op!.resume = 12;
+    tribe.op!.raidFrom = state.turn;
+    state.units = state.units.filter((u) => !w.includes(u));
+    tick();
+    expect(tribe.op!.done).toBe(true);
+    expect(tribe.assaultTargets).toBeUndefined();
   });
 });
 

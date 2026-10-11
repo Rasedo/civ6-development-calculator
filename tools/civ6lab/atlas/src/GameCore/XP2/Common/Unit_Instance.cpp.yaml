@@ -20,6 +20,7 @@
   impl: [cpu/core/tactical.ts:canAct]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
@@ -95,6 +96,7 @@
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
   context:
@@ -119,10 +121,11 @@
       value: 1120 t13 17 / 32 (a defender at 18 HP).
   impl: [cpu/core/tactical.ts:healthOf, cpu/core/tactical.ts:flees]
   readings:
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the raids — READ"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+    - "H-1: the raids — READ"
   context:
     - "...s the node's units whose damage (unit +0xcf0) is at least that share of their health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its..."
     - "...bFightWhileEmbarked). Both sides' totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is..."
@@ -183,7 +186,7 @@
   impl: [cpu/core/tactical.ts:flees]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at half its health or worse whose planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds however hurt; a whole one where the danger exceeds its strength + 20 — and move..."

@@ -63,9 +63,7 @@
   kind: function
   status: PARTLY
   impl: [cpu/harness/drawSites.ts:DRAW_SITES]
-  readings:
-    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
-    - "H-1: draws the AI takes, draws the engines lack"
+  readings: ["H-1: the raids — READ", "H-1: draws the AI takes, draws the engines lack", "H-1: the raids — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...
@@ -216,7 +214,7 @@
   impl: [ai/major/danger.ts:out, cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0, each plot their strike covers down by   its strengt..."
   context:
@@ -239,7 +237,7 @@
     - ai/major/danger.ts:unitDanger
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH..."
   context:
@@ -259,7 +257,7 @@
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
-    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: the danger map and Move to Safety — READ, ported"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...tance, x5 unowned; later ones 100 /   turns where it may found). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) wit..."
@@ -312,7 +310,10 @@
   final: 0x4d26e0
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  impl: [cpu/core/tactical.ts:barbarianOpTrees]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before th..."
