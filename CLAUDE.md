@@ -25,7 +25,10 @@ by one scripted decision server (`policy/`), verified against each other by
   point is the per-seat ACTION format: the majors' AI and an RL agent emit
   the same actions and the engine applies either, so a seat swaps between
   them by setup alone; the battery relays the majors' AI actions to the
-  GPU lane through that path. Our scripted driver (`policy/`) and the
+  GPU lane through that path. Diplomatic proposals (missions included) go
+  through the deal offer / accept path, answered by the receiver's own
+  action; pantheon and religion choices are seat actions (owner
+  2026-10-11). Our scripted driver (`policy/`) and the
   neutral observation it reads go once the port drives every party; the
   RL observation and masks are built at RL prep.
 - **Delete, don't preserve.** No shims, aliases, re-exports, fallbacks,
