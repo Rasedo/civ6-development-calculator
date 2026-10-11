@@ -69,6 +69,11 @@ export interface MajorUnitView {
   range: number;
   damage: number;
   movesLeft: number;
+  /** its base Movement (0x56d9f0 with -1: Units.BaseMoves, embarked the
+   *  embarked pool), whole */
+  baseMoves: number;
+  /** its bombard strength, 0 for none */
+  bombard: number;
 }
 
 /** what a city of the seat produces: the UnitType in its queue's head (null
@@ -126,6 +131,63 @@ export interface MajorGovernorView {
   appointed: boolean;
   promotions: ReadonlySet<string>;
   city: { seat: number; id: number } | null;
+}
+
+/** an entry of the seat's tactical target list (the knowledge base's +0x368
+ *  list, 0x783980), in the list's order: its TargetType (cpu/core/tactical's
+ *  names), plot, player (-1 for none), its unit's UnitType (null for a target
+ *  that is no unit) and the reach its blows have (+0x18: a unit's attack
+ *  Range, a district's strike range) */
+export interface MajorAttackTargetView {
+  type: string;
+  plot: number;
+  owner: number;
+  unitType: string | null;
+  range: number;
+}
+
+/** one unit's part in an attack assignment (0x776140), in the order the
+ *  assignment runs: the plot it stands on, the plot it moves to and the plot
+ *  it strikes this turn (-1 none) */
+export interface MajorAttackView {
+  unit: number;
+  from: number;
+  move: number;
+  attack: number;
+}
+
+/** a defensible district of a known city as the knowledge base records it
+ *  (the 0x20-byte entries at +0x48, 0x5efaf0: a district with a garrison
+ *  pool): its defense strength (+0x14), that strength again where its walls
+ *  stand (+0x18, 0 without walls) and its strike strength (+0x1c), whole */
+export interface MajorKnownDistrictView {
+  plot: number;
+  defense: number;
+  walls: number;
+  strike: number;
+}
+
+/** a city the seat's knowledge base holds (the 0xe0-byte entries of
+ *  m_knownCities, 0x5ef9a0 / 0x5efaf0) */
+export interface MajorKnownCityView {
+  plot: number;
+  owner: number;
+  /** the engine's city id (a city-state's one city -1) */
+  id: number;
+  /** its citizens (+0x1c) */
+  population: number;
+  /** its owner's original capital (+0x14), its owner's capital (+0x15) */
+  originalCapital: boolean;
+  capital: boolean;
+  /** its yields in YieldTypes order, whole (+0x30) */
+  yields: readonly number[];
+  /** the world wonders it holds (0x5eb680) */
+  wonders: number;
+  districts: readonly MajorKnownDistrictView[];
+  /** the resources it holds, by ResourceType, with their counts (+0xc0) */
+  resources: readonly { resource: string; count: number }[];
+  /** the great works it holds (+0xa8) */
+  greatWorks: number;
 }
 
 export interface MajorView extends AiValueView {
@@ -226,6 +288,9 @@ export interface MajorView extends AiValueView {
   // major's seat, a city-state's seat, the Free Cities' and the barbarians'.
   /** the major civilizations' seats in turn order, the defeated left out */
   majors(): readonly number[];
+  /** every player in the game in seat order: the majors, the city-states,
+   *  the Free Cities (where the game holds them) and the barbarians */
+  players(): readonly number[];
   /** the seat's LeaderType, null for a seat with no leader */
   leader(seat: number): string | null;
   /** the turn `seat` met `other`, null while they have not met */
@@ -320,8 +385,8 @@ export interface MajorView extends AiValueView {
   // THE OPERATIONS' VIEW (ai/major/operations/)
   /** what each of the seat's cities produces */
   cityBuilds(seat: number): readonly MajorCityBuildView[];
-  /** the seat's best combat strength (player +0x1330 +0xf0): the largest
-   *  combat strength of its units */
+  /** the seat's best combat strength (PlayerStats +0xf0, 0x4d9320: the
+   *  strongest melee strength it has trained, m_iMaxMeleeStrengthTrained) */
   bestCombatStrength(seat: number): number;
   /** the player's units the seat sees now (its own: all of them) */
   knownUnits(seat: number, player: number): readonly MajorUnitView[];
@@ -348,4 +413,35 @@ export interface MajorView extends AiValueView {
   cityLoyaltyPerTurn(seat: number, cityId: number): number;
   /** the city-state holds its city */
   cityStateHasCity(cityState: number): boolean;
+  // THE WAR OPERATIONS' VIEW
+  /** the cities the seat's knowledge base holds: every city whose centre the
+   *  seat has revealed, its own included */
+  knownCities(seat: number): readonly MajorKnownCityView[];
+  /** the seat's own citizens' Loyalty pressure on a plot less every other
+   *  player's (0x19d470 with its byte set: 0x1a1ae0's raw own - foreign),
+   *  in pressure units */
+  pressureLead(seat: number, plot: number): number;
+  /** the plot's owner keeps the seat's units out (its borders enforced, no
+   *  open borders, no alliance, no war between them) */
+  borderClosed(seat: number, plot: number): boolean;
+  /** the seat has denounced the player (Player_Diplomacy 0x3da8e0) */
+  denounced(seat: number, player: number): boolean;
+  /** the city centre's hit points on the plot: its most and its damage,
+   *  null where no city stands there */
+  cityHitPoints(plot: number): { max: number; damage: number } | null;
+  /** the hit points a unit's blow would take from the city on the plot as
+   *  its planning predicts it (0x791470's district branch), 0 where its
+   *  planning holds no plot to strike the city from within two turns */
+  cityBlow(unitId: number, plot: number): number;
+  /** the seat's tactical target list */
+  attackTargets(seat: number): readonly MajorAttackTargetView[];
+  /** the attack assignment (0x776140) of the seat's units over the targets
+   *  of its tactical target list `keep` picks (by index): `even` drops a
+   *  plot where the blow and the blow back take more of the unit than they
+   *  deal, `survive` one where they would kill it (neither against a HIGH
+   *  target) */
+  attackAssignment(seat: number, units: readonly number[], keep: (index: number) => boolean, even: boolean, survive: boolean): readonly MajorAttackView[];
+  /** the unit action column that strikes the plot from where the unit stands
+   *  (ATTACK_d beside it, SNIPE_k / SNIPE3_k at range), -1 for none */
+  strikeColumn(unitId: number, plot: number): number;
 }

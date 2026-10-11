@@ -45,6 +45,7 @@
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: Coastal Raid — READ, ported"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed
@@ -67,9 +68,12 @@
     - cpu/core/tactical.ts:planUnit
     - cpu/core/tactical.ts:CIVILIAN_TAKEN
     - gpu/core/sim_tactics.py:_WANDER_BACK_RANGE
+    - cpu/core/combat.ts:predictCityBlow
+    - ai/major/view.ts:MajorView
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."
@@ -153,3 +157,12 @@
   context:
     - "- THE PLANNING'S TARGETS (0x792f90): every target within its Movement x 2 + its range of the unit; the spots (0x790c60 on..."
   review: reviewed
+- addr: 0x793210
+  final: 0x51dcd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...90: +0xdb0 > 0) of the largest predicted damage of their planning's entry for the city (0x793210, +0x64 per spot; 0x791470 runs the combat under the simulation flag) against half the c..."
+  review: imported

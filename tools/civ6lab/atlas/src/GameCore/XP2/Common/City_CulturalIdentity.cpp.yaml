@@ -17,6 +17,64 @@
   context:
     - "...f0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x19b090) into its loyalty term: both 0 → 0; own 0 → −MAX_LOYALTY; foreign 0 → +MAX_LOYALTY; else..."
   review: imported
+- addr: 0x19b5f0
+  final: 0x113e00
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+    - recording: AI_Diplomacy.csv
+      value: the war declarations' desire functors (the   replay feeds PrepareForWarWith from AI_Diplomacy.csv);
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...M / MINIMUM 0) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...; unread), each only where p's +0x72..."
+    - ...ry known city); the land strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0, 0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war record +0x...
+  review: imported
+- addr: 0x19b820
+  final: 0x114030
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+    - recording: AI_Diplomacy.csv
+      value: the war declarations' desire functors (the   replay feeds PrepareForWarWith from AI_Diplomacy.csv);
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...ities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...; unread), each only where p's +0x728 is set — then the citi..."
+    - ...nd strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0, 0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war record +0xc's writer; the team u...
+  review: imported
+- addr: 0x19bbb0
+  final: 0x1142a0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+    - recording: AI_Diplomacy.csv
+      value: the war declarations' desire functors (the   replay feeds PrepareForWarWith from AI_Diplomacy.csv);
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...; unread), each only where p's +0x728 is set — th..."
+    - ...y); the land strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0, 0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war record +0xc's writer;...
+  review: imported
+- addr: 0x19cd80
+  final: 0x114a80
+  kind: function
+  name: a player's identity sources at a plot
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "- THE LOYALTY LEAD (0x19d470 with its byte): per player p of the game's list, 0x19cd80 — its own sources at the plot as P would hold a city there, added for P and taken off f..."
+  review: reviewed
 - addr: 0x19d200
   final: 0x114c80
   kind: function
@@ -30,14 +88,81 @@
 - addr: 0x19d470
   final: 0x114d90
   kind: function
+  name: loyalty at a plot for a player
   status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      turn: 18
+      value: China at Caguana a lead of 4
+  impl: [ai/major/view.ts:MajorView, cpu/core/phase.ts:plotPressureLead]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
-  notes:
-    - ".claude/scratchpad/st1/reading.md: ...ity (a min,   0 with none); the danger (the influence map below, 0x716a90); the Loyalty   pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another   player is skipped (a city there sets \"ene..."
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "..., 0 with none); the danger (the influence map below, 0x716a90); the Loyalty pressure (0x19d470 >> 8); and per ring plot revealed: one owned by another player is skipped (a city there..."
+  review: reviewed
+- addr: 0x1a0140
+  final: 0x1163b0
+  kind: function
+  name: CAPITAL_IDENTITY_PRESSURE
+  status: READ
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - ...s a Free City / city-state (0x469d40 / 0x469de0); for each p CAPITAL_IDENTITY_PRESSURE (0x1a0140; MAXIMUM / MINIMUM 0) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0c...
+  review: reviewed
+- addr: 0x1a08d0
+  final: 0x116800
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "..._IDENTITY_PRESSURE (0x1a0140; MAXIMUM / MINIMUM 0) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...;..."
   review: imported
+- addr: 0x1a0ae0
+  final: 0x116910
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...RESSURE (0x1a0140; MAXIMUM / MINIMUM 0) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...; unread), ea..."
+  review: imported
+- addr: 0x1a0cc0
+  final: 0x116a30
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...1a0140; MAXIMUM / MINIMUM 0) and its cities' terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 / 0x19bbb0 / 0x19b820: governors, great works ...; unread), each only whe..."
+  review: imported
+- addr: 0x1a1050
+  final: 0x116cb0
+  kind: function
+  name: ownership identity pressure
+  status: READ
+  cases:
+    - recording: 1117
+      value: "The port counts the citizens with the city on the plot on P's   side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese   pressure) reads the city's 3 citizens;"
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...for P and taken off for every other p: for P alone OWNERSHIP_IDENTITY_PRESSURE_FROM_* (0x1a1050; 0 in Gathering Storm) and IDENTITY_PER_TURN_FROM_FREE_CITIES / _CITY_STATES (gp +0x40c..."
+  review: reviewed
 - addr: 0x1a1370
   final: 0x116f80
   kind: function
@@ -73,8 +198,14 @@
       value: "the engines' floor(256·(10 − d)/10) per city, each city's product floored, is a fit (AUDIT C-94 LAB): runs/h1_duelw1112 Yiyang t192 reads 0.546875 (own 971/256, foreign 918/256 → r 270/256) where the "
     - recording: 1112
       value: "recorded terms 2,036 → 2,092 of 2,097 (1112), 2,038 → 2,092 of 2,114 (1106), 1,619 → 1,751 of 1,843 (1110)."
-  impl: [cpu/core/phase.ts:pressureTerm, gpu/core/sim_phase.py:_pressure_term]
-  readings: ["H-1: the citizen pressure term — PARTLY READ"]
+  impl:
+    - cpu/core/phase.ts:pressureTerm
+    - gpu/core/sim_phase.py:_pressure_term
+    - cpu/core/phase.ts:plotPressureLead
+    - ai/major/view.ts:MajorView
+  readings:
+    - "H-1: the citizen pressure term — PARTLY READ"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - 0x1a1ae0 (City_CulturalIdentity.cpp) turns a city's own and foreign citizen pressure (24.8 fixed p...
   review: imported

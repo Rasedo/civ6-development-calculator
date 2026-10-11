@@ -24,14 +24,14 @@ import { majorView, type MajorViewInputs } from '../core/majorView';
 import { seatOf } from '../core/seats';
 import { spawnUnit, unitFullMoves } from '../core/units';
 import type { GameState, Seat } from '../core/types';
-import { newOpsAi, operationsTurn, opsOf, remapUnits, type OpsAi } from '../../ai/major/operations/manager';
-import { opUnits } from '../../ai/major/operations/nodes';
+import { newOpsAi, operationsTurn, opsOf, prepareForWarWith, remapUnits, type OpsAi } from '../../ai/major/operations/manager';
+import { opUnits } from '../../ai/major/operations/operation';
 import { engineRowOf } from './import';
 import { gameTypeOf } from '../data/aliases';
 import type { Catalog, TurnRecord } from './record';
 
 /** the families measured: the operations the port starts, then all */
-const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'all'] as const;
+const FAMILIES = ['Settle New City', 'Naval Superiority', 'Attack Barb Camp', 'Attack Enemy City', 'Attack Walled City', 'all'] as const;
 const TRACE = (process.env.REPLAY_TRACE ?? '').split(',').includes('operations');
 
 /** a line's operation name */
@@ -56,6 +56,54 @@ function kindOf(line: string): string {
 const KINDS = ['started', 'running', 'team', 'recruit', 'move', 'changeTarget', 'attack', 'protect', 'complete', 'other'] as const;
 
 const norm = (s: string): string => s.replace(/\s+$/, '');
+
+/** the players each major prepares for war with from a turn on: two turns
+ *  after its AI_Diplomacy.csv first shows a war declaration toward the
+ *  player with a positive desire (the diplomatic AI's pick of a declaration
+ *  not ready calls PrepareForWarWith, 0x6742d0; a fit: the soonest first
+ *  candidate against a player follows the first desire by two turns, 1117
+ *  t18 -> t20 and t32 -> t34, 1121 t29 -> t31)
+ *  — by `${player}`, [turn, target] in turn order */
+function readPrepares(path: string): Map<number, [number, number][]> {
+  const out = new Map<number, [number, number][]>();
+  if (!existsSync(path)) return out;
+  let cols: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of readFileSync(path, 'utf8').split('\n')) {
+    const f = raw.replace(/\r$/, '').split(',').map((x) => x.trim());
+    if (f[0] === 'Game Turn') {
+      cols = f;
+      continue;
+    }
+    const action = f[2] ?? '';
+    if (!/^DIPLOACTION_DECLARE_.*WAR/.test(action)) continue;
+    const turn = Number(f[0]);
+    const player = Number(f[1]);
+    for (let i = 3; i < f.length && i < cols.length; i++) {
+      const v = f[i];
+      if (!v.includes(':') || !(Number(v.split(':')[0]) > 0)) continue;
+      const target = Number(cols[i]);
+      const k = `${player}:${target}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      (out.get(player) ?? out.set(player, []).get(player)!).push([turn + 2, target]);
+    }
+  }
+  return out;
+}
+
+/** the "CITY VALUES" lines by `${turn}:${player}`: [city name, value] */
+function readCityValues(path: string): Map<string, [string, number][]> {
+  const out = new Map<string, [string, number][]>();
+  if (!existsSync(path)) return out;
+  for (const raw of readFileSync(path, 'utf8').split('\n')) {
+    const m = /^(\d+), (\d+), -1, CITY VALUES, ([-\d.]+), (\S+)/.exec(raw.replace(/\r$/, ''));
+    if (!m) continue;
+    const k = `${m[1]}:${m[2]}`;
+    (out.get(k) ?? out.set(k, []).get(k)!).push([m[4].replace(/^LOC_CITY_NAME_/, ''), Number(m[3])]);
+  }
+  return out;
+}
 
 /** a csv's lines by `${turn}:${player}`, each without its turn and player */
 function readLog(path: string, keep: (rest: string) => boolean): Map<string, string[]> {
@@ -89,19 +137,29 @@ export interface OperationsTally {
   families: Record<string, FamilyTally>;
   /** the candidate lines against no enemy: turns, turns all equal, the
    *  log's lines and ours, the log's lines against an enemy (not run) */
-  evals: { turns: number; turnsEqual: number; log: number; ours: number; logEnemy: number; firstMiss?: string; misses: string[] };
+  evals: EvalTally;
+  /** the candidate lines against an enemy (the war candidates) */
+  warEvals: EvalTally;
+  /** the CITY VALUES lines: the log's, ours, equal within 0.1, ours equal
+   *  the log's of the turn before */
+  cityValues: { log: number; ours: number; equal: number; equalBefore: number; firstMiss?: string; misses: string[] };
 }
+
+interface EvalTally { turns: number; turnsEqual: number; log: number; ours: number; logEnemy: number; firstMiss?: string; misses: string[] }
 
 const newFamily = (): FamilyTally => ({ turns: 0, turnsEqual: 0, kinds: Object.fromEntries(KINDS.map((k) => [k, { log: 0, ours: 0, turnsEqual: 0, turns: 0 }])),
   plots: 0, plotsEqual: 0, misses: [] });
+const newEvals = (): EvalTally => ({ turns: 0, turnsEqual: 0, log: 0, ours: 0, logEnemy: 0, misses: [] });
 const newTally = (): OperationsTally => ({ families: Object.fromEntries(FAMILIES.map((f) => [f, newFamily()])),
-  evals: { turns: 0, turnsEqual: 0, log: 0, ours: 0, logEnemy: 0, misses: [] } });
+  evals: newEvals(), warEvals: newEvals(), cityValues: { log: 0, ours: 0, equal: 0, equalBefore: 0, misses: [] } });
 
 const inFamily = (family: string, line: string): boolean => family === 'all' || opName(line) === family;
 
 export class OperationsProbe {
   private readonly log: Map<string, string[]>;
   private readonly evalLog: Map<string, string[]>;
+  private readonly cityValueLog: Map<string, [string, number][]>;
+  private readonly prepares: Map<number, [number, number][]>;
   private readonly ais = new Map<number, OpsAi>();
   /** the record unit keys of the last record state's engine units, by seat */
   private keys = new Map<number, string>();
@@ -115,6 +173,8 @@ export class OperationsProbe {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = readLog(`${logs}AI_Operation.csv`, () => true);
     this.evalLog = readLog(`${logs}AI_Operation_Eval.csv`, (r) => !/^-?\d+, (CITY VALUES|MINOR CIV LEVY),/.test(r));
+    this.cityValueLog = readCityValues(`${logs}AI_Operation_Eval.csv`);
+    this.prepares = readPrepares(`${logs}AI_Diplomacy.csv`);
   }
 
   get active(): boolean {
@@ -169,6 +229,11 @@ export class OperationsProbe {
       if (!seatOf(copy, seat)) continue;
       let ai = this.ais.get(seat);
       if (!ai) this.ais.set(seat, (ai = newOpsAi(seat)));
+      // the diplomatic AI's preparations for war, from its log
+      for (const [from, target] of this.prepares.get(player) ?? []) {
+        const s = this.seatOfPlayer.get(target);
+        if (from <= turn && s !== undefined) prepareForWarWith(ai, s, true);
+      }
       let view = majorView(copy, this.inputs(turn));
       const out = operationsTurn(ai, {
         turn,
@@ -193,7 +258,13 @@ export class OperationsProbe {
         console.error(`   ops ${opsOf(ai).map((o) => `${o.def.name}#${o.id}[${o.teams.map((t) => t.members.join(',')).join('|')}]`).join(' ')}`);
       }
       this.compare(turn, player, ours);
-      this.compareEvals(turn, player, out.evals);
+      // the eval lines name the enemy by the game's player id
+      const playerOf = new Map([...this.seatOfPlayer].map(([p, s]) => [s, p]));
+      const evals = out.evals.map((l) => l.replace(/^(-?\d+), /, (_m, s: string) => `${Number(s) < 0 ? s : playerOf.get(Number(s)) ?? s}, `));
+      this.compareEvals(this.tally.evals, turn, player, evals, true);
+      this.compareEvals(this.tally.warEvals, turn, player, evals, false);
+      const names = new Map(rec.cities.map((c) => [c.y * rec.head.W + c.x, c.name.replace(/^LOC_CITY_NAME_/, '')]));
+      this.compareCityValues(turn, player, out.cityValues.map(({ plot, value }) => [names.get(plot) ?? '?', value]));
       for (const op of opsOf(ai)) {
         for (const id of opUnits(op)) {
           const u = view.units(seat).find((x) => x.id === id);
@@ -238,10 +309,33 @@ export class OperationsProbe {
     }
   }
 
-  private compareEvals(turn: number, player: number, ours: string[]): void {
-    const e = this.tally.evals;
+  /** the CITY VALUES lines of the turn by city name, against the log's of the
+   *  turn and of the turn before */
+  private compareCityValues(turn: number, player: number, ours: [string, number][]): void {
+    const t = this.tally.cityValues;
+    const logs = this.cityValueLog.get(`${turn}:${player}`) ?? [];
+    const before = new Map(this.cityValueLog.get(`${turn - 1}:${player}`) ?? []);
+    t.log += logs.length;
+    t.ours += ours.length;
+    const mine = new Map(ours);
+    for (const [name, value] of logs) {
+      const v = mine.get(name);
+      if (v !== undefined && Math.abs(v / 256 - value) < 0.1) t.equal++;
+      else if (t.misses.length < 40) {
+        const m = `t${turn} p${player} ${name}: log ${value.toFixed(1)} ours ${v === undefined ? '-' : (v / 256).toFixed(1)}`;
+        t.firstMiss ??= m;
+        t.misses.push(m);
+      }
+      const b = before.get(name);
+      if (v !== undefined && b !== undefined && Math.abs(v / 256 - b) < 0.1) t.equalBefore++;
+    }
+  }
+
+  private compareEvals(e: EvalTally, turn: number, player: number, mine: string[], noEnemy: boolean): void {
     const all = this.evalLog.get(`${turn}:${player}`) ?? [];
-    const logs = all.filter((l) => l.startsWith('-1,'));
+    const pick = (l: string) => l.startsWith('-1,') === noEnemy;
+    const logs = all.filter(pick);
+    const ours = mine.filter(pick);
     e.logEnemy += all.length - logs.length;
     if (!logs.length && !ours.length) return;
     e.turns++;
@@ -275,7 +369,11 @@ export class OperationsProbe {
 export function operationsMarkdown(t: OperationsTally): string[] {
   const out = ['', "## The majors' AI: operations (ai/major/operations)", ''];
   const e = t.evals;
-  out.push(`Candidates against no enemy (AI_Operation_Eval.csv, enemy -1): turns ${e.turns}, every line equal ${e.turnsEqual}; lines log ${e.log}, ours ${e.ours}; the log's lines against an enemy (not run) ${e.logEnemy}; first miss: ${e.firstMiss ?? '-'}.`);
+  out.push(`Candidates against no enemy (AI_Operation_Eval.csv, enemy -1): turns ${e.turns}, every line equal ${e.turnsEqual}; lines log ${e.log}, ours ${e.ours}; first miss: ${e.firstMiss ?? '-'}.`);
+  const w = t.warEvals;
+  out.push('', `Candidates against an enemy (the war candidates): turns ${w.turns}, every line equal ${w.turnsEqual}; lines log ${w.log}, ours ${w.ours}; first miss: ${w.firstMiss ?? '-'}.`);
+  const cv = t.cityValues;
+  out.push('', `CITY VALUES lines: log ${cv.log}, ours ${cv.ours}; equal (within 0.1) ${cv.equal}; ours equal to the log's of the turn before ${cv.equalBefore}; first miss: ${cv.firstMiss ?? '-'}.`);
   for (const family of FAMILIES) {
     const f = t.families[family];
     out.push('', `### ${family === 'all' ? 'Every operation' : `"${family}"`}`, '',
@@ -288,5 +386,7 @@ export function operationsMarkdown(t: OperationsTally): string[] {
     if (family !== 'all') out.push('', 'Misses:', '', ...f.misses.map((m) => `- ${m}`));
   }
   out.push('', 'Candidate misses:', '', ...e.misses.map((m) => `- ${m}`));
+  out.push('', 'War candidate misses:', '', ...t.warEvals.misses.map((m) => `- ${m}`));
+  out.push('', 'CITY VALUES misses:', '', ...t.cityValues.misses.map((m) => `- ${m}`));
   return out;
 }

@@ -726,10 +726,21 @@
   final: 0x1ed940
   kind: function
   status: PARTLY
-  readings: ["C-93: the climate step after the events — CLOSED"]
+  readings:
+    - "C-93: the climate step after the events — CLOSED"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...335040, the weights and \"Random Event Roll\" — and only then the climate component's turn (0x2d1f20's component, the one the district repair's FLOODED / CONTAMINATED reasons read). The engi..."
+  review: imported
+- addr: 0x2d2090
+  final: 0x1edda0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - ...cityTrade, 0x78e010); MustHaveNukes (definition +0x7a) asks the nuke check 0x2d1f20 / 0x2d2090; the value the city value (0x79fef0, its fifth argument MustHaveNukes, its sixth 1); th...
   review: imported
 - addr: 0x2d2100
   final: 0x1ede20
@@ -914,13 +925,17 @@
 - addr: 0x484a10
   final: 0x307950
   kind: function
+  name: player valid and a full civ
   status: PARTLY
   impl: [cpu/core/barbarians.ts:next]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...p, To Range 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTL...
-  review: imported
+  review: reviewed
 - addr: 0x484ab0
   final: 0x3079b0
   kind: function
@@ -1008,6 +1023,7 @@
     - recording: 1106
       turn: 243
       value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
+  impl: [cpu/harness/import.ts:newlyRevealed]
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
   context:
@@ -1107,6 +1123,7 @@
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "- The damage law (0x519090; struct 0x519370): damage = trunc((24 + r) x expf(x) + 0.5), clamped [1, 100], x = (k x D) >> 8 in 1/256..."
     - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's hit points (hash 0x5e97d629) and..."
@@ -2052,6 +2069,7 @@
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...b0); a region holds a site where one scores above   0. The best region top other than a given plot (0x6fe2b0) is the \"Settle   New City\" operation's target (the target list 0x747230, TARGET_SETTLE_   LOCATION..."
   context:
@@ -2136,6 +2154,7 @@
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the..."
   context:
@@ -2149,7 +2168,9 @@
     - recording: 1124
       turn: 1
       value: 1124's   running-line orders t1-t74 all read so (t26 Settle and Attack Enemy City   end, t27's Settle takes the city assault's slot 2 and the new assault   slot 0).
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   context:
     - "- The pool (+0x2e0, 0x71e370): an operation takes the slot freed last, else a new one; the manager and the trees wal..."
   review: imported
@@ -2163,6 +2184,7 @@
     - "H-1: draws the AI takes, draws the engines lack"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -2198,17 +2220,23 @@
 - addr: 0x724dd0
   final: 0x4d0610
   kind: function
+  name: a target an active operation holds
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  impl: [ai/major/operations/evaluate.ts:EvalInputs, ai/major/operations/evaluate.ts:enemyCities]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...my's known cities (TargetParameter 0: 0x5eb600 at most +0x58), not another operation's (0x724dd0), reached from a city of the player (its build AI's +0x870 set), value the city value 0..."
-  review: imported
+  review: reviewed
 - addr: 0x726470
   final: 0x4d18d0
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...he strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
@@ -2219,7 +2247,9 @@
   name: AI_EVENT_DESIRE_SETTLE
   status: PARTLY
   impl: [ai/major/operations/manager.ts:operationsTurn]
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's flag any, el..."
@@ -2248,7 +2278,9 @@
   final: 0x4e73f0
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at +0x328), built and evaluated before the turn's triggers: one per running operation (0x747f30 + 0x747fa0: its definition and enemy, its target as the fixed rally +0x40, its teams' s..."
@@ -2257,7 +2289,9 @@
   final: 0x4e7450
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "..., built and evaluated before the turn's triggers: one per running operation (0x747f30 + 0x747fa0: its definition and enemy, its target as the fixed rally +0x40, its teams' strength +0x..."
@@ -2356,6 +2390,15 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...18bd) whose planning of two turns holds a plot at range 1 (0x791300) is queued with it (0x7803d0, \"Coastal Raid\"); the queue carried out (0x7735d0): each queued unit that can act moves..."
+  review: imported
+- addr: 0x78e010
+  final: 0x519960
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - ...er's cities must list it in its trade AI's city list (CityBuildAI +0x870 m_cityTrade, 0x78e010); MustHaveNukes (definition +0x7a) asks the nuke check 0x2d1f20 / 0x2d2090; the value t...
   review: imported
 - addr: 0x78fa10
   final: 0x51ae50
@@ -2625,14 +2668,16 @@
 - addr: 0x7db850
   final: 0x547380
   kind: function
+  name: behaviour tree node names
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...RS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th id stored the k-th name, @d5b198 one unnamed): Operation Move update..."
-  review: imported
+  review: reviewed
 - addr: 0x7e7200
   final: 0x54f6b0
   kind: function
@@ -2651,6 +2696,18 @@
   impl: [cpu/core/aiCityTrees.ts:buildImprovement]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
+- addr: 0x7e9120
+  final: 0x551580
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Diplomacy.csv
+      value: the war declarations' desire functors (the   replay feeds PrepareForWarWith from AI_Diplomacy.csv);
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - ...executions of Siege City (0x811e80), Pillage (0x811390), Build Military Improvement (0x7e9120), Air Assault (0x80fb50), Attack City (district targets in the assignment); the war dec...
+  review: imported
 - addr: 0x7e9670
   final: 0x551a80
   kind: function
@@ -2662,6 +2719,18 @@
   context:
     - ...4980; Protect Unit 0x7f07c0; Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670; Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
   review: imported
+- addr: 0x7e9b10
+  kind: function
+  name: Build Military Improvement (update)
+  status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:ASSAULT_NODES
+    - ai/major/operations/assault.ts:buildMilitaryImprovement
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...e, ERROR with no enemy, SUCCESS with units, else FAILURE. BUILD MILITARY IMPROVEMENT (0x7e9b10) — ERROR with neither Defensive Improvement nor a Specific Improvement; else it picks a..."
+  review: reviewed
 - addr: 0x7eb0f0
   kind: function
   status: PARTLY
@@ -2679,6 +2748,21 @@
   context:
     - ...ING keeps the resume), Concurrent 0x7eb0f0 (Max Failures, Exit on Success; its update 0x7eb210 clears failures and the last good child), Not 0x7f15f0, pass-through 0x7f15a0, Turn Lim...
   review: imported
+- addr: 0x7edde0
+  final: 0x555ee0
+  kind: function
+  name: Is At War (decision)
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 20
+      value: "China never at war with Caguana: the march's Priority falls to the Declare War contract"
+  impl: [ai/major/operations/assault.ts:ASSAULT_NODES, ai/major/operations/assault.ts:isAtWar]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "- THE NODES: IS AT WAR (0x7edde0) — at war with at least Minimum Number (1 absent) players, the barbarians only with Inc..."
+  review: reviewed
 - addr: 0x7f1500
   kind: function
   status: PARTLY
@@ -2880,7 +2964,9 @@
   kind: function
   name: AI_EVENT_DESIRE_SETTLE
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- AI_EVENT_DESIRE_SETTLE (0x800c60 -> 0x7265b0): the candidate of the named definition with no operation (with the call's..."
@@ -2918,6 +3004,20 @@
   context:
     - "...CESS — the team flag +0x90 with no units FAILURE, unread); Naval Patrol / Naval Pillage 0x803880 (RUNNING with units, else FAILURE); Operation Defend Units' update 0x80ee70 (SUCCESS; m..."
   review: imported
+- addr: 0x80b830
+  final: 0x56c0e0
+  kind: function
+  name: "Attack Units' targets: all"
+  status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - ai/major/operations/assault.ts:pickTargets
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...in 3 + its reach (+0x18: GetRange, a district's 0x249e40) of the target slot; else all (0x80b830). Logged \"Op Attack Units Targets, Target %d, Owner %d, %s, %d:%d\" (NULL TARGET for non..."
+  review: reviewed
 - addr: 0x80b9b0
   final: 0x56ba10
   kind: function
@@ -2931,6 +3031,7 @@
   impl: [cpu/core/tactical.ts:opNearbyTargets]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...of another player or as a DEFENDER (+0x1c0 == 4); the targets: the list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's..."
@@ -2938,13 +3039,18 @@
 - addr: 0x80bb50
   final: 0x56bda0
   kind: function
+  name: "Attack Units' targets: near the target"
   status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - ai/major/operations/assault.ts:pickTargets
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...ry barbarian node asks Attack Nearby Units, so the march's 0x80be90 and the near-target 0x80bb50 never run. The assignment 0x776140 with its fifth argument (the exchange filter) where...
-  review: imported
+  review: reviewed
 - addr: 0x80bd20
   final: 0x56bf70
   kind: function
@@ -2955,23 +3061,32 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:opNearbyTargets, gpu/core/sim_tactics.py:_barb_op_attack]
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - ai/major/operations/assault.ts:pickTargets
+    - cpu/core/tactical.ts:opNearbyTargets
+    - gpu/core/sim_tactics.py:_barb_op_attack
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...ts: the list's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or the operation's enemy — a civi..."
   review: reviewed
 - addr: 0x80be90
   final: 0x56bbb0
   kind: function
+  name: "Attack Units' targets: along the march"
   status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - ai/major/operations/assault.ts:pickTargets
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...ent left) of a member); every barbarian node asks Attack Nearby Units, so the march's 0x80be90 and the near-target 0x80bb50 never run. The assignment 0x776140 with its fifth argument...
-  review: imported
+  review: reviewed
 - addr: 0x80c080
   final: 0x56c260
   kind: function
@@ -2982,12 +3097,26 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:opNearbyTargets, gpu/core/sim_tactics.py:_barb_op_attack]
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - cpu/core/tactical.ts:opNearbyTargets
+    - gpu/core/sim_tactics.py:_barb_op_attack
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...st's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or the operation's enemy — a civilian of anyo..."
+  review: reviewed
+- addr: 0x80f280
+  final: 0x56f320
+  kind: function
+  name: "Attack City's targets: districts within 3"
+  status: PARTLY
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...members alive with Movement left; the COMBAT_DISTRICT targets within 3 of the target (0x80f280); the assignment (bytes 0, 1) logged \"Operation City Attack\" and carried out."
   review: reviewed
 - addr: 0x814840
   final: 0x574440
@@ -3447,6 +3576,29 @@
   readings: ["C-20: the Trader's path and range"]
   context:
     - ".../ 31). The sweep's GetTradeRoutePath paths (read from the trade manager's path cache, 0x9af6c0, which answers pairs CanStartTradeRoute refuses: 10 of the 54 recorded) carry 44 pure-l..."
+  review: imported
+- addr: 0x9bbaa0
+  final: 0x6c6100
+  kind: function
+  name: PrepareForWarWith
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 18
+      value: "The log shows it: every war candidate's first eval line comes   the turn after the first positive war-declaration desire toward that   player in AI_Diplomacy.csv, or later (1117 China -> 3: desire t18"
+    - recording: 1127
+      turn: 48
+      value: "1127 -> 3: t48, t49;"
+    - recording: 1117
+      turn: 20
+      value: eleven pairs over the five verbose duels), and   it stays (1117 China's candidates against Caguana t20 ..
+    - recording: 1117
+      turn: 18
+      value: The replay sets it two   turns after the first desire, a LAB fit (1117 t18 -> t20, t32 -> t34;
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...a560 / 0x3de4e0): the \"ALLY\" ones. PrepareForWarWith (0x724f30; Lua PrepareForWarWith 0x9bbaa0) is set by the war declarations' not-ready hook (DiplomaticActions slot +0x68 = 0x6742d..."
   review: imported
 - addr: 0x9c0c80
   final: 0x6cb250

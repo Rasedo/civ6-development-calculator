@@ -141,6 +141,8 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0..."

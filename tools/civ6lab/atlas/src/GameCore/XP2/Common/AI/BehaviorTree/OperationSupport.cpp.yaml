@@ -12,6 +12,20 @@
   context:
     - ...0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
   review: imported
+- addr: 0x8163f0
+  final: 0x5760d0
+  kind: function
+  name: Operation Diplomacy (execution)
+  status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:ASSAULT_NODES
+    - ai/major/operations/assault.ts:operationDiplomacy
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...es Denouncement SUCCESS, Desires War RUNNING until at war; else SUCCESS. Its execution (0x8163f0): an AI owner; DENOUNCE (@f2e584) where it desires denouncement and has neither denounc..."
+  review: reviewed
 - addr: 0x816cb0
   kind: function
   name: opMoveExec
@@ -54,6 +68,20 @@
   context:
     - "- Leaves READ: Decode Trigger 0x7f2970; Operation Change Target 0x8196d0 (INVALID -> the backup of the same kind, else \"No backup\" FAILURE; Always Swap; Fail..."
   review: imported
+- addr: 0x819db0
+  final: 0x579bf0
+  kind: function
+  name: Operation Diplomacy (update)
+  status: PARTLY
+  impl:
+    - ai/major/operations/assault.ts:ASSAULT_NODES
+    - ai/major/operations/assault.ts:operationDiplomacy
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...nts left (0x5e97d629's most less its damage): SUCCESS at or above. OPERATION DIPLOMACY (0x819db0) — ERROR without any of its four flags or with no enemy; Had Denounced and not denounce..."
+  review: reviewed
 - addr: 0x81a090
   final: 0x579e90
   kind: function

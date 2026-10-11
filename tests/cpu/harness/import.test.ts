@@ -245,8 +245,8 @@ describe('the history', () => {
 
   it('raises the best melee on no unit first seen embarked', () => {
     const h = newHistory();
-    advanceHistory(h, record(1), CAT);
-    advanceHistory(h, record(2, { units: [...record(1).units, { ...unit(0, 9, 1, 2, 2), embarked: true }] }), CAT);
+    advanceHistory(h, record(1, { units: [] }), CAT);
+    advanceHistory(h, record(2,{ units: [{ ...unit(0, 9, 1, 2, 2), embarked: true }] }), CAT);
     expect(h.bestMelee.get(0) ?? 0).toBe(0);
   });
 });

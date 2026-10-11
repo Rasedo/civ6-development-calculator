@@ -171,6 +171,8 @@
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/mu1/readings_c96.md: ...r plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else   NEUTRAL_CITY — each where the player..."
@@ -180,15 +182,18 @@
   review: imported
 - addr: 0x3da8e0
   kind: function
-  status: PARTLY
+  name: has denounced
+  status: READ
   cases:
     - recording: h1_duelv1127
       value: "The desires' +20 (+10 Open Borders, -10 Demand   Tribute) at the focus agrees with \"the other's opinion of the owner at the   previous turn above 0\" on 172 / 185 (Qin) and 26 / 28 (Rome) rows of   h1_"
+  impl: [ai/major/view.ts:MajorView, cpu/core/majorView.ts:denounced]
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - ...0x2a81f0 against GlobalParameters +0x268 through the speed; one at war, or turned away (0x3da8e0), is passed over; else p's AI's value of the owner (p's +0x1280 vt+0x18) above the best...
-  review: imported
+  review: reviewed
 - addr: 0x3daaf0
   final: 0x2a6be0
   kind: function
@@ -217,6 +222,17 @@
     - ...with no civic chosen is held at +0xb40 until one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refre...
     - "...2 row (+0x18): +0x28 bit 0 CityState — a city-state in the minor list the player has met (0x3daaf0); bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the playe..."
   review: imported
+- addr: 0x3dab70
+  kind: function
+  name: may enter the player's territory (open borders, alliance)
+  status: PARTLY
+  impl: [cpu/core/majorView.ts:borderClosed]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...sign rebuilt), the first plot P may enter — its own, no one's, open borders / alliance (0x3dab70), or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where the walk..."
+  review: reviewed
 - addr: 0x3dcec0
   final: 0x2a86c0
   kind: function
@@ -224,6 +240,7 @@
   readings:
     - "H-1: the city-states' quests — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...49cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then the logic's own test; weight 1 each; one draw \"Selecting a random new quest\" ove..."
@@ -267,7 +284,10 @@
   final: 0x2a9b50
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...acy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency, +0x18, on...

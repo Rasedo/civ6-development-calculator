@@ -874,7 +874,7 @@ const PLAN_TURNS = 2;
  *  attacks into strikes it (the barbarians'; not a city-state's or the Free
  *  Cities' wander or chase), the units left, each one's planning reach, and
  *  those done (`0x570b40`). */
-interface Pass {
+export interface Pass {
   seat: number;
   strike: boolean;
   units: Unit[];
@@ -1231,7 +1231,7 @@ interface AssignSpot { tile: number; claims: Claim[]; holder: number; holderTarg
 interface AssignTarget { target: Target; unit: Unit; health: number; damage: number; units: number[]; barb: boolean }
 /** one unit's assignment (0x38 entries): its spot, the plot it strikes (-1
  *  where the blow falls on a later turn), where it stands, its damage */
-interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean }
+export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean }
 
 /**
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
@@ -1250,15 +1250,11 @@ interface Assigned { unit: Unit; move: number; attack: number; from: number; dam
  *  - each assigned unit's move: its spot, and the target's plot as the
  *    attack where its claim's blow falls this turn, sorted (0x7704e0).
  */
-function assignAttacks(state: GameState, pass: Pass, units: Unit[], targets: Target[], high: boolean): Assigned[] {
-  return assignTo(state, pass, units, targets, !high, !high);
-}
-
 /** the assignment with its two filters: `exchange` drops a spot where the
  *  damage the unit takes passes the damage it deals, `survive` one where it
  *  would die (0x776140's fifth and sixth arguments); a HIGH target drops
  *  neither */
-function assignTo(state: GameState, pass: Pass, units: Unit[], targets: Target[], exchange: boolean, survive: boolean): Assigned[] {
+export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: Target[], exchange: boolean, survive: boolean): Assigned[] {
   const tg: AssignTarget[] = [];
   for (const t of targets) {
     const v = targetUnit(state, t)!;
@@ -1450,7 +1446,7 @@ function carryOut(state: GameState, pass: Pass, out: Assigned[], move = 'Attack 
  * ATTACK HIGH / MEDIUM / LOW PRIORITY (0x7784b0 with the target type; LOW
  * takes the RELIGIOUS targets too): each target of the type in the list's
  * order, its unit still on the map, the units that can strike its plot
- * (`strikers`) assigned (`assignAttacks`) over the targets of its type
+ * (`strikers`) assigned (`assignTo`) over the targets of its type
  * within 5 of it, and the assignment carried out (`carryOut`).
  */
 function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
@@ -1462,7 +1458,7 @@ function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
     if (!units.length) continue;
     const near = pass.targets.filter((t) => t.type === e.type && targetUnit(state, t)
       && plotDistance(state, t.unit!.tileIndex, v.tileIndex) <= ATTACK_TARGETS_RANGE);
-    carryOut(state, pass, assignAttacks(state, pass, units, near, type === 'HIGH'));
+    carryOut(state, pass, assignTo(state, pass, units, near, type !== 'HIGH', type !== 'HIGH'));
   }
 }
 
@@ -1989,7 +1985,7 @@ function freeHome(state: GameState, u: Unit): number {
 
 /** a player's tactical pass as it opens: its units in pool order, their AI
  *  types, their planning reach, its tactical target list (what it sees) */
-function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number): Pass {
+export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number): Pass {
   const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
   for (const u of units) ai.set(u.id, aiOf(u));

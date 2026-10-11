@@ -13,7 +13,7 @@ import { isFloodplains } from '../../world/features';
 import { ITERU_RIVER_PROD_MULT, EPIC_QUEST_LEVY_DISCOUNT_PCT, CLEOPATRA_TRADE_QP_MULT, HARDRADA_NAVAL_MELEE_PROD_MULT, ENKIDU_COMMON_FOE_QP, SKIP_FREE_CITY_ROWS, rowIsFor } from '../data/civilizations';
 import { atRngPoint, randWeighted } from './rand';
 import { emergencyEnvoyIncome, seatAccumulators, seatGrowth, commitProduction } from './seatTurn';
-import { spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
+import { cityAtIndex, spawnUnit, unitsAt, unitsHostile, unitIsMilitary, encampmentIntact, stepUnit, unitFullMoves, ownerHasTech, tileFreeForUnit, visibleHostilesAt , navalMelee, crossesRiver, builderHarvest, unitIsNoncombat } from './units';
 import { cityStrikeStrength, cityStrikeDefenderCS, airPillage, airStrike, detonate, nukeTargets, siloReaches, shootable } from './combat';
 import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
@@ -28,7 +28,7 @@ import { IMPROVEMENTS } from '../data/improvements';
 import { isSpaceProject } from '../data/projects';
 import { containmentBonus, sameReligionToken, getModifiers, makeYieldCtx, prodBoostPct, seatYieldMultPerSuzerain, unitUpkeep } from './effects';
 import { allRoadsLeadToRome, addTradeRoute, addCsTradeRoute, addIntlTradeRoute, cancelRoutesBetween, congressCancelBannedIntl, tradeRouteExpiry, tradeRouteWalk } from './trade';
-import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
+import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, envoysOf, hasMet, isSuzerain, minorCity, resolveSuzerains, sueForPeaceWithCityState, suzerainBuildingLoyalty, suzerainProjectMult, suzerainWonderPct, meetCityState } from './cityStates';
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, freeCityResearch, minorBestOfClass, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
@@ -507,6 +507,27 @@ export function pressureTerm(own: number, foreign: number): number {
  *  cities against every other seat's and the Free Cities' (the term
  *  `loyaltyDelta` takes for a city, no city of its own needed on the plot) */
 export function plotPressure(state: GameState, seat: number, here: Tile): number {
+  const { own, foreign } = pressureSides(state, seat, here);
+  return pressureTerm(own, foreign);
+}
+
+/** The seat's citizens' pressure on a plot less every other side's (the raw
+ *  own - foreign 0x1a1ae0 returns under its byte argument), the city on the
+ *  plot counted the seat's as if it held it, in pressure units */
+export function plotPressureLead(state: GameState, seat: number, here: Tile): number {
+  let { own, foreign } = pressureSides(state, seat, here);
+  const held = cityAtIndex(state, here.index);
+  const cs = held ? undefined : state.cityStates.find((c) => c.centerIndex === here.index);
+  const city = held ? held.city : cs ? minorCity(cs) : null;
+  if (city) {
+    const sub = citizenPressure(state, here, [city]);
+    own += sub;
+    if (held && held.holder.seat !== seat && (isFreeSeat(held.holder.seat) || !alliedAtLevel(state, seat, held.holder.seat, ALLIANCE_CULTURAL, 1))) foreign -= sub;
+  }
+  return own - foreign;
+}
+
+function pressureSides(state: GameState, seat: number, here: Tile): { own: number; foreign: number } {
   let own = 0;
   let foreign = 0;
   for (const s of state.seats) {
@@ -519,7 +540,7 @@ export function plotPressure(state: GameState, seat: number, here: Tile): number
   // CIV6: a Free City's citizens press on their neighbours like any other
   // city's. The Free Cities player has no age, so they press at the base.
   if (state.freeSeat) foreign += citizenPressure(state, here, state.freeSeat.cities);
-  return pressureTerm(own, foreign);
+  return { own, foreign };
 }
 
 export function loyaltyDelta(state: GameState, city: City, amenityTierName: string): number {

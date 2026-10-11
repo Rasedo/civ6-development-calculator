@@ -5724,7 +5724,7 @@ DebugGameplay.sqlite).
   Operation Siege City, Operation Attack City, Operation Air Assault, Build
   Military Improvement), City Defense's (Is City Threatened, Garrison City).
 
-## C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread
+## C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread
 
 Ported in `ai/major/operations/` (manager.ts, evaluate.ts, recruit.ts,
 operation.ts); measured by the replay's OperationsProbe against
@@ -5735,8 +5735,9 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   per running operation (0x747f30 + 0x747fa0: its definition and enemy, its
   target as the fixed rally +0x40, its teams' strength +0x4b0 as ours
   +0x48, its id +0x4c); then per other player — a WAR definition where at
-  war (0x469cd0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread),
-  an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed
+  war (0x469cd0 = diplomacy 0x3dcec0) or flagged (+0xc58 m_prepareForWarWith,
+  +0xd18; the section "C-97: the war operations"), an ALLY one where allied
+  (0x3da560, 0x3de4e0); then each allowed
   definition with EnemyType NONE (one with ActiveEmergency, +0x18, only
   where the player has that emergency). The allowed list: Leaders
   .OperationList, else Default_List, AllowedOperations by rowid.
@@ -5769,11 +5770,8 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   within 3; FRIENDLY_CITY — the player's own cities (TargetParameter > 0
   needs the city AI's +0x1b8 above -1), value 0, enemy strength 0x5eb2c0 x
   1.5 per 0x5eb600 > 1 and +0x58 > 1 (unread terms); COMBAT_DISTRICT /
-  PASSIVE — the enemy's known cities (TargetParameter 0: 0x5eb600 at most
-  +0x58), not another operation's (0x724dd0), reached from a city of the
-  player (its build AI's +0x870 set), value the city value 0x79fef0 (the
-  "CITY VALUES" lines; unread), enemy strength 0x5eadb0 within 3 where the
-  player's best combat exceeds the enemy's by 30.
+  PASSIVE — the enemy's known cities, valued by the city value 0x79fef0
+  (the section "C-97: the war operations").
 - The pick: a running operation's valid candidate sets its backup
   (0x73e610); of the new ones that start themselves the highest Priority
   (+0x40), then the larger odds (+0x54), where the running operations of
@@ -5798,9 +5796,227 @@ AI_Operation.csv and AI_Operation_Eval.csv (the verbose recordings).
   running Settle operation's backup absent on its start turn); the Attack
   Barb Camp start on t32 at 6:3 with value 50.
 - Unread: the staging list (+0x12b8 +0xb58, the port takes the player's
-  cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with
-  0x7a0ac0), City Defense's start (0x5cced0 "Defense %s"), the knowledge
-  base's camp order (the port reads plot order).
+  cities), the ALLY gate, City Defense's start (0x5cced0 "Defense %s"), the
+  knowledge base's camp order (the port reads plot order).
+
+## C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ
+
+Ported in `ai/major/operations/` (cityValue.ts, evaluate.ts's district
+walk, manager.ts's war candidates, knowledge.ts, assault.ts); measured by
+the replay's OperationsProbe (the war candidates' eval lines, the "CITY
+VALUES" lines, the "Attack Enemy City" / "Attack Walled City" families).
+Evidence: the verbose recordings runs/h1_duelv1117 / 1121 / 1124 / 1127 /
+1128 (AI_Operation.csv, AI_Operation_Eval.csv, AI_Diplomacy.csv,
+AI_Knowledge.csv).
+
+- THE WAR GATE (0x722d70, per player of the game's list +0x4a0 but the
+  seat): at war (0x469cd0), or flagged in the military AI's
+  m_prepareForWarWith (+0xbb0 autovariable, data +0xc08 +0x50 = +0xc58) or
+  +0xd18: each allowed definition whose EnemyType is "WAR" (the +0x178 list,
+  0x80 each) is a candidate against the player; else allied (0x3da560 /
+  0x3de4e0): the "ALLY" ones. PrepareForWarWith (0x724f30; Lua
+  PrepareForWarWith 0x9bbaa0) is set by the war declarations' not-ready hook
+  (DiplomaticActions slot +0x68 = 0x6742d0, from the pick 0x64ba90 through
+  0x6744a0 / 0x674420 where the best action toward a player is not ready):
+  where the players at war or prepared for number at most half the +0xb50
+  list and the player is neither a declared friend nor an ally; 0x650890
+  clears it. The log shows it: every war candidate's first eval line comes
+  the turn after the first positive war-declaration desire toward that
+  player in AI_Diplomacy.csv, or later (1117 China -> 3: desire t18, eval
+  t20; 1127 -> 3: t48, t49; eleven pairs over the five verbose duels), and
+  it stays (1117 China's candidates against Caguana t20 .. t56 with no war
+  declared and the desires negative from t21). The replay sets it two
+  turns after the first desire, a LAB fit (1117 t18 -> t20, t32 -> t34;
+  1121 t29 -> t31; 1127 -> 3 the one pair a turn after).
+- THE DISTRICT WALK (0x747230, COMBAT_DISTRICT / PASSIVE): an enemy needed;
+  each known city of the enemy with a valid plot; TargetParameter 0 skips a
+  city whose districts' defenses and walls (0x5eb600: per district +0x14 > 0
+  and +0x18 > 0) outnumber its districts (+0x58) — walls standing; the
+  running operation's own target and any active operation's (0x724dd0: the
+  manager's +0x318 list, 0x73a840) skipped; one of the player's cities must
+  list it in its trade AI's city list (CityBuildAI +0x870 m_cityTrade,
+  0x78e010); MustHaveNukes (definition +0x7a) asks the nuke check 0x2d1f20 /
+  0x2d2090; the value the city value (0x79fef0, its fifth argument
+  MustHaveNukes, its sixth 1); the enemy strength — where the player's best
+  combat strength passes the enemy's by more than 30 (or no enemy) — the
+  enemy's known units within 3 (0x5eadb0, threshold 0, no districts); above
+  MaxTargetDefense (+0x70, >= 0) the target is skipped. The definition's
+  fields: +0x60 / +0x64 / +0x68 MaxTargetDistInRegion / InArea / InWorld,
+  +0x6c MaxTargetStrength, +0x70 MaxTargetDefense, +0x74 MinOddsOfSuccess,
+  +0x78 SelfStart, +0x79 MustBeAtWar, +0x7a MustHaveNukes, +0x7c
+  MustHaveUnits.
+- THE CITY'S WORTH (0x7a0ac0, the known city K, the player P):
+  PSEUDOYIELD_CITY_POPULATION of floor(pop / 5); CITY_BASE of 1;
+  ORIGINAL_CAPITAL of 1 for an original capital (K +0x14), of 0.5 (the float
+  cut to 24.8) for a capital (+0x15); PSEUDOYIELD_WONDER of 40 per wonder
+  (0x5eb680: buildings flagged +0x158 & 0x40 K holds); the yield values of 7
+  x K's Production, Science and Culture (+0x30; the serializer 0x34460 orders
+  the yield globals Food @f2f974, Production @f2f978, Gold @f2f97c, Science
+  @f2f980, Culture @f2f984); then P's loyalty lead there (0x19d470 with its
+  byte, whole): at or below -LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_
+  MAX_LOYALTY (gp +0x474, 20) the worth is 0, else + 10 a point up to 5,
+  and below -5 another 10 a point per step of 5 back up; then the culture
+  AI's value of each great work K holds (0x623b30 over CultureAi +0x7b8: a
+  table's entry, 0 above 5000 unless P owns K; unread) and each resource K
+  holds (0x7a21e0 at count 1, turn 0, horizon 100, rate 2.0).
+- THE LOYALTY LEAD (0x19d470 with its byte): per player p of the game's
+  list, 0x19cd80 — its own sources at the plot as P would hold a city there,
+  added for P and taken off for every other p: for P alone
+  OWNERSHIP_IDENTITY_PRESSURE_FROM_* (0x1a1050; 0 in Gathering Storm) and
+  IDENTITY_PER_TURN_FROM_FREE_CITIES / _CITY_STATES (gp +0x40c / +0x408)
+  where P is a Free City / city-state (0x469d40 / 0x469de0); for each p
+  CAPITAL_IDENTITY_PRESSURE (0x1a0140; MAXIMUM / MINIMUM 0) and its cities'
+  terms near the plot (0x1a08d0 / 0x1a0ae0 / 0x1a0cc0 over 0x19b5f0 /
+  0x19bbb0 / 0x19b820: governors, great works ...; unread), each only where
+  p's +0x728 is set — then the citizens' own - foreign (0x1a1ae0 with its
+  byte: the plot walk over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, no
+  ratio). The port counts the citizens with the city on the plot on P's
+  side (as P would hold it): 1117 China at Caguana (distance 10, no Chinese
+  pressure) reads the city's 3 citizens; the log sits 10 above (t18, t20,
+  t25: a lead of 4).
+- THE CITY VALUE (0x79fef0): W the worth; with the fifth argument max(W, 0).
+  Else A / B the land strength of P / the owner E (PlayerStats 0x4bd0d0
+  domain 2, +0x2d0; its writer unread — the port counts the land units), C
+  / D their best combat strengths (PlayerStats +0xf0
+  m_iMaxMeleeStrengthTrained through the shared getter 0x4d9320; the
+  replay's import now raises it from the first record's starting units, as
+  0x4580b0 does); the nearest city N of P (the first of the least
+  distance); G the city's defense (0x5eb2c0 with its byte: per district the
+  walls' strongest + 10 where its walls stand (+0x18), else its defense
+  (+0x14); without it the strongest of defense - 10 and walls); H E's known
+  units within 3 of K at least C - 30 strong (0x5eadb0 over the knowledge
+  base's army records) and E's known districts' strikes there (+0x1c, 0
+  without walls: 1117 t18 682.9 holds without Caguana's 3); T = H + D, +
+  min(1, 2 dist(N, K) / (25 at the game speed, 0x5254d0)) x B where B > 2
+  (H + D). With C > 0: less PSEUDOYIELD_CITY_DEFENSES of G / C where G >=
+  C; with the sixth argument and N, per other known city X of E no further
+  from K than N is (the offset coordinates read as axial) and on N's side of
+  K (the dot product above 0), less 2 x CITY_DEFENSES of X's defense (no
+  byte) / C, twice where X is within 5 of K; where C < D + 30: x 0.25 (float
+  @d2f324) where C < D - 15 or B > 3A, less PSEUDOYIELD_CITY_DEFENDING_UNITS
+  of T / C. Plus the knowledge base's war record's +0xc toward E (kb +0x668,
+  0x10 an entry by player id; every AI_Knowledge.csv WAR line logs 0.00);
+  never below 0.
+- THE KNOWN CITY RECORD (0x5efaf0, 0xe0 bytes; AI_Knowledge.csv's CITY
+  lines 0x5ed0b0): +0x8 / +0xc the plot, +0x1c the population, +0x14 /
+  +0x15 original capital / capital, +0x30 the yields, +0x48 the defensible
+  districts (0x20 each, a district with a hit-point pool: GetMaxDamage
+  0x5e97d629 above 0 — +0x14 GetDefenseStrength, +0x18 the same while the
+  outer defense 0x6da56a3d holds, +0x1c the strike 0x249ee0), +0x58 their
+  count, +0xa8 the great works, +0xc0 the resources. 1117 t18 Caguana: "0, 3,
+  100, 43.00, 1, 1, 9, 24, 0" = population 3, one district, max(19 - 10, 0)
+  = 9, yields 24 — the engine's.
+- THE MANAGER'S CITY VALUES (0x7277d0): after the candidates' eval lines,
+  each known city of another player, "%d, %d, -1, CITY VALUES, %3.1f, %s" —
+  the walk's call. A turn's evaluation reads what the turn before logged
+  (1117 China t20 442.9 = t19's; over the five duels the war eval lines
+  match the CITY VALUES of the turn before only on 461, of the same turn
+  only on 37, both on 249): the knowledge base's records refresh after the
+  evaluation — the port evaluates on the records of the turn before and
+  logs the CITY VALUES on the turn's (the city records' 0x5efaf0 and the
+  look 0x7877e0).
+- THE NODES: IS AT WAR (0x7edde0) — at war with at least Minimum Number (1
+  absent) players, the barbarians only with Include Barbarian, only the
+  operation's enemy With Operation Target (ERROR with no operation); Skip
+  For Minors is tested present and read through With Operation Target's
+  value, then SUCCESS against an enemy that is no full civ (0x484a10).
+  CAN ALPHA CITY (0x812cc0) — FAILURE with the target gone (0x73a8e0) or no
+  city there; else the sum over the teams' units with Movement left
+  (0x56c690: +0xdb0 > 0) of the largest predicted damage of their
+  planning's entry for the city (0x793210, +0x64 per spot; 0x791470 runs
+  the combat under the simulation flag) against half the centre's hit
+  points left (0x5e97d629's most less its damage): SUCCESS at or above.
+  OPERATION DIPLOMACY (0x819db0) — ERROR without any of its four flags or
+  with no enemy; Had Denounced and not denounced (0x3da8e0: diplomacy
+  +0x9d0[p] >= 0) SUCCESS; Is At War and not at war FAILURE; with a
+  Contract, Desires Denouncement SUCCESS, Desires War RUNNING until at war;
+  else SUCCESS. Its execution (0x8163f0): an AI owner; DENOUNCE (@f2e584)
+  where it desires denouncement and has neither denounced nor gone to war;
+  with Desires War it sets the operation's AllowUnitConstruction (op
+  +0x5d8) and, not at war, DECLARE_SURPRISE_WAR (@f2e5a8); the action goes
+  to the contract manager (P +0x12d0, 0x60bb50) as a diplomatic contract
+  (+0x368 type 4) at the tree's present value unless the tag holds one.
+  OPERATION ATTACK CITY (0x813250) — SUCCESS with the target gone; FAILURE
+  where the target plot holds no city nor a district whose row's +0xe2 is
+  set; RUNNING while the operation holds units (0x6092c0), else FAILURE.
+  OPERATION AIR ASSAULT (0x813140) — the same district test, SUCCESS.
+  OPERATION PILLAGE (0x8134a0) — ERROR where its three flags are present and
+  false; SUCCESS with the target gone or units held, else FAILURE.
+  OPERATION SIEGE CITY (0x8136a0) — SUCCESS with the target gone, ERROR with
+  no enemy, SUCCESS with units, else FAILURE. BUILD MILITARY IMPROVEMENT
+  (0x7e9b10) — ERROR with neither Defensive Improvement nor a Specific
+  Improvement; else it picks a member with build charges (+0xed0) whose
+  class (+0x160) builds a defensive improvement (+0x108 & 0x40, +0x34 > 0)
+  the player may build (0x35ede0) into its memory (+0x20 the unit, +0x24 the
+  improvement): SUCCESS. The node table: the registration 0x7db850 (names
+  -> id globals @f2eeb0..) and the handler tables filled by 0x7cbca0.
+- THE TEAM UPDATE (0x738f20 from 0x73f7d0, the team +0xe8 + 8 x the goal
+  slot): per member its axial column (x - floor(y / 2)) and row summed; per
+  tactical target (kb +0x370: the unit targets CIVILIAN..HIGH, the
+  districts) within twice its base Movement (0x56d9f0 with -1: Units +0x38,
+  embarked the embarked pool): the team's attack strength (+0x98) once per
+  member that can strike it (0x791300), the damage the target would deal it
+  (0x51a240 / 0x519370 under the danger map 0x716a60), the target into the
+  team's list (+0xb8) and the enemy strength (+0x94); a member the expected
+  damage would kill is endangered (+0xa0). Then slot 3 (+0x100) the centre
+  (the sums' signed quotients, x = q + floor(y / 2)); slot 5 (+0x110) the
+  march point — with the operation's enemy (the second argument) not at war,
+  from the target back toward the rally in single-precision axial steps of
+  one plot (n = the truncated largest of |dq|, |dy|, |dq + dy|; the
+  position rounded by 0x38070: each component roundf'd, where they no
+  longer sum to 0 the one furthest by the sum's sign rebuilt), the first
+  plot P may enter — its own, no one's, open borders / alliance (0x3dab70),
+  or an owner not enforcing its borders (diplomacy +0x6c0) — the rally where
+  the walk reaches it; with no enemy or at war, the target; and with targets
+  slot 4 (+0x108) the battle line, halfway (cut toward 0) between the centre
+  and the targets' average (unsigned quotients of the sums), the team
+  engaged (+0x90). Logged "%d, %s, %d, , Battle line, %d:%d, %d endangered".
+- OPERATION ATTACK UNITS' EXECUTION (0x80ceb0): per team engaged (+0x90) or
+  with strength (+0x58): the members alive with Movement left, in no
+  formation (+0x1fb8 +0x738 = 1), a siege unit (bombard) only where the
+  target is another player's city (or its +0x1c0 is 4); the targets of the
+  tactical target list (kb +0x368, 0x80b9b0) the node's data pick: Attack
+  Nearby Units (0x80bd20 / 0x80c080) — another player's, at war with P or
+  (with an enemy named) the enemy's, of a player other than the enemy only
+  its civilians, within max(2, Movement left) of a member; else Attack
+  Along March (0x80be90) — another player's ahead of the battle line toward
+  the target (the axial dot product of target - line and the target slot -
+  line above 0); else Attack Near Target (0x80bb50) — a player at war's
+  within 3 + its reach (+0x18: GetRange, a district's 0x249e40) of the
+  target slot; else all (0x80b830). Logged "Op Attack Units Targets, Target
+  %d, Owner %d, %s, %d:%d" (NULL TARGET for none). The assignment 0x776140
+  — byte 5 (Allow Unequal Attacks unset and one unit) drops a spot whose
+  received damage tops the dealt, byte 6 (always) one that would kill the
+  unit, neither against a HIGH target — logged "Operation Attack Units, %s,
+  At %d:%d, Move %d:%d, Attack %d:%d" and carried out (0x771f80). The port
+  runs `cpu/core/tactical.ts`'s planUnit and assignAttacks through the view
+  and leaves the moves and blows as the seat's unit action rows in
+  0x771f80's order.
+- OPERATION ATTACK CITY'S EXECUTION (0x8109e0): per team the members alive
+  with Movement left; the COMBAT_DISTRICT targets within 3 of the target
+  (0x80f280); the assignment (bytes 0, 1) logged "Operation City Attack" and
+  carried out.
+- MEASURED (the replay on the five verbose duels, the war candidates fed
+  nothing but the prepare flag): war-candidate eval lines log / ours 1117
+  194 / 231, 1121 9 / 3, 1124 436 / 528, 1127 73 / 148, 1128 101 / 142;
+  the first candidate's turn met in 1117 (t20) and 1121 (t31), its value
+  off (1117 682.9 against 442.9: ours keeps the log's t18 value through
+  the log's t19 drop of 240; 1121 506.3 against 501.3); CITY VALUES within 0.1: 27 /
+  502, 176 / 528, 72 / 799, 72 / 695, 21 / 356, the misses the knowledge
+  base's army memory and the lead's per-city sources. The log's candidates
+  fall silent on turns the desire holds (1117 China -> 3: 46 eval turns
+  over 228 desire turns), unread. The assignment weighs the unit targets
+  only (a district target's health in 0x7704e0 unread).
+- PARTLY READ / unread (AUDIT C-97): the +0xd18 gate flag; the trade AI's
+  city list (CityBuildAI +0x870: the port takes every known city); the land
+  strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0,
+  0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war
+  record +0xc's writer; the team update's danger and attack strengths; the
+  executions of Siege City (0x811e80), Pillage (0x811390), Build Military
+  Improvement (0x7e9120), Air Assault (0x80fb50), Attack City (district
+  targets in the assignment); the war declarations' desire functors (the
+  replay feeds PrepareForWarWith from AI_Diplomacy.csv); Is City Threatened
+  and Garrison City (City Defense's tree, its start 0x5cced0).
 
 ## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
 

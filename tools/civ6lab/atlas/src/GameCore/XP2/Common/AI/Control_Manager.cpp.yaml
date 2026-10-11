@@ -7,7 +7,9 @@
   final: 0x401ba0
   kind: function
   status: PARTLY
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...able slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list..."
@@ -74,6 +76,7 @@
   impl: [cpu/core/aiContracts.ts:submitContract]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The submission 0x60bb50: SUBMITTED, then the player's signal +0x270 runs each city's listener 0x5d6050 in city..."

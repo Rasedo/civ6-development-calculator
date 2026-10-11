@@ -18,7 +18,9 @@
 import { NO_PLOT, type Operation } from './operation';
 import type { AiOpDef } from './types';
 import { bestSettleSite, type SettleRegions } from '../settle';
-import type { MajorView } from '../view';
+import { cityValue } from './cityValue';
+import type { KnownUnit } from './knowledge';
+import type { MajorKnownCityView, MajorView } from '../view';
 
 /** one candidate (the 0x70-byte entries at manager +0x328) */
 export interface Candidate {
@@ -44,14 +46,18 @@ export function fixed(f: number): number {
   return (w << 8) | (Math.trunc(Math.fround(Math.fround(f - w) * 256)) & 0xff);
 }
 
+/** a unit as the army strength reads it */
+export type ArmyUnit = Pick<KnownUnit, 'plot' | 'combat' | 'ranged' | 'damage'>;
+
 /** the strength of a player's units the seat knows within `radius` of a plot
  *  (0x5eadb0 over the knowledge base's army lists 0x5ef760): each unit its
  *  larger of combat and ranged strength, less its damage x
- *  COMBAT_WOUNDED_DAMAGE_MULTIPLIER (10) x -0.01 cut toward 0 */
-export function armyStrength(view: MajorView, seat: number, player: number, plot: number, radius: number): number {
+ *  COMBAT_WOUNDED_DAMAGE_MULTIPLIER (10) x -0.01 cut toward 0; a unit whose
+ *  larger strength is below `minStrength` left out */
+export function armyStrength(view: MajorView, units: readonly ArmyUnit[], plot: number, radius: number, minStrength = -Infinity): number {
   let s = 0;
-  for (const u of view.knownUnits(seat, player)) {
-    if (view.plotDistance(u.plot, plot) > radius) continue;
+  for (const u of units) {
+    if (view.plotDistance(u.plot, plot) > radius || Math.max(u.combat, u.ranged) < minStrength) continue;
     s += Math.max(u.combat, u.ranged) + Math.trunc(Math.fround(u.damage * 10 * Math.fround(-0.01)));
   }
   return s;
@@ -87,8 +93,9 @@ interface Target {
 }
 
 /** the targets of a candidate's definition (0x747230), in the walk's order */
-function targetsOf(view: MajorView, seat: number, c: Candidate, regions: SettleRegions): Target[] {
+function targetsOf(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
   const { def } = c;
+  const { regions } = inputs;
   switch (def.targetType) {
     // the best settle site but the running operation's target, its score's
     // whole part (0x6fe2b0) the value, above 0
@@ -121,15 +128,46 @@ function targetsOf(view: MajorView, seat: number, c: Candidate, regions: SettleR
     case 'TARGET_BARBARIAN_CAMP': {
       const camps = view.barbarianCamps(seat);
       const barb = view.barbarianSeat();
-      return camps.map((p) => ({ plot: p, value: (camps.length * 50) << 8, enemyStr: Math.trunc(6 + armyStrength(view, seat, barb, p, 3)) }));
+      return camps.map((p) => ({ plot: p, value: (camps.length * 50) << 8, enemyStr: Math.trunc(6 + armyStrength(view, inputs.army(barb), p, 3)) }));
     }
     // the seat's cities (TargetParameter 0), valued 0
     case 'TARGET_FRIENDLY_CITY':
       if (def.targetParameter > 0) return [];
       return view.cityPlots(seat).map((p) => ({ plot: p, value: 0, enemyStr: 0 }));
+    case 'TARGET_ENEMY_COMBAT_DISTRICT':
+    case 'TARGET_ENEMY_PASSIVE_DISTRICT':
+      return enemyCities(view, seat, c, inputs);
     default:
       return [];
   }
+}
+
+/** the enemy's cities as targets (0x747230's district branch): each city of
+ *  the enemy the seat knows — with TargetParameter 0 one whose districts'
+ *  defenses and walls (0x5eb600) are no more than its districts, no walls
+ *  standing — but the running operation's target and any running
+ *  operation's (0x724dd0); valued by the city value (0x79fef0); the enemy's
+ *  known units within 3 its strength where the seat's best combat strength
+ *  passes the enemy's by more than 30, else none; above the definition's
+ *  MaxTargetDefense (where it has one) left out */
+function enemyCities(view: MajorView, seat: number, c: Candidate, inputs: EvalInputs): Target[] {
+  const { def } = c;
+  const cities = inputs.known;
+  const outclassed = view.bestCombatStrength(c.enemy) + 30 < view.bestCombatStrength(seat);
+  const out: Target[] = [];
+  for (const k of cities) {
+    if (k.owner !== c.enemy) continue;
+    if (def.targetParameter === 0) {
+      const marks = k.districts.reduce((n, d) => n + (d.defense > 0 ? 1 : 0) + (d.walls > 0 ? 1 : 0), 0);
+      if (marks > k.districts.length) continue;
+    }
+    if (c.op && c.op.target === k.plot) continue;
+    if (inputs.taken.has(k.plot)) continue;
+    const enemyStr = outclassed ? armyStrength(view, inputs.army(c.enemy), k.plot, 3, 0) : 0;
+    if (def.maxTargetDefense >= 0 && enemyStr > def.maxTargetDefense) continue;
+    out.push({ plot: k.plot, value: cityValue(view, seat, k, cities, inputs.army), enemyStr });
+  }
+  return out;
 }
 
 /** a target's distance limit from a rally (0x746920): MaxTargetDistInRegion
@@ -143,8 +181,20 @@ function distLimit(view: MajorView, def: AiOpDef, rally: number, target: number)
 /** the 24.8 product (0x16e7d0) */
 const mul = (a: number, b: number): number => Math.trunc((a * b) / 256);
 
+/** what an evaluation reads beside the view: the settle regions, the
+ *  targets the running operations hold (0x724dd0) and the cities the
+ *  knowledge base held when the evaluation ran */
+export interface EvalInputs {
+  regions: SettleRegions;
+  taken: ReadonlySet<number>;
+  known: readonly MajorKnownCityView[];
+  /** a player's army as the knowledge base holds it (the seat's own: its
+   *  units) */
+  army: (player: number) => readonly ArmyUnit[];
+}
+
 /** evaluate a candidate (0x746920): its target, rally, odds and value */
-export function evaluate(view: MajorView, seat: number, c: Candidate, rallies: readonly number[], regions: SettleRegions): void {
+export function evaluate(view: MajorView, seat: number, c: Candidate, rallies: readonly number[], inputs: EvalInputs): void {
   const { def } = c;
   c.valid = false;
   c.target = NO_PLOT;
@@ -155,7 +205,7 @@ export function evaluate(view: MajorView, seat: number, c: Candidate, rallies: r
   if (def.mustHaveNukes) return;
   const bestOurs = view.bestCombatStrength(seat);
   const bestTheirs = c.enemy >= 0 ? view.bestCombatStrength(c.enemy) : null;
-  for (const t of targetsOf(view, seat, c, regions)) {
+  for (const t of targetsOf(view, seat, c, inputs)) {
     if (c.enemy >= 0 && t.value <= 0) continue;
     const from = c.presetRally !== NO_PLOT ? [c.presetRally] : rallies;
     for (const rally of from) {
@@ -163,7 +213,7 @@ export function evaluate(view: MajorView, seat: number, c: Candidate, rallies: r
       if (d === 0 && def.targetType !== 'TARGET_FRIENDLY_CITY') continue;
       const limit = distLimit(view, def, rally, t.plot);
       if (limit >= 0 && d > limit) continue;
-      const ours = c.presetStrength ?? armyStrength(view, seat, seat, rally, 10);
+      const ours = c.presetStrength ?? armyStrength(view, inputs.army(seat), rally, 10);
       const odds = oddsOf(ours, t.enemyStr, d, bestOurs, bestTheirs);
       if (def.minOddsOfSuccess > 0 && !(odds > def.minOddsOfSuccess)) continue;
       if (c.target !== NO_PLOT && mul(fixed(odds), t.value) < mul(c.value, fixed(c.odds))) continue;

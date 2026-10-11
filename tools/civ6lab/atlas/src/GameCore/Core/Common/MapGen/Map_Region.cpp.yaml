@@ -16,9 +16,13 @@
 - addr: 0x38070
   final: 0x2c360
   kind: function
+  name: cube rounding
   status: PARTLY
-  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+  impl: [ai/major/operations/assault.ts:cubePlot, ai/major/operations/assault.ts:updateTeam]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - ...eeps a pair (offset plots) when the plots its line passes between them (the cube walk 0x38070 of 0x371d0) all lie in one area, once per ordered pair.
-  review: imported
+  review: reviewed

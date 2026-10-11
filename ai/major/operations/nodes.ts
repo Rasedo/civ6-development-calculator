@@ -8,8 +8,9 @@
  */
 import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataFloat, dataInt, dataTag, dataValue,
   type BtHandler, type BtRun } from '../../../cpu/core/behaviorTree';
-import { NO_PLOT, addMember, hasAiType, memberStrength, teamReady, type Operation } from './operation';
+import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnits, targetGone, teamReady, unitsById, xy, type Operation } from './operation';
 import { desiredStrength, recruitOperation } from './recruit';
+import { ASSAULT_NODES, attackUnitsExecute, updateTeam } from './assault';
 import { canFoundAt } from '../settle';
 import type { MajorUnitView, MajorView } from '../view';
 
@@ -28,6 +29,18 @@ export interface Contract {
   op: number;
 }
 
+/** a request an operation's Operation Diplomacy made of the diplomatic AI
+ *  (a diplomatic contract, contract manager +0x368 type 4): the
+ *  DiplomaticActionType against the enemy, at the tree's present value */
+export interface DiplomacyRequest {
+  id: number;
+  action: string;
+  enemy: number;
+  value: number;
+  turn: number;
+  op: number;
+}
+
 export interface OpsContext {
   seat: number;
   turn: number;
@@ -42,16 +55,12 @@ export interface OpsContext {
   others(): readonly Operation[];
   contracts: Map<number, Contract>;
   newContract(unitType: string): Contract;
+  /** the seat's diplomatic requests standing, by id */
+  diplomacy: ReadonlyMap<number, DiplomacyRequest>;
+  requestDiplomacy(action: string, enemy: number, value: number): number;
   log(line: string): void;
 }
 
-const unitsById = (view: MajorView, seat: number): Map<number, MajorUnitView> => new Map(view.units(seat).map((u) => [u.id, u]));
-const xy = (view: MajorView, p: number): string => (p < 0 ? '-9999:-9999' : `${view.plots()[p].x}:${view.plots()[p].y}`);
-
-/** the units the operation holds, every team's, in team then join order */
-export function opUnits(op: Operation): number[] {
-  return op.teams.flatMap((t) => t.members);
-}
 
 /** a unit list held under a tag */
 function tagUnits(run: BtRun, tag: string | undefined): number[] {
@@ -314,6 +323,7 @@ export function refreshStrengths(ctx: OpsContext): void {
     .filter((h) => view.plotDistance(h.plot, op.target) <= 3)
     .reduce((s, h) => s + Math.max(h.melee, h.ranged), 0);
   let total = 0;
+  const targets = view.attackTargets(ctx.seat);
   for (const t of op.teams) {
     t.counts = t.reqs.map((r) => t.members.filter((id) => {
       const u = units.get(id);
@@ -324,6 +334,7 @@ export function refreshStrengths(ctx: OpsContext): void {
       return u ? s + memberStrength(u) : s;
     }, 0);
     t.ready = teamReady(t);
+    updateTeam(view, ctx.seat, op, t, targets);
     total += t.strength;
   }
   op.strength = total;
@@ -527,36 +538,6 @@ function barred(view: MajorView, seat: number, u: MajorUnitView, goal: number, m
 }
 
 
-/** a unit's move order to a plot: the steps of its path, as far as its
- *  Movement carries it this turn (the engine refuses the rest) */
-export function moveTo(ctx: OpsContext, u: MajorUnitView, dest: number): void {
-  if (u.plot === dest || u.movesLeft <= 0) return;
-  const view = ctx.view();
-  const path = view.unitPath(u.id, dest);
-  if (path.length === 0) return;
-  const reach = new Map(view.unitReach(u.id, 1).map((r) => [r.plot, r] as const));
-  const units = view.units(ctx.seat);
-  const col = units.findIndex((x) => x.id === u.id);
-  if (col < 0) return;
-  // a formation's other unit steps with it
-  const pair = ctx.op.formations.find((f) => f.includes(u.id));
-  const mate = pair ? units.findIndex((x) => x.id === (pair[0] === u.id ? pair[1] : pair[0])) : -1;
-  const together = mate >= 0 && units[mate].plot === u.plot;
-  const rows: number[][] = [];
-  let at = u.plot;
-  for (const p of path) {
-    const r = reach.get(p);
-    if (!r || r.turns > 1) break;
-    const row = units.map(() => -1);
-    const a = view.unitActionColumn(`MOVE_${view.stepDirection(at, p)}`);
-    row[col] = a;
-    if (together) row[mate] = a;
-    rows.push(row);
-    at = p;
-  }
-  if (rows.length) ctx.act(rows);
-}
-
 // SETTLE (0x7f0b30 update, 0x7ef530 execution): a unit that founds cities
 // whose planning reaches the target this turn; it founds there
 const settle: BtHandler<OpsContext> = {
@@ -590,24 +571,6 @@ const settle: BtHandler<OpsContext> = {
 };
 
 const success: BtHandler<OpsContext> = { update: () => BT_SUCCESS };
-
-/** the operation's target gone (0x73a8e0): a camp target no camp the seat
- *  knows stands on; a city target no city stands on; never a friendly city
- *  or a settle site; any other kind always */
-function targetGone(view: MajorView, seat: number, op: Operation): boolean {
-  switch (op.def.targetType) {
-    case 'TARGET_BARBARIAN_CAMP':
-      return !view.barbarianCamps(seat).includes(op.target);
-    case 'TARGET_ENEMY_COMBAT_DISTRICT':
-    case 'TARGET_ENEMY_PASSIVE_DISTRICT':
-      return op.target === NO_PLOT || !view.plots()[op.target].city;
-    case 'TARGET_FRIENDLY_CITY':
-    case 'TARGET_SETTLE_LOCATION':
-      return false;
-    default:
-      return true;
-  }
-}
 
 // OPERATION ATTACK (0x80ec10): SUCCESS once the target is gone, RUNNING while
 // the operation holds units, else FAILURE
@@ -686,7 +649,8 @@ export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   'Operation Move': operationMove,
   'Lock Units': lockUnits,
   'Make Formation': makeFormation,
-  'Operation Attack Units': operationAttackUnits,
+  'Operation Attack Units': { ...operationAttackUnits, execute: attackUnitsExecute },
+  ...ASSAULT_NODES,
   'Operation Attack': operationAttack,
   'Naval Patrol': navalUnitsRunning,
   'Naval Pillage': navalUnitsRunning,

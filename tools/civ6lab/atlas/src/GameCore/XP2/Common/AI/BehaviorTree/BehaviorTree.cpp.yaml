@@ -37,14 +37,16 @@
 - addr: 0x7cbca0
   final: 0x5405c0
   kind: function
+  name: behaviour tree handler tables
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "- THE NODES' HANDLERS (the dispatcher 0x7cbca0 storing each type's functions under the id the registration 0x7db850 gives it, the k-th..."
-  review: imported
+  review: reviewed
 - addr: 0x7d15e0
   final: 0x543210
   kind: function

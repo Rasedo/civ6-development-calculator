@@ -34,7 +34,10 @@
     - recording: h1_duelv1124
       turn: 71
       value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
-  impl: [cpu/core/tactical.ts:tacticalTargets, cpu/core/tactical.ts:pillage]
+  impl:
+    - cpu/core/tactical.ts:tacticalTargets
+    - cpu/core/tactical.ts:pillage
+    - ai/major/view.ts:MajorAttackTargetView
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
@@ -161,9 +164,13 @@
     - recording: h1_duelv1124
       turn: 17
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
-  impl: [cpu/core/fog.ts:cityStateSight, cpu/core/minorBuild.ts:minorKnowledge]
+  impl:
+    - cpu/core/fog.ts:cityStateSight
+    - cpu/core/minorBuild.ts:minorKnowledge
+    - ai/major/operations/knowledge.ts:lookArmy
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "- THE LOOK (0x7877e0, Targets.cpp, \"Invalid unit when updating AI knowledge base\"; after the ageing in 0x785..."
   review: reviewed

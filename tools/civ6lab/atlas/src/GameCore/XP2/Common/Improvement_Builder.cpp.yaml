@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "- The analysis (0x5ce970): per improvement in database order, FX(-9999) where 0x35ede0 refuses the player or 0x35fd60 the plot; else T = max(the research AI's turns 0x7610e0..."
   review: imported

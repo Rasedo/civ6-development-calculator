@@ -20,10 +20,18 @@
     - recording: h1_duelw1117-1128
       turn: all
       value: "the action replay: the Operation rows end on the game's plot 416 of 1,265; barb:move imposed 1117 634 -> 421, 1121 1,325 -> 1,096"
-  impl: [cpu/core/tactical.ts:opAttackExec, gpu/core/sim_tactics.py:_barb_op_attack]
+    - recording: h1_duelv1128
+      turn: 188
+      value: Attack Walled City's Cavalry At 43:12, Move 43:15, Attack 42:15
+  impl:
+    - ai/major/operations/assault.ts:attackUnitsExecute
+    - ai/major/operations/assault.ts:pickTargets
+    - cpu/core/tactical.ts:opAttackExec
+    - gpu/core/sim_tactics.py:_barb_op_attack
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...s of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore..."
   review: reviewed

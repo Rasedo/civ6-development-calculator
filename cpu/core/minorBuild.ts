@@ -1030,7 +1030,7 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
 
 /** A record ages a turn at each update and drops once its age passes this
  *  (0x5ebb30: the age before the increment above 0x14) */
-const ARMY_RECORD_AGE = 21;
+export const ARMY_RECORD_AGE = 21;
 
 /**
  * THE KNOWLEDGE BASE'S ARMY UPDATE (CivKnowledge, the records 0x5e9530 keeps

@@ -32,6 +32,8 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     domesticTourists: () => 0, visitingTourists: () => 0, scienceWonders: () => 0, spaceProjects: () => 0,
     minorCivilization: () => null, cityCitizens: () => 0, citySpecialtyDistricts: () => 0, cityStrikes: () => false, projectCompletions: () => 0, projectTurns: () => -1,
     governors: () => [], governorAvailable: () => false, governorTitles: () => 0, governorCanPromote: () => false, cityLoyaltyPerTurn: () => 0, cityStateHasCity: () => false,
+    knownCities: () => [], pressureLead: () => 0, players: () => [], borderClosed: () => false, denounced: () => false,
+    cityHitPoints: () => null, cityBlow: () => 0, attackTargets: () => [], attackAssignment: () => [], strikeColumn: () => -1,
     ...over,
   };
 }

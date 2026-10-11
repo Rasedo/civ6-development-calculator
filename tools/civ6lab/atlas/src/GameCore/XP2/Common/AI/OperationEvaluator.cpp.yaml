@@ -11,7 +11,8 @@
     - ai/major/operations/evaluate.ts:oddsOf
     - ai/major/operations/evaluate.ts:distLimit
     - ai/major/operations/evaluate.ts:evaluate
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The evaluation (job \"Op Evaluation\", 0x746920): MustBeAtWar, MustHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each tar..."

@@ -16,15 +16,17 @@
 - addr: 0x56c690
   final: 0x3a25f0
   kind: function
+  name: a unit with Movement left
   status: PARTLY
   impl: [cpu/core/tactical.ts:canAct]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
-  review: imported
+  review: reviewed
 - addr: 0x56cb00
   final: 0x3a2980
   kind: function
@@ -52,6 +54,18 @@
     - ...der onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within...
     - "...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random Direction\" draws pair one to one with the AI_..."
   review: imported
+- addr: 0x56d9f0
+  final: 0x3a33d0
+  kind: function
+  name: a unit's base moves (embarked pool)
+  status: PARTLY
+  impl: [ai/major/view.ts:MajorUnitView, cpu/core/majorView.ts:unitView]
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  notes: [read; no recorded decision of the five verbose duels tells it apart yet]
+  context:
+    - "...+0x370: the unit targets CIVILIAN..HIGH, the districts) within twice its base Movement (0x56d9f0 with -1: Units +0x38, embarked the embarked pool): the team's attack strength (+0x98) o..."
+  review: reviewed
 - addr: 0x56daa0
   final: 0x3a3480
   kind: function

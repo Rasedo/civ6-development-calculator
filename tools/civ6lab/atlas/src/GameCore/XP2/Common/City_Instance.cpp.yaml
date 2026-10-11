@@ -32,7 +32,8 @@
   final: 0x131a10
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 h..."

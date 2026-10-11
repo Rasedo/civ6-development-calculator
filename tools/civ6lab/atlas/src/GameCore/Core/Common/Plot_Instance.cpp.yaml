@@ -91,6 +91,7 @@
   readings:
     - "H-1: the plot's Appeal — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   context:
     - ...eturns 0, a mountain (terrain 2/5/8/11/14) that + 4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete district while pillaged, -1 for its own pillaged improvement (+0...
     - "...quals) whose ring walk within 4 holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value 100, enemy strength the largest best combat strength of the game's majors; BA..."
@@ -138,6 +139,7 @@
     - "H-1: the plot's Appeal — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-95: the danger map and Move to Safety — READ, ported"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   context:
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...

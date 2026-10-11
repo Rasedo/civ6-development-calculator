@@ -46,9 +46,18 @@
   name: teamUpdate
   semantics: "a team's update: strengths, endangered list, battle points and line (+0x90 in battle)"
   status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      turn: 20
+      value: Battle line 31:15, 0 endangered
+  impl:
+    - ai/major/operations/assault.ts:WEIGHED
+    - ai/major/operations/assault.ts:marchPoint
+    - ai/major/operations/assault.ts:updateTeam
+    - ai/major/operations/operation.ts:OpTeam
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...ays Running); FAILURE where a team is in battle (+0x90, the team update's battle points 0x738f20) and the operation holds no unit — a team in battle has a member, so never in a turn...."
   review: reviewed
@@ -66,7 +75,9 @@
   kind: function
   status: PARTLY
   impl: [ai/major/operations/manager.ts:startOperation]
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
@@ -84,6 +95,7 @@
   impl: [cpu/core/tactical.ts:barbarianOpTrees]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t list (+0x60), the tribe's next turn starting it at CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000..."
@@ -92,10 +104,14 @@
   final: 0x4de400
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:targetGone, cpu/core/tactical.ts:raidTargetGone]
+  impl:
+    - ai/major/operations/nodes.ts:targetGone
+    - cpu/core/tactical.ts:raidTargetGone
+    - ai/major/operations/operation.ts:targetGone
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - ...peration Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operation Attack Units 0x80ecf0 (target gone SUCCES...
   review: imported
@@ -133,7 +149,9 @@
   final: 0x4dee80
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ning lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
@@ -177,7 +195,9 @@
   final: 0x4e1620
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pick: a running operation's valid candidate sets its backup (0x73e610); of the new ones that start themselves the highest Priority (+0x40), then the larger o..."
@@ -188,7 +208,9 @@
   kind: function
   status: PARTLY
   impl: [ai/major/operations/nodes.ts:switchToBackup]
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
@@ -198,7 +220,9 @@
   kind: function
   status: PARTLY
   impl: [ai/major/operations/nodes.ts:refreshStrengths]
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
@@ -207,8 +231,11 @@
   final: 0x4e2670
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:refreshStrengths]
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  impl: [ai/major/operations/nodes.ts:refreshStrengths, ai/major/operations/assault.ts:WEIGHED]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."

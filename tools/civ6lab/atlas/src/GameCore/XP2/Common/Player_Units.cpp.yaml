@@ -104,7 +104,8 @@
   final: 0x34f550
   kind: function
   status: UNREAD
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
   context:
     - ...E_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms, unread); the odds min(0.9, ((ours - theirs) / min(best ours, best theirs) + 1) x...
   review: imported

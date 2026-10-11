@@ -1375,6 +1375,15 @@ export function advanceHistory(h: History, rec: TurnRecord, cat: Catalog): void 
   if (h.last === null) {
     h.firstTurn = rec.turn;
     if (rec.turn > 1) for (const c of rec.cities) h.unknownSince.add(c.y * W + c.x);
+    // the era's starting units raise the best melee and ranged strengths
+    // as they are placed (0x4580b0 -> 0x4c1c10)
+    for (const u of rec.units) {
+      if (bool(u.embarked)) continue;
+      const cs = made(u.type, Math.max(0, num(u.formation)));
+      if (cs > (h.bestMelee.get(u.owner) ?? 0)) h.bestMelee.set(u.owner, cs);
+      const rs = madeRanged(u.type, Math.max(0, num(u.formation)));
+      if (rs > (h.bestRanged.get(u.owner) ?? 0)) h.bestRanged.set(u.owner, rs);
+    }
   } else {
     const seen = new Set(h.last.units.map((u) => `${u.owner}:${u.id}`));
     const builder = cat.units.indexOf('UNIT_BUILDER');

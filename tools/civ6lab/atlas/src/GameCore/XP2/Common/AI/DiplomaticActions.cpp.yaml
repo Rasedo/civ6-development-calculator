@@ -485,13 +485,56 @@
 - addr: 0x6742d0
   final: 0x447ad0
   kind: function
-  status: PARTLY
+  name: war declarations' not-ready hook (PrepareForWarWith)
+  status: READ
+  cases:
+    - recording: h1_duelv1117
+      turn: 19
+      value: a positive DECLARE_WAR_MINOR_CIV desire at t18, the candidate the turn after
+  impl: [cpu/harness/operationsAi.ts:readPrepares]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
-  notes:
-    - ".claude/scratchpad/dp2/readings_dp2.md: ...0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static initializer 0x67ff10   (Embassy @f2e564, Dema..."
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - .../ - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the static initializer 0x67ff10 (Embassy @f2...
+  review: reviewed
+- addr: 0x674420
+  final: 0x447c30
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 18
+      value: "The log shows it: every war candidate's first eval line comes   the turn after the first positive war-declaration desire toward that   player in AI_Diplomacy.csv, or later (1117 China -> 3: desire t18"
+    - recording: 1127
+      turn: 48
+      value: "1127 -> 3: t48, t49;"
+    - recording: 1117
+      turn: 20
+      value: eleven pairs over the five verbose duels), and   it stays (1117 China's candidates against Caguana t20 ..
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...k (DiplomaticActions slot +0x68 = 0x6742d0, from the pick 0x64ba90 through 0x6744a0 / 0x674420 where the best action toward a player is not ready): where the players at war or prepar..."
+  review: imported
+- addr: 0x6744a0
+  final: 0x447cb0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 18
+      value: "The log shows it: every war candidate's first eval line comes   the turn after the first positive war-declaration desire toward that   player in AI_Diplomacy.csv, or later (1117 China -> 3: desire t18"
+    - recording: 1127
+      turn: 48
+      value: "1127 -> 3: t48, t49;"
+    - recording: 1117
+      turn: 20
+      value: eleven pairs over the five verbose duels), and   it stays (1117 China's candidates against Caguana t20 ..
+  readings:
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+  context:
+    - "...t-ready hook (DiplomaticActions slot +0x68 = 0x6742d0, from the pick 0x64ba90 through 0x6744a0 / 0x674420 where the best action toward a player is not ready): where the players at wa..."
   review: imported
 - addr: 0x674820
   final: 0x447d10

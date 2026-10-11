@@ -12,6 +12,7 @@ import { AI_OP_TEAMS, AI_TEAM_REQS, AI_UNIT_AI } from './tables';
 import type { AiOpDef, AiOpTeam, AiTeamReq } from './types';
 import type { BtRun } from '../../../cpu/core/behaviorTree';
 import type { MajorUnitView, MajorView } from '../view';
+import type { OpsContext } from './nodes';
 
 export const NO_PLOT = -1;
 
@@ -22,9 +23,12 @@ export interface OpTeam {
   members: number[];
   /** per requirement, the members carrying its AI type */
   counts: number[];
-  /** the team's goal plots by Operation Move's "Move To (enum)": 0 the
-   *  rally, 1 the target */
+  /** the team's goal plots by Operation Move's "Move To (enum)" (team
+   *  +0xe8 + 8 x the slot): 0 the rally, 1 the target, 3 the members' centre,
+   *  4 the battle line, 5 the march point (the team update 0x738f20) */
   goals: number[];
+  /** enemy targets stand within reach of its members (team +0x90) */
+  engaged: boolean;
   /** every requirement's minimum met (team +0x11) */
   ready: boolean;
   /** the members' strength (0x73fba0): each its larger of combat and ranged
@@ -66,7 +70,8 @@ export const hasAiType = (unitType: string, ai: string): boolean => unitAiTypes(
 export function newTeams(def: AiOpDef, view: MajorView, target: number): OpTeam[] {
   return (AI_OP_TEAMS[def.name] ?? []).filter((t) => teamApplies(t, view, target)).map((t) => {
     const reqs = AI_TEAM_REQS[t.team] ?? [];
-    return { def: t, reqs, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT], ready: false, strength: 0 };
+    return { def: t, reqs, members: [], counts: reqs.map(() => 0), goals: [NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT, NO_PLOT], engaged: false,
+      ready: false, strength: 0 };
   });
 }
 
@@ -134,3 +139,62 @@ export function fitsMaxima(team: OpTeam, unitType: string, extra: number, skip =
   }
   return { fits: true, matched };
 }
+
+/** the units the operation holds, every team's, in team then join order */
+export function opUnits(op: Operation): number[] {
+  return op.teams.flatMap((t) => t.members);
+}
+
+/** the operation's target gone (0x73a8e0): a camp target no camp the seat
+ *  knows stands on; a city target no city stands on; never a friendly city
+ *  or a settle site; any other kind always */
+export function targetGone(view: MajorView, seat: number, op: Operation): boolean {
+  switch (op.def.targetType) {
+    case 'TARGET_BARBARIAN_CAMP':
+      return !view.barbarianCamps(seat).includes(op.target);
+    case 'TARGET_ENEMY_COMBAT_DISTRICT':
+    case 'TARGET_ENEMY_PASSIVE_DISTRICT':
+      return op.target === NO_PLOT || !view.plots()[op.target].city;
+    case 'TARGET_FRIENDLY_CITY':
+    case 'TARGET_SETTLE_LOCATION':
+      return false;
+    default:
+      return true;
+  }
+}
+
+/** a unit's move order to a plot: the steps of its path, as far as its
+ *  Movement carries it this turn (the engine refuses the rest) */
+export function moveTo(ctx: OpsContext, u: MajorUnitView, dest: number): void {
+  if (u.plot === dest || u.movesLeft <= 0) return;
+  const view = ctx.view();
+  const path = view.unitPath(u.id, dest);
+  if (path.length === 0) return;
+  const reach = new Map(view.unitReach(u.id, 1).map((r) => [r.plot, r] as const));
+  const units = view.units(ctx.seat);
+  const col = units.findIndex((x) => x.id === u.id);
+  if (col < 0) return;
+  // a formation's other unit steps with it
+  const pair = ctx.op.formations.find((f) => f.includes(u.id));
+  const mate = pair ? units.findIndex((x) => x.id === (pair[0] === u.id ? pair[1] : pair[0])) : -1;
+  const together = mate >= 0 && units[mate].plot === u.plot;
+  const rows: number[][] = [];
+  let at = u.plot;
+  for (const p of path) {
+    const r = reach.get(p);
+    if (!r || r.turns > 1) break;
+    const row = units.map(() => -1);
+    const a = view.unitActionColumn(`MOVE_${view.stepDirection(at, p)}`);
+    row[col] = a;
+    if (together) row[mate] = a;
+    rows.push(row);
+    at = p;
+  }
+  if (rows.length) ctx.act(rows);
+}
+
+/** a plot as the operation logs write it, x:y (-9999:-9999 for none) */
+export const xy = (view: MajorView, p: number): string => (p < 0 ? '-9999:-9999' : `${view.plots()[p].x}:${view.plots()[p].y}`);
+
+/** the seat's units by id */
+export const unitsById = (view: MajorView, seat: number): Map<number, MajorUnitView> => new Map(view.units(seat).map((u) => [u.id, u]));

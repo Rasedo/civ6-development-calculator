@@ -6,14 +6,20 @@
 - addr: 0x7a0ac0
   final: 0x527c50
   kind: function
+  name: the city's worth
   status: PARTLY
+  cases:
+    - recording: h1_duelv1117
+      turn: 18
+      value: Caguana 450 + 200 + Production / Science / Culture x 7 + 10 a lead point
+  impl: [ai/major/operations/cityValue.ts:cityWorth]
   readings:
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
-  notes: ["imported: READ in its section, no confirming case found beside it"]
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   context:
     - "...akes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the po..."
-  review: imported
+  review: reviewed
 - addr: 0x7a10c0
   final: 0x527fd0
   kind: function
@@ -114,6 +120,7 @@
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
