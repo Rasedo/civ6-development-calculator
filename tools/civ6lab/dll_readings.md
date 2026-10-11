@@ -4035,7 +4035,11 @@ Ported in `cpu/core/aiCityTrees.ts` (the events, the trees' nodes, the
 tick), `cpu/core/aiContracts.ts` (the contracts) and the interpreter
 `cpu/core/behaviorTree.ts` (shared with the majors' operations); the trees
 generated into `cpu/data/aiCityTrees.ts` by
-`tools/install/ai_operation_tables.py`. Measured by
+`tools/install/ai_operation_tables.py`. The GPU twin, `gpu/core/sim_citytrees.py`
+(the events, the city trees on a batched interpreter, the contracts and
+the economic AI's gold purchase), is paired with the TS by a scenario both
+tests run (tests/cpu/minors/city-trees.test.ts, tests/gpu/city_trees_test.py:
+42 turn digests equal). Measured by
 `cpu/harness/cityContractLab.ts` against AI_CityBuild.csv's contract and
 queue lines of the five verbose duels (runs/h1_duelv11{17,21,24,27,28}):
 SUBMITTED 259 exact, 8 at another value, 75 a turn or two apart of 434
@@ -5332,6 +5336,14 @@ context +0xc0; "span" is PV(horizon) - PV(start) by two 0x7a16e0 calls,
   requirements; the effects the policies and governments name, ranked by the
   score lines they miss, with their analyzers and whether they reach
   CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`.
+
+The modifier evaluator's GPU twin (`gpu/core/sim_cityvalue.py`, the
+analyzers, evaluators and collections the buildings' and projects' rows
+carry; a row with a TS read it lacks is refused at the tables' build) pins
+the TS values of the 46 such rows (tests/gpu/city_value_test.py,
+tests/cpu/minors/modifier-value.test.ts), and the minors' tables and pick
+off the sim's own state equal the TS's on seed9001
+(tests/cpu/minors/minor-tables.test.ts).
 
 The modifier evaluator: a building's BuildingModifiers are analysed once,
 at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]):

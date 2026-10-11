@@ -326,6 +326,7 @@
     - gpu/core/sim_cityvalue.py:_cv_project_table
     - gpu/core/sim_cityvalue.py:_cv_unit_turns
     - gpu/core/sim_cityvalue.py:_cv_building_turns
+    - cpu/core/minorBuild.ts:minorTables
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

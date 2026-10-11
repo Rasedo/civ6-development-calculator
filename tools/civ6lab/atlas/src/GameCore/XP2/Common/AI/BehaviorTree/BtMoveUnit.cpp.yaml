@@ -59,7 +59,7 @@
   final: 0x5580a0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:moveUnit]
+  impl: [cpu/core/aiCityTrees.ts:moveUnit, gpu/core/sim_citytrees.py:_u_move]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

@@ -11,7 +11,7 @@
     - recording: h1_duelw1124
       turn: 2
       value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
-  impl: [cpu/core/aiModifiers.ts:analysis]
+  impl: [cpu/core/aiModifiers.ts:analysis, gpu/core/sim_cityvalue.py:_cv_analysis]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"

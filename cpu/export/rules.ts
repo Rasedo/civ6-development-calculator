@@ -316,7 +316,14 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 import { RESOURCES } from '../../world/resources';
 import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
 import { AI_DEFAULT_SAVINGS, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
-import { engineId, gameTypeOf } from '../data/aliases';
+import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
+/** an engine row's install type: its own where that names it, else the one
+ *  its catalog tag names */
+const installTypeOf = (kind: string, id: string, prefix: string, known: object): string =>
+  engineId(kind, prefix + id, prefix, known) === id ? prefix + id : gameTypeOf(kind, id, prefix);
+import { AI_MODIFIER_READS } from '../core/aiModifiers';
+import { promotionWeight } from '../core/minorBuild';
+import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
 import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
 import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
@@ -1020,8 +1027,8 @@ export function buildRules() {
     },
     // the city build AI's value tables (`aiCityBuild.ts`, `aiPlotValue.ts`,
     // `aiDistrictValue.ts`, `aiProjectValue.ts`, `aiEconomic.ts`): the yields'
-    // and pseudo-yields' DefaultValue by type, the rows in database order (a
-    // project's completion modifiers as their count), the savings' weights,
+    // and pseudo-yields' DefaultValue by type, the rows in database order
+    // with their modifiers, what the modifier evaluator reads, the savings' weights,
     // the military AI's unit efficiencies
     aiCityBuild: {
       yieldDefault: AI_YIELD_DEFAULT,
@@ -1030,18 +1037,45 @@ export function buildRules() {
       features: AI_FEATURES,
       resources: AI_RESOURCES.map((r) => ({ type: r.type, class: r.class, harvests: r.harvests, yields: r.yields })),
       districts: AI_DISTRICTS,
-      projects: AI_PROJECTS.map((p) => ({ ...p, modifiers: p.modifiers.length })),
+      projects: AI_PROJECTS,
       savings: AI_DEFAULT_SAVINGS.map((s) => s.weight),
-      // a building's modifiers as their count
-      buildings: AI_BUILDINGS.map((b) => ({ ...b, modifiers: b.modifiers.length })),
+      buildings: AI_BUILDINGS,
+      modifierReads: AI_MODIFIER_READS,
       units: AI_UNITS,
       unitEfficiency: AI_UNIT_EFFICIENCY,
       // per engine unit (the GPU's unit index) its AI_UNITS row, -1 none: its
       // own install type, else the one its catalog tag names
-      engineUnitRow: Object.values(UNITS).map((u) => {
-        const t = engineId('unit', 'UNIT_' + u.id, 'UNIT_', UNITS) === u.id ? 'UNIT_' + u.id : gameTypeOf('unit', u.id, 'UNIT_');
-        return AI_UNITS.findIndex((r) => r.type === t);
-      }),
+      // per AI row its engine index (-1 none): the building in the city's
+      // building plane's order, the unit, the district, the project; per
+      // install tech, civic and resource type its engine index
+      engineIndex: {
+        building: AI_BUILDINGS.map((r) => buildingIdx.get(engineId('building', r.type, 'BUILDING_', BUILDINGS) ?? '') ?? -1),
+        unit: AI_UNITS.map((r) => Object.values(UNITS).findIndex((u) => u.id === engineId('unit', r.type, 'UNIT_', UNITS))),
+        district: AI_DISTRICTS.map((r) => PLACEABLE_DISTRICTS.indexOf(engineId('district', r.type, 'DISTRICT_', DISTRICTS) as never)),
+        project: AI_PROJECTS.map((r) => Object.keys(PROJECTS).indexOf(engineId('project', r.type, 'PROJECT_', PROJECTS) ?? '')),
+        tech: Object.fromEntries(techList.map((t, i) => [installTypeOf('tech', t.id, 'TECH_', TECHS), i])),
+        civic: Object.fromEntries(civicList.map((c, i) => [installTypeOf('civic', c.id, 'CIVIC_', CIVICS), i])),
+        resource: Object.fromEntries(RESOURCE_IDS.map((id, i) => [installTypeOf('resource', id, 'RESOURCE_', RESOURCES), i])),
+      },
+      engineUnitRow: Object.values(UNITS).map((u) => AI_UNITS.findIndex((r) => r.type === installTypeOf('unit', u.id, 'UNIT_', UNITS))),
+      // a plot as the modifiers read it: per engine terrain its install type
+      // on flat ground, per engine feature its install type and whether it
+      // bars passage, per engine resource its install type
+      plotNames: {
+        terrain: TERRAIN_IDS.map((t) => installTerrain(t as never, 'FLAT' as never)),
+        feature: FEAT_IDS.map((f) => installFeature(f)),
+        featureImpassable: FEAT_IDS.map((f) => !!(FEATURES[f] as { impassable?: boolean }).impassable),
+        resource: RESOURCE_IDS.map((r) => `RESOURCE_${r}`),
+      },
+      // a minor's promotion class weights (MINOR_CIV_DEFAULT_TRAIT's list)
+      minorPromotionWeights: Object.fromEntries([...new Set(AI_UNITS.map((u) => u.promotionClass).filter((c): c is string => !!c))]
+        .map((c) => [c, promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], c)])),
+      // the city events (their slots in table order), each leader trait's
+      // list of the tree an event starts, and the trees' nodes
+      // (`aiCityTrees.ts`, `behaviorTree.ts`)
+      cityEventTypes: AI_CITY_EVENT_TYPES,
+      cityEventLists: Object.fromEntries(Object.entries(AI_CITY_EVENT_LISTS).map(([t, l]) => [t, AI_CITY_EVENTS[l]])),
+      cityTrees: AI_CITY_TREES,
     },
     researchAi: {
       taskBias: RESEARCH_AI_TASK_BIAS,

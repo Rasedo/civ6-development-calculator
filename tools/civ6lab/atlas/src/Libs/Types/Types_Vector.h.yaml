@@ -523,7 +523,7 @@
 - addr: 0x7e7d20
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:addGoalTech]
+  impl: [cpu/core/aiCityTrees.ts:addGoalTech, gpu/core/sim_citytrees.py:_u_add_goal_tech]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -534,7 +534,10 @@
   final: 0x554b10
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:findAvailableUnit, cpu/core/operations/nodes.ts:findAvailableUnit]
+  impl:
+    - cpu/core/aiCityTrees.ts:findAvailableUnit
+    - cpu/core/operations/nodes.ts:findAvailableUnit
+    - gpu/core/sim_citytrees.py:_u_find_unit
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -545,7 +548,7 @@
   final: 0x55c550
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiContracts.ts:buildUnitNode]
+  impl: [cpu/core/aiContracts.ts:buildUnitNode, gpu/core/sim_citytrees.py:_u_build_unit]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -557,7 +560,7 @@
   final: 0x55ef10
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:reservePlot]
+  impl: [cpu/core/aiCityTrees.ts:reservePlot, gpu/core/sim_citytrees.py:_u_reserve_plot]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

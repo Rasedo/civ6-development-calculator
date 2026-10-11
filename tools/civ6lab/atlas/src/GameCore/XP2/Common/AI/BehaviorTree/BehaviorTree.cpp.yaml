@@ -58,7 +58,10 @@
   final: 0x5432a0
   kind: function
   status: PARTLY
-  impl: [cpu/core/behaviorTree.ts:AiTreeNode, cpu/core/behaviorTree.ts:propagate]
+  impl:
+    - cpu/core/behaviorTree.ts:AiTreeNode
+    - cpu/core/behaviorTree.ts:propagate
+    - gpu/core/sim_citytrees.py:_propagate
   readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
   context:
     - "...val / Naval Choose Target: the index their update stored) and the parent propagation's (0x7d1750: a finished child tells its parent's function, @f2ed70, which may finish the parent and..."
@@ -88,6 +91,7 @@
     - gpu/core/sim_tactics.py:_barb_op_trees
     - cpu/core/tactical.ts:BT_OK
     - cpu/core/behaviorTree.ts:AiTreeNode
+    - gpu/core/sim_citytrees.py:tick_tree
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"

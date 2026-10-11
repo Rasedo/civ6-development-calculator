@@ -34,11 +34,7 @@ import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSp
 import { AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { projectTable, projectValue } from '../core/aiProjectValue';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
-import { gameProgressPct } from '../data/constants';
-import { TECHS } from '../data/techs';
-import { CIVICS } from '../data/civics';
-import { engineId } from '../data/aliases';
-import { minorBuildFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { minorBuildFacts, minorProjectFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
@@ -309,38 +305,13 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // THE PROJECTS TABLE: the analysis' gates and the value at the build turns
     const loggedProjects = centre.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`)?.PROJECTS;
     if (loggedProjects) {
-      const r = cs.research;
-      const oursProjects = projectTable({
-        view: facts.view,
-        seat: facts.seat,
-        cityId: facts.cityId,
-        capital: facts.capital,
-        advanced: () => 0,
-        buildTurns: (p) => facts.buildTurns(p),
-        progressPct: gameProgressPct(r.techs.length, r.civics.length),
-        spaceRaceStanding: 0,
-        defenceRepairs: 0,
-        population: facts.population,
-        districts: facts.districtCount,
-        loyaltyFalling: false,
-        buildingValue: (b, t) => {
-          const row = AI_BUILDINGS.find((x) => x.type === b);
-          return row ? buildingValue(facts, row, t) : 0;
-        },
-        hasBuilding: (b) => facts.hasBuilding(b),
-        hasCivic: (c) => r.civics.includes(engineId('civic', c, 'CIVIC_', CIVICS) ?? ''),
-        hasTech: (t) => r.techs.includes(engineId('tech', t, 'TECH_', TECHS) ?? ''),
-        hasDistrict: (d) => facts.hasDistrict(d),
-        unlockedByEffect: () => false,
-        producingElsewhere: () => 0,
-        favoured: () => false,
-        horizon: AI_VALUE_HORIZON,
-      });
+      const projectFacts = minorProjectFacts(cs, facts);
+      const oursProjects = projectTable(projectFacts);
       tallyRow(AI_PROJECTS.map((p) => p.type), projectsAll, turn, player, loggedProjects, oursProjects, projectsPer);
       if (projectsOut !== null) {
         AI_PROJECTS.forEach((p, k) => {
           if (!p.type.includes(projectsOut) || loggedProjects[k] <= -9000) return;
-          const pf = { view: facts.view, seat: facts.seat, cityId: facts.cityId, capital: facts.capital, advanced: () => 0, buildTurns: (q: string) => facts.buildTurns(q), progressPct: gameProgressPct(r.techs.length, r.civics.length), spaceRaceStanding: 0, defenceRepairs: 0, population: facts.population, districts: facts.districtCount, loyaltyFalling: false, buildingValue: () => 0, hasBuilding: () => false };
+          const pf = projectFacts;
           const T = facts.buildTurns(p.type);
           if (Math.abs(oursProjects[k] / 256 - loggedProjects[k]) < 0.0051) return;
           console.log('PROJECT', turn, player, p.type, 'log', loggedProjects[k], 'ours', (oursProjects[k] / 256).toFixed(2), 'T', T, 'pc', pf.progressPct, [0, 1, 2, 3, 4, 5, 6, 8, 10].map((tt) => (projectValue(pf, p.type, tt, AI_VALUE_HORIZON) / 256).toFixed(2)).join(' '));

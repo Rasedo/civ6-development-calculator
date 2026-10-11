@@ -1,9 +1,10 @@
 """The city build AI's values on the GPU (`gpu/core/sim_cityvalue.py`): the
 growth forecast and the housing value, the improvement value, the district
 value, the project value and the PROJECTS table's gates, the savings and the
-unit purchase — the same numbers the TS vitests pin
+unit purchase, the modifiers' values, and the minors' tables and pick read
+off a sim's own state — the same numbers the TS vitests pin
 (tests/cpu/minors/plot-value.test.ts, district-value.test.ts,
-city-build-values.test.ts).
+city-build-values.test.ts, modifier-value.test.ts, minor-tables.test.ts).
 
     npm run seed && npm run export        # (once) writes seeder/worlds/
     python tests/gpu/city_value_test.py
@@ -380,8 +381,8 @@ class City:
     def government_tier(self):
         return 0
 
-    def worship(self):
-        return None
+    def worship_is(self, b):
+        return 0
 
     def riverside(self):
         return False
@@ -389,8 +390,11 @@ class City:
     def ground_refuses(self, b):
         return False
 
-    def current(self):
-        return None
+    def producing(self):
+        return 0
+
+    def current_is(self, item):
+        return 0
 
     def tech_turns(self, t):
         return 0
@@ -455,7 +459,7 @@ class City:
     def handicap(self):
         return 0
 
-    def horizon(self):
+    def value_horizon(self):
         return 50
 
     def housing_value(self, housing, t, h):
@@ -581,8 +585,187 @@ def test_known(v: Values) -> None:
     print("  the known units OK")
 
 
+# the owner city's plots, view and pins of tests/cpu/minors/modifier-value.test.ts
+MOD_PLOTS = [
+    dict(terrain="TERRAIN_COAST", feature=None, resource="RESOURCE_FISH", resourceVisible=True, improvement=False, impassable=False),
+    dict(terrain="TERRAIN_COAST", feature="FEATURE_REEF", resource=None, resourceVisible=False, improvement=False, impassable=False),
+    dict(terrain="TERRAIN_COAST", feature=None, resource=None, resourceVisible=False, improvement=True, impassable=False),
+    dict(terrain="TERRAIN_GRASS", feature="FEATURE_JUNGLE", resource="RESOURCE_WHEAT", resourceVisible=True, improvement=True, impassable=False),
+    dict(terrain="TERRAIN_PLAINS", feature="FEATURE_MARSH", resource="RESOURCE_RICE", resourceVisible=True, improvement=False, impassable=False),
+    dict(terrain="TERRAIN_GRASS_MOUNTAIN", feature=None, resource=None, resourceVisible=False, improvement=False, impassable=True),
+]
+MOD_PINS = {
+    "BUILDING_MONUMENT": [5120, 4096, 1792],
+    "BUILDING_PALACE": [768, 768, 768],
+    "BUILDING_BARRACKS": [4608, 3840, 1792],
+    "BUILDING_WATER_MILL": [5120, 4096, 1536],
+    "BUILDING_LIGHTHOUSE": [83712, 69888, 37120],
+    "BUILDING_MARKET": [71424, 59904, 33024],
+    "BUILDING_STABLE": [4608, 3840, 1792],
+    "BUILDING_CASTLE": [0, 0, 0],
+    "BUILDING_ARMORY": [4608, 3840, 1792],
+    "BUILDING_SHIPYARD": [9728, 7936, 3328],
+    "BUILDING_STAR_FORT": [0, 0, 0],
+    "BUILDING_MILITARY_ACADEMY": [4608, 3840, 1792],
+    "BUILDING_ZOO": [5120, 4096, 1536],
+    "BUILDING_HANGAR": [4608, 3840, 1792],
+    "BUILDING_SEAPORT": [12288, 9984, 4096],
+    "BUILDING_AIRPORT": [9472, 7680, 3584],
+    "BUILDING_STADIUM": [0, 0, 0],
+    "BUILDING_MOSQUE": [0, 0, 0],
+    "BUILDING_PAGODA": [5376, 4352, 2048],
+    "BUILDING_FERRIS_WHEEL": [0, 0, 0],
+    "BUILDING_AQUARIUM": [5120, 4096, 1536],
+    "BUILDING_AQUATICS_CENTER": [0, 0, 0],
+    "BUILDING_GOV_TALL": [0, 0, 0],
+    "BUILDING_GOV_WIDE": [0, 0, 0],
+    "BUILDING_GOV_CONQUEST": [0, 0, 0],
+    "BUILDING_GOV_CITYSTATES": [16128, 13056, 5888],
+    "BUILDING_GOV_SPIES": [10240, 10240, 10240],
+    "BUILDING_GOV_FAITH": [0, 0, 0],
+    "BUILDING_GOV_MILITARY": [0, 0, 0],
+    "BUILDING_GOV_SCIENCE": [0, 0, 0],
+    "BUILDING_SHOPPING_MALL": [0, 0, 0],
+    "BUILDING_HYDROELECTRIC_DAM": [0, 0, 0],
+    "BUILDING_CONSULATE": [5120, 4096, 1792],
+    "BUILDING_CHANCERY": [7680, 6144, 2816],
+    "PROJECT_LAUNCH_EARTH_SATELLITE": [0, 0, 0],
+    "PROJECT_LAUNCH_MOON_LANDING": [0, 0, 0],
+    "PROJECT_BUILD_NUCLEAR_DEVICE": [0, 0, 0],
+    "PROJECT_BUILD_THERMONUCLEAR_DEVICE": [0, 0, 0],
+    "PROJECT_BREAD_AND_CIRCUSES": [0, 0, 0],
+    "PROJECT_WATER_BREAD_AND_CIRCUSES": [0, 0, 0],
+    "PROJECT_CARBON_RECAPTURE": [0, 0, 0],
+    "PROJECT_LAUNCH_EXOPLANET_EXPEDITION": [0, 0, 0],
+    "PROJECT_ORBITAL_LASER": [0, 0, 0],
+    "PROJECT_TERRESTRIAL_LASER": [0, 0, 0],
+    "PROJECT_SEND_AID": [0, 0, 0],
+    "PROJECT_RECOMMISSION_REACTOR": [0, 0, 0],
+}
+
+
+class Mods:
+    """the owner city's analysis (modifier-value.test.ts's view)"""
+
+    def like(self):
+        return L(0)
+
+    def yield_w(self, y):
+        return 0
+
+    def pseudo_w(self, p):
+        return 128 if p == "PSEUDOYIELD_DIPLOMATIC_FAVOR" else 0
+
+    def player_cities(self):
+        return 1
+
+    def city_districts(self):
+        return [("DISTRICT_CITY_CENTER", 1), ("DISTRICT_HARBOR", 1)]
+
+    def plot_valid(self):
+        return torch.ones(1, len(MOD_PLOTS), dtype=torch.bool)
+
+    def plot_is(self, kind, name):
+        if kind in ("resourceVisible", "improvement", "impassable"):
+            vals = [bool(p[kind]) for p in MOD_PLOTS]
+        else:
+            vals = [p[kind] is not None and p[kind] == name for p in MOD_PLOTS]
+        return torch.tensor([vals])
+
+    def city_yield(self, y):
+        return 7.5 if y == "YIELD_PRODUCTION" else 3
+
+    def city_strikes(self):
+        return 1
+
+    def city_has_building(self, b):
+        return int(b == "BUILDING_MONUMENT")
+
+    def traders(self):
+        return 0
+
+    def trade_capacity(self):
+        return 1
+
+    def trade_knowledge(self):
+        return 4 * FX + 64
+
+    def unit_cost(self, u):
+        return 40
+
+
+def test_modifiers(v: Values) -> None:
+    """`modifiersValue` (0x7a4b20) over every building the tables value and
+    every project that carries modifiers, landing in 0, 5 and 20 turns"""
+    T = v._cv_tables()
+    rows = {r["type"]: r for r in T["bld_rows"] + T["proj_rows"]}
+    m = Mods()
+    for name, want in MOD_PINS.items():
+        got = [int(v._cv_modifiers(m, rows[name]["modifiers"], L(t), L(50))[0]) for t in (0, 5, 20)]
+        assert got == want, (name, got, want)
+    print(f"  modifiers OK ({len(MOD_PINS)} rows)")
+
+
+# per minor the valued rows' (count, sum) of the buildings, units and projects
+# tables and the pick (kind, row, value) — tests/cpu/minors/minor-tables.test.ts
+MINOR_TABLES = {
+    100: ([(9, 62956), (32, 10710), (1, 0)], ("BUILDING_WALLS", 23332)),
+    101: ([(15, 94682), (34, 5880), (1, 0)], ("BUILDING_WALLS", 23981)),
+    102: ([(17, 111536), (35, 1269), (1, 0)], ("BUILDING_WALLS", 25389)),
+}
+MINOR_TABLES_HELD = {
+    100: ([(11, 52891), (34, 6046), (1, 0)], ("BUILDING_WALLS", 15277)),
+    101: ([(18, 100114), (35, -161), (1, 0)], ("BUILDING_WALLS", 16493)),
+    102: ([(18, 94321), (35, -161), (1, 0)], ("BUILDING_WALLS", 16493)),
+}
+
+
+def test_minor_tables(rules) -> None:
+    """THE MINORS' TABLES OFF THE SIM: seed9001's opening state, then each
+    minor at population 3, a Monument held and a Warrior in hand (7 in, 2 in
+    the overflow store)"""
+    from core.simbase import FIXTURES
+    from warmup import opened
+
+    sim = opened(rules, FIXTURES / "seed9001.json", 0)
+    T = sim._cv_tables()
+    E = T["engine"]
+    fx_min = -9999 * FX
+
+    def check(want: dict) -> None:
+        for seat, (sums, pick) in want.items():
+            s = seat - 100
+            tabs = sim._cv_minor_tables(s)
+            got = []
+            for tab in tabs:
+                vals = [int(x[0]) for x in tab if int(x[0]) != fx_min]
+                got.append((len(vals), sum(vals)))
+            assert got == sums, (seat, got, sums)
+            kind, row, value = sim._cv_minor_pick(s)
+            assert int(kind[0]) == 0, (seat, int(kind[0]))
+            assert (T["bld_rows"][int(row[0])]["type"], int(value[0])) == pick, (seat, int(row[0]), int(value[0]), pick)
+
+    check(MINOR_TABLES)
+    mon = E["building"][[r["type"] for r in T["bld_rows"]].index("BUILDING_MONUMENT")]
+    war = E["unit"][T["unit_index"]["UNIT_WARRIOR"]]
+    for seat in MINOR_TABLES_HELD:
+        s = seat - 100
+        row = sim._CITY_MINOR0 + s
+        sim.city_pop[:, row, 0] = 3
+        sim.city_bldg[:, row, 0, mon] = True
+        sim.citystate_item[:, s] = war
+        sim.citystate_prod[:, s] = 7
+        sim.citystate_ovf[:, s] = 2
+    sim._eff_version += 1
+    sim._bldg_version += 1
+    sim._gen_ver += 1
+    check(MINOR_TABLES_HELD)
+    print("  the minors' tables off the sim OK")
+
+
 def main() -> None:
-    v = Values(load_rules())
+    rules = load_rules()
+    v = Values(rules)
     print("city_value_test:")
     test_housing(v)
     test_improvements(v)
@@ -593,6 +776,8 @@ def main() -> None:
     test_pick(v)
     test_desire(v)
     test_known(v)
+    test_modifiers(v)
+    test_minor_tables(rules)
     print("CITY VALUE OK")
 
 

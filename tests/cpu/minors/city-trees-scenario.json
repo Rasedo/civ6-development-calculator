@@ -1,0 +1,41 @@
+{
+  "about": "one city-state city over fourteen turns for the city events, trees and contracts in both twins (tests/cpu/minors/city-trees.test.ts, tests/gpu/city_trees_test.py): its plot evaluations, the items its tables value, the research it gains, its production (an item queued completes two turns on); each variant its district choice draws and the keys it overrides",
+  "seat": 2,
+  "city": 7,
+  "cityPlot": 70,
+  "turns": 14,
+  "owned": [70, 71, 72, 73, 74],
+  "unowned": [75],
+  "evals": [
+    {"plot": 70, "owned": true, "improvable": false, "districtOk": false, "nearOwned": false, "improvements": {}, "districts": {}},
+    {"plot": 71, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_FARM": 10}, "districts": {"DISTRICT_CAMPUS": 40}},
+    {"plot": 72, "owned": true, "improvable": true, "districtOk": false, "nearOwned": false, "improvements": {"IMPROVEMENT_FARM": 30}, "districts": {}},
+    {"plot": 73, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_FARM": 20}, "districts": {"DISTRICT_CAMPUS": 40}},
+    {"plot": 74, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_MINE": 45}, "districts": {"DISTRICT_HOLY_SITE": 12}},
+    {"plot": 75, "owned": false, "improvable": true, "districtOk": true, "nearOwned": true, "improvements": {}, "districts": {"DISTRICT_CAMPUS": 30}}
+  ],
+  "canImprove": [[71, "IMPROVEMENT_FARM"], [72, "IMPROVEMENT_FARM"], [73, "IMPROVEMENT_FARM"], [74, "IMPROVEMENT_MINE"]],
+  "districtSites": [71, 73, 74, 75],
+  "buildings": {"BUILDING_MONUMENT": 24, "BUILDING_GRANARY": 18},
+  "units": {"UNIT_WARRIOR": 10, "UNIT_BUILDER": 22},
+  "techs": ["TECH_POTTERY"],
+  "civics": [],
+  "gain": {"5": ["TECH_WRITING"], "8": ["TECH_MINING"]},
+  "researching": {"2": "TECH_WRITING", "3": "TECH_WRITING", "4": "TECH_WRITING", "6": "TECH_MINING", "7": "TECH_MINING"},
+  "bestUnit": 12,
+  "bestProject": 0,
+  "buildTurns": 2,
+  "variants": [
+    {"ties": [0, 0, 0, 0]},
+    {"ties": [1, 1, 1, 1]},
+    {"ties": [], "gain": {"9": ["TECH_MINING"]}, "researching": {},
+     "evals": [
+       {"plot": 70, "owned": true, "improvable": false, "districtOk": false, "nearOwned": false, "improvements": {}, "districts": {}},
+       {"plot": 71, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_FARM": 10}, "districts": {"DISTRICT_HOLY_SITE": 20}},
+       {"plot": 72, "owned": true, "improvable": true, "districtOk": false, "nearOwned": false, "improvements": {"IMPROVEMENT_FARM": 30}, "districts": {}},
+       {"plot": 73, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_MINE": 50}, "districts": {"DISTRICT_CAMPUS": 25}},
+       {"plot": 74, "owned": true, "improvable": true, "districtOk": true, "nearOwned": false, "improvements": {"IMPROVEMENT_MINE": 45}, "districts": {"DISTRICT_HOLY_SITE": 12}},
+       {"plot": 75, "owned": false, "improvable": true, "districtOk": true, "nearOwned": true, "improvements": {}, "districts": {"DISTRICT_CAMPUS": 60}}
+     ]}
+  ]
+}

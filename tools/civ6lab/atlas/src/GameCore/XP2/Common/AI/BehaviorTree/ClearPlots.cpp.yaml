@@ -7,7 +7,7 @@
   final: 0x55e160
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:checkPlot]
+  impl: [cpu/core/aiCityTrees.ts:checkPlot, gpu/core/sim_citytrees.py:_u_check_plot]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -18,7 +18,7 @@
   final: 0x55eaf0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:clearPlot]
+  impl: [cpu/core/aiCityTrees.ts:clearPlot, gpu/core/sim_citytrees.py:_u_clear]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -29,7 +29,7 @@
   final: 0x55ed80
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:purchasePlot]
+  impl: [cpu/core/aiCityTrees.ts:purchasePlot, gpu/core/sim_citytrees.py:_u_purchase]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]

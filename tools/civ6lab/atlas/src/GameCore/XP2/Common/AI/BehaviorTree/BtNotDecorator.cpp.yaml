@@ -12,7 +12,7 @@
     - recording: h1_duelv1124
       turn: 83
       value: "Granada's Builder contracts 236, 273, 319 at t83, t93, t103: each tree's Contract Manager past its limit"
-  impl: [cpu/core/aiContracts.ts:contractManagerNode]
+  impl: [cpu/core/aiContracts.ts:contractManagerNode, gpu/core/sim_citytrees.py:_u_contract_manager]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

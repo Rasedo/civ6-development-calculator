@@ -34,7 +34,7 @@ import { UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
 import { PROJECTS, projectConversionRate } from '../data/projects';
 import { worshipBuildingOf } from '../data/religion';
 import { CIV_LEVELS } from '../data/civLevels';
-import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../data/constants';
+import { CITY_MIN_STRIKE_CS, FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT, gameProgressPct } from '../data/constants';
 import { canPlaceDistrictIn, fitEncampOuter, outerPool, validImprovements, wallsMax } from './rules';
 import { lumpFood, seatGrowth } from './seatTurn';
 import { bankruptcy, cityBorderGrowth, cityStrikes, cultureAfterGrowth, paveGround } from './phase';
@@ -65,8 +65,9 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
-import { FX, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween } from './aiValue';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, unitTable, type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { projectTable, type ProjectTableFacts } from './aiProjectValue';
+import { FX, FX_MIN, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween } from './aiValue';
 import { majorView } from './majorView';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -1292,6 +1293,52 @@ export function minorBuildFacts(state: GameState, cityState: CityState, known: (
       const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100));
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
+  };
+}
+
+/** What the PROJECTS table (`aiProjectValue.ts`) reads of a minor's city
+ *  beside its city build facts: its completions (player +0x1330), one city
+ *  producing, the game's progress; the space-race standing, the outer
+ *  defences' repair count, the loyalty and the effects' unlocks not read
+ *  (none), no favoured items */
+export function minorProjectFacts(cityState: CityState, facts: CityBuildFacts): ProjectTableFacts {
+  const r = cityState.research;
+  return {
+    view: facts.view,
+    seat: cityState.seat,
+    cityId: facts.cityId,
+    capital: true,
+    advanced: (p) => facts.view.projectCompletions(cityState.seat, p),
+    buildTurns: (p) => facts.buildTurns(p),
+    progressPct: gameProgressPct(r.techs.length, r.civics.length),
+    spaceRaceStanding: 0,
+    defenceRepairs: 0,
+    population: facts.population,
+    districts: facts.districtCount,
+    loyaltyFalling: false,
+    buildingValue: (b, t) => {
+      const row = AI_BUILDINGS[AI_BUILDING_INDEX.get(b) ?? -1];
+      return row ? buildingValue(facts, row, t) : 0;
+    },
+    hasBuilding: (b) => facts.hasBuilding(b),
+    hasCivic: (c) => r.civics.includes(engineId('civic', c, 'CIVIC_', CIVICS) ?? ''),
+    hasTech: (t) => r.techs.includes(engineId('tech', t, 'TECH_', TECHS) ?? ''),
+    hasDistrict: (d) => facts.hasDistrict(d),
+    unlockedByEffect: () => false,
+    producingElsewhere: () => 0,
+    favoured: () => false,
+    horizon: AI_VALUE_HORIZON,
+  };
+}
+
+/** THE CITY CENTRE'S VALUE TABLES of a minor (0x5ce970's buildings, units
+ *  and projects), its knowledge base's unit counts `known` */
+export function minorTables(state: GameState, cityState: CityState, known: (unit: string) => number): CityBuildTables {
+  const facts = minorBuildFacts(state, cityState, known);
+  return {
+    buildings: buildingTable(facts),
+    units: unitTable(facts).map((v) => v ?? FX_MIN),
+    projects: projectTable(minorProjectFacts(cityState, facts)),
   };
 }
 

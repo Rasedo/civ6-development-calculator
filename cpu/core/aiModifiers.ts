@@ -817,6 +817,25 @@ export function envoyValue(t: ValueTerms, minor: number, tokens: number): number
   return modifiersValue({ view: t.view, seat: t.seat, start: t.start, horizon: t.horizon, rate: t.rate, other: minor, tokens }, mods);
 }
 
+/** WHAT THE EVALUATOR READS, by name: the RequirementTypes the registry
+ *  names, those with an evaluator here, the EffectTypes with an analyzer
+ *  (and the wrappers analysed through their nested modifiers), the analyzers
+ *  that set the total, those with a slot 2, the collections walked, the
+ *  wonders CITY_HAS_BUILDING passes over — the
+ *  GPU twin (gpu/core/sim_cityvalue.py) refuses a read it lacks */
+export const AI_MODIFIER_READS = {
+  requirements: [...REGISTERED_REQUIREMENTS],
+  evaluators: Object.keys(EVALUATORS),
+  analyzers: [...Object.keys(ANALYZERS), 'EFFECT_GRANT_ABILITY', 'EFFECT_ATTACH_MODIFIER', 'EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE'],
+  sets: Object.keys(SETS),
+  none: Object.keys(NONE_ANALYZERS),
+  collections: ['COLLECTION_OWNER', 'COLLECTION_PLAYER_CITIES', 'COLLECTION_PLAYER_CAPITAL_CITY', 'COLLECTION_PLAYER_DISTRICTS',
+    'COLLECTION_CITY_DISTRICTS', 'COLLECTION_CITY_TRAINED_UNITS', 'COLLECTION_CITY_PLOT_YIELDS', 'COLLECTION_ALL_CITIES',
+    'COLLECTION_ALL_PLAYERS', 'COLLECTION_MAJOR_PLAYERS'],
+  /** the wonders CITY_HAS_BUILDING never holds outside its own city */
+  wonders: Object.keys(BUILT_WONDERS),
+};
+
 /** One modifier's value: its analysis's whole number, 0 where refused */
 export function modifierValue(t: ValueTerms, m: AiModifier): number {
   return analysis(t, m, 1) ?? 0;
