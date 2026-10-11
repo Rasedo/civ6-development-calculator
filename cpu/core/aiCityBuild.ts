@@ -32,10 +32,11 @@
  * (0x7a4b20, `aiModifiers.ts`) over T to the horizon, the building's owner
  * the city.
  */
-import { AI_BUILDINGS } from '../data/aiBuildTables';
+import { AI_BUILDINGS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
-import { AMENITY_TIERS, amenityTier } from '../data/constants';
+import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
+import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { modifiersValue, type AiModifier } from './aiModifiers';
 
 /** One Buildings row as the city build AI reads it (ai_tables.py) */
@@ -48,6 +49,7 @@ export interface AiBuildingRow {
   regionalRange: number;
   outerDefenseHitPoints: boolean;
   outerDefenseStrength: number;
+  defenseModifier: number;
   tech: string | null;
   civic: string | null;
   district: string | null;
@@ -97,6 +99,8 @@ export interface CityBuildFacts {
   /** the player's version of a building, or null where its civilization
    *  may not build it */
   version(building: string): string | null;
+  /** the player's version of a unit (player +0x12e8 +0x1c0), or null */
+  unitVersion(unit: string): string | null;
   hasBuilding(building: string): boolean;
   /** the city holds the district complete (one under construction is not
    *  held: runs/h1_duelv1124 Bologna t16 counts its Campus's turns) */
@@ -123,6 +127,127 @@ export interface CityBuildFacts {
   regionalAmenities(range: number): readonly AmenityCity[];
   /** turns to build an item at the city's Production toward it */
   buildTurns(item: string): number;
+  /** the city's growth as its forecast reads it */
+  growth: CityGrowth;
+  /** the player is CIVILIZATION_LEVEL_FULL_CIV (0x469db0) / _TRIBE (0x469ce0) */
+  fullCiv: boolean;
+  tribe: boolean;
+  /** the player's units (its unit list's count, player +0x12e8 +0xc0) */
+  unitCount: number;
+}
+
+/** 0x7b62c0's exits, A UNIT VALUED AT FX(-9999): at or past the horizon;
+ *  not the player's version of it; a player that is neither a full
+ *  civilization nor the barbarians, at peace and holding more than five
+ *  units (runs/h1_duelv1124: a city-state's Shrine logs FX(-9999) plus its
+ *  own value on 124 of the 127 turns it holds six units or more); a Spy for
+ *  a player that is not a full civilization. Null where none applies (the
+ *  value past them is not read here). */
+export function unitValueExit(f: CityBuildFacts, unit: string, t: number, h = AI_VALUE_HORIZON): number | null {
+  if (t >= h || f.unitVersion(unit) !== unit) return FX_MIN;
+  if (!f.fullCiv && !f.tribe && !f.atWar && f.unitCount > 5) return FX_MIN;
+  if (unit === 'UNIT_SPY' && !f.fullCiv) return FX_MIN;
+  return null;
+}
+
+/** A city's growth (its growth object, city +0x1788): its Food surplus less
+ *  its citizens' (raw, 0x1b5620), its housing (whole, 0x1b5840), the Food in
+ *  store (raw, +0x80) and its overall growth multiplier (raw, 0x1b62d0) */
+export interface CityGrowth {
+  surplus: number;
+  housing: number;
+  population: number;
+  stored: number;
+  multiplier: number;
+}
+
+/** one step of the growth forecast: from `turn` the city holds `pop`
+ *  citizens and its housing withholds `lost` Food a turn (raw) */
+export interface GrowthStep {
+  turn: number;
+  lost: number;
+  pop: number;
+}
+
+/** the turns the growth forecast runs to (CityBuildAI +0x6c0) */
+const FORECAST_TURNS = 100;
+
+/** 0x527ca0: the growth factor of the housing left, raw */
+const housingFactor = (left: number): number => fxConst(housingGrowthFactor(left));
+
+/** the Food the housing factor `f` withholds of `surplus` (both raw) */
+const withheld = (surplus: number, f: number): number => Math.floor((-surplus * (f - FX)) / FX);
+
+/** 0x1b6390: the turns to the next citizen — the Food the threshold still
+ *  needs over the surplus times the growth multiplier, rounded up; -1 with
+ *  no surplus */
+function turnsToGrow(g: CityGrowth): number {
+  if (g.surplus <= 0) return -1;
+  const eff = fmul(g.surplus, g.multiplier);
+  if (eff <= 0) return -1;
+  const q = Math.trunc(((growthFoodNeeded(g.population) * FX - g.stored) * FX) / eff);
+  return (q >> 8) + ((q & 0xff) !== 0 ? 1 : 0);
+}
+
+/** 0x5cb570, THE GROWTH FORECAST (CityBuildAI +0x6c8 / +0x738 / +0x7a8):
+ *  each turn ahead where the housing factor changes, the citizens then and
+ *  the Food the housing withholds — the surplus falling 2 a citizen, each
+ *  next citizen at its whole turns past the last, to 100 turns */
+export function growthForecast(g: CityGrowth): GrowthStep[] {
+  const out: GrowthStep[] = [];
+  let s = g.surplus;
+  let factor = housingFactor(g.housing - g.population);
+  if (factor !== FX) out.push({ turn: 0, lost: withheld(s, factor), pop: g.population });
+  let turn = turnsToGrow(g);
+  for (let pop = g.population + 1; turn < FORECAST_TURNS; pop++) {
+    const f = housingFactor(g.housing - pop);
+    if (f !== factor) {
+      factor = f;
+      out.push({ turn, lost: withheld(s, factor), pop });
+    }
+    const eff = Math.floor((factor * s) / FX);
+    if (eff <= 0) break;
+    turn += Math.trunc((growthFoodNeeded(pop) * FX * FX) / eff) >> 8;
+    s = Math.max(s - 2 * FX, 0);
+  }
+  return out;
+}
+
+/** 0x7a3d70: `housing` more in the city from turn `t` to the horizon — over
+ *  each step of the forecast, twice the Food (at its DefaultValue) the
+ *  housing factor stops withholding, discounted over the step */
+export function housingValue(g: CityGrowth, forecast: readonly GrowthStep[], housing: number, t: number, h: number): number {
+  const s = g.surplus;
+  const food = fxConst(AI_YIELD_DEFAULT.YIELD_FOOD ?? 1);
+  const next = (after: number): GrowthStep | undefined => forecast.find((e) => e.turn > after);
+  const amount = (c: { pop: number; lost: number }): number =>
+    2 * fmul(withheld(-s, housingFactor(g.housing - c.pop + housing)) + c.lost, food);
+  let cur = { pop: g.population, lost: withheld(s, housingFactor(g.housing - g.population)) };
+  let fetched = cur.lost;
+  let start = -1;
+  let e = next(start);
+  while (e && e.turn < t) {
+    cur = e;
+    start = e.turn;
+    fetched = e.lost;
+    e = next(start);
+  }
+  e = next(start);
+  if (e) fetched = e.lost;
+  let value = 0;
+  while (e && start < h) {
+    const a = amount(cur);
+    value += presentValue(a, AI_RATE, Math.min(h, e.turn)) - presentValue(a, AI_RATE, Math.max(t, start));
+    start = e.turn;
+    cur = e;
+    e = next(start);
+    if (e) fetched = e.lost;
+  }
+  if (fetched > 0) {
+    const a = amount(cur);
+    value += presentValue(a, AI_RATE, h) - presentValue(a, AI_RATE, Math.max(t, start));
+  }
+  return value;
 }
 
 const turnsOver = (f: CityBuildFacts, b: AiBuildingRow): number => Math.max(f.techTurns(b.tech), f.civicTurns(b.civic));
@@ -160,7 +285,7 @@ export function buildingTurns(f: CityBuildFacts, b: AiBuildingRow): number {
 
 /** CanConstruct with its reasons all clear: the technology and the civic
  *  held, the district standing in the city, a prerequisite building held */
-function constructibleNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
+export function constructibleNow(f: CityBuildFacts, b: AiBuildingRow): boolean {
   if (refused(f, b) || f.techTurns(b.tech) !== 0 || f.civicTurns(b.civic) !== 0) return false;
   if (b.district && !f.hasDistrict(b.district)) return false;
   return !b.prereqs.length || b.prereqs.some((p) => f.hasBuilding(p));
@@ -247,9 +372,111 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     for (const c of cities) e += valueBetween(amenityPerTurn(f, c), t, h);
     value += b.regionalRange <= 1 ? e : Math.min(e, 50 * FX);
   }
+  // its free units (Unit_BuildingPrereqs) but an Archaeologist, each at its
+  // unit value
+  for (const u of b.units) if (u !== 'UNIT_ARCHAEOLOGIST') value += unitValueExit(f, u, t, h) ?? 0;
+  if (b.housing > 0) value += housingValue(f.growth, growthForecast(f.growth), b.housing, t, h);
   value += modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, owner: { cityId: f.cityId, capital: f.capital } },
     b.modifiers);
   return value;
+}
+
+/** One Units row as the Default Specialization pick reads it */
+export interface AiUnitRow {
+  type: string;
+  foundCity: boolean;
+  buildCharges: number;
+  mustPurchase: boolean;
+  combat: number;
+  /** TypeTags CLASS_RECON */
+  recon: boolean;
+}
+
+/** The city centre's value tables (raw, database order) */
+export interface CityBuildTables {
+  buildings: readonly number[];
+  units: readonly number[];
+  projects: readonly number[];
+}
+
+/** What the Default Specialization pick reads of the city beside its tables */
+export interface PickFacts {
+  /** the building in the city's queue or held (0x17e690 > 0) */
+  buildingHeld(building: string): boolean;
+  /** CanConstruct (0x170450) with its reasons clear */
+  canConstruct(building: string): boolean;
+  /** CanTrain (0x172820) */
+  canTrain(unit: string): boolean;
+  /** the project the city may produce (0x179650) */
+  canProduce(project: string): boolean;
+  /** the city's favoured-items verdict on a building (CityBuildAI +0x528,
+   *  0x5d2d10): 1 favoured, -1 disfavoured, 0 neither */
+  favored(building: string): -1 | 0 | 1;
+  /** the defensive pick: the military AI's +0x4b8, or the city's threat
+   *  (CityBuildAI +0x1b8 above -1) with its centre's district property or
+   *  CityBuildAI +0x218 */
+  defense: boolean;
+}
+
+export interface Pick {
+  kind: 'building' | 'unit' | 'project';
+  type: string;
+  value: number;
+}
+
+/** 0x5d4d70, THE DEFAULT SPECIALIZATION PICK over the city centre's tables:
+ *  the best building (0x5d0860: not held, constructible, its value halved
+ *  where disfavoured and doubled where favoured; in the defensive pick only
+ *  one with a DefenseModifier or OuterDefenseStrength), the best unit
+ *  (0x5d2600: no FoundCity, no BuildCharges, trainable, not MustPurchase; in
+ *  the defensive pick only a combat unit that is not CLASS_RECON) and, but
+ *  in the defensive pick, the best project (0x5d1f10) — each best starting
+ *  at FX(-9999) and taking a strictly higher value, the first in database
+ *  order on a tie. The building wins at least the unit's and the project's
+ *  value, else the unit at least the project's, else the project; null
+ *  where none is valued (the log's "NO BUILDS AT ALL" for a player that is
+ *  not a full civilization). */
+export function defaultSpecialization(t: CityBuildTables, f: PickFacts): Pick | null {
+  let bIdx = -1;
+  let bVal = FX_MIN;
+  AI_BUILDINGS.forEach((b, k) => {
+    if (f.buildingHeld(b.type)) return;
+    if (f.defense && !(b.defenseModifier > 0 || b.outerDefenseStrength > 0)) return;
+    if (!f.canConstruct(b.type)) return;
+    let v = t.buildings[k];
+    const fav = f.favored(b.type);
+    if (fav === -1) v = fmul(v, fxConst(0.5));
+    else if (fav === 1) v = fmul(v, 2 * FX);
+    if (v > bVal) {
+      bVal = v;
+      bIdx = k;
+    }
+  });
+  let uIdx = -1;
+  let uVal = FX_MIN;
+  AI_UNITS.forEach((u, k) => {
+    if (u.foundCity || u.buildCharges > 0) return;
+    if (!f.canTrain(u.type) || u.mustPurchase) return;
+    if (f.defense && (u.combat === 0 || u.recon)) return;
+    if (t.units[k] > uVal) {
+      uVal = t.units[k];
+      uIdx = k;
+    }
+  });
+  let pIdx = -1;
+  let pVal = FX_MIN;
+  if (!f.defense) {
+    AI_PROJECTS.forEach((p, k) => {
+      if (f.canProduce(p) && t.projects[k] > pVal) {
+        pVal = t.projects[k];
+        pIdx = k;
+      }
+    });
+  }
+  if (bIdx >= 0 && bVal >= uVal && bVal >= pVal) return { kind: 'building', type: AI_BUILDINGS[bIdx].type, value: bVal };
+  if (uIdx >= 0 && uVal >= pVal) return { kind: 'unit', type: AI_UNITS[uIdx].type, value: uVal };
+  if (pIdx >= 0) return { kind: 'project', type: AI_PROJECTS[pIdx], value: pVal };
+  return null;
 }
 
 /** THE BUILDINGS TABLE of the city centre (0x5ce970's building loop): a raw

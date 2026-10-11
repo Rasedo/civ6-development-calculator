@@ -8,6 +8,7 @@
  * prefix (`BUILDING_` + id), which is how most ids are spelled.
  */
 import type { Src } from './provenance';
+import type { Elevation, TerrainId } from '../../world/types';
 import { BUILDINGS } from './buildings';
 import { BUILT_WONDERS } from './builtWonders';
 import { CIVICS } from './civics';
@@ -114,4 +115,29 @@ const reverse: Record<string, Map<string, string>> = {};
 export function gameTypeOf(kind: string, id: string, prefix: string): string {
   const rev = (reverse[kind] ??= new Map([...(aliases()[kind] ?? new Map())].map(([type, eid]) => [eid, type] as const)));
   return rev.get(id) ?? prefix + id;
+}
+
+/** the game's TerrainTypes' base names (TERRAIN_<base>[_HILLS|_MOUNTAIN]) to
+ *  the engine's land terrains; COAST, LAKE and OCEAN keep their names */
+export const TERRAIN_BASE: Readonly<Record<string, TerrainId>> = {
+  GRASS: 'GRASSLAND', PLAINS: 'PLAINS', DESERT: 'DESERT', TUNDRA: 'TUNDRA', SNOW: 'SNOW',
+};
+/** the game's FeatureTypes whose engine id is not the name without its
+ *  prefix */
+export const FEATURE_ID: Readonly<Record<string, string>> = {
+  FEATURE_FOREST: 'WOODS', FEATURE_JUNGLE: 'RAINFOREST', FEATURE_BARRIER_REEF: 'GREAT_BARRIER_REEF',
+  FEATURE_KILIMANJARO: 'MOUNT_KILIMANJARO', FEATURE_EVEREST: 'MOUNT_EVEREST',
+  FEATURE_CLIFFS_DOVER: 'CLIFFS_OF_DOVER', FEATURE_BURNING_FOREST: 'BURNING_WOODS',
+  FEATURE_BURNT_FOREST: 'BURNT_WOODS', FEATURE_BURNING_JUNGLE: 'BURNING_RAINFOREST',
+  FEATURE_BURNT_JUNGLE: 'BURNT_RAINFOREST', FEATURE_DEVILSTOWER: 'DEVILS_TOWER',
+  FEATURE_WHITEDESERT: 'WHITE_DESERT',
+};
+
+/** a tile's TerrainType and FeatureType in the game's names */
+export function installTerrain(terrain: TerrainId, elevation: Elevation): string {
+  const base = Object.entries(TERRAIN_BASE).find(([, t]) => t === terrain)?.[0] ?? terrain;
+  return `TERRAIN_${base}${elevation === 'HILLS' ? '_HILLS' : elevation === 'MOUNTAIN' ? '_MOUNTAIN' : ''}`;
+}
+export function installFeature(feature: string): string {
+  return Object.entries(FEATURE_ID).find(([, f]) => f === feature)?.[0] ?? `FEATURE_${feature}`;
 }

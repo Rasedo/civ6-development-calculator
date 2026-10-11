@@ -40,6 +40,7 @@ import { floodplainList } from './eventDraws';
 import { countFlood, eruptionRings, floodRiverIndex, riverReach, soilPaintable, stormFootprint, stormStartRadius } from '../core/disasters';
 import { ERUPTION_CUL_P, ERUPTION_PAINT_P, ERUPTION_PROD_P, ERUPTION_ROWS, ERUPTION_SCI_P, ERUPTION_WONDER, DROUGHT_HEXES, DROUGHT_TURNS, FLOOD_YIELD_ROWS, STORM_EVENTS, STORM_MOVEMENT, STORM_ROWS } from '../data/disasters';
 import { isWater } from '../../world/query';
+import { FEATURE_ID, TERRAIN_BASE } from '../data/aliases';
 import { goldShortfall } from '../data/seats';
 import { governorsOf } from '../core/governors';
 import { envoysWith } from '../core/cityStates';
@@ -191,17 +192,6 @@ export interface Imported {
 
 const strip = (s: string, prefix: string) => (s.startsWith(prefix) ? s.slice(prefix.length) : s);
 
-const TERRAIN_BASE: Record<string, TerrainId> = {
-  GRASS: 'GRASSLAND', PLAINS: 'PLAINS', DESERT: 'DESERT', TUNDRA: 'TUNDRA', SNOW: 'SNOW',
-};
-const FEATURE_ID: Record<string, string> = {
-  FEATURE_FOREST: 'WOODS', FEATURE_JUNGLE: 'RAINFOREST', FEATURE_BARRIER_REEF: 'GREAT_BARRIER_REEF',
-  FEATURE_KILIMANJARO: 'MOUNT_KILIMANJARO', FEATURE_EVEREST: 'MOUNT_EVEREST',
-  FEATURE_CLIFFS_DOVER: 'CLIFFS_OF_DOVER', FEATURE_BURNING_FOREST: 'BURNING_WOODS',
-  FEATURE_BURNT_FOREST: 'BURNT_WOODS', FEATURE_BURNING_JUNGLE: 'BURNING_RAINFOREST',
-  FEATURE_BURNT_JUNGLE: 'BURNT_RAINFOREST', FEATURE_DEVILSTOWER: 'DEVILS_TOWER',
-  FEATURE_WHITEDESERT: 'WHITE_DESERT',
-};
 /** the game's six river / cliff direction bits per plot: 1 = the plot lies NE
  *  of the edge (the edge is its SW side), 2 = NW of it (SE side), 4 = W of it
  *  (E side). The game's y grows NORTH and a record's rows are y, so the

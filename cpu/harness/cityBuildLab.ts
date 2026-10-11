@@ -22,14 +22,14 @@ import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory } from './import';
 import type { CityState, GameState } from '../core/types';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
-import { buildingPerTurn, buildingTable, buildingTurns, buildingValue } from '../core/aiCityBuild';
-import { minorBuildFacts, minorItemCost, minorItemKey, minorItemPct, type MinorItem } from '../core/minorBuild';
+import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue } from '../core/aiCityBuild';
+import { minorBuildFacts, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
 import { FX_MIN } from '../core/aiValue';
-import { loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
+import { loadCityBuildCentre, loadCityBuildPicks, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -101,7 +101,23 @@ function loadResearch(path: string): Map<string, [number, string]> {
 }
 const research = loadResearch(dump.replace(/\.jsonl$/, '.logs/AI_Research.csv'));
 
+/** AI_Knowledge.csv's TRADE lines: `${turn}:${player}` -> VAL */
+const tradeVal = new Map<string, number>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      if (p[2] === 'TRADE') tradeVal.set(`${p[0]}:${p[1]}`, Number(p[4].replace('VAL ', '')));
+    }
+  }
+}
+const zero = args.includes('--zero') ? args[args.indexOf('--zero') + 1].split(',') : [];
+
 const tables = loadCityBuildTables(dump);
+const centre = loadCityBuildCentre(dump);
+const picks = loadCityBuildPicks(dump);
+const pickTally = { log: { n: 0, ok: 0, miss: [] as string[] }, ours: { n: 0, ok: 0, miss: [] as string[] } };
 if (!tables.size) throw new Error(`no PLOT ANALYSIS LOG beside ${dump}`);
 const cat = loadCatalog(dump);
 const recs: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord)
@@ -128,6 +144,17 @@ for (let i = 0; i + 1 < recs.length; i++) {
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, stats.total.culture);
     const facts = minorBuildFacts(state, cs);
+    // the inputs the port does not read, as the game's logs give them: the
+    // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
+    // pseudo-yields whose weights are not read set to -1.0 (factor 0)
+    {
+      const v0 = facts.view;
+      const k = tradeVal.get(`${turn - 1}:${player}`);
+      facts.view = Object.assign(Object.create(v0) as typeof v0, {
+        tradeKnowledge: (s: number) => (s === cs.seat && k !== undefined ? Math.round(k * 256) : v0.tradeKnowledge(s)),
+        pseudoYieldWeight: (s: number, p: string) => (zero.includes(p) ? -256 : v0.pseudoYieldWeight(s, p)),
+      });
+    }
     if (args.includes('--logtech')) {
       // the research AI's turns as the game's log gives them: the entry of
       // the turn, plus the turns left on the research in hand as its last
@@ -147,6 +174,28 @@ for (let i = 0; i + 1 < recs.length; i++) {
     }
     const ours = buildingTable(facts);
     tallyBuildings(all, turn, player, logged, ours, per);
+    // THE DEFAULT SPECIALIZATION PICK on the turns the log shows it: over the
+    // log's own tables (the pick apart from the values), and with our
+    // buildings table in place of the log's
+    const cityName = imp.dumpOfMinor.get(cs)!.name;
+    const pickKey = `${turn}:${player}:${cityName}`;
+    if (picks.has(pickKey)) {
+      const want = picks.get(pickKey)!;
+      const rows = centre.get(pickKey)!;
+      const raw = (xs: number[] | undefined) => (xs ?? []).map((x) => Math.round(x * 256));
+      const saved = cs.prodItem;
+      delete cs.prodItem;
+      const pf = minorPickFacts(state, cs, facts);
+      cs.prodItem = saved;
+      for (const [tag, bt] of [['log', raw(rows.BUILDINGS)], ['ours', ours]] as const) {
+        const got = defaultSpecialization({ buildings: bt, units: raw(rows.UNITS), projects: raw(rows.PROJECTS) }, pf);
+        const ok = want === null ? got === null : got !== null && got.type === want.item;
+        const t = pickTally[tag];
+        t.n += 1;
+        if (ok) t.ok += 1;
+        else if (t.miss.length < 12) t.miss.push(`t${turn} p${player} log ${want ? `${want.item} ${want.value}` : 'NONE'} ours ${got ? `${got.type} ${(got.value / 256).toFixed(2)}` : 'NONE'}`);
+      }
+    }
     // the value apart from the turns: a logged value our value prints at
     // some T below the horizon
     AI_BUILDINGS.forEach((brow, k) => {
@@ -170,10 +219,14 @@ for (let i = 0; i + 1 < recs.length; i++) {
         const parts = [facts.techTurns(brow.tech), facts.civicTurns(brow.civic), brow.district && !facts.hasDistrict(brow.district) ? facts.buildTurns(brow.district) : -1, facts.buildTurns(brow.type), facts.current];
         const rlog = brow.tech ? research.get(`${turn}:${player}:${brow.tech}`) ?? null : null;
         const cur = researching.get(`${turn}:${player}`) ?? null;
-        rows.push({ t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null });
+        rows.push({ nu: state.units.filter((u) => u.seat === cs.seat).length, war: facts.atWar, t: turn, p: player, b: brow.type, log: g, ours: o, T, v, parts, rlog, cur, pop: cs.population, prod: stats.total.production, item: cs.prodItem ?? null, g: brow.housing > 0 ? { ...facts.growth, fc: growthForecast(facts.growth), hv: housingValue(facts.growth, growthForecast(facts.growth), brow.housing, T, 50) / 256 } : undefined });
       });
     }
   }
+}
+for (const [tag, t] of Object.entries(pickTally)) {
+  console.log(`DEFAULT SPECIALIZATION (${tag} buildings table): ${t.ok} / ${t.n} as logged`);
+  for (const m of t.miss) console.log(`  ${m}`);
 }
 for (const [type, t] of [...per].sort((a, b) => b[1].log - a[1].log)) {
   if (!t.log && !t.onlyOurs) continue;

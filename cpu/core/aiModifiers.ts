@@ -21,7 +21,7 @@
 import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import {
-  FX, discounted, fmul, fxConst, presentValue, pseudoYieldValue, valueBetween, whole, yieldValue, type AiValueView,
+  FX, discounted, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
 
 export interface AiRequirement {
@@ -44,6 +44,8 @@ export interface AiModifier {
   args: Readonly<Record<string, string>>;
   subjectReqs?: AiRequirementSet;
   ownerReqs?: AiRequirementSet;
+  /** an EFFECT_GRANT_ABILITY's ability's own modifiers (UnitAbilityModifiers) */
+  ability?: readonly AiModifier[];
 }
 
 /** One evaluation's terms (the analysis context 0x6ccd50 the analyzers
@@ -65,7 +67,8 @@ export interface ValueTerms {
 type Subject =
   | { kind: 'player' }
   | { kind: 'city'; id: number; capital: boolean }
-  | { kind: 'district'; cityId: number; type: string };
+  | { kind: 'district'; cityId: number; type: string }
+  | { kind: 'plot'; plot: AiPlotView };
 
 /** a collection's subjects for the seat (the collection objects' iterators);
  *  null for a collection not read */
@@ -75,6 +78,10 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     case 'COLLECTION_PLAYER_CITIES': return t.view.cities(t.seat).map((c) => ({ kind: 'city', id: c.id, capital: c.capital }));
     case 'COLLECTION_PLAYER_CAPITAL_CITY': return t.view.cities(t.seat).filter((c) => c.capital).map((c) => ({ kind: 'city', id: c.id, capital: true }));
     case 'COLLECTION_PLAYER_DISTRICTS': return t.view.districts(t.seat).map((d) => ({ kind: 'district', cityId: d.cityId, type: d.type }));
+    // 0x69ffa0: once, the evaluation's city (context +0x70)
+    case 'COLLECTION_CITY_TRAINED_UNITS': return t.owner ? [{ kind: 'city', id: t.owner.cityId, capital: t.owner.capital }] : [];
+    // 0x69feb0: the evaluation city's plots of its three rings that it owns
+    case 'COLLECTION_CITY_PLOT_YIELDS': return t.owner ? t.view.cityOwnedPlots(t.seat, t.owner.cityId).map((plot) => ({ kind: 'plot', plot })) : [];
     default: return null;
   }
 }
@@ -108,6 +115,15 @@ const REGISTERED_REQUIREMENTS: ReadonlySet<string> = new Set([
 type Evaluator = (t: ValueTerms, args: Readonly<Record<string, string>>, s: Subject) => boolean;
 
 const EVALUATORS: Readonly<Record<string, Evaluator>> = {
+  // the plot subject's (context +0x88) terrain (0x6d1dd0: plot +0x2c),
+  // feature (0x6d4380), resource (0x6d1970: plot +0x40, none fails), the
+  // resource revealed to the player (0x6d1c00), an improvement (0x6cfcd0:
+  // plot +0x44)
+  REQUIREMENT_PLOT_TERRAIN_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.terrain === args.TerrainType,
+  REQUIREMENT_PLOT_FEATURE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && s.plot.feature === args.FeatureType,
+  REQUIREMENT_PLOT_RESOURCE_TYPE_MATCHES: (_t, args, s) => s.kind === 'plot' && !!s.plot.resource && s.plot.resource === args.ResourceType,
+  REQUIREMENT_PLOT_RESOURCE_VISIBLE: (_t, _args, s) => s.kind === 'plot' && s.plot.resourceVisible,
+  REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT: (_t, _args, s) => s.kind === 'plot' && !!s.plot.improvement,
   // 0x6d08c0: a district subject of the type (with none, the district type
   // the evaluation is of, context +0x1c — none in a policy's analysis)
   REQUIREMENT_DISTRICT_TYPE_MATCHES: (_t, args, s) => s.kind === 'district' && s.type === args.DistrictType,
@@ -261,13 +277,37 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   // 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR at the player's weight,
   // PV(horizon) - PV(start)
   EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_DIPLOMATIC_FAVOR'))),
+  // 0x6c0ff0: a Trader's worth (0x7a7110) with the amount's capacity more,
+  // from the start to the horizon; 0 where the route value is not read
+  EFFECT_ADJUST_TRADE_ROUTE_CAPACITY: (t, args) =>
+    whole(traderValue(t.view, t.seat, Number(args.Amount ?? 0) | 0, t.start, t.horizon, 0, t.rate) ?? 0),
+  // 0x6afa10: a plot subject that is not impassable; half of the amount's
+  // PV(horizon) - PV(start), the yield unweighted
+  EFFECT_ADJUST_PLOT_YIELD: (t, args, s) => {
+    if (s.kind !== 'plot' || s.plot.impassable) return 0;
+    return whole(yieldValue(null, null, fmul(span(t, amountOf(args)), fxConst(0.5)), args.YieldType ?? ''));
+  },
+  // 0x6c09b0 (its parser 0x6c0590 stores fx(Amount x 0.01f) as unweighted
+  // Gold): with no unit, a city subject's Production (City::GetYield) times
+  // it, from the start to the horizon
+  EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER: (t, args, s) => {
+    if (s.kind !== 'city') return 0;
+    const per = yieldValue(null, null, fxConst(Math.fround((Number(args.Amount ?? 0) | 0) * Math.fround(0.01))), 'YIELD_GOLD');
+    const production = fxOf(t.view.cityYield(t.seat, s.id, 'YIELD_PRODUCTION'));
+    return whole(valueBetween(fmul(per, production), t.start, t.horizon, t.rate));
+  },
 };
 
 /** One modifier's value (0x6cede0 over its subjects, each analyzer's whole
  *  number added): 0 where its collection, a requirement evaluator or its
  *  effect's analyzer is not read. */
-export function modifierValue(t: ValueTerms, m: AiModifier): number {
-  const an = ANALYZERS[m.effect];
+export function modifierValue(t: ValueTerms, m: AiModifier, depth = 1): number {
+  // 0x6b5b30, EFFECT_GRANT_ABILITY: per subject, the ability's own
+  // modifiers analysed in a copy of the context, their sums added; a fourth
+  // nested analysis is refused
+  const an = m.effect === 'EFFECT_GRANT_ABILITY'
+    ? (depth >= 4 ? undefined : (tt: ValueTerms) => (m.ability ?? []).reduce((a, x) => a + modifierValue(tt, x, depth + 1), 0))
+    : ANALYZERS[m.effect];
   const subs = subjects(t, m.collection);
   if (!an || !subs) return 0;
   let sum = 0;

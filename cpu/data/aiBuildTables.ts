@@ -1,11 +1,11 @@
 /**
  * THE CITY BUILD AI'S TABLES (cpu/core/aiCityBuild.ts), written by
  * tools/install/ai_tables.py from the layered install (`--check` reports a
- * stale file): the Buildings in DATABASE ORDER — the index the AI's value
- * tables run in — with the columns and child rows the building value
- * reads.
+ * stale file): the Buildings, Units and Projects in DATABASE ORDER — the
+ * index the AI's value tables run in — with the columns and child rows
+ * the values and the Default Specialization pick read.
  */
-import type { AiBuildingRow } from '../core/aiCityBuild';
+import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';
 
 export const AI_BUILDINGS: readonly AiBuildingRow[] = [
  {
@@ -17,6 +17,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -82,6 +83,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -153,6 +155,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BRONZE_WORKING",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -193,7 +196,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_BARRACKS_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "BARRACKS_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "BARRACKS_ADJUST_RESOURCE_STOCKPILE_CAP",
@@ -209,7 +222,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_NIHANG_BARRACKS_STRENGTH"
-    }
+    },
+    "ability": [
+     {
+      "id": "NIHANG_BARRACKS_STRENGTH",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_COMBAT_STRENGTH",
+      "args": {
+       "Amount": "15"
+      }
+     }
+    ]
    }
   ]
  },
@@ -222,6 +245,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_POTTERY",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -259,6 +283,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_WRITING",
   "civic": null,
   "district": "DISTRICT_CAMPUS",
@@ -301,6 +326,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ASTROLOGY",
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -345,6 +371,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": true,
   "outerDefenseStrength": 3,
+  "defenseModifier": 0,
   "tech": "TECH_MASONRY",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -377,6 +404,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_THE_WHEEL",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -482,6 +510,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
   "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
@@ -519,6 +548,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CELESTIAL_NAVIGATION",
   "civic": null,
   "district": "DISTRICT_HARBOR",
@@ -552,7 +582,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_LIGHTHOUSE_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "LIGHTHOUSE_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "LIGHTHOUSE_COAST_FOOD",
@@ -625,6 +665,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CURRENCY",
   "civic": null,
   "district": "DISTRICT_COMMERCIAL_HUB",
@@ -676,6 +717,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_HORSEBACK_RIDING",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -716,7 +758,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_STABLE_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "STABLE_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "STABLE_ADJUST_RESOURCE_STOCKPILE_CAP",
@@ -737,6 +789,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_THEOLOGY",
   "district": "DISTRICT_HOLY_SITE",
@@ -793,6 +846,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_THEOLOGY",
   "district": "DISTRICT_HOLY_SITE",
@@ -908,6 +962,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_DRAMA_POETRY",
   "district": "DISTRICT_THEATER",
@@ -957,6 +1012,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": true,
   "outerDefenseStrength": 3,
+  "defenseModifier": 0,
   "tech": "TECH_CASTLES",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -998,6 +1054,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_EDUCATION",
   "civic": null,
   "district": "DISTRICT_CAMPUS",
@@ -1042,6 +1099,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_THEOLOGY",
   "district": "DISTRICT_CAMPUS",
@@ -1091,6 +1149,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_APPRENTICESHIP",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -1133,6 +1192,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MILITARY_ENGINEERING",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -1176,7 +1236,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_ARMORY_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "ARMORY_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "ARMORY_ADJUST_RESOURCE_STOCKPILE_CAP",
@@ -1192,7 +1262,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_NIHANG_ARMORY_STRENGTH"
-    }
+    },
+    "ability": [
+     {
+      "id": "NIHANG_ARMORY_STRENGTH",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_COMBAT_STRENGTH",
+      "args": {
+       "Amount": "15"
+      }
+     }
+    ]
    }
   ]
  },
@@ -1205,6 +1285,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MASS_PRODUCTION",
   "civic": null,
   "district": "DISTRICT_HARBOR",
@@ -1250,7 +1331,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_SHIPYARD_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "SHIPYARD_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "SHIPYARD_UNIMPROVED_COAST_PRODUCTION",
@@ -1289,6 +1380,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BANKING",
   "civic": null,
   "district": "DISTRICT_COMMERCIAL_HUB",
@@ -1333,6 +1425,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": true,
   "outerDefenseStrength": 3,
+  "defenseModifier": 0,
   "tech": "TECH_SIEGE_TACTICS",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -1380,6 +1473,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_HUMANISM",
   "district": "DISTRICT_THEATER",
@@ -1440,6 +1534,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_HUMANISM",
   "district": "DISTRICT_THEATER",
@@ -1499,6 +1594,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_INDUSTRIALIZATION",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -1543,6 +1639,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_INDUSTRIALIZATION",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -1610,6 +1707,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ECONOMICS",
   "civic": null,
   "district": "DISTRICT_COMMERCIAL_HUB",
@@ -1654,6 +1752,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MILITARY_SCIENCE",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -1694,7 +1793,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_MILITARY_ACADEMY_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "MILITARY_ACADEMY_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "MILITARY_ACADEMY_TRAINED_CORPS_ARMY_DISCOUNT",
@@ -1719,7 +1828,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_NIHANG_ACADEMY_STRENGTH"
-    }
+    },
+    "ability": [
+     {
+      "id": "NIHANG_ACADEMY_STRENGTH",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_COMBAT_STRENGTH",
+      "args": {
+       "Amount": "15"
+      }
+     }
+    ]
    }
   ]
  },
@@ -1732,6 +1851,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_SANITATION",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -1764,6 +1884,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
   "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
@@ -1841,6 +1962,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_FLIGHT",
   "civic": null,
   "district": "DISTRICT_AERODROME",
@@ -1874,7 +1996,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_HANGAR_TRAINED_AIRCRAFT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "HANGAR_TRAINED_AIRCRAFT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "HANGAR_BONUS_AIR_SLOTS",
@@ -1895,6 +2027,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ELECTRICITY",
   "civic": null,
   "district": "DISTRICT_HARBOR",
@@ -1939,7 +2072,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_SEAPORT_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "SEAPORT_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "SEAPORT_TRAINED_CORPS_ARMY_DISCOUNT",
@@ -1982,6 +2125,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_NUCLEAR_FISSION",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -2033,6 +2177,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_RADIO",
   "civic": null,
   "district": "DISTRICT_THEATER",
@@ -2089,6 +2234,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_RADIO",
   "civic": null,
   "district": "DISTRICT_THEATER",
@@ -2155,6 +2301,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CHEMISTRY",
   "civic": null,
   "district": "DISTRICT_CAMPUS",
@@ -2199,6 +2346,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ADVANCED_FLIGHT",
   "civic": null,
   "district": "DISTRICT_AERODROME",
@@ -2234,7 +2382,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_AIRPORT_TRAINED_AIRCRAFT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "AIRPORT_TRAINED_AIRCRAFT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "50"
+      }
+     }
+    ]
    },
    {
     "id": "AIRPORT_BONUS_AIR_SLOTS",
@@ -2255,6 +2413,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_PROFESSIONAL_SPORTS",
   "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
@@ -2330,6 +2489,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2376,6 +2536,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2419,6 +2580,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2462,6 +2624,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2522,6 +2685,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2570,6 +2734,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2609,6 +2774,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2652,6 +2818,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2691,6 +2858,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_HOLY_SITE",
@@ -2730,6 +2898,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ASTROLOGY",
   "civic": null,
   "district": null,
@@ -2810,6 +2979,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_IRRIGATION",
   "civic": null,
   "district": null,
@@ -2851,6 +3021,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MASONRY",
   "civic": null,
   "district": null,
@@ -2918,6 +3089,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MYSTICISM",
   "district": null,
@@ -3116,6 +3288,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CELESTIAL_NAVIGATION",
   "civic": null,
   "district": null,
@@ -3156,7 +3329,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_GREAT_LIGHTHOUSE_MOVEMENT"
-    }
+    },
+    "ability": [
+     {
+      "id": "GREAT_LIGHTHOUSE_SEA_MOVEMENT",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_SEA_MOVEMENT",
+      "args": {
+       "Amount": "1"
+      }
+     }
+    ]
    },
    {
     "id": "GREATLIGHTHOUSE_ADJUST_EMBARKED_MOVEMENT",
@@ -3172,7 +3355,8 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_GREAT_LIGHTHOUSE_EMBARKED_MOVEMENT"
-    }
+    },
+    "ability": []
    }
   ]
  },
@@ -3185,6 +3369,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_SHIPBUILDING",
   "civic": null,
   "district": null,
@@ -3245,6 +3430,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MATHEMATICS",
   "civic": null,
   "district": null,
@@ -3306,6 +3492,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
   "district": null,
@@ -3368,6 +3555,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_RECORDED_HISTORY",
   "district": null,
@@ -3443,6 +3631,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_THEOLOGY",
   "district": null,
@@ -3501,6 +3690,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CONSTRUCTION",
   "civic": null,
   "district": null,
@@ -3537,7 +3727,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_ARCHAEOLOGIST_ENTER_FOREIGN_LANDS"
-    }
+    },
+    "ability": [
+     {
+      "id": "MOD_ENTER_FOREIGN_LANDS",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_ENTER_FOREIGN_LANDS",
+      "args": {
+       "Enter": "true"
+      }
+     }
+    ]
    },
    {
     "id": "TERRACOTTA_ARMY_LEVEL_UP_UNITS",
@@ -3558,6 +3758,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BUTTRESS",
   "civic": null,
   "district": null,
@@ -3604,6 +3805,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 4,
   "tech": "TECH_CASTLES",
   "civic": null,
   "district": null,
@@ -3650,6 +3852,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_GUILDS",
   "district": null,
@@ -3723,6 +3926,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 6,
   "tech": null,
   "civic": "CIVIC_DIVINE_RIGHT",
   "district": null,
@@ -3776,6 +3980,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MASS_PRODUCTION",
   "civic": null,
   "district": null,
@@ -3841,6 +4046,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BANKING",
   "civic": null,
   "district": null,
@@ -3912,6 +4118,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_PRINTING",
   "civic": null,
   "district": null,
@@ -3958,6 +4165,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ASTRONOMY",
   "civic": null,
   "district": null,
@@ -4017,6 +4225,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_INDUSTRIALIZATION",
   "civic": null,
   "district": null,
@@ -4089,6 +4298,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_OPERA_BALLET",
   "district": null,
@@ -4152,6 +4362,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_SCIENTIFIC_THEORY",
   "civic": null,
   "district": null,
@@ -4216,6 +4427,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ECONOMICS",
   "civic": null,
   "district": null,
@@ -4277,6 +4489,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
   "district": null,
@@ -4324,6 +4537,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_STEEL",
   "civic": null,
   "district": null,
@@ -4365,6 +4579,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MASS_MEDIA",
   "district": null,
@@ -4439,6 +4654,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MASS_MEDIA",
   "district": null,
@@ -4494,6 +4710,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 100000,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_PROFESSIONAL_SPORTS",
   "district": null,
@@ -4533,6 +4750,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_CULTURAL_HERITAGE",
   "district": null,
@@ -4582,6 +4800,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_SPACEPORT",
@@ -4617,6 +4836,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_SPACEPORT",
@@ -4652,6 +4872,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_SPACEPORT",
@@ -4687,6 +4908,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
   "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
@@ -4733,6 +4955,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MILITARY_TACTICS",
   "civic": null,
   "district": null,
@@ -4810,6 +5033,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_THEOLOGY",
   "district": "DISTRICT_HOLY_SITE",
@@ -4885,6 +5109,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MEDIEVAL_FAIRES",
   "district": null,
@@ -4939,6 +5164,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CURRENCY",
   "civic": null,
   "district": "DISTRICT_COMMERCIAL_HUB",
@@ -5016,6 +5242,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_IRON_WORKING",
   "civic": null,
   "district": null,
@@ -5063,6 +5290,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BRONZE_WORKING",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -5103,7 +5331,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_BASILIKOI_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "BASILIKOI_TRAINED_UNIT_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "BASILIKOI_PAIDES_SCIENCE_TRAINED_UNIT",
@@ -5133,6 +5371,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_POLITICAL_PHILOSOPHY",
   "district": null,
@@ -5199,6 +5438,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_DEFENSIVE_TACTICS",
   "district": null,
@@ -5278,6 +5518,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_HORSEBACK_RIDING",
   "civic": null,
   "district": "DISTRICT_ENCAMPMENT",
@@ -5318,7 +5559,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_ORDU_TRAINED_UNIT_XP"
-    }
+    },
+    "ability": [
+     {
+      "id": "ORDU_TRAINED_XP",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
+      "args": {
+       "Amount": "25"
+      }
+     }
+    ]
    },
    {
     "id": "ORDU_INCREASED_MOVEMENT_MODIFIER",
@@ -5326,7 +5577,17 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_ORDU_INCREASED_MOVEMENT"
-    }
+    },
+    "ability": [
+     {
+      "id": "ORDU_ADJUST_MOVEMENT",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_MOVEMENT",
+      "args": {
+       "Amount": "1"
+      }
+     }
+    ]
    },
    {
     "id": "ORDU_ADJUST_RESOURCE_STOCKPILE_CAP",
@@ -5347,6 +5608,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": true,
   "outerDefenseStrength": 3,
+  "defenseModifier": 0,
   "tech": "TECH_SIEGE_TACTICS",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -5419,6 +5681,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ARCHERY",
   "civic": null,
   "district": null,
@@ -5456,6 +5719,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MACHINERY",
   "civic": null,
   "district": null,
@@ -5799,6 +6063,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_DIVINE_RIGHT",
   "district": null,
@@ -5852,6 +6117,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_CARTOGRAPHY",
   "civic": null,
   "district": null,
@@ -5970,6 +6236,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_REFORMED_CHURCH",
   "district": null,
@@ -6079,6 +6346,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_HUMANISM",
   "district": null,
@@ -6121,6 +6389,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_CIVIL_ENGINEERING",
   "district": null,
@@ -6185,6 +6454,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_RAPID_DEPLOYMENT",
   "district": null,
@@ -6289,6 +6559,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
   "district": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
@@ -6335,6 +6606,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 9,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
   "district": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
@@ -6417,6 +6689,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 9,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_PROFESSIONAL_SPORTS",
   "district": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
@@ -6479,6 +6752,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6569,6 +6843,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6623,6 +6898,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6671,6 +6947,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6754,6 +7031,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6820,6 +7098,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -6962,6 +7241,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -7011,6 +7291,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -7064,6 +7345,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -7113,6 +7395,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_REPLACEABLE_PARTS",
   "civic": null,
   "district": "DISTRICT_NEIGHBORHOOD",
@@ -7152,6 +7435,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_CAPITALISM",
   "district": "DISTRICT_NEIGHBORHOOD",
@@ -7200,6 +7484,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_COMPUTERS",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -7232,6 +7517,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ELECTRICITY",
   "civic": null,
   "district": "DISTRICT_DAM",
@@ -7296,6 +7582,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_INDUSTRIALIZATION",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -7343,6 +7630,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ELECTRICITY",
   "civic": null,
   "district": "DISTRICT_INDUSTRIAL_ZONE",
@@ -7390,6 +7678,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_BANKING",
   "civic": null,
   "district": "DISTRICT_COMMERCIAL_HUB",
@@ -7451,6 +7740,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_DRAMA_POETRY",
   "district": "DISTRICT_THEATER",
@@ -7552,6 +7842,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": null,
   "district": "DISTRICT_GOVERNMENT",
@@ -7627,6 +7918,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 6,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
   "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
@@ -7709,6 +8001,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_POTTERY",
   "civic": null,
   "district": null,
@@ -7751,6 +8044,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_ENGINEERING",
   "civic": null,
   "district": null,
@@ -7969,6 +8263,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_CIVIL_SERVICE",
   "district": null,
@@ -8011,7 +8306,51 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_GUIDE_MOVEMENT_AOE_RELIGIOUS"
-    }
+    },
+    "ability": [
+     {
+      "id": "GUIDE_MOVEMENT_AOE_RELIGIOUS_XP2",
+      "collection": "COLLECTION_PLAYER_UNITS",
+      "effect": "EFFECT_GRANT_ABILITY",
+      "args": {
+       "AbilityType": "ABILITY_GURU_MOVEMENT"
+      },
+      "ability": [
+       {
+        "id": "GURU_MOVEMENT_XP2",
+        "collection": "COLLECTION_OWNER",
+        "effect": "EFFECT_ADJUST_UNIT_MOVEMENT",
+        "args": {
+         "Amount": "1"
+        },
+        "subjectReqs": {
+         "test": "ALL",
+         "reqs": [
+          {
+           "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+           "inverse": false,
+           "args": {
+            "Tag": "CLASS_GURU"
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+         "inverse": false,
+         "args": {
+          "Tag": "CLASS_RELIGIOUS_ALL"
+         }
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "MEENAKSHITEMPLE_RELIGIOUS_UNITS_COMBAT",
@@ -8019,7 +8358,51 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_SAGE_COMBAT_AOE_RELIGIOUS"
-    }
+    },
+    "ability": [
+     {
+      "id": "SAGE_COMBAT_AOE_RELIGIOUS_XP2",
+      "collection": "COLLECTION_PLAYER_UNITS",
+      "effect": "EFFECT_GRANT_ABILITY",
+      "args": {
+       "AbilityType": "ABILITY_GURU_STRENGTH"
+      },
+      "ability": [
+       {
+        "id": "GURU_STRENGTH_XP2",
+        "collection": "COLLECTION_UNIT_COMBAT",
+        "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+        "args": {
+         "Amount": "5"
+        },
+        "subjectReqs": {
+         "test": "ALL",
+         "reqs": [
+          {
+           "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+           "inverse": false,
+           "args": {
+            "Tag": "CLASS_GURU"
+           }
+          }
+         ]
+        }
+       }
+      ],
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_UNIT_TAG_MATCHES",
+         "inverse": false,
+         "args": {
+          "Tag": "CLASS_RELIGIOUS_ALL"
+         }
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "MEENAKSHITEMPLE_GURU_DISCOUNT",
@@ -8041,6 +8424,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_EDUCATION",
   "civic": null,
   "district": null,
@@ -8138,6 +8522,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_SANITATION",
   "civic": null,
   "district": null,
@@ -8184,6 +8569,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_STEAM_POWER",
   "civic": null,
   "district": null,
@@ -8221,6 +8607,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_COMBUSTION",
   "civic": null,
   "district": null,
@@ -8295,6 +8682,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MILITARY_TRAINING",
   "district": null,
@@ -8372,6 +8760,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_SYNTHETIC_MATERIALS",
   "civic": null,
   "district": null,
@@ -8439,6 +8828,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MYSTICISM",
   "district": "DISTRICT_PRESERVE",
@@ -8471,6 +8861,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_CONSERVATION",
   "district": "DISTRICT_PRESERVE",
@@ -8503,6 +8894,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_MATHEMATICS",
   "civic": null,
   "district": "DISTRICT_DIPLOMATIC_QUARTER",
@@ -8571,6 +8963,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_DIPLOMATIC_SERVICE",
   "district": "DISTRICT_DIPLOMATIC_QUARTER",
@@ -8624,6 +9017,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_IRRIGATION",
   "civic": null,
   "district": "DISTRICT_CITY_CENTER",
@@ -8681,6 +9075,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_EDUCATION",
   "civic": null,
   "district": "DISTRICT_CAMPUS",
@@ -8749,6 +9144,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": "TECH_WRITING",
   "civic": null,
   "district": null,
@@ -8955,6 +9351,7 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
   "regionalRange": 0,
   "outerDefenseHitPoints": false,
   "outerDefenseStrength": 0,
+  "defenseModifier": 0,
   "tech": null,
   "civic": "CIVIC_MERCANTILISM",
   "district": null,
@@ -9016,4 +9413,1199 @@ export const AI_BUILDINGS: readonly AiBuildingRow[] = [
    }
   ]
  }
+];
+
+export const AI_UNITS: readonly AiUnitRow[] = [
+ {
+  "type": "UNIT_SETTLER",
+  "foundCity": true,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BUILDER",
+  "foundCity": false,
+  "buildCharges": 3,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_TRADER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MISSIONARY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_APOSTLE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_INQUISITOR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GURU",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_WARRIOR_MONK",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ARCHAEOLOGIST",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_GENERAL",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_ADMIRAL",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_ENGINEER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_MERCHANT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_PROPHET",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_SCIENTIST",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_WRITER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_ARTIST",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREAT_MUSICIAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SPY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_NATURALIST",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SCOUT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 10,
+  "recon": true
+ },
+ {
+  "type": "UNIT_WARRIOR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SLINGER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 5,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BARBARIAN_HORSEMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BARBARIAN_HORSE_ARCHER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 10,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SUMERIAN_WAR_CART",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 30,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GALLEY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 30,
+  "recon": false
+ },
+ {
+  "type": "UNIT_NORWEGIAN_LONGSHIP",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ARCHER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 15,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SPEARMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 25,
+  "recon": false
+ },
+ {
+  "type": "UNIT_HEAVY_CHARIOT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 28,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BATTERING_RAM",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GREEK_HOPLITE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 28,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SWORDSMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_HORSEMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 36,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SCYTHIAN_HORSE_ARCHER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ROMAN_LEGION",
+  "foundCity": false,
+  "buildCharges": 1,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_KONGO_SHIELD_BEARER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 38,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CATAPULT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 25,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SIEGE_TOWER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_QUADRIREME",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_EGYPTIAN_CHARIOT_ARCHER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 25,
+  "recon": false
+ },
+ {
+  "type": "UNIT_JAPANESE_SAMURAI",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 48,
+  "recon": false
+ },
+ {
+  "type": "UNIT_NORWEGIAN_BERSERKER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 48,
+  "recon": false
+ },
+ {
+  "type": "UNIT_KNIGHT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": false
+ },
+ {
+  "type": "UNIT_INDIAN_VARU",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ARABIAN_MAMLUK",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CROSSBOWMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 30,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CHINESE_CROUCHING_TIGER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 30,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MILITARY_ENGINEER",
+  "foundCity": false,
+  "buildCharges": 2,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PIKEMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MUSKETMAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SPANISH_CONQUISTADOR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 58,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CARAVEL",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BOMBARD",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_FRIGATE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PRIVATEER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ENGLISH_SEADOG",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_FIELD_CANNON",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CAVALRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 62,
+  "recon": false
+ },
+ {
+  "type": "UNIT_RUSSIAN_COSSACK",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 67,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ENGLISH_REDCOAT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_FRENCH_GARDE_IMPERIALE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MEDIC",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_IRONCLAD",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_AMERICAN_ROUGH_RIDER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 67,
+  "recon": false
+ },
+ {
+  "type": "UNIT_RANGER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": true
+ },
+ {
+  "type": "UNIT_OBSERVATION_BALLOON",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BIPLANE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 80,
+  "recon": false
+ },
+ {
+  "type": "UNIT_INFANTRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 75,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ARTILLERY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 60,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BATTLESHIP",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 60,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BRAZILIAN_MINAS_GERAES",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SUBMARINE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 65,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GERMAN_UBOAT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 65,
+  "recon": false
+ },
+ {
+  "type": "UNIT_AT_CREW",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 75,
+  "recon": false
+ },
+ {
+  "type": "UNIT_TANK",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 85,
+  "recon": false
+ },
+ {
+  "type": "UNIT_FIGHTER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 100,
+  "recon": false
+ },
+ {
+  "type": "UNIT_AMERICAN_P51",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 105,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BOMBER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 85,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ANTIAIR_GUN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MACHINE_GUN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_AIRCRAFT_CARRIER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 65,
+  "recon": false
+ },
+ {
+  "type": "UNIT_DESTROYER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 85,
+  "recon": false
+ },
+ {
+  "type": "UNIT_HELICOPTER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 86,
+  "recon": false
+ },
+ {
+  "type": "UNIT_NUCLEAR_SUBMARINE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 80,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MECHANIZED_INFANTRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 85,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ROCKET_ARTILLERY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 70,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MOBILE_SAM",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_JET_FIGHTER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 110,
+  "recon": false
+ },
+ {
+  "type": "UNIT_JET_BOMBER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 90,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MISSILE_CRUISER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 75,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MODERN_AT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 85,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MODERN_ARMOR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 95,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MAN_AT_ARMS",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_LINE_INFANTRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 65,
+  "recon": false
+ },
+ {
+  "type": "UNIT_TREBUCHET",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_AZTEC_EAGLE_WARRIOR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 28,
+  "recon": false
+ },
+ {
+  "type": "UNIT_INDONESIAN_JONG",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_KHMER_DOMREY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_POLISH_HUSSAR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 64,
+  "recon": false
+ },
+ {
+  "type": "UNIT_NUBIAN_PITATI",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 17,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MACEDONIAN_HYPASPIST",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 38,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MACEDONIAN_HETAIROI",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 36,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PERSIAN_IMMORTAL",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_DIGGER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 78,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ZULU_IMPI",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_KOREAN_HWACHA",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 45,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SCOTTISH_HIGHLANDER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": true
+ },
+ {
+  "type": "UNIT_DE_ZEVEN_PROVINCIEN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MONGOLIAN_KESHIG",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GEORGIAN_KHEVSURETI",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 48,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MAPUCHE_MALON_RAIDER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CREE_OKIHTCITAW",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": true
+ },
+ {
+  "type": "UNIT_SPEC_OPS",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 60,
+  "recon": true
+ },
+ {
+  "type": "UNIT_DRONE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PIKE_AND_SHOT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SUPPLY_CONVOY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SKIRMISHER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": true
+ },
+ {
+  "type": "UNIT_COURSER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 46,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CUIRASSIER",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 64,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GIANT_DEATH_ROBOT",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 130,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ROCK_BAND",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_CANADA_MOUNTIE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 62,
+  "recon": false
+ },
+ {
+  "type": "UNIT_HUNGARY_BLACK_ARMY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 49,
+  "recon": false
+ },
+ {
+  "type": "UNIT_HUNGARY_HUSZAR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 65,
+  "recon": false
+ },
+ {
+  "type": "UNIT_INCA_WARAKAQ",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": true
+ },
+ {
+  "type": "UNIT_MALI_MANDEKALU_CAVALRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MAORI_TOA",
+  "foundCity": false,
+  "buildCharges": 1,
+  "mustPurchase": false,
+  "combat": 38,
+  "recon": false
+ },
+ {
+  "type": "UNIT_OTTOMAN_BARBARY_CORSAIR",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 40,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PHOENICIA_BIREME",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SULEIMAN_JANISSARY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 60,
+  "recon": false
+ },
+ {
+  "type": "UNIT_SWEDEN_CAROLEAN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ },
+ {
+  "type": "UNIT_MAYAN_HULCHE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 15,
+  "recon": false
+ },
+ {
+  "type": "UNIT_LAHORE_NIHANG",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": true,
+  "combat": 25,
+  "recon": false
+ },
+ {
+  "type": "UNIT_COMANDANTE_GENERAL",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 0,
+  "recon": false
+ },
+ {
+  "type": "UNIT_COLOMBIAN_LLANERO",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 62,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BYZANTINE_DROMON",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BYZANTINE_TAGMA",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 50,
+  "recon": false
+ },
+ {
+  "type": "UNIT_GAUL_GAESATAE",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 20,
+  "recon": false
+ },
+ {
+  "type": "UNIT_VIETNAMESE_VOI_CHIEN",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 35,
+  "recon": false
+ },
+ {
+  "type": "UNIT_ETHIOPIAN_OROMO_CAVALRY",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 48,
+  "recon": false
+ },
+ {
+  "type": "UNIT_BABYLONIAN_SABUM_KIBITTUM",
+  "foundCity": false,
+  "buildCharges": 0,
+  "mustPurchase": false,
+  "combat": 17,
+  "recon": false
+ },
+ {
+  "type": "UNIT_PORTUGUESE_NAU",
+  "foundCity": false,
+  "buildCharges": 2,
+  "mustPurchase": false,
+  "combat": 55,
+  "recon": false
+ }
+];
+
+export const AI_PROJECTS: readonly string[] = [
+ "PROJECT_REPAIR_OUTER_DEFENSES",
+ "PROJECT_LAUNCH_EARTH_SATELLITE",
+ "PROJECT_LAUNCH_MOON_LANDING",
+ "PROJECT_MANHATTAN_PROJECT",
+ "PROJECT_OPERATION_IVY",
+ "PROJECT_BUILD_NUCLEAR_DEVICE",
+ "PROJECT_BUILD_THERMONUCLEAR_DEVICE",
+ "PROJECT_CARNIVAL",
+ "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT",
+ "PROJECT_ENHANCE_DISTRICT_HARBOR",
+ "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
+ "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB",
+ "PROJECT_ENHANCE_DISTRICT_HOLY_SITE",
+ "PROJECT_ENHANCE_DISTRICT_CAMPUS",
+ "PROJECT_ENHANCE_DISTRICT_THEATER",
+ "PROJECT_WATER_CARNIVAL",
+ "PROJECT_BREAD_AND_CIRCUSES",
+ "PROJECT_WATER_BREAD_AND_CIRCUSES",
+ "PROJECT_COTHON_CAPITAL_MOVE",
+ "PROJECT_CARBON_RECAPTURE",
+ "PROJECT_CONVERT_REACTOR_TO_COAL",
+ "PROJECT_CONVERT_REACTOR_TO_OIL",
+ "PROJECT_CONVERT_REACTOR_TO_URANIUM",
+ "PROJECT_LAUNCH_MARS_BASE",
+ "PROJECT_LAUNCH_EXOPLANET_EXPEDITION",
+ "PROJECT_ORBITAL_LASER",
+ "PROJECT_TERRESTRIAL_LASER",
+ "PROJECT_SEND_AID",
+ "PROJECT_TRAIN_ATHLETES",
+ "PROJECT_TRAIN_ASTRONAUTS",
+ "PROJECT_RECOMMISSION_REACTOR",
+ "PROJECT_DECOMMISSION_COAL_POWER_PLANT",
+ "PROJECT_DECOMMISSION_OIL_POWER_PLANT",
+ "PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT",
+ "PROJECT_LIJIA_FAITH",
+ "PROJECT_LIJIA_FOOD",
+ "PROJECT_LIJIA_GOLD"
 ];

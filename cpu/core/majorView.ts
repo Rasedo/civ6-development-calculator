@@ -7,9 +7,9 @@
 import type { MajorCityDefenceView, MajorPlotView, MajorSlotView, MajorView } from '../../ai/major/view';
 import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
-import type { AiCityView, AiDistrictView } from './aiValue';
+import type { AiCityView, AiDistrictView, AiPlotView } from './aiValue';
 import { followedStrategies, pseudoYieldWeights, yieldWeights, type AiWeightInputs } from './aiWeights';
-import { engineId, gameTypeOf } from '../data/aliases';
+import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressure } from './phase';
 import { borderTurnsFrom, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, seatOf, tileSeat, unitsOf } from './seats';
@@ -32,7 +32,7 @@ import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
 import { UNITS } from '../data/units';
 import { EMBASSY_CIVIC } from '../data/seats';
-import { envoysOf, hasMet, suzerainOf } from './cityStates';
+import { envoysOf, hasMet, minorCity, suzerainOf } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
 import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency, tileYields } from './yields';
@@ -249,8 +249,28 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return !GP_CLASSES.includes(c) || gpOffer(state, c) !== -2;
     },
     cities: (i): AiCityView[] => citiesOf(state, i).map((c) => ({ id: c.id, capital: c.isCapital })),
+    cityOwnedPlots: (i, id): AiPlotView[] => {
+      // a city-state's one city is its own view (`minorCity`, id -1) and owns
+      // its whole ground
+      const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
+      if (!city) return [];
+      const centre = map.tiles[city.centerIndex];
+      return tilesWithin(map, centre.col, centre.row, 3)
+        .filter((t) => tileSeat(t) === i && (minor || t.ownerCity === city.id))
+        .map((t) => ({
+          terrain: installTerrain(t.terrain, t.elevation),
+          feature: t.feature ? installFeature(t.feature) : null,
+          resource: t.resource ? `RESOURCE_${t.resource}` : null,
+          resourceVisible: !!t.resource && !hiddenOf(i).has(t.resource),
+          improvement: t.improvement,
+          impassable: isImpassable(t),
+        }));
+    },
     cityYield: (i, id, type) => {
-      const city = citiesOf(state, i).find((c) => c.id === id);
+      // a city-state's one city is its own view (`minorCity`, id -1)
+      const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
       const key = YIELD_KEY[type];
       return city && key ? computeCityStats(state, city).total[key] : 0;
     },
@@ -282,6 +302,9 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       }));
     },
     tradeRouteCapacity: (i) => tradeCapacity(state, i),
+    traders: (i) => unitsOf(state, i).filter((u) => UNITS[u.type]?.trader).length,
+    // the trade AI's knowledge base (its route evaluation) is not read
+    tradeKnowledge: () => null,
     influenceTokensUsed: (i) => state.cityStates.reduce((n, cs) => n + envoysOf(cs, i), 0),
     tributaries: (i) => state.cityStates.filter((cs) => suzerainOf(cs) === i).length,
     unitMaintenances: (i) => state.units.filter((u) => u.seat === i).map((u) => UNITS[u.type]?.maintenance ?? 0),

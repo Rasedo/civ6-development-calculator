@@ -2044,7 +2044,17 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_RELIGIOUS_ORDERS_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "RELIGIOUS_ORDERS_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      }
+     }
+    ]
    }
   ]
  },
@@ -3120,6 +3130,16 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "args": {
      "AbilityType": "ABILITY_MILITARYORGANIZATION_MOVEMENT"
     },
+    "ability": [
+     {
+      "id": "MILITARYORGANIZATION_MOVEMENT",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_MOVEMENT",
+      "args": {
+       "Amount": "2"
+      }
+     }
+    ],
     "subjectReqs": {
      "test": "ALL",
      "reqs": [
@@ -3612,7 +3632,32 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_FINEST_HOUR_FRIENDLY_TERRITORY"
-    }
+    },
+    "ability": [
+     {
+      "id": "FINEST_HOUR_FRIENDLY_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      },
+      "subjectReqs": {
+       "test": "ANY",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_UNIT_ADJACENT_TO_OWNER_TERRITORY",
+         "inverse": false,
+         "args": {}
+        },
+        {
+         "type": "REQUIREMENT_UNIT_IN_OWNER_TERRITORY",
+         "inverse": false,
+         "args": {}
+        }
+       ]
+      }
+     }
+    ]
    }
   ]
  },
@@ -5273,7 +5318,17 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_OLIGARCHY_LEGACY_MELEE_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "OLIGARCHY_LEGACY_MELEE_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "4"
+      }
+     }
+    ]
    }
   ]
  },
@@ -5440,7 +5495,17 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_THEOCRACY_LEGACY_RELIGIOUS_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "THEOCRACY_LEGACY_RELIGIOUS_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      }
+     }
+    ]
    },
    {
     "id": "THEOCRACY_RELIGIOUS_PEOPLE",
@@ -5512,7 +5577,27 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_FASCISM_LEGACY_ATTACK_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "FASCISM_LEGACY_ATTACK_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+         "inverse": false,
+         "args": {}
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "FASCISM_WAR_WEARINESS",
@@ -6008,7 +6093,27 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_TWILIGHT_VALOR_ATTACK_BONUS"
-    }
+    },
+    "ability": [
+     {
+      "id": "TWILIGHT_VALOR_ATTACK_BONUS",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+         "inverse": false,
+         "args": {}
+        }
+       ]
+      }
+     }
+    ]
    }
   ]
  },
@@ -6037,7 +6142,17 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_INQUISITION_FRIENDLY_TERRITORY_BONUS"
-    }
+    },
+    "ability": [
+     {
+      "id": "INQUISITION_FRIENDLY_TERRITORY_BONUS",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_UNIT_FRIENDLY_TERRITORY_COMBAT",
+      "args": {
+       "Amount": "15"
+      }
+     }
+    ]
    },
    {
     "id": "INQUISITION_SCIENCE_MODIFIER",
@@ -6750,7 +6865,30 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_GLOBAL_COALITION_FRIENDLY_TERRITORY"
-    }
+    },
+    "ability": [
+     {
+      "id": "GLOBAL_COALITION_FRIENDLY_TERRITORY",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "7"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLOT_ADJACENT_FRIENDLY_TERRITORY",
+         "inverse": false,
+         "args": {
+          "MinRange": "0",
+          "MaxRange": "0"
+         }
+        }
+       ]
+      }
+     }
+    ]
    }
   ]
  },
@@ -6989,7 +7127,29 @@ export const AI_POLICIES: readonly AiPolicy[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_CYBER_WARFARE_COMBAT_BONUS"
-    }
+    },
+    "ability": [
+     {
+      "id": "CYBER_WARFARE_INFO_FUTURE_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "10"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_OPPONENT_ERA_AT_LEAST",
+         "inverse": false,
+         "args": {
+          "MinimumEraType": "ERA_INFORMATION"
+         }
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "CYBER_WARFARE_DISABLE_GRIEVANCE_DECAY",
@@ -7360,7 +7520,17 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_OLIGARCHY_MELEE_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "OLIGARCHY_MELEE_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "4"
+      }
+     }
+    ]
    },
    {
     "id": "OLIGARCHY_UNIT_EXPERIENCE",
@@ -7589,7 +7759,17 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_THEOCRACY_RELIGIOUS_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "THEOCRACY_RELIGIOUS_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      }
+     }
+    ]
    },
    {
     "id": "THEOCRACY_RELIGIOUS_PEOPLE",
@@ -7705,7 +7885,27 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_FASCISM_ATTACK_BUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "FASCISM_ATTACK_BUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "5"
+      },
+      "subjectReqs": {
+       "test": "ALL",
+       "reqs": [
+        {
+         "type": "REQUIREMENT_PLAYER_IS_ATTACKING",
+         "inverse": false,
+         "args": {}
+        }
+       ]
+      }
+     }
+    ]
    },
    {
     "id": "FASCISM_WAR_WEARINESS",
@@ -8028,7 +8228,17 @@ export const AI_GOVERNMENTS: readonly AiGovernment[] = [
     "effect": "EFFECT_GRANT_ABILITY",
     "args": {
      "AbilityType": "ABILITY_DIGITAL_DEMOCRACY_DEBUFF"
-    }
+    },
+    "ability": [
+     {
+      "id": "DIGITAL_DEMOCRACY_DEBUFF",
+      "collection": "COLLECTION_UNIT_COMBAT",
+      "effect": "EFFECT_ADJUST_PLAYER_STRENGTH_MODIFIER",
+      "args": {
+       "Amount": "-3"
+      }
+     }
+    ]
    }
   ]
  },

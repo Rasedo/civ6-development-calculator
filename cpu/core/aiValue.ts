@@ -173,6 +173,42 @@ export interface AiValueView {
   tributaries(seat: number): number;
   /** each of the seat's units' Units.Maintenance */
   unitMaintenances(seat: number): readonly number[];
+  /** the plots the city owns within its three rings (the
+   *  COLLECTION_CITY_PLOT_YIELDS walk, 0x69feb0) */
+  cityOwnedPlots(seat: number, cityId: number): readonly AiPlotView[];
+  /** the seat's trade units (Units +0x1b9 bit 6) */
+  traders(seat: number): number;
+  /** the trade AI's expected route value (the knowledge base's +0x6d8,
+   *  AI_Knowledge.csv's TRADE VAL), raw; null where it is not read */
+  tradeKnowledge(seat: number): number | null;
+}
+
+/** 0x7a7110, A TRADER'S WORTH from turn `start`: none once the seat's trade
+ *  units fill its capacity (plus `extra`, the capacity the caller adds);
+ *  else the trade AI's expected route value from `start` to 30 turns on (or
+ *  the horizon), one discounted turn where the two meet, plus a route's era
+ *  score (0x2c4470, `moment`) as PSEUDOYIELD_GOLDENAGE_POINT, times 4; null
+ *  where the route value is not read */
+export function traderValue(view: AiValueView, seat: number, extra: number, start: number, horizon: number, moment = 0,
+  r = AI_RATE): number | null {
+  if (view.traders(seat) >= view.tradeRouteCapacity(seat) + extra) return 0;
+  const k = view.tradeKnowledge(seat);
+  if (k === null) return null;
+  const end = Math.min(start + 30, horizon);
+  const v = start === end ? discounted(k, r, start) : presentValue(k, r, end) - presentValue(k, r, start);
+  return (v + pseudoYieldValue(view, seat, moment * FX, 'PSEUDOYIELD_GOLDENAGE_POINT')) * 4;
+}
+
+/** A plot as the AI's requirement evaluators read it, in the game's type
+ *  names */
+export interface AiPlotView {
+  terrain: string;
+  feature: string | null;
+  resource: string | null;
+  /** the resource revealed to the player (0x50a690) */
+  resourceVisible: boolean;
+  improvement: string | null;
+  impassable: boolean;
 }
 
 /** A district as the AI's value reads it */

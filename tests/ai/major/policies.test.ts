@@ -34,7 +34,7 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     tradeRouteCapacity: () => 0,
     influenceTokensUsed: () => 0,
     tributaries: () => 0,
-    unitMaintenances: () => [],
+    unitMaintenances: () => [], cityOwnedPlots: () => [], traders: () => 0, tradeKnowledge: () => null,
     cityHasDistrict: () => false,
     districtBuildingYields: () => [],
     policyColumn: () => -1,

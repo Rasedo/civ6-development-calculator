@@ -102,11 +102,19 @@ def build() -> str:
                           "inverse": reqs.get(r, {}).get("Inverse") == "true",
                           "args": rargs.get(r, {})} for r in rset_reqs[rid]]}
 
+    amods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("UnitAbilityModifiers"):
+        if "UnitAbilityType" in c:
+            amods[c["UnitAbilityType"]].append(c["ModifierId"])
+
     def modifier(mid):
         m = mods.get(mid, {})
         d = dyn.get(m.get("ModifierType", ""), {})
         out = {"id": mid, "collection": d.get("CollectionType", "?"), "effect": d.get("EffectType", "?"),
                "args": margs.get(mid, {})}
+        if out["effect"] == "EFFECT_GRANT_ABILITY":
+            # the ability's own modifiers, which its analyzer runs
+            out["ability"] = [modifier(x) for x in amods[out["args"].get("AbilityType", "")]]
         sub = reqset(m.get("SubjectRequirementSetId"))
         own = reqset(m.get("OwnerRequirementSetId"))
         if sub:
@@ -352,7 +360,7 @@ def build_city(rows, modifier) -> str:
             "type": b, "cost": num(c, "Cost"), "maintenance": num(c, "Maintenance"), "housing": num(c, "Housing"),
             "entertainment": num(c, "Entertainment"), "regionalRange": num(c, "RegionalRange"),
             "outerDefenseHitPoints": c.get("OuterDefenseHitPoints") not in (None, "", "NULL"),
-            "outerDefenseStrength": num(c, "OuterDefenseStrength"),
+            "outerDefenseStrength": num(c, "OuterDefenseStrength"), "defenseModifier": num(c, "DefenseModifier"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
             "wonder": c.get("IsWonder") == "true", "placement": c.get("RequiresPlacement") == "true",
             "maxPlayerInstances": num(c, "MaxPlayerInstances", -1), "maxWorldInstances": num(c, "MaxWorldInstances", -1),
@@ -372,14 +380,28 @@ def build_city(rows, modifier) -> str:
             "entertainmentWithPower": num(x, "EntertainmentBonusWithPower"),
             "modifiers": [modifier(r["ModifierId"]) for r in bmods[b]],
         })
+    tags = multi("TypeTags", "Type")
+    units = []
+    for u, c in in_game_order("Units", "UnitType", keyed(rows("Units"), "UnitType")):
+        units.append({
+            "type": u, "foundCity": c.get("FoundCity") == "true", "buildCharges": num(c, "BuildCharges"),
+            "mustPurchase": c.get("MustPurchase") == "true", "combat": num(c, "Combat"),
+            "recon": any(t.get("Tag") == "CLASS_RECON" for t in tags[u]),
+        })
+    # the database's own rows: the install reader also takes a persona pack's
+    # project (PROJECT_COURT_FESTIVAL) the recorded games did not load — their
+    # logged PROJECTS rows hold the database's 37
+    projects = [r[0] for r in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid")]
     return (
         "/**\n * THE CITY BUILD AI'S TABLES (cpu/core/aiCityBuild.ts), written by\n"
         " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
-        " * stale file): the Buildings in DATABASE ORDER — the index the AI's value\n"
-        " * tables run in — with the columns and child rows the building value\n"
-        " * reads.\n */\n"
-        "import type { AiBuildingRow } from '../core/aiCityBuild';\n\n"
-        f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n"
+        " * stale file): the Buildings, Units and Projects in DATABASE ORDER — the\n"
+        " * index the AI's value tables run in — with the columns and child rows\n"
+        " * the values and the Default Specialization pick read.\n */\n"
+        "import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';\n\n"
+        f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n\n"
+        f"export const AI_UNITS: readonly AiUnitRow[] = {json.dumps(units, indent=1)};\n\n"
+        f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n"
     )
 
 

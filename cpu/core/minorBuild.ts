@@ -62,7 +62,7 @@ import { hasRiver, isWater } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
-import { AI_BUILDING_INDEX, type CityBuildFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
 import { FX, fxOf, turnsAt } from './aiValue';
 import { majorView } from './majorView';
 
@@ -1035,6 +1035,21 @@ export function minorBuildFacts(state: GameState, cityState: CityState): CityBui
     amenity,
     // a city-state holds one city
     regionalAmenities: () => [amenity],
+    // a city-state trains no civilization's unique unit
+    unitVersion: (u) => {
+      const id = engineId('unit', u, 'UNIT_', UNITS);
+      return id && !UNITS[id].uniqueTo ? u : null;
+    },
+    fullCiv: false,
+    tribe: false,
+    unitCount: state.units.filter((u) => u.seat === cityState.seat).length,
+    growth: {
+      surplus: fxOf(stats.foodSurplus),
+      housing: stats.housing,
+      population: cityState.population,
+      stored: fxOf(city.foodBox),
+      multiplier: stats.foodSurplus > 0 ? Math.round((stats.effectiveFoodSurplus / stats.foodSurplus) * FX) : FX,
+    },
     current,
     techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, techLeft),
     civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
@@ -1050,6 +1065,49 @@ export function minorBuildFacts(state: GameState, cityState: CityState): CityBui
       const rate = fxOf(stats.total.production * (1 + minorItemPct(state, cityState, item) / 100));
       return turnsAt(cost * FX - fxOf(progress), rate);
     },
+  };
+}
+
+/** What the Default Specialization pick (`defaultSpecialization`) reads of
+ *  a minor's city: the building held or in hand, CanConstruct (`constructibleNow`
+ *  on the city build facts), CanTrain (its research unlocks the unit, no
+ *  civilization's unique unit, none faith-bought or spawned, a naval unit at
+ *  a coastal centre, an air unit beside a complete Aerodrome, a Trader below
+ *  the trade capacity, the Archaeologist with an Archaeological Museum; a
+ *  city-state ignores the strategic resources), the district projects; no
+ *  favoured items; the plain pick (the defensive one's inputs, the military
+ *  AI's +0x4b8 and the city's threat, are not read). */
+export function minorPickFacts(state: GameState, cityState: CityState, facts: CityBuildFacts): PickFacts {
+  const r = cityState.research;
+  const held = cityState.buildings ?? [];
+  const inHand = minorItemType(cityState);
+  const hasDistrict = (d: DistrictId) => (cityState.districts ?? []).some((x) => x.type === d && state.map.tiles[x.tileIndex].districtComplete);
+  return {
+    buildingHeld: (b) => {
+      const id = engineId('building', b, 'BUILDING_', BUILDINGS);
+      return inHand === b || (!!id && held.includes(id));
+    },
+    canConstruct: (b) => constructibleNow(facts, AI_BUILDINGS[AI_BUILDING_INDEX.get(b)!]),
+    canTrain: (u) => {
+      const id = engineId('unit', u, 'UNIT_', UNITS);
+      const d = id ? UNITS[id] : undefined;
+      if (!d || d.uniqueTo || d.faithOnly || d.spawnOnly || d.spy) return false;
+      if (d.requiresTech && !r.techs.includes(d.requiresTech)) return false;
+      if (d.requiresCivic && !r.civics.includes(d.requiresCivic)) return false;
+      if (d.requiresResource && !minorAnyResource()) return false;
+      if (d.naval && !cityNavalCapable(state, minorCity(cityState))) return false;
+      if (d.air && !hasDistrict('AERODROME')) return false;
+      if (d.trader && minorTraders(state, cityState) >= tradeCapacity(state, cityState.seat)) return false;
+      if (id === 'ARCHAEOLOGIST' && !held.includes('MUSEUM_ARTIFACT')) return false;
+      return true;
+    },
+    canProduce: (p) => {
+      const id = engineId('project', p, 'PROJECT_', PROJECTS);
+      if (id === 'REPAIR_DEFENSES') return repairAvailable(state, minorCity(cityState));
+      return !!id && minorProjectOk(state, cityState, id);
+    },
+    favored: () => 0,
+    defense: false,
   };
 }
 

@@ -3389,20 +3389,40 @@ building tables).
   or +0x2340 null), the Default Specialization pick 0x5d4d70. A second hook
   (0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0)
   and then walks 0x5d2810's items through 0x68be60.
-- The Default Specialization pick (0x5d4d70): the best building (0x5d0860),
-  unit (0x5d2600) and project (0x5d1f10) of the city centre's evaluation
-  (tables +0x28, +0x40, +0x38; each best starts at FX(-9999)); the building
-  wins when its value is at least the unit's and the project's, else the
-  unit when at least the project's, else the project. A building already
-  queued or held (0x17e690 > 0) is skipped; its value x0.5 when the city's
-  favoured-items list (CityBuildAI +0x528, 0x5d2d10) holds it negative, x2
-  when positive, x5 for a wonder (Buildings +0x159 bit 4) under the
-  condition at 0x5d0b0f. A unit with Units +0x1b9 bit 2 or +0x44 > 0 is
-  skipped, and under the caller's flags it must pass CanTrain (0x172820).
-  The pick is queued (0x5c9ea0 / 0x5ca5a0 / 0x5ca450, "Unable to build
-  building, errored in making..."); a refusal falls to 0x5d2810, logged
-  "Generic Offense" ("NO BUILDS AT ALL (maybe city was nuked?)" with
-  nothing to take). The log line is the pick and its value.
+- The Default Specialization pick (0x5d4d70, `defaultSpecialization` in
+  `cpu/core/aiCityBuild.ts`): nothing for a player 0x469d70 names or with
+  an item in the queue (city +0x1e0 / +0x1d0); the contract events first
+  (+0x3a8, their trees' slot +0x98 / +0x68 / +0xa8). Then the best building
+  (0x5d0860), unit (0x5d2600) and project (0x5d1f10) of the city centre's
+  evaluation (tables +0x28, +0x40, +0x38; each best starts at FX(-9999) and
+  takes a strictly higher value, the first in table order on a tie). Plain
+  pick (flags 1, 0): the building not queued or held (0x17e690 > 0),
+  CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear,
+  not MustPurchase (Buildings +0x159 bit 4 — MustPurchase, no row sets it),
+  its value x0.5 where the favoured-items verdict (CityBuildAI +0x528,
+  0x5d2d10: list > 0 -> 1, < 0 -> -1) is -1, x2 where 1 (a MustPurchase row
+  of the district @0xf2f988 x5 first); the unit without FoundCity (+0x1b9
+  bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase
+  (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4b8 set,
+  or CityBuildAI +0x1b8 above -1 with the centre's property 0x5e97d629 or
+  CityBuildAI +0x218): only a building with DefenseModifier (+0x28) or
+  OuterDefenseStrength (+0x44), only a unit with Combat (+0x48), +0x168 and
+  +0x170 set and no CLASS_RECON tag, no project. A contract in hand (+0x398)
+  worth at least the unit's value less 1.0 and the project's takes the turn
+  (its vt +0x38). Else the building wins at least the unit's and the
+  project's value, else the unit at least the project's, else the project,
+  queued by 0x5c9ea0 / 0x5ca5a0 / 0x5ca450; with none, or the queue refusing
+  it, 0x5d2810's item for a full civilization ("Generic Offense"), "NO BUILDS
+  AT ALL (maybe city was nuked?)" for any other. The log line is the pick
+  and its value; the second hook 0x5ce5b0 runs it again (two NO BUILDS lines
+  a turn). MEASURED (`cityBuildLab.ts`, the five verbose duels, every
+  city-state pick line, the engine's CanConstruct / CanTrain / projects, no
+  favoured items, the plain pick): 812 of 920 as logged over the log's own
+  three tables, 801 with our buildings table in place of the log's; of the
+  log's own-table misses 78 are the log's NO BUILDS where we pick (a valued
+  building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an
+  unfilled Factory contract of t125 —, or the defensive pick: Granada
+  t124..t126 under siege), 29 another item.
 - The tables (0x5ce970, per plot evaluation). A building other than a
   wonder is valued on the city centre only: T = max(tech turns 0x7610e0,
   civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10
@@ -3523,45 +3543,116 @@ building tables).
   building the city's religion does not offer, RequiresAdjacentRiver off a
   river, a Flood Barrier with no coastal lowland — not a district no plot can
   hold yet (the Harbor's buildings are valued).
-- READ, the unit value's exits (0x7b62c0): T at the horizon; a unit not the
-  player's version; a domain the city cannot build (0x17d660); a religious
-  unit (Units +0x1ba bit 2) for a player not CIVILIZATION_LEVEL_FULL_CIV
-  (0x469db0, hash 0x253718b0) -> FX(-9999). A building's free units
-  (Unit_BuildingPrereqs; an Archaeologist skipped) add their value — a
-  city-state's Shrine logs FX(-9999) plus its own value at times. The
-  Trader (0x7a7110): 0 once the player's Traders fill its capacity (+ the
-  extra the caller adds); else the trade AI's expected route value (its
-  knowledge base +0x6d8, unread) over min(T + 30, H), plus the golden-age
-  points of a route (0x2c4470) as PSEUDOYIELD_GOLDENAGE_POINT, x4. The
+- READ, the unit value's exits (0x7b62c0, `unitValueExit`): T at the
+  horizon; a unit not the player's version (player +0x12e8 +0x1c0); a
+  domain the city cannot build (0x17d660); a player that is neither
+  CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE
+  (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five
+  units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — the Spy column,
+  `dll_rowmap.py a6f2b0`; not a religious flag) for a player not a full
+  civilization -> FX(-9999). Then by the unit's pseudo-yield (Units +0x290,
+  PSEUDOYIELD_UNIT_COMBAT by default; the globals @0xf2e254 COMBAT, 258
+  NAVAL, 25c AIR, 26c TRADE, 268 RELIGIOUS, 250 ARCHAEOLOGIST, 260 EXPLORER,
+  264 SETTLER, 270 SPY, 2bc TOURISM, 2a0 NUCLEAR_WEAPON — `pyglob` over
+  0x5bbf80, each global stored after the next name's load): a Trader
+  0x7a7110 through PSEUDOYIELD_UNIT_TRADE; a religious unit from
+  ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c), ReligiousHealCharges
+  (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is
+  -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)
+  that a city-state's TOURISM weight (MinorCivPseudoYields -200, held at
+  -1.0) zeroes; WMDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON. The
+  tail: x (the city's extra copies + 1, 0x179dd0), the promotion class
+  weight, a strategic resource the player lacks and no city of its holds
+  near (0x4aa790, 0x5d45c0) -> 0, the pseudo-yield, the Gold maintenance
+  below handicap 3, the PV over T to H, the tourism and modifier terms. A
+  building's free units (Unit_BuildingPrereqs, its +0x298; an Archaeologist,
+  PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124
+  a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127
+  analyses at six units or more at peace, and its own value on 356 of 362
+  below (the remainder the lab's unit count a step off). The Trader
+  (0x7a7110, `traderValue`): 0 once the player's MakeTradeRoute units
+  (+0x1b9 bit 64) fill its capacity (0x4d9320, + the extra the caller adds);
+  else the trade AI's route value K (its knowledge base +0x6d8, logged as
+  AI_Knowledge.csv "TRADE, TO -1, VAL" by 0x5ed280; its writer unread) from
+  T to min(T + 30, H) (one discounted turn where they meet), plus a route's
+  era score (0x2c4470: the eras record's +0x44, none for a city-state) as
+  PSEUDOYIELD_GOLDENAGE_POINT, x4; the analysis reads the K the turn before
+  logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T). The
   military AI's unit table is built by 0x78e0a0 (entries 0x168 bytes, the
-  value at +0x160, sorted by 0x796070); 0x79ca90 reads it.
-- PARTLY: Housing 0x7a3d70 walks the CityBuildAI growth forecast (+0x720
-  populations, +0x790 turns, +0x800, 0x5d2c50) with the housing growth
-  factor 0x527ca0; the GlobalParameters +0x6b4 term of a negative Amenity
-  balance (PSEUDOYIELD_GOLDENAGE_POINT); a city-state's Barracks and
-  Stable log v 0 (1 Production at -50%, 1 Great General point, 1 Gold) —
-  the General's 0.5 does not count for it (its source among 0x700810's
-  parts unread; the Military AI's +0x7e8 array is written by its turn
-  0x71fb80).
+  value at +0x160, sorted by 0x796070; per known city of the knowledge base
+  +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0); 0x79ca90
+  reads it (0 for a unit it lacks).
+- HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth
+  +0x1788, the rate, population, Housing, T, H): S = the Food surplus less
+  the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing
+  0x1b5840 (whole); the factor 0x527ca0(left) = 0 below
+  CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (1),
+  else 1. Over the forecast's steps from T (0x5d2c50: the first entry whose
+  turn is past the one given): a step at population p pays 2 x
+  DefaultValue(Food) x (S x (factor(housing - p + Housing) - 1) + the Food
+  the step withholds), PV to min(H, the next step's turn) less PV from
+  max(T, its turn); past the last step, where it withholds Food, to H. THE
+  FORECAST 0x5cb570 (CityBuildAI +0x6c8 turns, +0x738 withheld, +0x7a8
+  population; each turn's full update): the current factor g (0x1b5f70);
+  where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen
+  0x1b6390 (the threshold 0x5276e0 less the store +0x80 over S x the overall
+  growth multiplier 0x1b62d0, rounded up; -1 with no surplus); then per next
+  citizen while the turn is below 100 (+0x6c0): its factor, a step where it
+  changes, the whole turns its threshold takes at g x S, S less 2.0 (at
+  least 0). The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+- THE ANALYZERS added (each its whole part): EFFECT_GRANT_ABILITY 0x6b5b30
+  (per subject the ability's UnitAbilityModifiers analysed in a copy of the
+  context, 0x142650, their sums added); COLLECTION_CITY_TRAINED_UNITS
+  (0x69ffa0: once, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER
+  0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold;
+  no unit: the city's Production, City::GetYield, times it, from T to H) —
+  the Barracks', Stable's, Lighthouse's trained-unit XP, an integer 0..3 at
+  a city-state; COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of
+  index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD
+  0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),
+  unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE
+  0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00,
+  HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's;
+  EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 (the Trader's worth with the
+  Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP
+  0x6b8e10 READ, not ported (no Amount: the whole part of the best of the
+  city centre's UNITS values, 0x5d4cd0, over the units each resource — or
+  the named one — lists, Resources +0x100; it waits for the units' table).
+- PARTLY: the GlobalParameters +0x6b4 term of a negative Amenity balance
+  (PSEUDOYIELD_GOLDENAGE_POINT). ASK: a city-state's Barracks and Stable
+  read their Great General point at 0 (the lab with PSEUDOYIELD_GPP_GENERAL's
+  factor 0: the Barracks 0 -> 740, the Stable 0 -> 468 of the five duels'
+  within 0.005; every other class counts: the Prophet's, Scientist's,
+  Admiral's, Engineer's and Writer's at 0 lose their buildings' matches).
+  0x700810's sum is max(-1.0, military AI +0x7e8 + player AI +0x620 + the
+  lists +0x768 / +0x748) plus, for the GP pseudo-yields (@0xf2e218
+  GPP_GENERAL .. @0xf2e238 GPP_MUSICIAN), the eras' 0x2c4230 points as
+  GOLDENAGE_POINT; the military AI's turn 0x71fb80 writes +0x7e8 for
+  UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY, never GPP_GENERAL;
+  the +0x620 array's writer is unread.
 - Measured (`cpu/harness/cityBuildLab.ts --logtech` over runs/h1_duelv1117 /
   1121 / 1124 / 1127 / 1128, every city-state's centre BUILDINGS row, a value
-  at or below -9000 counted as none): 24,438 logged values, 22,997 valued by
-  both, 6,463 within 0.005 at the reconstructed T, 9,852 at some T below the
-  horizon; 1,441 the log's alone, 3,041 ours alone. The Monument 255 of 255
-  at some T (167 at the reconstructed T: the lab's in-hand item and progress
-  are rebuilt from whole-number records), the Grove 1161 / 1161, the Walls
-  91%, the Castle 89%, the Star Fort 83%, the Water Mill 79%; the heaviest
-  residuals the Barracks (1,888) and Stable (1,470) — the General's points —,
-  the Lighthouse (1,817) and Shipyard (851) — Housing and the plot-yield
-  analyzers —, the Market (1,161) — the trade route capacity, the Trader's
-  value —, the Temple (455) and the Shrine's late rows — a religious free
-  unit's FX(-9999). The city's percent on a yield (city +0xbc0) is the
-  modifiers' alone, not the happiness level's (1127: 477 -> 801 within 0.005).
-- Unread: the military unit table (0x78e0a0), the events (0x5cd150, 0x5cc910, 0x5ccc10,
-  0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp:
-  the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40,
-  FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 ("Canceling current
-  build"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970.
+  at or below -9000 counted as none, the trade route value from
+  AI_Knowledge.csv): 24,438 logged values, 22,991 valued by both, 7,582
+  within 0.005 at the reconstructed T (8,782 with the General at 0), 11,526
+  at some T below the horizon (13,320); 1,447 the log's alone, 1,318 ours
+  alone (3,041 before the free units' exit). The Monument 255 of 255 at some
+  T, the Grove 1161 / 1161, the Water Mill 100%, the Walls 91%, the Castle
+  89%; the heaviest residuals the Lighthouse (31% at some T) and Shipyard
+  (32%) — the lab's district progress a turn off (1124 Cardiff t49..t55 logs
+  each turn's value one turn late) —, the Market (50%), the Arena (53%), the
+  Temple (0%: the Warrior Monk's unit value, a combat unit's). The city's
+  percent on a yield (city +0xbc0) is the modifiers' alone, not the
+  happiness level's (1127: 477 -> 801 within 0.005).
+- Unread: the military unit table (0x78e0a0) and the unit value's tail, the
+  project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries'
+  amenities over the player's cities, strategics over the units needing
+  them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150,
+  0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the
+  contracts (Contracts.cpp: the contract line 0x5f4cd0, the queued line
+  0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation
+  0x5d7640 ("Canceling current build"). About 224 KB of code reaches from
+  0x5ce680 and 0x5ce970.
 
 ## H-1: the research AI — READ (the choice), PARTLY READ (the value)
 

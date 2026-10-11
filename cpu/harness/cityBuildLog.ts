@@ -13,7 +13,13 @@ import { FX_MIN } from '../core/aiValue';
 
 /** the city centre's BUILDINGS values, by `${turn}:${player}:${city}` */
 export function loadCityBuildTables(dumpPath: string): Map<string, number[]> {
-  const out = new Map<string, number[]>();
+  return new Map([...loadCityBuildCentre(dumpPath)].map(([k, t]) => [k, t.BUILDINGS ?? []]));
+}
+
+/** the city centre's value rows (DISTRICTS, IMPROVEMENTS, BUILDINGS, UNITS,
+ *  PROJECTS), by `${turn}:${player}:${city}` */
+export function loadCityBuildCentre(dumpPath: string): Map<string, Record<string, number[]>> {
+  const out = new Map<string, Record<string, number[]>>();
   const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_CityBuild.csv');
   if (!existsSync(path)) return out;
   const text = readFileSync(path, 'utf8');
@@ -26,8 +32,12 @@ export function loadCityBuildTables(dumpPath: string): Map<string, number[]> {
     const line = text.slice(at, end);
     at = end + 1;
     if (line.startsWith(',,,')) {
-      if (key && centre && line.startsWith(',,,BUILDINGS,')) {
-        out.set(key, line.slice(13).split(',').map((x) => x.trim()).filter(Boolean).map(Number));
+      if (key && centre) {
+        const cut = line.indexOf(',', 3);
+        const name = line.slice(3, cut);
+        let rows = out.get(key);
+        if (!rows) out.set(key, (rows = {}));
+        rows[name] = line.slice(cut + 1).split(',').map((x) => x.trim()).filter(Boolean).map(Number);
       }
       continue;
     }
@@ -42,6 +52,21 @@ export function loadCityBuildTables(dumpPath: string): Map<string, number[]> {
       continue;
     }
     key = null;
+  }
+  return out;
+}
+
+/** the Default Specialization lines (0x5d4d70): `${turn}:${player}:${city}`
+ *  -> the item and its value, or null for "NO BUILDS AT ALL" */
+export function loadCityBuildPicks(dumpPath: string): Map<string, { item: string; value: number } | null> {
+  const out = new Map<string, { item: string; value: number } | null>();
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_CityBuild.csv');
+  if (!existsSync(path)) return out;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line.includes('Default Specialization') && !line.includes('NO BUILDS AT ALL')) continue;
+    const p = line.split(',').map((x) => x.trim());
+    const key = `${p[0]}:${p[1]}:${p[2]}`;
+    out.set(key, p[6] === 'Default Specialization' ? { item: p[5], value: Number(p[9].replace('Value ', '')) } : null);
   }
   return out;
 }
