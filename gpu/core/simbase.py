@@ -1194,11 +1194,13 @@ _MUTABLE = [
     "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
+    "citystate_kb_seq", "citystate_kb_next",  # the records' order
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
     "city_free_grant",  # a Free City's count of turns toward its next grant
+    "city_free_allowed",  # a Free City's allowed units
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step
     "seat_explored", "barb_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",

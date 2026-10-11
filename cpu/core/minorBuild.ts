@@ -51,11 +51,11 @@ import { centerBuildingIds } from './prodLayout';
 import { cityLowlands, floodBarrierCost, repairBehindBarrier } from './climate';
 import { minorRouteCandidate, minorTrade, tradeCapacity } from './trade';
 import { BARB_SEAT, FREE_SEAT, hiddenResourcesFor, isCiv, majorityReligionOf, majorsAlive, seatOf, tileSeat } from './seats';
-import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary, unitVisibleTo } from './units';
+import { builderCost, cityNavalCapable, disbandUnit, raiseBestTrained, spawnUnit, tileFreeForUnit, traderCost, unitIsMilitary } from './units';
 import { irradiated } from './nuclear';
 import { atRngPoint, randRange } from './rand';
 import { IMPROVEMENT_IDS } from './unitActions';
-import { cityStateTactics } from './tactical';
+import { cityStateTactics, knowledgeLook } from './tactical';
 import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
@@ -1034,40 +1034,10 @@ export function minorUnitProduction(state: GameState, cityState: CityState, know
   });
 }
 
-/** A record ages a turn at each update and drops once its age passes this
- *  (0x5ebb30: the age before the increment above 0x14) */
-export const ARMY_RECORD_AGE = 21;
-
-/**
- * THE KNOWLEDGE BASE'S ARMY UPDATE (CivKnowledge, the records 0x5e9530 keeps
- * per player and unit type). At the minor's turn (`age`: the tactical AI's
- * turn 0x785f30 — the ageing 0x5ebb30, then the look 0x7877e0) every record
- * ages and one past `ARMY_RECORD_AGE` drops; at its turn's end (player signal
- * +0x228 -> 0x7877e0) the look alone. The look: each unit on a plot the minor
- * sees (`cityStateSight`; a stealth unit only where it is seen,
- * `unitVisibleTo`) refreshes its record — the one of its id, under its
- * owner and type (0x5e9530 finds the unit's id in its type's list) — with the
- * turn and its plot, or adds one. Its own units count as any other's.
- * AI_Knowledge.csv's ARMY lines print, per player and type, the records and
- * the oldest's age: runs/h1_duelv1124 minor 3's dead Warrior 131073 stays
- * on its line from t17 to t38; minor 2 sees a barbarian Scout at age 1 at t7
- * that its Warrior's t6 move brought into view.
- */
+/** A city-state's knowledge base's army update (`knowledgeLook`) over the
+ *  plots it sees (`cityStateSight`). */
 export function minorKnowledge(state: GameState, cityState: CityState, age: boolean): void {
-  const sight = cityStateSight(state, cityState.seat);
-  const kept = (cityState.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
-  for (const u of state.units) {
-    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, cityState.seat)) continue;
-    const type = u.type;
-    const r = kept.find((x) => x.id === u.id && x.type === type && x.owner === u.seat);
-    if (r) {
-      r.seen = state.turn;
-      r.plot = u.tileIndex;
-    }
-    else kept.push({ id: u.id, owner: u.seat, type, seen: state.turn, plot: u.tileIndex });
-  }
-  if (kept.length) cityState.armyKnown = kept;
-  else delete cityState.armyKnown;
+  knowledgeLook(state, cityState, cityState.seat, cityStateSight(state, cityState.seat), age);
 }
 /** THE COMBAT DESIRE of a minor (`combatDesire`) at its military AI's turn,
  *  `turn` the one its knowledge base's records were last aged to: the

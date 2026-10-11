@@ -420,6 +420,11 @@ GAME = {
     "freeTreasury": lambda sim, b, rows: [float(sim.free_treasury[b])],
     "freeShortfall": lambda sim, b, rows: [int(sim.seat_shortfall[b, sim.FREE_ROW])],
     "freeResearch": lambda sim, b, rows: [_research_record(sim, b, sim.FR)],
+    "barbArmyKnown": lambda sim, b, rows: [[x for r in sorted(
+        (int(o), int(t), int(n), int(p)) for k, o, t, n, p in zip(
+            sim.citystate_kb_slot[b, sim.BK].tolist(), sim.citystate_kb_owner[b, sim.BK].tolist(),
+            sim.citystate_kb_type[b, sim.BK].tolist(), sim.citystate_kb_seen[b, sim.BK].tolist(),
+            sim.citystate_kb_plot[b, sim.BK].tolist()) if k != -2) for x in r]],
     "storms": lambda sim, b, rows: [_storm_table(sim, b)],
     "droughts": lambda sim, b, rows: [_drought_table(sim, b)],
 }
@@ -1117,6 +1122,8 @@ CITY = {
     "foundedTurn": _cty("city_founded_turn"),
     "freePot": _cty("city_free_pot"),
     "freeGrantTurns": _cty("city_free_grant"),
+    "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
+                                         for c, s in rows],
     # every layout slot's work — object, maker, era, civilization; -1s for an
     # empty slot — exactly like the TS extractor.
     "greatWorks": lambda sim, b, rows: _gw_rows(sim, b, rows),

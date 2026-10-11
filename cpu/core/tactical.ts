@@ -7,7 +7,7 @@
  * (`barbarianPhase`), a city-state's turn for its own (`cityStateTactics`),
  * the Free Cities' turn for theirs (`freeCityTactics`).
  */
-import type { City, CityState, GameState, Tile, Unit } from './types';
+import type { ArmyRecord, City, CityState, GameState, Tile, Unit } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
@@ -456,7 +456,82 @@ function rangedStrength(u: Unit): number {
  * (An ALLY_SUPPORT entry, a district of an ally, makes them MEDIUM: a
  * city-state and the Free Cities hold no ally.)
  */
-export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<number>, revealed: ArrayLike<number> | null): Target[] {
+/** A record ages a turn at each update and drops once its age passes this
+ *  (0x5ebb30: the age before the increment above 0x14) */
+export const ARMY_RECORD_AGE = 21;
+
+/**
+ * THE KNOWLEDGE BASE'S ARMY UPDATE (CivKnowledge, the records 0x5e9530 keeps
+ * per player and unit type) of `holder`, a city-state or the barbarians. At
+ * the player's tactical turn (`age`: 0x785f30 — the ageing 0x5ebb30, then
+ * the look 0x7877e0) every record ages and one past `ARMY_RECORD_AGE`
+ * drops; at its turn's end (player signal +0x228 -> 0x7877e0) the look
+ * alone. The look: each unit on a plot of `sight` (a stealth unit only
+ * where it is seen, `unitVisibleTo`) refreshes its record — the one of its
+ * id, under its owner and type (0x5e9530 finds the unit's id in its type's
+ * list) — with the turn and its plot, or adds one at the end. Its own units
+ * count as any other's. AI_Knowledge.csv's ARMY lines print, per player and
+ * type, the records and the oldest's age: runs/h1_duelv1124 minor 3's dead
+ * Warrior 131073 stays on its line from t17 to t38; minor 2 sees a
+ * barbarian Scout at age 1 at t7 that its Warrior's t6 move brought into
+ * view.
+ */
+export function knowledgeLook(state: GameState, holder: { armyKnown?: ArmyRecord[] }, seat: number,
+  sight: ArrayLike<number>, age: boolean): void {
+  const kept = (holder.armyKnown ?? []).filter((r) => !age || state.turn - r.seen <= ARMY_RECORD_AGE);
+  for (const u of state.units) {
+    if (!sight[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
+    const r = kept.find((x) => x.id === u.id && x.type === u.type && x.owner === u.seat);
+    if (r) {
+      r.seen = state.turn;
+      r.plot = u.tileIndex;
+    }
+    else kept.push({ id: u.id, owner: u.seat, type: u.type, seen: state.turn, plot: u.tileIndex });
+  }
+  if (kept.length) holder.armyKnown = kept;
+  else delete holder.armyKnown;
+}
+
+/** a player's place in the game's player list (0x483b50): the majors, the
+ *  city-states, the Free Cities, the barbarians */
+function playerOrder(seat: number): number {
+  if (isCityStateSeat(seat)) return 1000 + seat;
+  if (seat === FREE_SEAT) return 5000;
+  if (isBarbSeat(seat)) return 6000;
+  return seat;
+}
+
+/**
+ * THE KNOWLEDGE BASE'S ENTRIES of the target list (0x783980 after its plot
+ * walk; the query 0x5eb8b0 at age 1, distance 2): for each player the
+ * player `seat` is at war with, in the game's order, its records by unit
+ * type (in the units' table order) then in their order — each record of
+ * age exactly 1 (seen at the last look, not at this turn's) whose unit
+ * still stands within 2 of the plot recorded: the unit's own plot now,
+ * where `seen` does not hold it, a LOW entry for a unit with Combat, else
+ * a CIVILIAN one.
+ */
+function knowledgeEntries(state: GameState, seat: number, seen: ArrayLike<number>, known: readonly ArmyRecord[]): Target[] {
+  const me = { seat };
+  const order = Object.keys(UNITS);
+  const recs = known.map((r, i) => ({ r, i }))
+    .filter(({ r }) => state.turn - r.seen === 1 && unitsHostile(state, me, { seat: r.owner }))
+    .sort((a, b) => playerOrder(a.r.owner) - playerOrder(b.r.owner)
+      || order.indexOf(a.r.type) - order.indexOf(b.r.type) || a.i - b.i);
+  const out: Target[] = [];
+  for (const { r } of recs) {
+    const u = state.units.find((x) => x.id === r.id && x.seat === r.owner && x.type === r.type);
+    if (!u || !onMap(u) || plotDistance(state, u.tileIndex, r.plot) > KNOWN_UNIT_RANGE || seen[u.tileIndex]) continue;
+    out.push({ type: (UNITS[u.type]?.combat ?? 0) > 0 ? 'LOW' : 'CIVILIAN', tile: u.tileIndex, seat: u.seat, unit: u });
+  }
+  return out;
+}
+
+/** the knowledge base's query's distance (0x5eb8b0's fifth argument) */
+const KNOWN_UNIT_RANGE = 2;
+
+export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<number>, revealed: ArrayLike<number> | null,
+  known: readonly ArmyRecord[]): Target[] {
   const { map } = state;
   const out: Target[] = [];
   const at = new Map<number, Unit[]>();
@@ -526,6 +601,7 @@ export function tacticalTargets(state: GameState, seat: number, seen: ArrayLike<
       out.push({ type: 'IMPROVEMENT', tile: t.index, seat: NO_SEAT, unit: null });
     }
   }
+  out.push(...knowledgeEntries(state, seat, seen, known));
   // a unit stacked with one that cannot fight
   for (const e of out) {
     if (e.type !== 'LOW') continue;
@@ -2064,7 +2140,7 @@ export function openPass(state: GameState, seat: number, aiOf: (u: Unit) => numb
   const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
   for (const u of units) ai.set(u.id, aiOf(u));
-  const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), null);
+  const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), null, seatOf(state, seat)?.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
   for (const u of units) {
@@ -2463,10 +2539,12 @@ function standIn(state: GameState, pass: Pass, move: string, pick: (u: Unit, tr:
  * THE BARBARIANS' TACTICAL PASS (TacticalAI 0x771530 over Tactics.xml's
  * "Default Barbarian" and "Default Barbarian HL" lists) for the units that
  * stood before their camps raised this turn's (a unit raised this turn acts
- * from the next): the units in their pool's order (`slot`), each one's
+ * from the next): the knowledge base's ageing and look (`knowledgeLook`),
+ * the units in their pool's order (`slot`), each one's
  * planning reach taken before any moves (0x792c90), the operations' trees
  * (`barbarianOpTrees`), then the moves in the
- * list's order, each walking the units the moves before it left.
+ * list's order, each walking the units the moves before it left; at the
+ * turn's end the knowledge base looks again.
  */
 export function barbarianTactics(state: GameState, acting: ReadonlySet<number>): void {
   costsHeld = new Map();
@@ -2475,6 +2553,8 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
   } finally {
     costsHeld = null;
   }
+  // the turn's end: the knowledge base looks again (player signal +0x228)
+  knowledgeLook(state, state.barbSeat, BARB_SEAT, plotsSeenNow(state, new Set([BARB_SEAT])), false);
 }
 
 function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
@@ -2484,7 +2564,9 @@ function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
   for (const u of all) ai.set(u.id, aiTypeOf(state, u));
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   const ex = state.barbSeat.explored;
-  const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null);
+  // the knowledge base ages and looks, then the target list (0x785f30)
+  knowledgeLook(state, state.barbSeat, BARB_SEAT, seen, true);
+  const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null, state.barbSeat.armyKnown ?? []);
   const reach = new Map<number, Reach[]>();
   const plan = new Map<number, Planner>();
   for (const u of all) {

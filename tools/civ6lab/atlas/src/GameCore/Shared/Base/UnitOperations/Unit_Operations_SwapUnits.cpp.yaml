@@ -10,6 +10,7 @@
   impl: [cpu/core/operations/assault.ts:garrisonExecute]
   readings:
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ..., the candidate moves to its planning's spot by the city and swaps in (the swap command 0x972880, unported); else the garrison fortifies (0x95eae0) where it has no range and the team...

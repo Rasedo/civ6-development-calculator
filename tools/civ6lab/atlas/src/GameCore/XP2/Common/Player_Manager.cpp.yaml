@@ -10,11 +10,12 @@
   cases:
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl: [cpu/core/tactical.ts:playerOrder]
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
-    - "C-95: the target list's knowledge-base entries — READ, unported"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:
     - "...not obsolete to the player with a combat pseudo-yield (or none), over the player list (0x483b50 +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the player's army re..."
     - "...lassicalSensitivity Science 10 ...) is > 0, over the player and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, m..."

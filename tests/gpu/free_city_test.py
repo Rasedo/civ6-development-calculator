@@ -357,28 +357,31 @@ def ring_walk(sim, centre: int, k: int) -> list[int]:
 def test_grants(rules, path) -> None:
     sim = fresh(rules, path)
     t0 = int(sim.turn)
-    # the wire: the pair's count and class, each grant class's chassis era by
-    # era (`eraUnitOfClass`)
-    assert (sim._free_pair_n, sim._free_grant_period) == (2, 5), "the wire's grant rows"
-    assert RULES["promotions"]["classes"][sim._free_pair_cls] == "MELEE"
-    assert [UNI[int(x)] if int(x) >= 0 else None for x in sim._free_grant_units[2]] == [
-        None, "HORSEMAN", "COURSER", "COURSER", "CAVALRY", "CAVALRY", "HELICOPTER", "HELICOPTER", "HELICOPTER"]
-    era = int(sim._world_era()[B0].clamp(min=0))
+    # the wire: the pair's count and class, the grant's classes and Builder
+    assert (sim._free_pair_n, sim._free_grant_period, sim._free_grant_cap) == (2, 5, 6), "the wire's grant rows"
+    classes = RULES["promotions"]["classes"]
+    assert classes[sim._free_pair_cls] == "MELEE"
+    assert [classes[c] for c in sim._free_grant_cls] == ["MELEE", "RANGED", "LIGHT_CAV"]
+    assert UNI[sim._free_builder] == "BUILDER" and sim._free_builder_threat == 5
+
+    def pair_of(row: int) -> int:
+        allowed = sim._trainable_in(sim._seat_techs(row), sim._seat_civics(row), True)
+        return int(sim._minor_best_of_class(allowed, sim._free_pair_cls)[B0])
     # the pair is the FORMER OWNER's best melee by its own research, whatever
     # the world era: Warriors with nothing, Swordsmen from Iron Working (no
     # Iron asked), Line Infantry from Military Science
     tech = {t["id"]: i for i, t in enumerate(RULES["techs"])}
     held = sim.civ_techs[B0, :2].clone()
     sim.civ_techs[B0, 0] = False
-    assert UNI[int(sim._free_pair_type(0)[B0])] == "WARRIOR"
+    assert UNI[pair_of(0)] == "WARRIOR"
     sim.civ_techs[B0, 1, tech["IRON_WORKING"]] = True
-    assert UNI[int(sim._free_pair_type(0)[B0])] == "WARRIOR", "another seat's research moved the pair"
+    assert UNI[pair_of(0)] == "WARRIOR", "another seat's research moved the pair"
     sim.civ_techs[B0, 0, tech["IRON_WORKING"]] = True
-    assert UNI[int(sim._free_pair_type(0)[B0])] == "SWORDSMAN"
+    assert UNI[pair_of(0)] == "SWORDSMAN"
     sim.civ_techs[B0, 0, tech["MILITARY_SCIENCE"]] = True
-    assert UNI[int(sim._free_pair_type(0)[B0])] == "LINE_INFANTRY"
+    assert UNI[pair_of(0)] == "LINE_INFANTRY"
     sim.civ_techs[B0, :2] = held
-    pair = int(sim._free_pair_type(0)[B0])
+    pair = pair_of(0)
     centre = revolt(sim)
     col = free_slot(sim, centre)
     F = sim.FREE_ROW
@@ -406,9 +409,12 @@ def test_grants(rules, path) -> None:
         sim.turn = t0 + k
         sim._free_cities_phase()
         assert len(grants()) == 2, (k, grants())
-    # ...then one draw over the classes alike, the class's chassis of the era
-    # (none where it has none), and the count back to 0...
-    open_ = {int(x) for x in sim._free_grant_units[:, era].tolist() if int(x) >= 0}
+    # ...then one draw over the classes alike, the class's chassis of the
+    # city's allowed units (none where they hold none), and the count back to 0...
+    allowed = {i for i, on in enumerate(sim.city_free_allowed[B0, F, col].tolist()) if on}
+    assert pair in allowed
+    open_ = {int(sim._free_chassis(torch.full((sim.B,), col), c)[B0]) for c in sim._free_grant_cls} - {-1}
+    assert open_ <= allowed
     rng0 = int(sim.rng_state[B0])
     sim.turn = t0 + 4
     sim._free_cities_phase()
@@ -435,11 +441,37 @@ def test_grants(rules, path) -> None:
     for s_ in free_slots[:max(0, sim._free_grant_cap - len(mine))]:
         sim.barb_unit_alive[B0, s_] = False
         sim.barb_unit_free_city[B0, s_] = -1
+    # a pillaged improvement within 2 and no HIGH target within 5: a Builder,
+    # a civilian of the hostile pool, not counted against the cap
+    ctr = int(sim.city_center[B0, F, col])
+    imp = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) <= 2 and int(sim.improvement[B0, t]) >= 0]
+    if not imp:
+        imp = [t for t in range(sim.T) if 1 <= int(sim.pair_dist[ctr, t]) <= 2 and bool(sim.passable[B0, t])][:1]
+        sim.improvement[B0, imp[0]] = 0
+    sim.pillaged[B0, imp[0]] = True
+    high = sim._tac_targets(FREE_SEAT, -1)
+    for h in (high["uk"][B0] == 3).nonzero(as_tuple=True)[0].tolist():
+        u = int(high["uu"][B0, h])
+        if int(sim.pair_dist[ctr, h]) <= 5 and u >= 0:
+            sim._occ_clear(torch.tensor([B0]), torch.tensor([h]), torch.tensor([u]))
+            sim.unit_alive[B0, u] = False
+    sim.city_free_grant[B0, F, col] = 4
+    n0 = len(grants())
+    sim._free_city_grant(torch.arange(sim.B) == B0, col)
+    got = grants()
+    assert len(got) == n0 + 1 and UNI[got[-1][1]] == "BUILDER", got
+    bslot = got[-1][0]
+    assert int(sim.civilian_at[B0, got[-1][2]]) == bslot, "the Builder stands outside the civilian plane"
+    # with its Builder standing the next grant is drawn
+    sim.city_free_grant[B0, F, col] = 4
+    rng2 = int(sim.rng_state[B0])
+    sim._free_city_grant(torch.arange(sim.B) == B0, col)
+    assert int(sim.rng_state[B0]) != rng2, "a city with its Builder drew nothing"
     # no barbarian rule walks them: the raid never moves a Free Cities unit
     before = free_units(sim)
     sim._barbarian_phase()
     assert free_units(sim) == before, "a barbarian walk moved a Free Cities unit"
-    print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit as the count reaches five, none at the cap, no barbarian walk")
+    print("  7 the grants OK — the former owner's melee pair on the flip turn, a drawn unit as the count reaches five, none at the cap, a Builder for a pillaged improvement, no barbarian walk")
 
 
 def test_grant_outward(rules, path) -> None:

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity, endTurn } from '../../../cpu/core/game';
 import { hexRingWalk, neighbors, tilesWithin } from '../../../world/hex';
-import { eraUnitOfClass, flipCity, freeCityPairType, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar, transferCity } from '../../../cpu/core/phase';
+import { flipCity, freeCityAllowed, freeCityChassis, freeCitiesPhase, freeCityLoyaltyDelta, loyaltyDelta, applyLoyalty, declareWar, transferCity } from '../../../cpu/core/phase';
 import { meleeAttack, attackTargets, cityDefenseStrength } from '../../../cpu/core/combat';
 import { disbandUnit, spawnUnit, unitsHostile } from '../../../cpu/core/units';
 import { computeCityStats, luxuryAmenities } from '../../../cpu/core/city';
@@ -11,7 +11,6 @@ import { worldEraIndex } from '../../../cpu/core/eras';
 import { researchCost } from '../../../cpu/core/economy';
 import { FREE_SEAT, atWarWithAny, emptySeat, isBarbSeat, isTerritorial, seatOf, setTileOwner, tileCity, tileSeat } from '../../../cpu/core/seats';
 import { CIV_LEADERS, FREE_CITY_GRANT_CAP, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_PERIOD, FREE_CITY_PAIR_COUNT, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_MAX } from '../../../cpu/data/seats';
-import { ERAS } from '../../../cpu/data/techs';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { isWater } from '../../../world/query';
@@ -178,32 +177,19 @@ describe('the Free City step', () => {
     expect(atWarWithAny(state, rival.seat)).toBe(false);
   });
 
-  it("each era's chassis of a class follows the install's upgrade chain and unlock eras", () => {
-    const at = (cls: Parameters<typeof eraUnitOfClass>[0]) => ERAS.map((_, e) => eraUnitOfClass(cls, e));
-    // CIV6 (Units.PrereqTech's era, UnitUpgrades): the recurring grants'
-    // chassis, class by class and era by era
-    expect(at('MELEE')).toEqual(['WARRIOR', 'SWORDSMAN', 'MAN_AT_ARMS', 'MUSKETMAN', 'LINE_INFANTRY',
-      'INFANTRY', 'INFANTRY', 'MECHANIZED_INFANTRY', 'MECHANIZED_INFANTRY']);
-    expect(at('RANGED')).toEqual(['ARCHER', 'ARCHER', 'CROSSBOWMAN', 'CROSSBOWMAN', 'FIELD_CANNON',
-      'FIELD_CANNON', 'MACHINE_GUN', 'MACHINE_GUN', 'MACHINE_GUN']);
-    expect(at('LIGHT_CAV')).toEqual([null, 'HORSEMAN', 'COURSER', 'COURSER', 'CAVALRY',
-      'CAVALRY', 'HELICOPTER', 'HELICOPTER', 'HELICOPTER']);
-    expect(at('RECON')).toEqual(['SCOUT', 'SCOUT', 'SKIRMISHER', 'SKIRMISHER', 'RANGER',
-      'RANGER', 'SPEC_OPS', 'SPEC_OPS', 'SPEC_OPS']);
-  });
-
   it("a revolt grants the former owner's best melee pair beside the centre, then a unit every fifth of its turns", () => {
     const { state, border } = scene(30);
     border.loyalty = 0;
-    const pair = freeCityPairType(state, border.seat);
+    const allowed = freeCityAllowed(state, border.seat);
     flipCity(state, border);
     const city = state.freeSeat!.cities[0];
+    expect(city.freeAllowed).toEqual(allowed);
+    const pair = freeCityChassis(city, 'MELEE');
     const centre = state.map.tiles[city.centerIndex];
     const free = () => state.units.filter((u) => u.seat === FREE_SEAT);
     // CIV6 (the live watches): the former owner's best melee, twice, on the
     // flip turn itself, on the nearest free land plots, the first on the
     // ring's walk first — seat 0 has researched nothing, so the Warrior
-    const era = Math.max(0, worldEraIndex(state));
     expect(pair).toBe('WARRIOR');
     const want = hexRingWalk(state.map, centre.col, centre.row, 1).filter((t) => !isWater(t))
       .slice(0, FREE_CITY_PAIR_COUNT);
@@ -219,7 +205,7 @@ describe('the Free City step', () => {
     }
     // ...then one draw over the three classes alike, the class's chassis of
     // the era (none where the era has none), and the count back to 0...
-    const open = FREE_CITY_GRANT_CLASSES.map((c) => eraUnitOfClass(c, era)).filter((u) => u !== null);
+    const open = FREE_CITY_GRANT_CLASSES.map((c) => freeCityChassis(city, c)).filter((u) => u !== null);
     const rng0 = state.rngState;
     state.turn = city.foundedTurn + FREE_CITY_GRANT_PERIOD - 1;
     freeCitiesPhase(state);
@@ -331,9 +317,34 @@ describe('the Free City step', () => {
       .toEqual(Array(FREE_CITY_PAIR_COUNT).fill('SWORDSMAN'));
     // the strongest melee the owner's research opens: Military Science's
     // Line Infantry over the Swordsman
-    expect(freeCityPairType(state, 0)).toBe('SWORDSMAN');
+    const pairOf = () => freeCityChassis({ freeAllowed: freeCityAllowed(state, 0) } as City, 'MELEE');
+    expect(pairOf()).toBe('SWORDSMAN');
     seatOf(state, 0)!.research.techs.push('MILITARY_SCIENCE');
-    expect(freeCityPairType(state, 0)).toBe('LINE_INFANTRY');
+    expect(pairOf()).toBe('LINE_INFANTRY');
+  });
+
+  it('a pillaged improvement near a Free City with no Builder and no threat brings a Builder, then a drawn unit', () => {
+    const { state, border } = scene(30);
+    border.loyalty = 0;
+    flipCity(state, border);
+    const city = state.freeSeat!.cities[0];
+    const c = state.map.tiles[city.centerIndex];
+    const t = tilesWithin(state.map, c.col, c.row, 2).find((x) => x.index !== c.index && !isWater(x))!;
+    t.improvement = 'FARM';
+    t.pillaged = true;
+    state.freeSeat!.treasury = 1e6;
+    city.freeGrantTurns = FREE_CITY_GRANT_PERIOD - 1;
+    city.loyalty = LOYALTY_MAX;
+    const before = state.units.length;
+    freeCitiesPhase(state);
+    const got = state.units.slice(before);
+    expect(got.map((u) => [u.type, u.seat, u.freeCity])).toEqual([['BUILDER', FREE_SEAT, city.id]]);
+    // its Builder standing, the next grant draws a class: no second Builder
+    city.freeGrantTurns = FREE_CITY_GRANT_PERIOD - 1;
+    city.loyalty = LOYALTY_MAX;
+    freeCitiesPhase(state);
+    expect(state.units.filter((u) => u.type === 'BUILDER' && u.seat === FREE_SEAT)).toHaveLength(1);
+    expect(city.freeGrantTurns).toBe(0);
   });
 
   it('a join takes the grants of the city that joins; any other Free Cities unit stays Free', () => {

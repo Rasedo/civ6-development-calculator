@@ -152,6 +152,9 @@ export interface City {
   freePot?: number;
   /** A FREE CITY's count of turns toward its next grant (`freeCityGrant`). */
   freeGrantTurns?: number;
+  /** A FREE CITY's allowed units (`freeCityAllowed`, its record's, made at
+   *  the revolt): the chassis its grants are drawn from. */
+  freeAllowed?: string[];
   /** CIV6 (Gain Sources): turns each SEAT's spies "operate at 2 levels higher"
    *  in this city, dense over seats. */
   spySources?: number[];
@@ -805,6 +808,11 @@ export interface Seat {
   /** a city-state's or the Free Cities' unit pool (`poolSlots`), its slot 0
    *  the founding Settler's */
   unitPool?: UnitPool;
+  /** THE KNOWLEDGE BASE'S ARMY RECORDS (`knowledgeLook`) of a city-state or
+   *  the barbarians: one per unit the player has seen — its id, owner and
+   *  unit type, the turn and plot last seen; a record drops 22 turns after.
+   *  Absent = none. */
+  armyKnown?: ArmyRecord[];
   /**
    * THIS SEAT'S CITIES — one field on one interface, so a rule that touches
    * a seat's cities cannot be written twice and drift.
@@ -1111,10 +1119,6 @@ export interface CityState extends Seat {
    *  while no one holds it. */
   levySeat?: number;
   levyEnds?: number;
-  /** THE KNOWLEDGE BASE'S ARMY RECORDS (`minorKnowledge`): one per unit the
-   *  minor has seen — its id, owner and unit type, the
-   *  turn and plot last seen; a record drops 22 turns after. Absent = none. */
-  armyKnown?: ArmyRecord[];
   /** the turn the minor's city last took a hit — the quiet the repair
    *  project waits on (`City.lastHitTurn`) */
   lastHitTurn?: number;

@@ -321,10 +321,16 @@ class SimInit:
         self.citystate_builder_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_army_seen = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_loss_turn = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        # the knowledge base's army records (`armyKnown`, `_minor_knowledge`):
-        # per record the unit's pool slot (-1 once the slot is reclaimed, -2 an
-        # empty record), its owner seat, type, and the turn and plot last seen
-        _kb = (B, s_pad, simbase.KB_RECORDS)
+        # the knowledge base's army records (`armyKnown`, `_knowledge_look`):
+        # one row per city-state, then the barbarians' (`BK`); per record the
+        # unit's pool slot (-1 once the slot is reclaimed, -2 an empty
+        # record), its owner seat, type, the turn and plot last seen, and its
+        # number in the order the records were added (`citystate_kb_next` the
+        # row's next)
+        self.BK = s_pad
+        _kb = (B, s_pad + 1, simbase.KB_RECORDS)
+        self.citystate_kb_seq = torch.full(_kb, -1, dtype=torch.int32, device=device)
+        self.citystate_kb_next = torch.zeros(B, s_pad + 1, dtype=torch.long, device=device)
         self.citystate_kb_slot = torch.full(_kb, -2, dtype=torch.int16, device=device)
         self.citystate_kb_owner = torch.full(_kb, -1, dtype=torch.int16, device=device)
         self.citystate_kb_type = torch.full(_kb, -1, dtype=torch.int16, device=device)
@@ -3901,6 +3907,9 @@ class SimInit:
         self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
+        # a FREE CITY's allowed units (`City.freeAllowed`), its grants' chassis
+        self.city_free_allowed = torch.zeros(B, self.CITY_ROWS, self.RC, len(rules.units) or 1, dtype=torch.bool,
+                                             device=device)
         # `City.projectYield`: the yield the city's last production step
         # converted from a district project — its amount and its yield
         # column (-1 for none) — which the city's yields read until the next
@@ -4707,19 +4716,20 @@ class SimInit:
         self._religion_loyalty = [float(x) for x in rules.seats["loyaltyReligion"]]
         self._starve_loyalty = float(rules.seats["loyaltyStarvation"])
         self._loyalty_after_cultural = float(rules.seats["loyaltyAfterCulturalTransfer"])
-        # the Free Cities player's own strength floor, and the units it is
-        # granted (`FREE_CITY_*`, measured in the live game): the former
-        # owner's best chassis of class `_free_pair_cls` on the flip turn
-        # (`_free_pair_type`), then as the city's count of turns reaches
-        # `_free_grant_period` one unit while fewer than `_free_grant_cap` of
-        # its grants stand, its class drawn over the classes alike and its
-        # chassis `_free_grant_units[class, era]` (-1 where the era has none)
+        # the units a Free City is granted (`FREE_CITY_*`): its allowed
+        # units' best of class `_free_pair_cls` on the flip turn, then as the
+        # city's count of turns reaches `_free_grant_period` one unit while
+        # fewer than `_free_grant_cap` of its grants stand — the Builder
+        # `_free_builder` where a pillaged improvement waits with no HIGH
+        # target within `_free_builder_threat`, else a class of
+        # `_free_grant_cls` drawn alike and its best allowed chassis
         self._free_pair_n = int(rules.seats["freeCityPairCount"])
         self._free_pair_cls = int(rules.seats["freeCityPairClass"])
         self._free_grant_period = int(rules.seats["freeCityGrantPeriod"])
         self._free_grant_cap = int(rules.seats["freeCityGrantCap"])
-        self._free_grant_units = torch.tensor(
-            [[int(x) for x in row] for row in rules.seats["freeCityGrantUnits"]], dtype=torch.long, device=device)
+        self._free_grant_cls = [int(x) for x in rules.seats["freeCityGrantClasses"]]
+        self._free_builder = int(rules.seats["freeCityBuilder"])
+        self._free_builder_threat = int(rules.seats["freeCityBuilderThreat"])
         # BANKRUPTCY on the turn's shortfall (GOLD_NEGATIVE_BALANCE_*), in
         # whole Gold: the amenity line and step, the disband line, the
         # disbands a turn

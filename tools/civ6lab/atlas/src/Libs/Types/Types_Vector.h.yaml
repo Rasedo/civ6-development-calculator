@@ -20,11 +20,26 @@
   name: freeCityRaise
   semantics: "a unit of a class for a Free City's record: of its allowed units (+0x28) the highest Combat (+0x48), placed by the ring walk within 3"
   status: PARTLY
+  impl: [cpu/core/phase.ts:freeCityChassis]
   readings:
-    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...(0x152eb0) over CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each; the unit 0x273a40: of the record's allowed units (+0x28) of the class, the highest Combat (+0x48, the fir..."
+  review: reviewed
+- addr: 0x273c50
+  final: 0x1ab750
+  kind: function
+  name: freeCityRecordInit
+  semantics: "a Free City's record at the revolt: the city, the count, the allowed units (CanTrain there, the +0x2b0 lines), the allowed buildings, the pair"
+  status: PARTLY
+  impl: [cpu/core/phase.ts:freeCityAllowed, gpu/core/sim_phase.py:_free_city_grant]
+  readings:
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "## C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+    - "- THE RECORD (0x273c50, made at the revolt by 0x276bc0): the city, live, the count 0; its allowed units (+0x28..."
   review: reviewed
 - addr: 0x274010
   final: 0x1abac0
@@ -45,9 +60,11 @@
     - cpu/data/seats.ts:FREE_CITY_GRANT_PERIOD
     - cpu/data/seats.ts:FREE_CITY_GRANT_CAP
     - cpu/data/seats.ts:FREE_CITY_GRANT_CLASSES
+    - cpu/core/phase.ts:pillagedNear
+    - cpu/data/seats.ts:FREE_CITY_BUILDER
   readings:
     - "H-1: draws with no game site"
-    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   context:
     - "...theon pick (`_seat_pantheon_race`) and the Free Cities' grant (\"Free Cities Unit Choice\", 0x274010, one weighted pick: the engines' `freeCityGrantType` / `_free_grant_type` take it as the..."
   review: reviewed

@@ -2749,21 +2749,22 @@ class SimMasks:
 
     def _spawn_barb(self, mask: torch.Tensor, at_tile: torch.Tensor, unit_type: int | torch.Tensor,
                     seat: int = BARB_SEAT, home: torch.Tensor | None = None, cart: torch.Tensor | None = None,
-                    naval_rows: torch.Tensor | None = None) -> torch.Tensor:
+                    naval_rows: torch.Tensor | None = None, civ: torch.Tensor | None = None) -> torch.Tensor:
         """Spawn into the HOSTILE pool — the barbarians' and the Free Cities'
         (`seat`), the two classes that earn no experience and that no driven
         seat walks. `unit_type` is a roster index or [B] roster indices,
         one per game; `home` [B] is the id of the Free City a grant comes from
         (`unit_free_city`), -1 on every other spawn; `naval_rows` [B] names
         the games whose unit is a hull where it varies per game, `cart` [B]
-        the games whose owner may put one on OCEAN. Returns the games where
-        the unit landed."""
+        the games whose owner may put one on OCEAN, `civ` [B] the games whose
+        unit is a civilian (a Free City's Builder), standing in the civilian
+        plane. Returns the games where the unit landed."""
         if not bool(mask.count_nonzero()):
             return mask & False
         # a NAVAL barb probes the WATER plane (its hull cannot stand ashore),
         # exactly as TS's spawnUnit branches on UNITS[type].naval.
         _nm = naval_rows
-        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm, cart=cart)
+        found, spot = self._first_free_spot(at_tile, seat, naval_mask=_nm, cart=cart, civ_mask=civ)
         can = mask & found
         if not bool(can.count_nonzero()):
             return can
@@ -2831,7 +2832,12 @@ class SimMasks:
         self.barb_unit_mp[rows, slot] = _m
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
-        self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
+        if civ is None:
+            self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
+        else:
+            cv = civ[rows]
+            self.military_at[(rows[~cv], spot[rows[~cv]])] = slot[~cv] + self.POOL_LO["barb"]
+            self.civilian_at[(rows[cv], spot[rows[cv]])] = slot[cv] + self.POOL_LO["barb"]
         # spawnUnit's revealAround: a barbarian's look lifts their fog
         if seat == BARB_SEAT:
             self._barb_reveal(rows, spot[rows], self._unit_sight(_ut_b, self.barb_unit_promos[rows, slot]),

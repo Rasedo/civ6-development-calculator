@@ -168,7 +168,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
   const targetLists = new Map<number, Target[]>();
   const targetsOf = (i: number): Target[] => {
     let t = targetLists.get(i);
-    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null)));
+    if (!t) targetLists.set(i, (t = tacticalTargets(state, i, plotsSeenNow(state, new Set([i])), null, [])));
     return t;
   };
   const seenBy = new Map<number, ReadonlySet<number>>();

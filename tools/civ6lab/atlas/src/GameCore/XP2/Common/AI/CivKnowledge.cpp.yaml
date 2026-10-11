@@ -13,7 +13,11 @@
     - recording: h1_duelv1124
       turn: 17
       value: minor 3's dead Warrior 131073 stays on its ARMY line from t17 to t38, gone at t39
-  impl: [cpu/core/minorBuild.ts:minorKnowledge, gpu/core/sim_minors.py:_minor_knowledge]
+  impl:
+    - cpu/core/minorBuild.ts:minorKnowledge
+    - gpu/core/sim_minors.py:_minor_knowledge
+    - cpu/core/tactical.ts:knowledgeLook
+    - gpu/core/sim_minors.py:_knowledge_look
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:
@@ -138,7 +142,13 @@
   name: knowledgeUnitsAt
   semantics: "a player's knowledge-base units of an age (exactly) still standing within a distance of their record: their plots now"
   status: PARTLY
-  readings: ["C-95: the target list's knowledge-base entries — READ, unported"]
+  impl:
+    - cpu/core/tactical.ts:knowledgeEntries
+    - gpu/core/sim_tactics.py:_tac_known_entries
+    - cpu/core/tactical.ts:KNOWN_UNIT_RANGE
+    - gpu/core/sim_tactics.py:_BARB_DEFENSE_ALL
+  readings:
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb5/NOTES.md: ...ore the turn's KB update -> t-1); +0.5*count term absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x7..."
@@ -151,10 +161,12 @@
   status: PARTLY
   impl:
     - ai/major/knowledge.ts:knowledgeTurn
-    - cpu/core/minorBuild.ts:ARMY_RECORD_AGE
+    - cpu/core/tactical.ts:ARMY_RECORD_AGE
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/core/operations/knowledge.ts:lookArmy
     - cpu/core/operations/manager.ts:lookCamps
+    - cpu/core/tactical.ts:ARMY_RECORD_AGE
+    - cpu/core/tactical.ts:knowledgeLook
   readings:
     - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -211,7 +223,8 @@
 - addr: 0x5ef650
   kind: function
   status: PARTLY
-  readings: ["C-95: the target list's knowledge-base entries — READ, unported"]
+  readings:
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each record (0x5ef650, 32 bytes) whose age (+0xc) is exactly 1 — seen at the last look, not at this turn's —..."

@@ -167,6 +167,7 @@
     - cpu/core/tactical.ts:tacticalTargets
     - cpu/core/tactical.ts:defenderAt
     - cpu/harness/checks.ts:fresh
+    - cpu/core/tactical.ts:ARMY_RECORD_AGE
   readings:
     - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
     - "H-1: the garrison requirement — READ"

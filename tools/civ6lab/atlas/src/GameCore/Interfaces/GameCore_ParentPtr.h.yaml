@@ -21,3 +21,13 @@
   context:
     - "...8: -1 when none, the unconverted), then recomputes; a loss only recomputes. The reset 0x1f6360 leaves one entry, {religion, pop x 50}; a recompute with no positive pressure leaves {-..."
   review: imported
+- addr: 0x276bc0
+  final: 0x1ada70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE RECORD (0x273c50, made at the revolt by 0x276bc0): the city, live, the count 0; its allowed units (+0x28, one flag per Units row): each..."
+  review: imported

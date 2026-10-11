@@ -162,6 +162,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   notes: ["label: CanTrain(unit)"]
   context:
     - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
@@ -179,7 +180,7 @@
   kind: function
   status: PARTLY
   readings:
-    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
 - addr: 0x175d10
   final: 0xfb9b0

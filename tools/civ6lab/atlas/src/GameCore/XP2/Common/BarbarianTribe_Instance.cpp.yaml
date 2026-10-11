@@ -98,20 +98,26 @@
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a name's +0..."
   review: reviewed
 - addr: 0x1485c0
   kind: function
+  name: barbFoundCityStart
+  semantics: "the scout's tree started: \"Barbarian Found City\" on the scout, the camp its Home Camp and the tribe its index"
   status: PARTLY
   impl: [cpu/core/barbarians.ts:barbScoutLook]
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...ing an owned plot of a city, its owner's throttle (manager +0x3d8, data +0x430) passed: 0x1485c0 starts the tribe's ScoutingBehaviorTree (\"Barbarian Found City\": Move Unit to the camp,..."
     - ...aises nothing. The engines take the scout's own sight (LAB). The throttle write follows 0x1485c0 whether or not a tree starts (the engines too).
-  review: imported
+  review: reviewed
 - addr: 0x1488a0
   final: 0xdc820
   kind: function

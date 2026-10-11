@@ -41,13 +41,15 @@
     - cpu/core/tactical.ts:Pass
     - cpu/core/tactical.ts:seenRegions
     - gpu/core/sim_tactics.py:_tac_seen_regions
+    - cpu/core/tactical.ts:ARMY_RECORD_AGE
+    - cpu/core/tactical.ts:knowledgeEntries
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (two tests below unread)"
-    - "C-95: the target list's knowledge-base entries — READ, unported"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes:
     - ".claude/scratchpad/cb5/NOTES.md: ...m absent at minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), proje..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...ATION, f2e1d0 GOODY_HUT, f2e1d4   ALLY_SUPPORT, f2e1d8 AIR_UNIT. The list's entries per plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT..."
@@ -80,6 +82,10 @@
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/harness/cityBuildLab.ts:kbUpdate
     - gpu/core/sim_minors.py:_minor_knowledge
+    - cpu/core/tactical.ts:knowledgeLook
+    - cpu/core/tactical.ts:ex
+    - gpu/core/sim_minors.py:_knowledge_look
+    - gpu/core/sim_tactics.py:_tac_pass
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
@@ -103,7 +109,8 @@
   final: 0x2a6aa0
   kind: function
   status: PARTLY
-  readings: ["C-95: the target list's knowledge-base entries — READ, unported"]
+  readings:
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "....+0x4a8) and, for each its player is at war with (0x469cd0), asks its knowledge base (0x786160) for that player's units (0x5eb8b0, age 1, distance 2): per unit type in DB order, each..."
@@ -125,10 +132,10 @@
     - recording: 1124
       turn: 201
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
-  impl: [cpu/core/tactical.ts:tacticalTargets]
+  impl: [cpu/core/tactical.ts:tacticalTargets, cpu/core/tactical.ts:ARMY_RECORD_AGE]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
-    - "C-95: the target list's knowledge-base entries — READ, unported"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   context:
     - "...s not seen follow (LOW, CIVILIAN where the unit cannot fight): unported (AUDIT). Then 0x786d50: a LOW unit sharing its plot with one that cannot fight is MEDIUM; the barbarians' prio..."
   review: imported
@@ -140,7 +147,7 @@
     - recording: 1124
       turn: 201
       value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
-  impl: [cpu/core/tactical.ts:tacticalTargets]
+  impl: [cpu/core/tactical.ts:tacticalTargets, cpu/core/tactical.ts:ARMY_RECORD_AGE]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
   context:
@@ -150,7 +157,7 @@
   final: 0x515590
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:tacticalTargets]
+  impl: [cpu/core/tactical.ts:tacticalTargets, cpu/core/tactical.ts:ARMY_RECORD_AGE]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
   notes:
@@ -184,6 +191,7 @@
     - cpu/core/minorBuild.ts:minorKnowledge
     - cpu/core/operations/knowledge.ts:lookArmy
     - cpu/core/operations/manager.ts:lookCamps
+    - cpu/core/tactical.ts:knowledgeLook
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"

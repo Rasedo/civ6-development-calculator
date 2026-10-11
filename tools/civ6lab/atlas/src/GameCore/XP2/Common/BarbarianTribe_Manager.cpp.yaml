@@ -146,7 +146,7 @@
   readings:
     - "C-74: the drought's start pick — READ (REVERSED)"
     - "H-1: the city-states' quests — READ"
-    - "C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)"
+    - "C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)"
   context:
     - "...st plot is d < Spacing away) and draws over the list's COUNT, `rand(n)` through the thunk 0x152eb0, indexing the list: the scores are stored and never read. **This reverses the weighted pi..."
     - "...ic's own test; weight 1 each; one draw \"Selecting a random new quest\" over their count (0x152eb0), the type's record started (0x849400: state 1, the ids, the turn) and its picker (+0x4..."
@@ -204,7 +204,10 @@
     - cpu/core/barbarians.ts:barbScoutLook
     - cpu/core/types.ts:GameState
     - cpu/data/barbarians.ts:BARB_SPOT_THROTTLE
-  readings: ["H-1: the raids — READ", "H-1: the raids — READ"]
+  readings:
+    - "H-1: the raids — READ"
+    - "H-1: the raids — READ"
+    - "C-95: the scout's tree \"Barbarian Found City\" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."

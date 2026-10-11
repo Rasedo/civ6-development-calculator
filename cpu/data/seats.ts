@@ -157,9 +157,9 @@ const FREE_CITY_CENSUS = 'C-60: runs/cs_watch_obs1_20260923T173434Z.jsonl, runs/
   + ' runs/cs_watch_lab4_20260923T135005Z.jsonl, runs/rebel_watch_rebel3b_20260924T043843Z.jsonl,'
   + ' runs/rebel_watch_rebel3c_20260924T043919Z.jsonl and the other cs_watch games';
 /** A revolt hands the Free City this many of the FORMER OWNER's best chassis
- *  of FREE_CITY_PAIR_CLASS on the flip turn itself (`freeCityPairType`: the
- *  strongest the owner's techs and civics unlock; a grant asks no strategic
- *  resource). */
+ *  of FREE_CITY_PAIR_CLASS on the flip turn itself (`freeCityChassis`: the
+ *  highest Combat among the units the city could train at the revolt; a grant
+ *  asks no strategic resource). */
 export const FREE_CITY_PAIR_COUNT = srcConst('seats.freeCityPairCount', 2, {
   lab: `${FREE_CITY_WATCH}: two UNIT_MAN_AT_ARMS of player 62 beside the centre on the flip turn (115);`
     + ` ${FREE_CITY_CENSUS}: two of the era's melee at the first read of the Free City`,
@@ -184,9 +184,20 @@ export const FREE_CITY_GRANT_CAP = srcConst('seats.freeCityGrantCap', 6, {
 });
 /** ...its CLASS one draw over these alike ("Free Cities Unit Choice",
  *  0x274010: CLASS_MELEE, CLASS_RANGED, CLASS_LIGHT_CAVALRY, weight 1 each),
- *  and its chassis that class's of the world era (`eraUnitOfClass`). */
+ *  and its chassis that class's of the city's allowed units
+ *  (`freeCityChassis`). */
 export const FREE_CITY_GRANT_CLASSES = srcConst('seats.freeCityGrantClasses',
   ['MELEE', 'RANGED', 'LIGHT_CAV'] as const, { lab: 'GameCore_XP2_Release.dll 0x274010 (the class list built at 0x274243)' });
+/** ...or, with no Builder of its own and a pillaged improvement within 2 of
+ *  the city, this chassis (0x274010: CLASS_BUILDER, the Builder) where no
+ *  HIGH target of the Free Cities' list stands within
+ *  `FREE_CITY_BUILDER_THREAT` of it (0x272fa0). */
+export const FREE_CITY_BUILDER = srcConst('seats.freeCityBuilder', 'BUILDER', {
+  lab: 'GameCore_XP2_Release.dll 0x274010 (CLASS_BUILDER at 0x2741d1)',
+});
+export const FREE_CITY_BUILDER_THREAT = srcConst('seats.freeCityBuilderThreat', 5, {
+  lab: 'GameCore_XP2_Release.dll 0x272fa0 (the HIGH targets within 5 of the city, 0x27309b)',
+});
 /** CIV6 (LOYALTY_PER_TURN_FROM_NEARBY_CITIZEN_PRESSURE_*): the citizen
  *  pressure term is linear in the ratio of the stronger side to the weaker —
  *  NEUTRAL_LOYALTY at NEUTRAL_RATIO, MAX_LOYALTY at MAX_RATIO and beyond,

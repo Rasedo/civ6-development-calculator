@@ -44,7 +44,8 @@
   final: 0x2c4360
   kind: function
   status: PARTLY
-  readings: ["C-95: the target list's knowledge-base entries — READ, unported"]
+  readings:
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...1 — seen at the last look, not at this turn's — whose unit (+0, the player's unit list 0x4f2310) still stands (+0x770 clear) within 2 of the plot recorded (+0x10 / +0x14): the unit's..."

@@ -449,6 +449,21 @@
           "note": "the Free Cities' research (`minorResearch` on `freeSeat.research`; the research row `FR`): its techs and civics, progress, items in hand, goal, overflows, turns left, kept progress and the two AIs' last analyses; empty until its first turn makes the seat."
         },
         {
+          "name": "barbArmyKnown",
+          "compare": "exact",
+          "note": "the barbarians' knowledge base's records (`knowledgeLook` on `barbSeat.armyKnown`; the row `BK`) as a sorted multiset of (owner, unit type, turn seen, plot), as minorArmyKnown.",
+          "covers": [
+            "Seat.armyKnown"
+          ],
+          "planes": [
+            "citystate_kb_slot",
+            "citystate_kb_owner",
+            "citystate_kb_type",
+            "citystate_kb_seen",
+            "citystate_kb_plot"
+          ]
+        },
+        {
           "name": "storms",
           "compare": "exact",
           "covers": [
@@ -2127,7 +2142,7 @@
           "compare": "exact",
           "note": "the records as a sorted multiset of (owner, unit type, turn seen, plot): the unit's identity (TS id, GPU pool slot) is not compared",
           "covers": [
-            "CityState.armyKnown"
+            "Seat.armyKnown"
           ],
           "planes": [
             "citystate_kb_slot",
@@ -2888,6 +2903,17 @@
             "city_free_grant"
           ],
           "note": "a FREE CITY's count of turns toward its next grant (`freeCityGrant`, 0x274010's +0x18): back to 0 at a grant, held while its own grants stand at the cap; 0 for any other city."
+        },
+        {
+          "name": "freeAllowed",
+          "compare": "exact",
+          "covers": [
+            "City.freeAllowed"
+          ],
+          "planes": [
+            "city_free_allowed"
+          ],
+          "note": "a FREE CITY's allowed units (`freeCityAllowed`, its record's at the revolt: the chassis the former owner may train), as unit rows; empty for any other city."
         },
         {
           "name": "greatWorks",
@@ -3962,6 +3988,14 @@
       }
     ],
     "gpu": [
+      {
+        "plane": "citystate_kb_seq",
+        "why": "the order the knowledge base's records were added in (`armyKnown`'s array order on TS), which the target list's entries follow: compared through their effect, the tactical moves; the records themselves are compared as a sorted multiset."
+      },
+      {
+        "plane": "citystate_kb_next",
+        "why": "each knowledge row's next record number (`citystate_kb_seq`): see citystate_kb_seq."
+      },
       {
         "plane": "tribe_store",
         "why": "the raid's Operation Move nodes' stored members (`BarbOp.store`), slot-indexed on the GPU and id-keyed on TS: no common key. Their effect, the operation's phase and its members' moves, is compared (the barbTribes row's resume, the units' plots)."

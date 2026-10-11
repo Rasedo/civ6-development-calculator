@@ -519,6 +519,11 @@ const GAME: Record<string, Extractor> = {
   // the Free Cities' research (`minorResearch`): empty until its first turn
   // makes the seat
   freeResearch: (s) => [researchRecord(s.freeSeat?.research)],
+  // the barbarians' knowledge base's army records (`knowledgeLook`), as a
+  // city-state's: owner, unit type, turn and plot last seen, sorted
+  barbArmyKnown: (s) => [(s.barbSeat.armyKnown ?? [])
+    .map((r) => [r.owner, idx(UNIT_IDX, r.type), r.seen, r.plot])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || a[3] - b[3]).flat()],
   // the live storms in the order they began: the last serial, then per
   // record its serial, row, centre, turns left, and its struck plots sorted
   // behind their count
@@ -971,6 +976,8 @@ const CITY: Record<string, Extractor> = {
   // a FREE CITY's build pot (`freeCityBuild`); 0 for any other city
   freePot: overCities((r) => r.city.freePot ?? 0),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
+  // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
+  freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),
   // every layout slot's work — object, maker, era, civilization; -1s for an
   // empty slot — which is what the theming rules and the yields read.
   greatWorks: overCities((r) => {

@@ -5024,7 +5024,7 @@ through `_minor_research` on the research row `FR` (gpu/core/sim_minors.py).
   (first off t35, Astrology for Archery); its analysis's rows within 0.05
   of AI_Research.csv 1,652 of 2,074 (1114) to 3,362 of 4,233 (1117).
 
-## C-60: the Free City's grant — READ (0x274010), ported (its Builder and its chassis below unread)
+## C-60: the Free City's grant — READ (0x274010, 0x273c50), ported (the allowed list's upgrade lines and the repairs below)
 
 `freeCityGrant` (cpu/core/phase.ts), `_free_city_grant`
 (gpu/core/sim_phase.py).
@@ -5043,13 +5043,31 @@ through `_minor_research` on the research row `FR` (gpu/core/sim_minors.py).
   of equals), placed by the ring walk 0x6aef0 within 3. The count back to
   0. Then, the city not producing (+0x2350 == 0), the first pillaged
   district it may repair (0x173f70), else a pillaged building's repair.
+- THE RECORD (0x273c50, made at the revolt by 0x276bc0): the city, live,
+  the count 0; its allowed units (+0x28, one flag per Units row): each unit
+  the city can train (CanTrain 0x172820 on its build queue, the former
+  owner's then) but those flagged +0x1b8 bit 0x40, those with religious
+  strength (+0x78) and the air ones (domain +0x20 2 with +0x44 0) and those
+  whose class def (0x28a940) bears +0x48 bit 0x10 — a unit with a list at
+  +0x2b0..+0x2b8 (its count +0x2d0) flags that list's units with no list
+  of their own in its place; its allowed buildings (+0x48: +0x54 set,
+  +0x58 above 0, constructible there); +0x1c the player's +0x12f0 +0xf4
+  where above 0; then the revolt's pair, 0x273a40 at CLASS_MELEE, 2 units
+  within 3.
 - The engines: the count `City.freeGrantTurns` / `city_free_grant`, the cap
-  6 over the units the city granted, the uniform draw, the class's chassis
-  of the world era (`eraUnitOfClass`; none, no unit). LAB: the chassis (the
-  allowed list's writer unread; the census's 12 melee of 69 combat grants
-  against a draw alike, runs of FREE_CITY_CENSUS); the units +0x7d0 skips.
-  BUILD (AUDIT C-60): the Builder grant (a civilian the hostile pool does
-  not host) and the record's repairs.
+  6 over the units the city granted (its Builder, `charges` above 0, not
+  counted), the Builder (`FREE_CITY_BUILDER`, a civilian of the hostile
+  pool on the GPU, `_spawn_barb`'s `civ`) where a pillaged improvement
+  lies within 2 and no HIGH target of the Free Cities' list within 5
+  (`threatened`, the list as `tacticalTargets` / `_tac_targets` builds it
+  then), else the uniform draw and the class's chassis of the city's
+  allowed units (`City.freeAllowed` / `city_free_allowed`: the former
+  owner's `trainableIn` at the revolt; `freeCityChassis` /
+  `_free_chassis`), the pair the same at MELEE. LAB: the +0x2b0 lists
+  (read as the units' own rows: `trainableIn` takes the generic chassis),
+  the units +0x7d0 skips. BUILD (AUDIT C-60): the repairs (requests on the
+  city's production, 0x97a1b0 / 0x97a0d0, the Free City's build the pick
+  takes over), the Builder's work.
 
 ## C-95: the homeland's Plunder Trader — READ, ported
 
@@ -5072,7 +5090,7 @@ gpu/core/sim_tactics.py.
   its route stands on no plot in the engines (`trade.ts` spawns one only
   where a route ends), so the target list holds no TRADER entry there.
 
-## C-95: the target list's knowledge-base entries — READ, unported
+## C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)
 
 - After its plot walk and the region set (0x7856f6), the tactical target
   list 0x783980 walks the game's players (0x483b50 +0x4a0..+0x4a8) and, for
@@ -5085,9 +5103,61 @@ gpu/core/sim_tactics.py.
   plot the player does not see now (+0x290 count 0) takes an entry after
   the walk's: TARGET_LOW_PRIORITY_UNIT where the unit's type has Combat
   (+0x48), else TARGET_CIVILIAN_UNIT. The priorities (0x786d50) follow.
-- The engines' target lists hold the walk's entries alone; the GPU's keeps
-  one unit entry a plot, in plot order, which a later entry on a plot of
-  the walk (an improvement it only revealed) does not fit (AUDIT C-95).
+- The knowledge base: the city-states' (C-96) and the barbarians' (aged
+  and looked at their tactical turn's start, looked again at its end),
+  `knowledgeLook` in cpu/core/tactical.ts (`Seat.armyKnown`) /
+  `_knowledge_look` in gpu/core/sim_minors.py (the knowledge tensors' row
+  `BK` the barbarians'; `citystate_kb_seq` the records' order). The
+  entries: `knowledgeEntries` / `_tac_known_entries`. The GPU list keeps
+  its unit entries apart from the plot's other one (`uk`, `uu`, `us`, and
+  `uo` each entry's place in the list), so a remembered unit on a plot the
+  walk gave a revealed camp, goody hut or improvement takes its own entry.
+  LAB: a plot holds one unit entry on the GPU — a second record's unit on
+  it takes none (the TS list takes both). The majors' lists
+  (`MajorView.attackTargets`) carry none (their knowledge base is
+  ai/major's).
+- MEASURED (the action replay, 5 seeds, against main e46f1ae3): barb:move
+  imposed 1117 404 -> 401, 1121 1,069 -> 1,066, 1124 1,017 -> 1,003, 1128
+  772 -> 766, 1127 535 -> 586; Attack Civilian rows taking the game's move
+  72 -> 102 of 157, Barbarian Rampage 2,552 -> 2,575; Pillage Improvement
+  59 -> 49 of 198. The city-states' moves unchanged.
+
+## C-95: the scout's tree "Barbarian Found City" — READ (the tree, its start, Protect Unit's update), PARTLY READ (the nodes' executions), unported
+
+- THE START (0x1485c0, from the scout's look 0x153ef0 once the player's
+  throttle allows, the tribe's scout walking none yet): the tree "Barbarian
+  Found City" ("Barbarian Behavior", 0x7ff9a0) on the scout alone, the
+  trigger's Location its tribe's camp ("Home Camp") and Value the tribe's
+  index ("Tribe Index"); the game signals BARBARIAN_SPOTTED_CITY and
+  BARBARIAN_RAID_STARTED linked (0x1808c4af0).
+- THE TREE (BehaviorTrees.xml): Sequence 0 (JumpTo 6) — Decode Trigger 1
+  (its Location to "Home Camp", its Value to "Tribe Index"), Concurrent 2
+  (JumpTo 5) over Protect Unit 3 (Damage Percentage 0.25) and Move Unit 4
+  (Location "Home Camp", Release when done true, Allow Danger true, To
+  Range 1), Notify Owner 5 (Data Payload "Tribe Index", 0x7c6fa0 ->
+  0x148270: the city to the tribe's raid or its list, "C-95: the
+  barbarians' raid"). The Concurrent RUNS while a child runs; the notify
+  follows its SUCCESS (the interpreter as "Raid City"'s, 0x7d3a00).
+- PROTECT UNIT. Update (0x7f07c0): its units (the Unit List, else the
+  tree's, 0x6092c0 on player +0x12d0); none FAILURE; each whose damage
+  (+0xcf0) is at least Damage Percentage of its health (0x56e0d0; the
+  percentage in 8.8) on a plot the influence map rates dangerous (player
+  +0x12d8, 0x716a90 above 0) counts; any counted RUNNING, else SUCCESS.
+  Execution (0x7ef0e0, PARTLY READ): each such unit to its safe plot
+  (0x716b90) and the move (0x962030, its turn ended 0x570b40), else its
+  rest (0x56ef30, 0x95eae0) and its turn done (0x56d6f0).
+- MOVE UNIT. Update (0x7f0020, PARTLY READ): its units, the location, the
+  planning's reach of it at To Range (0x791300) and the danger (0x716a60).
+  Execution (0x7eeba0, PARTLY READ): each unit not +0x770 — its planning's
+  plot at To Range of the location this turn (0x791300), else the
+  location; a plot of danger only where Allow Danger; woken (0x53e20) and
+  moved (0x972880 / 0x962030).
+- The engines report a scout's city without the tree (`scoutReports` /
+  `_barb_scout_report`, after the tactical pass): within BARB_HOME_RANGE of
+  its camp, held while hurt by a quarter and threatened (`threatened`); the
+  scout itself walks the tactical pass's moves. Porting it on the
+  operation manager wants Move Unit's update and both executions read in
+  full (AUDIT C-95).
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 

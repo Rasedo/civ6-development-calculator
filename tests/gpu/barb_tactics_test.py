@@ -135,14 +135,14 @@ def scalar_spots(sim, b, slot, tg):
     lim = int(sim._tac_full_now()[b, slot]) // sim._mp_scale * 2 + rng
     here = int(sim.barb_unit_tile[b, slot])
     fights = bool(sim._tac_can_fight()[b, slot])
-    dk, ok = tg["dk"][b].tolist(), tg["ok"][b].tolist()
+    dk, uk = tg["dk"][b].tolist(), tg["uk"][b].tolist()
     keys = []
     for p in range(sim.T):
         if int(sim.pair_dist[here, p]) > lim:
             continue
         if dk[p] == 1:
             keys.append(2 * p)
-        if 1 <= ok[p] <= 3 or ok[p] == 7:
+        if uk[p] > 0:
             keys.append(2 * p + 1)
     water = sim.water[b].tolist()
     ctr = sim._centre_plane()[b].tolist()
@@ -158,7 +158,7 @@ def scalar_spots(sim, b, slot, tg):
 
     def link(P, par, T, M):
         for k in keys:
-            tp, civ = k // 2, k % 2 == 1 and ok[k // 2] == 7
+            tp, civ = k // 2, k % 2 == 1 and uk[k // 2] == 7
             d = int(sim.pair_dist[P, tp])
             spot, turns, dd, fixed = P, T, d, False
             taken = (civ and d == 0) if rng != 0 else d == 0
@@ -527,7 +527,7 @@ def main() -> None:
     sim._occ_set(torch.tensor([0]), torch.tensor([mt]), torch.tensor([m]))
     sim.tribe_alive[0, k] = False
     sim.tribe_ramp[0, k] = int(sim.unit_seat[0, m])
-    tg = sim._tac_targets()
+    tg = sim._tac_targets(BARB_SEAT, sim.BK)
     assert int(tg["os"][0, mt]) == int(sim.unit_seat[0, m]) and 1 <= int(tg["ok"][0, mt]) <= 3, (
         f"the unit is no target: ok {int(tg['ok'][0, mt])} os {int(tg['os'][0, mt])} seen {bool(sim._barb_seen('barbarians')[0, mt])}")
     sim._barb_reset_mp()
@@ -557,27 +557,33 @@ def main() -> None:
     found = None
     # a COMBAT unit (a camp keeps its DEFENDER) with no HIGH target in its
     # planning: Attack High runs before Attack Civilians
-    high = (sim._tac_targets()["ok"][0] == 3).nonzero(as_tuple=True)[0].tolist()
+    tgh = sim._tac_targets(BARB_SEAT, sim.BK)
+    high = (tgh["uk"][0] == 3).nonzero(as_tuple=True)[0].tolist()
     for s in barb_units(sim):
         if (int(ai[0, s]) != 3 or bool(sim.barb_unit_op[0, s]) or bool(sim.unit_naval[int(sim.barb_unit_type[0, s])])
                 or int(sim._type_ranged_strength[int(sim.barb_unit_type[0, s])]) > 0):
             continue
         bt = int(sim.barb_unit_tile[0, s])
-        if any(int(sim.pair_dist[bt, h]) <= 8 for h in high):
-            continue
         spot = [n for n in sim.neigh[bt].tolist() if open_plot(n) and int(sim.tmove[0, n]) == 0]
         if spot:
             found = (s, spot[0])
             break
     assert found, "no barbarian fighter with an open plot beside it"
     s, ct = found
+    # its planning holds no HIGH target: those within 8 of it leave the map
+    bt = int(sim.barb_unit_tile[0, s])
+    for h in high:
+        u = int(tgh["uu"][0, h])
+        if int(sim.pair_dist[bt, h]) <= 8 and u >= 0 and u != c:
+            sim._occ_clear(torch.tensor([0]), torch.tensor([h]), torch.tensor([u]))
+            sim.unit_alive[0, u] = False
     sim._occ_clear(torch.tensor([0]), torch.tensor([int(sim.unit_tile[0, c])]), torch.tensor([c]))
     sim.unit_type[0, c] = sim._builder_idx
     sim.unit_tile[0, c] = ct
     sim._occ_set(torch.tensor([0]), torch.tensor([ct]), torch.tensor([c]))
     assert int(sim.civilian_at[0, ct]) == c, "the Builder stands in no civilian plane"
     seat0 = int(sim.unit_seat[0, c])
-    assert int(sim._tac_targets()["ok"][0, ct]) == 7, "the Builder is no CIVILIAN target"
+    assert int(sim._tac_targets(BARB_SEAT, sim.BK)["ok"][0, ct]) == 7, "the Builder is no CIVILIAN target"
     sim._barb_reset_mp()
     acting = torch.zeros_like(sim.barb_unit_alive)
     acting[0, s] = True
@@ -591,7 +597,7 @@ def main() -> None:
     sim._barb_slots()
     sim._barb_reset_mp()
     ai, _ = sim._tac_ai()
-    tg = sim._tac_targets()
+    tg = sim._tac_targets(BARB_SEAT, sim.BK)
     units = [s for s in barb_units(sim) if int(ai[0, s]) >= 2]
     res = sim._tac_plan(torch.zeros(len(units), dtype=torch.long), torch.tensor(units), tg)
     nspots = 0
@@ -637,7 +643,7 @@ def main() -> None:
     sim.unit_hp[0, c] = 10
     sim.barb_unit_hp[0, s] = int(rules.combat["unitHp"])
     hp0 = 10
-    kind = int(sim._tac_targets()["ok"][0, ft])
+    kind = int(sim._tac_targets(BARB_SEAT, sim.BK)["ok"][0, ft])
     assert 1 <= kind <= 3, f"the major's unit beside the barbarian is no unit target ({kind})"
     sim._barb_reset_mp()
     acting = torch.zeros_like(sim.barb_unit_alive)
@@ -707,7 +713,7 @@ def main() -> None:
     danger = dplane[0].tolist()
     bt = int(sim.barb_unit_tile[0, s])
     assert danger[bt] > 0, "the barbarian's plot holds no danger"
-    res = sim._tac_plan(torch.tensor([0]), torch.tensor([s]), sim._tac_targets())
+    res = sim._tac_plan(torch.tensor([0]), torch.tensor([s]), sim._tac_targets(BARB_SEAT, sim.BK))
     # no blow of its planning that kills (a civilian near would give one)
     res["wins"] = torch.zeros_like(res["wins"])
     want_plot = scalar_safe_plot(sim, s, res, danger)
@@ -734,7 +740,9 @@ def main() -> None:
     sim._barb_slots()
     sim._barb_reset_mp()
     ai, _ = sim._tac_ai()
-    scouts = [s for s in barb_units(sim) if int(ai[0, s]) == 2]
+    # an explorer with no more than half its health lost (`exploreLand`)
+    hp_max = int(rules.combat["unitHp"])
+    scouts = [s for s in barb_units(sim) if int(ai[0, s]) == 2 and hp_max - int(sim.barb_unit_hp[0, s]) <= hp_max >> 1]
     assert scouts, "no barbarian explorer"
     s = scouts[0]
     # the barbarians have revealed the ground two round it alone
@@ -754,8 +762,35 @@ def main() -> None:
         sim._tac_in_pass = False
     assert want >= 0 and int(first[0, s]) == want, f"the explorer goes first for {int(first[0, s])}, not {want}"
     print(f"  12 an explorer goes to the plot of its reach whose sight takes in the most unrevealed ({want})")
+    # -- 13: the knowledge base's units seen last turn, after the walk -------
+    sim = fresh(rules, path)
+    T = sim.T
+    every = torch.ones(sim.B, T, dtype=torch.bool)
+    live_b = torch.ones(sim.B, dtype=torch.bool)
+    sim.citystate_kb_slot[:, sim.BK] = -2
+    sim._knowledge_look(sim.BK, BARB_SEAT, every, live_b, True)
+    known = [int(k) for k in sim.citystate_kb_slot[0, sim.BK].tolist() if k >= 0]
+    foes = [u for u in known if int(sim.unit_seat[0, u]) < sim.n_majors and bool(sim._type_dom_mil[int(sim.unit_type[0, u])])]
+    assert foes, "the barbarians' look recorded no major's fighter"
+    u = foes[0]
+    sim.turn = int(sim.turn) + 1
+    none = torch.full((sim.B, T), -1, dtype=torch.long)
+    empty = torch.zeros(sim.B, T, dtype=torch.long)
+    uk, uu, us, uo = sim._tac_known_entries(BARB_SEAT, sim.BK, torch.zeros(sim.B, T, dtype=torch.bool),
+                                            empty.clone(), none.clone(), none.clone(), torch.full((sim.B, T), 1 << 40))
+    at = int(sim.unit_tile[0, u])
+    assert int(uk[0, at]) == 1 and int(uu[0, at]) == u and int(uo[0, at]) >= T, (int(uk[0, at]), int(uu[0, at]))
+    # one the player sees now is none of the knowledge base's; two turns old none
+    uk2, *_ = sim._tac_known_entries(BARB_SEAT, sim.BK, every, empty.clone(), none.clone(), none.clone(),
+                                     torch.full((sim.B, T), 1 << 40))
+    assert int(uk2[0].count_nonzero()) == 0
+    sim.turn = int(sim.turn) + 1
+    uk3, *_ = sim._tac_known_entries(BARB_SEAT, sim.BK, torch.zeros(sim.B, T, dtype=torch.bool), empty.clone(),
+                                     none.clone(), none.clone(), torch.full((sim.B, T), 1 << 40))
+    assert int(uk3[0].count_nonzero()) == 0
+    print(f"  13 the knowledge base's units seen last turn enter after the walk ({int(uk[0].count_nonzero())} entries)")
     print("BARB TACTICS OK — the pathfinder's order, the pool, the camp's defender, the pillage, the wander, the rampage,"
-          " the civilians, the attacks, the danger map, Move to Safety, Explore")
+          " the civilians, the attacks, the danger map, Move to Safety, Explore, the knowledge base's entries")
 
 
 if __name__ == "__main__":

@@ -73,33 +73,40 @@ class SimMinors:
         return seen
 
     def _minor_knowledge(self, s: int, age: bool) -> None:
-        """`minorKnowledge` — the knowledge base's army records of minor `s`
-        (CivKnowledge 0x5e9530). `age`: the minor's turn (0x785f30) — every
-        record ages and one past 21 turns drops — then the look; else the
-        look alone (its turn's end). The look: each unit on a plot the minor
-        sees (`_minor_sight`; a hidden stealth unit or another's Spy not)
-        refreshes its record — the one of its pool slot, owner and type —
-        with the turn and its plot, or takes a free record. A record's slot
-        is -1 once the pool reclaims it (its unit long dead), -2 a free one."""
+        """`minorKnowledge` — minor `s`'s knowledge base's look over the plots
+        it sees (`_minor_sight`)."""
         alive = self.citystate_alive[:, s]
         if not bool(alive.count_nonzero()):
             return
+        self._knowledge_look(s, 100 + s, self._minor_sight(s), alive, age)
+
+    def _knowledge_look(self, r: int, seat: int, sight: torch.Tensor, alive: torch.Tensor, age: bool) -> None:
+        """`knowledgeLook` — the knowledge base's army records on row `r` of
+        the knowledge tensors (a city-state's, or the barbarians' `BK`) for
+        player `seat` (CivKnowledge 0x5e9530), in the games of `alive`.
+        `age`: the player's tactical turn (0x785f30) — every record ages and
+        one past 21 turns drops — then the look; else the look alone (its
+        turn's end). The look: each unit on a plot of `sight` (a hidden
+        stealth unit or another's Spy not) refreshes its record — the one of
+        its pool slot, owner and type — with the turn and its plot, or takes a
+        free record, numbered after the last added (`citystate_kb_seq`, the
+        records' order). A record's slot is -1 once the pool reclaims it (its
+        unit long dead), -2 a free one."""
         B, dev = self.B, self.device
-        seat = 100 + s
         turn = int(self.turn)
-        slot = self.citystate_kb_slot[:, s]
-        owner = self.citystate_kb_owner[:, s]
-        typ = self.citystate_kb_type[:, s]
-        seen_t = self.citystate_kb_seen[:, s]
-        plot = self.citystate_kb_plot[:, s]
+        slot = self.citystate_kb_slot[:, r]
+        owner = self.citystate_kb_owner[:, r]
+        typ = self.citystate_kb_type[:, r]
+        seen_t = self.citystate_kb_seen[:, r]
+        plot = self.citystate_kb_plot[:, r]
+        seq = self.citystate_kb_seq[:, r]
         K = slot.shape[1]
         if age:
             drop = (slot != -2) & (turn - seen_t.long() > 21) & alive.unsqueeze(1)
             if bool(drop.count_nonzero()):
                 slot[drop] = -2
-                for p in (owner, typ, seen_t, plot):
-                    p[drop] = -1
-        sight = self._minor_sight(s)
+                for q in (owner, typ, seen_t, plot, seq):
+                    q[drop] = -1
         tile = self.unit_tile.clamp(min=0)
         vis = self.unit_alive & (self.unit_tile >= 0) & sight.gather(1, tile) & alive.unsqueeze(1)
         if self._stealth_live:
@@ -129,7 +136,7 @@ class SimMinors:
         if bool(new.count_nonzero()):
             free = slot == -2
             if bool((new.sum(dim=1) > free.sum(dim=1)).any()):
-                raise RuntimeError(f"_minor_knowledge: more than KB_RECORDS={K} army records")
+                raise RuntimeError(f"_knowledge_look: more than KB_RECORDS={K} army records")
             pos = torch.argsort((~free).to(torch.int8), dim=1, stable=True)
             rank = new.long().cumsum(dim=1) - 1
             b, u = new.nonzero(as_tuple=True)
@@ -139,6 +146,9 @@ class SimMinors:
             typ[b, k] = self.unit_type[b, u].to(typ.dtype)
             seen_t[b, k] = turn
             plot[b, k] = self.unit_tile[b, u].to(plot.dtype)
+            nxt = self.citystate_kb_next[:, r]
+            seq[b, k] = (nxt[b] + rank[b, u]).to(seq.dtype)
+            self.citystate_kb_next[:, r] = nxt + new.sum(dim=1)
 
     def _minor_levy_return(self, s: int) -> None:
         """`minorLevyReturn` — CIV6 (LOC_CITY_STATES_LEVY_MILITARY_DETAILS):

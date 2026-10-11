@@ -125,8 +125,8 @@
     - "C-95: the danger map and Move to Safety — READ, ported"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
-    - "C-95: the target list's knowledge-base entries — READ, unported"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
+    - "C-95: the target list's knowledge-base entries — READ, ported (two records on one plot below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
   context:

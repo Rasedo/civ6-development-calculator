@@ -3,7 +3,7 @@ import { BARB_SEAT, emptySeat, isBarbSeat, markCityCentre, seatOfCityState, setT
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { disbandUnit, grantedMoves, spawnUnit } from '../../../cpu/core/units';
 import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeDies, tribeOf } from '../../../cpu/core/barbarians';
-import { barbarianTactics, cityStateTactics, dangerPlane, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets, traceTactics } from '../../../cpu/core/tactical';
+import { barbarianTactics, cityStateTactics, dangerPlane, enemyAt, knowledgeLook, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets, traceTactics } from '../../../cpu/core/tactical';
 import { DIRECTION_TYPES, neighborTile, tilesWithin } from '../../../world/hex';
 import { LCG_ADD, LCG_MUL } from '../../../cpu/core/rand';
 import type { CityState, GameState, Unit } from '../../../cpu/core/types';
@@ -142,10 +142,35 @@ describe("the barbarians' tactical pass", () => {
     const near = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 10).index, 0)!;
     const far = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 17, 10).index, 0)!;
     const seen = new Uint8Array(state.map.tiles.length).fill(1);
-    const list = tacticalTargets(state, BARB_SEAT, seen, null);
+    const list = tacticalTargets(state, BARB_SEAT, seen, null, []);
     expect(list.find((e) => e.unit === near)?.type).toBe('HIGH');
     expect(list.find((e) => e.unit === far)?.type).toBe('LOW');
     expect(list.find((e) => e.tile === camp.index)?.type).toBe('CAMP');
+  });
+
+  it("the knowledge base's units seen last turn enter the list after the walk, at their plots now", () => {
+    const state = land();
+    const near = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 12, 10).index, 0)!;
+    const far = spawnUnit(state, 'BUILDER', tileAtCoords(state.map, 14, 10).index, 0)!;
+    const gone = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 16, 10).index, 0)!;
+    const all = new Uint8Array(state.map.tiles.length).fill(1);
+    knowledgeLook(state, state.barbSeat, BARB_SEAT, all, true);
+    expect(state.barbSeat.armyKnown?.length).toBe(3);
+    // the next turn: two moved within 2 of where they were seen, one past it
+    state.turn += 1;
+    near.tileIndex = tileAtCoords(state.map, 13, 11).index;
+    far.tileIndex = tileAtCoords(state.map, 15, 10).index;
+    gone.tileIndex = tileAtCoords(state.map, 19, 10).index;
+    const seen = new Uint8Array(state.map.tiles.length);
+    const list = tacticalTargets(state, BARB_SEAT, seen, null, state.barbSeat.armyKnown!);
+    // in the units' table order: the Builder's record before the Warrior's
+    expect(list.map((e) => [e.type, e.unit])).toEqual([['CIVILIAN', far], ['LOW', near]]);
+    expect(list[1].tile).toBe(near.tileIndex);
+    // a unit the player sees now is the walk's; one two turns old none
+    seen[near.tileIndex] = 1;
+    expect(tacticalTargets(state, BARB_SEAT, seen, null, state.barbSeat.armyKnown!).filter((e) => e.unit === near)).toHaveLength(1);
+    state.turn += 1;
+    expect(tacticalTargets(state, BARB_SEAT, new Uint8Array(state.map.tiles.length), null, state.barbSeat.armyKnown!)).toHaveLength(0);
   });
 
   it('a unit near its standing camp wanders on ONE "Random Direction" draw over its plots of this turn', () => {
@@ -242,7 +267,7 @@ describe("a city-state's tactical pass", () => {
     const near = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 13, 10).index, BARB_SEAT)!;
     const far = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 14, 10).index, BARB_SEAT)!;
     const seen = new Uint8Array(state.map.tiles.length).fill(1);
-    const list = tacticalTargets(state, cs.seat, seen, null);
+    const list = tacticalTargets(state, cs.seat, seen, null, []);
     expect(list.find((e) => e.tile === cs.centerIndex)?.type).toBe('FRIENDLY_CITY');
     expect(list.find((e) => e.unit === near)?.type).toBe('HIGH');
     expect(list.find((e) => e.unit === far)?.type).toBe('LOW');

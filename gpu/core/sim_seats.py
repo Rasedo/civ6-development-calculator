@@ -10990,6 +10990,7 @@ class SimSeats:
         self.city_proj_yield[b, row, col] = -1
         self.city_free_pot[b, row, col] = 0
         self.city_free_grant[b, row, col] = 0
+        self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0
         self.city_powered[b, row, col] = False
         for _p in ("city_gw_obj", "city_gw_maker", "city_gw_era", "city_gw_seat"):
@@ -11460,6 +11461,7 @@ class SimSeats:
         # became independent"; any other arrival carries none
         self.city_free_press[b, dst_row, col, :] = 0
         self.city_free_grant[b, dst_row, col] = 0
+        self.city_free_allowed[b, dst_row, col] = False
         # ...and the turn its new owner took it
         self.city_founded_turn[b, dst_row, col] = int(self.turn)
         self._q_clear(b, dst_row, col)           # TS queue: []

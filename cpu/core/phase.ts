@@ -19,7 +19,7 @@ import { nukeOffers } from './nuclear';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { applyTrainingGrants, meleeAttack, rangedAttack, hostileRangedStrike, damageRoll, awardDefenseXp, encircled, stackDefender, unitAttackRange } from './combat';
 import { promoClassOf, promoValue, takePromotion } from './promotions';
-import { PROMO_COLS, UNIT_PROMO_CLASS, type PromoClass } from '../data/promotions';
+import { PROMO_COLS, type PromoClass } from '../data/promotions';
 import { availableTechsIn, availableCivicsIn, computeUnlocks, isCivicComplete, type Unlocks , prodMultFor, notFoundedSum, peacefulFounderFaith, foreignFollowerCount, greatWorkLoyalty, goldPrice, faithPrice } from './effects';
 import { boostOnWarDeclared, detectBoosts, markBoost } from './boosts';
 import { BOOSTS } from '../data/boosts';
@@ -32,7 +32,8 @@ import { addEnvoys, allianceSuzInfluence, cityStateById, declareWarOnCityState, 
 import { LEVY_TURNS, INFLUENCE_PER_TURN, ENVOY_COST, GOV_INFLUENCE_TIER, CITY_STATE_MAX_HP } from '../data/cityStates';
 import { freeCityBuild, minorBestOfClass, minorResearch, trainableIn } from './minorBuild';
 import { FREE_CITY_PAIR_CLASS, LOYALTY_RELIGION_MATCHING, LOYALTY_RELIGION_MISMATCHING, LOYALTY_STARVATION } from '../data/seats';
-import { freeCityTactics } from './tactical';
+import { freeCityTactics, plotDistance, tacticalTargets } from './tactical';
+import { plotsSeenNow } from './barbarians';
 import { POLICY_LIST } from '../data/policies';
 import { PROJECTS, PROJECT_LIST, projectConversionRate } from '../data/projects';
 import { adoptGovernment, carryPolicies, seatGovernment, governmentBit, darkAgeEra, unlockedPolicyIds, fitPolicies, governmentSlots, governmentChanges, policySetChanges, policyUnlockCost } from './effects';
@@ -42,7 +43,7 @@ import { BUILDINGS, SCRIPTED_HELD_BUILDINGS } from '../data/buildings';
 import { prodLayout } from './prodLayout';   // ONE column layout, shared with the exporter
 import { CIVICS } from '../data/civics';
 import { RESOURCES } from '../../world/resources';
-import { UNITS, UNIT_TYPE_IDX, UNIT_ERA_INDEX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
+import { UNITS, UNIT_TYPE_IDX, CITY_HEAL_PER_TURN, ENCAMPMENT_HP, CITY_MAX_HP, URBAN_DEFENSES_TECH, FORMATION_CIVIC, FORMATION_COST_MULT, FORMATION_TRAIN_DISCOUNT, FORMATION_TRAIN_BUILDING } from '../data/units';
 import { availableBuildings, buildingCompletable, buildingCostIn, purchasableBuildings, outerPool, wallsMax, urbanDefensesFit, repairDrip, fitEncampOuter, encampOuterPool } from './rules';
 import { generalAuraMP } from './aura'; // the aura's +1 MP half
 import { PANTHEONS, PANTHEON_FAITH_COST, PANTHEON_IDS } from '../data/religion';
@@ -108,7 +109,7 @@ const A_HARVEST = unitActionIndex(IMPROVEMENT_IDS).HARVEST;
 const A_WONDER_CHARGE = unitActionIndex(IMPROVEMENT_IDS).WONDER_CHARGE;
 const A_PORTAL = unitActionIndex(IMPROVEMENT_IDS).PORTAL;
 const A_ACTIVATE_GP = unitActionIndex(IMPROVEMENT_IDS).ACTIVATE_GP;
-import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
+import { ALLIANCE_CULTURAL, ALLIANCE_E2_INFLUENCE, ALLIANCE_MILITARY, ALLIANCE_M2_MIL_PROD_PCT, ALLIANCE_QP_ROUTE, ALLIANCE_QP_TURN, ALLIANCE_R2_BOOST_TURNS, ALLIANCE_R3_SCI_PCT, ALLIANCE_C3_CUL_PCT, ALLIANCE_RESEARCH, ALLIANCE_REL3_FAITH_PER_POP, ALLIANCE_RELIGIOUS, ALLIANCE_ROUTE_FROM, ALLIANCE_ROUTE_YKEY, DEAL_ITEMS, DEAL_OFFER_TURNS, CIV_LEADERS, MAX_CITIES_PER_SEAT, WAR_MIN_TURNS, PEACE_TREATY_TURNS, PEACE_GOLD_COST, LOYALTY_MAX, LOYALTY_RANGE, LOYALTY_PRESS_MAX_LOYALTY, LOYALTY_PRESS_MAX_RATIO, LOYALTY_PRESS_NEUTRAL_LOYALTY, LOYALTY_PRESS_NEUTRAL_RATIO, CITIZEN_PRESSURE_BASE, CITIZEN_PRESSURE_CAPITAL, CITIZEN_PRESSURE_DOMINANCE_PCT, LOYALTY_AMENITY, FREE_CITY_LOYALTY_PER_TURN, LOYALTY_AFTER_CULTURAL_TRANSFER, FREE_CITY_PAIR_COUNT, FREE_CITY_GRANT_PERIOD, FREE_CITY_GRANT_CLASSES, FREE_CITY_GRANT_CAP, FREE_CITY_BUILDER, FREE_CITY_BUILDER_THREAT, bankruptDisbands, goldShortfall, GOVERNOR_LOYALTY, CONGRESS_MIN_ERA, CONGRESS_PROD_MULT } from '../data/seats';
 import { resolveCompetition } from './competition';
 import { acceptDeal, capitalCityOf, dealPhase, setDealOffer } from './deals';
 import { hiddenResourcesFor } from './seats';
@@ -815,42 +816,33 @@ export function flipCity(state: GameState, city: City): void {
     return;
   }
   const free = freeSeatOf(state);
-  const pair = freeCityPairType(state, city.seat);
+  const allowed = freeCityAllowed(state, city.seat);
   transferCity(state, city.seat, free, city, 'revolted');
   const freed = free.cities[free.cities.length - 1];
+  freed.freeAllowed = allowed;
+  const pair = freeCityChassis(freed, FREE_CITY_PAIR_CLASS);
   if (pair) for (let k = 0; k < FREE_CITY_PAIR_COUNT; k++) grantFreeCityUnit(state, freed, pair);
 }
 
-/** THE REVOLT'S PAIR: the strongest `FREE_CITY_PAIR_CLASS` chassis the
- *  FORMER OWNER's techs and civics unlock (`trainableIn`; a grant asks no
- *  strategic resource — the watched pairs were Swordsmen and Musketmen;
- *  `minorBestOfClass`, ties by catalog order). */
-export function freeCityPairType(state: GameState, formerOwner: number): string | null {
+/** A FREE CITY'S ALLOWED UNITS, its record's (0x273c50, at the revolt): the
+ *  chassis the FORMER OWNER may train there (`trainableIn` over its techs and
+ *  civics; a grant asks no strategic resource — the watched pairs were
+ *  Swordsmen and Musketmen). */
+export function freeCityAllowed(state: GameState, formerOwner: number): string[] {
   const r = seatOf(state, formerOwner)?.research ?? { techs: [], civics: [] };
-  return minorBestOfClass(trainableIn(r, true), FREE_CITY_PAIR_CLASS);
+  return trainableIn(r, true).map((d) => d.id);
 }
 
-/** THE ERA'S CHASSIS of a promotion class: the class's generic land chain (no
- *  civilization's unique, no hull, no plane) from the chassis nothing
- *  upgrades into, followed up its upgrades while the next one's era — the era
- *  of the tech or civic that unlocks it (`UNIT_ERA_INDEX`) — is at or below
- *  `era`. Null where even the chain's first chassis comes later. */
-export function eraUnitOfClass(cls: PromoClass, era: number): string | null {
-  const chain = Object.values(UNITS).filter((d) =>
-    UNIT_PROMO_CLASS[d.id] === cls && !d.uniqueTo && !d.naval && !d.air);
-  let d = chain.find((c) => !chain.some((o) => o.upgradesTo === c.id));
-  let at: string | null = null;
-  while (d && UNIT_ERA_INDEX[d.id] <= era) {
-    at = d.id;
-    const next = d.upgradesTo;
-    d = chain.find((c) => c.id === next);
-  }
-  return at;
+/** A grant's chassis of a promotion class (0x273a40): of the city's allowed
+ *  units, the strongest of the class, the first of equals
+ *  (`minorBestOfClass`); null none */
+export function freeCityChassis(city: City, cls: PromoClass): string | null {
+  return minorBestOfClass((city.freeAllowed ?? []).map((id) => UNITS[id]), cls);
 }
 
 /** A FREE CITY's granted unit. The Free Cities player's revolt hands it
- *  `FREE_CITY_PAIR_COUNT` of the former owner's best melee on the flip turn
- *  (`freeCityPairType`), and
+ *  `FREE_CITY_PAIR_COUNT` of its allowed units' best melee on the flip turn
+ *  (`freeCityChassis`), and
  *  while it stays Free one more as its grant falls due
  *  (`freeCityGrant`). Each stands on the NEAREST free land plot outward
  *  from the centre, never the centre itself: with every plot of ring 1 held
@@ -893,21 +885,43 @@ function grantFreeCityUnit(state: GameState, city: City, unitType: string): void
  * A FREE CITY'S GRANT, each Free Cities turn (0x274010, the city's record):
  * its count of turns (`City.freeGrantTurns`) rises by one, the flip turn's
  * the first, and at `FREE_CITY_GRANT_PERIOD` a grant falls due. None while
- * `FREE_CITY_GRANT_CAP` of the units the city granted stand, the count held
- * so it falls due again the next turn; else ONE
+ * `FREE_CITY_GRANT_CAP` of the units the city granted stand (its Builder,
+ * a unit with build charges, not counted), the count held so it falls due
+ * again the next turn. With no Builder of its own, no HIGH target of the
+ * Free Cities' list within `FREE_CITY_BUILDER_THREAT` of the city (0x272fa0)
+ * and a pillaged improvement on a plot within 2 of it, a Builder; else ONE
  * draw over `FREE_CITY_GRANT_CLASSES` alike ("Free Cities Unit Choice") and
- * the class's chassis of the world era (`eraUnitOfClass`; none, no unit),
- * the count back to 0.
+ * the class's chassis of the city's allowed units (`freeCityChassis`; none,
+ * no unit). The count back to 0.
  */
 function freeCityGrant(state: GameState, city: City): void {
   city.freeGrantTurns = (city.freeGrantTurns ?? 0) + 1;
   if (city.freeGrantTurns < FREE_CITY_GRANT_PERIOD) return;
   const own = state.units.filter((u) => u.seat === FREE_SEAT && u.freeCity === city.id);
-  if (own.length >= FREE_CITY_GRANT_CAP) return;
-  const cls = FREE_CITY_GRANT_CLASSES[randRange(state, FREE_CITY_GRANT_CLASSES.length, 'Free Cities Unit Choice')];
-  const id = eraUnitOfClass(cls, Math.max(0, worldEraIndex(state)));
-  if (id) grantFreeCityUnit(state, city, id);
+  const builder = own.some((u) => (u.charges ?? 0) > 0);
+  if (own.filter((u) => !((u.charges ?? 0) > 0)).length >= FREE_CITY_GRANT_CAP) return;
+  if (!builder && pillagedNear(state, city) && !threatened(state, city)) {
+    grantFreeCityUnit(state, city, FREE_CITY_BUILDER);
+  } else {
+    const cls = FREE_CITY_GRANT_CLASSES[randRange(state, FREE_CITY_GRANT_CLASSES.length, 'Free Cities Unit Choice')];
+    const id = freeCityChassis(city, cls);
+    if (id) grantFreeCityUnit(state, city, id);
+  }
   city.freeGrantTurns = 0;
+}
+
+/** a pillaged improvement on a plot within 2 of the city (0x274010's walk of
+ *  the city's plots, +0x44 set and +0x4d bit 0) */
+function pillagedNear(state: GameState, city: City): boolean {
+  const c = state.map.tiles[city.centerIndex];
+  return tilesWithin(state.map, c.col, c.row, 2).some((t) => t.improvement !== null && !!t.pillaged);
+}
+
+/** a HIGH target of the Free Cities' tactical list within
+ *  `FREE_CITY_BUILDER_THREAT` of the city (0x272fa0) */
+function threatened(state: GameState, city: City): boolean {
+  const list = tacticalTargets(state, FREE_SEAT, plotsSeenNow(state, new Set([FREE_SEAT])), null, []);
+  return list.some((e) => e.type === 'HIGH' && plotDistance(state, e.tile, city.centerIndex) <= FREE_CITY_BUILDER_THREAT);
 }
 
 /** BANKRUPTCY for seat `s` once its turn's charges have landed, every seat

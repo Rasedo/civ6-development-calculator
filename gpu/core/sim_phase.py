@@ -683,22 +683,29 @@ class SimPhase:
                 if win >= 0 and bool(self._skips_free_city(win)[b]):
                     self._transfer_city(b, row, j, win, conquest=False, loyalty=True)
                 else:
-                    pair = self._free_pair_type(row)
+                    allowed = self._trainable_in(self._seat_techs(row), self._seat_civics(row), True)[b]
                     self._transfer_city(b, row, j, self.FREE_ROW, conquest=False, loyalty=True)
-                    # the revolt GRANTS the Free City the former owner's best
+                    # the revolt GRANTS the Free City its allowed units' best
                     # melee pair on the flip turn itself (`flipCity`)
                     one = torch.zeros(self.B, dtype=torch.bool, device=self.device)
                     one[b] = True
                     fcol = self.centre_slot_at[:, int(here[b])].clamp(min=0)
+                    self.city_free_allowed[b, self.FREE_ROW, int(fcol[b])] = allowed
+                    pair = self._free_chassis(fcol, self._free_pair_cls)
                     for _k in range(self._free_pair_n):
                         self._grant_free_unit(one, fcol, pair)
 
-    def _free_pair_type(self, row: int) -> torch.Tensor:
-        """[B] long — `freeCityPairType`: the strongest chassis of the pair's
-        class the FORMER OWNER row's techs and civics unlock (a grant asks no
-        strategic resource), ties by catalog order; -1 where none."""
-        train = self._trainable_in(self._seat_techs(row), self._seat_civics(row), True)
-        return self._minor_best_of_class(train, self._free_pair_cls)
+    def _free_chassis(self, col: torch.Tensor, cls) -> torch.Tensor:
+        """[B] long — `freeCityChassis`: of the allowed units of the Free City
+        in column `col` [B], the strongest of promotion class `cls` (an int,
+        or [B] per game), ties by catalog order; -1 where none."""
+        allowed = self.city_free_allowed[self._bidx, self.FREE_ROW, col.clamp(min=0)]
+        pc = self.rules_dev.u_promo_class.to(self.device).unsqueeze(0)
+        c = cls.unsqueeze(1) if torch.is_tensor(cls) else cls
+        ok = allowed & (pc == c)
+        cs = torch.where(ok, self._type_combat.unsqueeze(0).long(), torch.full_like(ok, -1, dtype=torch.long))
+        pick = cs.argmax(dim=1)
+        return torch.where(ok.any(dim=1), pick, torch.full_like(pick, -1))
 
     def _grant_free_unit(self, mask: torch.Tensor, col: torch.Tensor, unit_type: torch.Tensor) -> None:
         """`grantFreeCityUnit` for the Free City in column `col` [B] of the
@@ -722,7 +729,8 @@ class SimPhase:
         ground = self.passable
         if self._imp_portal_any:
             ground = ground | self._portal_plane()
-        ok = (ground & ~self._blocked_for(tiles, FREE_SEAT) & (tiles != ctr.unsqueeze(1))
+        civ = ~self._type_dom_mil.take(unit_type.clamp(min=0, max=self.NU - 1))
+        ok = (ground & ~self._blocked_for(tiles, FREE_SEAT, is_civilian=civ) & (tiles != ctr.unsqueeze(1))
               & (self.district < 0))
         # each plot's ring k and its place on that ring's walk
         k = self.pair_dist[ctr].long()
@@ -732,33 +740,47 @@ class SimPhase:
         best = key.min(dim=1).values
         spot = key.min(dim=1).indices
         home = self.city_id[self._bidx, self.FREE_ROW, col.clamp(min=0)]
-        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home)
+        self._spawn_barb(mask & (best < T * span), spot, unit_type.clamp(min=0), seat=FREE_SEAT, home=home, civ=civ)
 
     def _free_city_grant(self, act: torch.Tensor, j: int) -> None:
         """`freeCityGrant` for the Free City in column `j` in the games of
         `act`: its count of turns (`city_free_grant`) rises by one, and at
         `_free_grant_period` a grant falls due — none while `_free_grant_cap`
-        of the units it granted stand (the count held); else ONE draw
-        ("Free Cities Unit Choice") over the classes alike and the class's
-        chassis of the world era (`_free_grant_units`, -1 none), the count
-        back to 0."""
+        of the units it granted stand (its Builder, a unit with build charges,
+        not counted; the count held); with no Builder of its own, a pillaged
+        improvement within 2 of the city and no HIGH target of the Free
+        Cities' list within `_free_builder_threat` of it, the Builder; else ONE
+        draw ("Free Cities Unit Choice") over the classes alike and the
+        class's chassis of the city's allowed units (`_free_chassis`, -1
+        none). The count back to 0."""
         row = self.FREE_ROW
+        B, dev = self.B, self.device
         cnt = self.city_free_grant[:, row, j] + act.long()
         self.city_free_grant[:, row, j] = cnt
         due = act & (cnt >= self._free_grant_period)
         if not bool(due.count_nonzero()):
             return
         cid = self.city_id[:, row, j]
-        own = (self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
-               & (self.barb_unit_free_city == cid.unsqueeze(1))).sum(dim=1)
-        due = due & (own < self._free_grant_cap)
+        mine = (self.barb_unit_alive & (self.barb_unit_seat == FREE_SEAT)
+                & (self.barb_unit_free_city == cid.unsqueeze(1)))
+        charged = self.barb_unit_charges > 0
+        due = due & ((mine & ~charged).sum(dim=1) < self._free_grant_cap)
         if not bool(due.count_nonzero()):
             return
-        n = self._free_grant_units.shape[0]
-        k = self._rand_range(due, n).clamp(min=0, max=n - 1)
-        era = self._world_era().clamp(min=0, max=self._free_grant_units.shape[1] - 1)
-        got = self._free_grant_units[k, era]
-        jc = torch.full((self.B,), j, dtype=torch.long, device=self.device)
+        ctr = self.city_center[:, row, j].clamp(min=0)
+        near2 = self.pair_dist[ctr].to(torch.long) <= 2
+        pillaged = (near2 & (self.improvement >= 0) & self.pillaged).any(dim=1)
+        build = due & ~(mine & charged).any(dim=1) & pillaged
+        if bool(build.count_nonzero()):
+            high = self._tac_targets(FREE_SEAT, -1)["uk"] == 3
+            threat = (high & (self.pair_dist[ctr].to(torch.long) <= self._free_builder_threat)).any(dim=1)
+            build = build & ~threat
+        jc = torch.full((B,), j, dtype=torch.long, device=dev)
+        draw = due & ~build
+        n = len(self._free_grant_cls)
+        k = self._rand_range(draw, n).clamp(min=0, max=n - 1)
+        cls = torch.tensor(self._free_grant_cls, dtype=torch.long, device=dev)[k]
+        got = torch.where(build, torch.full_like(k, self._free_builder), self._free_chassis(jc, cls))
         self._grant_free_unit(due, jc, torch.where(due, got, torch.full_like(got, -1)))
         self.city_free_grant[:, row, j] = torch.where(due, torch.zeros_like(cnt), self.city_free_grant[:, row, j])
 

@@ -77,6 +77,14 @@ def main() -> None:
     sim.tribe_op_resume[0, k] = 9
     sim.tribe_op_done[0, k] = False
     sim.tribe_score[0, k] = 0
+    # the march's Attack Units takes a foe within its reach: none stands there
+    t0 = int(sim.barb_unit_tile[0, u])
+    for m in range(sim.UNIT_MAX):
+        t = int(sim.unit_tile[0, m])
+        if (bool(sim.unit_alive[0, m]) and int(sim.unit_seat[0, m]) != BARB_SEAT and t >= 0
+                and int(sim.pair_dist[t0, t]) <= 3):
+            sim._occ_clear(torch.tensor([0]), torch.tensor([t]), torch.tensor([m]))
+            sim.unit_alive[0, m] = False
 
     def tick():
         sim._barb_reset_mp()
