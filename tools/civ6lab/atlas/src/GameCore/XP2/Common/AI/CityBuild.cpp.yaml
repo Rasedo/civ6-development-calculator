@@ -583,6 +583,7 @@
     - cpu/core/aiCityTrees.ts:wholeValue
     - cpu/core/aiContracts.ts:ContractCity
     - cpu/core/aiDistrictValue.ts:DistrictValueFacts
+    - cpu/core/minorBuild.ts:minorUnitTerm
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"

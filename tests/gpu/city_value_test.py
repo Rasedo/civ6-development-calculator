@@ -20,13 +20,14 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 
 from core import load_rules
+from core.sim_civics import SimCivics
 from core.sim_cityvalue import SimCityValue
 from core.sim_economy import SimEconomy
 
 FX = 256
 
 
-class Values(SimCityValue, SimEconomy):
+class Values(SimCityValue, SimEconomy, SimCivics):
     """the value mixin over the rules alone"""
 
     def __init__(self, rules):
@@ -621,7 +622,8 @@ MOD_PINS = {
     "BUILDING_GOV_WIDE": [0, 0, 0],
     "BUILDING_GOV_CONQUEST": [0, 0, 0],
     "BUILDING_GOV_CITYSTATES": [16128, 13056, 5888],
-    "BUILDING_GOV_SPIES": [10240, 10240, 10240],
+    # its spy (EFFECT_GRANT_SPY, 402 / 330 / 152) and its 40
+    "BUILDING_GOV_SPIES": [113152, 94720, 49152],
     "BUILDING_GOV_FAITH": [0, 0, 0],
     "BUILDING_GOV_MILITARY": [0, 0, 0],
     "BUILDING_GOV_SCIENCE": [0, 0, 0],

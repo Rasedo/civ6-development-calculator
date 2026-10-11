@@ -1089,7 +1089,7 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"

@@ -66,6 +66,7 @@
   final: 0x34f4f0
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiCivics.ts:civicValue]
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
@@ -125,9 +126,13 @@
   cases:
     - recording: AI_Knowledge.csv
       value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
-  impl: [cpu/core/aiUnitProduction.ts:UnitProductionFacts, cpu/core/aiPlotValue.ts:PlotValueFacts]
+  impl:
+    - cpu/core/aiUnitProduction.ts:UnitProductionFacts
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/core/minorBuild.ts:minorUnitTerm
   readings:
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   context:
     - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
   review: imported

@@ -48,6 +48,15 @@ export const PSEUDOYIELD_TECHNOLOGY = srcConst('aiValue.pyTechnology', 5, py('PS
 export const PSEUDOYIELD_CIVIC = srcConst('aiValue.pyCivic', 5, py('PSEUDOYIELD_CIVIC'));
 export const PSEUDOYIELD_WONDER = srcConst('aiValue.pyWonder', 2, py('PSEUDOYIELD_WONDER'));
 export const PSEUDOYIELD_DISTRICT = srcConst('aiValue.pyDistrict', 4, py('PSEUDOYIELD_DISTRICT'));
+export const PSEUDOYIELD_NUCLEAR_WEAPON = srcConst('aiValue.pyNuclearWeapon', 25, py('PSEUDOYIELD_NUCLEAR_WEAPON'));
+export const PSEUDOYIELD_UNIT_COMBAT = srcConst('aiValue.pyUnitCombat', 1, py('PSEUDOYIELD_UNIT_COMBAT'));
+
+/** What one unlocked project stands for, a yield a turn (0x7b3e50: 1.0; 4.0
+ *  where the player's record +0x1290 +0x6e8 holds a positive count for the
+ *  project, a record not read — 1.0 here). */
+export const AI_PROJECT_SHARE = srcConst('aiValue.projectShare', 1, {
+  lab: 'tools/civ6lab/dll_readings.md H-1: the research AI (0x7b3e50: the project loop, 0x100 or 0x400)',
+});
 
 /** The share one unlocked building, wonder or district stands for (0x7b3e50
  *  and 0x7a9a10: 0.5 at 0xd20458, a wonder's and a district's through their

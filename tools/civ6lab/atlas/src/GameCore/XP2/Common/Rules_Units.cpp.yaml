@@ -16,6 +16,7 @@
     - cpu/core/stockpile.ts:upgradeGoldCost
     - cpu/data/constants.ts:UPGRADE_BASE_COST
     - gpu/core/sim_seats.py:_upgrade_gold_cost
+    - cpu/core/minorBuild.ts:minorUnitTerm
   readings:
     - "H-1: the upgrade's gold — READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"

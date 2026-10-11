@@ -458,6 +458,17 @@
   context:
     - "- A city's yield (Lua City:GetYield 0x981dd0 -> 0xaa060 -> GameAttribute value 0xaa740): ONE fixed-point modifier per attribute, clamped to (..."
   review: imported
+- addr: 0x116f80
+  final: 0x2af30
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
+  readings: ["C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"]
+  context:
+    - "...ion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs..."
+  review: imported
 - addr: 0x140510
   final: 0xd6160
   kind: function
@@ -1271,6 +1282,24 @@
   context:
     - "...ent starts the next turn at the domain's full Movement; the step's cost (Rules_Movement 0x531660..0x530240: the terrain's MovementCost, the feature's and the improvement's MovementChan..."
     - "...er plot; the majors' and the minors' do from t62-69). The step's cost (0x26e920's rules 0x531660..0x530240): into a city at most CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x272ca0)..."
+  review: imported
+- addr: 0x536da0
+  final: 0x37d730
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 120
+      value: "then a civic of an era before [player+0x1358]+0x158   (the game's era, as the research value reads it) is taken (that - era)   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic a"
+    - recording: AI_Military.csv
+      value: "EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's  "
+  impl: [cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...0x4f2af0 (the units manager's Corps / Army TECH, -1 in the install) names the row and 0x536da0 (the player holds that civic and tech) fails — never. PSEUDOYIELD_TOURISM of the +0xe8..."
+    - "...ionalism, Mobilization, a trait's EFFECT_ADJUST_CORPS_ARMY_PREREQ — names the row and 0x536da0 fails; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per d..."
   review: imported
 - addr: 0x538040
   final: 0x37e2a0
@@ -2262,6 +2291,7 @@
   readings:
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x..."
   context:
@@ -2807,7 +2837,7 @@
   final: 0x534c10
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiProjectValue.ts:ProjectValueFacts]
+  impl: [cpu/core/aiProjectValue.ts:ProjectValueFacts, cpu/core/aiResearch.ts:techValue]
   readings:
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:

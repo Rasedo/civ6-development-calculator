@@ -445,6 +445,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   context:
     - ...unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot build (0x17d660); a player that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor...
     - ...nit not the player's version (player +0x12e8 +0x1c0), a domain the city cannot train (0x17d660), a non-full, non-tribe player at peace with more than five units, a Spy for a non-full...

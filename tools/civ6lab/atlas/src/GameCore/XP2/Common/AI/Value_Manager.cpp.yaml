@@ -291,6 +291,7 @@
     - ai/major/governors.ts:governorValue
     - gpu/core/sim_cityvalue.py:SimCityValue
     - gpu/core/sim_cityvalue.py:_cv_modifiers
+    - cpu/core/aiCivics.ts:civicValue
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -304,6 +305,7 @@
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
     - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
     - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -389,6 +391,7 @@
     - cpu/core/aiValue.ts:yieldValue
     - ai/major/diploState.ts:answerAction
     - gpu/core/sim_cityvalue.py:_cv_yield
+    - cpu/core/minorBuild.ts:minorUnitTerm
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
@@ -499,6 +502,9 @@
     - cpu/core/aiCivics.ts:civicValue
     - cpu/data/aiCivics.ts:CIVIC_AI_POLICY_FLOOR
     - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
+    - cpu/core/minorBuild.ts:minorResearchTerms
+    - cpu/core/minorBuild.ts:minorUnitTerm
+    - cpu/data/aiCivics.ts:CIVIC_AI_FORMATION_UNITS
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   context:
@@ -659,6 +665,10 @@
     - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
     - cpu/core/aiResource.ts:TECH_IMPROVEMENT_RESOURCES
     - cpu/core/minorBuild.ts:minorResearchResources
+    - cpu/core/minorBuild.ts:minorResearchTerms
+    - cpu/core/minorBuild.ts:minorUnitTerm
+    - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_UNIT
+    - cpu/data/aiValue.ts:AI_PROJECT_SHARE
   readings:
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
@@ -672,6 +682,7 @@
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0x716b90 with the target), \"Operation Protect Units, Move\"; then the hurt: a promotion (0x7b5d70, \"Promote\"), a plunder, a safe plot afloat."

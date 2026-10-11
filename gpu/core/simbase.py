@@ -477,11 +477,13 @@ class Rules:
     c_award_titles: torch.Tensor  # long [NC]
     c_award_projpct: torch.Tensor  # long [NC]
     t_repeat: torch.Tensor  # bool [NT] — CIV6 `Repeatable`: researchable again once complete
-    t_ai_unlocks: torch.Tensor  # long [NT, 3] — what the research AI's value counts: buildings, districts, wonders (`techUnlocks`)
+    t_ai_unlocks: torch.Tensor  # long [NT, 5] — what the research AI's value counts: buildings, districts, wonders, projects, weapon projects (`techUnlocks`)
     t_embark_all: torch.Tensor  # bool [NT] — CIV6 `EmbarkAll`
+    t_embark_unit: torch.Tensor  # bool [NT] — an EmbarkUnitType (`RESEARCH_AI_EMBARK_UNIT`)
     t_ai_res: list  # per tech the resources its improvement walk reaches, with repeats (`TECH_IMPROVEMENT_RESOURCES`)
     res_ai: list  # per resource {cls, happy, units: [{need, ver, obsT, obsC, eng}]} (`AI_RESOURCE_EXPORT`)
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
+    c_ai_mods: torch.Tensor  # long [NC, 4] — the civics AI value's modifiers and formations: envoys, spies, combat adjacency, land formations
     ai_value: dict  # the AI's value tables (`aiValue.ts`): horizon, discountPct, the pseudo-yields, unlockShare
     research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll
     ai_city_build: dict  # the city build AI's value tables (`aiCityBuild.ts`): DefaultValues, the improvements, features, resources, districts, projects, savings
@@ -729,11 +731,15 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         c_award_titles=torch.tensor([int(c["awardTitles"]) for c in r["civics"]], dtype=torch.long),
         c_award_projpct=torch.tensor([int(c["awardProjectPct"]) for c in r["civics"]], dtype=torch.long),
         t_repeat=torch.tensor([bool(t["repeatable"]) for t in r["techs"]], dtype=torch.bool),
-        t_ai_unlocks=torch.tensor([[int(t["aiBuildings"]), int(t["aiDistricts"]), int(t["aiWonders"])] for t in r["techs"]], dtype=torch.long),
+        t_ai_unlocks=torch.tensor([[int(t["aiBuildings"]), int(t["aiDistricts"]), int(t["aiWonders"]), int(t["aiProjects"]), int(t["aiWeapons"])]
+                                   for t in r["techs"]], dtype=torch.long),
         t_embark_all=torch.tensor([bool(t["embarkAll"]) for t in r["techs"]], dtype=torch.bool),
+        t_embark_unit=torch.tensor([bool(t["embarkUnit"]) for t in r["techs"]], dtype=torch.bool),
         t_ai_res=[list(t["aiResources"]) for t in r["techs"]],
         res_ai=list(r["resources"]["ai"]),
         c_ai_unlocks=torch.tensor([[int(c["aiBuildings"]), int(c["aiDistricts"]), int(c["aiWonders"])] for c in r["civics"]], dtype=torch.long),
+        c_ai_mods=torch.tensor([[int(c["aiTokens"]), int(c["aiSpies"]), int(c["aiAdjacency"]), int(c["aiFormations"])] for c in r["civics"]],
+                               dtype=torch.long),
         ai_value=r["aiValue"],
         research_ai=r["researchAi"],
         ai_city_build=r["aiCityBuild"],

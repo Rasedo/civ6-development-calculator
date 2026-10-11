@@ -244,6 +244,9 @@ export interface AiValueView {
   grievances(holder: number, against: number): number;
   /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
   militaryStrength(seat: number): number;
+  /** PlayerStats' strength over every domain (0x4bd0d0 with -1: +0x210 less
+   *  +0x390) */
+  domainStrength(seat: number): number;
   /** the pair's standing alliance */
   allied(a: number, b: number): boolean;
   /** `a`'s standing denouncement of `b` */

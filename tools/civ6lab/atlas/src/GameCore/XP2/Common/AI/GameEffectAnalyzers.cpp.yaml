@@ -87,8 +87,10 @@
   kind: function
   name: EFFECT_GRANT_INFLUENCE_TOKEN
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...CivicModifiers, the civics AI's 0x7a4b20 term, not wired): EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 READ (Amount x the player's points a token, Player_Influence +0x270, 30 without a playe..."
@@ -281,6 +283,23 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...ty's great works, PSEUDOYIELD_TOURISM, between), EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJ...
+  review: imported
+- addr: 0x6aa780
+  final: 0x480d90
+  kind: function
+  name: EFFECT_GRANT_SPY
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 120
+      value: "then a civic of an era before [player+0x1358]+0x158   (the game's era, as the research value reads it) is taken (that - era)   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic a"
+    - recording: AI_Military.csv
+      value: "EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's  "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...eshold at the speed — PSEUDOYIELD_INFLUENCE, discounted from landing); EFFECT_GRANT_SPY 0x6aa780 (PSEUDOYIELD_UNIT_SPY of Amount, landing to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY..."
   review: imported
 - addr: 0x6ab400
   final: 0x4819a0
@@ -959,6 +978,23 @@
   readings:
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
+- addr: 0x6c4060
+  final: 0x474a90
+  kind: function
+  name: EFFECT_GRANT_COMBAT_ADJACENCY
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 120
+      value: "then a civic of an era before [player+0x1358]+0x158   (the game's era, as the research value reads it) is taken (that - era)   times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic a"
+    - recording: AI_Military.csv
+      value: "EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the   player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -   +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's  "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...(PSEUDOYIELD_UNIT_SPY of Amount, landing to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -..."
+  review: imported
 - addr: 0x6c4820
   final: 0x475250
   kind: function

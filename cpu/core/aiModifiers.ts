@@ -501,6 +501,24 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     const v = pseudoYieldValue(t.view, t.seat, amountOf(args) * t.view.cityStates * token, 'PSEUDOYIELD_INFLUENCE');
     return whole(discounted(v, t.rate, t.start));
   },
+  // 0x6a3780: the amount x the player's points a token (Player_Influence
+  // +0x270: its government's InfluencePointsThreshold at the game speed, a
+  // player in none Chiefdom's — every city-state's 50 at the online speed,
+  // runs/h1_duelv1127's envoy civics), as PSEUDOYIELD_INFLUENCE, discounted
+  // from the start (0x7a1240)
+  EFFECT_GRANT_INFLUENCE_TOKEN: (t, args) => {
+    const threshold = AI_GOVERNMENT_INFLUENCE_THRESHOLD[t.view.government(t.seat) ?? 'GOVERNMENT_CHIEFDOM'] ?? 0;
+    const token = Math.trunc((threshold * t.view.costMultiplierPct) / 100);
+    const v = pseudoYieldValue(t.view, t.seat, amountOf(args) * token, 'PSEUDOYIELD_INFLUENCE');
+    return whole(discounted(v, t.rate, t.start));
+  },
+  // 0x6aa780: PSEUDOYIELD_UNIT_SPY of the amount, from the start to the
+  // horizon (0x7a2140)
+  EFFECT_GRANT_SPY: (t, args) => whole(valueBetween(pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_UNIT_SPY'), t.start, t.horizon, t.rate)),
+  // 0x6c4060: with Enable, the player's strength over every domain
+  // (PlayerStats 0x4bd0d0(-1)) a turn, bare, from the start to the horizon
+  EFFECT_GRANT_COMBAT_ADJACENCY: (t, args) =>
+    args.Enable === 'true' ? whole(valueBetween(t.view.domainStrength(t.seat) * FX, t.start, t.horizon, t.rate)) : 0,
   // 0x6ae510: PSEUDOYIELD_INFLUENCE, PV(horizon) - PV(start)
   EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN: (t, args) => whole(span(t, pseudoYieldValue(t.view, t.seat, amountOf(args), 'PSEUDOYIELD_INFLUENCE'))),
   // 0x6addf0: a district subject only; the district's yield (0x24b5a0) x the

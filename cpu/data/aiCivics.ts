@@ -16,6 +16,15 @@ export const CIVIC_AI_POLICY_FLOOR = srcConst('civicAi.policyFloor', 20, {
   lab: 'tools/civ6lab/dll_readings.md H-1: the civics AI (0x7aacb1: mov [rbp-0x78], 0x1400; cmovge the larger)',
 });
 
+/** The units a civic unlocking a land formation stands for, as
+ *  PSEUDOYIELD_UNIT_COMBAT (0x7a9a10: 0x6400 = 100.0 where the units
+ *  manager's Corps or Army civic is the row and the player cannot form one
+ *  yet, 0x536da0) — runs/h1_duelv1127 every city-state's Mobilization 100
+ *  and Nationalism 100 beyond its spy. */
+export const CIVIC_AI_FORMATION_UNITS = srcConst('civicAi.formationUnits', 100, {
+  lab: 'tools/civ6lab/dll_readings.md H-1: the civics AI (0x7aa5c4 / 0x7aa69e: mov [rsp+0x40], 0x6400; PSEUDOYIELD_UNIT_COMBAT @0xf2e254)',
+});
+
 /** The leader's favored civics (AiLists System="Civics" on a trait the
  *  leader, its civilization or its agenda carries, AiFavoredItems
  *  Favored="true"; an item naming no Civics row is dropped, as the game

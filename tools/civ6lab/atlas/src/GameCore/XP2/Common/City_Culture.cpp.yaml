@@ -190,7 +190,9 @@
     - recording: 1117
       turn: 222
       value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
-  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  readings:
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
   context:
     - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
   review: imported

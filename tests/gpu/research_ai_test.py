@@ -50,6 +50,9 @@ def test_value(rules) -> None:
     assert value("ASTROLOGY", 25) == 13091, "a district's share at its pseudo-yield, weighted 1 + 0.5 x the Ancient ChronologyIndex"
     assert value("WRITING", 37) == 4649
     assert value("SHIPBUILDING", 4) == 48958, "EmbarkAll adds 5"
+    assert value("SAILING", 1) == 30893, "an EmbarkUnitType adds 1.0"
+    assert value("INDUSTRIALIZATION", 1) == 41184, "a project's 1.0, the install's buildings and wonder"
+    assert value("ADVANCED_FLIGHT", 1) == 28316, "the Airport, a Buildings PrereqTech row"
     assert value("MINING", 50) == 35, "at the horizon one discounted turn"
     assert value("MINING", 51) == -9999 * 256, "past it -9999"
     sim.game_era[0] = 2

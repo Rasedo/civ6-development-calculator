@@ -36,6 +36,18 @@ describe('the research value (0x7b3e50)', () => {
     expect(techValue(st, 'MINING', 51, new Map())).toBe(-9999 * 256);
   });
 
+  it("adds 1.0 for an EmbarkUnitType, a project's 1.0, the install's buildings", () => {
+    const st = { gameEra: 0 } as unknown as GameState;
+    // runs/h1_duelv1127 t22 minor 3: Sailing at 1 turn 120.7, its own 6.0 a
+    // turn (Builders embark)
+    expect(techValue(st, 'SAILING', 1, new Map())).toBe(30893);
+    // Industrialization: Factory, Coal Power Plant, Ruhr Valley, Convert Reactor
+    // to Coal (each city-state at 1 turn 20.1 above the buildings' shares)
+    expect(techValue(st, 'INDUSTRIALIZATION', 1, new Map())).toBe(41184);
+    // Advanced Flight: the Airport (Buildings PrereqTech)
+    expect(techValue(st, 'ADVANCED_FLIGHT', 1, new Map())).toBe(28316);
+  });
+
   it("counts an older era's row once per era between, plus one", () => {
     const st = { gameEra: 2 } as unknown as GameState;
     expect(techValue(st, 'POTTERY', 12, new Map())).toBe(50905);

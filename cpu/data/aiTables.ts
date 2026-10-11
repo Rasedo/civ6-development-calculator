@@ -6,7 +6,8 @@
  * and the AI lists the weights sum: System Yields and YieldSensitivities by
  * trait — a leader's traits through its InheritFrom chain, a civilization's,
  * an agenda's (AgendaTraits) —, those and PseudoYields by strategy
- * (Strategy_Priorities).
+ * (Strategy_Priorities); the city-states' modifiers their envoys reach,
+ * the civics' modifiers (CivicModifiers).
  */
 import type { AiModifier } from '../core/aiModifiers';
 import type { AiListRef, AiListItem } from '../core/aiValue';
@@ -23271,6 +23272,543 @@ export const AI_MINOR_INFLUENCE_MODIFIERS: Readonly<Record<string, readonly AiMo
       "args": {}
      }
     ]
+   }
+  }
+ ]
+};
+export const AI_CIVIC_MODIFIERS: Readonly<Record<string, readonly AiModifier[]>> = {
+ "CIVIC_CIVIL_ENGINEERING": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_COLD_WAR": [
+  {
+   "id": "CIVIC_GRANT_SPY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_SPY",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_COLONIALISM": [
+  {
+   "id": "CIVIC_AWARD_TWO_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "2"
+   }
+  }
+ ],
+ "CIVIC_CONSERVATION": [
+  {
+   "id": "CIVIC_AWARD_THREE_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "3"
+   }
+  },
+  {
+   "id": "CONSERVATION_ANCIENT_WALL_TOURISM",
+   "collection": "COLLECTION_PLAYER_DISTRICTS",
+   "effect": "EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE",
+   "args": {
+    "Amount": "1"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+      "inverse": false,
+      "args": {
+       "DistrictType": "DISTRICT_CITY_CENTER"
+      }
+     },
+     {
+      "type": "REQUIREMENT_CITY_HAS_BUILDING",
+      "inverse": false,
+      "args": {
+       "BuildingType": "BUILDING_WALLS"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "CONSERVATION_MEDIEVAL_WALL_TOURISM",
+   "collection": "COLLECTION_PLAYER_DISTRICTS",
+   "effect": "EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE",
+   "args": {
+    "Amount": "2"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+      "inverse": false,
+      "args": {
+       "DistrictType": "DISTRICT_CITY_CENTER"
+      }
+     },
+     {
+      "type": "REQUIREMENT_CITY_HAS_BUILDING",
+      "inverse": false,
+      "args": {
+       "BuildingType": "BUILDING_CASTLE"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "CONSERVATION_RENAISSANCE_WALL_TOURISM",
+   "collection": "COLLECTION_PLAYER_DISTRICTS",
+   "effect": "EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE",
+   "args": {
+    "Amount": "3"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+      "inverse": false,
+      "args": {
+       "DistrictType": "DISTRICT_CITY_CENTER"
+      }
+     },
+     {
+      "type": "REQUIREMENT_CITY_HAS_BUILDING",
+      "inverse": false,
+      "args": {
+       "BuildingType": "BUILDING_STAR_FORT"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "id": "CONSERVATION_TSIKHE_TOURISM_GOLDEN_AGE",
+   "collection": "COLLECTION_PLAYER_DISTRICTS",
+   "effect": "EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE",
+   "args": {
+    "Amount": "3"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+      "inverse": false,
+      "args": {
+       "DistrictType": "DISTRICT_CITY_CENTER"
+      }
+     },
+     {
+      "type": "REQUIREMENT_CITY_HAS_BUILDING",
+      "inverse": false,
+      "args": {
+       "BuildingType": "BUILDING_TSIKHE"
+      }
+     },
+     {
+      "type": "REQUIREMENT_PLAYER_HAS_GOLDEN_AGE",
+      "inverse": false,
+      "args": {}
+     }
+    ]
+   }
+  },
+  {
+   "id": "CONSERVATION_ARENA_TOURISM",
+   "collection": "COLLECTION_PLAYER_DISTRICTS",
+   "effect": "EFFECT_ADJUST_DISTRICT_TOURISM_CHANGE",
+   "args": {
+    "Amount": "1"
+   },
+   "subjectReqs": {
+    "test": "ALL",
+    "reqs": [
+     {
+      "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+      "inverse": false,
+      "args": {
+       "DistrictType": "DISTRICT_ENTERTAINMENT_COMPLEX"
+      }
+     },
+     {
+      "type": "REQUIREMENT_CITY_HAS_BUILDING",
+      "inverse": false,
+      "args": {
+       "BuildingType": "BUILDING_ARENA"
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "CIVIC_CULTURAL_HERITAGE": [
+  {
+   "id": "CIVIC_AWARD_THREE_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "3"
+   }
+  },
+  {
+   "id": "CIVIC_GENERATE_SEA_ANTIQUITIES",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_TRIGGER_GAME_MECHANIC",
+   "args": {
+    "MechanicName": "GenerateSeaAntiquities"
+   }
+  },
+  {
+   "id": "CIVIC_EXTRACT_SEA_ARTIFACTS",
+   "collection": "COLLECTION_PLAYER_UNITS",
+   "effect": "EFFECT_ADJUST_UNIT_EXTRACT_SEA_ARTIFACTS",
+   "args": {
+    "Extract": "true"
+   }
+  }
+ ],
+ "CIVIC_DEFENSIVE_TACTICS": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_DIPLOMATIC_SERVICE": [
+  {
+   "id": "CIVIC_GRANT_SPY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_SPY",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_EARLY_EMPIRE": [
+  {
+   "id": "CIVIC_ENFORCE_BORDERS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_ENFORCE_BORDERS",
+   "args": {
+    "Enable": "true"
+   }
+  },
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_ENVIRONMENTALISM": [
+  {
+   "id": "ENVIRONMENTALISM_BOOST_ALL_TOURISM",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_TOURISM",
+   "args": {
+    "Amount": "25"
+   }
+  }
+ ],
+ "CIVIC_FOREIGN_TRADE": [
+  {
+   "id": "CIVIC_GRANT_ONE_TRADE_ROUTE",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_FUTURE_CIVIC": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  },
+  {
+   "id": "CIVIC_GRANT_FAVOR",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADD_PLAYER_FAVOR",
+   "args": {
+    "Amount": "50"
+   }
+  }
+ ],
+ "CIVIC_GLOBALIZATION": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_GLOBAL_WARMING_MITIGATION": [
+  {
+   "id": "CIVIC_AWARD_THREE_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "3"
+   }
+  },
+  {
+   "id": "CIVIC_MITIGATION_GRANT_DIPLOVP",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS",
+   "args": {
+    "Amount": "1",
+    "Tooltip": "LOC_DVP_TOOLTIP_OTHER_SOURCES"
+   }
+  }
+ ],
+ "CIVIC_GUILDS": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_IDEOLOGY": [
+  {
+   "id": "CIVIC_GRANT_SPY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_SPY",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_MASS_MEDIA": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_MEDIEVAL_FAIRES": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_MERCENARIES": [
+  {
+   "id": "CIVIC_AWARD_ONE_INFLUENCE_TOKEN",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_MILITARY_TRADITION": [
+  {
+   "id": "CIVIC_GRANT_COMBAT_ADJACENCY_BONUS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_COMBAT_ADJACENCY",
+   "args": {
+    "Enable": "true"
+   }
+  }
+ ],
+ "CIVIC_MILITARY_TRAINING": [
+  {
+   "id": "CIVIC_AWARD_ONE_INFLUENCE_TOKEN",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_MOBILIZATION": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_MYSTICISM": [
+  {
+   "id": "CIVIC_AWARD_ONE_INFLUENCE_TOKEN",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_NATIONALISM": [
+  {
+   "id": "CIVIC_GRANT_SPY",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_SPY",
+   "args": {
+    "Amount": "1"
+   }
+  },
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_NATURAL_HISTORY": [
+  {
+   "id": "CIVIC_AWARD_TWO_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "2"
+   }
+  },
+  {
+   "id": "CIVIC_GENERATE_LAND_ANTIQUITIES",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_TRIGGER_GAME_MECHANIC",
+   "args": {
+    "MechanicName": "GenerateLandAntiquities"
+   }
+  }
+ ],
+ "CIVIC_NAVAL_TRADITION": [
+  {
+   "id": "CIVIC_AWARD_ONE_INFLUENCE_TOKEN",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_NEAR_FUTURE_GOVERNANCE": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  },
+  {
+   "id": "CIVIC_AWARD_THREE_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "3"
+   }
+  }
+ ],
+ "CIVIC_OPERA_BALLET": [
+  {
+   "id": "CIVIC_AWARD_TWO_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "2"
+   }
+  }
+ ],
+ "CIVIC_RECORDED_HISTORY": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_SCORCHED_EARTH": [
+  {
+   "id": "CIVIC_AWARD_TWO_INFLUENCE_TOKENS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "2"
+   }
+  }
+ ],
+ "CIVIC_SOCIAL_MEDIA": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_STATE_WORKFORCE": [
+  {
+   "id": "CIVIC_GRANT_PLAYER_GOVERNOR_POINTS",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS",
+   "args": {
+    "Delta": "1"
+   }
+  }
+ ],
+ "CIVIC_THEOLOGY": [
+  {
+   "id": "CIVIC_AWARD_ONE_INFLUENCE_TOKEN",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_GRANT_INFLUENCE_TOKEN",
+   "args": {
+    "Amount": "1"
+   }
+  }
+ ],
+ "CIVIC_THE_ENLIGHTENMENT": [
+  {
+   "id": "CIVIC_REDUCE_RELIGIOUS_TOURISM",
+   "collection": "COLLECTION_OWNER",
+   "effect": "EFFECT_ADJUST_PLAYER_RELIGIOUS_TOURISM_REDUCTION",
+   "args": {
+    "Modifier": "50"
    }
   }
  ]

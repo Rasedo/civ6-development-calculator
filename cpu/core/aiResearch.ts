@@ -33,9 +33,11 @@
  * Arithmetic is the DLL's 24.8 fixed point throughout (`aiValue.ts`).
  */
 import { ERAS, TECHS, TECH_TABLE_ORDER } from '../data/techs';
-import { BUILT_WONDERS } from '../data/builtWonders';
-import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { AI_BUILDINGS, AI_PROJECTS } from '../data/aiBuildTables';
+import {
+  AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
+} from '../data/aiValue';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_FAVORED, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
@@ -109,18 +111,21 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
 
 /**
  * 0x7b3e50, THE VALUE of landing `id` in `turns` turns: the technology's own
- * pseudo-yield (PSEUDOYIELD_TECHNOLOGY; EmbarkAll adds 5; a row of an era
- * before the game's counts once per era between, plus one), and per
- * building it unlocks a share (a wonder's at PSEUDOYIELD_WONDER), per district
- * a share at PSEUDOYIELD_DISTRICT — each a yield a turn from landing to the
- * horizon, each pseudo-yield at the seat's weight `pw` (`aiWeights.ts`).
- * Past the horizon -9999.
+ * pseudo-yield (PSEUDOYIELD_TECHNOLOGY; an EmbarkUnitType adds 1.0, EmbarkAll
+ * 5; a row of an era before the game's counts once per era between, plus
+ * one), and per building it unlocks a share (a wonder's at
+ * PSEUDOYIELD_WONDER), per district a share at PSEUDOYIELD_DISTRICT, per
+ * project `AI_PROJECT_SHARE` and a weapon project PSEUDOYIELD_NUCLEAR_WEAPON
+ * of 1.0 more — each a yield a turn from landing to the horizon, each
+ * pseudo-yield at the seat's weight `pw` (`aiWeights.ts`). A space race
+ * project's term (0x7b8a30) is not read: none. Past the horizon -9999.
  */
 export function techValue(state: GameState, id: string, turns: number, pw: ReadonlyMap<string, number>): number {
   if (turns > AI_VALUE_HORIZON) return fxConst(-9999);
   const def = TECHS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
   let own = pseudoYield(PSEUDOYIELD_TECHNOLOGY, FX, w('PSEUDOYIELD_TECHNOLOGY'));
+  if (RESEARCH_AI_EMBARK_UNIT.includes(id)) own += FX;
   if (def.embarkAll) own += fxConst(RESEARCH_AI_EMBARK_ALL);
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
@@ -128,21 +133,32 @@ export function techValue(state: GameState, id: string, turns: number, pw: Reado
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = techUnlocks(id);
   return fromLanding(own, turns) + n.buildings * fromLanding(share, turns)
+    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
-    + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns);
+    + n.projects * fromLanding(fxConst(AI_PROJECT_SHARE), turns)
+    + n.weapons * fromLanding(pseudoYield(PSEUDOYIELD_NUCLEAR_WEAPON, FX, w('PSEUDOYIELD_NUCLEAR_WEAPON')), turns);
 }
 
-/** what a technology unlocks that its value counts: buildings, districts,
- *  wonders */
-export function techUnlocks(id: string): { buildings: number; districts: number; wonders: number } {
+/** what a technology unlocks that its value counts: the buildings and
+ *  wonders whose PrereqTech it is that no civilization's trait holds (each
+ *  player's version of a building once), the districts, the projects but the
+ *  space race's, the weapon projects among them */
+export function techUnlocks(id: string): { buildings: number; wonders: number; districts: number; projects: number; weapons: number } {
   return UNLOCKS.get(id)!;
 }
 
-const UNLOCKS = new Map(Object.values(TECHS).map((t) => [t.id, {
-  buildings: t.effects.filter((e) => e.kind === 'unlockBuilding').length,
-  districts: t.effects.filter((e) => e.kind === 'unlockDistrict').length,
-  wonders: Object.values(BUILT_WONDERS).filter((w) => w.requiresTech === t.id).length,
-}]));
+const UNLOCKS = new Map(Object.values(TECHS).map((t) => {
+  const type = `TECH_${t.id}`;
+  const b = AI_BUILDINGS.filter((x) => x.tech === type && !x.trait);
+  const p = AI_PROJECTS.filter((x) => x.tech === type && !x.spaceRace);
+  return [t.id, {
+    buildings: b.filter((x) => !x.wonder).length,
+    wonders: b.filter((x) => x.wonder).length,
+    districts: t.effects.filter((e) => e.kind === 'unlockDistrict').length,
+    projects: p.length,
+    weapons: p.filter((x) => x.wmd).length,
+  }];
+}));
 
 /** the unowned prerequisites one and two levels up (0x7604e0's walk), each
  *  level's rows once */
@@ -180,11 +196,13 @@ function researchOf(state: GameState, seat: number): ResearchState {
 }
 
 /** THE ANALYSIS: every technology's entry, in table order, scored and
- *  propagated; `science` is the seat's Science a turn, `resourceTerm` the
- *  value's resources term (per improvement the row unlocks, the resources its
- *  cities hold unimproved, 0x5d45c0 -> 0x7a21e0) where the seat's facts give it */
+ *  propagated; `science` is the seat's Science a turn, `cityTerm` the
+ *  value's terms its cities give where the seat's facts give them — the
+ *  unlocked units' (their City Analysis values and their upgrade sources) and
+ *  the resources' (per improvement the row unlocks, the resources its cities
+ *  hold unimproved, 0x5d45c0 -> 0x7a21e0) */
 export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {},
-  resourceTerm?: (tech: string, turns: number) => number): ResearchEntry[] {
+  cityTerm?: (tech: string, turns: number) => number): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
   const pw = pseudoYieldWeights(state, seat, weights);
@@ -192,7 +210,7 @@ export function researchAnalysis(state: GameState, seat: number, science: number
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (resourceTerm && turns <= AI_VALUE_HORIZON ? resourceTerm(id, turns) : 0);
+    const base = turns < 0 ? 0 : techValue(state, id, turns, pw) + (cityTerm && turns <= AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { tech: id, next, turns, owned: false, leaf, base, score: base };
   });
   const leader = leaderOf(state, seat);

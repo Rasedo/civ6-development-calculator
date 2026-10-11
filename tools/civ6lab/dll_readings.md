@@ -1484,6 +1484,24 @@ the two logs draw 12, its class's rows. Each of the three classes'
 rows share one Level in the engines' catalog, so the sort keeps the shuffle's
 order. The engines follow (`drawPromoOffer` / `_promo_offer_draw`).
 
+## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported
+
+The tactical move Promotion (0x77ac30): each unit of the pool (+0x240)
+alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the
+move list (logged "Promote" in AI_Tactical.csv); 0x774970 then runs each:
+over the UnitPromotions rows in database order that the unit can earn
+(0x55d750), the row's modifiers gathered (+0x28) and valued by 0x7b5d70
+(start 0, the horizon [GlobalAI+0x2f0][0], the discount 0x6fec30); the
+first row strictly above the best so far (from 0) is taken. 0x7b5d70: past
+the horizon -9999, 0 where the unit cannot earn it; else a = the military
+AI's unit value of the type ([player+0x1290]+0x268, 0x79ca90) x min(unit
++0xcf0, global +0x328) / its max hit points, PV(horizon) - PV(start), plus
+max(the modifiers' sum 0x7a4b20, 5 x the row's +0x24); the a term is the
+same for every row of a unit, so the pick is the first row with the
+greatest max(modifiers, 5 x +0x24). Operation Protect Units (0x80d790) and
+0x70fae0 take the same value. Unported: the promotion modifiers' analyzers
+(AUDIT C-96).
+
 ## H-1: the World Congress slate (0x598270) — READ
 
 The session setup, at the session itself, lists the resolutions in their
@@ -4245,14 +4263,23 @@ Contract %d").
   PV(H) - PV(turns) (0x7a16e0: a(D-1)/(kD), D = 1 + nk + n(n-1)k²/2 +
   n(n-1)(n-2)k³ x 0.16667, k = rate/100, a perpetuity a/k past nk >= 10;
   the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667).
-  Then: per unlocked unit the player's version, 10 x the cities' average
-  City Analysis value (0x5d4cd0, capped 50.0), and its upgrade sources'
-  gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where
-  0x4f2af0 names the row; PSEUDOYIELD_TOURISM of the +0xe8 list's count;
-  per building 0.5, a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5; per
-  district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5; per
-  project (+0x160) PSEUDOYIELD_SPACE_RACE of 0x7b8a30² or NUCLEAR_WEAPON of
-  1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
+  Row +0xc0 is the EmbarkUnitType (Sailing, Celestial Navigation). Then,
+  paid whole: per unlocked unit (+0x178) the player's version, over its
+  cities training the unit's domain (0x17d660) the average of the City
+  Analysis values above 0 (0x5d4cd0, each capped 50.0) x 10, and per upgrade
+  source (unit +0x1d8) each of the player's units of it (0x4f2c90, a plain
+  count) max(that average - the upgrade's Gold as a yield (0x5376d0 ->
+  0x7a6690), 20.0); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 (the units
+  manager's Corps / Army TECH, -1 in the install) names the row and
+  0x536da0 (the player holds that civic and tech) fails — never.
+  PSEUDOYIELD_TOURISM of the +0xe8 list (per improvement Tourism row, the
+  player's plots of it, 0x1aba40); per building (+0x90) the player's
+  version (+0x230) 0.5, a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5;
+  per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5;
+  per project (+0x160) 1.0 (4.0 where [player+0x1290]+0x6e8 counts it),
+  PSEUDOYIELD_SPACE_RACE of 0x7b8a30² (a std::function walk, unread) for a
+  space race one, + NUCLEAR_WEAPON of 1.0 for a weapon (+0x148), each paid
+  from landing; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0);
   the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88
   and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The
   discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer
@@ -4293,6 +4320,13 @@ Contract %d").
   (the Tech Contracts' values among them: 1124 t3 minor 2 Masonry 13.0, as
   its contract row) — AUDIT C-96. The prerequisites walk in the install's
   order (Education: Mathematics, then Apprenticeship).
+- MEASURED with the terms above (`cpu/harness/researchValueLab.ts`, the
+  verbose duels' city-states, a row researchable now against its own
+  value plus the logged Tech Contracts, the unit term on the city's
+  UNITS table the log printed the turn before): runs/h1_duelv1127 3,729 of
+  3,875 (Sailing 120.7 at 1 turn with its EmbarkUnitType; Iron Working +20 a
+  Warrior; Industrialization's project +20.1); the space race (Rocketry)
+  the rest. On the engine's own unit tables 3,488.
 
 ## H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)
 
@@ -4321,20 +4355,39 @@ row with turns at least 0; "RANDOMLY CHOSEN CIVIC" 0x626600).
   own term PSEUDOYIELD_CIVIC of 1.0 (0x7a60d0) paid from landing to the
   horizon (PV(H) - PV(turns), 0x7a16e0); the governments it unlocks, each
   max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0
-  -> 0x7b26b0, unread); then a civic of an era at or before the game's
-  ([player+0x1358]+0x158 one past the era index) is taken (game - era + 1)
-  times — Craftsmanship 120.6 at 1 turn in era 0, 221.1 in era 1 (x2), 321.7
-  in era 2 — and a later one adds PSEUDOYIELD_GOLDENAGE_POINT of the
-  player's eras record +0x2c (0x2c4110, 0 for a city-state); per unit the
-  player's version, the cities' average City Analysis value (0x5d4cd0) and
-  the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of
-  100 where 0x4f2ac0 names the row; per building the player's version 0.5,
-  a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have
-  (0x406c00) PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the
-  horizon; its policies: the best new policy's value less the weakest
-  slotted one's (0x623b90, the policy AI's), at least 20.0 (0x7aacb1); and
-  the civic's modifiers analysed (0x7a4b20). The discount and H are the
-  research value's (4.0, 50).
+  -> 0x7b26b0, unread); then a civic of an era before [player+0x1358]+0x158
+  (the game's era, as the research value reads it) is taken (that - era)
+  times — no +1 here (runs/h1_duelv1127: every city-state's Ancient civic at
+  1 turn 120.6 in the Classical era) — and a later one adds
+  PSEUDOYIELD_GOLDENAGE_POINT of the player's eras record +0x2c (0x2c4110, 0
+  for a city-state); per unit the player's version (+0x170) the cities'
+  average City Analysis value (0x5d4cd0, uncapped, once) and per upgrade
+  source unit max(that - the upgrade's gold, 20.0), paid whole;
+  PSEUDOYIELD_UNIT_COMBAT of 100, paid whole, where 0x4f2ac0 — the units
+  manager's land Corps (+0xaa8) / Army (+0xb08) civic: Nationalism,
+  Mobilization, a trait's EFFECT_ADJUST_CORPS_ARMY_PREREQ — names the row
+  and 0x536da0 fails; per building the player's version 0.5, a wonder
+  PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00)
+  PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the horizon; its
+  policies: the best of its cards' scores (0x623b90, 0 at least) less the
+  weakest slotted card's (0 with none), at least 20.0 (0x7aacb1); and the
+  civic's modifiers analysed (0x7a4b20) from landing to the horizon. The
+  discount and H are the research value's (4.0, 50). The CivicModifiers'
+  analyzers: EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 (Amount x the player's
+  points a token, Player_Influence +0x270 — 50 for every city-state, the
+  Chiefdom threshold at the speed — PSEUDOYIELD_INFLUENCE, discounted from
+  landing); EFFECT_GRANT_SPY 0x6aa780 (PSEUDOYIELD_UNIT_SPY of Amount, landing
+  to the horizon); EFFECT_GRANT_COMBAT_ADJACENCY 0x6c4060 (Enable: the
+  player's strength over every domain 0x4bd0d0(-1) = PlayerStats +0x210 -
+  +0x390, bare, landing to the horizon — 20 a Warrior, AI_Military.csv's
+  Regional Strength); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0 for a
+  city-state (State Workforce, Early Empire every one exact).
+- MEASURED (`cpu/harness/researchValueLab.ts`, a row researchable now
+  against its own value, the policy term on the logged Policies scores of
+  the turn before): runs/h1_duelv1127's city-states 2,446 of 2,952; the
+  governments (Reformed Church, Divine Right, Exploration, Political
+  Philosophy, the tier-3 civics) and Foreign Trade's route value the rest.
+  On the policy floor alone 2,058.
 - THE PROPAGATION, 0x61ee30 (the turn 0x620110's first step, on each
   entry): a row in reach scores its own value and its prerequisites' one and
   two levels up (owned ones walked through at no value; each level's rows

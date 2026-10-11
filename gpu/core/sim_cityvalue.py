@@ -1051,7 +1051,8 @@ class SimCityValue:
     _CV_ANALYZERS = ("EFFECT_ADJUST_PLOT_YIELD", "EFFECT_ADJUST_CITY_YIELD_CHANGE", "EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER",
                      "EFFECT_ADJUST_CITY_INNER_DEFENSE", "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
                      "EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN", "EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN",
-                     "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER")
+                     "EFFECT_GRANT_UNIT_IN_CITY", "EFFECT_GRANT_ABILITY", "EFFECT_ATTACH_MODIFIER",
+                     "EFFECT_GRANT_INFLUENCE_TOKEN", "EFFECT_GRANT_SPY", "EFFECT_GRANT_COMBAT_ADJACENCY")
 
     def _cv_check_read(self, m: dict, reads: dict, depth: int = 1) -> None:
         """refuse a modifier whose analysis the TS evaluator reads through an
@@ -1201,6 +1202,19 @@ class SimCityValue:
             if not city:
                 return zero
             return _t(f.unit_cost(a.get("UnitType", "")), like) * amount
+        # the civics value's grants (`sim_civics.py`'s terms): the envoys'
+        # points as PSEUDOYIELD_INFLUENCE discounted from the start, a spy's
+        # PSEUDOYIELD_UNIT_SPY and the minor's strength from the start to the
+        # horizon
+        C = self._cai_grants()
+        if eff == "EFFECT_GRANT_INFLUENCE_TOKEN":
+            return _discounted(torch.full_like(like, amount * C["token"]), r, t) >> 8
+        if eff == "EFFECT_GRANT_SPY":
+            return between(torch.full_like(like, amount * C["spy"])) >> 8
+        if eff == "EFFECT_GRANT_COMBAT_ADJACENCY":
+            if a.get("Enable") != "true":
+                return zero
+            return between(self._cai_strength(f.s) * _FX) >> 8
         raise NotImplementedError(eff)
 
     def _cv_analysis(self, f, m: dict, t: torch.Tensor, h: torch.Tensor, depth: int):

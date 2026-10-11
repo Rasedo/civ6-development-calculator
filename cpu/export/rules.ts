@@ -33,9 +33,12 @@ import { GP_CLASSES, GP_WORK_CULTURE, GP_WORK_TOURISM, GREAT_PEOPLE, GP_ERA_GPP,
 import { PANTHEONS, RELIGION_TYPES, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, PANTHEON_FAITH_COST, RELIGION_PRESSURE_RANGE, RELIGION_PRESSURE_PER_TURN, HOLY_CITY_PRESSURE_MULT, HOLY_SITE_PRESSURE_MULT, ATHEISM_PRESSURE_PER_POP, COLONIZE_PRESSURE_EXTRA, HOLY_CITY_FOUNDING_PRESSURE_PER_POP, ROUTE_PRESSURE_DESTINATION, ROUTE_PRESSURE_ORIGIN, JUST_WAR_RANGE, SPREAD_STRENGTH_PCT, MISSIONARY_CAP, APOSTLE_CAP, THEO_PRESSURE_SWING, THEO_PRESSURE_RANGE, INQUISITOR_CAP, GURU_CAP, GURU_HEAL, INQUISITOR_HOME_STRENGTH, REMOVE_HERESY_PCT, LAUNCH_INQUISITION_CHARGES, RELIGION_INITIAL_BELIEFS, PROPHET_MAX_PLAYER_INSTANCES, CONDEMN_PRESSURE_RANGE, CONDEMN_PRESSURE_SWING, type BeliefEffects } from '../data/religion';
 import { PROJECTS, isSpaceProject, PROJECT_GPP_FRACTION, SPACE_FLIGHT_LY, LASER_POWER_LOAD, gpClassesOf, gppFractionOf } from '../data/projects';
 import { BUILT_WONDERS } from '../data/builtWonders';
-import { AI_DISCOUNT_PCT, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER } from '../data/aiValue';
-import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
-import { CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
+import {
+  AI_DISCOUNT_PCT, AI_PROJECT_SHARE, AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_NUCLEAR_WEAPON,
+  PSEUDOYIELD_TECHNOLOGY, PSEUDOYIELD_WONDER,
+} from '../data/aiValue';
+import { RESEARCH_AI_EMBARK_ALL, RESEARCH_AI_EMBARK_UNIT, RESEARCH_AI_TASK_BIAS } from '../data/aiResearch';
+import { CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
 import { techUnlocks } from '../core/aiResearch';
 import { civicUnlocks } from '../core/aiCivics';
 import { GW_HOLDERS, GW_LAYOUT, GW_LAYOUT_W, GWS_ACCEPTS, RELIC_COUNT, GWO_COUNT, GWO_NAMES, GWO_CULTURE, GWO_FAITH, GWO_TOURISM, gwKindOf, EXTRA_SLOT_ROWS, GW_GP_EXTRA_SLOTS, AUTO_THEME_ROWS, THEMING_MULT } from '../data/greatWorks';
@@ -315,7 +318,7 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
-import { AI_DEFAULT_SAVINGS, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_CIVIC_MODIFIERS, AI_DEFAULT_SAVINGS, AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 /** an engine row's install type: its own where that names it, else the one
  *  its catalog tag names */
@@ -1019,9 +1022,15 @@ export function buildRules() {
       pyCivic: PSEUDOYIELD_CIVIC,
       pyWonder: PSEUDOYIELD_WONDER,
       pyDistrict: PSEUDOYIELD_DISTRICT,
+      pyNuclearWeapon: PSEUDOYIELD_NUCLEAR_WEAPON,
       unlockShare: AI_UNLOCK_SHARE,
+      projectShare: AI_PROJECT_SHARE,
       // the resources term's pseudo-yields and the yields' DefaultValue (AI_YIELDS order)
       pyHappiness: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_HAPPINESS,
+      // the civics' modifiers' and formations' pseudo-yields
+      pyInfluence: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_INFLUENCE,
+      pyUnitSpy: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_UNIT_SPY,
+      pyUnitCombat: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_UNIT_COMBAT,
       pyLuxury: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_RESOURCE_LUXURY,
       yieldDefault: AI_YIELDS.map((y) => AI_YIELD_DEFAULT[y]),
     },
@@ -1083,6 +1092,10 @@ export function buildRules() {
     },
     civicAi: {
       policyFloor: CIVIC_AI_POLICY_FLOOR,
+      formationUnits: CIVIC_AI_FORMATION_UNITS,
+      // a player in no government's points a token (EFFECT_GRANT_INFLUENCE_TOKEN):
+      // Chiefdom's threshold at the speed
+      tokenPoints: Math.trunc((AI_GOVERNMENT_INFLUENCE_THRESHOLD.GOVERNMENT_CHIEFDOM * COST_MULTIPLIER_PCT) / 100),
     },
     cityState: {
       envoyCost: ENVOY_COST,
@@ -3016,12 +3029,15 @@ export function buildRules() {
       awardTitles: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.titles ?? 0 : 0), 0),
       awardProjectPct: t.effects.reduce((n, e) => n + (e.kind === 'award' ? e.projectPct ?? 0 : 0), 0),
       repeatable: t.repeatable ? 1 : 0,
-      // what the research AI's value counts of the row (`techUnlocks`), and
-      // the embark-everything flag
+      // what the research AI's value counts of the row (`techUnlocks`), the
+      // embark-everything flag and the EmbarkUnitType one
       aiBuildings: techUnlocks(t.id).buildings,
       aiDistricts: techUnlocks(t.id).districts,
       aiWonders: techUnlocks(t.id).wonders,
+      aiProjects: techUnlocks(t.id).projects,
+      aiWeapons: techUnlocks(t.id).weapons,
       embarkAll: t.embarkAll ? 1 : 0,
+      embarkUnit: RESEARCH_AI_EMBARK_UNIT.includes(t.id) ? 1 : 0,
       // the resources the research value's improvement walk reaches (`TECH_IMPROVEMENT_RESOURCES`)
       aiResources: aiTechResources(t.id).map((r) => RESOURCE_IDS.indexOf(r as never)).filter((i) => i >= 0),
     })),
@@ -3041,6 +3057,11 @@ export function buildRules() {
       aiBuildings: civicUnlocks(c.id).buildings,
       aiDistricts: civicUnlocks(c.id).districts,
       aiWonders: civicUnlocks(c.id).wonders,
+      // its modifiers the value analyses (CivicModifiers): the envoys granted,
+      // the spies granted, the combat adjacency granted; the land formations
+      // whose civic it is with no trait's (FORMATION_CIVIC)
+      ...civicAiModifiers(c.id),
+      aiFormations: FORMATION_CIVIC.filter((f) => f === c.id).length,
     })),
     // government + policy modifier tables (the belief-table shape).
     // Slot kinds: military=0, economic=1, diplomatic=2, wildcard=3. Every
@@ -3097,3 +3118,15 @@ export function buildRules() {
   return rules;
 }
 
+/** the CivicModifiers the civics AI's value reads of a civic, as the GPU twin
+ *  takes them: each effect's Amount (Enable as 1) */
+function civicAiModifiers(id: string): { aiTokens: number; aiSpies: number; aiAdjacency: number } {
+  const mods = AI_CIVIC_MODIFIERS[`CIVIC_${id}`] ?? [];
+  const sum = (effect: string, arg: string): number => mods.filter((m) => m.effect === effect)
+    .reduce((n, m) => n + (arg === 'Enable' ? (m.args.Enable === 'true' ? 1 : 0) : Number(m.args[arg] ?? 0) | 0), 0);
+  return {
+    aiTokens: sum('EFFECT_GRANT_INFLUENCE_TOKEN', 'Amount'),
+    aiSpies: sum('EFFECT_GRANT_SPY', 'Amount'),
+    aiAdjacency: sum('EFFECT_GRANT_COMBAT_ADJACENCY', 'Enable'),
+  };
+}

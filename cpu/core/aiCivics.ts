@@ -30,13 +30,18 @@
  */
 import { CIVICS, CIVIC_TABLE_ORDER } from '../data/civics';
 import { ERAS } from '../data/techs';
-import { BUILT_WONDERS } from '../data/builtWonders';
-import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_WONDER } from '../data/aiValue';
-import { CIVIC_AI_FAVORED, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
+import { AI_BUILDINGS } from '../data/aiBuildTables';
+import { AI_UNLOCK_SHARE, AI_VALUE_HORIZON, PSEUDOYIELD_CIVIC, PSEUDOYIELD_DISTRICT, PSEUDOYIELD_UNIT_COMBAT, PSEUDOYIELD_WONDER } from '../data/aiValue';
+import { CIVIC_AI_FAVORED, CIVIC_AI_FORMATION_UNITS, CIVIC_AI_POLICY_FLOOR } from '../data/aiCivics';
+import { AI_CIVIC_MODIFIERS } from '../data/aiTables';
+import { FORMATION_CIVIC } from '../data/units';
 import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
-import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
+import { AI_RATE, FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt, type AiValueView } from './aiValue';
+import { modifiersValue } from './aiModifiers';
+import { getModifiers } from './effects';
+import { majorView } from './majorView';
 import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
@@ -100,40 +105,64 @@ function walk(state: GameState, seat: number, r: ResearchState, id: string, rate
   return front.length ? { turns: -1, next } : { turns: Math.max(0, turns), next };
 }
 
-/** what a civic unlocks that its value counts: buildings, districts,
- *  wonders */
+/** what a civic unlocks that its value counts: the buildings and wonders
+ *  whose PrereqCivic it is that no civilization's trait holds (each player's
+ *  version of a building once), the districts */
 export function civicUnlocks(id: string): { buildings: number; districts: number; wonders: number } {
   return UNLOCKS.get(id)!;
 }
 
-const UNLOCKS = new Map(Object.values(CIVICS).map((c) => [c.id, {
-  buildings: c.effects.filter((e) => e.kind === 'unlockBuilding').length,
-  districts: c.effects.filter((e) => e.kind === 'unlockDistrict').length,
-  wonders: Object.values(BUILT_WONDERS).filter((w) => w.requiresCivic === c.id).length,
-}]));
+const UNLOCKS = new Map(Object.values(CIVICS).map((c) => {
+  const b = AI_BUILDINGS.filter((x) => x.civic === `CIVIC_${c.id}` && !x.trait);
+  return [c.id, {
+    buildings: b.filter((x) => !x.wonder).length,
+    districts: c.effects.filter((e) => e.kind === 'unlockDistrict').length,
+    wonders: b.filter((x) => x.wonder).length,
+  }];
+}));
 
 /**
- * 0x7a9a10, THE VALUE of landing `id` in `turns` turns: the civic's own
- * pseudo-yield (PSEUDOYIELD_CIVIC) from landing to the horizon, counted once
- * per era between its era and the game's, plus one; per building it unlocks
- * a share, per wonder a share at PSEUDOYIELD_WONDER, per district a share at
- * PSEUDOYIELD_DISTRICT, each from landing to the horizon; its policies at
- * least `CIVIC_AI_POLICY_FLOOR`. At the horizon or past it -9999.
+ * 0x7a9a10, THE VALUE of landing `id` in `turns` turns for `seat`: the
+ * civic's own pseudo-yield (PSEUDOYIELD_CIVIC) from landing to the horizon,
+ * counted (game - era) times where its era is before the game's; per
+ * building it unlocks a share, per wonder a share at PSEUDOYIELD_WONDER, per
+ * district a share at PSEUDOYIELD_DISTRICT, each from landing to the
+ * horizon; PSEUDOYIELD_UNIT_COMBAT of 100 per land formation the civic
+ * unlocks for the seat (its Corps' and its Armies' civic, the units manager's
+ * +0xaa8 / +0xb08 through 0x4f2ac0); its policies at least
+ * `CIVIC_AI_POLICY_FLOOR` (the best new card's score over the weakest
+ * slotted one's is not read: the floor); its modifiers (CivicModifiers)
+ * analysed from landing to the horizon (0x7a4b20) on `view` (the
+ * state's `majorView` where none is given). The
+ * governments it unlocks (max(v - v(current), v / 2) of the government
+ * values) are not read: none. At the horizon or past it -9999.
  */
-export function civicValue(state: GameState, id: string, turns: number, pw: ReadonlyMap<string, number>): number {
+export function civicValue(state: GameState, seat: number, id: string, turns: number, pw: ReadonlyMap<string, number>,
+  view?: AiValueView): number {
   if (turns >= AI_VALUE_HORIZON) return fxConst(-9999);
   const def = CIVICS[id];
   const w = (p: string): number => pw.get(p) ?? 0;
   let v = fromLanding(pseudoYield(PSEUDOYIELD_CIVIC, FX, w('PSEUDOYIELD_CIVIC')), turns);
   const era = ERAS.indexOf(def.era);
   const game = state.gameEra ?? 0;
-  if (era <= game) v = fmul(v, (game - era + 1) * FX);
+  if (era < game) v = fmul(v, (game - era) * FX);
   const share = fxConst(AI_UNLOCK_SHARE);
   const n = civicUnlocks(id);
+  const formations = [1, 2].filter((tier) => formationCivic(state, seat, tier) === id).length;
+  const mods = AI_CIVIC_MODIFIERS[`CIVIC_${id}`] ?? [];
   return v + n.buildings * fromLanding(share, turns)
     + n.wonders * fromLanding(pseudoYield(PSEUDOYIELD_WONDER, share, w('PSEUDOYIELD_WONDER')), turns)
     + n.districts * fromLanding(pseudoYield(PSEUDOYIELD_DISTRICT, share, w('PSEUDOYIELD_DISTRICT')), turns)
-    + fxConst(CIVIC_AI_POLICY_FLOOR);
+    + formations * pseudoYield(PSEUDOYIELD_UNIT_COMBAT, fxConst(CIVIC_AI_FORMATION_UNITS), w('PSEUDOYIELD_UNIT_COMBAT'))
+    + fxConst(CIVIC_AI_POLICY_FLOOR)
+    + (mods.length ? modifiersValue({ view: view ?? majorView(state), seat, start: turns, horizon: AI_VALUE_HORIZON, rate: AI_RATE }, mods) : 0);
+}
+
+/** the civic a land formation of `tier` (1 Corps, 2 Army) needs for the
+ *  seat: its own (EFFECT_ADJUST_CORPS_ARMY_PREREQ), else the game's */
+function formationCivic(state: GameState, seat: number, tier: number): string {
+  const row = getModifiers(state, seat).formations.find((r) => r.tier === tier && !r.naval && r.civic !== undefined);
+  return row?.civic ?? FORMATION_CIVIC[tier];
 }
 
 /** the row and its prerequisites one and two levels up (0x61ee30's walk),
@@ -173,15 +202,18 @@ function researchOf(state: GameState, seat: number): ResearchState {
 
 /** THE ANALYSIS: every civic's entry, in table order, valued and
  *  propagated; `culture` is the seat's Culture a turn, `weights` what a
- *  major's AI follows (`aiWeights.ts`) */
-export function civicAnalysis(state: GameState, seat: number, culture: number, weights: AiWeightInputs = {}): CivicEntry[] {
+ *  major's AI follows (`aiWeights.ts`), `cityTerm` the value's terms its
+ *  cities give (the unlocked units') where the seat's facts give them */
+export function civicAnalysis(state: GameState, seat: number, culture: number, weights: AiWeightInputs = {},
+  cityTerm?: (civic: string, turns: number) => number): CivicEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(culture);
   const pw = pseudoYieldWeights(state, seat, weights);
+  let view: AiValueView | undefined;
   const entries: CivicEntry[] = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id]).map((id) => {
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
-    const base = turns < 0 ? 0 : civicValue(state, id, turns, pw);
+    const base = turns < 0 ? 0 : civicValue(state, seat, id, turns, pw, view ??= majorView(state)) + (cityTerm && turns < AI_VALUE_HORIZON ? cityTerm(id, turns) : 0);
     return { civic: id, next, turns, owned: false, base, score: base };
   });
   const leader = leaderOf(state, seat);

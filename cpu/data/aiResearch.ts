@@ -20,6 +20,16 @@ export const RESEARCH_AI_EMBARK_ALL = srcConst('aiResearch.embarkAll', 5, {
   lab: 'tools/civ6lab/dll_readings.md H-1: the research AI (0x7b3e50: test [row+0x70], 4; add 0x500)',
 });
 
+/** The technologies that let a unit type embark (Technologies EmbarkUnitType,
+ *  the row's +0xc0): their own value adds 1.0 (0x7b3e50). */
+export const RESEARCH_AI_EMBARK_UNIT: readonly string[] = srcConst('aiResearch.embarkUnit', ['SAILING', 'CELESTIAL_NAVIGATION'], {
+  derived: 'the Technologies rows with an EmbarkUnitType',
+  inputs: [
+    xml('Technologies', 'TechnologyType=TECH_SAILING', 'EmbarkUnitType', { expect: 'UNIT_BUILDER' }),
+    xml('Technologies', 'TechnologyType=TECH_CELESTIAL_NAVIGATION', 'EmbarkUnitType', { expect: 'UNIT_TRADER' }),
+  ],
+});
+
 /** The leader's favored technologies (AiLists System="Technologies" on a
  *  trait the leader, its civilization or its agenda carries, AiFavoredItems
  *  Favored="true"): their score after the prerequisites is taken 1.5 times

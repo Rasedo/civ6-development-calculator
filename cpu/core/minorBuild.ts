@@ -65,9 +65,10 @@ import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { TECH_IMPROVEMENT_RESOURCES, resourceValue, type ResourceFacts } from './aiResource';
 import { RESOURCES, extractsResource } from '../../world/resources';
 import { unitProductionTable } from './aiUnitProduction';
-import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, unitTable, type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, amenityPerTurn, buildingTable, buildingValue, constructibleNow, unitTable, type AiUnitRow, type CityBuildFacts, type CityBuildTables, type PickFacts } from './aiCityBuild';
 import { projectTable, type ProjectTableFacts } from './aiProjectValue';
-import { FX, FX_MIN, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween } from './aiValue';
+import { upgradeGoldCost } from './stockpile';
+import { FX, FX_MIN, fxConst, fxOf, pseudoYieldValue, turnsAt, valueBetween, yieldValue } from './aiValue';
 import { majorView } from './majorView';
 import { cityStateSight } from './fog';
 import { combatDesire, type CombatDesire } from './aiMilitary';
@@ -1165,6 +1166,73 @@ export function minorResourceFacts(state: GameState, cityState: CityState): Reso
       const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
       return row ? { cost: row.resourceCost, maintenance: row.maintenanceResourceAmount } : null;
     },
+  };
+}
+
+/** THE RESEARCH AND CIVICS VALUES' TERMS A MINOR'S CITY GIVES (0x7b3e50,
+ *  0x7a9a10): a technology's resources (`minorResearchResources`) and either
+ *  row's units (`minorUnitTerm`) — on `units`, the city's unit table, where
+ *  given (a recording's logged table), else its own. The minors' turn
+ *  (`minorResearch`) takes the resources alone; `cpu/harness/
+ *  researchValueLab.ts` the whole. */
+export function minorResearchTerms(state: GameState, cityState: CityState, units?: readonly (number | null)[]): {
+  tech: (tech: string, turns: number) => number;
+  civic: (civic: string, turns: number) => number;
+} {
+  const resources = minorResearchResources(state, cityState);
+  const term = minorUnitTerm(state, cityState, units);
+  return {
+    tech: (tech, turns) => resources(tech, turns) + term(UNITS_OF_TECH.get(`TECH_${tech}`) ?? [], false),
+    civic: (civic) => term(UNITS_OF_CIVIC.get(`CIVIC_${civic}`) ?? [], true),
+  };
+}
+
+const UNITS_OF_TECH = new Map<string, AiUnitRow[]>();
+const UNITS_OF_CIVIC = new Map<string, AiUnitRow[]>();
+for (const u of AI_UNITS) {
+  if (u.tech) UNITS_OF_TECH.set(u.tech, [...UNITS_OF_TECH.get(u.tech) ?? [], u]);
+  if (u.civic) UNITS_OF_CIVIC.set(u.civic, [...UNITS_OF_CIVIC.get(u.civic) ?? [], u]);
+}
+
+/** A unit's at least this much per upgrade source unit (0x7b45..: 20.0) */
+const UPGRADE_SOURCE_FLOOR = fxConst(20);
+/** A city's unit value counts at most this much in a technology's value (50.0) */
+const UNIT_CITY_VALUE_CAP = fxConst(50);
+
+/**
+ * The value's UNIT TERM of a minor, paid whole (not from landing): per unit
+ * the row unlocks that is the minor's version, over its cities that train
+ * the unit's domain, the average of the City Analysis unit values above 0
+ * (0x5d4cd0) — a technology's (0x7b3e50) each at most 50.0 and the average
+ * taken 10 times, a civic's (0x7a9a10) as they stand and once; and per
+ * upgrade source of the unit (UnitUpgrades), each of the minor's units of it
+ * (0x4f2c90) adds that average less the upgrade's Gold valued as a yield
+ * (0x5376d0 -> 0x7a6690), at least 20.0.
+ */
+function minorUnitTerm(state: GameState, cityState: CityState, given?: readonly (number | null)[]): (units: readonly AiUnitRow[], civic: boolean) => number {
+  let facts: CityBuildFacts | undefined;
+  let table = given;
+  return (units, civic) => {
+    let v = 0;
+    for (const u of units) {
+      if (minorUnitVersion(u.type) !== u.type) continue;
+      facts ??= minorBuildFacts(state, cityState, minorKnownUnits(cityState));
+      let avg = 0;
+      if (facts.trainsDomain(u.domain)) {
+        table ??= unitTable(facts);
+        avg = Math.max(0, civic ? table[AI_UNIT_INDEX.get(u.type)!] ?? 0 : Math.min(table[AI_UNIT_INDEX.get(u.type)!] ?? 0, UNIT_CITY_VALUE_CAP));
+      }
+      v += civic ? avg : avg * 10;
+      const id = engineId('unit', u.type, 'UNIT_', UNITS);
+      for (const src of Object.values(UNITS)) {
+        if (!id || src.upgradesTo !== id) continue;
+        const n = state.units.filter((x) => x.seat === cityState.seat && x.type === src.id).length;
+        if (n === 0) continue;
+        const gold = yieldValue(facts.view, cityState.seat, upgradeGoldCost(state, cityState.seat, src.id) * FX, 'YIELD_GOLD');
+        v += n * Math.max(avg - gold, UPGRADE_SOURCE_FLOOR);
+      }
+    }
+    return v;
   };
 }
 

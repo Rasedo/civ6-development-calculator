@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .sim_research import _FX, _fmul, _fx_const, _imul, _turns_at, _walk_slots
+from .sim_research import _FX, _discounted, _fmul, _fx_const, _imul, _turns_at, _walk_slots
 
 # THE CIVICS AI (`cpu/core/aiCivics.ts`, GameCore_XP2 AI/CultureAi.cpp;
 # tools/civ6lab/dll_readings.md "H-1: the civics AI") — the city-states'
@@ -40,6 +40,9 @@ class SimCivics:
             "lv": _walk_slots(pre, dev),
             "lineage": torch.tensor([x + [-1] * (k - len(x)) for x in lineage], dtype=torch.long, device=dev),
             "unlocks": rules.c_ai_unlocks.to(dev),
+            "mods": rules.c_ai_mods.to(dev),
+            "rate": _fx_const(float(av["discountPct"])),
+            **self._cai_grants(),
             "era": rules.c_era.to(dev),
             "repeat": rules.c_repeat.to(dev),
             "horizon": int(av["horizon"]),
@@ -50,6 +53,19 @@ class SimCivics:
         }
         self._cai_cache = cached
         return cached
+
+    def _cai_grants(self) -> dict:
+        """the civic value's grants at a city-state's weights (0 but the
+        district's): a token's points as PSEUDOYIELD_INFLUENCE (a player in no
+        government's, Chiefdom's at the speed), a spy as PSEUDOYIELD_UNIT_SPY, a
+        land formation's units as PSEUDOYIELD_UNIT_COMBAT — the modifier
+        analyzers' too (`sim_cityvalue.py`)"""
+        av, ca = self.rules.ai_value, self.rules.civic_ai
+        return {
+            "token": _imul(int(ca["tokenPoints"]) * _FX, _fx_const(float(av["pyInfluence"]))),
+            "spy": _imul(_FX, _fx_const(float(av["pyUnitSpy"]))),
+            "formation": _imul(int(ca["formationUnits"]) * _FX, _fx_const(float(av["pyUnitCombat"]))),
+        }
 
     def _cai_analysis(self, s: int, cul: torch.Tensor):
         """`civicAnalysis` for minor `s` ([B] Culture a turn): per row (engine
@@ -96,26 +112,54 @@ class SimCivics:
 
     def _cai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
         """`civicValue` [B, NC] for minor `s`: landing each row in `turns` turns — its own
-        pseudo-yield from landing to the horizon, once per era between its
-        era and the game's plus one; a share per building, a wonder's and a
+        pseudo-yield from landing to the horizon, (game - era) times where
+        its era is before the game's; a share per building, a wonder's and a
         district's at their pseudo-yields (the district's at the minor's
-        weight, `_ai_district_share`), each from landing to the horizon; the
-        policy floor. At the horizon or past it -9999"""
+        weight, `_ai_district_share`), each from landing to the horizon;
+        PSEUDOYIELD_UNIT_COMBAT of 100 per land formation it unlocks; the
+        policy floor; its modifiers, each its whole part: the envoys granted
+        (their points as PSEUDOYIELD_INFLUENCE discounted from landing), the
+        spies (PSEUDOYIELD_UNIT_SPY) and the combat adjacency (the minor's
+        strength, `_cai_strength`) from landing to the horizon. At the
+        horizon or past it -9999"""
         T = self._cai_tables()
         B, NC = turns.shape
         nn = turns.clamp(min=0)
         era = T["era"].unsqueeze(0)
         game = self.game_era.unsqueeze(1)
         own = self._rai_from_landing(torch.full((B, NC), T["own"], dtype=torch.long, device=self.device), nn)
-        own = torch.where(era <= game, _fmul(own, (game - era + 1) * _FX), own)
+        own = torch.where(era < game, _fmul(own, (game - era) * _FX), own)
         u = T["unlocks"].unsqueeze(0)
 
         def land(a: int) -> torch.Tensor:
             return self._rai_from_landing(torch.full((B, NC), a, dtype=torch.long, device=self.device), nn)
 
         district = self._rai_from_landing(self._ai_district_share(s).unsqueeze(1).expand(B, NC), nn)
-        val = own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district + T["floor"]
+        m = T["mods"].unsqueeze(0)
+
+        def whole(x: torch.Tensor) -> torch.Tensor:
+            return torch.div(x, _FX, rounding_mode="floor") * _FX
+
+        tokens = whole(_discounted(m[:, :, 0] * T["token"], T["rate"], nn))
+        spies = whole(self._rai_from_landing(m[:, :, 1] * T["spy"], nn))
+        strength = self._cai_strength(s).unsqueeze(1).expand(B, NC)
+        adjacency = whole(self._rai_from_landing(strength * _FX, nn)) * m[:, :, 2]
+        val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
+               + m[:, :, 3] * T["formation"] + T["floor"] + tokens + spies + adjacency)
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
+
+    def _cai_strength(self, s: int) -> torch.Tensor:
+        """[B] minor `s`'s strength over every domain (`domainStrength`): per
+        unit the greater of its combat and ranged strengths x its hit points
+        left over its most, 24.8 truncated, the sum's whole part"""
+        seat = FREE_SEAT if s == self.FR else 100 + s
+        mine = self.major_unit_alive & (self.major_unit_seat == seat)
+        mt = self.major_unit_type.clamp(min=0, max=self.NU - 1)
+        st = torch.maximum(self._type_combat.take(mt), self._type_ranged_strength.take(mt)) << 8
+        left = self.major_unit_hp.clamp(min=0) << 8
+        hp = int(self.rules.combat["unitHp"]) << 8
+        per = torch.div(torch.div(st * left, 256, rounding_mode="trunc") * 256, hp, rounding_mode="trunc")
+        return (per * mine.long()).sum(dim=1) >> 8
 
     def _cai_best(self, ent, key: torch.Tensor) -> torch.Tensor:
         """`best` (0x6182e0): the comparator's row over the entries in table

@@ -249,6 +249,18 @@
   context:
     - "...target, the units whose planning holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER..."
   review: imported
+- addr: 0x774970
+  final: 0x5069c0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "The tactical move Promotion (0x77ac30): each unit of the pool (+0x240) alive (+0x770 clear) with a promotion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv);"
+  readings: ["C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"]
+  context:
+    - "## C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
+    - "...tion due (0x116f80 on +0x1bc0) joins the move list (logged \"Promote\" in AI_Tactical.csv); 0x774970 then runs each: over the UnitPromotions rows in database order that the unit can earn (0x..."
+  review: imported
 - addr: 0x774e90
   final: 0x506ec0
   kind: function
@@ -517,6 +529,7 @@
       value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-96: the AI's promotion choice (0x77ac30, 0x774970, 0x7b5d70) — READ, not ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...(C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' operations (Naval   Superiority, City Defense, Attack Barb C..."
   context:

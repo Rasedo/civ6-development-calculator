@@ -145,6 +145,7 @@ class SimResearch:
             "leaf": ~required,
             "unlocks": rules.t_ai_unlocks.to(dev),
             "embark": rules.t_embark_all.to(dev),
+            "embark_unit": rules.t_embark_unit.to(dev),
             "era": rules.t_era.to(dev),
             "repeat": rules.t_repeat.to(dev),
             "horizon": int(av["horizon"]),
@@ -153,6 +154,8 @@ class SimResearch:
             "own": _imul(_FX, _fx_const(float(av["pyTechnology"]))),
             "embark_add": _fx_const(float(ra["embarkAll"])),
             "share": _fx_const(float(av["unlockShare"])),
+            "project": _fx_const(float(av["projectShare"])),
+            "py_nuclear": _fx_const(float(av["pyNuclearWeapon"])),
             "py_district": _fx_const(float(av["pyDistrict"])),
             "py_wonder": _fx_const(float(av["pyWonder"])),
         }
@@ -420,23 +423,26 @@ class SimResearch:
 
     def _rai_value(self, s: int, turns: torch.Tensor) -> torch.Tensor:
         """`techValue` [B, NT] for minor `s`: landing each row in `turns`
-        turns — its own pseudo-yield (EmbarkAll adds; a row of an era before
-        the game's counts once per era between, plus one), a share per
-        building, a district's and a wonder's at their pseudo-yields (the
-        district's at the minor's weight), each from landing to the horizon;
-        past the horizon -9999"""
+        turns — its own pseudo-yield (an EmbarkUnitType and EmbarkAll add; a
+        row of an era before the game's counts once per era between, plus
+        one), a share per building, a district's and a wonder's at their
+        pseudo-yields (the district's at the minor's weight), a project's
+        share and a weapon project's PSEUDOYIELD_NUCLEAR_WEAPON of 1.0, each
+        from landing to the horizon; past the horizon -9999"""
         T = self._rai_tables()
         B, NT = turns.shape
         era = T["era"].unsqueeze(0)
         game = self.game_era.unsqueeze(1)
         own = torch.full((B, NT), T["own"], dtype=torch.long, device=self.device)
-        own = own + T["embark"].long().unsqueeze(0) * T["embark_add"]
+        own = own + T["embark_unit"].long().unsqueeze(0) * _FX + T["embark"].long().unsqueeze(0) * T["embark_add"]
         own = torch.where(era < game, _fmul(own, (game - era + 1) * _FX), own)
         nn = turns.clamp(min=0)
         u = T["unlocks"].unsqueeze(0)
         val = (self._rai_from_landing(own, nn) + u[:, :, 0] * self._rai_from_landing(torch.full_like(own, T["share"]), nn)
                + u[:, :, 1] * self._rai_from_landing(self._ai_district_share(s).unsqueeze(1).expand(B, NT), nn)
-               + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn))
+               + u[:, :, 2] * self._rai_from_landing(torch.full_like(own, _imul(T["share"], T["py_wonder"])), nn)
+               + u[:, :, 3] * self._rai_from_landing(torch.full_like(own, T["project"]), nn)
+               + u[:, :, 4] * self._rai_from_landing(torch.full_like(own, _imul(_FX, T["py_nuclear"])), nn))
         return torch.where(turns > T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _rai_upstream(self, have: torch.Tensor, base: torch.Tensor, turns: torch.Tensor) -> torch.Tensor:

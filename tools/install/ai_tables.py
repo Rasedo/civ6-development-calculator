@@ -481,6 +481,12 @@ def build() -> str:
             x = inherit.get(x)
         ids = sorted({m for lt in tree for t in ltraits[lt] for m in trait_mods[t]} | {m for t in civ_traits_all[civ] for m in trait_mods[t]})
         minor_influence[civ] = [modifier(m) for m in ids if influenced(m)]
+    # each civic's modifiers (CivicModifiers), the civics AI's value analyses
+    # them (0x7a9a10 -> 0x7a4b20)
+    civic_mods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("CivicModifiers"):
+        if c.get("CivicType"):
+            civic_mods[c["CivicType"]].append(c["ModifierId"])
     # THE ECONOMIC AI'S SAVINGS (every party's: the majors' and the minors'
     # traits carry DefaultSavings): the SavingTypes in table order (a slot's
     # index) and the list's weight of each
@@ -494,7 +500,8 @@ def build() -> str:
         " * and the AI lists the weights sum: System Yields and YieldSensitivities by\n"
         " * trait — a leader's traits through its InheritFrom chain, a civilization's,\n"
         " * an agenda's (AgendaTraits) —, those and PseudoYields by strategy\n"
-        " * (Strategy_Priorities).\n */\n"
+        " * (Strategy_Priorities); the city-states' modifiers their envoys reach,\n"
+        " * the civics' modifiers (CivicModifiers).\n */\n"
         "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
         + lit("AI_YIELD_DEFAULT", yields, "Readonly<Record<string, number>>")
         + lit("AI_PSEUDOYIELD_DEFAULT", pseudo, "Readonly<Record<string, number>>")
@@ -510,6 +517,8 @@ def build() -> str:
               "readonly { strategy: string; yield: string; pct: number }[]")
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
+        + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
+              "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace") == "true"],
               "readonly string[]")
         + lit("AI_DEFAULT_SAVINGS", savings, "readonly { saving: string; weight: number }[]")
