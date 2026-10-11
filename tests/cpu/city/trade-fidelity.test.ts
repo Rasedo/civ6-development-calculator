@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { cityStateOfSeat, civsAtWar, emptySeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
-import { settleAt, makeMap, makeState, tileAtCoords, expandBorders } from '../helpers';
+import { settleAt, makeMap, makeState, meetAll, tileAtCoords, expandBorders } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
 import { tilesWithin } from '../../../world/hex';
 import { canAddTradeRoute, freeTrader, tradeCapacity, addTradeRoute, addIntlTradeRoute, canAddIntlTradeRoute, cityTradeYields, routeYieldsInternational, routeYields, specialtyDistricts, routeChainGold, routeCoursePosts, routePathGold, stampTradingPost, routePostGold, wonderRouteOriginGold, TRADE_ROUTE_DURATION } from '../../../cpu/core/trade';
@@ -146,6 +146,7 @@ describe('international route yields', () => {
 
     // War CANCELS the pair's routes (real Civ 6 has no suspension) — the
     // income stops because the route is GONE.
+    meetAll(state);
     declareWar(state, 0, civ.seat);
     expect(state.seats[0].tradeRoutes!.length).toBe(0);
     expect(cityTradeYields(state, origin).gold).toBe(0);
@@ -157,6 +158,7 @@ describe('international route yields', () => {
     addCompletedCampus(state, civ.cities[0], 12, 7);
     expect(addIntlTradeRoute(state, origin.id, civ.seat, civ.cities[0].id, 0).ok).toBe(true);
 
+    meetAll(state);
     const col = warTargets(state, 0).indexOf(civ.seat);
     expect(col).toBeGreaterThanOrEqual(0);
     state.unitsMode = true;
@@ -463,6 +465,7 @@ describe('the Trader unit', () => {
     // a rival's centre on the row: open at peace, closed at war
     const civ = addCiv(state, 7, 4);
     expect(tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)).toContain(civ.cities[0].centerIndex);
+    meetAll(state);
     declareWar(state, 0, civ.seat);
     expect(tradeCourse(tradeReach(state, 0, origin.centerIndex), dest.centerIndex)).not.toContain(civ.cities[0].centerIndex);
     // fog: the unrevealed ground is closed to a major

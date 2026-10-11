@@ -1,7 +1,7 @@
 /** Shared test fixtures: small synthetic maps with uniform terrain. */
 
 import type { City, GameMap, GameState, TerrainId, Tile } from '../../cpu/core/types';
-import { BARB_SEAT, NO_SEAT, emptySeat, seatOf, setTileOwner, tileSeat } from '../../cpu/core/seats';
+import { BARB_SEAT, NO_SEAT, emptySeat, isCiv, seatOf, setMetTurnWith, setTileOwner, tileSeat } from '../../cpu/core/seats';
 import { foundCity } from '../../cpu/core/game';
 import { slotGreedily } from '../../cpu/core/effects';
 import { deriveAreas, deriveContinents, deriveMountainRanges, deriveRegions } from '../../world/query';
@@ -113,6 +113,16 @@ export function seededGame(seed: number, civs: number, cityStates = 0): GameStat
     if (!res.ok) throw new Error(`seed ${seed}: seat ${s.seat} cannot found its capital: ${res.reason}`);
   }
   return state;
+}
+
+/** Every pair of majors has met (this turn): a scene whose pair verbs
+ *  (war, missions, deals) need the meeting. */
+export function meetAll(state: GameState): void {
+  for (const a of state.seats) {
+    for (const b of state.seats) {
+      if (a.seat < b.seat && isCiv(a.seat) && isCiv(b.seat)) setMetTurnWith(state, a.seat, b.seat, state.turn);
+    }
+  }
 }
 
 export function tileAtCoords(map: GameMap, col: number, row: number): Tile {

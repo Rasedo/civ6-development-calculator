@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { civsAtWar, emptySeat, seatOfCityState, setWar, setWarTurnsWith, treatyTurnsWith } from '../../../cpu/core/seats';
-import { makeState, settleAt, tileAtCoords } from '../helpers';
+import { makeState, meetAll, settleAt, tileAtCoords } from '../helpers';
 import { declareWar, sueForPeace, seatPhase } from '../../../cpu/core/phase';
 import { declareWarOnCityState, sueForPeaceWithCityState } from '../../../cpu/core/cityStates';
 import { PEACE_TREATY_TURNS, WAR_MIN_TURNS } from '../../../cpu/data/seats';
@@ -17,6 +17,7 @@ function twoMajors(): GameState {
   // the countdown rides the seat phase, which skips a seat with no cities
   settleAt(state, tileAtCoords(state.map, 3, 3).index, 0);
   settleAt(state, tileAtCoords(state.map, 9, 9).index, 1);
+  meetAll(state);
   return state;
 }
 

@@ -700,7 +700,41 @@ export function setBorderTurnsFrom(state: GameState, grantor: number, guest: num
   state.borderTurns[grantKey(grantor, guest)] = v;
 }
 
-/** Does `sender` hold a Delegation or Resident Embassy with `target`? */
+/** the turn majors `a` and `b` met, null while they have not (`meetMajors`) */
+export function metTurnWith(state: GameState, a: number, b: number): number | null {
+  if (a === b) return null;
+  return state.metTurns?.[warClockKey(a, b)] ?? null;
+}
+
+/** have majors `a` and `b` met */
+export function majorsMet(state: GameState, a: number, b: number): boolean {
+  return metTurnWith(state, a, b) !== null;
+}
+
+export function setMetTurnWith(state: GameState, a: number, b: number, turn: number): void {
+  if (a === b) return;
+  if (!state.metTurns) state.metTurns = {};
+  state.metTurns[warClockKey(a, b)] = turn;
+}
+
+/** the turn majors `a` and `b` last made peace, null where they never fought */
+export function peaceTurnWith(state: GameState, a: number, b: number): number | null {
+  if (a === b) return null;
+  return state.peaceTurn?.[warClockKey(a, b)] ?? null;
+}
+
+export function setPeaceTurnWith(state: GameState, a: number, b: number, turn: number): void {
+  if (a === b) return;
+  if (!state.peaceTurn) state.peaceTurn = {};
+  state.peaceTurn[warClockKey(a, b)] = turn;
+}
+
+/** the missions a seat may hold with another (`delegations`) */
+export const MISSION_DELEGATION = 1;
+export const MISSION_EMBASSY = 2;
+
+/** The mission `sender` holds with `target`: 0 none, MISSION_DELEGATION or
+ *  MISSION_EMBASSY. */
 export function delegationWith(state: GameState, sender: number, target: number): number {
   if (sender === target) return 0;
   return state.delegations?.[grantKey(sender, target)] ?? 0;

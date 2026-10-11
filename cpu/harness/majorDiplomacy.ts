@@ -7,12 +7,9 @@
  *
  * The set-up's draws ("Random Diplomatic Value", "Choose random agenda") and
  * the civic agenda's draws are the game's own, taken from its draw log in
- * order. The facts the engine does not keep come from the game's logs: when
- * two majors met (DiplomacySummary.csv's Met rows; the record's action log
- * names the player whose turn it was), the Delegations and Resident
- * Embassies sent, and the wars and peaces. A fact of turn t made in player
- * X's turn is in view at owner O's turn start of t when X moves before O,
- * else at O's start of t+1.
+ * order. The diplomatic facts — when two majors met, their wars and peaces,
+ * the Delegations and Resident Embassies held — are the replayed engine's,
+ * on both lanes (the record carries none of them).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import {
@@ -22,17 +19,6 @@ import {
 import { majorView } from '../core/majorView';
 import type { GameState } from '../core/types';
 import type { LoggedDraw, RandLog } from './randLog';
-import type { TurnRecord } from './record';
-
-/** a diplomatic fact the logs name: `a` and `b` are player ids */
-interface DiploEvent {
-  turn: number;
-  kind: 'met' | 'delegation' | 'embassy' | 'war' | 'peace';
-  a: number;
-  b: number;
-  /** the player whose turn it fell in */
-  mover: number;
-}
 
 /** the opinion entries of one AI_Diplomacy row: [opinion, state] per player
  *  listed, in the log's order */
@@ -51,24 +37,6 @@ function readDiplomacyLog(path: string): Map<string, LogRow> {
       const k = x.indexOf(':');
       return [Number(x.slice(0, k)), x.slice(k + 1)] as [number, string];
     }));
-  }
-  return out;
-}
-
-function readSummary(path: string): DiploEvent[] {
-  const out: DiploEvent[] = [];
-  if (!existsSync(path)) return out;
-  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
-    const c = line.split(',').map((x) => x.trim());
-    if (c.length < 4) continue;
-    const kind = ({ Met: 'met', Delegation: 'delegation', Embassy: 'embassy', 'At War': 'war', Peace: 'peace' } as const)[c[3]];
-    if (!kind) continue;
-    const turn = Number(c[0]);
-    const a = Number(c[1]);
-    const b = Number(c[2]);
-    // a meeting is logged both ways: keep the first
-    if (kind === 'met' && out.some((e) => e.kind === 'met' && e.turn === turn && e.a === b && e.b === a)) continue;
-    out.push({ turn, kind, a, b, mover: kind === 'delegation' || kind === 'embassy' || kind === 'war' ? a : Number.MAX_SAFE_INTEGER });
   }
   return out;
 }
@@ -132,14 +100,17 @@ class Lane {
 
 export class DiplomacyProbe {
   private readonly log: Map<string, LogRow> | null;
-  private readonly events: DiploEvent[];
   private readonly lanes = { record: new Lane(), engine: new Lane() };
 
   /** `players`: seat -> the game's player id, the majors' and the city-states' */
   constructor(dumpPath: string, private readonly players: ReadonlyMap<number, number>, private readonly seatOf: ReadonlyMap<number, number>) {
     const base = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = existsSync(base + 'AI_Diplomacy.csv') ? readDiplomacyLog(base + 'AI_Diplomacy.csv') : null;
-    this.events = readSummary(base + 'DiplomacySummary.csv');
+  }
+
+  /** the agendas the engine lane's majors carry */
+  agendasOf(seat: number): readonly string[] {
+    return this.lanes.engine.mem?.agendas.get(seat) ?? [];
   }
 
   get active(): boolean {
@@ -150,85 +121,30 @@ export class DiplomacyProbe {
     return { record: this.lanes.record.tally, engine: this.lanes.engine.tally };
   }
 
-  /** the turn's meetings' movers, from the record holding the turn's actions */
-  private moversOf(b: TurnRecord, turn: number): void {
-    const acts = (b as { actions?: unknown[][] }).actions;
-    if (!Array.isArray(acts)) return;
-    let mover = 0;
-    for (const a of acts) {
-      if (!Array.isArray(a) || a[1] !== turn) continue;
-      if (a[2] === 'PlayerTurnActivated') mover = Number(a[3]);
-      else if (a[2] === 'DiplomacyMeet') {
-        const x = Number(a[3]);
-        const y = Number(a[4]);
-        for (const e of this.events) {
-          if (e.kind === 'met' && e.turn === turn && ((e.a === x && e.b === y) || (e.a === y && e.b === x))) e.mover = Math.min(e.mover, mover);
-        }
-      }
-    }
-  }
-
-  /** the event `kind` between players a and b last in view at owner O's
-   *  start of turn t, or null */
-  private lastSeen(kind: DiploEvent['kind'], a: number, b: number, owner: number, turn: number, directed: boolean): DiploEvent | null {
-    let out: DiploEvent | null = null;
-    for (const e of this.events) {
-      if (e.kind !== kind) continue;
-      if (!((e.a === a && e.b === b) || (!directed && e.a === b && e.b === a))) continue;
-      if (e.turn > turn || (e.turn === turn && e.mover >= owner)) continue;
-      out = e;
-    }
-    return out;
-  }
-
-  private view(state: GameState, ownerSeat: number, after?: GameState) {
-    const owner = this.players.get(ownerSeat) ?? ownerSeat;
-    const turn = state.turn;
-    const pid = (seat: number) => this.players.get(seat) ?? seat;
-    const metTurn = (i: number, j: number): number | null => this.lastSeen('met', pid(i), pid(j), owner, turn, false)?.turn ?? null;
-    const lastWar = (i: number, j: number) => {
-      const w = this.lastSeen('war', pid(i), pid(j), owner, turn, false);
-      const p = this.lastSeen('peace', pid(i), pid(j), owner, turn, false);
-      return { w, p };
-    };
-    return majorView(state, {
-      ...(after ? { civicsHeld: (i: number) => majorView(after).civicsHeld(i) } : {}),
-      metTurn,
-      peaceSince: (i, j) => {
-        const { w, p } = lastWar(i, j);
-        if (p && (!w || p.turn >= w.turn)) return p.turn;
-        return metTurn(i, j);
-      },
-      mission: (s, r, kind) => {
-        const sent = this.lastSeen(kind, pid(s), pid(r), owner, turn, true);
-        if (!sent) return false;
-        // a war sends the missions home; an Embassy takes the Delegation's
-        // place (runs/h1_duelw1110: Rome's +3 for Qin's Delegation of 56 gone
-        // with its Embassy of 98)
-        const { w } = lastWar(s, r);
-        const embassy = kind === 'delegation' ? this.lastSeen('embassy', pid(s), pid(r), owner, turn, true) : null;
-        return (!w || w.turn < sent.turn) && (!embassy || embassy.turn < sent.turn);
-      },
-    });
+  private view(state: GameState, after?: GameState) {
+    return majorView(state, after ? { civicsHeld: (i: number) => majorView(after).civicsHeld(i) } : {});
   }
 
   /** the set-up, on the replay's first state */
   setup(state: GameState, randLog: RandLog | undefined, slots: readonly number[]): void {
     if (!this.log) return;
-    const owner = Math.min(...[...this.players.keys()]);
     for (const lane of Object.values(this.lanes)) {
       lane.feed = new LogFeed(randLog?.draws ?? []);
-      lane.mem = diplomacySetup(this.view(state, owner), slots, lane.feed.draw(1));
+      lane.mem = diplomacySetup(this.view(state), slots, lane.feed.draw(1));
     }
   }
 
   /** each major's turn start of the pair's first turn, on the engine's state
-   *  and on the record's, scored against the log's rows of that turn; `b`
-   *  holds the turn's action log */
-  preTurn(engine: GameState, record: GameState, recordNext: GameState, b: TurnRecord): void {
+   *  and on the record's (its diplomatic facts the engine's), scored against
+   *  the log's rows of that turn */
+  preTurn(engine: GameState, record: GameState, recordNext: GameState): void {
     if (!this.log) return;
-    this.moversOf(b, engine.turn);
     this.lane(this.lanes.engine, engine);
+    for (const r of [record, recordNext]) {
+      r.metTurns = { ...engine.metTurns };
+      r.peaceTurn = { ...engine.peaceTurn };
+      r.delegations = { ...engine.delegations };
+    }
     this.lane(this.lanes.record, record, recordNext);
   }
 
@@ -242,7 +158,7 @@ export class DiplomacyProbe {
     for (const owner of majors) {
       // the record is read at the first major's turn start: a later major's
       // civics completed at its own start show in the next record
-      const view = this.view(state, owner, next && owner !== majors[0] ? next : undefined);
+      const view = this.view(state, next && owner !== majors[0] ? next : undefined);
       if (!view.majors().includes(owner)) continue;
       diplomacyTurnStart(view, mem, owner, feed.draw(turn), lane.gaps);
       const row = this.log.get(`${turn}:${this.players.get(owner)}`);

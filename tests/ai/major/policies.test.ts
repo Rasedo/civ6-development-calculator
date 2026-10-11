@@ -63,6 +63,9 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     resourceVisible: () => false, resourceHeld: () => 0, cityPlots: () => [], homeContinent: () => -1, pressureAt: () => 0,
     strategies: () => new Set(), leaderType: () => null, civilizationType: () => null, units: () => [], unitReach: () => [], hostileUnits: () => [],
     hostileCities: () => [], cityDefences: () => [], unitPath: () => [], stepDirection: () => -1, unitActionColumn: () => -1,
+    mapCities: () => [], plotsSeen: () => new Set(), startPlots: () => [], handicap: () => 3, playerEra: () => 0, techCount: () => 0,
+    militaryStrength: () => 0, score: () => 0, greatPeopleOfClass: () => 0, greatPersonOffered: () => false, greatWorksMade: () => 0,
+    domesticTourists: () => 0, visitingTourists: () => 0, scienceWonders: () => 0, spaceProjects: () => 0,
     ...over,
   };
 }

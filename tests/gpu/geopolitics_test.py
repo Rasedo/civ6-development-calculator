@@ -118,11 +118,18 @@ def build(rules, path, steps: int = 18, dtype=torch.float64, slot: int = 0):
     which is everything these pokes write, the `_STATIC` roster pair aside.
 
     `slot` keys a SECOND engine for the one scene that holds two live sims at
-    once: the World Congress twin (`s8b`, compared against `s8`)."""
+    once: the World Congress twin (`s8b`, compared against `s8`). Every major
+    has met every other (the pair verbs need the meeting; `poke_contact`
+    unmeets a pair to test it)."""
     def make():
         sim = settle_all(BatchSim([load_fixture(path)], rules, device="cpu", dtype=dtype))
         for _ in range(steps):
             sim.step()
+        n = sim.n_majors
+        off = ~torch.eye(n, dtype=torch.bool).unsqueeze(0).expand(sim.B, n, n)
+        sim.seat_met_turn[:, :n, :n] = torch.where(off & (sim.seat_met_turn[:, :n, :n] < 0),
+                                                   torch.zeros_like(sim.seat_met_turn[:, :n, :n]),
+                                                   sim.seat_met_turn[:, :n, :n])
         return sim
     return warm_base((str(path), steps, str(dtype), slot), make, _STATIC)
 
@@ -920,11 +927,17 @@ def poke_delegation(rules, path):
     # one per pair: a second send buys nothing and costs nothing
     want(sim, a, "delegation", b)
     assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost
-    # ...and the sender's own civics price a NEW mission
+    # ...and with Diplomatic Service the mission is the Resident Embassy,
+    # which takes a standing Delegation's place (DiplomaticActions)
     sim.civ_civics[0, a, sim._embassy_civic] = True
     want(sim, a, "delegation", 0)
-    assert int(sim.seat_delegation[0, a, 0]) == 1
+    assert int(sim.seat_delegation[0, a, 0]) == 2
     assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost - sim._embassy_cost
+    want(sim, a, "delegation", b)
+    assert int(sim.seat_delegation[0, a, b]) == 2, "the Embassy replaces the Delegation"
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost - 2 * sim._embassy_cost
+    want(sim, a, "delegation", b)
+    assert float(sim.civ_treasury[0, a]) == 1000.0 - sim._deleg_cost - 2 * sim._embassy_cost, "one Embassy per pair"
 
     # a denouncement either way turns it away, and so does an empty purse
     clear_pairs(sim)
@@ -948,6 +961,48 @@ def poke_delegation(rules, path):
         "war left a mission standing"
     )
     print("  i4 mission OK (paid to the other leader, one per pair, denounce-gated, war clears)")
+
+
+def poke_contact(rules, path):
+    """i6. THE MAJORS' MEETING (`meetMajors`): an unmet pair can neither
+    declare war nor send a mission; the meeting stamps the turn both ways,
+    lands each side's MEET_CIV boosts, and the met-all moment pays each side
+    that has now met every living major (FIRST_IN_WORLD only where no major
+    had met them all before); peace stamps the pair's peace turn."""
+    sim, _ja, _jb = controlled_pair(rules, path, extra_for_a=False)
+    a, b = 1, 2
+    n = sim.n_majors
+    sim.civ_treasury[:] = 1000.0
+    sim.seat_met_turn[0, a, b] = sim.seat_met_turn[0, b, a] = -1
+    want(sim, a, "delegation", b)
+    assert int(sim.seat_delegation[0, a, b]) == 0, "a mission reached an unmet major"
+    assert float(sim.civ_treasury[0, a]) == 1000.0
+    head_war(sim, a, b)
+    assert not bool(sim.war[0, a, b]), "war was declared on an unmet major"
+
+    era = sim.era_score[0].clone()
+    pay = sim._mom["metAll"]
+    every_before = bool(sim._met_every_major()[0, 0])
+    m = torch.zeros(sim.B, dtype=torch.bool)
+    m[0] = True
+    sim._meet_majors(m, a, b)
+    t = int(sim.turn)
+    assert int(sim.seat_met_turn[0, a, b]) == t and int(sim.seat_met_turn[0, b, a]) == t
+    alive = sim._barb_majors_alive()[0]
+    if n == 3 and bool(alive.all()):
+        per = int(pay[0]) if every_before else int(pay[1])
+        for s in (a, b):
+            assert int(sim.era_score[0, s]) - int(era[s]) >= per, "the met-all moment did not pay"
+    # a second meeting is no meeting: nothing moves
+    era2 = sim.era_score[0].clone()
+    sim._meet_majors(m, a, b)
+    assert torch.equal(era2, sim.era_score[0]) and int(sim.seat_met_turn[0, a, b]) == t
+
+    # now met: the war lands, and the peace stamps its turn
+    head_war(sim, a, b)
+    assert bool(sim.war[0, a, b]), "the met pair's declaration must land"
+    assert int(sim.seat_peace_turn[0, a, b]) < 0
+    print("  i6 contact OK (unmet refuses war and missions, meeting stamps both ways once, met-all paid)")
 
 
 def poke_visibility(rules, path):
@@ -1081,6 +1136,7 @@ def main() -> None:
     poke_transfer(rules, path)
     poke_float32(rules, path)
     poke_delegation(rules, path)
+    poke_contact(rules, path)
     poke_deal(rules, path)
     poke_visibility(rules, path)
     print("GEOPOLITICS POKES OK")

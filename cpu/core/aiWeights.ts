@@ -34,23 +34,18 @@
  * adds 0.5 x the ChronologyIndex of the player's era (player +0x1358 +0xf8,
  * Eras +0x1c).
  *
- * The strategies followed: the era strategies (STRATEGY_<ERA>_CHANGES, "Is
- * <Era>" with "Is Not Major" disqualifying) while the major's era — the
- * latest era of a technology or civic it holds — has reached theirs (the
- * game starts each the turn the major's first row of that era lands and
- * stops none: AI_Victories.csv, 29 duels); STRATEGY_DARKAGE ("Is In Dark
- * Age") while a major is in one; and the strategies the caller names (the
- * others, whose conditions are not ported).
+ * The strategies followed are the majors' AI's own (ai/major/strategies.ts,
+ * the victory manager's update), handed in by the caller; a city-state
+ * follows none.
  */
 import { AI_CIVILIZATION_TRAITS, AI_DIFFICULTIES, AI_LEADER_TRAITS, AI_LIST_ITEMS, AI_STRATEGY_LISTS, AI_STRATEGY_YIELD_PRIORITIES,
   AI_TRAIT_LISTS } from '../data/aiTables';
-import { ERAS } from '../data/techs';
 import { CIV_LEADERS } from '../data/seats';
 import { FX, fmul, fxConst, type AiListItem, type AiListRef } from './aiValue';
 import { civEraIndex, computeCityStats, luxuryAmenities } from './city';
-import { getModifiers, inDarkAge, unitUpkeep } from './effects';
+import { getModifiers, unitUpkeep } from './effects';
 import { wmdUpkeep } from './nuclear';
-import { isCiv, seatOf } from './seats';
+import { isCiv, majorsMet, seatOf } from './seats';
 import { minorCity } from './cityStates';
 import type { GameState, Seat } from './types';
 
@@ -60,35 +55,17 @@ export const AI_YIELDS = ['YIELD_FOOD', 'YIELD_PRODUCTION', 'YIELD_GOLD', 'YIELD
 /** the Prince handicap, a Difficulties index: a seat with none set */
 const PRINCE = AI_DIFFICULTIES.indexOf('DIFFICULTY_PRINCE');
 
-/** What the weights take from AI parts this engine does not run: every
- *  strategy the player follows, where a caller knows them (the victory
- *  strategies, Early Exploration, Rapid Expansion, Naval and Wonder Obsessed
- *  have conditions not ported; absent, the player follows the ported ones),
- *  and the majors it has met. */
+/** What the weights take from the majors' AI: the strategies the player
+ *  follows (its victory manager, ai/major/strategies.ts). */
 export interface AiWeightInputs {
   strategies?: ReadonlySet<string>;
-  met?: readonly number[];
 }
 
-/** the strategies a major follows by the rules ported: one era strategy per
- *  era its techs and civics have reached, the Dark Age one in a Dark Age */
-export function portedStrategies(state: GameState, seat: number): string[] {
-  const s = seatOf(state, seat);
-  if (!s || !isCiv(seat)) return [];
-  const era = civEraIndex(s.research.techs, s.research.civics);
-  const out: string[] = [];
-  for (let e = 0; e <= era; e++) {
-    const name = `STRATEGY_${ERAS[e].toUpperCase()}_CHANGES`;
-    if (name in AI_STRATEGY_LISTS) out.push(name);
-  }
-  if (inDarkAge(state, seat)) out.push('STRATEGY_DARKAGE');
-  return out;
-}
-
-/** the strategies the player follows: those named, else the ported ones */
-export function followedStrategies(state: GameState, seat: number, inputs: AiWeightInputs = {}): string[] {
+/** the strategies the player follows: a major's as its AI names them, a
+ *  city-state's none */
+export function followedStrategies(seat: number, inputs: AiWeightInputs = {}): string[] {
   if (!isCiv(seat)) return [];
-  return inputs.strategies ? [...inputs.strategies] : portedStrategies(state, seat);
+  return [...(inputs.strategies ?? [])];
 }
 
 /** the seat's leader's and civilization's traits that carry a weight list */
@@ -155,7 +132,7 @@ export function yieldWeights(state: GameState, seat: number, inputs: AiWeightInp
   const s = seatOf(state, seat);
   const w: Record<string, number> = Object.fromEntries(AI_YIELDS.map((y) => [y, 0]));
   if (!s) return w;
-  const strategies = followedStrategies(state, seat, inputs);
+  const strategies = followedStrategies(seat, inputs);
   // the Economic AI's gold boost (0x687bf0)
   const gpt = goldPerTurn(state, seat);
   if (gpt < 0) w.YIELD_GOLD += fmul(fxConst(-0.2), fxConst(gpt));
@@ -165,7 +142,7 @@ export function yieldWeights(state: GameState, seat: number, inputs: AiWeightInp
   for (const [y, v] of listSum(seat, s, strategies, 'Yields', true)) if (y in w) w[y] += v;
   // the sensitivity boost
   const sens = listSum(seat, s, strategies, 'YieldSensitivities', true);
-  const others = (inputs.met ?? []).filter((o) => o !== seat && isCiv(o) && seatOf(state, o));
+  const others = state.seats.map((o) => o.seat).filter((o) => o !== seat && isCiv(o) && majorsMet(state, seat, o));
   for (const [y, sv] of sens) {
     if (!(y in w) || sv <= 0 || !others.length) continue;
     const xs = [seat, ...others].map((p) => yieldPerTurn(state, p, y));
@@ -184,7 +161,7 @@ export function pseudoYieldWeights(state: GameState, seat: number, inputs: AiWei
   const out = new Map<string, number>();
   const s = seatOf(state, seat);
   if (!s) return out;
-  for (const [p, v] of listSum(seat, s, followedStrategies(state, seat, inputs), 'PseudoYields', false)) out.set(p, Math.max(2 * v, -FX));
+  for (const [p, v] of listSum(seat, s, followedStrategies(seat, inputs), 'PseudoYields', false)) out.set(p, Math.max(2 * v, -FX));
   const chronology = civEraIndex(s.research.techs, s.research.civics) + 1;
   out.set('PSEUDOYIELD_DISTRICT', (out.get('PSEUDOYIELD_DISTRICT') ?? 0) + fxConst(0.5 * chronology));
   return out;

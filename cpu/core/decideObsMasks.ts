@@ -10,7 +10,7 @@ import { goldAffordable } from './game';
 import { researchOwed } from './boosts';
 import { congressPolicyBlocked } from './congress';
 import { cityStateById, hasMet, isSuzerain } from './cityStates';
-import { civsAtWar, atWarWithAny, isCityStateSeat, cityStateOfSeat, seatOf, treatyTurnsWith, warTurnsWith } from './seats';
+import { civsAtWar, atWarWithAny, isCityStateSeat, cityStateOfSeat, majorsMet, seatOf, treatyTurnsWith, warTurnsWith } from './seats';
 import { warTargets } from './phase';
 import { defaultWarKind, warBuffRowsOf, warKindAllowed } from './casusBelli';
 
@@ -71,8 +71,8 @@ export interface WarObs {
 }
 
 /** The `war` group over the war head's columns (`warTargets`). A column is
- *  OPEN to declare where the target stands (a city-state still on the
- *  roster and met), no war is on and no peace treaty binds; the declaration's
+ *  OPEN to declare where the target stands and is met (a city-state still
+ *  on the roster), no war is on and no peace treaty binds; the declaration's
  *  own verb re-validates the rest (friendship, the casus belli, the bans) at
  *  apply. Open to SUE where the war has run `WAR_MIN_TURNS`, and a major's
  *  peace price is affordable from this seat's treasury (the record's peace
@@ -98,7 +98,7 @@ export function warObs(state: GameState, seat: number): WarObs {
       live = !!cs && hasMet(cs, seat);
       peaceOk = !!cs && !state.seats.some((x) => x.seat !== seat && civsAtWar(state, x.seat, seat) && isSuzerain(state, cs, x.seat));
     } else {
-      live = !!seatOf(state, foe);
+      live = !!seatOf(state, foe) && majorsMet(state, seat, foe);
       peaceOk = goldAffordable(me.treasury ?? 0, PEACE_GOLD_COST(waited));
     }
     const atWar = civsAtWar(state, seat, foe);

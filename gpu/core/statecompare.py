@@ -816,6 +816,8 @@ SEAT = {
     # DIRECTED: the row is what that seat GRANTS, never what it holds.
     "borderTurns": _seat_pair_clock("seat_borders_turns"),
     "delegations": _seat_pair_clock("seat_delegation"),
+    "metTurns": _seat_pair_mark("seat_met_turn"),
+    "peaceTurn": _seat_pair_mark("seat_peace_turn"),
     "spyHeld": _spy_held_count,
     "spyHeldLevels": _spy_held_levels,
     "dealOffers": _deal_line("deal_offer_left", ("deal_offer_give", "deal_offer_ask")),

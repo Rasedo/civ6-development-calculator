@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, tileAtCoords, settleAt } from '../helpers';
+import { makeMap, makeState, meetAll, tileAtCoords, settleAt } from '../helpers';
 import { emptySeat, setTileOwner, civsAtWar, seatOf } from '../../../cpu/core/seats';
 import { spawnUnit } from '../../../cpu/core/units';
 import { detonate, nukeReach, nukeTargets, plotDefenseModifier, siloReaches, siloTargets, siloTiles } from '../../../cpu/core/combat';
@@ -23,6 +23,7 @@ function world() {
   state.seats.push(emptySeat(1));
   settleAt(state, tileAtCoords(map, 4, 4).index, 0);
   settleAt(state, tileAtCoords(map, 14, 10).index, 1);
+  meetAll(state);
   return state;
 }
 

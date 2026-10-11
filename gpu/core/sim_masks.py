@@ -51,9 +51,10 @@ class SimMasks:
             return torch.zeros(B, 2 * n, dtype=torch.bool, device=dev)
         rr = self.rules.seats
         idx = torch.tensor(tgt, dtype=torch.long, device=dev)
-        cols = [self.civ_alive[:, t] for t in tgt[:n_opp]]
-        # A MINOR column needs the MEETING as well: `declareWarOnCityState`
-        # refuses an unmet city-state, and a captured one has left the roster.
+        # every column needs the MEETING: `declareWar` refuses an unmet major,
+        # `declareWarOnCityState` an unmet city-state, and a captured one has
+        # left the roster.
+        cols = [self.civ_alive[:, t] & (self.seat_met_turn[:, row, t] >= 0) for t in tgt[:n_opp]]
         cols += [self.citystate_alive[:, s] & self.seat_citystate_met[:, row, s]
                  for s in range(self.S)]
         live = self.civ_alive[:, row].unsqueeze(1) & torch.stack(cols, dim=1)
@@ -2897,7 +2898,7 @@ class SimMasks:
         self._reveal_around(rows, seat_row, tiles, 3, see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
-                       see_through: torch.Tensor | None = None) -> None:
+                       see_through: torch.Tensor | None = None, placed: bool | None = None) -> None:
         """revealAround's twin: lift `seat_row`'s fog within `radius` of
         `tiles`. rows [K] batch indices (UNIQUE per call — advanced-index
         assignment is last-write-wins), seat_row an int or [K] long, tiles
@@ -2915,7 +2916,10 @@ class SimMasks:
         `_capture_city_state` for both CS conquests). NOT reveals on either
         engine: the melee advance-into-freed-tile and unit capture/transfers
         (TS writes tileIndex directly — no stepUnit, no reveal), and a goody
-        hut, whose reward table in the install carries no maps arm."""
+        hut, whose reward table in the install carries no maps arm.
+        `placed` (`majorLook`'s): the look is the seat's own unit's stepping
+        there — a unit's look (`see_through` given) unless a city-state's it
+        is suzerain of lends it (`_suzerain_look`)."""
         if not self.fog_of_war or rows.numel() == 0:
             return
         # `see_through` names a UNIT's look (revealAround's `los`): the disk is
@@ -2957,6 +2961,7 @@ class SimMasks:
                                  for s in range(self.S)], dim=1)
             if bool(_seen.count_nonzero()):
                 self._meet_citystates(rows, seat_row, _seen)
+        self._major_look_meets(rows, seat_row, tiles, disk, see_through is not None if placed is None else placed)
         # CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you
         # discover a new Continent or natural wonder" — no continent's discovery
         # is tracked, so wonders are the whole event.
@@ -3074,9 +3079,11 @@ class SimMasks:
         for g in range(self.n_majors):
             seen = (disk & (own == g)).any(dim=1) | (uin & (us == g)).any(dim=1)
             # `seatSeesPlot`: its plot or one beside, a centre within two, a
-            # unit whose sight reaches the plot
-            seen = seen | ((own == g) & (dist <= 1)).any(dim=1) | ((ctr == g) & (dist <= 2)).any(dim=1)
-            mine = self.major_unit_alive[rows] & (us == g)
+            # unit whose sight reaches the plot — its own or a city-state's
+            # it is suzerain of
+            seen = seen | (self._eyes_of(rows, own, g) & (dist <= 1)).any(dim=1) \
+                | (self._eyes_of(rows, ctr, g) & (dist <= 2)).any(dim=1)
+            mine = self.major_unit_alive[rows] & self._eyes_of(rows, us, g)
             near = mine & (dist.gather(1, ut_all) <= 8)
             for j in near.any(dim=0).nonzero(as_tuple=True)[0].tolist():
                 k = (near[:, j] & ~seen).nonzero(as_tuple=True)[0]
@@ -3092,6 +3099,119 @@ class SimMasks:
             if bool(seen.count_nonzero()):
                 k = seen.nonzero(as_tuple=True)[0]
                 self._meet_citystates(rows[k], g, col[k])
+
+    def _eyes_of(self, rows: torch.Tensor, seats: torch.Tensor, g: int) -> torch.Tensor:
+        """`seatSeesPlot`'s eyes: where `seats` ([K, X] absolute seats, the
+        games `rows`) names major `g` or a living city-state whose suzerain
+        `g` is."""
+        m = seats == g
+        if self.S > 0:
+            cs = (seats >= 100) & (seats < 100 + self.S)
+            suz = self.citystate_suzerain[rows, :self.S].gather(1, (seats - 100).clamp(min=0, max=self.S - 1))
+            m = m | (cs & (suz == g))
+        return m
+
+    def _suzerain_look(self, rows: torch.Tensor, s: torch.Tensor, tiles: torch.Tensor, radius,
+                       see_through: torch.Tensor | None) -> None:
+        """`revealAround`'s city-state arm: minor `s` ([K] long)'s look over
+        `tiles` ([K], the games `rows`, unique) is its suzerain's too
+        (`majorLook`, not its own unit's stepping there)."""
+        if not self.fog_of_war or rows.numel() == 0 or self.S == 0:
+            return
+        suz = self.citystate_suzerain[rows, s.clamp(min=0, max=self.S - 1)]
+        for g in range(self.n_majors):
+            m = suz == g
+            if not bool(m.count_nonzero()):
+                continue
+            rad = radius[m] if torch.is_tensor(radius) else radius
+            self._reveal_around(rows[m], g, tiles[m], rad, None if see_through is None else see_through[m], placed=False)
+
+    def _met_every_major(self) -> torch.Tensor:
+        """[B, n_majors] bool — `metEveryMajor`: the seat has met every
+        other living major (`majorsAlive`)."""
+        n = self.n_majors
+        live = self._barb_majors_alive()
+        met = self.seat_met_turn[:, :n, :n] >= 0
+        eye = torch.eye(n, dtype=torch.bool, device=self.device).unsqueeze(0)
+        return (met | eye | ~live.unsqueeze(1)).all(dim=2)
+
+    def _meet_majors(self, m: torch.Tensor, a: int, b: int) -> None:
+        """`meetMajors`: majors `a` and `b` meet in the games of `m` [B]
+        where they have not — the pair's meeting turn, each side's MEET_CIV
+        boosts, then each that has now met every living major records
+        PLAYER_MET_ALL_MAJORS, FIRST_IN_WORLD where no living major had met
+        them all before this meeting."""
+        if a == b:
+            return
+        new = m & (self.seat_met_turn[:, a, b] < 0)
+        if not bool(new.count_nonzero()):
+            return
+        first = ~(self._met_every_major() & self._barb_majors_alive()).any(dim=1)
+        t = torch.full_like(self.seat_met_turn[:, a, b], int(self.turn))
+        for x, y in ((a, b), (b, a)):
+            self.seat_met_turn[:, x, y] = torch.where(new, t, self.seat_met_turn[:, x, y])
+        for s in (a, b):
+            self._grant_boost_rows(s, new, lambda r: r["cls"] == "MEET_CIV")
+        every = self._met_every_major()
+        pay = self._mom["metAll"]
+        for s in (a, b):
+            hit = new & every[:, s]
+            if bool(hit.count_nonzero()):
+                self._add_era_score(s, int(pay[1]), (hit & first).long())
+                self._add_era_score(s, int(pay[0]), (hit & ~first).long())
+
+    def _major_look_meets(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, disk: torch.Tensor,
+                          unit_look: bool) -> None:
+        """`majorLookMeets`: a major's look over `disk` ([K, T], the games
+        `rows`, unique) meets every major a plot or a unit of whose it takes
+        in, and, for a unit's look (`unit_look`), every major that sees the
+        plot it stands on (`seatSeesPlot`); the majors in seat order."""
+        n = self.n_majors
+        if n < 2 or rows.numel() == 0:
+            return
+        sr = seat_row if torch.is_tensor(seat_row) else torch.full_like(rows, int(seat_row))
+        major = sr < n
+        if not bool(major.count_nonzero()):
+            return
+        srm = sr.clamp(max=n - 1)
+        own = self.tile_seat[rows]
+        ut_all = self.major_unit_tile[rows].clamp(min=0)
+        uin = disk.gather(1, ut_all) & self.major_unit_alive[rows]
+        us = self.major_unit_seat[rows]
+        at = tiles.clamp(min=0)
+        if unit_look:
+            dist = self.pair_dist[at].long()  # [K, T]
+            ctr = self._centre_seat_plane()[rows]
+        for g in range(n):
+            cand = major & (sr != g) & (self.seat_met_turn[rows, srm, g] < 0)
+            if not bool(cand.count_nonzero()):
+                continue
+            seen = (disk & (own == g)).any(dim=1) | (uin & (us == g)).any(dim=1)
+            if unit_look:
+                # `seatSeesPlot`: its plot or one beside, a centre within two,
+                # a unit whose sight reaches the plot — its own or a
+                # city-state's it is suzerain of
+                seen = seen | (self._eyes_of(rows, own, g) & (dist <= 1)).any(dim=1) \
+                    | (self._eyes_of(rows, ctr, g) & (dist <= 2)).any(dim=1)
+                mine = self.major_unit_alive[rows] & self._eyes_of(rows, us, g)
+                near = mine & (dist.gather(1, ut_all) <= 8)
+                for j in near.any(dim=0).nonzero(as_tuple=True)[0].tolist():
+                    k = (near[:, j] & ~seen & cand).nonzero(as_tuple=True)[0]
+                    if k.numel() == 0:
+                        continue
+                    kr = rows[k]
+                    utp = self.unit_type[kr, j]
+                    upr = self.unit_promos[kr, j]
+                    rad = self._unit_sight(utp, upr, self.unit_seat[kr, j], kr)
+                    look = self._los_disk(kr, self.unit_tile[kr, j].clamp(min=0), rad, self._sees_through(utp, upr))
+                    seen[k] = seen[k] | look.gather(1, at[k].unsqueeze(1)).squeeze(1)
+            hit = cand & seen
+            if not bool(hit.count_nonzero()):
+                continue
+            for a in sorted(set(sr[hit].tolist())):
+                m = torch.zeros(self.B, dtype=torch.bool, device=self.device)
+                m[rows[hit & (sr == a)]] = True
+                self._meet_majors(m, a, g)
 
     def _meet_citystates(self, rows: torch.Tensor, seat_row, seen: torch.Tensor | None = None) -> None:
         """`meetCityState` for every live minor `seen` ([K, S]; None: its
@@ -3267,9 +3387,10 @@ class SimMasks:
                                                  torch.full_like(slot, row), rows),
                                 see_through=self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
         elif 100 <= seat < 100 + self.S:
-            self._minor_look_meets(rows, torch.full_like(slot, seat - 100), spot.take(rows),
-                                   self._unit_sight(type_idx.take(rows), torch.zeros_like(slot)),
-                                   self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)])
+            _sight = self._unit_sight(type_idx.take(rows), torch.zeros_like(slot))
+            _thr = self._type_see_through[type_idx.take(rows).clamp(min=0, max=self.NU - 1)]
+            self._minor_look_meets(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
+            self._suzerain_look(rows, torch.full_like(slot, seat - 100), spot.take(rows), _sight, _thr)
         getattr(self, f"{pre}_unit_hp")[rows, slot] = self.rules.combat["unitHp"]
         getattr(self, f"{pre}_unit_fortify")[rows, slot] = 0
         getattr(self, f"{pre}_unit_revealed_turn")[rows, slot] = -1

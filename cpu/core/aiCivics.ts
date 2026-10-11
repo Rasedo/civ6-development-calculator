@@ -37,7 +37,7 @@ import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
 import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
-import { pseudoYieldWeights } from './aiWeights';
+import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 export interface CivicEntry {
@@ -172,11 +172,12 @@ function researchOf(state: GameState, seat: number): ResearchState {
 }
 
 /** THE ANALYSIS: every civic's entry, in table order, valued and
- *  propagated; `culture` is the seat's Culture a turn */
-export function civicAnalysis(state: GameState, seat: number, culture: number): CivicEntry[] {
+ *  propagated; `culture` is the seat's Culture a turn, `weights` what a
+ *  major's AI follows (`aiWeights.ts`) */
+export function civicAnalysis(state: GameState, seat: number, culture: number, weights: AiWeightInputs = {}): CivicEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(culture);
-  const pw = pseudoYieldWeights(state, seat);
+  const pw = pseudoYieldWeights(state, seat, weights);
   const entries: CivicEntry[] = CIVIC_TABLE_ORDER.filter((id) => CIVICS[id]).map((id) => {
     if (owned(r, id)) return { civic: id, next: id, turns: -1, owned: true, base: 0, score: 0 };
     const { turns, next } = walk(state, seat, r, id, rate);
@@ -228,7 +229,8 @@ export function civicChoice(state: GameState, seat: number, entries: readonly Ci
  *  turn left (`entries`; a fresh analysis where none), with `done` the
  *  completed civic, or the turn's over a fresh analysis (`culture` its
  *  Culture a turn) */
-export function civicAiChoice(state: GameState, seat: number, culture: number, done: string | null, entries: readonly CivicEntry[] | null, draw: CivicDraw): string | null {
-  if (done) return civicChoice(state, seat, entries ?? civicAnalysis(state, seat, culture), done, draw);
-  return civicChoice(state, seat, civicAnalysis(state, seat, culture), null, draw);
+export function civicAiChoice(state: GameState, seat: number, culture: number, done: string | null, entries: readonly CivicEntry[] | null, draw: CivicDraw,
+                              weights: AiWeightInputs = {}): string | null {
+  if (done) return civicChoice(state, seat, entries ?? civicAnalysis(state, seat, culture, weights), done, draw);
+  return civicChoice(state, seat, civicAnalysis(state, seat, culture, weights), null, draw);
 }

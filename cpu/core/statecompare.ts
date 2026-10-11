@@ -47,7 +47,7 @@ import type { City, CityState, DealItem, GameState, ProjectYield, Seat, Tile, Un
 import { YIELD_KEYS } from '../../world/types';
 import { DEAL_ITEMS, PRODUCTION_QUEUE_MAX } from '../data/seats';
 import { dealOfferOf, dealTermOf, spyHeldWith, spyLevelsHeld } from './deals';
-import { BARB_SEAT, FREE_SEAT, alliancePtsWith, allianceTypeWith, allyTurnsWith, borderTurnsFrom, citiesOf, delegationWith, friendTurnsWith, isCiv, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith, cityHolders } from './seats';
+import { alliancePtsWith, allianceTypeWith, allyTurnsWith, BARB_SEAT, borderTurnsFrom, citiesOf, cityHolders, delegationWith, FREE_SEAT, friendTurnsWith, isCiv, metTurnWith, peaceTurnWith, prophetsOf, seatOf, treatyTurnsWith, warsOf, warTurnsWith } from './seats';
 import { grievanceWith, promiseBrokenWith, promiseWith } from './grievance';
 import { PROMISES } from '../data/promises';
 import { isWater } from '../../world/query';
@@ -377,6 +377,21 @@ const agreementClockLine = (
   for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
     const left = read(state, seat, other);
     if (left > 0) out.push(other, left);
+  }
+  return out;
+};
+
+/** A pair's TURN STAMP (the meeting, the last peace): [other, turn] per
+ *  major it is stamped with, ascending seat order. */
+const pairTurnLine = (
+  state: GameState,
+  seat: number,
+  read: (state: GameState, a: number, b: number) => number | null,
+): Val => {
+  const out: number[] = [];
+  for (const other of state.seats.map((x) => x.seat).sort((a, b) => a - b)) {
+    const t = read(state, seat, other);
+    if (t !== null) out.push(other, t);
   }
   return out;
 };
@@ -715,6 +730,9 @@ const SEAT: Record<string, Extractor> = {
   // DIRECTED: what this seat GRANTS, never what it was granted.
   borderTurns: overSeats((s, state) => agreementClockLine(state, s.seat, borderTurnsFrom)),
   delegations: overSeats((s, state) => agreementClockLine(state, s.seat, delegationWith)),
+  // [other, turn] per major this seat has met / last made peace with
+  metTurns: overSeats((s, state) => pairTurnLine(state, s.seat, metTurnWith)),
+  peaceTurn: overSeats((s, state) => pairTurnLine(state, s.seat, peaceTurnWith)),
   spyHeld: overSeats((s, state) => agreementClockLine(state, s.seat, spyHeldWith)),
   // [captor, level, level, ...] per holding captor, levels DESCENDING — the
   // order the release takes them in

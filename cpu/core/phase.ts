@@ -6,7 +6,7 @@ import { activateGreatPerson } from './gpAbility';
 import { GW_KINDS } from '../data/greatWorks';
 import { drainRelicReserve, gwCountKind, gwHasRoom, gwLastOfKind, moveGreatWork } from './greatWorks';
 import { completeQueueItem, dropQueuedBuilding, cultureBomb, grantFreeResearch } from './production';
-import { cityLook, isExplored, revealAround, unitSight, unitSeesThrough } from './fog';
+import { cityLook, fogActive, isExplored, meetMajors, revealAround, unitSight, unitSeesThrough } from './fog';
 import { tilesWithin, hexDistance, hexRingWalk, neighbors, neighborTile } from '../../world/hex';
 import { isWater, hasRiver, isCoastalLand } from '../../world/query';
 import { isFloodplains } from '../../world/features';
@@ -116,7 +116,7 @@ import { grievanceCityTaken, grievanceDenounce, grievanceLastCity, grievanceWarD
 import { levyMoment, pantheonMoment, transferMoments, agePressure, worldEraIndex } from './eras';
 import { improvementMoment } from './moments';
 import { cityAppealResolver, cityGovernorEstablished, establishedGovernorCityIds, governorFlag, governorLoyaltyAura, governorMult, governorPhase, governedCityIds, governorSum, cityGovernorPromos } from './governors';
-import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed } from './seats';
+import { NO_SEAT, civOf, alliancePtsWith, allianceTypeWith, alliedAtLevel, allyTurnsWith, atWarWithAny, borderTurnsFrom, campTiles, citiesOf, civsAtWar, cityStateOfSeat, clearDelegations, delegationWith, setDelegationWith, denounceActive, friendTurnsWith, isCiv, isCityStateSeat, isTerritorial, seatOf, seatOfCityState, seatsAllied, seatsFriends, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom, setFriendTurnsWith, setTileOwner, setWar, setWarKind, clearWarKind, setTreatyTurnsWith, setWarTurnsWith, tileBelongsTo, tileCity, tileOwnedByCiv, tileSeat, unitsOf, treatyTurnsWith, warClockKey, warTurnsWith, warsOf, hasRouteToSeat , leaderOf, warBanned, cityAtTile, onHomeContinent, FREE_SEAT, isFreeSeat, freeSeatOf, cityHolders, civLevelOf, tileClaimed, majorsMet, MISSION_DELEGATION, MISSION_EMBASSY, setPeaceTurnWith } from './seats';
 import { warWearinessBattle, warWearinessPeace, warWearinessTurn } from './weariness';
 import { snipeRing, snipeRing3, spreadFromUnit } from './unitOrders';
 import { unitKillEvent, buildingDedications, goldenDedication } from './eras';
@@ -221,6 +221,7 @@ export function declareWar(state: GameState, declarer: number, target: number, k
   const actor = seatOf(state, declarer);
   const foe = seatOf(state, target);
   if (!actor || !foe || declarer === target) return no('No such civilization.');
+  if (isCiv(declarer) && isCiv(target) && !majorsMet(state, declarer, target)) return no('Not met.');
   if (civsAtWar(state, declarer, target)) return no('Already at war.');
   if (seatsAllied(state, declarer, target) || seatsFriends(state, declarer, target)) return no('A friend cannot be attacked.');
   const bound = treatyTurnsWith(state, declarer, target);
@@ -306,6 +307,7 @@ function defensivePact(state: GameState, aggressor: number, victim: number): voi
 
 function makePeace(state: GameState, actor: Seat, foe: number): void {
   setWar(state, actor.seat, foe, false);
+  if (isCiv(foe)) setPeaceTurnWith(state, actor.seat, foe, state.turn);
   clearWarKind(state, actor.seat, foe);
   warWearinessPeace(state, foe, actor.seat);
   setWarTurnsWith(state, actor.seat, foe, 0);
@@ -2409,19 +2411,47 @@ export function healCities(state: GameState): void {
 }
 
 /**
+ * A MISSION `actor` sends to major `tj`, true where it is sent. CIV6
+ * (DiplomaticActions): the Delegation (NoCurrentDelegation, obsolete for the
+ * sender with Diplomatic Service) before the civic, the Resident Embassy
+ * (NoCurrentEmbassy, its prerequisite) after it — an Embassy takes a standing
+ * Delegation's place; to a major met, with a city, the cost in the treasury.
+ * A rival worse than Neutral turns the mission away, which this model reads
+ * as the two states it can name: a war, or a denouncement either way.
+ */
+export function sendMission(state: GameState, actor: Seat, tj: number): boolean {
+  const target = seatOf(state, tj);
+  if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) return false;
+  const embassy = actor.research.civics.includes(EMBASSY_CIVIC);
+  const held = delegationWith(state, actor.seat, target.seat);
+  if (embassy ? held === MISSION_EMBASSY : held > 0) return false;
+  const cost = embassy ? EMBASSY_COST : DELEGATION_COST;
+  if ((actor.treasury ?? 0) < cost) return false;
+  if (civsAtWar(state, actor.seat, target.seat)) return false;
+  if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) return false;
+  // "...which is paid to the other leader."
+  actor.treasury = (actor.treasury ?? 0) - cost;
+  target.treasury = (target.treasury ?? 0) + cost;
+  setDelegationWith(state, actor.seat, target.seat, embassy ? MISSION_EMBASSY : MISSION_DELEGATION);
+  state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
+  return true;
+}
+
+/**
  * ONE SEAT'S DIPLOMACY, at the tail of its own turn: the record's
  * agreements in the GPU's arm order — denounce, friendship, the alliance
  * friendship unlocks, the delegation, the border grant, the gifts — then its
  * offer on the table and its answers to the offers standing there, then its
  * promise asks, each answered at once by the promiser's own record (a keep
  * made, else a refusal). Every arm is re-validated here — the record only
- * names the target. A seat with no city takes no diplomacy.
+ * names the target, a major the seat has met (`majorsMet`). A seat with no
+ * city takes no diplomacy.
  */
 function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | undefined): void {
   if (!isCiv(actor.seat) || actor.cities.length === 0) return;
   for (const tj of recG?.denounce ?? []) {
     const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
     if (denounceActive(state, actor.seat, target.seat)) continue; // already standing
     if (civsAtWar(state, actor.seat, target.seat)) continue;
     // CIV6 (Denouncing): "You cannot denounce Declared Friends or Allies -
@@ -2434,7 +2464,7 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
   }
   for (const tj of recG?.friend ?? []) {
     const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
     if (civsAtWar(state, actor.seat, target.seat)) continue;
     if (seatsFriends(state, actor.seat, target.seat)) continue;
     if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
@@ -2449,7 +2479,7 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
   for (let tk = 0; tk < allyList.length; tk++) {
     const tj = allyList[tk];
     const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
     // CIV6 (Alliance): "Alliances become possible after developing the Civil
     // Service civic. You can only enter into an Alliance with a
     // civilization if you and its leader are Declared Friends."
@@ -2463,29 +2493,10 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
     setAllianceTypeWith(state, actor.seat, target.seat, recG?.allyType?.[tk] ?? 0);
     state.eventLog.push(`${actor.name} and ${target.name} form an alliance.`);
   }
-  for (const tj of recG?.delegation ?? []) {
-    const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
-    if (delegationWith(state, actor.seat, target.seat) > 0) continue;
-    // CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
-    // the Delegation once Diplomatic Service is in, so the mission is one
-    // fact and the sender's own civics say what it costs.
-    const cost = actor.research.civics.includes(EMBASSY_CIVIC) ? EMBASSY_COST : DELEGATION_COST;
-    if ((actor.treasury ?? 0) < cost) continue;
-    // A rival worse than Neutral turns the mission away, and this model
-    // reads that as the two states it can name: a war, or a denouncement
-    // either way.
-    if (civsAtWar(state, actor.seat, target.seat)) continue;
-    if (denounceActive(state, actor.seat, target.seat) || denounceActive(state, target.seat, actor.seat)) continue;
-    // "...which is paid to the other leader."
-    actor.treasury = (actor.treasury ?? 0) - cost;
-    target.treasury = (target.treasury ?? 0) + cost;
-    setDelegationWith(state, actor.seat, target.seat, 1);
-    state.eventLog.push(`${actor.name} sends a mission to ${target.name}.`);
-  }
+  for (const tj of recG?.delegation ?? []) sendMission(state, actor, tj);
   for (const tj of recG?.borders ?? []) {
     const target = seatOf(state, tj);
-    if (!target || !isCiv(target.seat) || target.cities.length === 0) continue;
+    if (!target || !isCiv(target.seat) || target.cities.length === 0 || !majorsMet(state, actor.seat, target.seat)) continue;
     // CIV6 (Open Borders): the agreement "becomes available" once the
     // GRANTOR has Early Empire — the civic that closed the border in the
     // first place. "Open Borders cannot be offered to or requested from a
@@ -2505,7 +2516,7 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
     // with."
     if (kind < 0 || kind >= GW_KINDS) continue;
     const target = seatOf(state, tj);
-    if (!target || !isCiv(tj) || target.cities.length === 0) continue;
+    if (!target || !isCiv(tj) || target.cities.length === 0 || !majorsMet(state, actor.seat, tj)) continue;
     if (civsAtWar(state, actor.seat, tj)) continue;
     // WHICH work goes is not a decision: the giver's FIRST city holding one
     // of the kind gives its LAST-placed such work, and the receiver's first
@@ -2523,7 +2534,7 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
   if (recG?.offer) {
     const [tj, give, ask] = recG.offer;
     const target = seatOf(state, tj);
-    if (target && isCiv(tj) && tj !== actor.seat && target.cities.length > 0
+    if (target && isCiv(tj) && tj !== actor.seat && target.cities.length > 0 && majorsMet(state, actor.seat, tj)
         && give.length <= DEAL_ITEMS && ask.length <= DEAL_ITEMS) {
       setDealOffer(state, actor.seat, tj, { left: DEAL_OFFER_TURNS + 1, give, ask });
     }
@@ -2534,7 +2545,7 @@ function seatDiplomacy(state: GameState, actor: Seat, recG: SeatActionRecord | u
     // peace deal, so confirming it is what ends the war.
     const wasWar = civsAtWar(state, fj, actor.seat);
     const from = seatOf(state, fj);
-    if (!from || !acceptDeal(state, fj, actor.seat)) continue;
+    if (!from || !majorsMet(state, fj, actor.seat) || !acceptDeal(state, fj, actor.seat)) continue;
     if (wasWar) makePeace(state, from, actor.seat);
     state.eventLog.push(`${actor.name} accepts a deal from ${from.name}.`);
   }
@@ -2704,6 +2715,9 @@ export function seatPhase(state: GameState): void {
           state.eventLog.push(`${actor.name} met the city-state of ${cityState.name}.`);
         }
       }
+      // with no fog every look takes in every major: the seat meets them all
+      // (`meetMajors`, seat order); with fog the looks meet them
+      if (!fogActive(state)) for (const o of state.seats) if (isCiv(o.seat) && o.seat !== actor.seat) meetMajors(state, actor.seat, o.seat);
       if (state.cityStates.some((cityState) => hasMet(cityState, actor.seat))) {
         const gov = seatGovernment(state, actor.seat);
         const tier = gov ? GOV_INFLUENCE_TIER[gov] ?? 0 : 0;

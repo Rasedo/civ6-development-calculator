@@ -258,8 +258,41 @@ def build() -> str:
                  "naturalWonder": c.get("NaturalWonder") == "true"}
                 for k, c in keyed(rows("Features"), "FeatureType").items()]
     res_class = {k: c.get("ResourceClassType") for k, c in keyed(rows("Resources"), "ResourceType").items()}
+    # the victory manager's strategies (Strategies) in database order, each
+    # with its StrategyConditions in database order; the Strategies-system
+    # AiLists a leader's traits (through InheritFrom) and a civilization's
+    # carry, each item a bias on the strategy's conditions needed
+    sconds: dict[str, list] = collections.defaultdict(list)
+    for c in rows("StrategyConditions"):
+        if c.get("StrategyType"):
+            sconds[c["StrategyType"]].append({
+                "fn": c.get("ConditionFunction"), "threshold": int(c.get("ThresholdValue", 0) or 0),
+                "string": c.get("StringValue"), "disqualifier": c.get("Disqualifier") in ("true", "1"),
+                "exclusive": c.get("Exclusive") in ("true", "1"), "forbidden": c.get("Forbidden") in ("true", "1")})
+    strategies = [{"type": k, "victory": c.get("VictoryType"), "needed": int(c.get("NumConditionsNeeded", 1) or 1),
+                   "conditions": sconds[k]} for k, c in keyed(rows("Strategies"), "StrategyType").items()]
+    st_lists = {c["ListType"]: c for c in rows("AiLists") if c.get("ListType") and c.get("System") == "Strategies"}
+    st_items: dict[str, list] = collections.defaultdict(list)
+    for c in rows("AiFavoredItems"):
+        if c.get("ListType") in st_lists and c.get("Item"):
+            st_items[c["ListType"]].append(c)
+
+    def strategy_bias(traits):
+        out = []
+        for lt, c in st_lists.items():
+            if c.get("LeaderType") not in traits:
+                continue
+            for it in st_items[lt]:
+                out.append({"strategy": it["Item"], "value": int(it.get("Value", 0) or 0),
+                            "minDifficulty": it.get("MinDifficulty") or c.get("MinDifficulty"),
+                            "maxDifficulty": it.get("MaxDifficulty") or c.get("MaxDifficulty")})
+        return out
+
+    bias_leader = {lt: strategy_bias(set(leader_traits(lt))) for lt in sorted(inherit)}
+    bias_civ = {cv: strategy_bias(set(ts)) for cv, ts in sorted(ctraits.items())}
     gps = keyed(rows("GlobalParameters"), "Name")
-    globals_ = {k: int(float(gps[k]["Value"])) for k in ("CITY_MIN_RANGE", "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER")}
+    globals_ = {k: int(float(gps[k]["Value"])) for k in ("CITY_MIN_RANGE", "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER",
+                                                         "AI_ISLAND_COAST_PERCENTAGE")}
 
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1)};\n"
@@ -268,7 +301,7 @@ def build() -> str:
         "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
         " * layered install (`--check` reports a stale file). Policies and governments\n"
         " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType } from './types';\n\n"
+        "import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType, AiStrategy, AiStrategyBias } from './types';\n\n"
         + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
         + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
         + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
@@ -281,6 +314,11 @@ def build() -> str:
         + lit("AI_FEATURES", features, "readonly AiFeature[]")
         + lit("AI_RESOURCE_CLASS", res_class, "Readonly<Record<string, string>>")
         + lit("AI_GLOBALS", globals_, "Readonly<Record<string, number>>")
+        + lit("AI_STRATEGIES", strategies, "readonly AiStrategy[]")
+        + lit("AI_STRATEGY_BIAS_BY_LEADER", {k: v for k, v in bias_leader.items() if v},
+              "Readonly<Record<string, readonly AiStrategyBias[]>>")
+        + lit("AI_STRATEGY_BIAS_BY_CIV", {k: v for k, v in bias_civ.items() if v},
+              "Readonly<Record<string, readonly AiStrategyBias[]>>")
     )
     core = (
         "/**\n * THE AI VALUE LAYER'S TABLES (cpu/core/aiValue.ts), written by\n"

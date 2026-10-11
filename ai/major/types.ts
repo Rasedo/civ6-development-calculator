@@ -47,6 +47,36 @@ export interface AiFeature {
   naturalWonder: boolean;
 }
 
+/** a StrategyConditions row: the condition function (the victory manager's
+ *  registry), its ThresholdValue and StringValue and its kind */
+export interface AiStrategyCondition {
+  fn: string;
+  threshold: number;
+  string: string | null;
+  disqualifier: boolean;
+  exclusive: boolean;
+  forbidden: boolean;
+}
+
+/** a Strategies row: its VictoryType (a victory strategy), the conditions
+ *  it needs and its conditions in database order */
+export interface AiStrategy {
+  type: string;
+  victory: string | null;
+  needed: number;
+  conditions: readonly AiStrategyCondition[];
+}
+
+/** a Strategies-system AiFavoredItems row a trait carries: Value added to
+ *  the strategy's conditions needed, kept while the handicap lies in the
+ *  bounds */
+export interface AiStrategyBias {
+  strategy: string;
+  value: number;
+  minDifficulty: string | null;
+  maxDifficulty: string | null;
+}
+
 export interface AiSlotType {
   type: string;
   /** AllowsAnyPolicy: the Wildcard */

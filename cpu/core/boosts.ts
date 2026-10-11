@@ -139,8 +139,8 @@ function ownUnits(state: GameState, seat: number, keep: (type: string, formation
  * THE STATE TRIGGERS: each BoostClass the seat's standing state answers,
  * read at the seat's turn (`detectBoosts`). An EVENT class (a kill, a camp
  * cleared, a declaration of war received, a park, an artifact) lands where
- * the event happens; a class neither engine models (`MEET_CIV`: no contact
- * between majors; `DISCOVER_CONTINENT`: no continent discovery tracked;
+ * the event happens (`MEET_CIV` at the meeting, `meetMajors`); a class
+ * neither engine models (`DISCOVER_CONTINENT`: no continent discovery tracked;
  * `HAVE_X_THEMED_BUILDINGS`, `DISTRICT_APPEAL_LEVEL_MINIMUM_X`,
  * `AIRBASE_FOREIGN_CONTINENT`) and the late game's
  * `NONE_LATE_GAME_CRITICAL_TECH` never trigger.
@@ -276,8 +276,9 @@ export function boostOnWarDeclared(state: GameState, declarer: number, target: n
 }
 
 /** CIV6 (BOOST_TRIGGER_CLEAR_CAMP / _CREATED_NATIONAL_PARK /
- *  _ARTIFACT_EXTRACTED): the event's boosts, each with its dedication */
-export function boostOnEvent(state: GameState, seat: number, cls: 'CLEAR_CAMP' | 'CREATED_NATIONAL_PARK' | 'ARTIFACT_EXTRACTED'): void {
+ *  _ARTIFACT_EXTRACTED / _MEET_CIV): the event's boosts, each with its
+ *  dedication */
+export function boostOnEvent(state: GameState, seat: number, cls: 'CLEAR_CAMP' | 'CREATED_NATIONAL_PARK' | 'ARTIFACT_EXTRACTED' | 'MEET_CIV'): void {
   if (isCiv(seat)) grantEvent(state, seat, cls, () => true);
 }
 

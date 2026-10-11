@@ -9,7 +9,7 @@ import { computeCityStats } from '../../../cpu/core/city';
 import { setMet } from '../../../cpu/core/cityStates';
 import { CITY_MAX_HP } from '../../../cpu/data/units';
 import { BARB_SEAT, cityStateOfSeat, civsAtWar, emptySeat, isBarbSeat, isCityStateSeat, seatOf, seatOfCityState, setTileOwner, setWar, setWarTurnsWith, tileCity, tileClaimed, tileSeat, unitsOf } from '../../../cpu/core/seats';
-import { makeMap, makeState, seededGame, settleAt, tileAtCoords } from '../helpers';
+import { makeMap, makeState, meetAll, seededGame, settleAt, tileAtCoords } from '../helpers';
 import { endTurn, serialize, deserialize } from '../../../cpu/core/game';
 import { canFoundCity, wallsMax } from '../../../cpu/core/rules';
 import { tilesWithin, hexDistance } from '../../../world/hex';
@@ -219,6 +219,7 @@ describe('war and peace', () => {
     const state = makeState();
     state.unitsMode = true;
     const civ = addCiv(state, 8, 8);
+    meetAll(state);
     const mine = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 4).index, 0)!;
     const theirs = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 4, 5).index, civ.seat)!;
     expect(unitsHostile(state, mine, theirs)).toBe(false);

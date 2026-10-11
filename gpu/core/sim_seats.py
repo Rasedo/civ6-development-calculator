@@ -515,6 +515,9 @@ class SimSeats:
         self._citystate_suzerain_release(tgt, row, peace)
         self._reset_war_clock(row, tgt, peace)
         self._stamp_treaty(row, tgt, peace)
+        _pt = torch.full_like(self.seat_peace_turn[:, row, tgt], int(self.turn))
+        for _x, _y in ((row, tgt), (tgt, row)):
+            self.seat_peace_turn[:, _x, _y] = torch.where(peace, _pt, self.seat_peace_turn[:, _x, _y])
         for _pr in (row, tgt):
             self.peace_turns[:, _pr] = torch.where(peace, torch.zeros_like(self.peace_turns[:, _pr]), self.peace_turns[:, _pr])
 
@@ -592,7 +595,9 @@ class SimSeats:
         or -1 takes `_default_war_kind`. A kind the declarer may not declare
         REFUSES the declaration (`warKindAllowed`), it never falls back.
         `agreed` is the JOINT WAR's accepted agreement — the one requirement
-        that is not a fact of the state; only the deal's move passes it."""
+        that is not a fact of the state; only the deal's move passes it.
+        An unmet target is refused here, as `declareWar` refuses it."""
+        declare = declare & (self.seat_met_turn[:, row, tgt] >= 0)
         if not bool(declare.count_nonzero()):
             return
         allowed = self._war_kinds_allowed(row, tgt)                       # [B, K]
@@ -13237,6 +13242,8 @@ class SimSeats:
             _up = u_promos.take(rows)[mnr]
             self._minor_look_meets(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
                                    self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
+            self._suzerain_look(rows[mnr], srow[mnr] - 100, dest.take(rows)[mnr],
+                                self._unit_sight(_ut, _up), self._sees_through(_ut, _up))
         # CIV6 (Pilgrim): "Gains 3 extra spreads when moving adjacent to a
         # natural wonder for the first time."
         if self._pk["PILGRIM"] >= 0:
@@ -15127,11 +15134,18 @@ class SimSeats:
         IS A RULE: Civ 6 grants the envoy the moment the meter fills,
         assigned or not — WHERE it goes is the wire's decision, applied at
         each row's own pick position."""
+        if self.S > 0:
+            self._meet_citystates(active.nonzero(as_tuple=True)[0], row)
+        # with no fog every look takes in every major: the seat meets them
+        # all (`meetMajors`, seat order); with fog the looks meet them
+        if not (self.units_mode and self.fog_of_war):
+            for o in range(self.n_majors):
+                if o != row:
+                    self._meet_majors(active, row, o)
         if self.S == 0:
             return
         B, S, dev = self.B, self.S, self.device
         rr = self.rules.citystate
-        self._meet_citystates(active.nonzero(as_tuple=True)[0], row)
         met_live = self.seat_citystate_met[:, row, :S] & self.citystate_alive[:, :S]
         any_met = active & met_live.any(dim=1)
         if not bool(any_met.count_nonzero()):
@@ -16484,7 +16498,7 @@ class SimSeats:
         gift, then its offer on the table and its answers to the offers
         standing, then its promise asks, each answered at once by the
         promiser's own record. Every want-mask is re-validated here — the
-        record only names the target. The keeps stay stashed for the phase:
+        record only names the target, a major the seat has met. The keeps stay stashed for the phase:
         every asker's settlement reads them."""
         stashes = self._driven_geo
         if not any(stashes.values()):
@@ -16504,7 +16518,7 @@ class SimSeats:
             for b in range(nrow):
                 if b == row or not bool(want[:, b].count_nonzero()):
                     continue
-                yield row, b, want[:, b] & alive_row[:, row] & alive_row[:, b]
+                yield row, b, want[:, b] & alive_row[:, row] & alive_row[:, b] & (self.seat_met_turn[:, row, b] >= 0)
 
         for a, b, ok in pairs("denounce"):
             # CIV6 (Denouncing): "You cannot denounce Declared Friends or
@@ -16558,17 +16572,19 @@ class SimSeats:
         stashes["ally_type"].pop(row, None)
 
         for a, b, ok in pairs("delegation"):
-            # CIV6 (Delegations and Embassies): the Resident Embassy "replaces"
-            # the Delegation once Diplomatic Service is in, so the mission is
-            # one fact and the sender's own civics say what it costs. A rival
-            # worse than Neutral turns it away, which this model reads as the
-            # two states it can name: a war, or a denouncement either way.
+            # CIV6 (DiplomaticActions): the Delegation (NoCurrentDelegation,
+            # obsolete for the sender with Diplomatic Service) before the
+            # civic, the Resident Embassy (NoCurrentEmbassy, its prerequisite)
+            # after it — an Embassy takes a standing Delegation's place. A
+            # rival worse than Neutral turns it away, which this model reads
+            # as the two states it can name: a war, or a denouncement either way.
             emb = (self.civ_civics[:, a, self._embassy_civic]
                    if 0 <= self._embassy_civic < self.civ_civics.shape[2]
                    else torch.zeros_like(ok))
+            held = self.seat_delegation[:, a, b]
             cost = torch.where(emb, torch.full_like(self.civ_treasury[:, a], self._embassy_cost),
                                torch.full_like(self.civ_treasury[:, a], self._deleg_cost))
-            send = (ok & (self.seat_delegation[:, a, b] == 0) & ~self.war[:, a, b]
+            send = (ok & torch.where(emb, held != 2, held == 0) & ~self.war[:, a, b]
                     & ~self._denounce_active(a, b) & ~self._denounce_active(b, a)
                     & (self.civ_treasury[:, a] >= cost))
             if bool(send.count_nonzero()):
@@ -16578,8 +16594,7 @@ class SimSeats:
                 self.civ_treasury[:, a] = self.civ_treasury[:, a] - paid
                 self.civ_treasury[:, b] = self.civ_treasury[:, b] + paid
                 self.seat_delegation[:, a, b] = torch.where(
-                    send, torch.ones_like(self.seat_delegation[:, a, b]),
-                    self.seat_delegation[:, a, b])
+                    send, torch.where(emb, torch.full_like(held, 2), torch.ones_like(held)), held)
 
         for a, b, ok in pairs("borders"):
             # CIV6 (Open Borders): the agreement "becomes available" once the
@@ -16604,7 +16619,7 @@ class SimSeats:
                         continue
                     self._gift_work(a, b, kind,
                                     want[:, kind, b] & alive_row[:, a] & alive_row[:, b]
-                                    & ~self.war[:, a, b])
+                                    & (self.seat_met_turn[:, a, b] >= 0) & ~self.war[:, a, b])
 
         # THE TABLE: this seat's offer goes down, then its answers to the
         # offers standing — an offer nobody takes stands until `_deal_phase`
@@ -16620,7 +16635,7 @@ class SimSeats:
                 if b == a or not bool((tgt == b).count_nonzero()):
                     continue
                 self._deal_offer(a, b, tgt == b, give, ask,
-                                 alive_row[:, a] & alive_row[:, b])
+                                 alive_row[:, a] & alive_row[:, b] & (self.seat_met_turn[:, a, b] >= 0))
 
         for a, b, ok in pairs("accept"):
             # `a` pressed the button; the offer on the table is `b`'s.

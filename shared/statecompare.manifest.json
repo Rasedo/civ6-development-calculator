@@ -1554,7 +1554,29 @@
           "planes": [
             "seat_delegation"
           ],
-          "note": "DIRECTED and indefinite: the row is the missions that seat SENDS, carried as a 1 so the pair-clock reader serves it."
+          "note": "DIRECTED and indefinite: the row is the missions that seat SENDS, 1 a Delegation and 2 a Resident Embassy, so the pair-clock reader serves it."
+        },
+        {
+          "name": "metTurns",
+          "compare": "exact",
+          "covers": [
+            "GameState.metTurns"
+          ],
+          "planes": [
+            "seat_met_turn"
+          ],
+          "note": "SYMMETRIC: [other, turn] per major the seat has met, ascending; -1 on the plane where they have not."
+        },
+        {
+          "name": "peaceTurn",
+          "compare": "exact",
+          "covers": [
+            "GameState.peaceTurn"
+          ],
+          "planes": [
+            "seat_peace_turn"
+          ],
+          "note": "SYMMETRIC: [other, turn] per major the seat last made peace with, ascending; -1 on the plane where they never fought."
         },
         {
           "name": "spyHeld",

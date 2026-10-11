@@ -40,7 +40,7 @@ import { researchCost } from './economy';
 import { randRange } from './rand';
 import { leaderOf, seatOf } from './seats';
 import { FX, fmul, fromLanding, fxConst, fxOf, pseudoYield, turnsAt } from './aiValue';
-import { pseudoYieldWeights } from './aiWeights';
+import { pseudoYieldWeights, type AiWeightInputs } from './aiWeights';
 import type { GameState, ResearchState } from './types';
 
 /** the seat's prerequisites of `id` in the install's order */
@@ -181,10 +181,10 @@ function researchOf(state: GameState, seat: number): ResearchState {
 
 /** THE ANALYSIS: every technology's entry, in table order, scored and
  *  propagated; `science` is the seat's Science a turn */
-export function researchAnalysis(state: GameState, seat: number, science: number): ResearchEntry[] {
+export function researchAnalysis(state: GameState, seat: number, science: number, weights: AiWeightInputs = {}): ResearchEntry[] {
   const r = researchOf(state, seat);
   const rate = fxOf(science);
-  const pw = pseudoYieldWeights(state, seat);
+  const pw = pseudoYieldWeights(state, seat, weights);
   const entries: ResearchEntry[] = TECH_TABLE_ORDER.filter((id) => TECHS[id]).map((id) => {
     const leaf = !REQUIRED.has(id);
     if (owned(r, id)) return { tech: id, next: id, turns: -1, owned: true, leaf, base: 0, score: 0 };
@@ -293,7 +293,8 @@ export function researchCompletionChoice(state: GameState, seat: number, entries
 
 /** THE MAJORS' AI's research: the choice its turn makes over a fresh analysis
  *  (`science` its Science a turn), or after `done` completed */
-export function researchAiChoice(state: GameState, seat: number, science: number, done: string | null, draw: ResearchDraw): ResearchChoice | null {
-  const entries = researchAnalysis(state, seat, science);
+export function researchAiChoice(state: GameState, seat: number, science: number, done: string | null, draw: ResearchDraw,
+                                 weights: AiWeightInputs = {}): ResearchChoice | null {
+  const entries = researchAnalysis(state, seat, science, weights);
   return done ? researchCompletionChoice(state, seat, entries, done, draw) : researchTurnChoice(state, seat, entries, draw);
 }

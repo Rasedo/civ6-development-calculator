@@ -30,7 +30,7 @@ import type { City, CityState, CityStateType, DistrictId, FeatureId, GameMap, Ga
 import { NO_SEAT } from '../core/types';
 import { minorItemKey, type MinorItem } from '../core/minorBuild';
 import { createGameFromMap } from '../core/game';
-import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar } from '../core/seats';
+import { BARB_SEAT, FREE_SEAT, civOf, emptySeat, freeSeatOf, grantKey, isCiv, markCityCentre, seatOf, tileBelongsTo, seatOfCityState, setTileOwner, setWar, majorsMet, setMetTurnWith } from '../core/seats';
 import { routeOriginCenter, stampTradingPost, tradeRouteMinDuration } from '../core/trade';
 import { tradeCourse, tradeReach } from '../core/tradePath';
 import { cityCentreYields, cityPlotBonus, cityYieldCtx, growthDetachResidue, luxuryAmenities, luxuryHoldings, parkAmenities } from '../core/city';
@@ -2255,6 +2255,12 @@ export function importTurn(rec: TurnRecord, cat: Catalog, history?: History): Im
     for (const q of p.wars ?? []) {
       const b = seatOfGame(q);
       if (a !== NO_SEAT && b !== NO_SEAT && a !== BARB_SEAT && b !== BARB_SEAT) setWar(state, a, b, true);
+    }
+    // the majors it has met: the record names no meeting turn, so the
+    // record's own
+    for (const q of p.met ?? []) {
+      const b = seatOfGame(num(q));
+      if (isCiv(a) && isCiv(b) && a !== b && !majorsMet(state, a, b)) setMetTurnWith(state, a, b, rec.turn);
     }
   }
   for (const p of minors) {

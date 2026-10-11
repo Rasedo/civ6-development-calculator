@@ -461,6 +461,12 @@ export interface GameState {
    * needs SPECIAL_SESSION_GAP turns of quiet before it may be called. */
   lastSessionTurn?: number;
   warTurns?: Record<string, number>;
+  /** THE MEETING of two majors: the turn they met, keyed like `warTurns`.
+   *  Symmetric; absent while they have not met (`meetMajors`). */
+  metTurns?: Record<string, number>;
+  /** the turn a pair of majors last made peace, keyed like `warTurns`;
+   *  absent where they never fought */
+  peaceTurn?: Record<string, number>;
   /** GRIEVANCES, one SIGNED balance per unordered pair, keyed like
    *  `warTurns`. Positive means the LOWER seat is the victim. Written only
    *  through `addGrievance`, read only through `grievanceWith`. */
@@ -483,8 +489,9 @@ export interface GameState {
    *  DIRECTED, because granting is one-way: "Granting open borders to a rival
    *  doesn't mean that rival also grants open borders to you." */
   borderTurns?: Record<string, number>;
-  /** DIRECTED, 1 where this seat holds a mission with that one. Indefinite:
-   *  a war is what ends it, never a clock. */
+  /** DIRECTED, the mission this seat holds with that one: MISSION_DELEGATION
+   *  or MISSION_EMBASSY (the Resident Embassy takes the Delegation's place).
+   *  Indefinite: a war is what ends it, never a clock. */
   delegations?: Record<string, number>;
   /** THE OFFER ON THE TABLE, keyed from -> to. One per ordered pair; it stands
    *  for the turn it was made and the one after, then lapses. */

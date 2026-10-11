@@ -3,7 +3,7 @@
  * layered install (`--check` reports a stale file). Policies and governments
  * run in DATABASE ORDER, the index the game's AI loops walk.
  */
-import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType } from './types';
+import type { AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiSlotType, AiStrategy, AiStrategyBias } from './types';
 
 export const AI_POLICIES: readonly AiPolicy[] = [
  {
@@ -9230,5 +9230,933 @@ export const AI_RESOURCE_CLASS: Readonly<Record<string, string>> = {
 };
 export const AI_GLOBALS: Readonly<Record<string, number>> = {
  "CITY_MIN_RANGE": 3,
- "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER": 17
+ "COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER": 17,
+ "AI_ISLAND_COAST_PERCENTAGE": 20
 };
+export const AI_STRATEGIES: readonly AiStrategy[] = [
+ {
+  "type": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+  "victory": "VICTORY_CULTURE",
+  "needed": 3,
+  "conditions": [
+   {
+    "fn": "Good Culture",
+    "threshold": 50,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Great Writer",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Great Artist",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Great Musician",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Great Works",
+    "threshold": 3,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Tourists Taken",
+    "threshold": 75,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": true,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "VICTORY_STRATEGY_MILITARY_VICTORY",
+  "victory": "VICTORY_CONQUEST",
+  "needed": 3,
+  "conditions": [
+   {
+    "fn": "Has Taken Capital",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Opponents",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Leads Military",
+    "threshold": 25,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Leads Score",
+    "threshold": 10,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Next Lower Score",
+    "threshold": 100,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Taken Capital",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": true,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+  "victory": "VICTORY_RELIGIOUS",
+  "needed": 2,
+  "conditions": [
+   {
+    "fn": "Good Faith City",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Founded Religion",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Unconverted Cities",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Cannot Found Religion",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Religion Destroyed",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+  "victory": "VICTORY_TECHNOLOGY",
+  "needed": 3,
+  "conditions": [
+   {
+    "fn": "Good Tech City",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Renaissance",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Science Wonders",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Has Tech Lead",
+    "threshold": 33,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Lags Military",
+    "threshold": 33,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Finished Space Project",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Finished Space Project",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": true,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_EARLY_EXPLORATION",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Fewer Cities",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_RAPID_EXPANSION",
+  "victory": null,
+  "needed": 3,
+  "conditions": [
+   {
+    "fn": "Has Settle Spot",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Cities Under Threat",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Major Civ Wars",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Handicap at or below",
+    "threshold": 2,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is In Dark Age",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": true
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_NAVAL",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is On Island",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_CLASSICAL_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Classical",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_MEDIEVAL_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Medieval",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_RENAISSANCE_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Renaissance",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_INDUSTRIAL_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Industrial",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_MODERN_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Modern",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_WONDER_OBSESSED",
+  "victory": null,
+  "needed": 2,
+  "conditions": [
+   {
+    "fn": "Has Agenda",
+    "threshold": 0,
+    "string": "AGENDA_WONDER_OBSESSED",
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Industrial",
+    "threshold": 0,
+    "string": "AGENDA_WONDER_OBSESSED",
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_DARKAGE",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is In Dark Age",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+  "victory": "VICTORY_DIPLOMATIC",
+  "needed": 2,
+  "conditions": [
+   {
+    "fn": "Has Diplomatic Victory Points",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Leads Diplomatic Victory Points",
+    "threshold": 1,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Percentage Diplomatic Victory Points",
+    "threshold": 25,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Percentage Diplomatic Victory Points",
+    "threshold": 60,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": true,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ },
+ {
+  "type": "STRATEGY_ANCIENT_CHANGES",
+  "victory": null,
+  "needed": 1,
+  "conditions": [
+   {
+    "fn": "Is Ancient",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": false,
+    "exclusive": false,
+    "forbidden": false
+   },
+   {
+    "fn": "Is Not Major",
+    "threshold": 0,
+    "string": null,
+    "disqualifier": true,
+    "exclusive": false,
+    "forbidden": false
+   }
+  ]
+ }
+];
+export const AI_STRATEGY_BIAS_BY_LEADER: Readonly<Record<string, readonly AiStrategyBias[]>> = {
+ "LEADER_ABRAHAM_LINCOLN": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": 5,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_ALEXANDER": [
+  {
+   "strategy": "VICTORY_STRATEGY_MILITARY_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_AMANITORE": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_CATHERINE_DE_MEDICI": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_CATHERINE_DE_MEDICI_ALT": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_ELEANOR_FRANCE": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_GANDHI": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_GILGAMESH": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_GORGO": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_JADWIGA": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_JAYAVARMAN": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_JOHN_CURTIN": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_KRISTINA": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_KUPE": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_LAURIER": [
+  {
+   "strategy": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_LUDWIG": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": 5,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_MVEMBA": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_NZINGA_MBANDE": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_PACHACUTI": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_PEDRO": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_PERICLES": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_PETER_GREAT": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_PHILIP_II": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_QIN": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_RAMSES": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_ROBERT_THE_BRUCE": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_SALADIN": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_SALADIN_ALT": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_SEJONG": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_SEONDEOK": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_SUNDIATA_KEITA": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_TAMAR": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_THEODORA": [
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_TOKUGAWA": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_T_ROOSEVELT": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": 5,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_DIPLOMATIC_VICTORY",
+   "value": -2,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_T_ROOSEVELT_ROUGHRIDER": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  },
+  {
+   "strategy": "VICTORY_STRATEGY_RELIGIOUS_VICTORY",
+   "value": 5,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_WU_ZETIAN": [
+  {
+   "strategy": "VICTORY_STRATEGY_CULTURAL_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ],
+ "LEADER_YONGLE": [
+  {
+   "strategy": "VICTORY_STRATEGY_SCIENCE_VICTORY",
+   "value": -1,
+   "minDifficulty": null,
+   "maxDifficulty": null
+  }
+ ]
+};
+export const AI_STRATEGY_BIAS_BY_CIV: Readonly<Record<string, readonly AiStrategyBias[]>> = {};

@@ -29,7 +29,7 @@ import {
   allyTurnsWith, borderTurnsFrom, delegationWith, denounceActive, denounceCasusBelli, diploVisibility, emptySeat,
   friendTurnsWith, seatsAllied, setAllianceTypeWith, setAlliancePtsWith, setAllyTurnsWith, setBorderTurnsFrom,
   setFriendTurnsWith,
-  setTileOwner, setWar, tileSeat, visibilityCS, warIsFormal,
+  setTileOwner, setWar, tileSeat, visibilityCS, warIsFormal, MISSION_EMBASSY,
 } from '../../../cpu/core/seats';
 import {
   VISIBILITY_CS_PER_LEVEL, VISIBILITY_LEVELS, VISIBILITY_MAX, VISIBILITY_TECH,
@@ -236,10 +236,17 @@ describe('the delegation and the resident embassy', () => {
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST);
     expect(diploVisibility(state, 1, 2)).toBe(1);
     // ...and the sender's own civics are what price a NEW mission
+    // (DiplomaticActions: the Delegation obsolete with Diplomatic Service,
+    // the Resident Embassy its successor, one per pair)
     state.seats[1].research.civics.push(EMBASSY_CIVIC);
     play(state, { 1: { delegation: [0] } });
-    expect(delegationWith(state, 1, 0)).toBe(1);
+    expect(delegationWith(state, 1, 0)).toBe(MISSION_EMBASSY);
     expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - EMBASSY_COST);
+    play(state, { 1: { delegation: [2] } });
+    expect(delegationWith(state, 1, 2)).toBe(MISSION_EMBASSY);
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - 2 * EMBASSY_COST);
+    play(state, { 1: { delegation: [2] } });
+    expect(state.seats[1].treasury).toBe(1000 - DELEGATION_COST - 2 * EMBASSY_COST);
   });
 
   it('a denounced rival turns it away, and an empty purse cannot send', () => {

@@ -17,17 +17,15 @@
  * Change" and "Slot Policy" lines after the event, and its card set with
  * record t+1's.
  *
- * The weights read the strategies each seat follows — the AI scores its
- * policies before it updates them, so a turn reads the ported ones (the era
- * and Dark Age strategies) as the turn opened and, for those whose
- * conditions are not ported, AI_Victories.csv's last status of each before
- * the turn — and the majors it has met (DiplomacySummary.csv "Met").
+ * The weights read the strategies each seat's victory manager follows as
+ * its AI turn opened (the AI scores its policies before it updates them;
+ * `StrategyProbe.followedBefore`); the majors it has met are the engine's,
+ * and the civic list the civics AI's (`majorView`).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { NO_SCORE, choosePolicies, policyRecord, policyScores, type PolicyScores } from '../../ai/major/policies';
 import { AI_POLICIES } from '../../ai/major/tables';
 import type { MajorView } from '../../ai/major/view';
-import { portedStrategies, type AiWeightInputs } from '../core/aiWeights';
 import { majorView } from '../core/majorView';
 import { adoptGovernment, fitPolicies, governmentSlots } from '../core/effects';
 import { seatOf } from '../core/seats';
@@ -42,7 +40,8 @@ interface LogEvent { civic: string; government: string | null; slots: string[] }
 
 interface LogTurn {
   policies: Map<string, number>;
-  civics: Set<string>;
+  /** the civics logged ("Civic" lines) with their scores */
+  civics: Map<string, number>;
   /** each Completed Civic of the turn with what followed it */
   events: LogEvent[];
 }
@@ -53,7 +52,7 @@ function readLog(path: string): Map<string, LogTurn> {
   const at = (t: number, p: number) => {
     const k = `${t}:${p}`;
     let v = out.get(k);
-    if (!v) out.set(k, (v = { policies: new Map(), civics: new Set(), events: [] }));
+    if (!v) out.set(k, (v = { policies: new Map(), civics: new Map(), events: [] }));
     return v;
   };
   for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
@@ -61,7 +60,7 @@ function readLog(path: string): Map<string, LogTurn> {
     if (c.length < 4) continue;
     const lt = at(Number(c[0]), Number(c[1]));
     if (c[2] === 'Policies') lt.policies.set(c[3], Math.round(Number(c[4]) * 256));
-    else if (c[2] === 'Civic') lt.civics.add(c[3]);
+    else if (c[2] === 'Civic') lt.civics.set(c[3], Number(c[4]));
     else if (c[2] === 'Completed Civic') lt.events.push({ civic: c[3], government: null, slots: [] });
     else if (c[2] === 'Government Change' && lt.events.length) lt.events[lt.events.length - 1].government = c[3];
     else if (c[2] === 'Slot Policy' && lt.events.length) lt.events[lt.events.length - 1].slots.push(c[3]);
@@ -102,6 +101,13 @@ export interface MajorAiTally {
   scoreOursOnly: number;
   /** per policy: lines compared and equal */
   scoreByPolicy: Record<string, [number, number]>;
+  /** the civic list the policy jobs gate on (the civics scored above 0):
+   *  turns with "Civic" lines, ours the same set, and the civics in either */
+  civicLists: number;
+  civicListsEqual: number;
+  civicLines: number;
+  civicLinesEqual: number;
+  firstCivicMiss?: string;
 }
 
 const choiceTally = (): ChoiceTally => ({ choices: 0, whole: 0, government: 0, slots: 0, slotsEqual: 0, pairs: 0, recordEqual: 0, misses: [] });
@@ -113,55 +119,14 @@ export class MajorAiProbe {
   private readonly kept = new Map<number, PolicyScores>();
   private readonly before = new Map<number, GovernmentState>();
   readonly tally: MajorAiTally = { ported: choiceTally(), logged: choiceTally(), scoreLines: 0, scoreEqual: 0,
-    scoreLoggedOnly: 0, scoreOursOnly: 0, scoreByPolicy: {} };
+    scoreLoggedOnly: 0, scoreOursOnly: 0, scoreByPolicy: {}, civicLists: 0, civicListsEqual: 0, civicLines: 0, civicLinesEqual: 0 };
 
-  private readonly strategies: Map<number, { turn: number; strategy: string; on: boolean }[]>;
-  private readonly meetings: { turn: number; a: number; b: number }[];
-  private readonly ported = new Map<number, string[]>();
-
-  /** `seats`: the AI majors, seat -> the record's player id; `majors`:
-   *  every major, player id -> seat */
-  constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>, private readonly majors: ReadonlyMap<number, number>) {
+  /** `seats`: the AI majors, seat -> the record's player id; `strategies`:
+   *  what each seat followed as the AI turn opened (`StrategyProbe`) */
+  constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>,
+              private readonly strategies: (turn: number) => ReadonlyMap<number, ReadonlySet<string>>) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = existsSync(logs + 'AI_GovtPolicies.csv') ? readLog(logs + 'AI_GovtPolicies.csv') : null;
-    this.strategies = new Map();
-    this.meetings = [];
-    if (existsSync(logs + 'AI_Victories.csv')) {
-      for (const line of readFileSync(logs + 'AI_Victories.csv', 'utf8').split('\n').slice(1)) {
-        const c = line.split(',').map((x) => x.trim());
-        if (c.length < 4 || /_CHANGES$|^STRATEGY_DARKAGE$/.test(c[2])) continue;
-        const p = Number(c[1]);
-        if (!this.strategies.has(p)) this.strategies.set(p, []);
-        this.strategies.get(p)!.push({ turn: Number(c[0]), strategy: c[2], on: c[3] === 'Following' || c[3] === 'Exclusive' });
-      }
-    }
-    if (existsSync(logs + 'DiplomacySummary.csv')) {
-      for (const line of readFileSync(logs + 'DiplomacySummary.csv', 'utf8').split('\n').slice(1)) {
-        const c = line.split(',').map((x) => x.trim());
-        if (c[3] === 'Met') this.meetings.push({ turn: Number(c[0]), a: Number(c[1]), b: Number(c[2]) });
-      }
-    }
-  }
-
-  /** what the yield weights read of the logs, per seat, at the AI turn `turn` */
-  weightInputs(turn: number): Map<number, AiWeightInputs> {
-    const out = new Map<number, AiWeightInputs>();
-    for (const [player, seat] of this.majors) {
-      const on = new Set<string>(this.ported.get(seat) ?? []);
-      for (const v of this.strategies.get(player) ?? []) {
-        if (v.turn >= turn) break;
-        if (v.on) on.add(v.strategy);
-        else on.delete(v.strategy);
-      }
-      const met = new Set<number>();
-      for (const m of this.meetings) {
-        if (m.turn > turn || m.a !== player) continue;
-        const other = this.majors.get(m.b);
-        if (other !== undefined) met.add(other);
-      }
-      out.set(seat, { strategies: on, met: [...met] });
-    }
-    return out;
   }
 
   get active(): boolean {
@@ -169,20 +134,15 @@ export class MajorAiProbe {
   }
 
   private view(state: GameState, turn: number): MajorView {
-    return majorView(state, {
-      civicList: new Map([...this.seats].map(([seat, p]) => [seat, this.log?.get(`${turn}:${p}`)?.civics ?? new Set<string>()] as const)),
-      weights: this.weightInputs(turn),
-    });
+    return majorView(state, { strategies: this.strategies(turn) });
   }
 
-  /** before the pair's turn: the seats' governments as they stand, and every
-   *  major's ported strategies (the AI updates them after it scores) */
+  /** before the pair's turn: the seats' governments as they stand */
   preTurn(state: GameState): void {
     for (const seat of this.seats.keys()) {
       const s = seatOf(state, seat);
       if (s) this.before.set(seat, structuredClone(s.government));
     }
-    for (const seat of this.majors.values()) this.ported.set(seat, portedStrategies(state, seat));
   }
 
   /** the log's scores of a turn as the choice reads them */
@@ -261,10 +221,23 @@ export class MajorAiProbe {
     // the AI turn's scores, against the log's lines of the turn
     for (const [seat, player] of this.seats) {
       if (!seatOf(state, seat)) continue;
-      const scores = policyScores(this.view(state, turn), seat);
+      const view = this.view(state, turn);
+      const scores = policyScores(view, seat);
       this.kept.set(seat, scores);
       const lt = this.log.get(`${turn}:${player}`);
       if (!lt || lt.civics.size === 0) continue;
+      // the civic list: ours (the civics AI's analysis) against the log's
+      // civics scored above 0
+      const ours = view.civicList(seat);
+      const logged = new Set([...lt.civics].filter(([, v]) => v > 0).map(([c]) => c));
+      const union = new Set([...ours, ...logged]);
+      let same = 0;
+      for (const c of union) if (ours.has(c) === logged.has(c)) same++;
+      t.civicLists++;
+      t.civicLines += union.size;
+      t.civicLinesEqual += same;
+      if (same === union.size) t.civicListsEqual++;
+      else t.firstCivicMiss ??= `t${turn} p${player}: ours only [${[...ours].filter((c) => !logged.has(c)).join(' ')}] log only [${[...logged].filter((c) => !ours.has(c)).join(' ')}]`;
       const names = new Set([...lt.policies.keys(), ...[...scores].filter(([, v]) => v > 0).map(([k]) => k)]);
       for (const p of names) {
         const ours = scores.get(p) ?? 0;
@@ -294,6 +267,7 @@ export function majorAiMarkdown(t: MajorAiTally): string[] {
     `- ${choiceLine('On the ported scores', t.ported)}`,
     `- ${choiceLine('On the game\'s logged scores', t.logged)}`,
     `- Score lines (logged above 0 or ours above 0): ${t.scoreLines}; equal ${t.scoreEqual}; logged only ${t.scoreLoggedOnly}; ours only ${t.scoreOursOnly}.`,
+    `- The civic list (the civics AI's, scored above 0): turns ${t.civicLists}, the log's set ${t.civicListsEqual}; civics ${t.civicLinesEqual} / ${t.civicLines}; first miss: ${t.firstCivicMiss ?? '-'}.`,
     '', '| policy | lines | equal |', '|---|---:|---:|'];
   for (const [p, [n, e]] of Object.entries(t.scoreByPolicy).sort((a, b) => b[1][1] - a[1][1] || b[1][0] - a[1][0])) out.push(`| ${p} | ${n} | ${e} |`);
   out.push('', 'Misses on the logged scores:', '', ...t.logged.misses.map((m) => `- ${m}`),

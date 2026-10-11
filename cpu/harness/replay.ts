@@ -38,7 +38,7 @@ import { endTurn, foundCity, foundCityAt, buyTile, settlerCost, projectCost, uni
   purchaseSettler, unitGoldPrice, availableProjects, goldAffordable, buildingFaithPrice, wonderChargeBoost, adoptBeliefs,
   serialize, deserialize } from '../core/game';
 import { applySeatActionRecord, applySeatUnitOrders, buySeatBuilding, declareWar, districtSiteCost, districtSiteLegal, grantPantheonUnit, levyGoldCost, levyUnits, paveGround,
-  placeSeatDistrict, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
+  placeSeatDistrict, sendMission, sueForPeace, transferCity, cityStrikeAt, holdCityStrikes } from '../core/phase';
 import { addEnvoys, cityStateAt, declareWarOnCityState, minorCity, placeCityStateAt, sueForPeaceWithCityState } from '../core/cityStates';
 import { availableBuildings, canPlaceWonder, validImprovements, wallsMax } from '../core/rules';
 import { builderHarvest, builderRemoveFeature, spawnUnit, trainableUnits, builderCost, traderCost, disbandUnit, drawAndPayGoody, grantedMoves, restUnit, upgradeUnit, unitsAt, unitDomain, fortifyBonus, crossesRiver, waterWalks, cityAtIndex, raiseBestTrained } from '../core/units';
@@ -63,7 +63,7 @@ import { addCsTradeRoute, addIntlTradeRoute, addTradeRoute, minorRouteTo, routeD
 import { questCampCleared, questRouteStarted, questUnitAdded } from '../core/quests';
 import { commitDedications, goodyMoment, pantheonMoment, religionMoment, unitKillEvent } from '../core/eras';
 import { initFog, revealAround, unitSeesThrough, unitSight } from '../core/fog';
-import { FREE_SEAT, civsAtWar, cityStateOfSeat, isBarbSeat, isCiv, isCityStateSeat, prophetsOf, seatOf, setTileOwner, setWar, tileSeat, unitsOf, BARB_SEAT } from '../core/seats';
+import { BARB_SEAT, cityStateOfSeat, civsAtWar, delegationWith, FREE_SEAT, isBarbSeat, isCityStateSeat, isCiv, MISSION_DELEGATION, MISSION_EMBASSY, prophetsOf, seatOf, setDelegationWith, setPeaceTurnWith, setTileOwner, setWar, tileSeat, unitsOf } from '../core/seats';
 import { activateGreatPerson, gpActivateOk, gpClassOfUnit } from '../core/gpAbility';
 import { BUILDINGS } from '../data/buildings';
 import { BUILT_WONDERS } from '../data/builtWonders';
@@ -92,6 +92,7 @@ import { engineId, gameHash } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
+import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -109,9 +110,11 @@ const VILLAGE_MIN = 8;
  *  an AI's 25, 1116 China t7) */
 const HUMAN_CAMP_GOLD = scaleByGameSpeed(50 + 5) - CAMP_DISPERSAL_GOLD;
 
-/** the lab's human seat's handicap (tools/civ6lab/h1/h1_duel.json
- *  "difficulty": DIFFICULTY_WARLORD); the AI seats keep the AI's Prince */
-const LAB_HUMAN_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
+/** every major's handicap in the lab's games (tools/civ6lab/h1/h1_duel.json
+ *  "difficulty": DIFFICULTY_WARLORD): the AI's too — its victory manager's
+ *  Rapid Expansion falls to "Handicap at or below 2" at t1 in every duel
+ *  (AI_Victories.csv "Forbidden", the AI seat's as the human's) */
+const LAB_HANDICAP = DIFFICULTIES.indexOf('WARLORD');
 
 /** the engine-side bookkeeping the replay carries across turns */
 interface Ctx {
@@ -989,6 +992,66 @@ function applyResearch(ctx: Ctx, player: number, row: number, civic: boolean): v
   if (!open && TRACE.has(kind)) console.error(`   ${kind} engine holds [${(civic ? r.civics : r.techs).join(',')}] at ${civic ? r.civic : r.tech} ${civic ? r.civicProgress : r.techProgress}`);
 }
 
+/** the techs and civics each major completed in turn `turn` before its
+ *  activation (its turn start's), from record t+1's action log: engine ids by
+ *  seat */
+function turnStartCompletions(ctx: Ctx, b: TurnRecord, turn: number): Map<number, { techs: string[]; civics: string[] }> {
+  const out = new Map<number, { techs: string[]; civics: string[] }>();
+  const active = new Set<number>();
+  for (const a of (b as { actions?: unknown[][] }).actions ?? []) {
+    if (!Array.isArray(a) || a[1] !== turn) continue;
+    const p = Number(a[3]);
+    if (a[2] === 'PlayerTurnActivated') active.add(p);
+    if ((a[2] !== 'ResearchCompleted' && a[2] !== 'CivicCompleted') || active.has(p)) continue;
+    const seat = ctx.seatOfPlayer.get(p);
+    if (seat === undefined || !isCiv(seat)) continue;
+    const civic = a[2] === 'CivicCompleted';
+    const id = civic ? engineId('civic', ctx.cat.civics[Number(a[4])], 'CIVIC_', CIVICS) : engineId('tech', ctx.cat.techs[Number(a[4])], 'TECH_', TECHS);
+    if (!id) continue;
+    if (!out.has(seat)) out.set(seat, { techs: [], civics: [] });
+    (civic ? out.get(seat)!.civics : out.get(seat)!.techs).push(id);
+  }
+  return out;
+}
+
+/** a Delegation or Resident Embassy the game's diplomacy log names: the
+ *  sender and the receiver (player ids) */
+interface MissionEvent { kind: 'delegation' | 'embassy'; from: number; to: number }
+
+/** DiplomacySummary.csv's missions by the turn they were sent: the majors'
+ *  diplomatic actions, decisions the replay carries out */
+function readMissions(dumpPath: string): Map<number, MissionEvent[]> {
+  const out = new Map<number, MissionEvent[]>();
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/') + 'DiplomacySummary.csv';
+  if (!existsSync(path)) return out;
+  for (const line of readFileSync(path, 'utf8').split('\n').slice(1)) {
+    const c = line.split(',').map((x) => x.trim());
+    if (c[3] !== 'Delegation' && c[3] !== 'Embassy') continue;
+    const t = Number(c[0]);
+    if (!out.has(t)) out.set(t, []);
+    out.get(t)!.push({ kind: c[3] === 'Delegation' ? 'delegation' : 'embassy', from: Number(c[1]), to: Number(c[2]) });
+  }
+  return out;
+}
+
+/** the turn's missions: the engine's own verb (`sendMission`), else laid as
+ *  the log names them */
+function imposeMissions(ctx: Ctx, events: readonly MissionEvent[]): void {
+  for (const e of events) {
+    const a = seatOfP(ctx, e.from);
+    const b = seatOfP(ctx, e.to);
+    const actor = seatOf(ctx.state, a) as Seat | undefined;
+    if (!actor || !isCiv(a) || !isCiv(b)) {
+      count(ctx, 'diplo:mission', 'refused', e.from);
+      continue;
+    }
+    const want = e.kind === 'embassy' ? MISSION_EMBASSY : MISSION_DELEGATION;
+    const ok = sendMission(ctx.state, actor, b) && delegationWith(ctx.state, a, b) === want;
+    if (!ok) setDelegationWith(ctx.state, a, b, want);
+    count(ctx, 'diplo:mission', ok ? 'applied' : 'fallback', e.from, ok ? undefined : `${e.kind} ${e.from}->${e.to}`);
+  }
+}
+
 type PolicyDecision = Extract<Decision, { kind: 'policies' }>;
 
 /** a government and card set as the engine names them */
@@ -1732,7 +1795,10 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
           else sueForPeace(state, a, o);
         }
         const ok = civsAtWar(state, a, o) === d.war;
-        if (!ok) setWar(state, a, o, d.war);
+        if (!ok) {
+          setWar(state, a, o, d.war);
+          if (!d.war && isCiv(a) && isCiv(o)) setPeaceTurnWith(state, a, o, state.turn);
+        }
         count(ctx, d.war ? 'war:declare' : 'war:peace', ok ? 'applied' : 'fallback', d.player);
         break;
       }
@@ -2159,6 +2225,18 @@ function fortifyOrders(ctx: Ctx, a: TurnRecord, b: TurnRecord): void {
 /** every unit the replay knows stands where record t+1 shows it, with the
  *  moves it has left and its charges; the record's units the engine never
  *  made stay missing (a production difference); `only` a player's alone */
+/** `fn` run with the state's turn at `turn` (a step of the turn the engine
+ *  has closed) */
+function inTurn(state: GameState, turn: number, fn: () => void): void {
+  const now = state.turn;
+  state.turn = turn;
+  try {
+    fn();
+  } finally {
+    state.turn = now;
+  }
+}
+
 function syncUnits(ctx: Ctx, b: TurnRecord, only?: number): void {
   for (const r of b.units) {
     if (only !== undefined && r.owner !== only) continue;
@@ -2598,6 +2676,8 @@ export interface ReplayReport {
   cityBuild?: CityBuildTally;
   cityBuildPer?: Record<string, CityBuildTally>;
   /** the majors' AI's government and card choices beside the record's */
+  strategies?: { engine: StrategyTally; record: StrategyTally };
+  contacts?: ContactTally;
   majorAi?: MajorAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
@@ -2740,7 +2820,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   state.seats.forEach((s, i) => { if (read[i]?.length) s.explored = read[i]; });
   for (const p of recs[0].players) {
     const seat = first.seatOfPlayer.get(p.id);
-    if (bool(p.human) && seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HUMAN_HANDICAP;
+    if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
   }
   seedMoments(state, first, history);
   // the AI majors: every major the record's first turn names no human
@@ -2752,10 +2832,13 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     majorSeats.set(p.id, seat);
     if (!bool(p.human)) aiSeats.set(seat, p.id);
   }
-  const majorAi = new MajorAiProbe(dumpPath, aiSeats, majorSeats);
   const diplomacy = new DiplomacyProbe(dumpPath, first.playerOfSeat, first.seatOfPlayer);
   diplomacy.setup(state, history.randLog, recs[0].players.map((p) => p.id).sort((x, y) => x - y));
-  const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => majorAi.weightInputs(turn));
+  const strategies = new StrategyProbe(dumpPath, new Map([...majorSeats].map(([pid, seat]) => [seat, pid] as const)),
+    (seat) => diplomacy.agendasOf(seat));
+  const majorAi = new MajorAiProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
+  const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
+  const missions = readMissions(dumpPath);
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2820,7 +2903,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     stageEnvoys(ctx, ds, a, b, history.randLog);
     const staged = stagePolicies(ctx, ds);
     majorAi.preTurn(state);
-    diplomacy.preTurn(state, recordA.state, read.state, b);
+    strategies.preTurn(state, recordA.state, turnStartCompletions(ctx, b, a.turn), recordMilitary(a, cat, ctx.seatOfPlayer));
+    diplomacy.preTurn(state, recordA.state, read.state);
+    strategies.recordContacts(b, ctx.seatOfPlayer);
     settleAi.preTurn(state, recordState);
     recordState = read.state;
     // the generator: held at each witnessed point (`streamHold`)
@@ -2949,6 +3034,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     state.units.push(...barbs);
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
+    imposeMissions(ctx, missions.get(a.turn) ?? []);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
       if (!d) return null;
@@ -2987,12 +3073,15 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       restUnit(state, rest, true);
       u.hp = rest.hp;
     }
-    syncUnits(ctx, b);
+    // the other players' units stand where their turn t's moves left them:
+    // their looks reveal and meet in turn t (runs/h1_duelv1127: China meets
+    // Rome at t61, DiplomacySummary.csv, the record of t62 the first to show it)
+    inTurn(state, a.turn, () => syncUnits(ctx, b));
     campsTaken(ctx, b, a.turn);
     minorAi(ctx, b, a.turn);
     barbarianTurn(ctx, b, a.turn);
     // the units the barbarians raised stand where the record holds them
-    syncUnits(ctx, b);
+    inTurn(state, a.turn, () => syncUnits(ctx, b));
     settleEnvoys(ctx, b);
     // the barbarians' units sat the engine's turn out, so their rest — the
     // fortification a unit holding the Fortify order digs in (`fortifyOrders`)
@@ -3142,6 +3231,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   holdCityStrikes(false);
   holdLevies(false);
   holdBarbarians(null);
+  if (strategies.active) {
+    report.strategies = strategies.tally;
+    report.contacts = strategies.contacts(state);
+  }
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
@@ -3258,6 +3351,7 @@ export function replayMarkdown(r: ReplayReport): string {
     out.push('', '## Recorded events no reader takes', '');
     for (const [k, n] of Object.entries(r.unread)) out.push(`- ${k}: ${n}`);
   }
+  if (r.strategies) out.push(...strategyMarkdown(r.strategies, r.contacts));
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));

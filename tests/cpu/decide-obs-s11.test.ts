@@ -6,7 +6,7 @@
  * `gpu/core/neutral.py`'s group of the same name every turn.
  */
 import { describe, it, expect } from 'vitest';
-import { makeMap, makeState, grantCivics, tileAtCoords } from './helpers';
+import { makeMap, makeState, grantCivics, meetAll, tileAtCoords } from './helpers';
 import { researchObs, policyObs, warObs, SEAT_GROUPS } from '../../cpu/core/decideObsMasks';
 import { TECHS } from '../../cpu/data/techs';
 import { CIVICS } from '../../cpu/data/civics';
@@ -56,6 +56,7 @@ describe('decision mask groups', () => {
   it('war: the head columns, declare and sue gates, the kind per major column', () => {
     const state = makeState(makeMap(20, 20));
     state.seats.push(emptySeat(1), emptySeat(2));
+    meetAll(state);
     state.cityStateMax = 2;
     // city-state 0 met and at war; city-state 1 never placed (off the roster)
     const cs = placeCityStateAt(state, 0, 'CS0', 'scientific', tileAtCoords(state.map, 10, 10).index);

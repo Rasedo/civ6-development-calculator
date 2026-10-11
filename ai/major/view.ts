@@ -82,6 +82,20 @@ export interface MajorCityDefenceView {
   range: number;
 }
 
+/** a city on the map as the AI's knowledge records it (the knowledge
+ *  base's entry 0x5ef9a0) */
+export interface MajorCityView {
+  plot: number;
+  owner: number;
+  /** its yields in YieldTypes order (the city's own totals) */
+  yields: readonly number[];
+  /** its majority religion (the founder's seat), -1 for none */
+  religion: number;
+  originalCapital: boolean;
+  /** the seat that founded it */
+  originalOwner: number;
+}
+
 export interface MajorView extends AiValueView {
   /** the map's plots by index */
   plots(): readonly MajorPlotView[];
@@ -198,4 +212,36 @@ export interface MajorView extends AiValueView {
   grievances(holder: number, against: number): number;
   /** the seat's military units of a DomainType */
   militaryUnits(seat: number, domain: string): number;
+
+  // THE VICTORY MANAGER'S CONDITIONS (ai/major/strategies.ts)
+  /** every city on the map, any seat's */
+  mapCities(): readonly MajorCityView[];
+  /** the plots the seat sees now */
+  plotsSeen(seat: number): ReadonlySet<number>;
+  /** the start plot of every player that has one (the majors' first
+   *  settlers', the city-states' centres) */
+  startPlots(): readonly { plot: number; seat: number }[];
+  /** the seat's handicap, a Difficulties index */
+  handicap(seat: number): number;
+  /** the seat's era (player +0x1358): the latest era of a technology or a
+   *  civic it holds, an index into AI_ERAS */
+  playerEra(seat: number): number;
+  techCount(seat: number): number;
+  /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
+  militaryStrength(seat: number): number;
+  score(seat: number): number;
+  /** the great people of a class (GREAT_PERSON_CLASS_*) the seat has earned */
+  greatPeopleOfClass(seat: number, cls: string): number;
+  /** a great person of the class stands offered now */
+  greatPersonOffered(cls: string): boolean;
+  /** the great works the seat's civilization made, wherever they hang */
+  greatWorksMade(seat: number): number;
+  /** the seat's domestic tourists (+0x10b0) and the tourists it draws from
+   *  the majors it has met (0x39bee0) */
+  domesticTourists(seat: number): number;
+  visitingTourists(seat: number): number;
+  /** the world wonders the seat's cities hold that carry a Science yield */
+  scienceWonders(seat: number): number;
+  /** the space race projects the seat has completed */
+  spaceProjects(seat: number): number;
 }

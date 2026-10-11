@@ -4770,6 +4770,166 @@ region's plots with their scores, per turn and player.
   steps, then FOUND_CITY, as `SeatActionRecord.units` rows) carry each
   settler to its pick on a copy of the state (7 of 7 on the replayed engine).
 
+## C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)
+
+AI/VictoryStrategy.cpp, the player's victory manager at GrandStrategic
++0x508. Ported in `ai/major/strategies.ts` (TS only, over `MajorView`);
+measured by the replay's strategy probe (`cpu/harness/strategyAi.ts`)
+against AI_Victories.csv ("%d, %d, %s, %s", the writer 0x7bec80: the turn,
+the player, the strategy, Following / Exclusive / Stopped / Forbidden; one
+line per strategy changed), on the engine's state and on the record's.
+
+- The manager's arrays (per strategy, database order = AI_STRATEGIES):
+  +0x30 following, +0x48 disqualified for good, +0x60 changes this turn,
+  +0x78 exclusive, +0x90 the turn it may next change, +0xa8 the bias — the
+  sum of the leader's and civilization's Strategies-system AiLists rows
+  (AiFavoredItems Value, within MinDifficulty / MaxDifficulty of the
+  player's handicap; the leader query 0x622e90).
+- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's
+  activation): a strategy disqualified for good is skipped; a victory
+  strategy whose victory is off, or whose ConditionsNeeded + bias exceeds
+  its conditions, is disqualified. Else each StrategyConditions row in
+  order, through the registry 0x7bd310 (name -> function): a true
+  Exclusive row marks it exclusive, a true Disqualifier disqualifies it,
+  sets its change and stops the walk, a true Forbidden row makes its change
+  = following and skips it this turn, any other true row counts. Before
+  +0x90 nothing changes; else count >= need changes a strategy not
+  followed, count < need one followed.
+- The apply (0x7bb3e0): the first victory strategy marked exclusive that
+  follows or changes makes every other followed victory strategy change and
+  voids the others' changes; then each change flips the strategy (a
+  disqualified one stays off) and stamps +0x90 = turn + 20 (0x7bf160 on,
+  0x7bb870 off). The log prints Forbidden / Following / Stopped, and
+  Exclusive for the forced stops.
+- The conditions READ: Is Ancient .. Is Information (0x7bea40: the
+  player's era >= the row's); Good Faith / Tech / Culture City (0x7bcd60:
+  some city's yield advantage 0x5d83c0, flag 0, >= threshold << 8);
+  Fewer Cities (cities <= threshold); Handicap at or below (player +0x908);
+  Major Civ Wars (0x3dfae0: majors at war <= threshold); Is On Island
+  (GrandStrategic +0x4a0); Has Agenda (+0xe20, the row's StringValue);
+  Founded Religion; Unconverted Cities (0x7bff10: knowledge-base entries
+  with no majority religion >= threshold); Cannot Found Religion (0x7bada0:
+  none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0);
+  Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the
+  met majors whose Culture is at most its own >= trunc(n x thr / 100));
+  Has Great Writer / Artist / Musician (0x2f30c0 earned); Has Great Works;
+  Tourists Taken (the most domestic tourists of another major, +0x10b0, > 0
+  and the player's visiting tourists from met majors, 0x39bee0, >=
+  trunc(max x thr x 0.01f)); Has Taken Capital (0x7bd1c0, also registered
+  for the three "Diplomatic Victory Points" names); Leads Military
+  (0x7baa20) and Lags Military (0x7babc0): the rank among the majors
+  against trunc(n x pct x 0.01f + 0.5), read only inside the "stronger"
+  count; Leads Score; Next Lower Score (0x7bebc0); Has Science Wonders;
+  Has Tech Lead (0x7bd210); Finished Space Project; Is Not Major (0x469db0,
+  CIVILIZATION_LEVEL_FULL_CIV; 0x469ce0 is the tribe test). Lists: +0xb50
+  the living full civs, +0x50 every living player, +0xfa0 the full civs' ids.
+- The military strength the rank conditions read (PlayerStats
+  m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each
+  player's turn starts, before its production): per unit max(Combat,
+  RangedCombat) x HP left / max HP in 24.8, truncated, plus the treasury's
+  whole Gold as trunc((gold x 256 / 6) / 512), the sum >> 8. A player
+  reads, as its last turn start before its own activation left them, this
+  turn's values for the players up to itself and last turn's for the
+  players after it (runs/h1_duelw1124: Rome, first to move, reads China's of
+  t-1; Rome's Scout, in record 5, first moves China's Lags Military at t6).
+- The island (GrandStrategic 0x6fafc0, after the apply; AI_ISLAND_COAST_PERCENTAGE
+  20): while +0x440 (a city's landmass more than half revealed) is clear or
+  +0x4a0 (island) set: per entry of the player +0x12f0 list, the share of
+  its landmass the knowledge base counts (0x786080: the +0x2e8 map's
+  +0x28 / +0x24, keyed by the plot's +8 id; the map refreshed by the
+  knowledge base's update 0x783980 from a per-plot visibility word > 0)
+  above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >=
+  trunc(total x 20 / 100) sets the island, else clears it and ends the walk.
+  PARTLY READ: the port takes the player's revealed plots for the share;
+  the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's
+  at t48), so the +0x12f0 list and the visibility word are unread.
+- PARTLY READ: Has Settle Spot (0x6fe2b0), Cities Under Threat (the city
+  AI's +0x1b8) and Has Opponents' +0x9d0 array (only its wars are counted)
+  read false in the port and are counted as gaps.
+- The AI's handicap: AI_Victories.csv logs Rapid Expansion "Forbidden" at
+  t1 for both AI majors of every duel ("Handicap at or below 2"), so the
+  majors' handicap is the game's difficulty (Warlord in the lab's games),
+  not the AI default; the replay sets it.
+- Timing on the records: record t is taken as the first player (Rome)
+  activates; a later player's turn start (its techs and civics completed
+  before its activation) lands before its own evaluation
+  (runs/h1_duelw1124: China's Civil Service, completed before its
+  activation at t69, moves its Medieval strategy at t69; its Celestial
+  Navigation, completed after it at t31, at t32).
+
+Measured on the five verbose recordings (runs/h1_duelv1117, 1121, 1124,
+1127, 1128): AI_Victories 120 of 163 lines equal on the record's state
+(24 / 34, 22 / 30, 27 / 38, 22 / 31, 25 / 30), 71 of 163 on the replayed
+engine's. The misses named on 1124: Religious t40 (the
+log) against t54 (Qin's Xi'an reads 0 Faith on record 40 and 1 on 41: its
+own turn start, after the record, reaches the yield the game reads), Naval
+(the island above), Cultural t103 against t138, Science p0 at t49 / 118 /
+154 / 179 / 242 and the Exclusive at t221.
+
+## C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)
+
+AI::Knowledge at player +0x12b8; its log AI_Knowledge.csv (per turn "START
+LOG" with mean +/- deviation per yield, then a CITY line per entry). Ported
+in `ai/major/knowledge.ts`.
+
+- The defaults (GlobalAI 0x6df230, once a game): per yield the mean and the
+  sample deviation (24.8) of the plot yields of every non-barbarian
+  player's start plot and the six beside it, each read for that player;
+  +0x1d0 the players counted — the entries the knowledge base needs before
+  its own statistics stand in.
+- The record (0x5ef9a0): an entry per city the player knows (its own and
+  those it sees): the yields truncated, the majority religion, the age.
+- The update (0x5ebb30): every entry ages; one whose plot the player sees
+  with no city of its owner there is dropped; with two entries or more the
+  mean is the sum of trunc(y x 256 / n), the variance the sum of
+  trunc(d^2 / (n - 1)), the deviation its square root; else 0.
+- The advantage (0x5d83c0, flag 0): x = the greater of the city AI's
+  stored yield (CityBuildAI +0x1118, unread: the port takes the city's
+  own) and the city's yield; mean and deviation the knowledge base's where
+  it holds +0x1d0 entries or more, else the defaults' mean x 6 and
+  deviation x fx(2.449) (626 >> 8); (x - mean) x 256 / deviation, x - mean
+  where the deviation is 0. Flag 1 (AI_CityBuild's Food / Prod Adv.) takes
+  37 and sqrt(37).
+
+Measured on the record's state: the statistics 317 of 2,398 turn-player
+lines over the five verbose recordings (1124: 100 of 498, its CITY lines
+212 equal). The first miss is t1: the log prints no CITY line on the turn
+the first city is founded.
+
+## C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)
+
+The players manager's meet (0x484ab0) and its three callers in the
+visibility manager. Ported in both twins (`meetMajors`, `majorLookMeets`,
+`seatSeesPlot` in cpu/core/fog.ts; `_meet_majors`, `_major_look_meets`,
+`_eyes_of`, `_suzerain_look` in gpu/core/sim_masks.py); measured against
+the records' `met` lists and DiplomacySummary.csv.
+
+- The triggers: a unit placed on a plot another player sees (0x5246f0, from
+  the placement 0x586d40: each player whose visibility count of the plot is
+  above 0); a plot coming into view meets its owner (0x524890); a unit
+  coming into view meets its owner (0x5249c0).
+- A city-state's sight is its suzerain's: runs/h1_duelw1124 t89, Rome's
+  Warrior steps beside Bologna's unit and China, Bologna's suzerain, meets
+  Rome that turn (the engine without the share met at t107); t90, China's
+  revealed plots take in the sight of Granada's unit at (39,17).
+- The effects: each side's BOOST_TRIGGER_MEET_CIV rows (runs/h1_duelw1114
+  t15, 1130 t11: both majors' Writing boosted the turn they met);
+  PLAYER_MET_ALL_MAJORS (3, FIRST_IN_WORLD 5) for each side that has now
+  met every living major (1121 t127: Rome and China, 5 each). The
+  "hospitality" greeting is the AI's diplomacy flavour, no rule.
+- Before the meeting no war (DiplomaticActions' declarations need the
+  contact) and no mission: Delegation (cost 25, NoCurrentDelegation,
+  obsolete for the sender with Diplomatic Service) and Resident Embassy
+  (cost 50, Diplomatic Service, NoCurrentEmbassy, taking the Delegation's
+  place) are two missions (`MISSION_DELEGATION`, `MISSION_EMBASSY`).
+- PARTLY READ: what a newly gained suzerain sees of the city-state's
+  revealed plots, and whether an envoy reveals the city-state's territory.
+
+Measured: the five verbose recordings' meeting turns all equal
+DiplomacySummary.csv's Met lines (1117 t161, 1121 t127, 1124 t89 through
+Bologna, 1127 t61, 1128 t81); the replay lands the other players' recorded
+moves in the turn they were made.
+
 ## DLL rules the engines contradict
 
 - The wounded law (0x522630) on a unit's strength in a fight: the engines'

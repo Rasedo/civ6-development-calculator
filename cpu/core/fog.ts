@@ -1,8 +1,10 @@
 
 import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
-import { citiesOf, civOf, isCityStateSeat, isCiv, leaderOf, seatOf, seatsAllied, tileSeat, unitsOf } from './seats';
-import { hasMet, meetCityState } from './cityStates';
+import { citiesOf, civOf, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
+import { hasMet, meetCityState, suzerainOf } from './cityStates';
+import { boostOnEvent } from './boosts';
+import { metAllMajorsMoment } from './eras';
 import { ALLIANCE_SHARED_VIS_ROWS, rowIsFor } from '../data/civilizations';
 import { neighbors, tilesWithin, hexDistance, axialDelta, offsetToAxial, axialToOffset, tileAt } from '../../world/hex';
 import { naturalWonderAt } from '../../world/query';
@@ -130,18 +132,72 @@ function minorLookMeets(state: GameState, seat: number, tileIndex: number, radiu
   }
 }
 
+/** a major that has met every other living major (`majorsAlive`) */
+function metEveryMajor(state: GameState, seat: number): boolean {
+  return majorsAlive(state).every((o) => o === seat || majorsMet(state, seat, o));
+}
+
+/**
+ * TWO MAJORS MEET (the players manager's meet 0x484ab0): the pair's meeting
+ * turn; each side's BOOST_TRIGGER_MEET_CIV rows (runs/h1_duelw1114 t15, 1130
+ * t11: both majors' Writing boosted the turn they met); then each that has
+ * now met every living major records PLAYER_MET_ALL_MAJORS, the
+ * FIRST_IN_WORLD row where no major had met them all before this meeting
+ * (1121 t127: Rome and China, 5 each).
+ */
+export function meetMajors(state: GameState, a: number, b: number): void {
+  if (a === b || !isCiv(a) || !isCiv(b) || majorsMet(state, a, b)) return;
+  const first = !majorsAlive(state).some((s) => metEveryMajor(state, s));
+  setMetTurnWith(state, a, b, state.turn);
+  for (const s of [a, b]) boostOnEvent(state, s, 'MEET_CIV');
+  for (const s of [a, b]) if (metEveryMajor(state, s)) metAllMajorsMoment(state, s, first);
+}
+
+/**
+ * A MAJOR'S LOOK MEETS THE MAJORS it takes in — a plot of theirs or a unit of
+ * theirs on a plot the look reaches (the visibility manager 0x50d390 on a
+ * plot coming into view: 0x524890 meets its owner, 0x5249c0 the owner of a
+ * unit on it) — and, where the look is its own unit's stepping there
+ * (`placed`), every major that sees the plot it stands on (the unit's
+ * placement 0x586d40 -> 0x5246f0: each player whose visibility count of the
+ * plot is above 0). The majors in seat order (`meetMajors`).
+ */
+function majorLookMeets(state: GameState, seat: number, tileIndex: number, radius: number, los: { seeThrough: boolean } | undefined,
+                        placed: boolean): void {
+  const t = state.map.tiles[tileIndex];
+  const others = state.seats.filter((s) => s.seat !== seat && isCiv(s.seat) && !majorsMet(state, seat, s.seat));
+  if (!others.length) return;
+  const units = new Set<string>();
+  for (const u of state.units) if (isCiv(u.seat) && u.seat !== seat) units.add(`${u.tileIndex}:${u.seat}`);
+  const seen = new Set<number>();
+  for (const n of tilesWithin(state.map, t.col, t.row, radius)) {
+    if (los && !canSee(state.map, t, n, los.seeThrough)) continue;
+    const owner = tileSeat(n);
+    if (isCiv(owner) && owner !== seat) seen.add(owner);
+    for (const s of others) if (units.has(`${n.index}:${s.seat}`)) seen.add(s.seat);
+  }
+  for (const s of others) {
+    if (seen.has(s.seat) || (placed && seatSeesPlot(state, s.seat, t))) meetMajors(state, seat, s.seat);
+  }
+}
+
 /** Does a major see the plot now (`plotsSeenNow` for one seat, at one plot):
  *  a unit of its whose sight reaches it, a city centre of its within two, a
- *  plot of its beside it or the plot itself. */
+ *  plot of its beside it or the plot itself — and what each city-state it
+ *  is suzerain of sees so (`majorLook`). */
 function seatSeesPlot(state: GameState, seat: number, t: Tile): boolean {
   const { map } = state;
-  if (tileSeat(t) === seat || neighbors(map, t).some((n) => tileSeat(n) === seat)) return true;
-  for (const c of citiesOf(state, seat)) {
-    const ct = map.tiles[c.centerIndex];
+  const eyes = [seat, ...state.cityStates.filter((cs) => suzerainOf(cs) === seat).map((cs) => cs.seat)];
+  if (tileSeat(t) >= 0 && eyes.includes(tileSeat(t))) return true;
+  if (neighbors(map, t).some((n) => eyes.includes(tileSeat(n)))) return true;
+  const centres = [...citiesOf(state, seat).map((c) => c.centerIndex),
+    ...state.cityStates.filter((cs) => suzerainOf(cs) === seat && cs.centerIndex >= 0).map((cs) => cs.centerIndex)];
+  for (const c of centres) {
+    const ct = map.tiles[c];
     if (hexDistance(map, ct.col, ct.row, t.col, t.row) <= 2) return true;
   }
   for (const u of state.units) {
-    if (u.seat !== seat) continue;
+    if (!eyes.includes(u.seat)) continue;
     const from = map.tiles[u.tileIndex];
     if (hexDistance(map, from.col, from.row, t.col, t.row) <= unitSight(u, state) && canSee(map, from, t, unitSeesThrough(u))) return true;
   }
@@ -172,14 +228,30 @@ export function revealAround(
   // A city-state's unit's look meets the majors it takes in: a plot of
   // theirs or a unit of theirs standing on it (runs/h1_duelw1124 t10:
   // Granada's Warrior steps beside Xi'an's coast and China's Builder, and
-  // China's first meeting's envoy lands before the minor's next move)
+  // China's first meeting's envoy lands before the minor's next move). Its
+  // suzerain sees what it sees (`majorLook`).
   if (isCityStateSeat(seat)) {
     if (los) minorLookMeets(state, seat, tileIndex, radius, los);
+    const cs = state.cityStates.find((c) => c.seat === seat);
+    const suz = cs ? suzerainOf(cs) : -1;
+    if (isCiv(suz)) majorLook(state, suz, tileIndex, radius, los, false);
     return;
   }
   // MAJOR seats only: nothing reads a city-state's or the barbarians' fog,
   // so tracking it would be write-only state (and a digest liability).
   if (!isCiv(seat)) return;
+  majorLook(state, seat, tileIndex, radius, los, !!los);
+}
+
+/**
+ * A MAJOR'S LOOK: its own unit's, city's or claimed plot's, or a city-state's
+ * it is suzerain of (the suzerain sees what the city-state sees:
+ * runs/h1_duelw1124 t89, Rome's Warrior steps beside Bologna's, and China,
+ * Bologna's suzerain, meets Rome; t90, China's revealed plots take in the
+ * sight of Granada's unit at (39,17)). `placed`: its own unit stepping there.
+ */
+function majorLook(state: GameState, seat: number, tileIndex: number, radius: number, los: { seeThrough: boolean } | undefined,
+                   placed: boolean): void {
   const { found, wonders } = liftFog(state, seat, tileIndex, radius, los);
   // A city-state is MET the moment this look takes in a plot of its
   // territory or a unit of its, in the move that does (runs/h1_duelw1121 t6:
@@ -201,6 +273,7 @@ export function revealAround(
       }
     }
   }
+  majorLookMeets(state, seat, tileIndex, radius, los, placed);
   // CIV6 (Hic Sunt Dracones, dark face): "+3 Era Score each time you discover
   // a new Continent or natural wonder" — no continent's discovery is tracked,
   // so wonders are the whole event.

@@ -692,9 +692,15 @@ class SimInit:
         self.civ_cul_rate = torch.zeros(B, self.n_majors, dtype=torch.float64, device=device)
         self.civ_tour_rate = torch.zeros(B, self.n_majors, dtype=torch.long, device=device)
         self.seat_borders_turns = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
-        # DIRECTED, 1 where the row seat holds a Delegation or Resident Embassy
-        # with the column seat. Indefinite: a war ends it, never a clock.
+        # DIRECTED, the mission the row seat holds with the column seat: 1 a
+        # Delegation, 2 a Resident Embassy (`MISSION_*`). Indefinite: a war
+        # ends it, never a clock.
         self.seat_delegation = torch.zeros(B, _pw, _pw, dtype=torch.long, device=device)
+        # THE MEETING of two majors (`meetMajors`): the turn they met, -1
+        # while they have not. Symmetric.
+        self.seat_met_turn = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
+        # the turn a pair of majors last made peace, -1 where they never fought
+        self.seat_peace_turn = torch.full((B, _pw, _pw), -1, dtype=torch.long, device=device)
         # THE NEGOTIATED DEAL. An offer sits on the table keyed from -> to: the
         # turns it still stands (0 = none) and the two bundles, each
         # `dealItems` slots of [kind, a, b] with kind -1 for an empty slot. A

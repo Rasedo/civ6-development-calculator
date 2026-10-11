@@ -169,10 +169,9 @@ export function canalMoment(state: GameState, seat: number): void {
   if (isCiv(seat)) addEraScore(state, seat, MOMENT_CANAL);
 }
 
-/** Major `seat` has met every living major: FIRST_IN_WORLD when no major had
- *  before this turn (two meeting each other both take it: 1121 t127, Rome
- *  and China 5 each), else the plain row. The engines hold no contact
- *  between majors, so only the H-1 harness calls it. */
+/** Major `seat` has met every living major (`meetMajors`): FIRST_IN_WORLD
+ *  when no major had before (two meeting each other both take it: 1121 t127,
+ *  Rome and China 5 each), else the plain row. */
 export function metAllMajorsMoment(state: GameState, seat: number, first: boolean): void {
   if (isCiv(seat)) addEraScore(state, seat, MOMENT_MET_ALL[first ? 1 : 0]);
 }

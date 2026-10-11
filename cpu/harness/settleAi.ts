@@ -27,7 +27,6 @@ import { existsSync, readFileSync } from 'node:fs';
 import { bestSettleSite, firstTurnSettlePlot, firstTurnSettlerOrders, settleRegions } from '../../ai/major/settle';
 import { applySeatUnitOrders } from '../core/phase';
 import type { MajorReachView } from '../../ai/major/view';
-import type { AiWeightInputs } from '../core/aiWeights';
 import { majorView } from '../core/majorView';
 import { citiesOf, seatOf } from '../core/seats';
 import { unitFullMoves } from '../core/units';
@@ -134,11 +133,11 @@ export class SettleProbe {
   private readonly picks: Pick[] = [];
   readonly tally = { engine: tally(), record: tally() };
 
-  /** `seats`: the AI majors, seat -> the record's player id; `weights`: what
-   *  the AI's weights read at a turn (the majors' probe's: the strategies the
-   *  seats follow, which pick the strategy lists) */
+  /** `seats`: the AI majors, seat -> the record's player id; `strategies`: what
+   *  each seat followed as its AI turn opened (`StrategyProbe`), which pick the
+   *  strategy lists */
   constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>,
-              private readonly weights: (turn: number) => ReadonlyMap<number, AiWeightInputs>) {
+              private readonly strategies: (turn: number) => ReadonlyMap<number, ReadonlySet<string>>) {
     const logs = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.ops = readOps(`${logs}AI_Operation.csv`);
     this.planning = readPlanning(`${logs}AI_Planning.csv`);
@@ -176,7 +175,7 @@ export class SettleProbe {
       if (t.misses.length < 40) t.misses.push(m);
     };
     const turn = state.turn;
-    const view = majorView(state, { weights: this.weights(turn) });
+    const view = majorView(state, { strategies: this.strategies(turn) });
     const plots = view.plots();
     const xy = (p: number) => `${plots[p].x}:${plots[p].y}`;
     const byXy = new Map<string, number>(plots.map((p) => [`${p.x}:${p.y}`, p.index]));

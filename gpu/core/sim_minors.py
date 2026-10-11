@@ -455,8 +455,9 @@ class SimMinors:
                 self.tile_seat[rows, spot] = int(self._ROW_SEAT[row])  # setTileOwner's two halves:
                 self.tile_city[rows, spot] = cid[rows]  # the seat and the city id
                 self._tile_owner_ver += 1
-                # acquireTile's revealAround is a MAJOR's alone ("nothing reads
-                # a city-state's fog"), so this row reveals nothing.
+                # acquireTile's revealAround: nothing reads a city-state's fog;
+                # its suzerain sees the plot's ring (`_suzerain_look`)
+                self._suzerain_look(rows, torch.full_like(rows, s), spot, 1, None)
                 # A claim widens a LATER city's workable candidates.
                 self._claim_version += 1
                 self.city_acquired[rows, row, col[rows]] += 1
