@@ -90,6 +90,16 @@
     - ...es (+0x7c), ReligiousHealCharges (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)...
     - "...or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARC..."
   review: imported
+- addr: 0x468260
+  final: 0x2f8170
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiProjectValue.ts:ProjectTableFacts]
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+  context:
+    - ...; UnlocksFromEffect (+0xe8 bit 2, or Projects_XP2's +0x60 bit 0) the player's unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredB...
+  review: imported
 - addr: 0x469cd0
   final: 0x2f9780
   kind: function

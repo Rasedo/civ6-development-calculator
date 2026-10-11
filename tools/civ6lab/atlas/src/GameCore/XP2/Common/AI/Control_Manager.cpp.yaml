@@ -34,7 +34,7 @@
   readings:
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...(0x60a8c0, unread) taken by the player's first job (0x5c2650, before the tribes' turn in 0x6096c0) would not hold a unit raised in the turn. The raid's end: \"C-95: the barbarians' raid\" (..."
     - "- THE TURN (0x6096c0, the player AI's jobs): a first list — the unit evaluator 0x5c2650, the barbarian manag..."
@@ -75,8 +75,8 @@
       value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
   impl: [cpu/core/aiContracts.ts:submitContract]
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The submission 0x60bb50: SUBMITTED, then the player's signal +0x270 runs each city's listener 0x5d6050 in city..."

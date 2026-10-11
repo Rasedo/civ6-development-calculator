@@ -1,13 +1,14 @@
 // The majors' diplomatic sending (ai/major/diploActions.ts) on a stub view:
-// the savings' shares and cap, the threat and trust terms, the desires of the
+// the threat and trust terms, the desires of the
 // missions, the friendship, the alliance and the surprise war, the can-do's
 // savings and spacing, the perform's spend and a refusal's refund.
 import { describe, expect, it } from 'vitest';
 import {
   ACTION_ALLIANCE, ACTION_DELEGATION, ACTION_FRIENDSHIP, ACTION_SURPRISE_WAR, actionCost, dealStruck, desire, focusTurn,
-  newDiploActionGaps, newDiploActionMemory, performAction, pickActions, recordAnswer, savingsTurn, threat, threatTerm,
+  newDiploActionGaps, newDiploActionMemory, performAction, pickActions, recordAnswer, senderOf, threat, threatTerm,
   trustTerm,
 } from '../../../ai/major/diploActions';
+import { savingsTurn } from '../../../cpu/core/aiEconomic';
 import type { MajorView } from '../../../ai/major/view';
 
 function view(over: Partial<MajorView> = {}): MajorView {
@@ -21,19 +22,6 @@ function view(over: Partial<MajorView> = {}): MajorView {
 
 const inputs = (state: string) => ({ state, delegationPrice: 10, embassyPrice: 25, distance: null, nearVictory: false,
   warOperation: false });
-
-describe('the savings (0x687bf0)', () => {
-  it('shares the treasury\'s change by the DefaultSavings weights and holds PLOTS at 150', () => {
-    const mem = newDiploActionMemory();
-    savingsTurn(view({ treasury: () => 90 }), mem, 1);
-    const s = mem.seats.get(1)!;
-    // 3 / 4 / 1 / 1 of 9, each fraction truncated to 1/256
-    expect(s.savings.map((x) => x / 256)).toEqual([(90 * 85) / 256, (90 * 113) / 256, (90 * 28) / 256, (90 * 28) / 256]
-      .map((x) => Math.floor(x * 256) / 256));
-    savingsTurn(view({ treasury: () => 90 + 2000 }), mem, 1);
-    expect(s.savings[2]).toBe(150 * 256);
-  });
-});
 
 describe('the threat and trust terms (0x671b80 / 0x671ef0)', () => {
   it('T is the weight at rank 1 of two majors met, negated without the flag, 0 where the preference rules it out', () => {
@@ -100,7 +88,7 @@ describe('the pick, the perform and the answer', () => {
     const mem = newDiploActionMemory();
     const gaps = newDiploActionGaps();
     const v = view();
-    savingsTurn(v, mem, 1);
+    savingsTurn(senderOf(mem, 1), 90 * 256);
     const ins = new Map([[0, inputs('DIPLO_STATE_NEUTRAL')]]);
     const picks = pickActions(v, mem, 1, ins, [], gaps);
     expect(picks.map((p) => p.action)).toEqual([ACTION_DELEGATION]);

@@ -5,9 +5,11 @@
  * its analysis (0x5ce680), its events: each starts its tree where the
  * city's slot for the event holds none still running — the building or unit
  * event (0x5cd150, "Build City Building"), the district event (0x5cc910),
- * the improvement event (0x5ccc10, "Build City Improvement"). The seat's
- * trees tick later in its turn (the tree manager 0x7ffdd0) on the shared
- * interpreter (`behaviorTree.ts`); their Build Unit makes the contracts
+ * the improvement event (0x5ccc10, "Build City Improvement"); the City
+ * Defense event (0x5cced0) starts the operation its list names through the
+ * player's operation manager instead. The seat's trees tick later in its
+ * turn (the tree manager 0x7ffdd0) on the shared interpreter
+ * (`behaviorTree.ts`); their Build Unit makes the contracts
  * (`aiContracts.ts`).
  *
  * The seat's state here is plain data (the trees' node memory and
@@ -27,6 +29,7 @@ import { FX, FX_MIN } from './aiValue';
 export const SLOT_UNIT_OR_BUILDING = 1;
 export const SLOT_DISTRICT = 2;
 export const SLOT_IMPROVEMENT = 3;
+export const SLOT_DEFENSE = 5;
 
 /** a tree's trigger (the event's data block, 0x140510): what it was started
  *  for */
@@ -147,6 +150,10 @@ export interface CityTreeCity extends ContractCity {
   /** the city holds the building, or the district complete, unpillaged */
   buildingHeld(building: string): boolean;
   districtHeld(district: string): boolean;
+  /** the city's threat (CityBuildAI +0x1b8), -1 none */
+  threat: number;
+  /** the city's plot */
+  plot: number;
 }
 
 /** The world the events and trees read and act on */
@@ -188,6 +195,11 @@ export interface CityTreeWorld {
   /** the unit still stands after the orders given (a Builder spending its
    *  last charge is gone) */
   unitAlive(unit: number): boolean;
+  /** the player's operation manager starts the operation of the name at the
+   *  plot (0x7265b0), its tree's id; null where it does not */
+  startOperation(name: string, plot: number): number | null;
+  /** the operation's tree still runs */
+  operationLive(tree: number): boolean;
   /** a lab's view of each tick: the tree, its root's status, its nodes'
    *  updates in walk order */
   trace?(tree: CityTree, root: number, updates: readonly string[]): void;
@@ -238,11 +250,22 @@ function startTree(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, slot: numbe
 }
 
 /** the city's full update: a slot whose tree no longer runs empties
- *  (0x5ce680 over +0xb30, 0x800590) */
-export function freeSlots(ai: CityAi, cityId: number): void {
+ *  (0x5ce680 over +0xb30, 0x800590; the defence slot's an operation's) */
+export function freeSlots(ai: CityAi, w: Pick<CityTreeWorld, 'operationLive'>, cityId: number): void {
   const s = ai.slots[cityId];
   if (!s) return;
-  for (let i = 0; i < s.length; i++) if (s[i] !== -1 && !live(ai, s[i])) s[i] = -1;
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] !== -1 && !(i === SLOT_DEFENSE ? w.operationLive(s[i]) : live(ai, s[i]))) s[i] = -1;
+  }
+}
+
+/** 0x5cced0, THE CITY DEFENSE EVENT: a threatened city (threat above -1)
+ *  with its slot free starts the operation its list's CITY_UNDER_THREAT
+ *  names ("City Defense") at its plot; the slot holds the operation's tree */
+export function defenseEvent(ai: CityAi, w: CityTreeWorld, city: CityTreeCity, operation: string | null): void {
+  if (city.threat <= -1 || !operation || !slotFree(ai, city.id, SLOT_DEFENSE)) return;
+  const tree = w.startOperation(operation, city.plot);
+  if (tree !== null) (ai.slots[city.id] ??= [-1, -1, -1, -1, -1, -1])[SLOT_DEFENSE] = tree;
 }
 
 /** the city's event slot holds no running tree */

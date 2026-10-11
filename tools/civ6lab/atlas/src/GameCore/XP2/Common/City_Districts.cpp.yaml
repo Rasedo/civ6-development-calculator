@@ -17,6 +17,16 @@
   context:
     - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
   review: imported
+- addr: 0x1ae8a0
+  final: 0x11eae0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - ...pseudo-yield while the city may add a district (not RequiresPopulation, +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0), the whole where the plot holds it; a regional building's reach (the la...
+  review: imported
 - addr: 0x1ae8f0
   final: 0x11eb20
   kind: function
@@ -26,13 +36,28 @@
     - recording: h1_duelw1117
       turn: 112
       value: two complete specialty districts
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiDistrictValue.ts:DistrictValueFacts
+    - cpu/core/aiProjectValue.ts:ProjectValueFacts
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2), complete (+0xb08..."
   review: reviewed
+- addr: 0x1aea60
+  final: 0x11ec40
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiProjectValue.ts:ProjectTableFacts]
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+  context:
+    - ...s unlock (0x468260); the civic (+0x120), tech (+0x150), district in the city (+0x128, 0x1aea60), RequiredBuilding (+0x158) held; its ProjectPrereqs (+0x130) each completed. T = the b...
+  review: imported
 - addr: 0x1aec20
   final: 0x11ee20
   kind: function
@@ -45,7 +70,10 @@
     - recording: 1116
       turn: 112
       value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
-  readings: ["H-1: the great person's spawn — READ"]
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "H-1: the great person's spawn — READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
   review: imported

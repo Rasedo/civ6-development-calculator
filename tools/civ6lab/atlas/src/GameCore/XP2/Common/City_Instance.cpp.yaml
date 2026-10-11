@@ -31,13 +31,20 @@
 - addr: 0x1c77c0
   final: 0x131a10
   kind: function
+  name: the city trains a domain
   status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      turn: 5
+      value: player 2's inland river city values the Harbor as one that trains ships (6.09 at (1,15))
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts, cpu/harness/plotValueLab.ts:df]
   readings:
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 h..."
-  review: imported
+  review: reviewed
 - addr: 0x1c79b0
   final: 0x131b80
   kind: function

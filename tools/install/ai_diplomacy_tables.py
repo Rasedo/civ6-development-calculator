@@ -12,8 +12,7 @@ tag), the random agendas' tags, the set-up and civic draws' tags, the
 historical agendas, the exclusive pairs; the diplomatic states, their
 transitions and the actions each state allows with their AI worth and cost;
 the DiplomaticActions preference lists (AiLists / AiFavoredItems) and who
-carries them — a leader trait, an agenda's trait, a strategy; the economic
-AI's saving slots (SavingTypes order) and their DefaultSavings weights.
+carries them — a leader trait, an agenda's trait, a strategy.
 Read through `xml_check.Install` (the layered install, the game's load order,
 Update and Delete applied).
 """
@@ -176,11 +175,6 @@ def build() -> str:
     agenda_pref_traits = {a: [t for t in agenda_traits[a] if t in trait_prefs] for a in agendas
                           if any(t in trait_prefs for t in agenda_traits[a])}
 
-    # THE ECONOMIC AI'S SAVINGS: the SavingTypes in table order (a slot's
-    # index) and the DefaultSavings list's weight of each
-    saving_types = list(keyed(rows("SavingTypes"), "SavingType"))
-    saving_weight = {c["Item"]: num(c.get("Value")) for c in rows("AiFavoredItems") if c.get("ListType") == "DefaultSavings"}
-    savings = [{"saving": t, "weight": saving_weight.get(t, 0)} for t in saving_types]
 
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1, ensure_ascii=False)};\n"
@@ -218,7 +212,6 @@ def build() -> str:
         + lit("DIPLO_PREFERENCE_LEADER_TRAITS", {k: leader_traits[k] for k in sorted(leader_traits)},
               "Readonly<Record<string, readonly string[]>>")
         + lit("DIPLO_PREFERENCE_AGENDA_TRAITS", agenda_pref_traits, "Readonly<Record<string, readonly string[]>>")
-        + lit("AI_DEFAULT_SAVINGS", savings, "readonly { saving: string; weight: number }[]")
     )
 
 

@@ -74,6 +74,7 @@
   status: PARTLY
   readings:
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
   review: imported
@@ -109,7 +110,7 @@
   kind: global
   status: PARTLY
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- A contract (vtable 0xd5b948; progress +0x100: 1 CLAIMED, 2 SUBMITTED, 3 ACCEPTED, 4 FAILED, 5 IN PROGRESS, 6 CANCEL..."
@@ -183,7 +184,9 @@
 - addr: 0xd71c24
   kind: global
   status: PARTLY
-  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  impl: [cpu/core/aiProjectValue.ts:NUCLEAR_OWN]
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - ...least 200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON terms (one at @0xd71c24, the difference of 1000.0's at the player and none).
   review: imported

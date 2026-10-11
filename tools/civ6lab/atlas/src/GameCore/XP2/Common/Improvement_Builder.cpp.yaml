@@ -27,7 +27,9 @@
   final: 0x25a360
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld]
+  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld, cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x35fd60

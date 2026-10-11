@@ -48,7 +48,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
     - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."

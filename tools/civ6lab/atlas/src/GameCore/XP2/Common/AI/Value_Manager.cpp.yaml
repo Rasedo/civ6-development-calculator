@@ -17,6 +17,7 @@
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...akes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the po..."
   review: reviewed
@@ -28,6 +29,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "...x1788, population +0x588, T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield we..."
   review: reviewed
@@ -50,8 +52,8 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -173,6 +175,7 @@
     - cpu/core/aiPlotValue.ts:featureRemovalValue
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "## C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b132..."
     - "...eps the feature where MustRemoveFeature is false. A feature it neither keeps nor lists: 0x7a3010, or 0 where not Removable. Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (..."
@@ -193,6 +196,7 @@
     - cpu/core/aiPlotValue.ts:harvestValue
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - "...ment value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence,..."
     - "...resource value and 0x7b1320 off. A resource the improvement does not list: its harvest 0x7a37d0 where Resource_Harvests has rows, else 0; one it lists keeps the feature where MustRemo..."
@@ -219,6 +223,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
     - ".claude/scratchpad/cb3/NOTES.md: ...whole number only if constructible now. OPEN: GPP general (Barracks/Stable v 0, unsourced), housing 0x7a3d70 forecast, free units FX_MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Ligh..."
@@ -254,6 +259,15 @@
   context:
     - ...ays, unread), +1.0 where row +0xc0 is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENA...
   review: imported
+- addr: 0x7a48d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - "...it 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), the positive summed, added only where its SpaceRace ones value above 0 — shared by..."
+  review: imported
 - addr: 0x7a4b20
   final: 0x529ed0
   kind: function
@@ -275,10 +289,11 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -299,9 +314,16 @@
   final: 0x52a440
   kind: function
   name: valueDistrictAtPlot
-  status: PARTLY
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
+  impl: [cpu/core/aiDistrictValue.ts:districtValue]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
-  review: imported
+  review: reviewed
 - addr: 0x7a58f0
   final: 0x52a8c0
   kind: function
@@ -433,12 +455,15 @@
     - recording: h1_duelw1124
       turn: 3
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
-  impl: [cpu/core/aiCityBuild.ts:buildingPerTurn, cpu/core/aiCityBuild.ts:buildingValue]
+  impl:
+    - cpu/core/aiCityBuild.ts:buildingPerTurn
+    - cpu/core/aiCityBuild.ts:buildingValue
+    - cpu/core/aiProjectValue.ts:ProjectValueFacts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   notes:
     - "label: valueConstructible(modifiers+yields)"
     - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."
@@ -464,13 +489,21 @@
 - addr: 0x7aaf80
   final: 0x52d500
   kind: function
+  name: the district value body
   status: PARTLY
-  readings: ["H-1: the district adjacency — READ"]
+  cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
+  impl: [cpu/core/aiDistrictValue.ts:districtBodyValue]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "- The city's walk 0x7aaf80 shifts each row's integer back to fixed point and applies the adjacency percent per row..."
-  review: imported
+  review: reviewed
 - addr: 0x7b0330
   final: 0x52fd20
   kind: function
@@ -536,6 +569,7 @@
   impl: [cpu/core/aiPlotValue.ts:improvementYieldsValue]
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...litary AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:
@@ -562,16 +596,22 @@
   kind: function
   name: valueProject
   status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 32
+      value: "player 4's Campus Research Grants 29 / 30 / 31 at T 3 / 2 / 1 (t32 .. t34), 16 points at 9%"
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts, cpu/core/aiProjectValue.ts:projectValue]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   notes:
     - ".claude/scratchpad/cb3/NOTES.md: ...ase +0x6d8), plot-yield modifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: ts..."
     - ".claude/scratchpad/cb5/NOTES.md: ...f0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhattan), resource value 0x7a21e0, GPU twin, swap...."
   context:
     - ...its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(...
     - "...records and the Combat Desire's strengths (the unit value's inputs), the project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries' amenities over the player's cities, strat..."
-  review: imported
+  review: reviewed
 - addr: 0x7b3be0
   kind: function
   name: resolutionOptionValue

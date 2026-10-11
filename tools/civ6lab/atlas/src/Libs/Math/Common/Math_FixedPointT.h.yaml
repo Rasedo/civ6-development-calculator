@@ -56,6 +56,17 @@
     - "...ul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" product is a b / 25600 truncated toward 0 (the /100 magic..."
     - "...50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`, the GPU's `river_mp`)."
   review: imported
+- addr: 0x1b22d0
+  final: 0x1216a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiEconomic.ts:PurchaseCity]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...take the first. 0x68be60 (Economic, city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0 skipped); the UNITS and SLUSH slots together above it with UNITS above half..."
+  review: imported
 - addr: 0x1f43c0
   final: 0x14a6f0
   kind: function

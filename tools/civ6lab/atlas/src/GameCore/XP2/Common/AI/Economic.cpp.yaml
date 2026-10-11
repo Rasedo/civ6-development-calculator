@@ -12,10 +12,11 @@
     - recording: h1_duelv1127
       turn: 62
       value: the missions' can-do at slot 2, frac 0.5
-  impl: [ai/major/diploActions.ts:canAfford]
+  impl: [ai/major/diploActions.ts:canAfford, cpu/core/aiEconomic.ts:canAfford]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-DO: not human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]..."
     - ".claude/scratchpad/dp2/NOTES.md: ...efaultSavings): SLUSH_FUND 3, UNITS 4, PLOTS 1, GREAT_PEOPLE 1 (slot order = ? rowid).   Can-afford 0x6874d0(econ,&amt,slot,&frac): savings+0x5b8[slot] >= amt*(1-frac) ... then +0x598 term.   Spend 0x68acd0(e..."
@@ -29,14 +30,15 @@
   semantics: "The economic AI's turn: the gold boost; the savings — the treasury's change since the balance shared by the DefaultSavings weights, a slot below 0 cleared, slot 2 held at 150 with the excess to slot 0, slot 3 to slot 0 with no Great Person class left."
   status: PARTLY
   impl:
-    - ai/major/diploActions.ts:savingsTurn
-    - cpu/core/aiWeights.ts:strategies
     - ai/major/diploActions.ts:SLOT_PLOTS
+    - cpu/core/aiEconomic.ts:SLOT_PLOTS
+    - cpu/core/aiEconomic.ts:savingsTurn
+    - cpu/core/aiWeights.ts:strategies
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/dp2/NOTES.md: ...2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI turn 0x687bf0: delta = treasury(+0x13a0 +0xf8) - last(+0x1b8); each saving slot i:   savings(+0x540)[i] += delta..."
@@ -54,10 +56,11 @@
     - recording: h1_duelv1127
       turn: 62
       value: the perform spends slot 1, a refusal -price on slot 2
-  impl: [ai/major/diploActions.ts:spend]
+  impl: [ai/major/diploActions.ts:spend, cpu/core/aiEconomic.ts:spend]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...0.   Accept: gold from->to, mission set. Then proposer AI 0x6543a0 records response: r!=1 -> econ   0x68acd0(slot 2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; always 0x64a300(+0xc28[to], a). - Economic AI..."
     - ".claude/scratchpad/dp2/NOTES.md: ...d 0x6874d0(econ,&amt,slot,&frac): savings+0x5b8[slot] >= amt*(1-frac) ... then +0x598 term.   Spend 0x68acd0(econ,&amt,slot): excess over slot from slot0?; slot = max(0, slot-amt). - Diplomatic state transiti..."
@@ -70,10 +73,12 @@
 - addr: 0x68be60
   final: 0x459320
   kind: function
+  name: TryPurchaseUnits
   status: PARTLY
+  impl: [cpu/core/aiEconomic.ts:tryPurchaseUnits]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's items through 0x68be60.
-  review: imported
+  review: reviewed

@@ -96,6 +96,60 @@ export interface AiDistrictRow {
   tech: string | null;
   civic: string | null;
   trait: string | null;
+  maintenance: number;
+  housing: number;
+  appeal: number;
+  /** HitPoints, null where the row has none */
+  hitPoints: number | null;
+  /** MilitaryDomain, null for none */
+  domain: string | null;
+  coast: boolean;
+  aqueduct: boolean;
+  internalOnly: boolean;
+  requiresPopulation: boolean;
+  /** District_GreatPersonPoints: [the class's PseudoYieldType, points] */
+  gpp: readonly (readonly [string | null, number])[];
+  /** Districts_XP2's Canal and PreventsFloods */
+  canal: boolean;
+  preventsFloods: boolean;
+  /** the projects whose PrereqDistrict it is, in the database's order */
+  projects: readonly string[];
+  /** the largest RegionalRange of its buildings, 0 none */
+  regionalRange: number;
+  /** AppealHousingChanges: [MinimumValue, AppealChange], the first the
+   *  plot's Appeal reaches applies */
+  appealHousing: readonly (readonly [number, number])[];
+}
+
+/** One Projects row as the project value reads it (ai_tables.py) */
+export interface AiProjectRow {
+  type: string;
+  tech: string | null;
+  civic: string | null;
+  district: string | null;
+  /** MaxPlayerInstances, -1 none */
+  maxPlayerInstances: number;
+  /** UnlocksFromEffect (Projects' or Projects_XP2's) */
+  unlocksFromEffect: boolean;
+  /** RequiredBuilding; the projects it needs (ProjectPrereqs) */
+  requiredBuilding: string | null;
+  prereqs: readonly string[];
+  outerDefenseRepair: boolean;
+  spaceRace: boolean;
+  wmd: boolean;
+  /** the projects whose prerequisite it is (ProjectPrereqs) */
+  unlocks: readonly string[];
+  /** Project_GreatPersonPoints: [the class's PseudoYieldType, Points,
+   *  PointProgressionParam1] */
+  gpp: readonly (readonly [string | null, number, number])[];
+  /** Projects_XP1's IdentityPerCitizenChange */
+  identityPerCitizen: number;
+  /** Projects_XP2's CreateBuilding; the buildings it consumes
+   *  (Project_BuildingCosts) */
+  createBuilding: string | null;
+  consumes: readonly string[];
+  /** ProjectCompletionModifiers */
+  modifiers: readonly AiModifier[];
 }
 
 /** What the city build AI reads of one city and its owner: the engine
@@ -592,7 +646,7 @@ export function defaultSpecialization(t: CityBuildTables, f: PickFacts): Pick | 
     return { kind: 'building', type: AI_BUILDINGS[building.index].type, value: building.value };
   }
   if (unit.index >= 0 && unit.value >= project.value) return { kind: 'unit', type: AI_UNITS[unit.index].type, value: unit.value };
-  if (project.index >= 0) return { kind: 'project', type: AI_PROJECTS[project.index], value: project.value };
+  if (project.index >= 0) return { kind: 'project', type: AI_PROJECTS[project.index].type, value: project.value };
   return null;
 }
 
@@ -630,7 +684,7 @@ export function specializationBests(t: CityBuildTables, f: PickFacts): Record<'b
   let pVal = f.defense ? 0 : FX_MIN;
   if (!f.defense) {
     AI_PROJECTS.forEach((p, k) => {
-      if (f.canProduce(p) && t.projects[k] > pVal) {
+      if (f.canProduce(p.type) && t.projects[k] > pVal) {
         pVal = t.projects[k];
         pIdx = k;
       }

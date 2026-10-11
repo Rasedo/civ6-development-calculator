@@ -196,7 +196,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       const logged = plots.get(`${turn}:${player}:${name}`);
       if (!logged || !before.dumpOfMinor.get(before.minorOfPlayer.get(player)!)) continue;
       const ai = ais.get(player) ?? newCityAi();
-      freeSlots(ai, cs.id);
+      freeSlots(ai, { operationLive: () => false }, cs.id);
       let n = 0;
       if (slotFree(ai, cs.id, SLOT_DISTRICT)) chooseDistrict(ai, evalsOf(before.state, state, cs.seat, logged), () => (n++, 0));
       need.push([player, n]);
@@ -276,6 +276,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
       eventBuilding: eventBuilding(tables, pfAi), eventUnit: eventUnit(tables),
       buildingHeld: (bt) => pfAi.buildingHeld(bt),
       districtHeld: (d) => (cs.districts ?? []).some((x) => typeOf('district', x.type) === d && state.map.tiles[x.tileIndex].districtComplete),
+      // the threat's writer unread: no city threatened, no City Defense
+      threat: -1,
+      plot: cs.centerIndex,
     };
     // the units as the AI acts: the record before's, and the units the
     // turn's production made, where the record after has them
@@ -310,6 +313,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
       distance: (p, q) => hexDistance(state.map, state.map.tiles[p].col, state.map.tiles[p].row, state.map.tiles[q].col, state.map.tiles[q].row),
       newContractId: () => contractSerial++,
       newTreeId: () => treeSerial++,
+      // the minors' operation manager is not ported
+      startOperation: () => null,
+      operationLive: () => false,
       log: (line) => ours.push(parseOurs(line)),
       clearProduction: () => undefined,
       // an improvement built or a feature cleared spends a charge: a Builder
@@ -343,7 +349,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
     // A: the city's full update, its events, the Default Specialization
     goalsReached(ai, (g) => world.techHeld(g) || world.civicHeld(g),
       (g) => g === research.tech || g === research.civic, (p) => state.map.tiles[p].ownerSeat === cs.seat);
-    freeSlots(ai, cityId);
+    freeSlots(ai, world, cityId);
     inHandCheck(ai, cityFacts, () => undefined);
     cityFacts.bestImprovement = pickImprovement(ai, world, evals);
     const list = AI_CITY_EVENTS[AI_CITY_EVENT_LISTS.MINOR_CIV_DEFAULT_TRAIT];

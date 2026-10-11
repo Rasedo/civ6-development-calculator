@@ -7,15 +7,27 @@
   final: 0x2c3fc0
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
   readings:
     - "H-1: the city-states' quests — READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era known and at most the actor's (0x93e5..."
     - "..., a wonder (+0x158 & 0x40) PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5; per project (+0x160) PSEUDOYIELD_SPACE_RACE of 0x7b8a30²..."
     - "...'s version 0.5, a wonder PSEUDOYIELD_WONDER of 0.5; per district the player may have (0x406c00) PSEUDOYIELD_DISTRICT of 0.5 — each paid from landing to the horizon; its policies: the..."
+  review: imported
+- addr: 0x408b60
+  final: 0x2c45b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - "..., the positive summed, added only where its SpaceRace ones value above 0 — shared by (0x408b60 all + 1) while 0x408b60 complete stands within ceil(0.5 x their count) and the plot lac..."
   review: imported
 - addr: 0x409870
   final: 0x2c4f10

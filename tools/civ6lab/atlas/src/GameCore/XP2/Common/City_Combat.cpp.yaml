@@ -7,6 +7,7 @@
   final: 0x111800
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiProjectValue.ts:ProjectValueFacts]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...defences: +1 for a city of two districts or more (city +0x1a60, the districts' count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), popul..."

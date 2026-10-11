@@ -8,7 +8,7 @@
   kind: function
   status: PARTLY
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...es, military), then A (the cities 0x5c2650 -> 0x5ce680), then C (the second city hook 0x5c2610 -> 0x5ce5b0: the Default Specialization where the queue is empty, then TryPurchaseUnits..."
@@ -21,7 +21,7 @@
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5cadc0, 0x5cbd10 (the yield advantage..."
   review: imported

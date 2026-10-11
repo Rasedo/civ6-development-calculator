@@ -15,7 +15,7 @@
   impl: [ai/major/operations/nodes.ts:decodeTrigger, cpu/core/aiCityTrees.ts:decodeTrigger]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "- Leaves READ: Decode Trigger 0x7f2970; Operation Change Target 0x8196d0 (INVALID -> the backup of the same kind, else \"No bac..."
   review: reviewed

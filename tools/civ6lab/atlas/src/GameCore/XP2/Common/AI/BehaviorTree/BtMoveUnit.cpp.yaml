@@ -62,7 +62,7 @@
   impl: [cpu/core/aiCityTrees.ts:moveUnit]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...7f1d70; Make Formation 0x7efd70 / 0x7ee630; Protect Unit 0x7f07c0 / 0x7ef0e0; Move Unit 0x7f0020 / 0x7eeba0; Operation Change Target 0x8196d0 / 0x8163a0; Operation Is Ready 0x81a090.
@@ -83,7 +83,7 @@
     - "H-1: the raids — READ"
     - "H-1: the raids — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...d City\" node 3, a Concurrent with Move Unit; TreeData Damage Percentage .25): its check 0x7f07c0 counts the node's units whose damage (unit +0xcf0) is at least that share of their he..."
   review: imported

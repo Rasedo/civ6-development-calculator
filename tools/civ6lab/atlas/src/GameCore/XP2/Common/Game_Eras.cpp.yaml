@@ -138,6 +138,19 @@
   context:
     - "...of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENAGE_POINT of 0x2c4170(player). Each term is paid from landing to the horizon: PV(H) - PV(turns) (0x7a16e0: a(..."
   review: imported
+- addr: 0x2c41d0
+  final: 0x1e5d40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1121
+      turn: 11
+      value: "The residuals:   per (turn, player) a constant across plots (Campus, Holy Site: 0.4 to   5.5), an Encampment's 0.5 a turn (the player's CITY_DEFENSES weight   reads 0 where the logs fit +0.25), Snow c"
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - "- PARTLY READ / unported: PSEUDOYIELD_GOLDENAGE_POINT x 0x2c41d0 (the era manager's +0x5b8 record of player +0x128, its +0x34); the claims, modifiers..."
+  review: imported
 - addr: 0x2c4230
   final: 0x1e5d90
   kind: function

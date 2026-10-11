@@ -5,14 +5,7 @@
  * "C-97: the sender's pick, the savings, the threat and the focus" and
  * "C-97: the other actions' desires, the trust and the transitions").
  *
- * THE SAVINGS (AI::Economic 0x687bf0, each AI turn): the treasury's change
- * since the last balance shared over the SavingTypes slots by the
- * DefaultSavings weights (each share the change x the weight's fraction of
- * the total, the fraction truncated to 1/256), a slot below 0 cleared, the
- * PLOTS slot (2) held at 150 with the excess to the SLUSH_FUND (0). A spend
- * (0x68acd0) takes its slot, the overflow from slot 0, and lowers the
- * balance; the can-afford (0x6874d0) asks the slot for the price x (1 -
- * frac) and slot 0 + the slot for the price.
+ * The sender's savings are the Economic AI's (`cpu/core/aiEconomic.ts`).
  *
  * THE THREAT (+0x6480, 0x647f10 each diplomatic AI turn): per met major, the
  * sum of (a) its team's best victory progress above 0.4, x 100, (b) 0.05 x
@@ -64,11 +57,12 @@
  * war's can-do asks.
  */
 import {
-  AI_DEFAULT_SAVINGS, DIPLO_PREFERENCE_AGENDA_TRAITS, DIPLO_PREFERENCE_LEADER_TRAITS, DIPLO_PREFERENCE_LISTS,
+  DIPLO_PREFERENCE_AGENDA_TRAITS, DIPLO_PREFERENCE_LEADER_TRAITS, DIPLO_PREFERENCE_LISTS,
   DIPLO_PREFERENCES_BY_STRATEGY, DIPLO_PREFERENCES_BY_TRAIT, DIPLO_STATE_ACTIONS,
 } from './diplomacyTables';
 import type { MajorView } from './view';
 import { FX, yieldValue } from '../../cpu/core/aiValue';
+import { SLOT_PLOTS, SLOT_UNITS, canAfford, newEconomicMemory, spend, type EconomicMemory } from '../../cpu/core/aiEconomic';
 import type { SeatActionRecord } from '../../cpu/core/types';
 
 export const ACTION_DELEGATION = 'DIPLOACTION_DIPLOMATIC_DELEGATION';
@@ -88,21 +82,8 @@ export const AI_TURNS_BETWEEN_FRIENDSHIP_OFFERS = 5;
 const TRUST_PER_DEAL = 2 * FX;
 /** the desire a disfavoured war takes (@f04cb0) */
 const WAR_DISFAVOURED = -9999 * FX;
-/** the savings slots by SavingTypes order */
-const SLOT_SLUSH = 0;
-const SLOT_UNITS = 1;
-const SLOT_PLOTS = 2;
-/** the PLOTS slot's ceiling (0x687bf0: 0x9600) */
-const PLOTS_CAP = 150 * FX;
-const TOTAL_WEIGHT = AI_DEFAULT_SAVINGS.reduce((a, s) => a + s.weight, 0);
-/** each slot's share of a change, the fraction truncated to 1/256 */
-const SHARE = AI_DEFAULT_SAVINGS.map((s) => Math.floor((s.weight / TOTAL_WEIGHT) * FX));
-
 /** one major's economic and diplomatic memory, raw 24.8 */
-export interface SenderMemory {
-  savings: number[];
-  /** the treasury at the last balance */
-  balance: number;
+export interface SenderMemory extends EconomicMemory {
   /** the turn of the last action sent to each major (0x3e6d20) */
   lastAction: Map<number, number>;
   /** the focus the last AI turn's close set (0x647bb0), null for none */
@@ -127,43 +108,10 @@ const bump = (g: DiploActionGaps, k: string) => g.unread.set(k, (g.unread.get(k)
 export function senderOf(mem: DiploActionMemory, seat: number): SenderMemory {
   let s = mem.seats.get(seat);
   if (!s) {
-    s = { savings: AI_DEFAULT_SAVINGS.map(() => 0), balance: 0, lastAction: new Map(), focus: null, trust: new Map() };
+    s = { ...newEconomicMemory(), lastAction: new Map(), focus: null, trust: new Map() };
     mem.seats.set(seat, s);
   }
   return s;
-}
-
-const fxGold = (g: number): number => Math.trunc(g * FX);
-
-/** THE ECONOMIC AI'S SAVINGS TURN (0x687bf0) */
-export function savingsTurn(view: MajorView, mem: DiploActionMemory, seat: number): void {
-  const s = senderOf(mem, seat);
-  const now = fxGold(view.treasury(seat));
-  const delta = now - s.balance;
-  for (let i = 0; i < s.savings.length; i++) {
-    s.savings[i] += (delta * SHARE[i]) >> 8;
-    if (s.savings[i] < 0) s.savings[i] = 0;
-  }
-  if (s.savings[SLOT_PLOTS] > PLOTS_CAP) {
-    s.savings[SLOT_SLUSH] += s.savings[SLOT_PLOTS] - PLOTS_CAP;
-    s.savings[SLOT_PLOTS] = PLOTS_CAP;
-  }
-  s.balance = now;
-}
-
-/** the can-afford (0x6874d0): the slot holds amount x (1 - frac), slot 0 and
- *  the slot together the amount */
-function canAfford(s: SenderMemory, amount: number, slot: number, frac: number): boolean {
-  return s.savings[slot] >= amount - Math.trunc(amount * frac) && s.savings[SLOT_SLUSH] + s.savings[slot] >= amount;
-}
-
-/** a spend (0x68acd0): the overflow from slot 0, the slot no lower than 0,
- *  the balance lowered by the amount (a refund is a negative amount) */
-function spend(s: SenderMemory, amount: number, slot: number): void {
-  const over = amount - s.savings[slot];
-  if (over > 0 && slot !== SLOT_SLUSH) s.savings[SLOT_SLUSH] -= over;
-  s.savings[slot] = Math.max(0, s.savings[slot] - amount);
-  s.balance -= amount;
 }
 
 /** THE DEAL SIGNAL's trust (0x6535f0): each party of a struck deal trusts

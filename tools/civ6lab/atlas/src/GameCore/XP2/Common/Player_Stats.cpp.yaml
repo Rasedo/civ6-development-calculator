@@ -141,10 +141,10 @@
     - recording: h1_duelw1117
       turn: 28
       value: 0 for every space project
-  impl: [cpu/core/aiValue.ts:AiValueView]
+  impl: [cpu/core/aiValue.ts:AiValueView, cpu/core/aiProjectValue.ts:ProjectValueFacts]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "...ooleans in order — the value whole where the owner advanced it, m_aiNumProjectsAdvanced 0x4be7b0; else, where the build turns at the Amount (parser 0x6be5b0: whole, 30) lifted fall bef..."
   review: reviewed

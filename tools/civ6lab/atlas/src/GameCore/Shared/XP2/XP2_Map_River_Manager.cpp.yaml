@@ -246,6 +246,15 @@
   context:
     - ...IELD_PER_FLOOD, the Bath's GREATBATH_FLOODFAITH Amount 1 Faith) is above 0 for the yield, 0xa2b810 walks the river vector in order and returns the id of the FIRST river whose floodplain pl...
   review: imported
+- addr: 0xa2bf20
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - ...bit 3) 100.0 an improved and 300.0 a districted plot of the owner's along its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a f...
+  review: imported
 - addr: 0xa2c060
   final: 0x72ed30
   kind: function

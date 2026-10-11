@@ -1,25 +1,40 @@
 /**
  * THE AI'S PLOT VALUES AGAINST THE GAME'S: each city-state's plot analysis
  * as AI_CityBuild.csv prints it (recordings made with the AI's verbose
- * logs) — the IMPROVEMENTS row of every plot the city evaluates — against
- * `aiPlotValue.ts` on the record of the turn.
+ * logs) — the IMPROVEMENTS row of every plot the city evaluates against
+ * `aiPlotValue.ts`, or with --districts its DISTRICTS row against
+ * `aiDistrictValue.ts` — on the record of the turn.
  *
  *    npx vite-node cpu/harness/plotValueLab.ts -- <dump.jsonl> [--player N] [--imp IMPROVEMENT_X] [--show N]
+ *        [--districts [--rows]]
  *
- * Prints, per improvement, the values within 0.01 of the log's, within 1.0,
- * and further, and the first further ones (with the landing turn that would
- * give the log's value). The world: the record of the turn, the Builders
- * the record after holds (the turn start's and the Economic AI's come
- * before the cities), the research AI's turns from AI_Research.csv.
+ * Prints, per improvement or district, the values within 0.01 of the log's,
+ * within 1.0, and further, and the first further ones (with the landing turn
+ * that would give the log's value); --rows every district row with its value
+ * two turns either side. The world: the record of the turn, the Builders the
+ * record after holds (the turn start's and the Economic AI's come before the
+ * cities), the research AI's turns from AI_Research.csv, the civics AI's as
+ * its turn would write them. A district's facts: the engine's adjacency
+ * (`baseAdjacency`) for both the whole and the rows, the plot's price where
+ * the city may buy it (`borderCandidates`), one city (no regional reach, no
+ * Dam, Canal or projects); LAB: an inland city-state on a river trains ships
+ * (0x1c77c0's sea test unread).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, importTurn, newHistory } from './import';
-import { AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
+import { AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_RESOURCES } from '../data/aiBuildTables';
 import { FX } from '../core/aiValue';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
 import { improvementValue, type PlotValueFacts } from '../core/aiPlotValue';
+import { districtValue, type DistrictValueFacts } from '../core/aiDistrictValue';
+import { baseAdjacency } from '../core/yields';
+import { tilePurchaseCost } from '../core/game';
+import { canPlaceDistrictIn } from '../core/rules';
 import { minorBuildFacts, minorResourceFacts } from '../core/minorBuild';
+import { minorCity } from '../core/cityStates';
+import { civicAnalysis } from '../core/aiCivics';
+import { borderCandidates, computeCityStats } from '../core/city';
 import { resourceValue } from '../core/aiResource';
 import { growthForecast, housingValue } from '../core/aiCityBuild';
 import { makeYieldCtx } from '../core/effects';
@@ -39,6 +54,9 @@ const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
 const onlyPlayer = args.includes('--player') ? Number(args[args.indexOf('--player') + 1]) : null;
 const onlyImp = args.includes('--imp') ? args[args.indexOf('--imp') + 1] : null;
+const districtsMode = args.includes('--districts');
+// every DISTRICTS row with its values two turns either side (--rows)
+const rowsOut = args.includes('--rows');
 const show = args.includes('--show') ? Number(args[args.indexOf('--show') + 1]) : 20;
 
 const cat = loadCatalog(dump);
@@ -63,6 +81,9 @@ const researching = new Map<string, [string, number]>();
 }
 const W = recs[0].head.W;
 const RES = new Map(AI_RESOURCES.map((r) => [r.type, r] as const));
+const AI_FEATURE_ROWS = new Map(AI_FEATURES.map((r) => [r.type, r] as const));
+/** an engine district's install type: the traitless AI row whose engine id it is */
+const typeOfDistrict = (id: string): string => AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
 const YIELD_KEY: Record<string, string> = {
   YIELD_FOOD: 'food', YIELD_PRODUCTION: 'production', YIELD_GOLD: 'gold', YIELD_SCIENCE: 'science', YIELD_CULTURE: 'culture', YIELD_FAITH: 'faith',
 };
@@ -95,6 +116,8 @@ for (const rec of recs) {
     // turn's (the turn start's training and the Economic AI's purchases
     // come before the cities)
     const builders = after.minorOfPlayer.get(player)?.buildersTrained ?? cs.buildersTrained;
+    // the civics AI's entries as its turn would write them (cityBuildLab.ts)
+    cs.research.civicAiEntries = civicAnalysis(state, cs.seat, computeCityStats(state, minorCity(cs)).total.culture);
     const facts = minorBuildFacts(state, cs, () => 0);
     const resFacts = minorResourceFacts(state, cs);
     const forecast = growthForecast(facts.growth);
@@ -120,7 +143,7 @@ for (const rec of recs) {
     for (const lp of logged) {
       // a plot the analysis left unvalued keeps its row at 0 (the city centre,
       // a district's plot)
-      if (lp.improvements.every((v) => v === 0)) continue;
+      if ((districtsMode ? lp.districts : lp.improvements).every((v) => v === 0)) continue;
       const plot = lp.y * W + lp.x;
       const tile = state.map.tiles[plot];
       const floodHome = floodRiverIndex(state.map, tile);
@@ -159,6 +182,76 @@ for (const rec of recs) {
           return row ? resourceValue(resFacts, row, count, t, h) : 0;
         },
       };
+      if (districtsMode) {
+        const city = minorCity(cs);
+        const specialty = (cs.districts ?? []).filter((x) => DISTRICTS[x.type]?.countsTowardLimit).length;
+        const districtAdj = (d: string, y: string): number => {
+          const id = engineId('district', d, 'DISTRICT_', DISTRICTS) as keyof typeof DISTRICTS | null;
+          if (!id || YIELD_KEY[y] !== DISTRICTS[id].adjacencyYield) return 0;
+          return baseAdjacency(yctx, tile, id);
+        };
+        const df: DistrictValueFacts = {
+          ...f,
+          owned: tile.ownerSeat >= 0,
+          purchaseCost: tile.ownerSeat >= 0 ? 0 : borderCandidates(state, city).includes(plot) ? tilePurchaseCost(state, city, plot) : -1,
+          lake: tile.terrain === 'LAKE',
+          keepsFeature: () => !!f.feature && !AI_FEATURE_ROWS.get(f.feature)?.removable,
+          district: tile.district ? typeOfDistrict(tile.district) : null,
+          districtPillaged: !!tile.districtPillaged,
+          isCity: tile.index === cs.centerIndex,
+          districtAdjacency: districtAdj,
+          rowsAdjacency: districtAdj,
+          // the districts the player may have (no other civilization's), the
+          // city lacks and the plot takes, research waived
+          otherDistricts: (d) => AI_DISTRICTS.filter((x) => {
+            if (x.type === d || x.trait !== null || x.type === 'DISTRICT_CITY_CENTER' || x.type === 'DISTRICT_WONDER') return false;
+            const id = engineId('district', x.type, 'DISTRICT_', DISTRICTS) as keyof typeof DISTRICTS | null;
+            if (!id || (cs.districts ?? []).some((c) => c.type === id)) return false;
+            return canPlaceDistrictIn(state, city, id, plot, { unlocks: null, ownsTile: () => true }).ok;
+          }).map((x) => x.type),
+          chronology: facts.era + 1,
+          districtCount: specialty,
+          districtCap: 1 + Math.floor((cs.population - 1) / 3),
+          // LAB: 0x1c77c0's sea test (the centre's plot's +0x40 and its
+          // flags +0x14 bit 0) unread; every inland city-state of the five
+          // verbose duels sits on a river and values as one that trains ships
+          cityTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && (state.map.tiles[cs.centerIndex].riverMask ?? 0) !== 0),
+          playerTrains: (dom) => facts.trainsDomain(dom) || (dom === 'DOMAIN_SEA' && (state.map.tiles[cs.centerIndex].riverMask ?? 0) !== 0),
+          domainUnitsValue: () => 0,
+          // a city-state: one city
+          regionalCities: () => 0,
+          riverPlots: () => ({ improved: 0, districted: 0 }),
+          canalTrade: 0,
+          projectValue: () => 0,
+          spaceRace: () => false,
+          favoured: () => false,
+          districtsOf: (d) => (cs.districts ?? []).filter((x) => typeOfDistrict(x.type) === d).length,
+        };
+        lp.districts.forEach((lv, i) => {
+          if (lv <= -9999) return;
+          const row = AI_DISTRICTS[i];
+          if (onlyImp && row.type !== onlyImp) return;
+          const inHand = 0;
+          const t = facts.buildTurns(row.type) + inHand + Math.max(techTurns(row.tech), facts.civicTurns(row.civic));
+          const tparts = `${facts.buildTurns(row.type)}+${inHand}+${techTurns(row.tech)}/${facts.civicTurns(row.civic)}`;
+          const ours = districtValue(df, row.type, t, AI_VALUE_HORIZON) / FX;
+          const d = Math.abs(ours - lv);
+          if (rowsOut) console.log(`ROW T=${t} ${[-2, -1, 1, 2].map((dt) => (districtValue(df, row.type, t + dt, AI_VALUE_HORIZON) / FX).toFixed(2)).join(',')} t${turn} p${player} (${lp.x},${lp.y}) ${row.type} log ${lv.toFixed(2)} ours ${ours.toFixed(2)} adj ${['YIELD_SCIENCE', 'YIELD_FAITH', 'YIELD_GOLD', 'YIELD_PRODUCTION', 'YIELD_CULTURE'].map((y) => districtAdj(row.type, y)).join('/')} own=${lp.owned} pc=${df.purchaseCost} feat=${f.feature} res=${f.resource}`);
+          const k = tallyOf(row.type);
+          if (d <= 0.01) k.exact++;
+          else if (d <= 1) k.close++;
+          else {
+            k.far++;
+            if (k.miss.length < show) {
+              let fit = -1;
+              for (let x = 0; x < AI_VALUE_HORIZON && fit < 0; x++) if (Math.abs(districtValue(df, row.type, x, AI_VALUE_HORIZON) / FX - lv) <= 0.01) fit = x;
+              const at15 = (districtValue(df, row.type, 15, AI_VALUE_HORIZON) / FX).toFixed(2);
+              k.miss.push(`t${turn} p${player} (${lp.x},${lp.y}) log ${lv.toFixed(2)} ours ${ours.toFixed(2)} t=${t} tp=${tparts} fitT=${fit} at15=${at15} own=${lp.owned} imp=${f.improvement} res=${f.resource} feat=${f.feature}`);
+            }
+          }
+        });
+        continue;
+      }
       lp.improvements.forEach((lv, i) => {
         if (lv <= -9999) return;
         const row = AI_IMPROVEMENTS[i];

@@ -184,10 +184,11 @@
     - cpu/core/effects.ts:policyEscalated
     - cpu/data/constants.ts:GAME_COST_ESCALATION
     - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/core/aiProjectValue.ts:ProjectValueFacts
   readings:
     - "B-D: the policy-unlock price — CLOSED"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...etCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."

@@ -181,7 +181,7 @@
   status: PARTLY
   impl: [cpu/core/aiCityTrees.ts:CityTreeWorld]
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...+0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where the value passes CityBuildAI +0xa48 and the production was set this turn or the...
@@ -245,8 +245,10 @@
       value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
     - recording: 1107
       value: 1107 Kandy's 8 against 4.
-  impl: [cpu/core/aiCityBuild.ts:PickFacts]
-  readings: ["C-94: the religious spread — READ"]
+  impl: [cpu/core/aiCityBuild.ts:PickFacts, cpu/core/aiProjectValue.ts:ProjectTableFacts]
+  readings:
+    - "C-94: the religious spread — READ"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "..., then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a Pr..."
   review: imported
@@ -353,7 +355,9 @@
   name: turnsToBuildDistrict
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:ContractCity]
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
   review: imported
@@ -361,10 +365,13 @@
   kind: function
   name: turnsToBuildProject
   status: PARTLY
-  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/aiProjectValue.ts:ProjectValueFacts
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   review: reviewed
 - addr: 0x17bb40
   kind: function
@@ -399,6 +406,15 @@
   readings: ["H-1: a unit's Production cost in the queue — READ"]
   context:
     - "...n int from the city build queue cache's `m_aiUnitCost` (Cache_City_BuildQueue.cpp), which 0x17c790 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x..."
+  review: imported
+- addr: 0x17cb00
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - "...ld value with no player, discounted T, taken off. A feature the district does not keep (0x17cb00) and the Features row does not let it clear: 0; else the feature removal (0x7a3010). A..."
   review: imported
 - addr: 0x17d1a0
   kind: function

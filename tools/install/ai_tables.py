@@ -478,6 +478,11 @@ def build() -> str:
             x = inherit.get(x)
         ids = sorted({m for lt in tree for t in ltraits[lt] for m in trait_mods[t]} | {m for t in civ_traits_all[civ] for m in trait_mods[t]})
         minor_influence[civ] = [modifier(m) for m in ids if influenced(m)]
+    # THE ECONOMIC AI'S SAVINGS (every party's: the majors' and the minors'
+    # traits carry DefaultSavings): the SavingTypes in table order (a slot's
+    # index) and the list's weight of each
+    saving_weight = {c["Item"]: int(float(c.get("Value") or 0)) for c in rows("AiFavoredItems") if c.get("ListType") == "DefaultSavings"}
+    savings = [{"saving": t, "weight": saving_weight.get(t, 0)} for t in keyed(rows("SavingTypes"), "SavingType")]
     core = (
         "/**\n * THE AI VALUE LAYER'S TABLES (cpu/core/aiValue.ts), written by\n"
         " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
@@ -504,6 +509,7 @@ def build() -> str:
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace") == "true"],
               "readonly string[]")
+        + lit("AI_DEFAULT_SAVINGS", savings, "readonly { saving: string; weight: number }[]")
     )
     city = build_city(rows, modifier)
     return major, core, city, build_congress(rows)
@@ -757,7 +763,42 @@ def build_city(rows, modifier) -> str:
                     for i, c in in_game_order("Improvements", "ImprovementType", keyed(rows("Improvements"), "ImprovementType"))]
     # the districts (the district choice's and the trees' rows: PrereqTech /
     # PrereqCivic, the civilization trait), in DATABASE ORDER
-    districts = [{"type": d, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType")}
+    # (the district value's: Maintenance, Housing, Appeal, HitPoints,
+    # MilitaryDomain, the flags it tests, District_GreatPersonPoints at their
+    # class's pseudo-yield, Districts_XP2's Canal / PreventsFloods, the
+    # projects whose PrereqDistrict it is in the database's order)
+    d_gpp = multi("District_GreatPersonPoints", "DistrictType")
+    d_xp2 = keyed(rows("Districts_XP2"), "DistrictType")
+    d_projects = collections.defaultdict(list)
+    project_rows = keyed(rows("Projects"), "ProjectType")
+    for (pr,) in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid"):
+        if project_rows.get(pr, {}).get("PrereqDistrict"):
+            d_projects[project_rows[pr]["PrereqDistrict"]].append(pr)
+
+    # the largest RegionalRange of the buildings the district holds (a
+    # civilization's own ones left out), the Appeal housing bands
+    # (AppealHousingChanges [MinimumValue, AppealChange] in the database's
+    # order)
+    d_range = collections.defaultdict(int)
+    for b, c in keyed(rows("Buildings"), "BuildingType").items():
+        if c.get("PrereqDistrict") and not c.get("TraitType"):
+            d_range[c["PrereqDistrict"]] = max(d_range[c["PrereqDistrict"]], num(c, "RegionalRange"))
+    d_appeal = collections.defaultdict(list)
+    for dt, mv, ch in sqlite3.connect(GAME_DB).execute(
+            "select DistrictType, MinimumValue, AppealChange from AppealHousingChanges order by rowid"):
+        d_appeal[dt].append([mv, ch])
+
+    def flag(c, k):
+        return str(c.get(k, "")).lower() in ("true", "1")
+    districts = [{"type": d, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType"),
+                  "maintenance": num(c, "Maintenance"), "housing": num(c, "Housing"), "appeal": num(c, "Appeal"),
+                  "hitPoints": num(c, "HitPoints") if c.get("HitPoints") not in (None, "", "NULL") else None,
+                  "domain": c.get("MilitaryDomain") if c.get("MilitaryDomain") not in (None, "", "NO_DOMAIN") else None,
+                  "coast": flag(c, "Coast"), "aqueduct": flag(c, "Aqueduct"), "internalOnly": flag(c, "InternalOnly"),
+                  "requiresPopulation": flag(c, "RequiresPopulation"),
+                  "gpp": [[gpc.get(r["GreatPersonClassType"]), num(r, "PointsPerTurn")] for r in d_gpp[d]],
+                  "canal": flag(d_xp2.get(d, {}), "Canal"), "preventsFloods": flag(d_xp2.get(d, {}), "PreventsFloods"),
+                  "projects": d_projects[d], "regionalRange": d_range[d], "appealHousing": d_appeal[d]}
                  for d, c in in_game_order("Districts", "DistrictType", keyed(rows("Districts"), "DistrictType"))]
     # the features (a feature a Builder clears for an improvement: Removable,
     # RemoveTech), in DATABASE ORDER
@@ -774,18 +815,51 @@ def build_city(rows, modifier) -> str:
     # the database's own rows: the install reader also takes a persona pack's
     # project (PROJECT_COURT_FESTIVAL) the recorded games did not load — their
     # logged PROJECTS rows hold the database's 37
-    projects = [r[0] for r in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid")]
+    # each with the columns the project value (0x7b28c0) reads: the projects
+    # it is a prerequisite of (ProjectPrereqs), Project_GreatPersonPoints at
+    # their class's pseudo-yield, Projects_XP1's loyalty a citizen,
+    # Projects_XP2's CreateBuilding, Project_BuildingCosts' consumed
+    # buildings, ProjectCompletionModifiers
+    p_rows = keyed(rows("Projects"), "ProjectType")
+    p_unlocks = collections.defaultdict(list)
+    p_prereqs = collections.defaultdict(list)
+    for c in rows("ProjectPrereqs"):
+        p_unlocks[c["PrereqProjectType"]].append(c["ProjectType"])
+        p_prereqs[c["ProjectType"]].append(c["PrereqProjectType"])
+    p_gpp = multi("Project_GreatPersonPoints", "ProjectType")
+    p_xp1 = keyed(rows("Projects_XP1"), "ProjectType")
+    p_xp2 = keyed(rows("Projects_XP2"), "ProjectType")
+    p_mods = multi("ProjectCompletionModifiers", "ProjectType")
+    p_consumes = multi("Project_BuildingCosts", "ProjectType")
+
+    def pflag(c, k):
+        return str(c.get(k, "")).lower() in ("true", "1")
+
+    def prow(pt):
+        c = p_rows.get(pt, {})
+        return {"type": pt, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
+                "maxPlayerInstances": num(c, "MaxPlayerInstances", -1),
+                "unlocksFromEffect": pflag(c, "UnlocksFromEffect") or pflag(p_xp2.get(pt, {}), "UnlocksFromEffect"),
+                "requiredBuilding": c.get("RequiredBuilding"), "prereqs": sorted(p_prereqs[pt]),
+                "outerDefenseRepair": pflag(c, "OuterDefenseRepair"), "spaceRace": pflag(c, "SpaceRace"), "wmd": pflag(c, "WMD"),
+                "unlocks": sorted(p_unlocks[pt]),
+                "gpp": [[gpc.get(r["GreatPersonClassType"]), num(r, "Points"), num(r, "PointProgressionParam1")] for r in p_gpp[pt]],
+                "identityPerCitizen": float(p_xp1.get(pt, {}).get("IdentityPerCitizenChange") or 0),
+                "createBuilding": p_xp2.get(pt, {}).get("CreateBuilding"),
+                "consumes": [r["ConsumedBuildingType"] for r in p_consumes[pt]],
+                "modifiers": [modifier(r["ModifierId"]) for r in p_mods[pt]]}
+    projects = [prow(r[0]) for r in sqlite3.connect(GAME_DB).execute("select ProjectType from Projects order by rowid")]
     return (
         "/**\n * THE CITY BUILD AI'S TABLES (cpu/core/aiCityBuild.ts), written by\n"
         " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
         " * stale file): the Buildings, Units and Projects in DATABASE ORDER — the\n"
         " * index the AI's value tables run in — with the columns and child rows\n"
         " * the values and the Default Specialization pick read.\n */\n"
-        "import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiUnitRow } from '../core/aiCityBuild';\n"
+        "import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiProjectRow, AiUnitRow } from '../core/aiCityBuild';\n"
         "import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';\n\n"
         f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n\n"
         f"export const AI_UNITS: readonly AiUnitRow[] = {json.dumps(units, indent=1)};\n\n"
-        f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n\n"
+        f"export const AI_PROJECTS: readonly AiProjectRow[] = {json.dumps(projects, indent=1)};\n\n"
         f"export const AI_RESOURCES: readonly AiResourceRow[] = {json.dumps(resources, indent=1)};\n\n"
         f"export const AI_IMPROVEMENTS: readonly AiImprovementRow[] = {json.dumps(improvements, indent=1)};\n\n"
         f"export const AI_DISTRICTS: readonly AiDistrictRow[] = {json.dumps(districts, indent=1)};\n\n"

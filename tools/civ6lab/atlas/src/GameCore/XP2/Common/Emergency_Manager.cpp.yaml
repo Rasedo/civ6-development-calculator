@@ -7,7 +7,8 @@
   final: 0x19a7b0
   kind: function
   status: PARTLY
-  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  readings:
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
   context:
     - "- A diplomatic-victory row (+0xe8 bit 4, or the Projects_XP2 row's +0x60 bit 1, with 0x25afc0): per its rows PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT of the era's points."
   review: imported

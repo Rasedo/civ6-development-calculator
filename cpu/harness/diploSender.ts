@@ -18,11 +18,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import {
   ACTION_ALLIANCE, ACTION_DELEGATION, ACTION_DEMAND_TRIBUTE, ACTION_EMBASSY, ACTION_FRIENDSHIP, ACTION_OPEN_BORDERS,
   ACTION_SURPRISE_WAR, actionCost, aiActionsIn, dealStruck, desire, type DiploActionMemory, focusTurn, newDiploActionGaps,
-  newDiploActionMemory, performAction, performFriendship, pickActions, preference, recordAnswer, savingsTurn, threat,
+  newDiploActionMemory, performAction, performFriendship, pickActions, preference, recordAnswer, senderOf, threat,
   type DesireInputs, type PickedAction, type PickInputs,
 } from '../../ai/major/diploActions';
 import type { KnownCity } from '../../ai/major/knowledge';
 import { majorView, type MajorViewInputs } from '../core/majorView';
+import { savingsTurn } from '../core/aiEconomic';
+import { FX } from '../core/aiValue';
 import { DEAL_FRIENDSHIP, DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
 import type { GameState } from '../core/types';
 import type { MajorView } from '../../ai/major/view';
@@ -173,7 +175,7 @@ export class DiploSender {
     const out: (PickedAction & { owner: number })[] = [];
     for (const [owner, pid] of this.seats) {
       if (!view.majors().includes(owner)) continue;
-      savingsTurn(view, this.mem, owner);
+      savingsTurn(senderOf(this.mem, owner), Math.trunc(view.treasury(owner) * FX));
       const ins = new Map<number, PickInputs>();
       for (const other of view.majors()) {
         if (other === owner || view.metTurn(owner, other) === null) continue;

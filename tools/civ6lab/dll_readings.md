@@ -3881,24 +3881,116 @@ the tables `AI_RESOURCES` / `AI_IMPROVEMENTS` in `cpu/data/aiBuildTables.ts`
 - MEASURED: the replay's research tallies (`cpu/harness/replay.ts`, "The
   research AI"), the five seeds before and after (AUDIT C-96).
 
-## C-96: the project value — PARTLY READ (the structure), unported
+## C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired
+
+Ported in `cpu/core/aiDistrictValue.ts`; measured by
+`cpu/harness/plotValueLab.ts --districts` against AI_CityBuild.csv's
+DISTRICTS rows of the five verbose duels: 8,629 of 55,800 within 0.02
+(Commercial Hub 2,077 of 7,627, Harbor 2,849 of 9,896, Industrial Zone
+911 of 6,108, Neighborhood 2,057 of 15,864, Campus 409 of 5,842, Holy
+Site 181 of 402; Theater 124 and Encampment 21 of ~5,000 each).
+
+- 0x7a51f0 (out, district, &rate, T, H, plot, city, ...): T past H
+  FX(-9999). A plot without an owner pays its price: the city's Gold price
+  0x1b1cb0 (city +0x1688; -1 where the plot lies beyond GlobalParameters
+  +0x124 of the city or no plot beside it is the city owner's — r8 0, no
+  forced buy) at the yield value with no player, discounted T, taken off.
+  A feature the district does not keep (0x17cb00) and the Features row
+  does not let it clear: 0; else the feature removal (0x7a3010). A
+  resource seen with no harvest row: 0; else the harvest (0x7a37d0). An
+  unpillaged improvement: its yields (0x7b1320) and the resource's value
+  at count -1 off. The plot's own district pillaged: the repair, +12500.0
+  at the city centre, the whole x2. Then 0x7aaf80.
+- 0x7aaf80 (the body): T at or past H FX(-9999); a Coast row on a lake
+  FX(-9999); a flood (unless Districts_XP2 PreventsFloods) or an eruption
+  sooner cuts H. A turn: PSEUDOYIELD_DISTRICT 1.0; per yield the whole
+  adjacency 0x366df0 -> 0x365720 (its rows through 0x365ae0 plus the
+  owner's adjacency modifiers), 0 at a plot without an owner (0x366df0
+  reads the plot's owner byte); the district's own rows (each through
+  0x365ae0) and, where a district the player may build, the city lacks and
+  the plot takes (0x406c00, 0x1aec20, 0x35f2d0) earns more by its rows,
+  that best off (not for an Aqueduct, +0xe0 bit 2); HitPoints (+0x58 /
+  +0x5c) x 0.02 x ((d - d f) / d + 1) of PSEUDOYIELD_CITY_DEFENSES at no
+  player (d) and at the player's (d f); 0.5 x the era's ChronologyIndex x
+  the district pseudo-yield while the city may add a district (not
+  RequiresPopulation, +0xe1 bit 6, or 0x1ae8a0 above 0x1ae8f0), the whole
+  where the plot holds it; a regional building's reach (the largest
+  RegionalRange of its buildings, +0x130) multiplies the turn so far by
+  (the player's other cities within it holding no such district within it
+  + 1) x 0.5; Appeal x 0.5 Food beside a district with Housing; its
+  domain (0xadd590: sea 0, air 1, land 2) where 0x1c77c0 says the city
+  does not train it (a district of the domain, land, or the sea where the
+  centre's plot's +0x40 and its flags +0x14 bit 0 hold) PSEUDOYIELD_UNIT_
+  NAVAL / AIR_COMBAT 5.0, twice where no city of the player's does, then
+  the domain's units' values (0x5d4cd0, each at least 0) once where none
+  does; Maintenance Gold off; District_GreatPersonPoints at their class's
+  pseudo-yield. PV(H) - PV(T) plus the units' lump; Housing (an
+  Aqueduct's CITY_POPULATION_AQUEDUCT_BOOST 2, the globals' +0x13c) plus
+  the first AppealHousingChanges band the plot's Appeal reaches (0x1b4450)
+  at the housing value 0x7a3d70; where the civics' list holds the district
+  (0x39dd20) the claimed plots (0x7a10c0); a Dam (Districts_XP2 +0x28 bit
+  3) 100.0 an improved and 300.0 a districted plot of the owner's along
+  its rivers (0xa2bf20); a Canal (bit 0) 100.0 x 0x4d9320; its projects
+  (+0x1d0) each 0x7b28c0 x 0.1, x3.0 a favoured one (0x7a48d0), the
+  positive summed, added only where its SpaceRace ones value above 0 —
+  shared by (0x408b60 all + 1) while 0x408b60 complete stands within
+  ceil(0.5 x their count) and the plot lacks the district; the modifiers
+  (0x7a4b20); at the top level the neighbours (0x79f280).
+- The analysis' T: the build turns (0x17b5a0) + max(the tech's turns, the
+  civic's) — 1127 t2's Campus T 15 = 2 + 13, no +10 for an item in hand.
+- Measured: 1127 t2 / t4's Campus rows exact on every plot (owned twice
+  the adjacency, unowned once, beyond the reach at -1); 1121 / 1127 Harbor
+  exact where the inland city-state's river counts as training ships (LAB:
+  0x1c77c0's sea test unread; every inland city-state of the five sits on
+  a river); the Industrial Zone 77 -> 911 with its reach.
+- PARTLY READ / unported: PSEUDOYIELD_GOLDENAGE_POINT x 0x2c41d0 (the era
+  manager's +0x5b8 record of player +0x128, its +0x34); the claims,
+  modifiers and neighbours terms (as the improvement value's); the
+  domain's resources path (where a city trains the domain). The residuals:
+  per (turn, player) a constant across plots (Campus, Holy Site: 0.4 to
+  5.5), an Encampment's 0.5 a turn (the player's CITY_DEFENSES weight
+  reads 0 where the logs fit +0.25), Snow coast plots 3.0 a turn high
+  (1121 (10,2) / (34,23)), Woods / Rainforest plots 0.44 low past t11 (the
+  removal), and the civic turns of the Theater and the Neighborhood (the
+  minors' civics analysis).
+
+## C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired
 
 0x7b28c0 (out, project, &rate, T, H, player, city, ...), the city build
-AI's PROJECTS table (0x5ce970) and the research value's projects.
+AI's PROJECTS table (0x5ce970) and the research value's projects. Ported in
+`cpu/core/aiProjectValue.ts`; measured by `cpu/harness/cityBuildLab.ts`
+against the PROJECTS rows of the five verbose duels: 6,004 of 6,837 logged
+values exact, the misses the build turns a turn either side (the value at
+the log's T exact: 1124's Campus, Harbor and Industrial Zone grants), the
+Encampment's grants (logged 0), Repair Outer Defenses (its count), the
+Manhattan Project and the nuclear device.
+
+- The table's gates: MaxPlayerInstances (+0x30 / +0x34) above the player's
+  completions and the other cities' builds (0x179650); UnlocksFromEffect
+  (+0xe8 bit 2, or Projects_XP2's +0x60 bit 0) the player's unlock
+  (0x468260); the civic (+0x120), tech (+0x150), district in the city
+  (+0x128, 0x1aea60), RequiredBuilding (+0x158) held; its ProjectPrereqs
+  (+0x130) each completed. T = the build turns (0x17b890), H
+  valueHorizons[1]; x1.5 (@0xd2f32c) where the player's list +0x6e8 holds
+  it. +0xe8: bit 0 OuterDefenseRepair, bit 1 SpaceRace, bit 2
+  UnlocksFromEffect, the SELECT's booleans in order.
 
 - T at or past H: FX(-9999). A row with MaxPlayerInstances (+0x30 / +0x34)
   the player has completed (0x4be7b0): FX(-9999).
-- Its prerequisite projects (+0xf0..+0xf8): each valued recursively at T
-  plus its build turns (0x17b890), at least 200.0, summed; a WMD one
-  (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON terms (one at @0xd71c24, the
-  difference of 1000.0's at the player and none).
-- SpaceRace (+0xe8 bit 2): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and
+- The projects it opens (+0xf0..+0xf8, the ProjectPrereqs naming it):
+  each valued recursively at T plus its build turns (0x17b890), at least
+  200.0, summed; a WMD one (+0x148) adds PSEUDOYIELD_NUCLEAR_WEAPON 250.0
+  (@0xd71c24) at the player's value and 1000.0's at the player's less at
+  none.
+- SpaceRace (+0xe8 bit 1): PSEUDOYIELD_SPACE_RACE of 0x7b8a30 squared, and
   1.0 per space-race project the player has completed.
 - Project_GreatPersonPoints (+0x108..+0x110): each class's pseudo-yield
-  (+0x40 -> +0x90 -> +0x14) of its Points through the progression 0x5267a0
-  (the model +0x1c, param +0x20, the player's techs or civics held, the
-  greater), x4.
-- OuterDefenseRepair (+0xe8 bit 1), where the city's +0x1880 count is
+  (+0x40 -> +0x90 -> +0x14) of its Points escalated by the progression
+  0x5267a0 type 1 at PointProgressionParam1 — Points + (Points x Param /
+  100 - Points) x p / 100, p the game's progress percent max(100 x techs
+  // 77, 100 x civics // 61) (1124 t32 .. t34's Campus grants 29 / 30 /
+  31: 16 points at 9%) —, x4.
+- OuterDefenseRepair (+0xe8 bit 0), where the city's +0x1880 count is
   above 0: that count x the population (+0x588) x 0x1ae8f0 x 10.0.
 - A diplomatic-victory row (+0xe8 bit 4, or the Projects_XP2 row's +0x60
   bit 1, with 0x25afc0): per its rows PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT
@@ -3906,8 +3998,9 @@ AI's PROJECTS table (0x5ce970) and the research value's projects.
 - The sum is paid once, discounted to T (0x7a1240). Then the Projects_XP2
   row's +0x1c (a float) times the population from T to H where the city's
   +0x2a78 check is negative; the row's CreateBuilding (+0x40, +0x48, +0x80)
-  through the building value 0x7a7590 less the value of each +0x68 building
-  the city holds (FX(-9999) where they are all held); the project's
+  through the building value 0x7a7590 less the value of each consumed
+  building (+0x68, Project_BuildingCosts) the city holds (FX(-9999) where
+  it has some and holds none); the project's
   modifiers (GlobalAI +0x3a38) through 0x7a4b20.
 - Logged at the city-states (the five verbose duels): Repair Outer Defenses
   0 or 3255.0 / 4708.13 / 10656.25 held turn after turn while the walls are
@@ -3915,7 +4008,7 @@ AI's PROJECTS table (0x5ce970) and the research value's projects.
   district projects 0..148 moving with the city's yields (Industrial Zone
   50.86..87.0); Manhattan 337.7..8884.5; the nuclear device 134..379.
 
-## C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread
+## C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread
 
 Ported in `cpu/core/aiCityTrees.ts` (the events, the trees' nodes, the
 tick), `cpu/core/aiContracts.ts` (the contracts) and the interpreter
@@ -3987,6 +4080,31 @@ operations' contracts, the improvement values below, the purchases).
   0x7ec7b0; Cancel Contract 0x7f5200 / 0x7f4980; Protect Unit 0x7f07c0;
   Move Unit 0x7f0020; Clear Plot 0x7f7960; Build Improvement 0x7e9670;
   Purchase Plot 0x7f7bf0 / 0x7f6820; Has Player Ability 0x7f1fa0.
+- THE PURCHASES (`cpu/core/aiEconomic.ts`, the savings shared with the
+  majors' sender): 0x5ce5b0's tail, for a city whose CityBuildAI +0x1b8 is
+  above -1 and a player no human drives, buys 0x5d2810's unit while
+  TryPurchaseUnits 0x68be60 succeeds. 0x5d2810: the city's list (CityBuildAI
+  +0x650, 0x168 bytes an entry, ranked by +0x30 then +0x2c) — its first
+  entry standing (+0xe), CanTrain, its unit's +0x1b9 byte below 0x80, of the
+  domain asked (-1 any); equal ranks take the first. 0x68be60 (Economic,
+  city or all, unit, flag): per city, the Gold price 0x1b22d0 (below 0
+  skipped); the UNITS and SLUSH slots together above it with UNITS above
+  half of it or SLUSH above twice it, or — the city's threat byte (CityBuildAI
+  +0x1b8's low byte) set — the balance (+0x1b8) at or above it; the
+  purchase request (0x977570, the game core's +0x48 / +0x50); then the
+  spend: UNITS then SLUSH for the overflow, a threatened city's from each
+  slot in order; the balance less the price.
+- CITY DEFENSE'S START 0x5cced0 (slot 5): first the defensive cancel
+  0x5d7640 (the military AI's +0x4b8, or the threat above -1 with the
+  centre damaged or CityBuildAI +0x218: the in-hand item cancelled unless a
+  defensive unit, building or district); a threat above -1 with slot 5
+  free starts the list's CITY_UNDER_THREAT operation ("City Defense") at
+  the city's plot through the player's operation manager (0x7265b0), slot
+  5 holding its tree (+0x780), its target the city, its worth the city's
+  (0x7a0ac0), its threat CityBuildAI +0x1b8. The city-states run it (1124
+  player 3 t19 "City Defense, Started"); the threat's writer, the minors'
+  operation manager and the tree's Is City Threatened, Garrison City and
+  Can Alpha City are unread.
 - A tech contract (Add Goal Tech) is IN PROGRESS while the tech is the
   research (AI_Research.csv prints it alive while RESEARCHING), CLAIMED
   off it, COMPLETED when held. The AI's view at turn T: the record of T,

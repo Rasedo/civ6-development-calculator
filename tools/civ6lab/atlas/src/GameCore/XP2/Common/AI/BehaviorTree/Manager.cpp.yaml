@@ -8,7 +8,7 @@
   kind: function
   status: PARTLY
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...nt 0x5ccc10 (slot 3), 0x5cd4e0; then 0x5d4d70 where the queue is empty. A tree is made (0x7ff9a0) and seeded (0x7cb230) by its event, never ticked there: no city-tree contract of the f..."

@@ -5,7 +5,7 @@
  * index the AI's value tables run in — with the columns and child rows
  * the values and the Default Specialization pick read.
  */
-import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiUnitRow } from '../core/aiCityBuild';
+import type { AiBuildingRow, AiDistrictRow, AiFeatureRow, AiProjectRow, AiUnitRow } from '../core/aiCityBuild';
 import type { AiImprovementRow, AiResourceRow } from '../core/aiResource';
 
 export const AI_BUILDINGS: readonly AiBuildingRow[] = [
@@ -15097,44 +15097,1003 @@ export const AI_UNITS: readonly AiUnitRow[] = [
  }
 ];
 
-export const AI_PROJECTS: readonly string[] = [
- "PROJECT_REPAIR_OUTER_DEFENSES",
- "PROJECT_LAUNCH_EARTH_SATELLITE",
- "PROJECT_LAUNCH_MOON_LANDING",
- "PROJECT_MANHATTAN_PROJECT",
- "PROJECT_OPERATION_IVY",
- "PROJECT_BUILD_NUCLEAR_DEVICE",
- "PROJECT_BUILD_THERMONUCLEAR_DEVICE",
- "PROJECT_CARNIVAL",
- "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT",
- "PROJECT_ENHANCE_DISTRICT_HARBOR",
- "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
- "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB",
- "PROJECT_ENHANCE_DISTRICT_HOLY_SITE",
- "PROJECT_ENHANCE_DISTRICT_CAMPUS",
- "PROJECT_ENHANCE_DISTRICT_THEATER",
- "PROJECT_WATER_CARNIVAL",
- "PROJECT_BREAD_AND_CIRCUSES",
- "PROJECT_WATER_BREAD_AND_CIRCUSES",
- "PROJECT_COTHON_CAPITAL_MOVE",
- "PROJECT_CARBON_RECAPTURE",
- "PROJECT_CONVERT_REACTOR_TO_COAL",
- "PROJECT_CONVERT_REACTOR_TO_OIL",
- "PROJECT_CONVERT_REACTOR_TO_URANIUM",
- "PROJECT_LAUNCH_MARS_BASE",
- "PROJECT_LAUNCH_EXOPLANET_EXPEDITION",
- "PROJECT_ORBITAL_LASER",
- "PROJECT_TERRESTRIAL_LASER",
- "PROJECT_SEND_AID",
- "PROJECT_TRAIN_ATHLETES",
- "PROJECT_TRAIN_ASTRONAUTS",
- "PROJECT_RECOMMISSION_REACTOR",
- "PROJECT_DECOMMISSION_COAL_POWER_PLANT",
- "PROJECT_DECOMMISSION_OIL_POWER_PLANT",
- "PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT",
- "PROJECT_LIJIA_FAITH",
- "PROJECT_LIJIA_FOOD",
- "PROJECT_LIJIA_GOLD"
+export const AI_PROJECTS: readonly AiProjectRow[] = [
+ {
+  "type": "PROJECT_REPAIR_OUTER_DEFENSES",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": true,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LAUNCH_EARTH_SATELLITE",
+  "tech": "TECH_ROCKETRY",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [
+   "PROJECT_LAUNCH_MOON_LANDING"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_EXPLORE_ENTIRE_MAP",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_EXPLORE_ENTIRE_MAP",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_LAUNCH_MOON_LANDING",
+  "tech": "TECH_SATELLITES",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_LAUNCH_EARTH_SATELLITE"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [
+   "PROJECT_LAUNCH_MARS_BASE"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_GRANT_CULTURE_BASED_ON_SCIENCE_RATE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GRANT_YIELD_BASED_ON_CURRENT_YIELD_RATE",
+    "args": {
+     "YieldToGrant": "YIELD_CULTURE",
+     "YieldToBaseOn": "YIELD_SCIENCE",
+     "Multiplier": "10"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_MANHATTAN_PROJECT",
+  "tech": "TECH_NUCLEAR_FISSION",
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": true,
+  "unlocks": [
+   "PROJECT_BUILD_NUCLEAR_DEVICE",
+   "PROJECT_OPERATION_IVY"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_OPERATION_IVY",
+  "tech": "TECH_NUCLEAR_FUSION",
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_MANHATTAN_PROJECT"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": true,
+  "unlocks": [
+   "PROJECT_BUILD_THERMONUCLEAR_DEVICE"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_BUILD_NUCLEAR_DEVICE",
+  "tech": "TECH_NUCLEAR_FISSION",
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_MANHATTAN_PROJECT"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": true,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_MODIFIER_CREATE_NUCLEAR_DEVICE",
+    "collection": "?",
+    "effect": "?",
+    "args": {
+     "Type": "WMD_NUCLEAR_DEVICE",
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_BUILD_THERMONUCLEAR_DEVICE",
+  "tech": "TECH_NUCLEAR_FUSION",
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_OPERATION_IVY"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": true,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_MODIFIER_CREATE_THERMONUCLEAR_DEVICE",
+    "collection": "?",
+    "effect": "?",
+    "args": {
+     "Type": "WMD_THERMONUCLEAR_DEVICE",
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_CARNIVAL",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_STREET_CARNIVAL",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_MERCHANT",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_WRITER",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_ARTIST",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_MUSICIAN",
+    5,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_ENCAMPMENT",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_GENERAL",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_HARBOR",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_HARBOR",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ADMIRAL",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_COMMERCIAL_HUB",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_MERCHANT",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_HOLY_SITE",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_HOLY_SITE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_PROPHET",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_CAMPUS",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_CAMPUS",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_SCIENTIST",
+    10,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_THEATER",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_THEATER",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_WRITER",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_ARTIST",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_MUSICIAN",
+    5,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_WATER_CARNIVAL",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_WATER_STREET_CARNIVAL",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_MERCHANT",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_WRITER",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_ARTIST",
+    5,
+    800
+   ],
+   [
+    "PSEUDOYIELD_GPP_MUSICIAN",
+    5,
+    800
+   ]
+  ],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_BREAD_AND_CIRCUSES",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_ENTERTAINMENT_COMPLEX",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 1.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_LOYALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GRANT_CITY_LOYALTY",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_WATER_BREAD_AND_CIRCUSES",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 1.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_LOYALTY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GRANT_CITY_LOYALTY",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_COTHON_CAPITAL_MOVE",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_COTHON",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_CARBON_RECAPTURE",
+  "tech": null,
+  "civic": "CIVIC_GLOBAL_WARMING_MITIGATION",
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_FAVOR_SEQUESTRATION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_PLAYER_FAVOR",
+    "args": {
+     "Amount": "30"
+    }
+   },
+   {
+    "id": "PROJECT_COMPLETION_CARBON_SEQUESTRATION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADD_PLAYER_SEQUESTERED_CARBON",
+    "args": {
+     "Amount": "50000"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_COAL",
+  "tech": "TECH_INDUSTRIALIZATION",
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": "BUILDING_COAL_POWER_PLANT",
+  "consumes": [
+   "BUILDING_FOSSIL_FUEL_POWER_PLANT",
+   "BUILDING_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_OIL",
+  "tech": "TECH_ELECTRICITY",
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": "BUILDING_FOSSIL_FUEL_POWER_PLANT",
+  "consumes": [
+   "BUILDING_COAL_POWER_PLANT",
+   "BUILDING_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_URANIUM",
+  "tech": "TECH_NUCLEAR_FISSION",
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": "BUILDING_POWER_PLANT",
+  "consumes": [
+   "BUILDING_COAL_POWER_PLANT",
+   "BUILDING_FOSSIL_FUEL_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LAUNCH_MARS_BASE",
+  "tech": "TECH_NANOTECHNOLOGY",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_LAUNCH_MOON_LANDING"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [
+   "PROJECT_LAUNCH_EXOPLANET_EXPEDITION"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LAUNCH_EXOPLANET_EXPEDITION",
+  "tech": "TECH_SMART_MATERIALS",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": 1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_LAUNCH_MARS_BASE"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [
+   "PROJECT_ORBITAL_LASER",
+   "PROJECT_TERRESTRIAL_LASER"
+  ],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_EXOPLANET_SCIENCE_VP",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PLAYER_SCIENCE_VICTORY_POINTS_PER_TURN",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_ORBITAL_LASER",
+  "tech": "TECH_OFFWORLD_MISSION",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_LAUNCH_EXOPLANET_EXPEDITION"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_ORBITAL_LASER_SCIENCE_VP",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PLAYER_SCIENCE_VICTORY_POINTS_PER_TURN",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_TERRESTRIAL_LASER",
+  "tech": "TECH_OFFWORLD_MISSION",
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [
+   "PROJECT_LAUNCH_EXOPLANET_EXPEDITION"
+  ],
+  "outerDefenseRepair": false,
+  "spaceRace": true,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_TERRESTRIAL_LASER_SCIENCE_VP",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PLAYER_SCIENCE_VICTORY_POINTS_PER_TURN",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_CITY_IS_POWERED",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   },
+   {
+    "id": "PROJECT_COMPLETION_TERRESTRIAL_LASER_REQUIRED_POWER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_REQUIRED_POWER",
+    "args": {
+     "Amount": "5"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_SEND_AID",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_SEND_AID_TO_AID_REQUESTS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_PLAYER_SEND_GOLD_TO_EMERGENCIES_OF_TYPE",
+    "args": {
+     "Amount": "200",
+     "EmergencyType": "EMERGENCY_SEND_AID"
+    }
+   },
+   {
+    "id": "PROJECT_COMPLETION_SEND_AID_TO_MILITARY_AID_REQUESTS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_PLAYER_SEND_GOLD_TO_EMERGENCIES_OF_TYPE",
+    "args": {
+     "Amount": "200",
+     "EmergencyType": "EMERGENCY_SEND_MILITARY_AID"
+    }
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_TRAIN_ATHLETES",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_TRAIN_ASTRONAUTS",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_SPACEPORT",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_RECOMMISSION_REACTOR",
+  "tech": "TECH_NUCLEAR_FISSION",
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": false,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": [
+   {
+    "id": "PROJECT_COMPLETION_RECOMMISSION_REACTOR",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_CITY_RECOMMISSION_REACTOR",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_COAL_POWER_PLANT",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [
+   "BUILDING_COAL_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_OIL_POWER_PLANT",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [
+   "BUILDING_FOSSIL_FUEL_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT",
+  "tech": null,
+  "civic": null,
+  "district": "DISTRICT_INDUSTRIAL_ZONE",
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [
+   "BUILDING_POWER_PLANT"
+  ],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LIJIA_FAITH",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LIJIA_FOOD",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ },
+ {
+  "type": "PROJECT_LIJIA_GOLD",
+  "tech": null,
+  "civic": null,
+  "district": null,
+  "maxPlayerInstances": -1,
+  "unlocksFromEffect": true,
+  "requiredBuilding": null,
+  "prereqs": [],
+  "outerDefenseRepair": false,
+  "spaceRace": false,
+  "wmd": false,
+  "unlocks": [],
+  "gpp": [],
+  "identityPerCitizen": 0.0,
+  "createBuilding": null,
+  "consumes": [],
+  "modifiers": []
+ }
 ];
 
 export const AI_RESOURCES: readonly AiResourceRow[] = [
@@ -18118,217 +19077,939 @@ export const AI_DISTRICTS: readonly AiDistrictRow[] = [
   "type": "DISTRICT_CITY_CENTER",
   "tech": null,
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": 200,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_HOLY_SITE",
   "tech": "TECH_ASTROLOGY",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_PROPHET",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_HOLY_SITE"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_CAMPUS",
   "tech": "TECH_WRITING",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_SCIENTIST",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_CAMPUS"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_ENCAMPMENT",
   "tech": "TECH_BRONZE_WORKING",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": 100,
+  "domain": "DOMAIN_LAND",
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_GENERAL",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_HARBOR",
   "tech": "TECH_CELESTIAL_NAVIGATION",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": "DOMAIN_SEA",
+  "coast": true,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ADMIRAL",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_HARBOR"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_AERODROME",
   "tech": "TECH_FLIGHT",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": null,
+  "domain": "DOMAIN_AIR",
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_COMMERCIAL_HUB",
   "tech": "TECH_CURRENCY",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_MERCHANT",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_ENTERTAINMENT_COMPLEX",
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_BREAD_AND_CIRCUSES"
+  ],
+  "regionalRange": 6,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_THEATER",
   "tech": null,
   "civic": "CIVIC_DRAMA_POETRY",
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_WRITER",
+    1
+   ],
+   [
+    "PSEUDOYIELD_GPP_ARTIST",
+    1
+   ],
+   [
+    "PSEUDOYIELD_GPP_MUSICIAN",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_THEATER"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_INDUSTRIAL_ZONE",
   "tech": "TECH_APPRENTICESHIP",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
+   "PROJECT_CARBON_RECAPTURE",
+   "PROJECT_CONVERT_REACTOR_TO_COAL",
+   "PROJECT_CONVERT_REACTOR_TO_OIL",
+   "PROJECT_CONVERT_REACTOR_TO_URANIUM",
+   "PROJECT_DECOMMISSION_COAL_POWER_PLANT",
+   "PROJECT_DECOMMISSION_OIL_POWER_PLANT",
+   "PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT"
+  ],
+  "regionalRange": 6,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_NEIGHBORHOOD",
   "tech": null,
   "civic": "CIVIC_URBANIZATION",
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 4,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": [
+   [
+    4,
+    2
+   ],
+   [
+    2,
+    1
+   ],
+   [
+    -1,
+    0
+   ],
+   [
+    -3,
+    -1
+   ],
+   [
+    -100,
+    -2
+   ]
+  ]
  },
  {
   "type": "DISTRICT_AQUEDUCT",
   "tech": "TECH_ENGINEERING",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": true,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_SPACEPORT",
   "tech": "TECH_ROCKETRY",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_LAUNCH_EARTH_SATELLITE",
+   "PROJECT_LAUNCH_MOON_LANDING",
+   "PROJECT_LAUNCH_MARS_BASE",
+   "PROJECT_LAUNCH_EXOPLANET_EXPEDITION",
+   "PROJECT_ORBITAL_LASER",
+   "PROJECT_TERRESTRIAL_LASER",
+   "PROJECT_TRAIN_ASTRONAUTS"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_WONDER",
   "tech": null,
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": true,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_ACROPOLIS",
   "tech": null,
   "civic": "CIVIC_DRAMA_POETRY",
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_ACROPOLIS"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_ACROPOLIS",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_WRITER",
+    1
+   ],
+   [
+    "PSEUDOYIELD_GPP_ARTIST",
+    1
+   ],
+   [
+    "PSEUDOYIELD_GPP_MUSICIAN",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_BATH",
   "tech": "TECH_ENGINEERING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_BATH"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_BATH",
+  "maintenance": 0,
+  "housing": 2,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": true,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_HANSA",
   "tech": "TECH_APPRENTICESHIP",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_HANSA"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_HANSA",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_LAVRA",
   "tech": "TECH_ASTROLOGY",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_LAVRA"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_LAVRA",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_PROPHET",
+    2
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_MBANZA",
   "tech": null,
   "civic": "CIVIC_GUILDS",
-  "trait": "TRAIT_CIVILIZATION_MBANZA"
+  "trait": "TRAIT_CIVILIZATION_MBANZA",
+  "maintenance": 0,
+  "housing": 5,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_STREET_CARNIVAL",
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
-  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL"
+  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_CARNIVAL"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_ROYAL_NAVY_DOCKYARD",
   "tech": "TECH_CELESTIAL_NAVIGATION",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_ROYAL_NAVY_DOCKYARD"
+  "trait": "TRAIT_CIVILIZATION_ROYAL_NAVY_DOCKYARD",
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": "DOMAIN_SEA",
+  "coast": true,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ADMIRAL",
+    2
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_IKANDA",
   "tech": "TECH_BRONZE_WORKING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_IKANDA"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_IKANDA",
+  "maintenance": 1,
+  "housing": 1,
+  "appeal": -1,
+  "hitPoints": 100,
+  "domain": "DOMAIN_LAND",
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_GENERAL",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_SEOWON",
   "tech": "TECH_WRITING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_SEOWON"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_SEOWON",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_SCIENTIST",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_GOVERNMENT",
   "tech": null,
   "civic": "CIVIC_STATE_WORKFORCE",
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": true,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_WATER_BREAD_AND_CIRCUSES"
+  ],
+  "regionalRange": 9,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_WATER_STREET_CARNIVAL",
   "tech": null,
   "civic": "CIVIC_NATURAL_HISTORY",
-  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL"
+  "trait": "TRAIT_CIVILIZATION_STREET_CARNIVAL",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": true,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_WATER_CARNIVAL"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_CANAL",
   "tech": "TECH_STEAM_POWER",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": true,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_DAM",
   "tech": "TECH_BUTTRESS",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 3,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": true,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_COTHON",
   "tech": "TECH_CELESTIAL_NAVIGATION",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_COTHON"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_COTHON",
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": "DOMAIN_SEA",
+  "coast": true,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ADMIRAL",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [
+   "PROJECT_COTHON_CAPITAL_MOVE"
+  ],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_SUGUBA",
   "tech": "TECH_CURRENCY",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_SUGUBA"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_SUGUBA",
+  "maintenance": 0,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_MERCHANT",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_OBSERVATORY",
   "tech": "TECH_WRITING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_OBSERVATORY"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_OBSERVATORY",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_SCIENTIST",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_HIPPODROME",
   "tech": null,
   "civic": "CIVIC_GAMES_RECREATION",
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_HIPPODROME"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_HIPPODROME",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_OPPIDUM",
   "tech": "TECH_IRON_WORKING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_OPPIDUM"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_OPPIDUM",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": 100,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [
+   [
+    "PSEUDOYIELD_GPP_ENGINEER",
+    1
+   ]
+  ],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_THANH",
   "tech": "TECH_BRONZE_WORKING",
   "civic": null,
-  "trait": "TRAIT_CIVILIZATION_DISTRICT_THANH"
+  "trait": "TRAIT_CIVILIZATION_DISTRICT_THANH",
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": -1,
+  "hitPoints": 100,
+  "domain": "DOMAIN_LAND",
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": false,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  },
  {
   "type": "DISTRICT_PRESERVE",
   "tech": null,
   "civic": "CIVIC_MYSTICISM",
-  "trait": null
+  "trait": null,
+  "maintenance": 0,
+  "housing": 1,
+  "appeal": 1,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": [
+   [
+    4,
+    2
+   ],
+   [
+    2,
+    1
+   ],
+   [
+    -1,
+    0
+   ],
+   [
+    -3,
+    -1
+   ],
+   [
+    -100,
+    -1
+   ]
+  ]
  },
  {
   "type": "DISTRICT_DIPLOMATIC_QUARTER",
   "tech": "TECH_MATHEMATICS",
   "civic": null,
-  "trait": null
+  "trait": null,
+  "maintenance": 1,
+  "housing": 0,
+  "appeal": 0,
+  "hitPoints": null,
+  "domain": null,
+  "coast": false,
+  "aqueduct": false,
+  "internalOnly": false,
+  "requiresPopulation": true,
+  "gpp": [],
+  "canal": false,
+  "preventsFloods": false,
+  "projects": [],
+  "regionalRange": 0,
+  "appealHousing": []
  }
 ];
 

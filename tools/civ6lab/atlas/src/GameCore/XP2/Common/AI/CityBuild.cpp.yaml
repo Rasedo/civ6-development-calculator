@@ -111,7 +111,7 @@
   impl: [cpu/core/aiCityTrees.ts:districtEvent]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"B..."
     - "...nits needing them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: th..."
@@ -128,7 +128,7 @@
   impl: [cpu/core/aiCityTrees.ts:improvementEvent]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...ent 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0..."
     - "...ng them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract..."
@@ -136,19 +136,25 @@
 - addr: 0x5cced0
   final: 0x3e1370
   kind: function
-  status: PARTLY
+  name: the City Defense event
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      turn: 19
+      value: player 3's City Defense, Started at 41:12
+  impl: [cpu/core/aiCityTrees.ts:defenseEvent]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...does not replay\"). Then, for a player the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0..."
     - "...with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f..."
     - "...WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the port reads plot order)."
-  review: imported
+  review: reviewed
 - addr: 0x5cd150
   kind: function
   name: the building or unit event
@@ -160,7 +166,7 @@
   impl: [cpu/core/aiCityTrees.ts:buildingEvent]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...er the AI drives: 0x5cdae0, the City Defense event 0x5cced0, the unit-or-building event 0x5cd150 (tree \"Build City Building\"), the district event 0x5cc910 (its \"City Build District Cho..."
     - ...s over the units needing them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contr...
@@ -171,7 +177,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the build queue empty (city +0x2350 0 or +0x2340 null), the Default Special..."
     - "...BuildAI +0x978's counts (0x5d45c0), the events (0x5cd150, 0x5cc910, 0x5ccc10, 0x5cced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the..."
@@ -187,10 +193,13 @@
 - addr: 0x5cdc50
   final: 0x3e1f10
   kind: function
+  name: the city under threat
   status: PARTLY
   impl: [cpu/core/aiContracts.ts:ContractCity]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
-  review: imported
+  review: reviewed
 - addr: 0x5cdce0
   final: 0x3e1fa0
   kind: function
@@ -230,18 +239,20 @@
 - addr: 0x5ce5b0
   final: 0x3e2750
   kind: function
-  status: PARTLY
+  name: the city's second hook
+  status: READ
   cases:
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  impl: [cpu/core/aiEconomic.ts:purchaseTurn]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...+0x2350 0 or +0x2340 null), the Default Specialization pick 0x5d4d70. A second hook (0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's...
     - "...ity was nuked?)\" for any other. The log line is the pick and its value; the second hook 0x5ce5b0 runs it again (two NO BUILDS lines a turn). MEASURED (`cityBuildLab.ts`, the five verbo..."
-  review: imported
+  review: reviewed
 - addr: 0x5ce680
   final: 0x3e2820
   kind: function
@@ -250,7 +261,7 @@
   impl: [cpu/core/aiCityTrees.ts:buildingEvent, cpu/core/aiCityTrees.ts:freeSlots]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "- The city's turn (0x5ce680, from the player's AI turn 0x5c2650 over its cities). On a full update: 0x5d7e00, 0x5ca..."
     - "...cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
@@ -266,7 +277,7 @@
       value: "Bologna's Builder contract 91.0: the pick reads t70's table (t69's Pasture plot valued 0)"
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...&4 && +0x228 == f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects,..."
   context:
@@ -279,27 +290,32 @@
   cases:
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+    - recording: h1_duelv1124
+      turn: 32
+      value: "player 4's Campus Research Grants 29 / 30 / 31 at T 3 / 2 / 1 (t32 .. t34), 16 points at 9%"
   impl:
-    - cpu/core/aiCityBuild.ts:buildingTurns
-    - cpu/core/aiCityBuild.ts:unitTurns
-    - cpu/core/aiCityBuild.ts:unitTable
     - cpu/core/aiCityBuild.ts:buildingTable
+    - cpu/core/aiCityBuild.ts:buildingTurns
+    - cpu/core/aiCityBuild.ts:unitTable
+    - cpu/core/aiCityBuild.ts:unitTurns
     - cpu/core/aiCityTrees.ts:PlotEval
+    - cpu/core/aiProjectValue.ts:analysed
+    - cpu/core/aiProjectValue.ts:projectTable
     - cpu/harness/cityContractLab.ts:evalsOf
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-95: the planning's spots and the combat prediction — READ, ported"
-    - "C-96: the project value — PARTLY READ (the structure), unported"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the project value — READ (0x7b28c0, the PROJECTS table 0x5ce970), PARTLY READ (the space-race standing 0x7b8a30, the diplomatic-victory rows, the repair count), unwired"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...== f2f988?) & cond -> +5.0. Initial best FX(-9999). CITY ANALYSIS job vtable d59af0 -> 0x5ce910 -> 0x5ce970 (per PLOT eval): +0x20 districts, +0x28 buildings, +0x30 improvements, +0x38 projects, +0x40 units...."
   context:
     - "...e City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, `m_plotEvaluations` at +0xcf8 / +0xd08, the..."
     - "- The tables (0x5ce970, per plot evaluation). A building other than a wonder is valued on the city centre only..."
     - "...0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
-  review: imported
+  review: reviewed
 - addr: 0x5d0860
   final: 0x3e4710
   kind: function
@@ -333,7 +349,7 @@
   impl: [cpu/core/aiCityTrees.ts:chooseDistrict]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...ity Building\"), the district event 0x5cc910 (its \"City Build District Choice\" draw in 0x5d0c20), the improvement event 0x5ccc10 (\"Build City Improvement\"), 0x5cd4e0; last, with the b..."
   review: reviewed
@@ -347,8 +363,6 @@
       turn: 2
       value: Hattusa's Farm at (4,12), the first 72.45 plot the district's tree does not reserve
   impl: [cpu/core/aiCityTrees.ts:bestPlotFor]
-  readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: reviewed
 - addr: 0x5d1f10
@@ -390,18 +404,22 @@
 - addr: 0x5d2810
   final: 0x3e6190
   kind: function
-  status: PARTLY
+  name: the city's purchase unit pick
+  status: READ
   cases:
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  impl: [cpu/core/aiEconomic.ts:purchasePick]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value table plotEval(cityCenter)+..."
   context:
     - ...(0x5ce5b0) runs the same pick on an empty queue (queue +0x1e0 / +0x1d0) and then walks 0x5d2810's items through 0x68be60.
     - "...oject, queued by 0x5c9ea0 / 0x5ca5a0 / 0x5ca450; with none, or the queue refusing it, 0x5d2810's item for a full civilization (\"Generic Offense\"), \"NO BUILDS AT ALL (maybe city was n..."
-  review: imported
+  review: reviewed
 - addr: 0x5d2bc0
   final: 0x3e63c0
   kind: function
@@ -453,7 +471,7 @@
   kind: function
   status: PARTLY
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t; no direct caller) read by the improvement pick 0x5c9a00 (CityBuildAI +0x648; the log 0x5d4030 prints the same evaluations), the events: defence 0x5cced0 (slot 5), building or unit..."
@@ -526,12 +544,16 @@
   cases:
     - recording: 1124
       value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
-  impl: [cpu/core/aiCityTrees.ts:wholeValue, cpu/core/aiContracts.ts:ContractCity]
+  impl:
+    - cpu/core/aiCityTrees.ts:wholeValue
+    - cpu/core/aiContracts.ts:ContractCity
+    - cpu/core/aiDistrictValue.ts:DistrictValueFacts
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...NREAD -> ASK. - Stockpile cap analyzer 0x6b8e10: max over resource units' city-centre UNITS values (0x5d4cd0), whole; needs unit table. - Trade knowledge K logged in AI_Knowledge.csv \"TRADE, TO x, VAL v\" (0x5..."
   context:
@@ -554,7 +576,7 @@
     - cpu/harness/cityBuildLog.ts:loadCityBuildPicks
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: DS '%d, %d, %s, , , %s, %s, , , Value %3.1f' at 0x5d4d70 (DS chooser).  advantage line 0x5cdd70: Food Adv = adv[YIELD_FOOD], Prod Adv = adv[YIELD_PRODUCTION..."
     - ".claude/scratchpad/cb/notes.txt: ...oader 0x5bbf80, mapping in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick..."
@@ -574,7 +596,7 @@
       value: Hunza's Builder contract 72.0 SUBMITTED by Build City Improvement, queued t3, COMPLETED t5
   impl: [cpu/core/aiContracts.ts:submitContract]
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...bmission 0x60bb50: SUBMITTED, then the player's signal +0x270 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its..."
@@ -585,15 +607,18 @@
   status: PARTLY
   impl: [cpu/core/aiCityTrees.ts:reservePlot]
   readings:
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...d Goal Tech 0x7e7d20 / 0x7e7200; Build Unit 0x7f4e00 / 0x7f4240; Reserve Plot 0x7f7da0 (0x5d74c0: another tree's reservation yields to a value 20.0 above it); Check Plot 0x7f6ea0; Find..."
   review: imported
 - addr: 0x5d7640
   kind: function
+  name: the defensive cancel
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - "...e queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation 0x5d7640 (\"Canceling current build\"). About 224 KB of code reaches from 0x5ce680 and 0x5ce970."
-  review: imported
+  review: reviewed

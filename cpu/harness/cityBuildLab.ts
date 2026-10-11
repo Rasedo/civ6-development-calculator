@@ -7,6 +7,7 @@
  * that record's) imported as it stands.
  *
  *    npx vite-node cpu/harness/cityBuildLab.ts -- <dump.jsonl> [--logtech] [--rows out.jsonl] [--json out.json] [--player N]
+ *        [--projects TEXT]
  *
  * --logtech takes the research AI's turns from the game's AI_Research.csv
  * (the entry of the turn plus the turns its research in hand had left as its
@@ -16,7 +17,9 @@
  * (`minorKnowledge` run over the records in the players' turn order, the
  * record's unit ids, tallied against the ARMY lines); the Combat Desire
  * AI_Military.csv's, --ourdesire the engine's (`minorCombatDesire`, tallied
- * against the log's strengths and desire), --nodesire none.
+ * against the log's strengths and desire), --nodesire none. The PROJECTS
+ * table (`aiProjectValue.ts`) on the engine's build turns; --projects TEXT
+ * prints the rows off the log's whose type holds TEXT.
  *
  * Per item family and item: the log's valid values, ours valid where the
  * log's are and the reverse, the values within 0.005, and the heaviest
@@ -28,7 +31,13 @@ import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory } from '
 import type { ArmyRecord, CityState, GameState } from '../core/types';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue, unitTable, unitTurns, unitValue } from '../core/aiCityBuild';
-import { AI_UNITS } from '../data/aiBuildTables';
+import { AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
+import { projectTable, projectValue } from '../core/aiProjectValue';
+import { AI_VALUE_HORIZON } from '../data/aiValue';
+import { gameProgressPct } from '../data/constants';
+import { TECHS } from '../data/techs';
+import { CIVICS } from '../data/civics';
+import { engineId } from '../data/aliases';
 import { minorBuildFacts, minorCombatDesire, minorKnowledge, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
@@ -148,6 +157,11 @@ const kbShift = args.includes('--kb') ? Number(args[args.indexOf('--kb') + 1]) :
 const unitsAll = newCityBuildTally();
 let dbg: unknown = null;
 const unitsPer = new Map<string, CityBuildTally>();
+// the PROJECTS rows off the log's whose type holds the text (--projects TEXT),
+// each with its value at landing turns 0..10
+const projectsOut = args.includes('--projects') ? args[args.indexOf('--projects') + 1] : null;
+const projectsAll = newCityBuildTally();
+const projectsPer = new Map<string, CityBuildTally>();
 const centre = loadCityBuildCentre(dump);
 const picks = loadCityBuildPicks(dump);
 const pickTally = { log: { n: 0, ok: 0, miss: [] as string[] }, ours: { n: 0, ok: 0, miss: [] as string[] }, units: { n: 0, ok: 0, miss: [] as string[] } };
@@ -292,6 +306,47 @@ for (let i = 0; i + 1 < recs.length; i++) {
     const loggedUnits = centre.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`)?.UNITS;
     const oursUnits = unitTable(facts);
     if (loggedUnits) tallyRow(AI_UNITS.map((u) => u.type), unitsAll, turn, player, loggedUnits, oursUnits, unitsPer);
+    // THE PROJECTS TABLE: the analysis' gates and the value at the build turns
+    const loggedProjects = centre.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`)?.PROJECTS;
+    if (loggedProjects) {
+      const r = cs.research;
+      const oursProjects = projectTable({
+        view: facts.view,
+        seat: facts.seat,
+        cityId: facts.cityId,
+        capital: facts.capital,
+        advanced: () => 0,
+        buildTurns: (p) => facts.buildTurns(p),
+        progressPct: gameProgressPct(r.techs.length, r.civics.length),
+        spaceRaceStanding: 0,
+        defenceRepairs: 0,
+        population: facts.population,
+        districts: facts.districtCount,
+        loyaltyFalling: false,
+        buildingValue: (b, t) => {
+          const row = AI_BUILDINGS.find((x) => x.type === b);
+          return row ? buildingValue(facts, row, t) : 0;
+        },
+        hasBuilding: (b) => facts.hasBuilding(b),
+        hasCivic: (c) => r.civics.includes(engineId('civic', c, 'CIVIC_', CIVICS) ?? ''),
+        hasTech: (t) => r.techs.includes(engineId('tech', t, 'TECH_', TECHS) ?? ''),
+        hasDistrict: (d) => facts.hasDistrict(d),
+        unlockedByEffect: () => false,
+        producingElsewhere: () => 0,
+        favoured: () => false,
+        horizon: AI_VALUE_HORIZON,
+      });
+      tallyRow(AI_PROJECTS.map((p) => p.type), projectsAll, turn, player, loggedProjects, oursProjects, projectsPer);
+      if (projectsOut !== null) {
+        AI_PROJECTS.forEach((p, k) => {
+          if (!p.type.includes(projectsOut) || loggedProjects[k] <= -9000) return;
+          const pf = { view: facts.view, seat: facts.seat, cityId: facts.cityId, capital: facts.capital, advanced: () => 0, buildTurns: (q: string) => facts.buildTurns(q), progressPct: gameProgressPct(r.techs.length, r.civics.length), spaceRaceStanding: 0, defenceRepairs: 0, population: facts.population, districts: facts.districtCount, loyaltyFalling: false, buildingValue: () => 0, hasBuilding: () => false };
+          const T = facts.buildTurns(p.type);
+          if (Math.abs(oursProjects[k] / 256 - loggedProjects[k]) < 0.0051) return;
+          console.log('PROJECT', turn, player, p.type, 'log', loggedProjects[k], 'ours', (oursProjects[k] / 256).toFixed(2), 'T', T, 'pc', pf.progressPct, [0, 1, 2, 3, 4, 5, 6, 8, 10].map((tt) => (projectValue(pf, p.type, tt, AI_VALUE_HORIZON) / 256).toFixed(2)).join(' '));
+        });
+      }
+    }
     if (rowsOut && loggedUnits) {
       AI_UNITS.forEach((u, k) => {
         if (oursUnits[k] === null) return;
@@ -375,6 +430,13 @@ for (const [type, t] of [...unitsPer].sort((a, b) => b[1].log - a[1].log)) {
   console.log(`${type.padEnd(34)} log ${String(t.log).padStart(5)} both ${String(t.both).padStart(5)} exact ${String(t.exact).padStart(5)}`
     + ` onlyLog ${String(t.onlyLog).padStart(4)} onlyOurs ${String(t.onlyOurs).padStart(4)}  ${f ? `t${f.turn} p${f.player} log ${f.log} ours ${f.ours}` : ''}`);
 }
+for (const [type, t] of [...projectsPer].sort((a, b) => b[1].log - a[1].log)) {
+  if (!t.log && !t.onlyOurs) continue;
+  const f = t.first;
+  console.log(`${type.padEnd(34)} log ${String(t.log).padStart(5)} both ${String(t.both).padStart(5)} exact ${String(t.exact).padStart(5)}`
+    + ` onlyLog ${String(t.onlyLog).padStart(4)} onlyOurs ${String(t.onlyOurs).padStart(4)}  ${f ? `t${f.turn} p${f.player} log ${f.log} ours ${f.ours}` : ''}`);
+}
+console.log(`PROJECTS TOTAL log ${projectsAll.log} both ${projectsAll.both} exact ${projectsAll.exact} onlyLog ${projectsAll.onlyLog} onlyOurs ${projectsAll.onlyOurs}`);
 console.log(`UNITS TOTAL log ${unitsAll.log} both ${unitsAll.both} exact ${unitsAll.exact} onlyLog ${unitsAll.onlyLog} onlyOurs ${unitsAll.onlyOurs}`);
 console.log(`KNOWLEDGE BASE: ${kbTally.ok} / ${kbTally.n} turn-player army counts as logged`);
 for (const m of kbTally.miss) console.log(`  ${m}`);

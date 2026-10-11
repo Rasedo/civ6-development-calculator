@@ -23283,3 +23283,21 @@ export const AI_SPACE_RACE_PROJECTS: readonly string[] = [
  "PROJECT_ORBITAL_LASER",
  "PROJECT_TERRESTRIAL_LASER"
 ];
+export const AI_DEFAULT_SAVINGS: readonly { saving: string; weight: number }[] = [
+ {
+  "saving": "SAVING_SLUSH_FUND",
+  "weight": 3
+ },
+ {
+  "saving": "SAVING_UNITS",
+  "weight": 4
+ },
+ {
+  "saving": "SAVING_PLOTS",
+  "weight": 1
+ },
+ {
+  "saving": "SAVING_GREAT_PEOPLE",
+  "weight": 1
+ }
+];

@@ -15,7 +15,7 @@
   impl: [ai/major/operations/nodes.ts:contractManager, cpu/core/aiCityTrees.ts:contractManager]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
-    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   context:
     - ...e 0x7f21c0; the limit at the game speed, 0x5254d0), Contract Manager 0x7f1500 (update 0x7f17a0, each contract's check 0x7f2220).
   review: reviewed

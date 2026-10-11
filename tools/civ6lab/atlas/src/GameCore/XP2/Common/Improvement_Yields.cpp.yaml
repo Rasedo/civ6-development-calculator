@@ -6,14 +6,21 @@
 - addr: 0x365720
   final: 0x25f570
   kind: function
-  status: PARTLY
-  impl: [cpu/core/yields.ts:districtAdjacency]
-  readings: ["H-1: the district adjacency — READ"]
+  name: the district's whole adjacency
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
+  impl: [cpu/core/yields.ts:districtAdjacency, cpu/core/aiDistrictValue.ts:DistrictValueFacts]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-r...
     - "- 0x365720 (player, city, district type, yield, plot): the district row's vector of Adjacency_Yiel..."
-  review: imported
+  review: reviewed
 - addr: 0x365ae0
   final: 0x25f890
   kind: function
@@ -28,9 +35,12 @@
     - gpu/core/sim_economy.py:_adj_district_count
     - gpu/core/sim_seats.py:_imp_adjacency
     - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/core/aiDistrictValue.ts:DistrictValueFacts
+    - cpu/core/aiDistrictValue.ts:rowsValue
   readings:
     - "H-1: the district adjacency — READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   context:
     - ...ia 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
     - "...plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER..."
@@ -51,13 +61,21 @@
 - addr: 0x366df0
   final: 0x260510
   kind: function
-  status: PARTLY
-  readings: ["H-1: the district adjacency — READ"]
+  name: the district's adjacency at an owned plot
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 2
+      value: player 3's Campus 109.41 owned (4,13), 91.75 unowned (5,14), 81.80 (5,12), 89.82 beyond the reach (3,16), T 15
+  impl: [cpu/core/aiDistrictValue.ts:DistrictValueFacts, cpu/core/aiDistrictValue.ts:v]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 it...
     - "- District::GetYield 0x249850 (yield, percent flag): 0 while pillaged; else 0x366df0's adjacency + the district's flat yield bucket (+0x2f0) + its appeal rows (+0x458: yiel..."
-  review: imported
+  review: reviewed
 - addr: 0x367010
   final: 0x260720
   kind: function

@@ -4,7 +4,7 @@ import {
   newContractBook, queueContract, reapContracts, submitContract, takesTurn, type AiContract, type ContractCity,
 } from '../../../cpu/core/aiContracts';
 import {
-  SLOT_DISTRICT, SLOT_UNIT_OR_BUILDING, buildingEvent, chooseDistrict, freeSlots, goalsReached, newCityAi, pickImprovement,
+  SLOT_DEFENSE, SLOT_DISTRICT, SLOT_UNIT_OR_BUILDING, buildingEvent, chooseDistrict, defenseEvent, freeSlots, goalsReached, newCityAi, pickImprovement,
   slotFree, tickCityTrees, type CityTreeCity, type CityTreeWorld, type PlotEval,
 } from '../../../cpu/core/aiCityTrees';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS } from '../../../cpu/data/aiCityTrees';
@@ -143,7 +143,7 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
       ...city(), name: 'LOC_CITY_NAME_X', evals: [], bestImprovement: -1, buildings: tables, units: [],
       eventBuilding: { index: monument, value: 24 * FX }, eventUnit: { index: -1, value: FX_MIN },
       itemValue: (i) => (i.building === 'BUILDING_MONUMENT' ? 24 * FX : FX_MIN),
-      buildingHeld: () => false, districtHeld: () => false,
+      buildingHeld: () => false, districtHeld: () => false, threat: -1, plot: 70,
     };
     const lines: string[] = [];
     let ids = 1;
@@ -152,7 +152,7 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
       builderType: () => 'UNIT_BUILDER', plotCity: () => 7, reachable: () => true, canPlaceDistrict: () => false, plotOwner: () => 2,
       buildersMakeDistricts: false, buildersMakeWonders: false, districtTie: () => 0, distance: () => 1,
       newContractId: () => ids++, newTreeId: () => 100 + ids++, log: (l) => lines.push(l), clearProduction: () => undefined,
-      order: () => undefined, unitAlive: () => true,
+      order: () => undefined, unitAlive: () => true, startOperation: () => 500, operationLive: (t) => t === 500,
     };
     const list = AI_CITY_EVENTS[AI_CITY_EVENT_LISTS.MINOR_CIV_DEFAULT_TRAIT];
     buildingEvent(ai, w, c, list.CITY_EVENT_UNIT_OR_BUILDING);
@@ -164,9 +164,19 @@ describe('the city events and trees (CityBuild.cpp, the tree nodes)', () => {
     // the building built completes the contract and the tree ends; the slot frees
     ai.contracts[0].progress = CP_COMPLETED;
     tickCityTrees(ai, w);
-    freeSlots(ai, 7);
+    freeSlots(ai, w, 7);
     expect(ai.trees).toEqual([]);
     expect(slotFree(ai, 7, SLOT_UNIT_OR_BUILDING)).toBe(true);
     expect(slotFree(ai, 7, SLOT_DISTRICT)).toBe(true);
+    // the City Defense event: nothing while the city is not threatened, then
+    // the list's operation at the city's plot, its tree in slot 5 while it runs
+    defenseEvent(ai, w, c, list.CITY_UNDER_THREAT);
+    expect(slotFree(ai, 7, SLOT_DEFENSE)).toBe(true);
+    const started: [string, number][] = [];
+    defenseEvent(ai, { ...w, startOperation: (n, p) => (started.push([n, p]), 500) }, { ...c, threat: 0 }, list.CITY_UNDER_THREAT);
+    expect(started).toEqual([['City Defense', 70]]);
+    expect(slotFree(ai, 7, SLOT_DEFENSE)).toBe(false);
+    freeSlots(ai, { operationLive: () => false }, 7);
+    expect(slotFree(ai, 7, SLOT_DEFENSE)).toBe(true);
   });
 });

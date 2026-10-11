@@ -13,6 +13,17 @@
   context:
     - "...0), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0x1b41e0: box - threshold, then the box clamped to the new threshold - 1) places one citizen incre..."
   review: imported
+- addr: 0x1b4450
+  final: 0x1232c0
+  kind: function
+  name: the district's housing at the plot's Appeal
+  status: PARTLY
+  readings:
+    - "C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired"
+  context:
+    - ...READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domai...
+    - ...he globals' +0x13c) plus the first AppealHousingChanges band the plot's Appeal reaches (0x1b4450) at the housing value 0x7a3d70; where the civics' list holds the district (0x39dd20)...
+  review: reviewed
 - addr: 0x1b4af0
   final: 0x123860
   kind: function
