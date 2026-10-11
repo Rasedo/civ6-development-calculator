@@ -61,6 +61,18 @@
   context:
     - "...E_NEAR_ME, 0xfadf5055). Then: the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (the influence map below, 0x716..."
   review: imported
+- addr: 0x82d90
+  final: 0x60180
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  context:
+    - "...d's +0x128; taken as passing); a goody hut's plot taken at once by a full civilization (0x82d90: no barbarian)."
+  review: imported
 - addr: 0x82e80
   final: 0x60270
   kind: function
@@ -124,6 +136,7 @@
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   context:
     - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
     - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...

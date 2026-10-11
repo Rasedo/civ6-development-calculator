@@ -455,6 +455,8 @@ const GAME: Record<string, Extractor> = {
     ]];
   },
   barbCamps: (s) => [[...s.barbSeat.camps].sort((a, b) => a - b)],
+  // the barbarians' revealed plots, by index
+  barbExplored: (s) => [s.barbSeat.explored.flatMap((v, i) => (v === 1 ? [i] : []))],
   barbTribes: (s) => {
     const live = new Set(s.units.filter((u) => u.seat === BARB_SEAT).map((u) => u.id));
     const tribes = s.barbTribes ?? [];

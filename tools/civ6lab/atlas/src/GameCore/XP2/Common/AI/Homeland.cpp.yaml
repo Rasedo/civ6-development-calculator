@@ -3,13 +3,150 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
-- addr: 0x70aa40
+- addr: 0x70a440
+  final: 0x4bb190
   kind: function
   status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  impl: [cpu/core/tactical.ts:exploreLand]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...he chosen list; the round's move orders (0x962030) are carried out together as it ends (0x70a440); another round only where one moved.
+  review: imported
+- addr: 0x70a6c0
+  final: 0x4bb410
+  kind: function
+  name: exploreUnrevealedCount
+  semantics: the plots within the unit's sight from a plot the player never revealed; a revealed plot's +0x47 flag unread
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
+  impl: [cpu/core/tactical.ts:exploreTarget]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  context:
+    - "...s within the unit's sight +0x1998 seen from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the la..."
+    - "...a revealed plot's +0x47 that makes a plot of positive count win once ahead of a larger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the..."
+  review: reviewed
+- addr: 0x70a8b0
+  final: 0x4bb660
+  kind: function
+  name: exploreUnseenCount
+  semantics: the plots within the unit's sight from a plot the player does not see now
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
+  impl: [cpu/core/tactical.ts:exploreTarget]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...n from the plot): those the player never revealed (0x70a6c0) and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot of the largest first count above 0 wins (\"HL: Ex..."
+  review: reviewed
+- addr: 0x70aa40
+  kind: function
+  name: exploreTarget
+  semantics: "HL Explore: the reach plot whose sight holds the most unrevealed; cur region / cur area; the region lists (writer unread); the unseen-now fallback"
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:exploreTarget, gpu/core/sim_tactics.py:_tac_explore]
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
   context:
     - "...d Units 0x80d790 (\"Operation Protect Units\"), Naval Patrol 0x803060 (the explore move 0x70aa40), Naval Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (..."
-  review: imported
+  review: reviewed
+- addr: 0x70b550
+  final: 0x4bc390
+  kind: function
+  name: nearestUnrevealedInArea
+  semantics: the nearest unrevealed enterable plot of the area
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
+  impl: [cpu/core/tactical.ts:nearestUnrevealed, gpu/core/sim_tactics.py:_tac_explore_region]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "..., not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area (0x70b550, \"cur area\"); then the player's primary, secondary and tertiary region lists (+0x1290 +..."
+  review: reviewed
+- addr: 0x70b6f0
+  final: 0x4bc500
+  kind: function
+  name: nearestUnrevealedInRegions
+  semantics: the nearest unrevealed enterable plot of the listed regions, plots in index order
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
+  impl: [cpu/core/tactical.ts:nearestUnrevealed, gpu/core/sim_tactics.py:_tac_explore_region]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in index order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with..."
+  review: reviewed
+- addr: 0x70bd40
+  final: 0x4bca20
+  kind: function
+  name: exploreOk
+  semantics: "may the explorer go to the plot: revealed, ownership, +0x4c, area, city; the turn test on a plot at war unread"
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "- PARTLY READ: the region lists' writer (the engines carry none: 36 of the   barbarians' 223 Explore rows of runs/h1_duelv1124 are \"tertiary regions\");"
+  impl: [cpu/core/tactical.ts:exploreOk, gpu/core/sim_tactics.py:_tac_explore_ok]
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  context:
+    - "...left; per plot closed, in order: no danger (0x716a90), not chosen, one it may go to (0x70bd40: not its own plot; revealed; another player's ground only at war with it; +0x4c not abo..."
+    - "...rger (0x70a6c0's second flag: not carried); the turn test on a plot of a player at war (0x70bd40: the game turn below the regions record's +0x128; taken as passing); a goody hut's plot..."
+  review: reviewed
+- addr: 0x70bf90
+  final: 0x4bcc20
+  kind: function
+  name: homelandSafetyUnit
+  semantics: one unit's safe plot and move; a barbarian with none fortifies in place
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+  impl: [cpu/core/tactical.ts:homelandSafety]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the hurt, the danger abov..."
+  review: reviewed
+- addr: 0x70ce90
+  final: 0x4bdb20
+  kind: function
+  name: exploreLand
+  semantics: "Explore Land: up to three rounds of HL Explore over EXPLORE units with Movement left and at most half their health lost, each round's moves together"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "HL: Explore ends on the game's plot 407 of 1,056 (128 with the stand-in)"
+  impl:
+    - cpu/core/tactical.ts:exploreLand
+    - gpu/core/sim_tactics.py:_tac_explore
+    - cpu/core/tactical.ts:EXPLORE_ROUNDS
+    - gpu/core/sim_tactics.py:_CITY_STRIKE_RANGE
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units; each unit not done (+0x770) with Moveme..."
+  review: reviewed
 - addr: 0x70d250
   final: 0x4bdf90
   kind: function
@@ -25,6 +162,25 @@
   context:
     - "- The first turn settler (0x70d250, the player with no city): of the settler's planning reach (unit +0x1fc0, AI_Planning.c..."
   review: imported
+- addr: 0x70f3b0
+  kind: function
+  name: homelandSafety
+  semantics: "the homeland's Move To Safety: a quarter of health for the hurt, unitDanger + 15 for a whole non-barbarian"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+  impl:
+    - cpu/core/tactical.ts:homelandSafety
+    - gpu/core/sim_tactics.py:_tac_move_to_safety
+    - cpu/core/tactical.ts:flees
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a quarter of its health (4 x damage) for the h..."
+  review: reviewed
 - addr: 0x710f40
   final: 0x4c1f40
   kind: function

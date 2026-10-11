@@ -371,6 +371,8 @@ GAME = {
     # vary), then the offer, price and passed-by vectors (one per class)
     "greatPeopleByClass": lambda sim, b, rows: [_gp_by_class(sim, b)],
     "barbCamps": lambda sim, b, rows: [sorted(int(t) for t in sim.camp_tile[b].tolist() if t >= 0)],
+    # the barbarians' revealed plots, by index
+    "barbExplored": lambda sim, b, rows: [sim.barb_explored[b].nonzero(as_tuple=True)[0].tolist()],
     "barbTribes": lambda sim, b, rows: [_barb_tribes_row(sim, b)],
     "unitPools": lambda sim, b, rows: [_unit_pools_row(sim, b)],
     "cityCount": lambda sim, b, rows: [sum(1 for c, _ in _city_rows(sim, b) if c < sim.n_majors)],  # civSeats' cities, as TS counts

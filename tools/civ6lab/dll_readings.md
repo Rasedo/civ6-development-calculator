@@ -4054,9 +4054,8 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   758 of 1,241, the game's plots within ours 862 -> 1,192.
 - The reach leaves out the plots the player never revealed (the game's
   lists drop them; a camp reveals three plots round it: 1124 t1, the camp at
-  40:21 lists 38:19 at distance 3 and not 38:18 at 4). The engines track no
-  barbarian revealed plots (`revealAround` writes majors only): every plot
-  reads as revealed — the AUDIT C-95 line.
+  40:21 lists 38:19 at distance 3 and not 38:18 at 4): "C-95: Explore Land
+  and the barbarians' revealed plots".
 - THE TARGET LIST (0x783980): the plots in index order, a plot the player
   sees (the word plane +0x290 > 0) giving, by its district (0x810d0): the
   player's own a FRIENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT
@@ -4125,39 +4124,181 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   turns, and moves to the first plot of its reach of this turn within its
   range (1 at least) of the target with none of its own stacking (0x775c60);
   the row's "Move To" is the target's plot.
-- ATTACK UNITS (0x7784b0) — READ, unported: per target of the move's type
-  (LOW also takes RELIGIOUS at war), the units whose planning holds its plot
-  within two turns (0x775340; for MEDIUM / LOW a ranged unit's spot at
-  exactly its range with Movement left, 0x78fa10), the targets of that type
-  within 5 of it (0x76eb50), each unit's spots per target from its planning
-  (turns, the planning's combat simulation 0x791470: the damage dealt
-  +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); for
-  MEDIUM / LOW a spot whose received exceeds the dealt, or whose received
-  would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0,
-  MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the
-  spots: per spot each unit's gain (λ 0x7702b0: the best of its entries
-  there, dealt / turns, a kill +100 where the target's damage reaches its
-  health, an overkill (health - damage) + 100; minus its value where it
-  stands assigned), the knapsack 0x61ddb0 at capacity 1 takes the first
-  largest positive gain, and the move (λ 0x770710) re-assigns it, the
-  spot's occupant unassigned. Each assigned unit's row: Move = its spot,
-  Attack = the target where the spot's turns are 1 (else -9999); the
-  "Expected Damage" field is never written (0 on all 7,241 rows). The
-  damages need the engines' combat strengths as a prediction (no such
-  function in either twin): the AUDIT C-95 line.
-- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported:
-  per player at war, each of its fighting units the player sees adds its
-  strength (the larger of melee and ranged; bombard less GlobalParameters
-  +0x188) to every plot of its one-turn reach (the search 0x26df90, flags
-  0x311) and to each plot within its range of those; an aircraft a disk of
-  its range; each city at war on a seen plot its defence at its centre and
-  its ranged strength on its strike disk; the player's own city centres
-  zeroed; each plot's feature's danger added. Move to Safety takes each unit
-  on a plot of danger > 0 (logged "Current Danger"): one with no strength,
-  or in a formation (0x8be30); a hurt one at half its health or worse whose
-  planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds
-  however hurt; a whole one where the danger exceeds its strength + 20 — and
-  moves them (0x774190, unread).
+- ATTACK UNITS (0x7784b0): `attackUnits` / `_tac_attack_units`, below.
+- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460): below
+  ("C-95: the danger map and Move to Safety").
+
+## C-95: the planning's spots and the combat prediction — READ, ported
+
+`planUnit` / `predictBlow` in cpu/core/tactical.ts, `_tac_plan` / `_tac_predict` in gpu/core/sim_tactics.py.
+
+- THE TARGETS (0x792f90): the list's unit targets and COMBAT_DISTRICTs
+  within 2 x the unit's Movement + its range (0x56e3d0) of it, in list order.
+- THE SPOTS (the cost callback 0x26d6f0 -> 0x790c60 on every link the
+  planning's two-turn search prices, the start node linked from itself):
+  melee — the plot an attack on the target's plot is linked from (the
+  attack's turn), a plot beside the target no other player's unit holds that
+  the step ends on with no Movement (the next turn) or that is the unit's own
+  plot (this turn); ranged (+0x19f8 the range) — any linked plot within the
+  range (in sight beyond 1, 0x5cf2b0), its turn the step's, the next where
+  it ends with no Movement; a civilian's plot taken from the plot it is
+  linked from; a land unit's spot (and a melee one's target) never water; six
+  spots a target at most, a plot once (the first link wins).
+- THE PREDICTION (0x791470): the damage law under the simulation flag takes
+  the roll at COMBAT_MAX_EXTRA_DAMAGE / 2 (`damageExpected`), the two
+  strengths the blow resolves on (`meleeUnitStrengths`,
+  `rangedUnitStrengths`: the engine's own terms, from the plot the attacker
+  stands on); a ranged blow and one on an embarked defender take none; a
+  civilian taken counts 150 dealt. Per spot of a fighter target the target's
+  blow back on the unit standing there (+0x94 / +0xac). A blow that kills
+  (dealt above the target's health) marks the planning (+0x60, `wins`).
+- MEASURED (the action replay, 5 seeds): the barbarians' "Attack Units" rows
+  end on the game's plot 70 of 126 (43 with the stand-in); on 1124 206 of
+  330 rows take the logged move and attack. The rest: the replay's state
+  (city-state units the record places after the move), spot order among
+  equal turns.
+
+## C-95: Attack Units — READ, ported
+
+`strikers`, `assignAttacks`, `carryOut`, `attackUnits` in cpu/core/tactical.ts; `_tac_attack_units`, `_tac_assign`, `_tac_merge_sort`, `_tac_carry_out` in gpu/core/sim_tactics.py.
+
+- THE UNIT SELECTOR (0x7710f0): a unit of AI type EXPLORE or above; an
+  explorer (PSEUDOYIELD_UNIT_EXPLORER: the Scout) only while its tribe
+  rampages; the rest go to the homeland.
+- THE STRIKERS (0x775340): per target of the move's type (LOW also takes
+  RELIGIOUS at war), in pool order, each unit whose planning holds the
+  target's plot within two turns — melee; a ranged unit a plot exactly its
+  range from the target within two turns with Movement left and none of its
+  own stacking there unless its own plot (0x78fa10); a DEFENDER only on its
+  own plot. The targets of the type within 5 of it (0x76eb50).
+- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less
+  its damage (1.1 in 24.8); for MEDIUM / LOW a spot whose received (taken +
+  back taken) tops the dealt (dealt + back dealt), or the unit's health, is
+  dropped; a unit that moved with turns 1 only its own plot; the stacking
+  block; claims in unit, target, spot order. ONE pass of the Generalized
+  Assignment (0x8b5bf0): the gain λ 0x7702b0 (dealt / turns, a kill +100,
+  an overkill (health - damage) + 100, a barbarian target x 0.8, less what
+  the unit holds assigned; early out where the unit already claims the
+  target), the knapsack 0x61ddb0 at capacity 1 (the first largest positive),
+  the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge
+  sort (halves n / 2).
+- THE EXECUTION (0x771f80): the moves (retried where not blocked), the
+  bombard strikes, the ranged strikes (unless a melee one is stronger and
+  reaches this turn), the move-and-attack onto the attack plot; turns end.
+- THE GPU TWIN predicts a pass's blows as a batch of their own
+  (`_GameRows`: each job a game, the per-game planes taken by rows), the
+  strength routines unchanged.
+
+## C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)
+
+`dangerPlane`, `flees`, `safePlot`, `moveToSafety`, `homelandSafety` in cpu/core/tactical.ts; `_danger_plane`, `_tac_flees`, `_tac_safe_plot`, `_tac_move_to_safety` in gpu/core/sim_tactics.py. The barbarians' lists take Move to Safety after Attack Medium Priority and in their homeland; the city-states' after Attack High Priority and in their homeland; the Free Cities' after Attack Medium Priority.
+
+- THE DANGER MAP (0x717460, a plot read by 0x716a90): per player at war
+  with the player (0x469cd0), each unit it sees (0x5033a0) not dead (+0x770)
+  with a combat, ranged or bombard strength; its danger (0x716400): a unit
+  with a bombard strength the larger of combat and bombard less
+  COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER (+0x188), any other the larger of
+  combat and ranged (a religious unit's religious strength onto the
+  religious map). Its plots: the one-turn breadth-first search (0x7921e0 ->
+  0x26df90, flags 0x311) from where it stands, every plot it closes; a
+  SECOND list — every plot within its range (0x1e000 over dx, dy) of those
+  outside them, then, a unit with +0x18bd (CanRaid: the field Coastal Raid
+  0x7794b0 and the pillage checks read — ABILITY_COASTAL_RAID's
+  MODIFIER_UNIT_ADJUST_RAIDING), the land plots beside them (the ring
+  0x6b0a0 radius 1, lambda 0x715f40: water skipped, deduped within the second
+  list alone, so a reached plot beside another takes the danger twice). The
+  danger is added once per list entry (two loops at 0x71690c / 0x7169a1). An
+  air unit (+0x650 == 1): the plots within its range. Each city of such a
+  player whose centre the player sees ([player +0x290] > 0): its defence
+  (0x24ae80) >> 8 on the centre; its strike (0x249ee0) >> 8 over its strike's
+  reach (0x249e40) less the centre, else 1 on each plot beside it (0x6b1b0 ->
+  0x691f0, the ring at distance 1, lambda 0x715ff0). Then the player's own
+  cities: a centre with a defence 0; each plot of its strike's reach with
+  danger down by the strike, to 1 at least. Features' +0x2c last (0 for
+  every feature of the install). The engines build it as each tactical pass
+  opens, the hostile units' searches on their full Movement.
+- MOVE TO SAFETY (0x77a4b0): each unit left (+0x530, +0x770 clear) on a plot
+  of danger above 0 is listed ("Move to safety ... Current Danger") when it
+  has no strength, or is embarked (0x8be30, IsEmbarked); hurt (+0xcf0 > 0): a
+  barbarian's (0x56ee80 -> 0x469ce0) at sea (+0x650 == 0) always, else when
+  2 x its damage reaches its health (0x56e0d0) and its planning (+0x1fc0)
+  holds no blow that kills (+0x60; none without a planning); whole: a
+  barbarian never, any other where the danger tops the larger of its combat
+  and ranged strengths + 20. Then (0x774190) each listed unit in order takes
+  its safe plot, the plots the ones before took left out, and moves there
+  (0x773fb0, its turn done); with none it stays for the moves after.
+- THE HOMELAND'S (0x70f3b0, each unit 0x70bf90): the same test with a
+  quarter of its health (4 x damage) for the hurt, the danger above
+  `unitDanger` + 15 for a whole unit not a barbarian; each fleeing unit in
+  turn takes its safe plot (0x962030, "Move To") or, a barbarian with none,
+  fortifies (0x95eae0, "Fortify in place").
+- THE SAFE PLOT (0x716b90): over the planning reach's plots of this turn
+  (+0x8 <= 1), none taken already, none (0x585eb0) with a unit of its own
+  stacking with it (itself counted), none with a unit at war (0x5861f0);
+  against the best so far, the first taken — of no danger over one of
+  danger; of two of no danger the player's own territory, else less Movement
+  left (+0xc); of two of danger on its own territory its own over another's,
+  the lower danger, then less Movement left; off it the lower danger, then
+  the farther (0x1deb0) from the unit. A unit with no combat strength skips a
+  water plot (0x834d0: terrain 15/16) of danger while the best is ashore.
+  PARTLY READ: a plot the global set 0x2d2100 counts above 0 is skipped (not
+  carried); a plot of the player's own city with the city flag +0x58 beats
+  all (not carried: no barbarian holds one); the planning's +0x738 in the
+  water test (taken as any unit).
+- MEASURED: the replay's barbarian "Current Danger" rows (5 seeds, the map
+  as the barbarians' turn opens on the copy) 114 of 240 equal; the misses
+  are mostly +1 to +3 (a no-strike city at distance 2 would explain them: a
+  LAB question, the ring reads distance 1) and the replay's placing of the
+  other players' units. End plots: "HL: Move To Safety" 183 of 371 (60 with
+  the stand-in), "Move to safety" 29 of 60 (0).
+
+## C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)
+
+`exploreLand`, `exploreTarget`, `exploreOk` in cpu/core/tactical.ts; `_tac_explore`, `_tac_explore_ok`, `_tac_explore_region` in gpu/core/sim_tactics.py; the revealed plots in cpu/core/fog.ts `revealAround` / gpu `_barb_reveal` (`barb_explored`).
+
+- THE REVEALED PLOTS (the player's +0x2f0, read by 0x154c0): the
+  barbarians' units' looks (each step's, a new unit's) and a new camp's
+  three plots round it. The planning's breadth-first lists keep to them
+  (`groundOf`'s known for a search without zones of control); a path (the
+  move order's pathfinder) takes any plot. A plot only revealed gives the
+  target list its districts, camp, goody hut, improvement.
+- EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units;
+  each unit not done (+0x770) with Movement left (+0xdb0), of AI type
+  EXPLORE (+0x1c0 == 2), its damage at most half its health (0x56e0d0 >>
+  1), in a later round not still on its way (0x26f830), takes HL Explore
+  (0x70aa40, the region fallbacks on the first round alone) and its target
+  joins the chosen list; the round's move orders (0x962030) are carried out
+  together as it ends (0x70a440); another round only where one moved.
+- HL EXPLORE (0x70aa40): the unit's breadth-first search of one turn
+  (0x7921e0 -> 0x26df90, flags 0x40 / 0x42) on its Movement left; per plot
+  closed, in order: no danger (0x716a90), not chosen, one it may go to
+  (0x70bd40: not its own plot; revealed; another player's ground only at war
+  with it; +0x4c not above 0, taken as no unit on it; its own area unless it
+  embarks (0x56c480), a hull on water; no city centre but its player's);
+  its two counts over its sight (0x58b1d0, the plots within the unit's sight
+  +0x1998 seen from the plot): those the player never revealed (0x70a6c0)
+  and those not visible now (0x70a8b0, [player +0x290] <= 0). The first plot
+  of the largest first count above 0 wins ("HL: Explore"). Else, on the
+  first round: the unit's region (plot +0x18) where the player's region
+  record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0)
+  — the nearest unrevealed plot of the region (0x70b6f0: plots in index
+  order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a
+  path to it (0x272a60), not chosen ("HL: Explore cur region"); a unit off
+  any region the nearest of its area (0x70b550, "cur area"); then the
+  player's primary, secondary and tertiary region lists (+0x1290 +0x2f0 /
+  +0x360 / +0x3d0, the same search: "primary / secondary / tertiary
+  regions"); else the first plot of the largest second count ("HL: Explore
+  fallback"). The unit's plot joins the chosen.
+- PARTLY READ: the region lists' writer (the engines carry none: 36 of the
+  barbarians' 223 Explore rows of runs/h1_duelv1124 are "tertiary regions");
+  a revealed plot's +0x47 that makes a plot of positive count win once
+  ahead of a larger (0x70a6c0's second flag: not carried); the turn test on
+  a plot of a player at war (0x70bd40: the game turn below the regions
+  record's +0x128; taken as passing); a goody hut's plot taken at once by a
+  full civilization (0x82d90: no barbarian).
+- MEASURED (the action replay, 5 seeds): the barbarians' "HL: Explore" rows
+  end on the game's plot 407 of 1,056 (128 with the stand-in); barb:move
+  applied 13,702 against 12,592 on the base engine.
 
 ## C-96 / C-97: the AI's weights and the modifier evaluator — READ (the parts below), the agendas' path and most analyzers unread
 
@@ -4211,14 +4352,14 @@ gpu/core/sim_tactics.py). Shadow checks `.claude/scratchpad/ana/{plan,rampage,at
   plot of another area (plot +8) counted three times as far; strictly nearer
   replaces.
 - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has
-  taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no
+  taken damage (+0xcf0 > 0), not embarked (0x8be30, IsEmbarked), on a plot of no
   danger (the influence map 0x716a90 <= 0) is queued ("Heal"); the queue's
   moves: a unit not of the sea domain (+0x650: 0 sea, 1 air, 2 land, the
   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify
   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside
   its own territory heads for its player's nearest city (first of equals) —
-  where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no
-  influence map: every plot reads no danger.
+  where 0x586360 (flag 0x10) allows it, PARTLY READ. The danger: "C-95: the
+  danger map and Move to Safety".
 - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player
   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a
   district of the player's own: its city centre too) and each ALLY_SUPPORT
@@ -4842,8 +4983,9 @@ region's plots with their scores, per turn and player.
   player's own cities: the centre 0, each plot their strike covers down by
   its strength to 1 at least (0x716080). Features' DangerValue last (none in
   the install).
-- PARTLY READ: the unit flag +0x18bd (taken as a unit with no ranged or
-  bombard strength: a fit), the units' strengths (the install's base, the
+- PARTLY READ: the unit flag +0x18bd (CanRaid: "C-95: the danger map
+  and Move to Safety"; ai/major/danger.ts takes it as a unit with no ranged
+  or bombard strength), the units' strengths (the install's base, the
   routines' modifiers unread), the plot yield 0x538a60 (the engine's
   `tileYields` for the seat), ownership type 0 (taken as the improved plots
   of the resource in the player's territory: the +4 new resources at

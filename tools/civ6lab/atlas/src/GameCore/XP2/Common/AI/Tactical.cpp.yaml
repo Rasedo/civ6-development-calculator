@@ -6,22 +6,53 @@
 - addr: 0x7702b0
   final: 0x5024e0
   kind: function
-  status: PARTLY
+  name: attackGain
+  semantics: "an attack claim's gain: dealt / turns, a kill +100, an overkill, a barbarian target x 0.8, less what the unit holds"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl:
+    - cpu/core/tactical.ts:assignAttacks
+    - cpu/core/tactical.ts:ATTACK_HEALTH_256
+    - cpu/core/tactical.ts:ATTACK_KILL
+    - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
+    - gpu/core/sim_tactics.py:gain
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...alizedAssignmentProblem.cpp) runs ONE pass over the spots: per spot each unit's gain (λ 0x7702b0: the best of its entries there, dealt / turns, a kill +100 where the target's damage re..."
+  review: reviewed
+- addr: 0x7704e0
+  final: 0x502660
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:assignAttacks, cpu/core/tactical.ts:assignedBefore]
+  readings: ["C-95: Attack Units — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...at capacity 1 (the first largest positive), the move λ 0x770710. The results sorted by 0x7704e0 through EASTL's merge sort (halves n / 2)."
   review: imported
 - addr: 0x770710
   kind: function
-  status: PARTLY
+  name: attackMove
+  semantics: "the assignment's move: re-assigns the spot, its occupant unassigned"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:assignAttacks, gpu/core/sim_tactics.py:claim]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...knapsack 0x61ddb0 at capacity 1 takes the first largest positive gain, and the move (λ 0x770710) re-assigns it, the spot's occupant unassigned. Each assigned unit's row: Move = its sp..."
-  review: imported
+  review: reviewed
 - addr: 0x770ce0
   final: 0x502dc0
   kind: function
@@ -31,6 +62,21 @@
   context:
     - "...x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list (Tactics.xml \"Default Barbar..."
   review: imported
+- addr: 0x7710f0
+  kind: function
+  name: tacticalUnit
+  semantics: "the tactical pass's unit selector: AI type EXPLORE or above, an explorer only while its tribe rampages"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:tacticalUnit, gpu/core/sim_tactics.py:_tac_tactical]
+  readings: ["C-95: Attack Units — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE UNIT SELECTOR (0x7710f0): a unit of AI type EXPLORE or above; an explorer (PSEUDOYIELD_UNIT_EXPLORER: the Scout..."
+  review: reviewed
 - addr: 0x771250
   kind: function
   status: READ
@@ -74,6 +120,22 @@
   context:
     - "...lse the nearest (strictly nearer replaces; the list's first of equals), and strikes it (0x771670: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or CO..."
   review: imported
+- addr: 0x771f80
+  final: 0x503f70
+  kind: function
+  name: carryOutAttacks
+  semantics: the moves, bombard strikes, ranged strikes (unless a melee one is stronger and reaches), move-and-attack; turns end
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:carryOut, gpu/core/sim_tactics.py:_tac_carry_out]
+  readings: ["C-95: Attack Units — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE EXECUTION (0x771f80): the moves (retried where not blocked), the bombard strikes, the ranged strikes (unles..."
+  review: reviewed
 - addr: 0x773030
   final: 0x505020
   kind: function
@@ -114,20 +176,30 @@
   final: 0x505fa0
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:moveToSafety]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
   review: imported
 - addr: 0x774190
   kind: function
-  status: UNREAD
+  name: moveToSafetyMoves
+  semantics: each listed unit takes its safe plot (the ones before left out) and moves there, its turn done
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+  impl: [cpu/core/tactical.ts:moveToSafety, gpu/core/sim_tactics.py:_tac_move_to_safety]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   context:
     - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
-  review: imported
+  review: reviewed
 - addr: 0x774380
   final: 0x5063d0
   kind: function
@@ -179,17 +251,24 @@
 - addr: 0x775340
   final: 0x507370
   kind: function
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:pillage, cpu/core/tactical.ts:reachers]
+  name: attackStrikers
+  semantics: the units whose planning holds the target within two turns (a ranged one at exactly its range, Movement left); a DEFENDER on its own plot
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:strikers, cpu/core/tactical.ts:pillage, cpu/core/tactical.ts:reachers]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...rovement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it..."
     - "...79240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340: pool order, a strength to fight with, a DEFENDER held until another unit goes in; the..."
     - "...ADER (0x77aa20): each TRADER target, the units whose planning holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement..."
-  review: imported
+  review: reviewed
 - addr: 0x775670
   final: 0x5076a0
   kind: function
@@ -217,17 +296,44 @@
     - "...h of this turn within its range (1 at least) of the city with none of its own stacking (0x775c60) and logs no row. Shadow check over 1124: of 446 rows the logged target is in the list..."
     - "...of this turn within its range (1 at least) of the target with none of its own stacking (0x775c60); the row's \"Move To\" is the target's plot."
   review: imported
+- addr: 0x776140
+  kind: function
+  name: assignAttacks
+  semantics: the claims (unit, target, spot), the MEDIUM / LOW exchange filter, one Generalized Assignment pass, the merge-sorted results
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl:
+    - cpu/core/tactical.ts:assignAttacks
+    - gpu/core/sim_tactics.py:_tac_assign
+    - cpu/core/tactical.ts:ATTACK_TARGETS_RANGE
+    - gpu/core/sim_tactics.py:_ATTACK_TARGETS_RANGE
+  readings: ["C-95: Attack Units — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE ASSIGNMENT (0x776140): a target's health floor(100 x 281 / 256) less its damage (1.1 in 24.8); for MEDIUM /..."
+  review: reviewed
 - addr: 0x7784b0
   kind: function
-  status: PARTLY
+  name: attackUnits
+  semantics: "Attack High / Medium / Low: per target of the type the strikers, the targets of the type within 5, the assignment, the execution"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:attackUnits, gpu/core/sim_tactics.py:_tac_attack_units]
   readings:
     - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...80, AllowedMoves hashes): f2e0f4 Move to Safety, f2e100/104/108 Attack High/Medium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120..."
     - "- ATTACK UNITS (0x7784b0) — READ, unported: per target of the move's type (LOW also takes RELIGIOUS at war), the..."
-  review: imported
+  review: reviewed
 - addr: 0x778910
   final: 0x50a870
   kind: function
@@ -281,7 +387,9 @@
   final: 0x50b3d0
   kind: function
   status: PARTLY
-  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
@@ -314,13 +422,24 @@
 - addr: 0x77a4b0
   final: 0x50c3d0
   kind: function
-  status: PARTLY
+  name: moveToSafety
+  semantics: "Move to Safety: lists units on danger that flee (no strength, embarked, hurt at half health with no kill, a hurt barbarian at sea, a whole non-barbarian topped by 20), then moves each to its safe plot"
+  status: READ
+  cases:
+    - recording: h1_duelw1117-1128
+      turn: all
+      value: "the barbarians' logged Current Danger 114 of 240 equal; HL: Move To Safety ends 184 of 371"
+  impl:
+    - cpu/core/tactical.ts:flees
+    - cpu/core/tactical.ts:moveToSafety
+    - gpu/core/sim_tactics.py:_tac_move_to_safety
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its figh..."
-  review: imported
+  review: reviewed
 - addr: 0x77a810
   final: 0x50c6c0
   kind: function

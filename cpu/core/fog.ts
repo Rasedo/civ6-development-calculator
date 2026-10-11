@@ -1,7 +1,7 @@
 
 import type { GameState, Tile } from './types';
 import type { GameMap } from '../../world/types';
-import { citiesOf, civOf, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
+import { citiesOf, civOf, isBarbSeat, isCityStateSeat, isCiv, leaderOf, majorsAlive, majorsMet, seatOf, seatsAllied, setMetTurnWith, tileSeat, unitsOf } from './seats';
 import { hasMet, meetCityState, suzerainOf } from './cityStates';
 import { boostOnEvent } from './boosts';
 import { metAllMajorsMoment } from './eras';
@@ -225,6 +225,12 @@ export function revealAround(
   los?: { seeThrough: boolean },
 ): void {
   if (!state.fogOfWar) return;
+  // the barbarians' revealed plots (the player's +0x2f0), which their units'
+  // planning and their target list read: the write alone
+  if (isBarbSeat(seat)) {
+    liftFog(state, seat, tileIndex, radius, los);
+    return;
+  }
   // A city-state's unit's look meets the majors it takes in: a plot of
   // theirs or a unit of theirs standing on it (runs/h1_duelw1124 t10:
   // Granada's Warrior steps beside Xi'an's coast and China's Builder, and
@@ -237,7 +243,7 @@ export function revealAround(
     if (isCiv(suz)) majorLook(state, suz, tileIndex, radius, los, false);
     return;
   }
-  // MAJOR seats only: nothing reads a city-state's or the barbarians' fog,
+  // MAJOR seats only: nothing reads a city-state's fog,
   // so tracking it would be write-only state (and a digest liability).
   if (!isCiv(seat)) return;
   majorLook(state, seat, tileIndex, radius, los, !!los);

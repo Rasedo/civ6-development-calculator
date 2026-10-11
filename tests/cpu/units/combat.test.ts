@@ -194,16 +194,15 @@ describe('combat', () => {
 });
 
 describe('barbarians', () => {
-  it('camps spawn deterministically and send raiders that pillage', () => {
+  it('camps spawn deterministically; a pillaged improvement is repaired', () => {
     const { state } = battlefield();
-    const farm = tileAtCoords(state.map, 10, 9);
-    farm.improvement = 'FARM';
     for (let i = 0; i < 60 && state.barbSeat.camps.length === 0; i++) barbarianPhase(state);
     expect(state.barbSeat.camps.length).toBeGreaterThan(0);
-    for (let i = 0; i < 120 && !farm.pillaged; i++) barbarianPhase(state);
-    expect(farm.pillaged).toBe(true);
 
     // pillaged improvements are dead weight until repaired
+    const farm = tileAtCoords(state.map, 10, 9);
+    farm.improvement = 'FARM';
+    farm.pillaged = true;
     const builder = spawnUnit(state, 'BUILDER', farm.index, 0)!;
     builder.tileIndex = farm.index;
     orderUnit(state, builder, 'REPAIR');

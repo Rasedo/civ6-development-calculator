@@ -3,6 +3,13 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x76f0f0
+  final: 0x501700
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:mergeSort]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x76f210
   final: 0x501810
   kind: function

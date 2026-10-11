@@ -110,6 +110,7 @@
     - cpu/core/combat.ts:atkCS
     - cpu/harness/replayActions.ts:melee
     - gpu/core/sim_seats.py:_melee_exchange
+    - cpu/core/combat.ts:defDef
   readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
   context:
     - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."

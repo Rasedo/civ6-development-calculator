@@ -55,7 +55,7 @@ import { GOVERNOR_PROMOTIONS, promotionBit } from '../data/governors';
 import { BOOSTS } from '../data/boosts';
 import { chargeUnitResource, upgradeGoldCost } from '../core/stockpile';
 import { applyTrainingGrants, cityStrikeStrength, clearCampFor, flankSupportLive, hostilePillage, meleeAttack, rangedAttack, seizeCivilian, terrainDefense } from '../core/combat';
-import { barbarianTactics, cityStateTactics, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
+import { barbarianTactics, cityStateTactics, dangerPlane, freeCityTactics, holdBarbarians, refreshBarbarians, tacticsDrawing, traceTactics } from '../core/tactical';
 import { barbSlots, barbSlotsDying, barbarianOps, barbarianRules, barbScoutLook, foundTribe, tribeDies, tribeKindAt } from '../core/barbarians';
 import { DIFFICULTIES } from '../data/barbarians';
 import { MINOR_UPGRADE_GOLD, LEVY_TURNS } from '../data/cityStates';
@@ -154,6 +154,10 @@ interface Ctx {
   engineKilled: Set<string>;
   /** this pair's moved units' steps (`move`'s path), by `owner:id` */
   paths: Map<string, number[]>;
+  /** the units a barbarian's battle of this pair struck or fought with,
+   *  as they stood before its first blow: the barbarians' AI takes its turn
+   *  from there (`barbarianAi`) */
+  barbBlows: Map<Unit, Unit>;
   /** the other players' envoys this pair staged for the engine's turn (`stageEnvoys`) */
   envoys: EnvoyDecision[];
   /** the record's units (`owner:id`) a battle of this pair the engine fought */
@@ -542,6 +546,11 @@ function barbarianTurn(ctx: Ctx, b: TurnRecord, closing: number): void {
   barbarianAi(ctx, b, closing, before, from);
   barbarianOps(state);
   barbSlotsDying(state);
+  // the barbarians' units look round where the record holds them (their
+  // moves are the record's, set without a step)
+  for (const u of state.units) {
+    if (isBarbSeat(u.seat)) revealAround(state, u.seat, u.tileIndex, unitSight(u, state), { seeThrough: unitSeesThrough(u) });
+  }
 }
 
 /** THE BARBARIANS' UNIT AI on a copy of the state, the units that stood
@@ -553,6 +562,21 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
   const copy = deserialize(serialize(state));
   const twin = new Map<Unit, Unit>();
   state.units.forEach((u, i) => twin.set(copy.units[i], u));
+  // the units the barbarians' battles of the pair struck (or lost) stand as
+  // they were before the first blow, where the blow found them
+  const acting = new Set([...before].map((u) => u.id));
+  const back = new Map([...twin].map(([c, u]) => [u, c] as const));
+  for (const [u, snap] of ctx.barbBlows) {
+    let c = back.get(u);
+    if (!c) {
+      c = structuredClone(snap);
+      copy.units.push(c);
+      twin.set(c, u);
+      if (isBarbSeat(u.seat)) acting.add(c.id);
+    }
+    c.hp = snap.hp;
+    c.tileIndex = snap.tileIndex;
+  }
   for (const [c, u] of twin) {
     const at = from.get(u);
     if (at !== undefined) c.tileIndex = at;
@@ -581,20 +605,25 @@ function barbarianAi(ctx: Ctx, b: TurnRecord, closing: number, before: ReadonlyS
       if (log && label === 'Random Direction' && j !== undefined) st.rngState = log.stateAt(j);
     },
   });
-  const moves = new Map<Unit, { move: string; plot: number }>();
-  traceTactics((c, move, plot) => {
+  const moves = new Map<Unit, { move: string; plot: number; attack: number; from: number }>();
+  traceTactics((c, move, plot, attack) => {
     const u = twin.get(c);
-    if (u) moves.set(u, { move, plot });
+    if (u) moves.set(u, { move, plot, attack, from: from.get(u) ?? u.tileIndex });
   });
+  // the danger map the barbarians' turn opens on, beside the game's logged
+  // "Current Danger" of each unit it moved to safety
+  const plane = dangerPlane(copy, BARB_SEAT);
+  const danger = new Map<Unit, number>();
+  for (const [c, u] of twin) if (isBarbSeat(c.seat)) danger.set(u, plane[c.tileIndex]);
   try {
-    barbarianTactics(copy, new Set([...before].map((u) => u.id)));
+    barbarianTactics(copy, acting);
   } finally {
     traceTactics(null);
     holdRng(held);
   }
   const ended = new Map<Unit, number>();
   for (const [c, u] of twin) if (copy.units.includes(c)) ended.set(u, c.tileIndex);
-  tallyTactics(ctx, b, closing, moves, ended);
+  tallyTactics(ctx, b, closing, moves, ended, danger);
 }
 
 /** the game's tactical log's category for a barbarian unit's move, the
@@ -609,10 +638,26 @@ function tacticalCategory(cat: string): string {
  * barbarian player's rows of the turn) holds for it — an operation's units
  * hold none — and the plot it ended on (`ended`) beside record t+1's: the
  * game's move taken (`barb:move` applied), or the record's imposed. Tallied
- * by the game's move, with the first turn the engine's differed.
+ * by the game's move, with the first turn the engine's differed; each row
+ * that logs a unit's "Current Danger" beside the engine's danger map there
+ * (`danger`, the tally's "(danger)": rows, those equal).
  */
-function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number }>,
-  ended: ReadonlyMap<Unit, number>): void {
+function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<Unit, { move: string; plot: number; attack: number; from: number }>,
+  ended: ReadonlyMap<Unit, number>, danger: ReadonlyMap<Unit, number>): void {
+  const rowsOf = ctx.tactical?.first.get(turn);
+  for (const [key, u] of ctx.units) {
+    if (!isBarbSeat(u.seat)) continue;
+    const m = /Current Danger: (-?\d+)/.exec(rowsOf?.get(Number(key.split(':')[1]))?.extra ?? '');
+    const d = danger.get(u);
+    if (!m || d === undefined) continue;
+    const t = (ctx.barbTally['(danger)'] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
+    t.units += 1;
+    if (d === Number(m[1])) t.move += 1;
+    else {
+      t.firstMove ??= turn;
+      if (TRACE.has('tactics')) console.error(`t${turn} ${key} ${u.type} danger ${d} | game ${m[1]}`);
+    }
+  }
   const keyOf = new Map<Unit, string>();
   for (const [key, u] of ctx.units) keyOf.set(u, key);
   const rows = ctx.tactical?.first.get(turn);
@@ -621,7 +666,8 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
     const key = keyOf.get(u);
     if (!key) continue;
     const id = Number(key.split(':')[1]);
-    const game = rows ? tacticalCategory(rows.get(id) ?? 'Operation') : undefined;
+    const row = rows?.get(id);
+    const game = rows ? tacticalCategory(row?.move ?? 'Operation') : undefined;
     const t = (ctx.barbTally[game ?? m.move] ??= { units: 0, move: 0, plot: 0, plotOf: 0 });
     t.units += 1;
     const same = game === undefined || game === tacticalCategory(m.move);
@@ -639,7 +685,11 @@ function tallyTactics(ctx: Ctx, b: TurnRecord, turn: number, moves: ReadonlyMap<
       count(ctx, 'barb:move', 'fallback', ctx.playerOfSeat.get(BARB_SEAT), `${game ?? m.move}: the AI's ${end}, the game's ${want}`);
     }
     // REPLAY_TRACE=tactics: each barbarian's move beside the game's
-    if (TRACE.has('tactics')) console.error(`t${turn} ${key} ${u.type} ${m.move}->${m.plot} at ${end} | game ${game ?? '-'} at ${want}`);
+    if (TRACE.has('tactics')) {
+      const xy = (p: number) => (p < 0 ? '-' : `${p % ctx.W} ${Math.floor(p / ctx.W)}`);
+      console.error(`t${turn} ${key} ${u.type} from ${xy(m.from)} ${m.move} Move ${xy(m.plot)} Attack ${xy(m.attack)} at ${xy(end)}`
+        + ` | game ${game ?? '-'} ${row?.extra ?? ''} at ${xy(want)}`);
+    }
   }
 }
 
@@ -2092,6 +2142,14 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const atk = unitOf(ctx, d.attacker);
         const def = unitOf(ctx, d.defender);
         if (!atk || !def) { count(ctx, 'battle', 'refused', d.player, 'a unit the replay does not hold'); if (TRACE.has('battle')) console.error(`   ${d.attacker} ${!!atk} ${d.defender} ${!!def}`); break; }
+        if (isBarbSeat(atk.seat)) {
+          for (const [u, at] of [[atk, d.from], [def, d.at]] as const) {
+            if (ctx.barbBlows.has(u)) continue;
+            const snap = structuredClone(u);
+            snap.tileIndex = at;
+            ctx.barbBlows.set(u, snap);
+          }
+        }
         const s0 = battleDraw(ctx, wit, b, d);
         if (s0 === undefined) { count(ctx, 'battle', 'refused', d.player, 'no damage draw in the log'); if (TRACE.has('battle')) console.error(`   ${d.attacker || 'city@' + d.from} vs ${d.defender || 'city@' + d.at} seq${d.seq}`); break; }
         // a unit the log's steps moved holds no fortification
@@ -2743,12 +2801,13 @@ export interface MinorDrawTally {
 }
 
 /** the game's tactical log: per turn, per barbarian unit ID, its first
- *  row's move; per turn, the barbarian units of its Wander rows in their
- *  order; per turn, per other player's unit (`player:ID`), its first row's
+ *  row's move and the rest of that row; per turn, the barbarian units of its
+ *  Wander rows in their order; per turn, per other player's unit
+ *  (`player:ID`), its first row's
  *  move; per turn, the unit (`player:ID`) of each row whose move takes a
  *  "Random Direction" draw (Wander, Garrison), every player's, in order */
 interface Tactical {
-  first: Map<number, Map<number, string>>;
+  first: Map<number, Map<number, { move: string; extra: string }>>;
   wanders: Map<number, number[]>;
   others: Map<number, Map<string, string>>;
   drawRows: Map<number, string[]>;
@@ -2758,7 +2817,7 @@ interface Tactical {
 function loadTactical(dumpPath: string): Tactical | undefined {
   const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Tactical.csv');
   if (!existsSync(path)) return undefined;
-  const out = new Map<number, Map<number, string>>();
+  const out = new Map<number, Map<number, { move: string; extra: string }>>();
   const wanders = new Map<number, number[]>();
   const others = new Map<number, Map<string, string>>();
   const drawRows = new Map<number, string[]>();
@@ -2780,7 +2839,7 @@ function loadTactical(dumpPath: string): Tactical | undefined {
     if (f[2] === 'Wander') wanders.set(turn, [...(wanders.get(turn) ?? []), id]);
     let t = out.get(turn);
     if (!t) out.set(turn, (t = new Map()));
-    if (!t.has(id)) t.set(id, f[2]);
+    if (!t.has(id)) t.set(id, { move: f[2], extra: f.slice(6).join(", ") });
   }
   return { first: out, wanders, others, drawRows };
 }
@@ -2878,7 +2937,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
-    engineKilled: new Set(), paths: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
+    engineKilled: new Set(), paths: new Map(), barbBlows: new Map(), envoys: [], battled: new Set(), fortified: new Map(), barbNew: [], lateEnvoys: [], log: history.randLog, stream, prev: recs[0],
     researchAi: report.researchAi, researchScores: report.researchScores, researchBefore: new Map(), aiResearchLog: loadAiResearchLog(dumpPath),
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
@@ -2924,6 +2983,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.battled = new Set();
     ctx.fortified = fortifiedIn(b);
     ctx.paths = new Map();
+    ctx.barbBlows = new Map();
     ctx.barbNew = [];
     ctx.lateEnvoys = [];
     traceTurn = b.turn;

@@ -42,8 +42,9 @@ def build():
 
 
 def inland_tile(sim) -> int:
-    """A passable unowned land tile with no water neighbour and nothing on it
-    or round it — a camp neither the naval row nor a unit can answer for."""
+    """A passable unowned land tile with no water or impassable plot round it
+    and nothing on it or round it — a camp neither the naval row nor a unit
+    can answer for, its ring free to raise on."""
     for t in range(sim.T):
         if not bool(sim.passable[0, t]) or bool(sim.wpass[0, t]) or int(sim.tile_seat[0, t]) >= 0:
             continue
@@ -52,7 +53,8 @@ def inland_tile(sim) -> int:
         ring = [int(r) for r in sim._barb_ring[t].tolist()[:19] if r >= 0]
         if len(ring) < 19:
             continue
-        if any(bool(sim.wpass[0, n]) or int(sim.military_at[0, n]) >= 0 or int(sim.civilian_at[0, n]) >= 0
+        if any(bool(sim.wpass[0, n]) or not bool(sim.passable[0, n]) or int(sim.military_at[0, n]) >= 0
+               or int(sim.civilian_at[0, n]) >= 0
                or int(sim.centre_slot_at[0, n]) >= 0 for n in ring):
             continue
         return t

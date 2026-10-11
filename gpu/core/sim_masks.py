@@ -340,6 +340,30 @@ class SimMasks:
         # the game's "Unit Combat Damage" draw: rand(COMBAT_MAX_EXTRA_DAMAGE)
         roll = self._rand_range(mask, self._dmg_max_extra)
         q = js_round(diff * 10).to(torch.long)
+        raw = self._damage_raw(roll, diff)
+        dmg = raw.clamp(min=self._dmg_min, max=self._dmg_max) if finish is None else finish(raw)
+        if log_hit:
+            t_ = int(tile[b]) if tile is not None else -1
+            # `parts` splits the diff into the two strengths (TS damageRoll's
+            # `parts` twin), so a disagreement names its SIDE before its term
+            ad = (f" a{int(js_round(parts[0][b].to(torch.float64) * 10))}"
+                  f" d{int(js_round(parts[1][b].to(torch.float64) * 10))}") if parts is not None else ""
+            if parts is not None and len(parts) > 2:
+                ad += f" at{int(parts[2][b])} as{int(parts[3][b])} dt{int(parts[4][b])} ds{int(parts[5][b])}"
+            self._combat_events.append(
+                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(roll[b])} dmg{int(dmg[b])}{ad}"
+            )
+        return dmg
+
+    def _damage_expected(self, diff: torch.Tensor) -> torch.Tensor:
+        """`damageExpected`: the law with COMBAT_MAX_EXTRA_DAMAGE / 2 for the
+        draw, nothing drawn (the AI's combat prediction)"""
+        roll = torch.full(diff.shape, self._dmg_max_extra // 2, dtype=torch.long, device=self.device)
+        return self._damage_raw(roll, diff).clamp(min=self._dmg_min, max=self._dmg_max)
+
+    def _damage_raw(self, roll: torch.Tensor, diff: torch.Tensor) -> torch.Tensor:
+        """`damageRaw`: the law's value before its clamp for the draw `roll`
+        and the strength difference `diff`"""
         # `damageExponent`: the difference at 1/65536, D = floor(256 * diff),
         # x = (k * D) >> 8 — integer floors on both engines
         q16 = js_round(diff.to(torch.float64) * 65536).to(torch.long)
@@ -354,20 +378,7 @@ class SimMasks:
         # rounding of it is the f32 product), truncated, clamped
         v = ((self._dmg_base_damage + roll).to(torch.float64) * base).to(torch.float32).to(torch.float64)
         v = (v + 0.5).to(torch.float32).to(torch.float64)
-        raw = torch.trunc(v).to(torch.long)
-        dmg = raw.clamp(min=self._dmg_min, max=self._dmg_max) if finish is None else finish(raw)
-        if log_hit:
-            t_ = int(tile[b]) if tile is not None else -1
-            # `parts` splits the diff into the two strengths (TS damageRoll's
-            # `parts` twin), so a disagreement names its SIDE before its term
-            ad = (f" a{int(js_round(parts[0][b].to(torch.float64) * 10))}"
-                  f" d{int(js_round(parts[1][b].to(torch.float64) * 10))}") if parts is not None else ""
-            if parts is not None and len(parts) > 2:
-                ad += f" at{int(parts[2][b])} as{int(parts[3][b])} dt{int(parts[4][b])} ds{int(parts[5][b])}"
-            self._combat_events.append(
-                f"k:{k} t:{t_} c:{c0} diff{int(q[b])} r{int(roll[b])} dmg{int(dmg[b])}{ad}"
-            )
-        return dmg
+        return torch.trunc(v).to(torch.long)
 
     def _capture_roll(self, mask: torch.Tensor, diff: torch.Tensor, tile: torch.Tensor) -> torch.Tensor:
         """[B] bool — `captureRoll`'s twin: does the beaten unit change hands?
@@ -2819,6 +2830,10 @@ class SimMasks:
         self.barb_unit_mp_full[rows, slot] = _m
         self.barb_unit_attacks[rows, slot] = 1
         self.military_at[(rows, spot[rows])] = slot + self.POOL_LO["barb"]
+        # spawnUnit's revealAround: a barbarian's look lifts their fog
+        if seat == BARB_SEAT:
+            self._barb_reveal(rows, spot[rows], self._unit_sight(_ut_b, self.barb_unit_promos[rows, slot]),
+                              see_through=self._sees_through(_ut_b, self.barb_unit_promos[rows, slot]))
         if self._log_diff:
             for _sb in rows.tolist():
                 _ut = unit_type[_sb] if isinstance(unit_type, torch.Tensor) else unit_type
@@ -2896,6 +2911,23 @@ class SimMasks:
         centre sees (`_los_disk`, no Sentry)."""
         self._reveal_around(rows, seat_row, tiles, 2)
         self._reveal_around(rows, seat_row, tiles, 3, see_through=torch.zeros(rows.numel(), dtype=torch.bool, device=self.device))
+
+    def _barb_reveal(self, rows: torch.Tensor, tiles: torch.Tensor, radius, see_through: torch.Tensor | None = None) -> None:
+        """`revealAround` for the barbarians: their revealed plots
+        (`barb_explored`) take the plots within `radius` [K] (or an int) of
+        `tiles` [K] in the games `rows` [K] (repeats allowed), cut by the
+        eye's line of sight where `see_through` names a unit's look. No-op
+        with fog off."""
+        if not self.fog_of_war or rows.numel() == 0:
+            return
+        if see_through is not None:
+            disk = self._los_disk(rows, tiles.clamp(min=0), radius, see_through)
+        else:
+            disk = self.pair_dist[tiles.clamp(min=0)] <= (
+                radius.unsqueeze(1) if torch.is_tensor(radius) else radius)
+        acc = torch.zeros(self.B, self.T, dtype=torch.float32, device=self.device)
+        acc.index_add_(0, rows, disk.to(torch.float32))
+        self.barb_explored |= acc > 0
 
     def _reveal_around(self, rows: torch.Tensor, seat_row, tiles: torch.Tensor, radius,
                        see_through: torch.Tensor | None = None, placed: bool | None = None) -> None:

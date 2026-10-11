@@ -2118,6 +2118,8 @@ export function buildRules() {
       cls: UNIT_CLASSES.reduce((m, c, i) => m | (unitHasClass(u, c) ? 1 << i : 0), 0),
       era: UNIT_ERA_INDEX[u.id] ?? 0,
       recon: u.recon ? 1 : 0, // Survey doubles what this class earns
+      // the AI's explorer (PSEUDOYIELD_UNIT_EXPLORER), a tactical unit only while its tribe rampages
+      explorer: u.explorer ? 1 : 0,
       // CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): `COPY_CLASSES[0]`'s plane
       lightcav: isLightCavalry(u) ? 1 : 0,
       // the NAVAL RAIDER axis: STEALTH hides the chassis from anything more

@@ -632,6 +632,8 @@ class SimInit:
         self.appeal_over = torch.tensor([[int(t.get("apo", -999)) for t in f["tiles"]] for f in fixtures], dtype=torch.long, device=device)
         self.civ_alive = torch.zeros(B, self.n_majors, dtype=torch.bool, device=device)
         self.seat_explored = torch.zeros(B, self.n_majors, self.T, dtype=torch.bool, device=device)
+        # the barbarians' revealed plots (`barbSeat.explored`)
+        self.barb_explored = torch.zeros(B, self.T, dtype=torch.bool, device=device)
 
         _civ_scalars = (
             ("best_melee", torch.long, 0), ("best_ranged", torch.long, 0), ("builders_trained", torch.long, 0),
@@ -4136,6 +4138,7 @@ class SimInit:
         self._type_cls = torch.tensor([int(u["cls"]) for u in ru], dtype=torch.long, device=device)
         self._type_era = torch.tensor([int(u["era"]) for u in ru], dtype=torch.long, device=device)
         self._type_recon = torch.tensor([bool(u["recon"]) for u in ru], dtype=torch.bool, device=device)
+        self._type_explorer = torch.tensor([bool(u["explorer"]) for u in ru], dtype=torch.bool, device=device)
         # CIV6 (PROMOTION_CLASS_LIGHT_CAVALRY): `COPY_CLASSES[0]`'s plane
         self._type_lightcav = torch.tensor([bool(u["lightcav"]) for u in ru], dtype=torch.bool, device=device)
         # THE NAVAL RAIDER AXIS. `_type_sight` is the chassis override; 0 means

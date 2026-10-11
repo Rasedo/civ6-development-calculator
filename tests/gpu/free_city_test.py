@@ -561,6 +561,11 @@ def test_defence_and_strike(rules, path) -> None:
             s.city_outer_hp[B0, F, j] = int(s._walls_max_at(torch.tensor([F]), torch.tensor([j]))[B0])
             base = int(s._city_defense_cs(torch.tensor([F]), torch.tensor([j]))[0][B0])
             assert base == before + int(s._b_walls_cs[wi]), (before, base)
+        # the Free Cities' own units gone, so only the city can strike (its
+        # units' Attack High takes a foe beside their city)
+        for slot, _t, tile in free_units(s):
+            s._occ_clear(torch.tensor([B0]), torch.tensor([tile]), torch.tensor([slot]))
+            s.unit_alive[B0, slot] = False
         u = put(s, 1, attack_plot(s, c), "WARRIOR")
         s._free_cities_phase()
         hp = int(s.major_unit_hp[B0, u])

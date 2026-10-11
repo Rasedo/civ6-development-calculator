@@ -108,6 +108,7 @@
     - cpu/data/constants.ts:COMBAT_BASE_DAMAGE
     - cpu/data/constants.ts:damageRaw
     - gpu/core/sim_init.py:__init__
+    - cpu/core/combat.ts:damageExpected
   readings:
     - "H-1: the draws per event (`dll_rng.py`)"
     - "C-34: the interception's damage, XP, weariness and the answers"

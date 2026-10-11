@@ -33,7 +33,7 @@ import { formationCS, escortRiders, unitsAt, unitDomain, tileFreeForUnit, disban
 import { isAirUnit, airRange, airCoverAgainst, airPillageFit, airPillageOffers, airStrikeReaches, airStrikeOffers, airDefenseOf, antiAirAt, displaceAirFrom, interceptorAgainst, priorityDefender, PRIORITY_TARGET_DAMAGE } from './air';
 import { outerPool, wallsMax, wallsTier, encampOuterPool } from './rules';
 import { fuelShortCS } from './stockpile';
-import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
+import { EMBARKED_DEFENSE_CS_BY_ERA, PALACE_CITY_CS, WOUNDED_DAMAGE_MULTIPLIER, ENVOY_CITY_CS, CITY_START_MELEE_MAJOR, CITY_START_MELEE_MINOR, CITY_BASE_MELEE_CUT, MP_SCALE, CAPTURE_BASE_STRENGTH_DIFF, CAPTURED_UNIT_HP, CAMP_DISPERSAL_GOLD, COMBAT_MAX_EXTRA_DAMAGE, COMBAT_BOMBARD_VS_UNIT, CITY_MIN_STRIKE_CS, damageExponent, damageOf, damageRaw, COMBAT_MAX_HIT_POINTS, COMBAT_MINIMUM_DAMAGE, COMBAT_DEFENSE_DAMAGE_PERCENT_MELEE, COMBAT_DEFENSE_DAMAGE_PERCENT_RANGED, COMBAT_DEFENSE_DAMAGE_PERCENT_BOMBARD } from '../data/constants';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { fireFeature } from '../data/disasters';
 import { isFloodplains } from '../../world/features';
@@ -902,6 +902,13 @@ export function rangedDomainCS(attacker: Unit, foeType: string): number {
 export function damageRoll(state: GameState, strengthDiff: number, k = '?', t = -1,
                            parts?: { a: number; d: number; at?: number; as?: number; dt?: number; ds?: number }): number {
   return lawDraw(state, strengthDiff, k, t, (raw) => Math.min(COMBAT_MAX_HIT_POINTS, Math.max(COMBAT_MINIMUM_DAMAGE, raw)), parts);
+}
+
+/** THE DAMAGE LAW'S EXPECTATION (0x519090 under the combat simulation's
+ *  flag, the AI's prediction 0x791470): the extra damage is
+ *  COMBAT_MAX_EXTRA_DAMAGE / 2 instead of a draw, nothing is drawn */
+export function damageExpected(strengthDiff: number): number {
+  return damageOf(COMBAT_MAX_EXTRA_DAMAGE >> 1, damageExponent(strengthDiff));
 }
 
 /** ONE "Unit Combat Damage" draw through the damage law, `finish` taking the
@@ -1850,6 +1857,45 @@ function retreatPlot(state: GameState, u: Unit): number {
   }
   return best;
 }
+/** THE TWO STRENGTHS of a melee blow on a fighter: the attacker from the
+ *  plot it stands on, the defender on `targetIndex` — what the blow resolves
+ *  on and what the AI's combat prediction reads (`damageExpected`) */
+export function meleeUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit): { atk: number; def: number } {
+  const from = state.map.tiles[attacker.tileIndex];
+  const target = state.map.tiles[targetIndex];
+  const amph = promoFlag(attacker, 'AMPHIBIOUS');
+  const atk = (UNITS[attacker.type]?.combat ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && crossesRiver(state.map, from, target) ? RIVER_ATTACK_PENALTY : 0)
+    - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0)
+    + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
+      * (1 + gpPermOf(seatOf(state, attacker.seat),
+        UNITS[attacker.type]?.naval ? 'flankPctNaval' : 'flankPctLand') / 100)
+    + promoCS(attacker, {
+      attacking: true, foeType: defender.type, foeDamaged: defender.hp < UNIT_HP,
+      foeFortified: (defender.fortifyTurns ?? 0) > 0,
+      foeInDistrict: inDistrictTile(state, targetIndex),
+      tile: from,
+    })
+    + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
+    + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
+    + classMatchupCS(attacker.type, defender.type)
+    + emergencyAttackCS(state, attacker.seat, defender.seat)
+    + barbarianCombatCS(state, attacker.seat, defender.seat)
+    + visibilityCS(state, attacker.seat, defender.seat)
+    + allianceWarCS(state, attacker.seat, defender.seat)
+    + rosterCS(state, attacker, defender.seat, defender.hp, false)
+    + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
+  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: true }) };
+}
+
+/** THE TWO STRENGTHS of a ranged blow on a unit from where the attacker
+ *  stands; `emergency` carries the emergencies' term (an ordered shot does,
+ *  the hostile seats' strike does not) */
+export function rangedUnitStrengths(state: GameState, attacker: Unit, targetIndex: number, defender: Unit, emergency = true): { atk: number; def: number } {
+  const def = UNITS[attacker.type];
+  const atk = (def?.ranged?.strength ?? 0) + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + (emergency ? emergencyAttackCS(state, attacker.seat, defender.seat) : 0) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
+  return { atk, def: defenderCS(state, defender, targetIndex, { attacker, melee: false }) };
+}
+
 function meleeAttackInner(state: GameState, attackerId: number, targetIndex: number, seat: number): RuleResult {
   const attacker = state.units.find((u) => u.id === attackerId);
   if (!attacker) return no('No such unit.');
@@ -1945,9 +1991,6 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
 
   const defender = stackDefender(state, enemies, false);
   const defDef = UNITS[defender.type];
-  const amph = promoFlag(attacker, 'AMPHIBIOUS');
-  const atkCS = def.combat + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) - (!amph && crossesRiver(state.map, from, target) ? RIVER_ATTACK_PENALTY : 0)
-    - (attacker.embarked && !amph ? AMPHIBIOUS_ATTACK_CS : 0);
 
   if ((defDef?.combat ?? 0) <= 0) {
     // no fighter stands there: the order is a MOVE onto the plot, which takes
@@ -1958,25 +2001,7 @@ function meleeAttackInner(state: GameState, attackerId: number, targetIndex: num
     stepUnit(state, attacker, target);
     return MOVED_ONTO;
   } else {
-    const atkCSf = atkCS + FLANKING_CS * promoStackMult(attacker, 'FLANK_MULT') * chassisFlankMult(attacker) * flankCount(state, targetIndex, attacker)
-      * (1 + gpPermOf(seatOf(state, attacker.seat),
-        UNITS[attacker.type]?.naval ? 'flankPctNaval' : 'flankPctLand') / 100)
-      + promoCS(attacker, {
-        attacking: true, foeType: defender.type, foeDamaged: defender.hp < UNIT_HP,
-        foeFortified: (defender.fortifyTurns ?? 0) > 0,
-        foeInDistrict: inDistrictTile(state, targetIndex),
-        tile: from,
-      })
-      + holdTheLineCS(state, attacker, attacker.tileIndex, defender.type)
-      + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) // aura keyed on the ATTACKER's own tile
-      + classMatchupCS(attacker.type, defender.type)
-      + emergencyAttackCS(state, attacker.seat, defender.seat)
-      + barbarianCombatCS(state, attacker.seat, defender.seat)
-      + visibilityCS(state, attacker.seat, defender.seat)
-      + allianceWarCS(state, attacker.seat, defender.seat)
-      + rosterCS(state, attacker, defender.seat, defender.hp, false)
-      + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker);
-    const defCSf = defenderCS(state, defender, targetIndex, { attacker, melee: true });
+    const { atk: atkCSf, def: defCSf } = meleeUnitStrengths(state, attacker, targetIndex, defender);
     defender.hp -= damageRoll(state, atkCSf - defCSf, 'mel', targetIndex, { a: atkCSf, d: defCSf });
     // CIV6 (GameCore_XP2_Release.dll 0x206960, the melee result): an
     // EMBARKED defender strikes no blow back — the counter is never drawn
@@ -2397,8 +2422,7 @@ function rangedAttackInner(state: GameState, attackerId: number, targetIndex: nu
   }
   if (enemies.length === 0) return no('Nothing to attack there.');
   const defender = stackDefender(state, enemies, true);
-  const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  const atkCS = (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + emergencyAttackCS(state, attacker.seat, defender.seat) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker));
+  const { atk: atkCS, def: defCS } = rangedUnitStrengths(state, attacker, targetIndex, defender);
   defender.hp -= damageRoll(state, atkCS - defCS, 'rng', targetIndex, {
     a: atkCS, d: defCS, at: UNIT_TYPE_IDX.indexOf(attacker.type), as: attacker.seat, dt: UNIT_TYPE_IDX.indexOf(defender.type), ds: defender.seat,
   });
@@ -2512,8 +2536,8 @@ function hostileRangedStrikeInner(state: GameState, attacker: Unit, targetIndex:
   );
   if (enemies.length === 0) return false; // the CITY_CENTER quirk: a no-op, like meleeAttack's `no(...)`
   const defender = stackDefender(state, enemies, true);
-  const defCS = defenderCS(state, defender, targetIndex, { attacker, melee: false });
-  defender.hp -= damageRoll(state, (def.ranged.strength + formationCS(attacker) + convoyCS(state, attacker) - fuelShortCS(state, attacker) + chassisAttackCS(attacker) - woundPenalty(attacker) + promoCS(attacker, rangedCtx(state, attacker, defender, targetIndex)) + religionAttackCS(state, attacker, targetIndex) + chassisAbilityCS(state, attacker, attacker.tileIndex, { foeType: defender.type }) + generalAuraCS(state, attacker, attacker.tileIndex) + classMatchupCS(attacker.type, defender.type) + rangedDomainCS(attacker, defender.type) + barbarianCombatCS(state, attacker.seat, defender.seat) + visibilityCS(state, attacker.seat, defender.seat) + allianceWarCS(state, attacker.seat, defender.seat) + rosterCS(state, attacker, defender.seat, defender.hp, false) + congressUnitCS(state, attacker) + governmentUnitCS(state, attacker)) - defCS, 'vrng', targetIndex);
+  const { atk, def: defCS } = rangedUnitStrengths(state, attacker, targetIndex, defender, false);
+  defender.hp -= damageRoll(state, atk - defCS, 'vrng', targetIndex);
   warWearinessBattle(state, attacker.seat, defender.seat, targetIndex, { dDied: defender.hp <= 0 });
   awardBattleXp(state, attacker, defender, { ranged: true, aDied: false, dDied: defender.hp <= 0 });
   if (defender.hp <= 0) {

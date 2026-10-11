@@ -41,7 +41,14 @@ _STATIC = ("row_leader",)
 
 
 def build(rules, path, steps: int = 0, slot: int = 0):
-    return warm_base((str(path), steps, slot), lambda: opened(rules, path, steps), _STATIC, ("_rl_war_active",))
+    def make():
+        sim = opened(rules, path, steps)
+        # every major has met every other: a declaration needs the meeting
+        n = sim.n_majors
+        off = ~torch.eye(n, dtype=torch.bool, device=sim.device)
+        sim.seat_met_turn[:, :n, :n] = torch.where(off, 1, sim.seat_met_turn[:, :n, :n])
+        return sim
+    return warm_base((str(path), steps, slot), make, _STATIC, ("_rl_war_active",))
 
 
 def snap_all(sim):
@@ -95,7 +102,7 @@ def test_declare(rules, path):
     sim = build(rules, path, steps=20)
     sim._rl_war_active = True
     m = sim._seat_war_mask(0)[0]
-    assert bool(m[0]), "declare-war column should be open (civ 0 alive, at peace)"
+    assert bool(m[0]), "declare-war column should be open (civ 0 alive, met, at peace)"
     assert not bool(m[sue_col(sim, 0)]), "peace column must be closed while not at war"
     snap = sim.snapshot()
     sim._apply_war_column(0, war_vec(sim, 0))  # the head, the one entry — same call every row makes
@@ -151,6 +158,7 @@ def test_peace(rules, path):
     sim._reset_war_clock(0, 1, torch.ones(sim.B, dtype=torch.bool))
     sim._clear_war_kind(0, 1, torch.ones(sim.B, dtype=torch.bool))  # the ended war's kind clears
     sim._stamp_treaty(0, 1, torch.ones(sim.B, dtype=torch.bool))  # peace BINDS the pair
+    sim.seat_peace_turn[:, 0, 1] = sim.seat_peace_turn[:, 1, 0] = int(sim.turn)  # the peace's turn, both ways
     sim.peace_turns[:, 0] = 0  # the treaty restarts BOTH parties' peace clocks
     sim.peace_turns[:, 1 + 0] = 0
     sim.step()

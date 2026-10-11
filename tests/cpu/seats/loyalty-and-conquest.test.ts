@@ -135,7 +135,11 @@ describe('barbarians vs the other civs', () => {
 
     const popBefore = civCity.population;
     barbarianPhase(state);
-    // Civ city sacked, not captured — it still belongs to Rome.
+    // a barbarian's blow on a city (its AI strikes one in an operation's
+    // assault): sacked, not captured — it still belongs to Rome
+    sieger.movesLeft = MP_SCALE;
+    sieger.attacksLeft = 1;
+    expect(meleeAttack(state, sieger.id, civCity.centerIndex, BARB_SEAT).ok).toBe(true);
     expect(civ.cities.length).toBe(1);
     expect(civCity.population).toBeLessThanOrEqual(popBefore);
     expect(civCity.hp).toBeGreaterThan(5); // reset after the sack

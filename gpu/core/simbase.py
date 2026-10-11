@@ -1180,7 +1180,7 @@ _MUTABLE = [
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
     "city_free_pot",  # a Free City's build pot
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step
-    "seat_explored",
+    "seat_explored", "barb_explored",
     "civ_culture", "civ_faith", "civ_tourism", "civ_tourism_rel", "civ_gpp", "civ_grievance",
     "civ_tourism_to", "civ_tourism_rel_to",  # lifetime tourism SENT, per (from, to) major pair
     "civ_dominant",  # cultural dominance, per (from, to) major pair
@@ -1405,12 +1405,13 @@ def record_reads(obj, fn, *args, may_set: tuple[str, ...] = ()):
 def memo_read(obj, store: dict, key, fn, *args, may_set: tuple[str, ...] = ()) -> tuple:
     """`fn(*args)` — a reader returning a tuple of tensors — through the
     read-set memo `store` (a derived cache on `obj`), entry `key`: a hit hands
-    back clones of the stored result. Under `_log_diff` it runs plain.
+    back clones of the stored result. Under `_log_diff`, and on a batch of
+    games taken by rows (`_game_rows`), it runs plain.
     STATS_MEMO_CHECK recomputes on every hit and asserts. Inside a recorded
     call the entry's reads are taken through the recording, so on a hit they
     join the enclosing calls' reads."""
     d = obj.__dict__ if not _REC else _RecView(obj)
-    if d.get("_log_diff", None):
+    if d.get("_log_diff", None) or d.get("_game_rows", None):
         return fn(*args)
     ent = store.get(key)
     if ent is not None and reads_hold(d, ent[0]):

@@ -251,6 +251,10 @@ export interface UnitDef {
   /** CIV 6 unit class: RECON (Scout). The class Survey doubles experience
    *  for, and the only class in this roster with no combat role. */
   recon?: boolean;
+  /** Units.PseudoYieldType PSEUDOYIELD_UNIT_EXPLORER (the Scout): the AI's
+   *  explorer, which its tactical pass takes only while its barbarian tribe
+   *  rampages */
+  explorer?: boolean;
   /** CIV6 unit ability STEALTH: "Remains hidden from units more than 1 hex
    *  away." The NAVAL RAIDER class carries it, and the class page adds the
    *  two exceptions: it stays hidden beside a City Center or an Encampment
@@ -477,6 +481,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
       moves: 3,
       combat: 10,
       recon: true,
+      explorer: true,
       revealStealth: true,
       description: 'Fast, fragile explorer.',
       src: {
@@ -486,6 +491,7 @@ export const UNITS: Record<string, UnitDef> = Object.fromEntries(
         moves: xml('Units', 'UnitType=UNIT_SCOUT', 'BaseMoves'),
         combat: xml('Units', 'UnitType=UNIT_SCOUT', 'Combat'),
         recon: xml('Units', 'UnitType=UNIT_SCOUT', 'PromotionClass', { expect: 'PROMOTION_CLASS_RECON' }),
+        explorer: xml('Units', 'UnitType=UNIT_SCOUT', 'PseudoYieldType', { expect: 'PSEUDOYIELD_UNIT_EXPLORER' }),
         revealStealth: xml('TypeTags', 'Type=UNIT_SCOUT&Tag=CLASS_REVEAL_STEALTH', 'Tag', { expect: 'CLASS_REVEAL_STEALTH' }),
       },
     }),

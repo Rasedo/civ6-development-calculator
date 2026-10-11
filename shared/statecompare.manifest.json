@@ -250,6 +250,17 @@
           "note": "camp TILES, sorted. Only the barbarian seat holds camps; every other seat's list is empty by rule, which is why this is one game-level field instead of a per-seat one."
         },
         {
+          "name": "barbExplored",
+          "compare": "exact",
+          "covers": [
+            "Seat.explored"
+          ],
+          "planes": [
+            "barb_explored"
+          ],
+          "note": "the barbarians' revealed plots (their seat's `explored`), by index: what their units' planning and their target list read."
+        },
+        {
           "name": "barbTribes",
           "compare": "exact",
           "covers": [

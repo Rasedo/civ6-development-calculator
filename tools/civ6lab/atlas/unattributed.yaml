@@ -12,6 +12,7 @@
       value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...the player's first city (+0x158). Of its planning reach   the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted..."
   context:
@@ -28,6 +29,7 @@
     - gpu/core/sim_tactics.py:_tac_alt_table
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ial steps (dx, dy),   dx outer from -range to range, dy inner, the plot at the step within range   (0x1e000: x - y//2 + dx, then back; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else)..."
   context:
@@ -183,6 +185,7 @@
     - "H-1: the plot's Appeal — READ"
     - "C-74: the fire's spread — READ (the order)"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its   own list). An air unit (+0x650 == 1, taken as the air domain) onto the   plot..."
   context:
@@ -241,6 +244,7 @@
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...) of them; a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring 0x6b0a0 -> 0x691f0, deduped within its   own list). An air unit (+0x650 == 1, taken as the air domain) onto..."
   context:
@@ -265,6 +269,7 @@
     - "C-74: the fire — READ"
     - "H-1: the plot's Appeal — READ"
     - "C-74: the fire's spread — READ (the order)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   context:
     - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its Ran..."
     - ...e pillaged, -1 for its own pillaged improvement (+0x4d bit 0), then the ring of radius 1 (0x6b1b0 -> 0x691f0, the centre not in it) through 0x513780, and last +1 when the plot's owner hol...
@@ -404,11 +409,12 @@
     - recording: 1120
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
-  impl: [cpu/core/tactical.ts:heal]
+  impl: [cpu/core/tactical.ts:heal, cpu/core/tactical.ts:flees]
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...ts moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a plot of no   danger (the influence map 0x716a90 <= 0) is queued (\"Heal\"); the queue's   move..."
   context:
@@ -569,6 +575,16 @@
   context:
     - "...s each row whose byte +0x48 is set and +0x50 non- null and whose live record (0x27a680 -> 0x25bef0 on the row's +0x20) reads -1 at +0x0 and +0xc — not in play —, weighs each 1 and draws ON..."
   review: imported
+- addr: 0x26d6f0
+  final: 0x1a6250
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings: ["C-95: the planning's spots and the combat prediction — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE SPOTS (the cost callback 0x26d6f0 -> 0x790c60 on every link the planning's two-turn search prices, the start node linked..."
+  review: imported
 - addr: 0x26d890
   final: 0x1a63f0
   kind: function
@@ -588,6 +604,16 @@
   context:
     - ...ning +0x30 (16-byte entries x, y, turns, Movement) is filled by the NotifyList callback 0x26d890 when a node CLOSES (code 3), so it holds the plots in the order Dijkstra closes them,...
     - "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a plot only where 0x586900 lets the unit end — another player's unit at peace..."
+  review: imported
+- addr: 0x272a60
+  final: 0x1aa7e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...order, strictly nearer replaces, +0x4c clear, enterable 0x586360), with a path to it (0x272a60), not chosen (\"HL: Explore cur region\"); a unit off any region the nearest of its area..."
   review: imported
 - addr: 0x272ca0
   final: 0x1aaa10
@@ -661,6 +687,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...335040, the weights and \"Random Event Roll\" — and only then the climate component's turn (0x2d1f20's component, the one the district repair's FLOODED / CONTAMINATED reasons read). The engi..."
+  review: imported
+- addr: 0x2d2100
+  final: 0x1ede20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...: terrain 15/16) of danger while the best is ashore. PARTLY READ: a plot the global set 0x2d2100 counts above 0 is skipped (not carried); a plot of the player's own city with the city..."
   review: imported
 - addr: 0x2d33a0
   final: 0x1eef10
@@ -961,6 +997,7 @@
   status: PARTLY
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ....cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x7164..."
   context:
@@ -1432,6 +1469,7 @@
   status: PARTLY
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...erkill (health - damage) + 100; minus its value where it stands assigned), the knapsack 0x61ddb0 at capacity 1 takes the first largest positive gain, and the move (λ 0x770710) re-assig..."
@@ -1848,13 +1886,15 @@
   kind: function
   status: PARTLY
   impl: [ai/major/danger.ts:ring]
+  readings:
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x716080
   final: 0x4c4fe0
   kind: function
   status: PARTLY
-  impl: [ai/major/danger.ts:dangerMap]
+  impl: [ai/major/danger.ts:dangerMap, cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
   notes:
@@ -2009,11 +2049,20 @@
   final: 0x501180
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:ATTACK_TARGETS_RANGE, gpu/core/sim_tactics.py:_CIVILIAN_TAKEN]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...actly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from its planning (turns, the planning's combat simulati...
+  review: imported
+- addr: 0x76f320
+  final: 0x501910
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:mergeSort]
+  notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x77d100
   final: 0x50edf0
@@ -2038,8 +2087,10 @@
   final: 0x51ae50
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:strikers]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...x775340; for MEDIUM / LOW a ranged unit's spot at exactly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from...
@@ -2505,6 +2556,7 @@
   impl: [cpu/core/tactical.ts:heal]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...indAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the t..."
     - ".claude/scratchpad/mu1/readings_c96.md: ...sea, 1 air, 2 land, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its pla..."

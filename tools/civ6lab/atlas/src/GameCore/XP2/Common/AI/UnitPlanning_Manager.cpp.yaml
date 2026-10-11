@@ -6,16 +6,26 @@
 - addr: 0x790c60
   final: 0x51bd50
   kind: function
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:planTargets]
+  name: planSpot
+  semantics: "the planning's cost callback on each link: lays a target's spots (melee: the attack's parent, the next-turn plot beside, the own plot; ranged: within range, sight beyond 1), six a target, the first link wins"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl:
+    - cpu/core/tactical.ts:planUnit
+    - gpu/core/sim_tactics.py:_tac_spot_link
+    - cpu/core/tactical.ts:Spot
   readings:
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the planning's spots and the combat prediction — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...t again keeps its place and takes the fewer turns, or at equal turns the more Movement (0x790c60). The planning runs once for every unit at the start of the AI's turn. Flag 0x800 skips...
     - "...TS (0x792f90): every target within its Movement x 2 + its range of the unit; the spots (0x790c60 on each link the search makes, at most 6): a unit target or a COMBAT_DISTRICT only — in..."
-  review: imported
+  review: reviewed
 - addr: 0x791300
   final: 0x51c340
   kind: function
@@ -27,18 +37,34 @@
 - addr: 0x791470
   final: 0x51c4b0
   kind: function
-  status: PARTLY
+  name: predictCombat
+  semantics: "the planning's combat simulation: the blow from where the attacker stands at the expected roll (COMBAT_MAX_EXTRA_DAMAGE/2); dealt +0x64, taken +0x7c, per spot the target's blow back +0x94 / +0xac; a kill sets +0x60"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl:
+    - cpu/core/tactical.ts:predictBlow
+    - gpu/core/sim_tactics.py:_tac_predict
+    - cpu/core/combat.ts:damageExpected
+    - cpu/core/tactical.ts:Spot
+    - cpu/core/tactical.ts:PlanEntry
+    - cpu/core/tactical.ts:planUnit
+    - cpu/core/tactical.ts:CIVILIAN_TAKEN
+    - gpu/core/sim_tactics.py:_WANDER_BACK_RANGE
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the planning's spots and the combat prediction — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...each unit's spots per target from its planning (turns, the planning's combat simulation 0x791470: the damage dealt +0x64, received +0x7c, and against a counterattack +0x94 / +0xac); fo..."
-  review: imported
+  review: reviewed
 - addr: 0x791e00
   kind: function
   name: UnitPlanning
   status: PARTLY
-  impl: [cpu/core/tactical.ts:reachPlots]
+  impl: [cpu/core/tactical.ts:reachPlots, cpu/core/tactical.ts:planUnit]
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -50,15 +76,21 @@
 - addr: 0x7920d0
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:DEFEND_CAMP_TURNS, gpu/core/sim_tactics.py:_WANDER_CAMP_RANGE]
+  impl:
+    - cpu/core/tactical.ts:DEFEND_CAMP_TURNS
+    - gpu/core/sim_tactics.py:_WANDER_CAMP_RANGE
+    - cpu/core/tactical.ts:planUnit
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7921e0
   final: 0x51cec0
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...t less;   otherwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd als..."
   context:
@@ -67,7 +99,10 @@
 - addr: 0x792c90
   kind: function
   status: PARTLY
-  impl: [cpu/core/tactical.ts:barbarianTactics]
+  impl:
+    - cpu/core/tactical.ts:barbarianTactics
+    - cpu/core/tactical.ts:Planner
+    - cpu/core/tactical.ts:planUnit
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
     - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
@@ -79,11 +114,18 @@
 - addr: 0x792f90
   final: 0x51da80
   kind: function
-  status: PARTLY
-  impl: [cpu/core/tactical.ts:planTargets, cpu/core/tactical.ts:planOf]
+  name: planTargets
+  semantics: "the planning's targets: the list's unit targets and COMBAT_DISTRICTs within 2 x Movement + range"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:planUnit, gpu/core/sim_tactics.py:_tac_plan]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the planning's spots and the combat prediction — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- THE PLANNING'S TARGETS (0x792f90): every target within its Movement x 2 + its range of the unit; the spots (0x790c60 on..."
-  review: imported
+  review: reviewed

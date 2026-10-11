@@ -24,8 +24,10 @@
 - addr: 0x249e40
   kind: function
   status: PARTLY
+  impl: [gpu/core/sim_tactics.py:_ATTACK_SIGHT]
   readings:
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...e the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0,..."
   context:
@@ -39,10 +41,14 @@
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
-  impl: [cpu/core/combat.ts:cityStrikeStrength, gpu/core/sim_masks.py:_strike_strength]
+  impl:
+    - cpu/core/combat.ts:cityStrikeStrength
+    - gpu/core/sim_masks.py:_strike_strength
+    - cpu/core/tactical.ts:dangerPlane
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -114,10 +120,11 @@
     - recording: 1119
       turn: 112
       value: 1119 t112 an Archer, no   term).
-  impl: [cpu/harness/checks.ts:luxAtRebuild]
+  impl: [cpu/harness/checks.ts:luxAtRebuild, cpu/core/tactical.ts:dangerPlane]
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes:
     - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
   context:

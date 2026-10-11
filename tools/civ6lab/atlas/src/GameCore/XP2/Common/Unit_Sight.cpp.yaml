@@ -19,7 +19,9 @@
     - recording: 1126
       value: "A city founded or taken looks two plots round its centre whole and three by the line: at every major's founding on 1126–1131 no plot two from the centre is left dark, and of the 98 left dark three fro"
   impl: [cpu/core/fog.ts:canSee]
-  readings: ["H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"]
+  readings:
+    - "H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
   context:
     - "## H-1: the sight rule and a city's look — LAB (records; the walk 0x58b1d0 unread)"
     - 0x58b1d0 builds a unit's sight list in 24.8 fixed point (constants 0.5 and 0.05) over a ring walk;...

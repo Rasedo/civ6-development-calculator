@@ -15,9 +15,12 @@
 - addr: 0x26df90
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:dangerPlane, cpu/core/tactical.ts:exploreTarget]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/st1/reading.md: ...herwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the l..."
@@ -94,6 +97,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The pool's count is set at game init (0x91e590 -> 0x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e4..."
+  review: imported
+- addr: 0x26f830
+  final: 0x1a7d40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...damage at most half its health (0x56e0d0 >> 1), in a later round not still on its way (0x26f830), takes HL Explore (0x70aa40, the region fallbacks on the first round alone) and its ta...
   review: imported
 - addr: 0x26f980
   final: 0x1a7e90

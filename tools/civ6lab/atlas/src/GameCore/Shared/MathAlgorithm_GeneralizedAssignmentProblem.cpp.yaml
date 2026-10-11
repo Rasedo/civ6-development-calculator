@@ -6,10 +6,18 @@
 - addr: 0x8b5bf0
   final: 0x5f9630
   kind: function
-  status: PARTLY
+  name: generalizedAssignment
+  semantics: "MathAlgorithm_GeneralizedAssignmentProblem: one pass over the spots, the knapsack at capacity 1, gain and move lambdas"
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 1-249
+      value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
+  impl: [cpu/core/tactical.ts:assignAttacks]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: Attack Units — READ, ported"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e dealt, or whose received would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0, MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the spots: per sp..."
-  review: imported
+  review: reviewed

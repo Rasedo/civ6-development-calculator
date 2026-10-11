@@ -94,6 +94,12 @@
   context:
     - "...ty hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, `m_plotEvaluations`..."
   review: imported
+- addr: 0xd5aff4
+  kind: global
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:ATTACK_KILL]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0xd5d420
   kind: global
   status: PARTLY

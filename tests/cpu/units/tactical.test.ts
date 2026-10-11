@@ -3,7 +3,7 @@ import { BARB_SEAT, emptySeat, isBarbSeat, markCityCentre, seatOfCityState, setT
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { disbandUnit, grantedMoves, spawnUnit } from '../../../cpu/core/units';
 import { barbarianTechs, barbSlots, barbSlotsDying, raiseCamp, tribeDies, tribeOf } from '../../../cpu/core/barbarians';
-import { barbarianTactics, cityStateTactics, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets } from '../../../cpu/core/tactical';
+import { barbarianTactics, cityStateTactics, dangerPlane, enemyAt, plotDistance, reachPlots, refreshBarbarians, stackedAt, tacticalTargets, traceTactics } from '../../../cpu/core/tactical';
 import { DIRECTION_TYPES, neighborTile, tilesWithin } from '../../../world/hex';
 import { LCG_ADD, LCG_MUL } from '../../../cpu/core/rand';
 import type { CityState, GameState, Unit } from '../../../cpu/core/types';
@@ -258,5 +258,116 @@ describe("a city-state's tactical pass", () => {
     expect(state.rngState).toBe(s0);
     expect(plotDistance(state, u.tileIndex, tileAtCoords(state.map, 14, 4).index)).toBeGreaterThan(0);
     expect(plotDistance(state, u.tileIndex, cs.centerIndex)).toBeLessThan(10);
+  });
+});
+
+// tools/civ6lab/dll_readings.md "C-95: the danger map and Move to Safety"
+describe('the danger map and Move to Safety', () => {
+  it("lays a foe's strength over its one-turn reach on its full Movement, a ranged foe's over its range of it", () => {
+    const state = land();
+    const eye = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 9, 11).index, BARB_SEAT)!;
+    const foe = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 10, 10).index, 0)!;
+    foe.movesLeft = 0;
+    const d = dangerPlane(state, BARB_SEAT);
+    const reach = new Set(reachPlots(state, { ...foe, movesLeft: grantedMoves(state, foe) }, 1).map((e) => e.tile));
+    expect(reach.size).toBeGreaterThan(7);
+    for (const t of state.map.tiles) {
+      if (plotDistance(state, t.index, eye.tileIndex) > 2 && plotDistance(state, t.index, foe.tileIndex) > 2) continue;
+      expect(d[t.index]).toBe(reach.has(t.index) ? 20 : 0);
+    }
+    const archer = spawnUnit(state, 'ARCHER', tileAtCoords(state.map, 10, 12).index, 0)!;
+    const d2 = dangerPlane(state, BARB_SEAT);
+    // the Archer's own plot: its reach, the Warrior's too (25 + 20)
+    expect(d2[archer.tileIndex]).toBe(reach.has(archer.tileIndex) ? 45 : 25);
+    expect(d2[tileAtCoords(state.map, 10, 16).index]).toBe(25);
+    expect(d2[tileAtCoords(state.map, 10, 17).index]).toBe(0);
+  });
+
+  it('a hurt barbarian with half its health or less and no blow that kills goes to a plot of no danger', () => {
+    const state = land();
+    const u = spawnUnit(state, 'WARRIOR', tileAtCoords(state.map, 8, 10).index, BARB_SEAT)!;
+    spawnUnit(state, 'SWORDSMAN', tileAtCoords(state.map, 9, 10).index, 0)!;
+    u.hp = 40;
+    turnStart(state);
+    const d = dangerPlane(state, BARB_SEAT);
+    expect(d[u.tileIndex]).toBeGreaterThan(0);
+    barbarianTactics(state, new Set([u.id]));
+    expect(d[u.tileIndex]).toBe(0);
+  });
+
+  it('a whole barbarian holds its ground however great the danger', () => {
+    const state = land();
+    const at = tileAtCoords(state.map, 8, 10).index;
+    const u = spawnUnit(state, 'WARRIOR', at, BARB_SEAT)!;
+    for (const d of DIRECTION_TYPES.slice(0, 2)) spawnUnit(state, 'SWORDSMAN', neighborTile(state.map, state.map.tiles[at], d)!.index, 0);
+    turnStart(state);
+    expect(dangerPlane(state, BARB_SEAT)[at]).toBeGreaterThan(40);
+    const seen: string[] = [];
+    traceTactics((x, move) => { if (x === u) seen.push(move); });
+    try {
+      barbarianTactics(state, new Set([u.id]));
+    } finally {
+      traceTactics(null);
+    }
+    expect(seen).not.toContain('Move to safety');
+    expect(seen).not.toContain('HL: Move To Safety');
+  });
+
+  it("a city-state's whole unit flees where the danger tops its strength by more than 20", () => {
+    const state = land();
+    const cs = addMinor(state, 4, 4);
+    const at = tileAtCoords(state.map, 8, 10).index;
+    const u = spawnUnit(state, 'WARRIOR', at, cs.seat)!;
+    for (const d of DIRECTION_TYPES.slice(0, 2)) spawnUnit(state, 'SWORDSMAN', neighborTile(state.map, state.map.tiles[at], d)!.index, BARB_SEAT);
+    minorStart(state, cs);
+    const d = dangerPlane(state, cs.seat);
+    expect(d[at]).toBeGreaterThan(40);
+    cityStateTactics(state, cs);
+    expect(u.tileIndex).not.toBe(at);
+    expect(d[u.tileIndex]).toBeLessThan(d[at]);
+  });
+});
+
+// tools/civ6lab/dll_readings.md "C-95: Explore Land and the barbarians' revealed plots"
+describe("the barbarians' revealed plots and Explore Land", () => {
+  it('a camp reveals the plots three round it, and the planning keeps to the revealed', () => {
+    const state = land();
+    state.fogOfWar = true;
+    const camp = tileAtCoords(state.map, 10, 10);
+    raiseCamp(state, camp.index);
+    const ex = state.barbSeat.explored;
+    expect(ex[tileAtCoords(state.map, 13, 10).index]).toBe(1);
+    expect(ex[tileAtCoords(state.map, 15, 10).index]).toBe(0);
+    const u = state.units.find((x) => x.id === state.barbTribes![0].defender)!;
+    turnStart(state);
+    expect(reachPlots(state, u, 2).every((e) => ex[e.tile] === 1)).toBe(true);
+  });
+
+  it("an explorer goes to the plot of its reach whose sight takes in the most it never revealed", () => {
+    const state = land();
+    state.fogOfWar = true;
+    const camp = tileAtCoords(state.map, 4, 10);
+    raiseCamp(state, camp.index);
+    const scout = state.units.find((x) => state.barbTribes![0].scouts.includes(x.id))!;
+    const ex = state.barbSeat.explored;
+    const unrevealedSeen = (p: number) => {
+      const t = state.map.tiles[p];
+      return tilesWithin(state.map, t.col, t.row, 2).filter((q) => ex[q.index] !== 1).length;
+    };
+    const acting = turnStart(state);
+    const from = scout.tileIndex;
+    const best = Math.max(...reachPlots(state, scout, 1).filter((e) => e.tile !== from).map((e) => unrevealedSeen(e.tile)));
+    expect(best).toBeGreaterThan(0);
+    const before = new Map(state.map.tiles.map((t) => [t.index, unrevealedSeen(t.index)] as const));
+    const moves: string[] = [];
+    traceTactics((x, move) => { if (x === scout) moves.push(move); });
+    try {
+      barbarianTactics(state, acting);
+    } finally {
+      traceTactics(null);
+    }
+    expect(moves[0]).toBe('HL: Explore');
+    expect(scout.tileIndex).not.toBe(from);
+    expect(before.get(scout.tileIndex)! > 0 || ex[scout.tileIndex] === 1).toBe(true);
   });
 });

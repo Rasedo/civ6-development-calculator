@@ -40,6 +40,15 @@
   context:
     - "...entry of the player +0x12f0 list, the share of its landmass the knowledge base counts (0x786080: the +0x2e8 map's +0x28 / +0x24, keyed by the plot's +8 id; the map refreshed by the..."
   review: imported
+- addr: 0x7861d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...egion (plot +0x18) where the player's region record holds less than all of it revealed (0x7861d0: +0x28 / +0x24 < 1.0) — the nearest unrevealed plot of the region (0x70b6f0: plots in i..."
+  review: imported
 - addr: 0x786d50
   final: 0x5152e0
   kind: function

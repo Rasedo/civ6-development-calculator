@@ -6550,6 +6550,9 @@ class SimSeats:
             reg = self.city_dist_tile[:, row]  # [B, RC, nD]
             stand = self.city_bldg[:, row] & ~self._bldg_dark(reg, self.city_bldg_pillaged[:, row]) & self.city_alive[:, row].unsqueeze(2)
             self._bstand_cache[row] = (simbase.plane_stamp(planes), stand)
+        if not w.is_floating_point():
+            # CUDA has no integer einsum
+            return (stand.to(w.dtype) * w).sum(dim=(1, 2))
         return torch.einsum("bjn,n->b", stand.to(w.dtype), w)
 
     def _city_terrain_count(self, row: int, plane: torch.Tensor) -> torch.Tensor:
@@ -12184,6 +12187,134 @@ class SimSeats:
         self._step_verb(ok, gslot, here, tgt, dirs, seat, torch.zeros_like(ok),
                         clear_camp=POOL_CLASS[atk_kind] == "major")
 
+    def _melee_unit_strengths(self, major: bool, a_slot: torch.Tensor, tgt: torch.Tensor,
+                              d_slot: torch.Tensor, d_seat: torch.Tensor):
+        """`meleeUnitStrengths` — the two strengths [B] of a melee blow the
+        merged-pool unit `a_slot` strikes from the plot it stands on at the
+        fighter `d_slot` on `tgt` (`d_seat` its seat, -1 none), and whether
+        that defender is embarked: what `_hostile_vs_unit` resolves on and
+        what the AI's combat prediction reads (`_tac_predict`). `major`: the
+        attacker is of the majors' pool (the terms a barbarian never takes)."""
+        neg = torch.full_like(d_seat, -1)
+        ttc = tgt.clamp(min=0)
+        a1 = a_slot.clamp(min=0).unsqueeze(1)
+        at = self.unit_type.gather(1, a1).squeeze(1)
+        a_hp = self.unit_hp.gather(1, a1).squeeze(1)
+        a_emb = self.unit_emb.gather(1, a1).squeeze(1)
+        a_seat = self.unit_seat.gather(1, a1).squeeze(1)
+        here = self.unit_tile.gather(1, a1).squeeze(1)
+        a_alive = self.unit_alive.gather(1, a1).squeeze(1)
+        zl = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        atk_cs_all = (self._type_combat[at] + self._form_cs(a_slot)
+                      + torch.where(a_alive, self._convoy_cs(a_slot), zl)
+                      - torch.where(a_alive, self._fuel_short_cs(a_slot), zl)
+                      + self._type_atk_cs.take(at.clamp(min=0, max=self.NU - 1)))
+        d_barb = d_seat == BARB_SEAT
+        ds0 = d_slot.clamp(min=0)
+        d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        def_fort = d_fort_t * 3
+        d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        def_cs = self._type_combat[d_type] + self._tdef_g(ttc) + def_fort
+        # an EMBARKED defender overrides to a flat CS, no
+        # terrain/fortify/support (barbs never embark, so one merged plane
+        # answers for every unit).
+        d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_seat >= 0)
+        if bool(d_emb.count_nonzero()):
+            def_cs = torch.where(
+                d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+        def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0) \
+            + self._type_def_melee_cs[d_type]  # CIV6 (Berserker Rage): melee defence
+        def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        a_promos = self.unit_promos.gather(1, a1).squeeze(1)
+        _true = torch.ones_like(d_slot, dtype=torch.bool)
+        atk_promo = self._promo_cs(
+            at, a_promos, attacking=_true,
+            foe_type=d_type, foe_damaged=self._damaged(def_hp),
+            foe_fortified=d_fort_t > 0,
+            foe_in_district=self._on_district(ttc), tile=here)
+        atk_e = (atk_cs_all - self._wound(a_hp, at)
+                 + atk_promo.to(atk_cs_all.dtype)
+                 - self._atk_pens(at, a_promos, here, tgt, a_emb))
+        def_e = def_cs - self._wound(def_hp, d_type)
+        # flanking helps the hostile attacker (barb/civ at `here`), support
+        # helps the defender, whichever seat it belongs to.
+        _fl, _sp = self._flank_support(
+            tgt, d_seat, a_slot, a_seat)
+        # CIV6 (Impi): "+100% Flanking bonus" — the chassis's own
+        # multiplier, beside the promotion's.
+        atk_e = atk_e + (FLANKING_CS * self._promo_mult(at, a_promos, "FLANK_MULT")
+                         * self._type_flank_mult[at.clamp(min=0, max=self.NU - 1)].long() * _fl
+                         * (1 + torch.where(
+                             self.unit_naval[at.clamp(min=0, max=self.NU - 1)],
+                             self._gp_perm_at(a_seat, "flankPctNaval"),
+                             self._gp_perm_at(a_seat, "flankPctLand"),
+                         ).to(atk_e.dtype) / 100))
+        atk_e = atk_e + self._hold_the_line(a_seat, here, d_type, at).to(atk_e.dtype)
+        # an embarked defender loses Support only to a NAVAL attacker
+        _no_sup = d_emb & self.unit_naval[at.clamp(min=0, max=self.NU - 1)]
+        def_e = (def_e + SUPPORT_CS
+                 * self._promo_mult(d_type, d_promos, "SUPPORT_MULT")
+                 * torch.where(_no_sup, torch.zeros_like(_sp), _sp))
+        # an embarked defender took the flat CS override, which replaces its
+        # terrain, its fortification and the promotions that name them
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
+            self._promo_cs(
+                d_type, d_promos, attacking=~_true,
+                foe_type=at, foe_damaged=self._damaged(a_hp),
+                foe_in_district=self._on_district(here), tile=ttc)
+            + self._hold_the_line(d_seat, ttc, at, d_type)
+        ).to(def_e.dtype))
+        # the class matchup, one term on each side of the same roll; an
+        # embarked defender's class is what the normalized CS removes
+        _cls = self._class_matchup_cs(at, d_type)
+        atk_e = atk_e + _cls.to(atk_e.dtype)
+        def_e = def_e + torch.where(
+            d_emb, torch.zeros_like(def_e),
+            self._class_matchup_cs(d_type, at).to(def_e.dtype))
+        # enhancer adders — a MAJOR attacker gets the attack terms (Just
+        # War near + Crusade onto following territory); the defender gets
+        # the defense terms (embarked = flat, none). A religion's id is its
+        # founder's seat, so both sides read the same planes; barbarians
+        # found none and score 0.
+        if major:
+            atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
+        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, here, foe_type=d_type).to(atk_e.dtype)
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, foe_type=at).to(def_e.dtype))
+        # Great General / Admiral aura. Attacker keyed on its own tile `here`
+        # (a CIV attacker gets its civ's aura; a BARB has none); defender
+        # keyed on `tgt` — any major seat, or barb (-1). Embarked/naval →
+        # the ADMIRAL (sea) plane, NOT zeroed for embarked: generalAuraCS
+        # gives an embarked defender the admiral aura on top of its flat CS.
+        if major:
+            atk_naval = self.unit_naval[at.clamp(min=0, max=self.NU - 1)] | a_emb
+            atk_e = atk_e + self._gen_aura_cs(a_seat, here, atk_naval).to(atk_e.dtype)
+            atk_e = atk_e + self._emergency_pair_cs(a_seat, d_seat).to(atk_e.dtype)
+            atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
+            atk_e = atk_e + self._vis_cs(a_seat, d_seat).to(atk_e.dtype)
+            atk_e = atk_e + self._ally_war_cs(a_seat, d_seat).to(atk_e.dtype)
+            atk_e = atk_e + self._roster_cs(a_seat, at, here, d_seat, def_hp, False,
+                                            self.unit_formation.gather(1, a1).squeeze(1),
+                                        self.unit_levied.gather(1, a1).squeeze(1)).to(atk_e.dtype)
+        atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
+                         + self._gov_unit_cs(at, a_seat)).to(atk_e.dtype)
+        def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
+        def_civ_u = torch.where(d_barb, neg, d_seat)
+        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+        def_e = def_e + self._barb_cs(def_civ_u, a_seat).to(def_e.dtype)
+        def_e = def_e + self._vis_cs(def_civ_u, a_seat).to(def_e.dtype)
+        def_e = def_e + self._ally_war_cs(def_civ_u, a_seat).to(def_e.dtype)
+        def_e = def_e + self._roster_cs(def_civ_u, d_type, ttc, a_seat, a_hp, False,
+                                        self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
+                                        self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
+        def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
+                         + self._gov_unit_cs(d_type, def_civ_u)
+                         + self._era_matchup_cs(def_civ_u, at)
+                         + self._gdr_armor_cs(d_type, def_civ_u, at)
+                         + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
+        return atk_e, def_e, d_emb
+
     def _hostile_vs_unit(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int) -> None:
         """`meleeAttackInner`'s unit arm — the ONE melee-vs-unit
         resolution, for slot `u` of whichever pool `atk_kind` names.
@@ -12198,8 +12329,6 @@ class SimSeats:
         it may hit from `_seats_hostile`."""
         a_hp, a_tile, a_type, a_xp, a_emb, a_alive, a_seat = self._pool_of(atk_kind)
         a_lo = self.POOL_LO[atk_kind]
-        atk_cs_all = (self._type_combat[a_type[:, u]] + self._form_cs_pool(atk_kind, u)
-                      + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
         major = POOL_CLASS[atk_kind] == "major"
         ttc = tgt.clamp(min=0)
         here = a_tile[:, u]
@@ -12228,108 +12357,11 @@ class SimSeats:
         if bool(mil_att.count_nonzero()):
             ds0 = d_slot.clamp(min=0)
             d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            def_fort = d_fort_t * 3
             d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
-            def_cs = self._type_combat[d_type] + self._tdef_g(ttc) + def_fort
-            # an EMBARKED defender overrides to a flat CS, no
-            # terrain/fortify/support (barbs never embark, so one merged plane
-            # answers for every unit).
-            d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & ok_m
-            if bool(d_emb.count_nonzero()):
-                def_cs = torch.where(
-                    d_emb, self._embarked_def_cs(m_seat).to(def_cs.dtype), def_cs)
-            def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0) \
-                + self._type_def_melee_cs[d_type]  # CIV6 (Berserker Rage): melee defence
-            def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)
             a_promos = self._promo_pool(atk_kind)[0][:, u]
-            _true = torch.ones_like(mslot_raw, dtype=torch.bool)
-            atk_promo = self._promo_cs(
-                a_type[:, u], a_promos, attacking=_true,
-                foe_type=d_type, foe_damaged=self._damaged(def_hp),
-                foe_fortified=d_fort_t > 0,
-                foe_in_district=self._on_district(ttc), tile=here)
-            atk_e = (atk_cs_all - self._wound(a_hp[:, u], a_type[:, u])
-                     + atk_promo.to(atk_cs_all.dtype)
-                     - self._atk_pens(a_type[:, u], a_promos, here, tgt, a_emb[:, u]))
-            def_e = def_cs - self._wound(def_hp, d_type)
-            # flanking helps the hostile attacker (barb/civ at `here`), support
-            # helps the defender, whichever seat it belongs to.
             d_seat_m = torch.where(ok_m, m_seat, neg)
-            _fl, _sp = self._flank_support(
-                tgt, d_seat_m, torch.full_like(here, a_lo + u), a_seat[:, u])
-            # CIV6 (Impi): "+100% Flanking bonus" — the chassis's own
-            # multiplier, beside the promotion's.
-            atk_e = atk_e + (FLANKING_CS * self._promo_mult(a_type[:, u], a_promos, "FLANK_MULT")
-                             * self._type_flank_mult[a_type[:, u].clamp(min=0, max=self.NU - 1)].long() * _fl
-                             * (1 + torch.where(
-                                 self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)],
-                                 self._gp_perm_at(a_seat[:, u], "flankPctNaval"),
-                                 self._gp_perm_at(a_seat[:, u], "flankPctLand"),
-                             ).to(atk_e.dtype) / 100))
-            atk_e = atk_e + self._hold_the_line(a_seat[:, u], here, d_type, a_type[:, u]).to(atk_e.dtype)
-            # an embarked defender loses Support only to a NAVAL attacker
-            _no_sup = d_emb & self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)]
-            def_e = (def_e + SUPPORT_CS
-                     * self._promo_mult(d_type, d_promos, "SUPPORT_MULT")
-                     * torch.where(_no_sup, torch.zeros_like(_sp), _sp))
-            # an embarked defender took the flat CS override, which replaces its
-            # terrain, its fortification and the promotions that name them
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
-                self._promo_cs(
-                    d_type, d_promos, attacking=~_true,
-                    foe_type=a_type[:, u], foe_damaged=self._damaged(a_hp[:, u]),
-                    foe_in_district=self._on_district(here), tile=ttc)
-                + self._hold_the_line(d_seat_m, ttc, a_type[:, u], d_type)
-            ).to(def_e.dtype))
-            # the class matchup, one term on each side of the same roll; an
-            # embarked defender's class is what the normalized CS removes
-            _cls = self._class_matchup_cs(a_type[:, u], d_type)
-            atk_e = atk_e + _cls.to(atk_e.dtype)
-            def_e = def_e + torch.where(
-                d_emb, torch.zeros_like(def_e),
-                self._class_matchup_cs(d_type, a_type[:, u]).to(def_e.dtype))
-            # enhancer adders — a MAJOR attacker gets the attack terms (Just
-            # War near + Crusade onto following territory); the defender gets
-            # the defense terms (embarked = flat, none). A religion's id is its
-            # founder's seat, so both sides read the same planes; barbarians
-            # found none and score 0.
-            if major:
-                atk_e = atk_e + (self._rel_atk_cs(a_seat[:, u], tgt).to(atk_e.dtype))  # unit-vs-unit: never city-gated
-            atk_e = atk_e + self._chassis_ability_cs(a_seat[:, u], a_type[:, u], here, foe_type=d_type).to(atk_e.dtype)
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(def_is_barb, neg, d_seat_m), tgt).to(def_e.dtype))
-            def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat_m, d_type, ttc, foe_type=a_type[:, u]).to(def_e.dtype))
-            # Great General / Admiral aura. Attacker keyed on its own tile `here`
-            # (a CIV attacker gets its civ's aura; a BARB has none); defender
-            # keyed on `tgt` — any major seat, or barb (-1). Embarked/naval →
-            # the ADMIRAL (sea) plane, NOT zeroed for embarked: generalAuraCS
-            # gives an embarked defender the admiral aura on top of its flat CS.
-            if major:
-                atk_naval = self.unit_naval[a_type[:, u].clamp(min=0, max=self.NU - 1)] | a_emb[:, u]
-                atk_e = atk_e + self._gen_aura_cs(a_seat[:, u], here, atk_naval).to(atk_e.dtype)
-                atk_e = atk_e + self._emergency_pair_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
-                atk_e = atk_e + self._barb_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
-                atk_e = atk_e + self._vis_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
-                atk_e = atk_e + self._ally_war_cs(a_seat[:, u], d_seat_m).to(atk_e.dtype)
-                atk_e = atk_e + self._roster_cs(a_seat[:, u], a_type[:, u], here, d_seat_m, def_hp, False,
-                                                getattr(self, f"{atk_kind}_unit_formation")[:, u],
-                                            getattr(self, f"{atk_kind}_unit_levied")[:, u]).to(atk_e.dtype)
-            atk_e = atk_e + (self._congress_unit_cs(a_type[:, u], a_seat[:, u])
-                             + self._gov_unit_cs(a_type[:, u], a_seat[:, u])).to(atk_e.dtype)
-            def_naval = d_emb | (~def_is_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
-            def_civ_u = torch.where(def_is_barb, neg, d_seat_m)
-            def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
-            def_e = def_e + self._barb_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
-            def_e = def_e + self._vis_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
-            def_e = def_e + self._ally_war_cs(def_civ_u, a_seat[:, u]).to(def_e.dtype)
-            def_e = def_e + self._roster_cs(def_civ_u, d_type, ttc, a_seat[:, u], a_hp[:, u], False,
-                                            self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
-                                            self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
-            def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
-                             + self._gov_unit_cs(d_type, def_civ_u)
-                             + self._era_matchup_cs(def_civ_u, a_type[:, u])
-                             + self._gdr_armor_cs(d_type, def_civ_u, a_type[:, u])
-                             + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
+            atk_e, def_e, d_emb = self._melee_unit_strengths(
+                major, torch.full_like(here, a_lo + u), tgt, d_slot, d_seat_m)
             _wwh = self._ww_occ(tgt)
             _wwd = d_seat_m
             rows, def_dead, atk_dead, captured = self._melee_exchange(
@@ -13208,10 +13240,17 @@ class SimSeats:
             for _ri in range(rider.shape[1]):
                 self._escort_carry_with(moved, rider[:, _ri], rider_free, here, dest, cost)
         # stepUnit's revealAround: EVERY hop lifts the mover's fog, at
-        # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range".
-        # Major seats only — revealAround gates to isCiv on TS the same way,
-        # so barbarian/city-state movers accrue nothing on either engine.
+        # SIGHT_RANGE plus what CIV6 (Spyglass / Rutter) calls "+1 sight range"
+        # — a major's, and the barbarians' revealed plots; a city-state's
+        # mover accrues nothing on either engine.
         srow = self.unit_seat[rows, gs]
+        brb = srow == BARB_SEAT
+        if bool(brb.count_nonzero()):
+            _bu = u_type.take(rows)[brb]
+            _bp = u_promos.take(rows)[brb]
+            self._barb_reveal(rows[brb], dest.take(rows)[brb],
+                              self._unit_sight(_bu, _bp),
+                              see_through=self._sees_through(_bu, _bp))
         major = srow < self.n_majors
         if bool(major.count_nonzero()):
             # the CHASSIS's own sight, not the default: `unitSight` is what TS
@@ -14672,6 +14711,96 @@ class SimSeats:
         self.unit_hp[cr, dst] = self._captured_hp
         self._gen_ver += 1
 
+    def _ranged_unit_strengths(self, hostile: bool, a_slot: torch.Tensor, tgt: torch.Tensor,
+                               d_slot: torch.Tensor, d_seat: torch.Tensor):
+        """`rangedUnitStrengths` as the hostile seats' strike takes it — the
+        two strengths [B] of a ranged blow the merged-pool unit `a_slot`
+        strikes from the plot it stands on at the unit `d_slot` on `tgt`
+        (`d_seat` its seat, -1 none): what `_hostile_ranged_strike` resolves
+        on and what the AI's combat prediction reads (`_tac_predict`).
+        `hostile`: the attacker is of the barbarians' pool."""
+        neg = torch.full_like(d_seat, -1)
+        ttc = tgt.clamp(min=0)
+        a1 = a_slot.clamp(min=0).unsqueeze(1)
+        at = self.unit_type.gather(1, a1).squeeze(1).clamp(min=0, max=self.NU - 1)
+        a_hp = self.unit_hp.gather(1, a1).squeeze(1)
+        a_tile = self.unit_tile.gather(1, a1).squeeze(1)
+        a_seat = self.unit_seat.gather(1, a1).squeeze(1)
+        a_form = self.unit_formation.gather(1, a1).squeeze(1)
+        a_lev = self.unit_levied.gather(1, a1).squeeze(1)
+        a_promos = self.unit_promos.gather(1, a1).squeeze(1)
+        a_naval = self.unit_naval.take(at) | self.unit_emb.gather(1, a1).squeeze(1)
+        a_alive = self.unit_alive.gather(1, a1).squeeze(1)
+        zl = torch.zeros(self.B, dtype=torch.long, device=self.device)
+        ds0 = d_slot.clamp(min=0)
+        d_barb = d_seat == BARB_SEAT
+        d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        def_cs = self._type_combat[d_type]
+        d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)  # civilians hold 0
+        d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
+        def_cs = def_cs + self._tdef_g(ttc) + d_fort_t * 3
+        d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
+        if bool(d_emb.count_nonzero()):
+            def_cs = torch.where(
+                d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
+        def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
+        def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
+        _t = torch.ones_like(d_slot, dtype=torch.bool)
+        # the chassis' own ranged strength plus the four pool adders —
+        # assembled HERE because the city and city-state arms assemble
+        # their own (off `_city_ranged_strength`), so a shot that never
+        # reaches a unit paid for four helper calls it could not use.
+        atk_rs = (self._type_ranged_strength[at] + self._form_cs(a_slot)
+                  + torch.where(a_alive, self._convoy_cs(a_slot), zl) - torch.where(a_alive, self._fuel_short_cs(a_slot), zl) + self._type_atk_cs.take(at))
+        atk_e = atk_rs - self._wound(a_hp, at) + self._promo_cs(
+            at, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
+            foe_damaged=self._damaged(def_hp), foe_fortified=d_fort_t > 0,
+            foe_in_district=self._on_district(ttc), tile=a_tile)
+        def_e = def_cs - self._wound(def_hp, d_type)
+        # an embarked defender took the flat CS override, which replaces the
+        # promotions naming its terrain and its fortification
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
+            self._promo_cs(
+                d_type, d_promos, attacking=~_t, ranged=_t, foe_type=at,
+                foe_damaged=self._damaged(a_hp),
+                foe_in_district=self._on_district(a_tile), tile=ttc)
+            + self._hold_the_line(d_seat, ttc, at, d_type)
+        ).to(def_e.dtype))
+        # "Ranged attacks ignore any Support received by the defender."
+        _cls = self._class_matchup_cs(at, d_type)
+        atk_e = atk_e + (_cls + self._ranged_domain_cs(at, d_type)).to(atk_e.dtype)
+        def_e = def_e + torch.where(
+            d_emb, torch.zeros_like(def_e),
+            self._class_matchup_cs(d_type, at).to(def_e.dtype))
+        if not hostile:
+            atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
+        def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=at).to(def_e.dtype))
+        # the attacker's own position clauses — a Varu or Toa beside the
+        # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
+        atk_e = atk_e + self._chassis_ability_cs(a_seat, at, a_tile, foe_type=d_type).to(atk_e.dtype)
+        if not hostile:
+            atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
+        def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
+        def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
+        def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
+        def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
+        atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
+        def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
+        atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
+        def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False,
+                                        self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
+                                        self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
+        atk_e = atk_e + self._roster_cs(a_seat, at, a_tile, d_seat, def_hp, False, a_form, a_lev).to(atk_e.dtype)
+        def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
+                         + self._gov_unit_cs(d_type, def_civ_u)
+                         + self._era_matchup_cs(def_civ_u, at)
+                         + self._gdr_armor_cs(d_type, def_civ_u, at)
+                         + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
+        atk_e = atk_e + (self._congress_unit_cs(at, a_seat)
+                         + self._gov_unit_cs(at, a_seat)).to(atk_e.dtype)
+        return atk_e, def_e
+
     def _hostile_ranged_strike(self, att: torch.Tensor, tgt: torch.Tensor, atk_kind: str, u: int,
                                row: int | None = None) -> torch.Tensor:
         ttc = tgt.clamp(min=0)
@@ -14805,7 +14934,7 @@ class SimSeats:
                 # strike does not engage another MAJOR's units at all, a scope-out
                 # ON TOP of hostility rather than instead of it. `isCiv` is
                 # every major seat (cpu/core/seats.ts: 0 <= seat < 100).
-                elig_m = elig_m & ~((m_seat >= 0) & (m_seat < 100))
+                elig_m = elig_m & ~((a_seat >= 0) & (a_seat < 100) & (m_seat >= 0) & (m_seat < 100))
             d_slot = torch.where(elig_m, mslot, neg)
             d_seat = torch.where(elig_m, m_seat, neg)
             unit_att = _rest & (d_slot >= 0)
@@ -14813,70 +14942,8 @@ class SimSeats:
                 ds0 = d_slot.clamp(min=0)
                 d_barb = d_seat == BARB_SEAT
                 d_type = self.unit_type.gather(1, ds0.unsqueeze(1)).squeeze(1)
-                def_cs = self._type_combat[d_type]
-                d_fort_t = self.unit_fortify.gather(1, ds0.unsqueeze(1)).squeeze(1)  # civilians hold 0
-                d_promos = self.unit_promos.gather(1, ds0.unsqueeze(1)).squeeze(1)
-                def_cs = def_cs + self._tdef_g(ttc) + d_fort_t * 3
-                d_emb = self.unit_emb.gather(1, ds0.unsqueeze(1)).squeeze(1) & (d_slot >= 0)
-                if bool(d_emb.count_nonzero()):
-                    def_cs = torch.where(
-                        d_emb, self._embarked_def_cs(d_seat).to(def_cs.dtype), def_cs)
-                def_cs = def_cs + self._form_cs(ds0) + self._convoy_cs(ds0) - self._fuel_short_cs(ds0)
-                def_hp = self.unit_hp.gather(1, ds0.unsqueeze(1)).squeeze(1)  # wounded defender
-                _t = torch.ones_like(mslot, dtype=torch.bool)
-                # the chassis' own ranged strength plus the four pool adders —
-                # assembled HERE because the city and city-state arms assemble
-                # their own (off `_city_ranged_strength`), so a shot that never
-                # reaches a unit paid for four helper calls it could not use.
-                atk_rs = (self._type_ranged_strength[ut0] + self._form_cs_pool(atk_kind, u)
-                          + self._convoy_cs_pool(atk_kind, u) - self._fuel_short_cs_pool(atk_kind, u) + self._chassis_atk_cs_pool(atk_kind, u))
-                atk_e = atk_rs - self._wound(a_hp, ut0) + self._promo_cs(
-                    ut0, a_promos, attacking=_t, ranged=_t, foe_type=d_type,
-                    foe_damaged=self._damaged(def_hp), foe_fortified=d_fort_t > 0,
-                    foe_in_district=self._on_district(ttc), tile=a_tile)
-                def_e = def_cs - self._wound(def_hp, d_type)
-                # an embarked defender took the flat CS override, which replaces the
-                # promotions naming its terrain and its fortification
-                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), (
-                    self._promo_cs(
-                        d_type, d_promos, attacking=~_t, ranged=_t, foe_type=ut0,
-                        foe_damaged=self._damaged(a_hp),
-                        foe_in_district=self._on_district(a_tile), tile=ttc)
-                    + self._hold_the_line(d_seat, ttc, ut0, d_type)
-                ).to(def_e.dtype))
-                # "Ranged attacks ignore any Support received by the defender."
-                _cls = self._class_matchup_cs(ut0, d_type)
-                atk_e = atk_e + (_cls + self._ranged_domain_cs(ut0, d_type)).to(atk_e.dtype)
-                def_e = def_e + torch.where(
-                    d_emb, torch.zeros_like(def_e),
-                    self._class_matchup_cs(d_type, ut0).to(def_e.dtype))
-                if not barb:
-                    atk_e = atk_e + (self._rel_atk_cs(a_seat, tgt).to(atk_e.dtype))  # NEVER gated
-                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._rel_def_cs(torch.where(d_barb, neg, d_seat), tgt).to(def_e.dtype))
-                def_e = def_e + torch.where(d_emb, torch.zeros_like(def_e), self._chassis_ability_cs(d_seat, d_type, ttc, def_ranged=True, foe_type=ut0).to(def_e.dtype))
-                # the attacker's own position clauses — a Varu or Toa beside the
-                # shooter lays its -5 on the SHOT too (`chassisAbilityCS(attacker)`)
-                atk_e = atk_e + self._chassis_ability_cs(a_seat, ut0, a_tile, foe_type=d_type).to(atk_e.dtype)
-                if not barb:
-                    atk_e = atk_e + self._gen_aura_cs(a_seat, a_tile, a_naval).to(atk_e.dtype)
-                def_civ_u = torch.where((d_slot >= 0) & ~d_barb, d_seat, neg)
-                def_naval = d_emb | (~d_barb & self.unit_naval[d_type.clamp(min=0, max=self.NU - 1)])
-                def_e = def_e + self._gen_aura_cs(def_civ_u, tgt, def_naval).to(def_e.dtype)
-                def_e = def_e + self._barb_cs(d_seat, a_seat).to(def_e.dtype)
-                atk_e = atk_e + self._barb_cs(a_seat, d_seat).to(atk_e.dtype)
-                def_e = def_e + (self._vis_cs(d_seat, a_seat) + self._ally_war_cs(d_seat, a_seat)).to(def_e.dtype)
-                atk_e = atk_e + (self._vis_cs(a_seat, d_seat) + self._ally_war_cs(a_seat, d_seat)).to(atk_e.dtype)
-                def_e = def_e + self._roster_cs(d_seat, d_type, ttc, a_seat, a_hp, False,
-                                                self.unit_formation.gather(1, ds0.unsqueeze(1)).squeeze(1),
-                                                self.unit_levied.gather(1, ds0.unsqueeze(1)).squeeze(1)).to(def_e.dtype)
-                atk_e = atk_e + self._roster_cs(a_seat, ut0, a_tile, d_seat, def_hp, False, a_form, a_lev).to(atk_e.dtype)
-                def_e = def_e + (self._congress_unit_cs(d_type, def_civ_u)
-                                 + self._gov_unit_cs(d_type, def_civ_u)
-                                 + self._era_matchup_cs(def_civ_u, ut0)
-                                 + self._gdr_armor_cs(d_type, def_civ_u, ut0)
-                                 + self._governor_territory_cs(def_civ_u, tgt)).to(def_e.dtype)
-                atk_e = atk_e + (self._congress_unit_cs(ut0, a_seat)
-                                 + self._gov_unit_cs(ut0, a_seat)).to(atk_e.dtype)
+                atk_e, def_e = self._ranged_unit_strengths(
+                    barb, torch.full_like(ttc, u + self.POOL_LO[atk_kind]), tgt, d_slot, d_seat)
                 def_hp0 = self.unit_hp[torch.arange(self.B, device=self.device), d_slot.clamp(min=0)]
                 d_def = self._damage_roll(unit_att, atk_e - def_e, k="vrng", tile=tgt)
                 g = unit_att.nonzero(as_tuple=True)[0]

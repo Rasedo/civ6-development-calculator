@@ -3,6 +3,16 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x56c480
+  final: 0x3a23e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...r with it; +0x4c not above 0, taken as no unit on it; its own area unless it embarks (0x56c480), a hull on water; no city centre but its player's); its two counts over its sight (0x5...
+  review: imported
 - addr: 0x56c690
   final: 0x3a25f0
   kind: function
@@ -49,6 +59,7 @@
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  impl: [cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -77,6 +88,7 @@
     - recording: 1121
       turn: 191
       value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
+  impl: [cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
   readings:
     - "C-34: the interception's damage, XP, weariness and the answers"
     - "C-94: the wounded law and the garrison — READ"
@@ -105,9 +117,12 @@
     - recording: 1120
       turn: 13
       value: 1120 t13 17 / 32 (a defender at 18 HP).
+  impl: [cpu/core/tactical.ts:healthOf, cpu/core/tactical.ts:flees]
   readings:
     - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-95: Explore Land and the barbarians' revealed plots — READ, ported (the region lists and three tests below unread)"
   context:
     - "...s the node's units whose damage (unit +0xcf0) is at least that share of their health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its..."
     - "...bFightWhileEmbarked). Both sides' totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is..."
@@ -128,9 +143,11 @@
   final: 0x3a3c70
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:dangerPlane]
   readings:
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-95: the planning's spots and the combat prediction — READ, ported"
   notes:
     - ".claude/scratchpad/mu1/readings_c96.md: ...at   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an A..."
     - ".claude/scratchpad/st1/reading.md: ...the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring..."
@@ -146,7 +163,7 @@
     - recording: 1120
       turn: 50
       value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
-  impl: [cpu/core/units.ts:ranged]
+  impl: [cpu/core/units.ts:ranged, cpu/core/tactical.ts:canFight, cpu/core/tactical.ts:aiStrengths]
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
@@ -163,8 +180,10 @@
   final: 0x3a4730
   kind: function
   status: PARTLY
+  impl: [cpu/core/tactical.ts:flees]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...at half its health or worse whose planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds however hurt; a whole one where the danger exceeds its strength + 20 — and move..."

@@ -7,10 +7,10 @@
  * (`barbarianPhase`), a city-state's turn for its own (`cityStateTactics`),
  * the Free Cities' turn for theirs (`freeCityTactics`).
  */
-import type { CityState, GameState, Tile, Unit } from './types';
-import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt } from '../../world/hex';
+import type { City, CityState, GameState, Tile, Unit } from './types';
+import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { isImpassable, isWater } from '../../world/query';
-import { MP_SCALE } from '../data/constants';
+import { COMBAT_BOMBARD_VS_UNIT, MP_SCALE } from '../data/constants';
 import { UNITS, UNIT_HP } from '../data/units';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
@@ -19,11 +19,14 @@ import {
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
-import { BARB_SEAT, FREE_SEAT, NO_SEAT, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
+import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { attackTargets, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, stackDefender, unitAttackRange } from './combat';
-import { canSee } from './fog';
+import { cityDefenseStrength, cityStrikeStrength, damageExpected, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, meleeUnitStrengths, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { CITY_STRIKE_RANGE } from './phase';
+import { outerPool } from './rules';
+import { minorCity } from './cityStates';
+import { canSee, unitSight } from './fog';
 import { barbarianOps, barbarianRules, barbSlots, barbSlotsDying, plotsSeenNow, poolDying, poolSlots, tribeOf } from './barbarians';
 import { generalAuraMP } from './aura';
 import { attacksLeftOf, attacksPerTurn } from './promotions';
@@ -120,7 +123,7 @@ interface Ground {
   stand: (i: number) => boolean;
 }
 
-function groundOf(state: GameState, unit: Unit): Ground {
+function groundOf(state: GameState, unit: Unit, revealedOnly = true): Ground {
   const held = new Set<number>();
   const foes = new Set<number>();
   for (const u of state.units) {
@@ -131,7 +134,9 @@ function groundOf(state: GameState, unit: Unit): Ground {
   const enters = new Map<number, boolean>();
   const zocs = new Map<number, boolean>();
   const ex = seatOf(state, unit.seat)?.explored;
-  const known = (i: number) => !ex || ex.length === 0 || ex[i] === 1;
+  // the breadth-first lists keep only the plots the player revealed; a path
+  // (`revealedOnly` false) takes any
+  const known = (i: number) => !revealedOnly || !ex || ex.length === 0 || ex[i] === 1;
   const def = UNITS[unit.type];
   const melee = !!def && def.combat > 0;
   const naval = !!def?.naval;
@@ -180,11 +185,15 @@ function groundOf(state: GameState, unit: Unit): Ground {
  * search, flag 0x800, reads none). Its cost (0x270dd0): 1000 x the step's
  * Movement +2, and where the step ends the turn's Movement +4, +3 more off
  * the unit's own territory. `onClose` sees each node as it closes; the
- * search stops where it answers true.
+ * search stops where it answers true. `onLink` sees each link the search
+ * prices (the cost callback 0x26d6f0): the plot, the plot it is linked from,
+ * the turn and Movement the step reaches it with, and whether it attacks —
+ * the start first, linked from itself.
  */
-function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean): void {
+function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, onClose: (n: PNode, ground: Ground) => boolean,
+  onLink?: (tile: number, from: number, turns: number, moves: number, attack: boolean) => void): void {
   const { map } = state;
-  const ground = groundOf(state, unit);
+  const ground = groundOf(state, unit, !zoc);
   const held = heldCostsOf(state, unit);
   const nodes = new Map<number, PNode>();
   // a turn starts on the full Movement of the domain its plot holds the unit
@@ -196,6 +205,8 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
   const start: PNode = { tile: unit.tileIndex, g: 0, tie: 0, moves: Math.floor(unit.movesLeft * FIX / MP_SCALE),
     turns: 1, closed: false, parent: null };
   nodes.set(start.tile, start);
+  // the start is priced too, linked from itself
+  onLink?.(start.tile, start.tile, start.turns, start.moves, false);
   // the open nodes, no two of one key; the cheapest and the dearest
   const open: PNode[] = [start];
   let lo: PNode | null = null;
@@ -260,6 +271,7 @@ function search(state: GameState, unit: Unit, maxTurns: number, zoc: boolean, on
         }
       }
       if (turns > maxTurns) continue;
+      onLink?.(to.index, best.tile, turns, moves, attack);
       const ends = moves <= 0 ? 4 + (tileSeat(to) !== unit.seat ? 3 : 0) : 0;
       const g = best.g + cost * 1000 + (ends + 2) * FIX;
       const c = nodes.get(to.index);
@@ -551,38 +563,276 @@ function rangeOf(u: Unit): number {
   return UNITS[u.type]?.ranged ? unitAttackRange(u) : 0;
 }
 
+/** One spot of a planning target (0x790c60): the plot the unit would strike
+ *  the target from, the turn the blow would fall on, and the target's
+ *  predicted blow back on the unit standing there (0x791470): the damage the
+ *  unit takes, the damage the target takes. */
+export interface Spot {
+  tile: number;
+  turns: number;
+  backTaken: number;
+  backDealt: number;
+}
+
+/** One planning target (the planner's 0xd0 entries): the list's target, its
+ *  spots (six at most) and the predicted blow from where the unit stands
+ *  (0x791470): the damage dealt and taken. */
+export interface PlanEntry {
+  target: Target;
+  spots: Spot[];
+  dealt: number;
+  taken: number;
+}
+
+/** A unit's planning (AI Unit Planning 0x792c90): its reach, its targets,
+ *  and whether a predicted blow of it kills (+0x60). */
+export interface Planner {
+  reach: Reach[];
+  entries: PlanEntry[];
+  wins: boolean;
+}
+
+/** the targets a unit strikes or takes */
+const STRUCK = new Set<TargetType>(['COMBAT_DISTRICT', 'CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
+const UNIT_TARGET = new Set<TargetType>(['CIVILIAN', 'LOW', 'MEDIUM', 'HIGH']);
+const FIGHTER_TARGET = new Set<TargetType>(['LOW', 'MEDIUM', 'HIGH']);
+
+/** a unit's health in the AI's reckoning (0x56e0d0 less its damage) */
+function healthOf(u: Unit): number {
+  return u.hp;
+}
+
+/** a unit with a strength to fight with (0x56dc90, 0x56e3e0, 0x56daa0) */
+function canFight(u: Unit): boolean {
+  const def = UNITS[u.type];
+  return !!def && (def.combat > 0 || rangedStrength(u) > 0 || def.bombard !== undefined);
+}
+
+/** a target's unit, still on the map */
+function targetUnit(state: GameState, e: Target): Unit | null {
+  return e.unit && state.units.includes(e.unit) ? e.unit : null;
+}
+
+/** THE COMBAT PREDICTION (0x791470's simulation, Rules_Combat under the
+ *  simulation flag): the blow `attacker` would strike `defender` on `at`
+ *  with, from where it stands — the damage it deals and the damage it takes
+ *  (none at range, none from an embarked defender) */
+export function predictBlow(state: GameState, attacker: Unit, defender: Unit, at: number): { dealt: number; taken: number } {
+  if (rangedStrength(attacker) > 0) {
+    const s = rangedUnitStrengths(state, attacker, at, defender);
+    return { dealt: damageExpected(s.atk - s.def), taken: 0 };
+  }
+  const s = meleeUnitStrengths(state, attacker, at, defender);
+  return { dealt: damageExpected(s.atk - s.def), taken: defender.embarked ? 0 : damageExpected(s.def - s.atk) };
+}
+
 /**
- * THE PLANNING'S TARGETS (0x792f90 at the planning, the spots 0x790c60): the
- * list's targets within 2 x the unit's Movement + its range of it, each with
- * whether the unit has a spot to strike it from within the planning's two
- * turns — a unit target or a COMBAT_DISTRICT only: in melee its plot in the
- * reach, at range a plot of the reach within range of it (in sight beyond 1).
+ * THE PLANNING (AI Unit Planning 0x792c90 -> 0x7920d0, 0x791e00, 0x791470)
+ * of one unit at the start of its player's turn:
+ *  - its targets (0x792f90): the list's within 2 x its Movement + its range
+ *    of it, in the list's order;
+ *  - its reach: the breadth-first search of two turns (`reachPlots`), and on
+ *    each link it prices the spots (0x790c60, six at most a target, a plot
+ *    once) of each unit target or COMBAT_DISTRICT — at range a plot within
+ *    the range (in sight beyond 1; a land unit's on land), its turn the
+ *    step's, the next where it ends with no Movement; in melee the plot an
+ *    attack on the target's plot is linked from, of the attack's turn, and a
+ *    plot beside the target no other player's unit holds that the step ends
+ *    on with no Movement (the next turn) or that is the unit's own (this
+ *    turn); a civilian's plot taken from the plot it is linked from;
+ *  - per target with a spot the predicted blow from where it stands
+ *    (`predictBlow`; a civilian taken 150), copied to every spot, and per
+ *    spot of a fighter the fighter's blow back on it standing there; a blow
+ *    that kills marks the planning `wins`.
  */
-export function planTargets(state: GameState, unit: Unit, reach: readonly Reach[], targets: readonly Target[]):
-  Map<Target, boolean> {
-  const out = new Map<Target, boolean>();
-  const range = rangeOf(unit);
-  const lim = maxMoves(state, unit) * PLAN_TURNS + range;
-  const inReach = new Set(reach.map((e) => e.tile));
+export function planUnit(state: GameState, unit: Unit, targets: readonly Target[]): Planner {
+  const R = rangeOf(unit);
+  const lim = maxMoves(state, unit) * PLAN_TURNS + R;
+  const naval = !!UNITS[unit.type]?.naval;
+  const fights = canFight(unit);
+  const entries: PlanEntry[] = [];
   for (const e of targets) {
     if (plotDistance(state, unit.tileIndex, e.tile) > lim) continue;
-    let spot = false;
-    const struck = e.type === 'COMBAT_DISTRICT' || e.type === 'CIVILIAN' || e.type === 'LOW' || e.type === 'MEDIUM' || e.type === 'HIGH';
-    if (struck) {
-      if (range === 0 || e.type === 'CIVILIAN') spot = inReach.has(e.tile);
-      else {
-        const to = state.map.tiles[e.tile];
-        spot = reach.some((r) => {
-          if (r.attack) return false;
-          const d = plotDistance(state, r.tile, e.tile);
-          return d >= 1 && d <= range && (d === 1 || canSee(state.map, state.map.tiles[r.tile], to, false));
-        });
+    entries.push({ target: e, spots: [], dealt: 0, taken: 0 });
+  }
+  const { tiles } = state.map;
+  const water = (p: number) => isWater(tiles[p]);
+  const foreignAt = (p: number) => {
+    const dom = unitDomain(unit.type);
+    return state.units.some((x) => x.tileIndex === p && x.seat !== unit.seat && onMap(x) && unitDomain(x.type) === dom);
+  };
+  const reach: Reach[] = [];
+  const onLink =(P: number, parent: number, T: number, M: number) => {
+    for (const E of entries) {
+      const ty = E.target.type;
+      if (!STRUCK.has(ty)) continue;
+      const TP = E.target.tile;
+      const d = plotDistance(state, P, TP);
+      let spot = P;
+      let turns = T;
+      let dd = d;
+      let fixed = false;
+      let taken = false;
+      if (R !== 0 ? ty === 'CIVILIAN' && d === 0 : d === 0) taken = true;
+      else if (R === 0 && d === 1 && (M === 0 || P === unit.tileIndex) && !foreignAt(P)) {
+        dd = 0;
+        fixed = M !== 0;
+      }
+      if (taken) {
+        if (naval ? !water(P) && tiles[P].district !== 'CITY_CENTER' : water(P)) continue;
+        spot = parent;
+        fixed = true;
+      }
+      if (!fixed && M === 0) turns = T + 1;
+      if (dd > R || E.spots.length >= 6) continue;
+      if (!naval && (R === 0 ? water(TP) : water(spot))) continue;
+      if (dd > 0 && ty === 'CIVILIAN') continue;
+      if (E.spots.some((s) => s.tile === spot)) continue;
+      if (!fights) continue;
+      if (UNIT_TARGET.has(ty) ? !targetUnit(state, E.target) : tiles[TP].district === null) continue;
+      if (R > 1 && dd > 1 && !canSee(state.map, tiles[spot], tiles[TP], false)) continue;
+      E.spots.push({ tile: spot, turns, backTaken: 0, backDealt: 0 });
+    }
+  };
+  search(state, unit, PLAN_TURNS, false, (n, ground) => {
+    // a plot another player's unit holds the unit only passes (0x586900)
+    if (n.attack || ground.stand(n.tile)) reach.push({ tile: n.tile, turns: n.turns, moves: n.moves, attack: !!n.attack });
+    return false;
+  }, entries.length ? onLink : undefined);
+  let wins = false;
+  for (const E of entries) {
+    if (!E.spots.length) continue;
+    const v = UNIT_TARGET.has(E.target.type) ? targetUnit(state, E.target) : null;
+    if (!v) continue;
+    const blow = predictBlow(state, unit, v, v.tileIndex);
+    E.dealt = E.target.type === 'CIVILIAN' ? CIVILIAN_TAKEN : blow.dealt;
+    E.taken = blow.taken;
+    if (E.dealt > healthOf(v)) wins = true;
+    if (!FIGHTER_TARGET.has(E.target.type)) continue;
+    const at = unit.tileIndex;
+    for (const s of E.spots) {
+      unit.tileIndex = s.tile;
+      const back = predictBlow(state, v, unit, s.tile);
+      unit.tileIndex = at;
+      s.backTaken = back.dealt;
+      s.backDealt = back.taken;
+    }
+  }
+  return { reach, entries, wins };
+}
+
+/** one unit's danger (0x716400): a unit with a bombard strength takes its
+ *  combat strength where that tops the bombard less
+ *  COMBAT_BOMBARD_VS_UNIT_STRENGTH_MODIFIER, else that less; any other the
+ *  larger of its combat and ranged strengths */
+export function unitDanger(melee: number, ranged: number, bombard: number): number {
+  if (bombard > 0) {
+    const vs = bombard - COMBAT_BOMBARD_VS_UNIT;
+    return melee > vs ? melee : vs;
+  }
+  return melee > ranged ? melee : ranged;
+}
+
+/** a unit's strengths as the AI reads them (0x56dc90, 0x56e3e0, 0x56daa0):
+ *  combat, ranged (none for a unit with a bombard) and bombard */
+function aiStrengths(u: Unit): { melee: number; ranged: number; bombard: number } {
+  const d = UNITS[u.type];
+  const bombard = d?.bombard ?? 0;
+  return { melee: d?.combat ?? 0, ranged: bombard > 0 ? 0 : d?.ranged?.strength ?? 0, bombard };
+}
+
+/**
+ * THE DANGER MAP (InfluenceMap 0x717460, the player's m_influence, a plot
+ * read by 0x716a90): per player at war with `seat`, each unit of it the seat
+ * sees now with a combat, ranged or bombard strength adds its danger
+ * (`unitDanger`) to every plot its one-turn planning search closes from where
+ * it stands on its full Movement (0x7921e0 -> 0x26df90, its attacks
+ * included), and to a second list, each plot once: every other plot within
+ * its range (0x56e3d0) of those and — a unit that may coastal raid (+0x18bd,
+ * CanRaid) — the land plots beside them (one it reaches too takes the
+ * danger twice); an aircraft to the plots within its range. Each such
+ * city whose centre the seat sees adds its defence on its centre and its
+ * strike over its strike's reach, else 1 on each plot beside it (0x715ff0).
+ * Then the seat's own cities: each centre 0, each plot their strike covers
+ * down by its strength, to 1 at least (0x716080). The game builds it as the
+ * player's turn opens.
+ */
+export function dangerPlane(state: GameState, seat: number): Int16Array {
+  const { map } = state;
+  const out = new Int16Array(map.tiles.length);
+  const seen = plotsSeenNow(state, new Set([seat]));
+  const within = (p: number, r: number) => {
+    const t = map.tiles[p];
+    return tilesWithin(map, t.col, t.row, r).map((x) => x.index);
+  };
+  for (const u of state.units) {
+    if (!onMap(u) && unitDomain(u.type) !== 'air') continue;
+    if (unitReligious(u.type) || !unitsHostile(state, { seat }, u) || !seen[u.tileIndex] || !unitVisibleTo(state, u, seat)) continue;
+    const st = aiStrengths(u);
+    if (st.melee <= 0 && st.ranged <= 0 && st.bombard <= 0) continue;
+    const s = unitDanger(st.melee, st.ranged, st.bombard);
+    const R = rangeOf(u);
+    if (unitDomain(u.type) === 'air') {
+      for (const p of within(u.tileIndex, R)) out[p] += s;
+      continue;
+    }
+    const reach: number[] = [];
+    const full = { ...u, movesLeft: unitFullMoves(state, u) };
+    search(state, full, 1, false, (n) => {
+      reach.push(n.tile);
+      return false;
+    });
+    const inReach = new Set(reach);
+    const extra: number[] = [];
+    const inExtra = new Set<number>();
+    for (const p of reach) {
+      for (const q of within(p, R)) {
+        if (inReach.has(q) || inExtra.has(q)) continue;
+        inExtra.add(q);
+        extra.push(q);
       }
     }
-    out.set(e, spot);
+    if (UNITS[u.type]?.raider) {
+      for (const p of reach) {
+        for (const q of within(p, 1)) {
+          if (q === p || isWater(map.tiles[q]) || inExtra.has(q)) continue;
+          inExtra.add(q);
+          extra.push(q);
+        }
+      }
+    }
+    for (const p of reach) out[p] += s;
+    for (const p of extra) out[p] += s;
+  }
+  // a city's strengths in whole numbers (the 24.8 values shifted down, 0x24ae80, 0x249ee0)
+  const cityStrike = (c: City) => outerPool(state, c) > 0 ? Math.floor(cityStrikeStrength(state, c)) : 0;
+  const citiesHeld = (h: { seat: number; cities: City[] }) => isCityStateSeat(h.seat)
+    ? state.cityStates.filter((cs) => cs.seat === h.seat && cs.centerIndex >= 0).map(minorCity) : h.cities;
+  for (const h of [...cityHolders(state), ...state.cityStates]) {
+    if (!unitsHostile(state, { seat }, h)) continue;
+    for (const c of citiesHeld(h)) {
+      if (!seen[c.centerIndex]) continue;
+      const def = Math.floor(cityDefenseStrength(state, c));
+      if (def > 0) out[c.centerIndex] += def;
+      const strike = cityStrike(c);
+      for (const p of within(c.centerIndex, strike > 0 ? CITY_STRIKE_RANGE : 1)) if (p !== c.centerIndex) out[p] += strike > 0 ? strike : 1;
+    }
+  }
+  const own = seatOf(state, seat);
+  for (const c of own ? citiesHeld(own) : []) {
+    if (cityDefenseStrength(state, c) > 0) out[c.centerIndex] = 0;
+    const strike = cityStrike(c);
+    if (strike <= 0) continue;
+    for (const p of within(c.centerIndex, CITY_STRIKE_RANGE)) {
+      if (p === c.centerIndex || out[p] <= 0) continue;
+      out[p] = out[p] - strike > 1 ? out[p] - strike : 1;
+    }
   }
   return out;
 }
+
+/** the predicted damage of taking a civilian (0x791470: 150) */
+const CIVILIAN_TAKEN = 150;
 
 /** UnitAiTypes: a unit's AI type (unit +0x1c0) */
 const AI_EXPLORE = 2;
@@ -600,6 +850,17 @@ function aiTypeOf(state: GameState, u: Unit): number {
   return AI_COMBAT;
 }
 
+/** A UNIT THE TACTICAL PASS TAKES (the tactical unit selector 0x7710f0 over
+ *  the units no AI system holds): one of AI type EXPLORE or above, an
+ *  explorer (`explorer`, PSEUDOYIELD_UNIT_EXPLORER) only while its tribe
+ *  rampages; the rest are the homeland's */
+function tacticalUnit(state: GameState, u: Unit, ai: number): boolean {
+  if (ai < AI_EXPLORE) return false;
+  if (ai !== AI_EXPLORE || !UNITS[u.type]?.explorer) return true;
+  const tr = tribeOf(state, u.id);
+  return !!tr && !tr.alive && tr.rampage !== undefined;
+}
+
 /** WANDER NEAR CAMP's radius (0x77b9a0: the plots within 5 of the camp) */
 const WANDER_CAMP_RANGE = 5;
 /** DEFEND CAMPS' reach (0x779010 -> 0x774e90: within 3 turns) */
@@ -607,10 +868,10 @@ const DEFEND_CAMP_TURNS = 3;
 /** the planning's breadth-first search (0x7920d0: two turns) */
 const PLAN_TURNS = 2;
 
-/** One pass's state: its player, whether its moves strike the plot they end
- *  on (the barbarians'; a city-state's and the Free Cities' attacks are not
- *  ported), the units left, each one's planning reach, and those done
- *  (`0x570b40`). */
+/** One pass's state: its player, whether a move that ends on a plot it
+ *  attacks into strikes it (the barbarians'; not a city-state's or the Free
+ *  Cities' wander or chase), the units left, each one's planning reach, and
+ *  those done (`0x570b40`). */
 interface Pass {
   seat: number;
   strike: boolean;
@@ -618,15 +879,17 @@ interface Pass {
   reach: Map<number, Reach[]>;
   done: Set<number>;
   ai: Map<number, number>;
-  /** the tactical target list as the pass began, and each unit's planning targets */
+  /** the tactical target list as the pass began, and each unit's planning */
   targets: Target[];
-  plan: Map<number, Map<Target, boolean>>;
+  plan: Map<number, Planner>;
+  /** the player's danger map as the pass began (`dangerPlane`) */
+  danger: Int16Array;
 }
 
-/** the move that took the unit, as the game's tactical log names it, and
- *  the plot it went for (-1 none), for the replay's comparison */
-let tacticsTrace: ((unit: Unit, move: string, plot: number) => void) | null = null;
-export function traceTactics(fn: ((unit: Unit, move: string, plot: number) => void) | null): void {
+/** the move that took the unit, as the game's tactical log names it, the
+ *  plot it went for and the plot it struck (-1 none), for the replay's comparison */
+let tacticsTrace: ((unit: Unit, move: string, plot: number, attack: number) => void) | null = null;
+export function traceTactics(fn: ((unit: Unit, move: string, plot: number, attack: number) => void) | null): void {
   tacticsTrace = fn;
 }
 
@@ -637,9 +900,9 @@ export function tacticsDrawing(): Unit | null {
   return drawing;
 }
 
-function finish(pass: Pass, u: Unit, move: string, plot = -1): void {
+function finish(pass: Pass, u: Unit, move: string, plot = -1, attack = -1): void {
   pass.done.add(u.id);
-  tacticsTrace?.(u, move, plot);
+  tacticsTrace?.(u, move, plot, attack);
 }
 
 const live = (state: GameState, pass: Pass, u: Unit) => !pass.done.has(u.id) && state.units.includes(u) && u.seat === pass.seat;
@@ -693,14 +956,6 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
       if (there) break;
     }
   }
-}
-
-/** the planning's targets of a unit (0x792f90), taken from the pass's target
- *  list and the unit's reach as they stood when the pass began */
-function planOf(state: GameState, pass: Pass, u: Unit): Map<Target, boolean> {
-  let p = pass.plan.get(u.id);
-  if (!p) pass.plan.set(u.id, (p = planTargets(state, u, pass.reach.get(u.id) ?? [], pass.targets)));
-  return p;
 }
 
 /** a unit of a player at war with the unit holds the plot to fight it (0x208b80) */
@@ -786,7 +1041,8 @@ function rampage(state: GameState, pass: Pass): void {
     let best: Target | null = null;
     let bestSpot = false;
     let bestD = 0;
-    for (const [e, spot] of planOf(state, pass, u)) {
+    for (const { target: e, spots } of pass.plan.get(u.id)?.entries ?? []) {
+      const spot = spots.length > 0;
       if (e.seat !== P) continue;
       const d = plotDistance(state, e.tile, u.tileIndex);
       if (best && bestSpot && d >= bestD) continue;
@@ -894,6 +1150,283 @@ function plunderTraders(state: GameState, pass: Pass): void {
   }
 }
 
+/** ATTACK UNITS' reach of the targets one assignment takes (0x76eb50) */
+const ATTACK_TARGETS_RANGE = 5;
+/** a target's health in the assignment (0x776140): 1.1 in 24.8 (0x119) of
+ *  its whole, less its damage */
+const ATTACK_HEALTH_256 = 281;
+/** a kill's worth in the gain (0x7702b0) */
+const ATTACK_KILL = 100;
+/** a barbarian target's worth (0x7702b0, @0xd5aff4) */
+const ATTACK_BARB = Math.fround(0.8);
+
+/**
+ * THE UNITS THAT CAN STRIKE A PLOT (0x775340 as Attack Units asks it, 2
+ * turns): each unit left, in pool order, with a strength to fight with,
+ * whose planning reach holds — in melee the plot within two turns, at range
+ * a plot exactly its range from it within two turns with Movement left and
+ * none of its own units stacking there unless it is its own (0x78fa10); a
+ * camp's DEFENDER goes in only before another unit.
+ */
+function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
+  const out: Unit[] = [];
+  let held: Unit | null = null;
+  for (const u of pass.units) {
+    if (!live(state, pass, u) || !canFight(u)) continue;
+    const reach = pass.reach.get(u.id) ?? [];
+    const ranged = rangedStrength(u) > 0;
+    const R = ranged ? rangeOf(u) : 0;
+    const ok = R === 0
+      ? reach.some((e) => e.tile === plot && e.turns <= PLAN_TURNS && (!ranged || e.moves > 0))
+      : reach.some((e) => plotDistance(state, e.tile, plot) === R && e.turns <= PLAN_TURNS && e.moves > 0
+        && (!stackedAt(state, u, e.tile) || e.tile === u.tileIndex));
+    if (!ok) continue;
+    if (pass.ai.get(u.id) === AI_DEFENDER && !out.length) {
+      held = u;
+      continue;
+    }
+    if (held) {
+      out.push(held);
+      held = null;
+    }
+    out.push(u);
+  }
+  return out;
+}
+
+/** one unit's claim on a spot in the assignment: the unit, the target, the
+ *  damage it would deal, the turn of the blow, its worth as last weighed */
+interface Claim { unit: number; target: number; dealt: number; turns: number; value: number }
+interface AssignSpot { tile: number; claims: Claim[]; holder: number; holderTarget: number }
+interface AssignTarget { target: Target; unit: Unit; health: number; damage: number; units: number[]; barb: boolean }
+/** one unit's assignment (0x38 entries): its spot, the plot it strikes (-1
+ *  where the blow falls on a later turn), where it stands, its damage */
+interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean }
+
+/**
+ * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
+ *  - each target's health (1.1 x its whole, less its damage);
+ *  - each unit with Movement left: per target its planning's spots (in
+ *    order), save — but against a HIGH target — one where the damage it
+ *    takes in the blow and the blow back passes the damage it deals in both,
+ *    or would kill it; a DEFENDER's only on its own plot, a unit that has
+ *    moved only its own plot this turn, and no spot another unit holds that
+ *    stacks with it (its own unit with Movement left aside); each a claim on
+ *    the spot (the spots in the order first claimed);
+ *  - the Generalized Assignment (MathAlgorithm_GeneralizedAssignmentProblem
+ *    0x8b5bf0, one pass): spot by spot each unit's gain there (`gain`, less
+ *    its worth at its own spot), the first largest positive taking it, the
+ *    spot's holder let go (`claim`);
+ *  - each assigned unit's move: its spot, and the target's plot as the
+ *    attack where its claim's blow falls this turn, sorted (0x7704e0).
+ */
+function assignAttacks(state: GameState, pass: Pass, units: Unit[], targets: Target[], high: boolean): Assigned[] {
+  const tg: AssignTarget[] = [];
+  for (const t of targets) {
+    const v = targetUnit(state, t)!;
+    tg.push({ target: t, unit: v, health: Math.floor(UNIT_HP * ATTACK_HEALTH_256 / 256) - (UNIT_HP - healthOf(v)),
+      damage: 0, units: [], barb: isBarbSeat(v.seat) });
+  }
+  const spots: AssignSpot[] = [];
+  units.forEach((u, i) => {
+    if (u.movesLeft <= 0) return;
+    const p = pass.plan.get(u.id);
+    if (!p) return;
+    const moved = u.movesLeft < (u.movesFull ?? unitFullMoves(state, u));
+    tg.forEach((T, k) => {
+      const E = p.entries.find((e) => e.target === T.target);
+      if (!E) return;
+      for (const s of E.spots) {
+        if (!high && (E.taken + s.backTaken > E.dealt + s.backDealt || E.taken + s.backTaken > healthOf(u))) continue;
+        if (pass.ai.get(u.id) === AI_DEFENDER && s.tile !== u.tileIndex) continue;
+        if (s.turns === 1 && moved && s.tile !== u.tileIndex) continue;
+        const dom = unitDomain(u.type);
+        if (state.units.some((x) => x.tileIndex === s.tile && onMap(x) && x !== T.unit
+          && !(x.seat === u.seat && x.movesLeft > 0) && unitDomain(x.type) === dom)) continue;
+        let sp = spots.find((x) => x.tile === s.tile);
+        if (!sp) spots.push((sp = { tile: s.tile, claims: [], holder: -1, holderTarget: -1 }));
+        sp.claims.push({ unit: i, target: k, dealt: E.dealt, turns: s.turns, value: 0 });
+      }
+    });
+  });
+  // the unit's worth at a spot (0x7702b0)
+  const gain = (i: number, j: number): number => {
+    let best = 0;
+    for (const c of spots[j].claims) {
+      if (c.unit !== i) continue;
+      const T = tg[c.target];
+      const blow = Math.trunc(c.dealt / c.turns);
+      if (T.units.includes(i)) return blow + (T.damage >= T.health ? ATTACK_KILL : 0);
+      let v = T.damage >= T.health ? T.health - T.damage + ATTACK_KILL : blow;
+      if (T.barb) v = Math.trunc(Math.fround(v * ATTACK_BARB));
+      c.value = v;
+      if (v > best) best = v;
+    }
+    return best;
+  };
+  // the unit takes the spot (0x770710): let go of its old one and of the
+  // spot's holder, claim its best there; the holder let go returned
+  const claim = (i: number, j: number, prev: number): number => {
+    if (prev >= 0) {
+      for (const c of spots[prev].claims) {
+        if (c.unit !== i) continue;
+        const T = tg[c.target];
+        const at = T.units.indexOf(i);
+        if (at < 0) continue;
+        T.units.splice(at, 1);
+        if (c.turns === 1) T.damage -= c.dealt;
+      }
+      spots[prev].holder = -1;
+      spots[prev].holderTarget = -1;
+    }
+    const S = spots[j];
+    const occ = S.holder;
+    if (occ >= 0) {
+      const c = S.claims.find((x) => x.unit === occ && x.target === S.holderTarget);
+      if (c) {
+        const T = tg[c.target];
+        const at = T.units.indexOf(occ);
+        if (at >= 0) T.units.splice(at, 1);
+        if (c.turns === 1) T.damage -= c.dealt;
+      }
+    }
+    let best = S.claims[0];
+    for (const c of S.claims.slice(1)) {
+      const mine = best.unit !== i;
+      if (mine !== (c.unit !== i) ? mine : best.value < c.value) best = c;
+    }
+    if (best && best.unit === i) {
+      const T = tg[best.target];
+      T.units.push(i);
+      if (best.turns === 1) T.damage += best.dealt;
+      S.holder = i;
+      S.holderTarget = best.target;
+    }
+    return occ;
+  };
+  const at = units.map(() => -1);
+  for (let j = 0; j < spots.length; j++) {
+    let pick = -1;
+    let top = 0;
+    for (let i = 0; i < units.length; i++) {
+      const w = at[i] === -1 || at[i] === j ? gain(i, j) : gain(i, j) - gain(i, at[i]);
+      if (pick < 0 || w > top) { pick = i; top = w; }
+    }
+    if (pick < 0 || top <= 0 || at[pick] === j) continue;
+    const occ = claim(pick, j, at[pick]);
+    at[pick] = j;
+    if (occ >= 0) at[occ] = -1;
+  }
+  const out: (Assigned | null)[] = units.map((u, i) => {
+    if (at[i] < 0) return null;
+    const S = spots[at[i]];
+    const c = S.claims.find((x) => x.unit === i && tg[x.target].units.includes(i));
+    if (!c) return null;
+    const T = tg[c.target];
+    return { unit: u, move: S.tile, attack: c.turns === 1 ? T.unit.tileIndex : -1, from: u.tileIndex,
+      damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN' };
+  });
+  return mergeSort(out, (a, b) => assignedBefore(state, a, b)).filter((a): a is Assigned => a !== null);
+}
+
+/** the order the assignments run in (0x7704e0): one with a spot before one
+ *  without; one whose spot is where the other stands after it, one standing
+ *  where the other's spot is before it; else the shorter move, at equal
+ *  lengths the less damaged unit, then the lower pool slot (the game compares
+ *  the unit IDs, whose low half is the slot) */
+function assignedBefore(state: GameState, a: Assigned | null, b: Assigned | null): boolean {
+  if (!a || !b) return !!a && !b;
+  if (a.move === b.from) return false;
+  if (a.from === b.move) return true;
+  const da = plotDistance(state, a.from, a.move);
+  const db = plotDistance(state, b.from, b.move);
+  if (da !== db) return da < db;
+  if (a.damage !== b.damage) return a.damage < b.damage;
+  return (a.unit.slot ?? 0) < (b.unit.slot ?? 0);
+}
+
+/** EASTL's merge sort with a buffer (0x76f0f0 -> 0x76f320): halves of n / 2,
+ *  each merge taking the second run's head only where it goes strictly first */
+function mergeSort<T>(a: T[], before: (x: T, y: T) => boolean): T[] {
+  if (a.length < 2) return a.slice();
+  const h = a.length >> 1;
+  const l = mergeSort(a.slice(0, h), before);
+  const r = mergeSort(a.slice(h), before);
+  const out: T[] = [];
+  let i = 0;
+  let k = 0;
+  while (i < l.length && k < r.length) out.push(before(r[k], l[i]) ? r[k++] : l[i++]);
+  while (i < l.length) out.push(l[i++]);
+  while (k < r.length) out.push(r[k++]);
+  return out;
+}
+
+/**
+ * THE ASSIGNMENT CARRIED OUT (0x771f80), in its order: every unit to its
+ * spot (a move order, again where it stopped short and no unit at war or of
+ * its own stands there); a siege unit strikes its attack; a ranged unit
+ * strikes it unless its melee is the stronger and it can reach the plot this
+ * turn; then every unit moves onto its attack (the attack flag) — a
+ * civilian taken, a fighter struck in melee; each one's turn done.
+ */
+function carryOut(state: GameState, pass: Pass, out: Assigned[]): void {
+  for (const a of out) {
+    const u = a.unit;
+    if (!state.units.includes(u) || u.tileIndex === a.move) continue;
+    moveTo(state, u, a.move);
+    if (state.units.includes(u) && u.tileIndex !== a.move && !enemyAt(state, u, a.move) && !stackedAt(state, u, a.move)) {
+      moveTo(state, u, a.move);
+    }
+  }
+  const strikeAt = (u: Unit, p: number) => {
+    if (p >= 0 && plotDistance(state, u.tileIndex, p) <= unitAttackRange(u) && attacksLeftOf(u) > 0) hostileRangedStrike(state, u, p);
+  };
+  for (const a of out) {
+    const u = a.unit;
+    if (a.civilian || !canAct(state, pass, u) || UNITS[u.type]?.bombard === undefined) continue;
+    strikeAt(u, a.attack);
+    u.movesLeft = 0;
+    finish(pass, u, 'Attack Units', a.move, a.attack);
+  }
+  for (const a of out) {
+    const u = a.unit;
+    if (a.civilian || !canAct(state, pass, u) || rangedStrength(u) <= 0) continue;
+    const melee = (UNITS[u.type]?.combat ?? 0) > rangedStrength(u)
+      && !!pass.reach.get(u.id)?.some((e) => e.tile === a.attack && e.turns <= 1);
+    if (melee) continue;
+    strikeAt(u, a.attack);
+    u.movesLeft = 0;
+    finish(pass, u, 'Attack Units', a.move, a.attack);
+  }
+  for (const a of out) {
+    const u = a.unit;
+    if (!state.units.includes(u)) continue;
+    if (a.attack >= 0 && canAct(state, pass, u)) moveTo(state, u, a.attack);
+    if (state.units.includes(u)) u.movesLeft = 0;
+    if (!pass.done.has(u.id)) finish(pass, u, 'Attack Units', a.move, a.attack);
+  }
+}
+
+/**
+ * ATTACK HIGH / MEDIUM / LOW PRIORITY (0x7784b0 with the target type; LOW
+ * takes the RELIGIOUS targets too): each target of the type in the list's
+ * order, its unit still on the map, the units that can strike its plot
+ * (`strikers`) assigned (`assignAttacks`) over the targets of its type
+ * within 5 of it, and the assignment carried out (`carryOut`).
+ */
+function attackUnits(state: GameState, pass: Pass, type: TargetType): void {
+  for (const e of pass.targets) {
+    if (e.type !== type && !(type === 'LOW' && e.type === 'RELIGIOUS')) continue;
+    const v = targetUnit(state, e);
+    if (!v) continue;
+    const units = strikers(state, pass, v.tileIndex);
+    if (!units.length) continue;
+    const near = pass.targets.filter((t) => t.type === e.type && targetUnit(state, t)
+      && plotDistance(state, t.unit!.tileIndex, v.tileIndex) <= ATTACK_TARGETS_RANGE);
+    carryOut(state, pass, assignAttacks(state, pass, units, near, type === 'HIGH'));
+  }
+}
+
 /** CHASE TARGET's reach of a target (0x775170, 8 plots) */
 const CHASE_SIGHT = 8;
 
@@ -963,13 +1496,12 @@ function wanderNearCamp(state: GameState, pass: Pass, homeOf: (u: Unit) => numbe
  * has taken damage (+0xcf0) is healed: a land unit holds its plot (it
  * fortifies, 0x95eae0, or sleeps, 0x9686d0); a naval one outside its own
  * territory heads for its player's nearest city (the first of equals), on
- * its own ground it holds. Its turn is done. The game skips a unit in a
- * formation (0x8be30) and one on a plot of danger (the influence map
- * 0x716a90 above 0), which the engines do not carry: every plot reads none.
+ * its own ground it holds. Its turn is done. An embarked unit (0x8be30)
+ * or on a plot of danger (`pass.danger` above 0, 0x716a90) is left.
  */
 function heal(state: GameState, pass: Pass): void {
   for (const u of pass.units) {
-    if (!live(state, pass, u) || u.hp >= UNIT_HP) continue;
+    if (!live(state, pass, u) || u.hp >= UNIT_HP || !!u.embarked || pass.danger[u.tileIndex] > 0) continue;
     if (UNITS[u.type]?.naval && tileSeat(state.map.tiles[u.tileIndex]) !== u.seat) {
       let best = -1;
       let bd = -1;
@@ -981,6 +1513,267 @@ function heal(state: GameState, pass: Pass): void {
     }
     finish(pass, u, 'Heal');
   }
+}
+
+/**
+ * Does the unit on a plot of danger `d` (> 0) flee — MOVE TO SAFETY's test
+ * (0x77a4b0), `hl` the homeland's (0x70f3b0)? One with no strength or
+ * embarked (0x8be30) does. A hurt one (+0xcf0): a barbarian's (0x56ee80)
+ * at sea does; else the tactical one with half its health or less lost
+ * (0x56e0d0) where its planning holds no blow that kills (+0x60, none
+ * without a planning), the homeland's with a quarter or more lost. A whole
+ * barbarian holds; any other whole one flees where `d` tops its strength —
+ * the larger of combat and ranged, by 20 (tactical); `unitDanger`, by 15
+ * (homeland).
+ */
+function flees(pass: Pass, u: Unit, d: number, hl: boolean): boolean {
+  const st = aiStrengths(u);
+  const ranged = st.ranged;
+  if (st.melee <= 0 && ranged <= 0 && st.bombard <= 0) return true;
+  if (u.embarked) return true;
+  const barb = isBarbSeat(u.seat);
+  const damage = UNIT_HP - u.hp;
+  if (damage > 0) {
+    if (barb && UNITS[u.type]?.naval) return true;
+    if (hl) return 4 * damage >= UNIT_HP;
+    if (2 * damage < UNIT_HP) return false;
+    return !pass.plan.get(u.id)?.wins;
+  }
+  if (barb) return false;
+  if (hl) return d > unitDanger(st.melee, ranged, st.bombard) + 15;
+  return d > Math.max(st.melee, ranged) + 20;
+}
+
+/**
+ * THE SAFE PLOT (InfluenceMap 0x716b90) for the unit: of its planning reach,
+ * the plots of this turn not `taken` already, none of its own units stacking
+ * with it there (0x585eb0, itself counted) and no unit at war with it
+ * (0x5861f0). Against the best so far, the first taken: a plot of no danger
+ * over one of danger; of two of no danger the player's own territory, else
+ * the one with less Movement left; of two in danger, on the player's own
+ * territory, its own over another's, then the lower danger, then less
+ * Movement left; off it, the lower danger, then the farther from the unit. A
+ * unit with no combat strength skips a water plot of danger while the best is
+ * on land. -1 none.
+ */
+function safePlot(state: GameState, pass: Pass, u: Unit, taken: ReadonlySet<number>): number {
+  const plan = pass.plan.get(u.id);
+  if (!plan) return -1;
+  const noCombat = aiStrengths(u).melee <= 0;
+  let best = -1;
+  let bSafe = false;
+  let bOwn = false;
+  let bWater = false;
+  let bDanger = 0;
+  let bMoves = 0;
+  let bDist = 0;
+  for (const r of plan.reach) {
+    if (r.turns > 1 || taken.has(r.tile)) continue;
+    if (stackedAt(state, u, r.tile) || enemyAt(state, u, r.tile)) continue;
+    const t = state.map.tiles[r.tile];
+    const d = pass.danger[r.tile];
+    const safe = d <= 0;
+    const own = tileSeat(t) === u.seat;
+    const water = isWater(t);
+    const dist = plotDistance(state, u.tileIndex, r.tile);
+    if (best >= 0) {
+      if (!bWater && noCombat && water && d > 0) continue;
+      let take: boolean;
+      if (safe) take = !bSafe || (own && !bOwn) || r.moves < bMoves;
+      else if (own) take = !bSafe && (!bOwn || d < bDanger || (d === bDanger && r.moves < bMoves));
+      else take = d < bDanger || (d === bDanger && dist > bDist);
+      if (!take) continue;
+    }
+    best = r.tile;
+    bSafe = safe;
+    bOwn = own;
+    bWater = water;
+    bDanger = d;
+    bMoves = r.moves;
+    bDist = dist;
+  }
+  return best;
+}
+
+/**
+ * MOVE TO SAFETY (0x77a4b0, its moves 0x774190): each unit left on a plot of
+ * danger that flees (`flees`) is listed ("Move to safety", its danger
+ * logged), then each in turn goes to its safe plot (`safePlot`, the plots
+ * the ones before it took left out), its turn done (0x773fb0); one with no
+ * safe plot stays for the moves after.
+ */
+function moveToSafety(state: GameState, pass: Pass): void {
+  const list = pass.units.filter((u) => live(state, pass, u) && pass.danger[u.tileIndex] > 0
+    && flees(pass, u, pass.danger[u.tileIndex], false));
+  const taken = new Set<number>();
+  for (const u of list) {
+    if (!live(state, pass, u)) continue;
+    const p = safePlot(state, pass, u, taken);
+    if (p < 0) continue;
+    taken.add(p);
+    moveTo(state, u, p, false);
+    finish(pass, u, 'Move to safety', p);
+  }
+}
+
+/**
+ * THE HOMELAND'S MOVE TO SAFETY (0x70f3b0, each unit 0x70bf90): each unit
+ * left on a plot of danger that flees (`flees`, the homeland's test) goes to
+ * its safe plot (`safePlot`, the plots the ones before it took left out);
+ * with none a barbarian fortifies where it stands ("Fortify in place"), any
+ * other stays for the moves after.
+ */
+function homelandSafety(state: GameState, pass: Pass): void {
+  const taken = new Set<number>();
+  for (const u of pass.units) {
+    if (!live(state, pass, u)) continue;
+    const d = pass.danger[u.tileIndex];
+    if (d <= 0 || !flees(pass, u, d, true)) continue;
+    const p = safePlot(state, pass, u, taken);
+    if (p >= 0) {
+      taken.add(p);
+      moveTo(state, u, p, false);
+      finish(pass, u, 'HL: Move To Safety', p);
+    } else if (isBarbSeat(u.seat)) finish(pass, u, 'HL: Move To Safety', u.tileIndex);
+  }
+}
+
+/** EXPLORE LAND's rounds over the homeland's units (0x70ce90: three at most) */
+const EXPLORE_ROUNDS = 3;
+
+/** the plots the player revealed (its `explored`; none tracked: every plot) */
+function revealedOf(state: GameState, seat: number): (i: number) => boolean {
+  const ex = seatOf(state, seat)?.explored;
+  return (i) => !ex || ex.length === 0 || ex[i] === 1;
+}
+
+/** may the explorer go to the plot (0x70bd40): not its own; one its player
+ *  revealed; another player's ground only at war with it; no unit on it
+ *  (+0x4c); on its own area unless it embarks (the barbarians never), a
+ *  hull on water; no city centre but its player's */
+function exploreOk(state: GameState, u: Unit, p: number, revealed: (i: number) => boolean): boolean {
+  if (p === u.tileIndex || !revealed(p)) return false;
+  const t = state.map.tiles[p];
+  const owner = tileSeat(t);
+  if (owner !== NO_SEAT && owner !== u.seat && !unitsHostile(state, u, { seat: owner })) return false;
+  if (state.units.some((x) => x.tileIndex === p && onMap(x))) return false;
+  const naval = !!UNITS[u.type]?.naval;
+  const here = state.map.tiles[u.tileIndex];
+  if ((t.area ?? -1) !== (here.area ?? -1) && !(canEmbark(state, u) && !isBarbSeat(u.seat)) && (!naval || !isWater(t))) return false;
+  return !(t.district === 'CITY_CENTER' && owner !== u.seat);
+}
+
+/** the nearest plot the unit's player never revealed that the set takes and
+ *  the unit may enter, no unit on it (0x70b6f0, 0x70b550: plots in index
+ *  order, the first of equals); -1 none */
+function nearestUnrevealed(state: GameState, u: Unit, revealed: (i: number) => boolean, inSet: (t: Tile) => boolean): number {
+  const ground = groundOf(state, u, false);
+  let best = -1;
+  let bd = Infinity;
+  for (const t of state.map.tiles) {
+    if (!inSet(t) || revealed(t.index)) continue;
+    const d = plotDistance(state, u.tileIndex, t.index);
+    if (d >= bd || state.units.some((x) => x.tileIndex === t.index && onMap(x)) || !ground.enter(t)) continue;
+    best = t.index;
+    bd = d;
+  }
+  return best;
+}
+
+/**
+ * HL EXPLORE (0x70aa40) for one explorer: of the plots its search of this
+ * turn closes (0x26df90 on its Movement left) with no danger, none chosen
+ * this move and one it may go to (`exploreOk`), the one whose sight (the
+ * plots within its sight it sees from there, `canSee`) holds the most plots
+ * its player never revealed (0x70a6c0, the first of equals, above 0); else,
+ * on the move's first round, the nearest unrevealed plot of its region
+ * where the player has not revealed all of it ("cur region", a path to it
+ * existing; a unit off any region the nearest of its area, "cur area");
+ * else the plot whose sight holds the most plots the player does not see
+ * now (0x70a8b0, "fallback"). The unit's own plot joins the chosen.
+ */
+function exploreTarget(state: GameState, pass: Pass, u: Unit, chosen: Set<number>, first: boolean,
+  revealed: (i: number) => boolean, seenNow: Uint8Array): { plot: number; move: string } | null {
+  const { map } = state;
+  const sight = unitSight(u, state);
+  const look = (p: number) => {
+    const t = map.tiles[p];
+    return tilesWithin(map, t.col, t.row, sight).filter((q) => canSee(map, t, q, false)).map((q) => q.index);
+  };
+  let best1 = -1;
+  let v1Best = 0;
+  let best2 = -1;
+  let v2Best = 0;
+  search(state, u, 1, false, (n, ground) => {
+    const p = n.tile;
+    if (!ground.stand(p) || pass.danger[p] > 0 || chosen.has(p) || !exploreOk(state, u, p, revealed)) return false;
+    const seen = look(p);
+    const v1 = seen.filter((q) => !revealed(q)).length;
+    const v2 = seen.filter((q) => !seenNow[q]).length;
+    if (v1 > v1Best) {
+      best1 = p;
+      v1Best = v1;
+    }
+    if (best2 < 0 || v2 > v2Best) {
+      best2 = p;
+      v2Best = v2;
+    }
+    return false;
+  });
+  chosen.add(u.tileIndex);
+  if (best1 >= 0) return { plot: best1, move: 'HL: Explore' };
+  if (!first) return null;
+  const here = map.tiles[u.tileIndex];
+  const reg = here.region ?? -1;
+  if (reg >= 0) {
+    if (map.tiles.some((t) => t.region === reg && !revealed(t.index))) {
+      const p = nearestUnrevealed(state, u, revealed, (t) => t.region === reg);
+      if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore cur region' };
+    }
+  } else {
+    const area = here.area ?? -1;
+    const p = nearestUnrevealed(state, u, revealed, (t) => (t.area ?? -1) === area);
+    if (p >= 0 && !chosen.has(p) && pathTo(state, u, p).length) return { plot: p, move: 'HL: Explore cur area' };
+  }
+  return best2 >= 0 ? { plot: best2, move: 'HL: Explore fallback' } : null;
+}
+
+/**
+ * EXPLORE LAND (0x70ce90): up to three rounds over the homeland's units in
+ * pool order, each round's moves carried out together as it ends (0x70a440)
+ * and another round only where one moved: each unit of AI type EXPLORE with
+ * Movement left and no more than half its health lost — in a later round
+ * one standing where its last move was for — takes its target
+ * (`exploreTarget`, the fallbacks on the first round alone), the target
+ * joining the chosen, and moves to it (0x962030); the move it first took
+ * names its turn.
+ */
+function exploreLand(state: GameState, pass: Pass): void {
+  const revealed = revealedOf(state, pass.seat);
+  const chosen = new Set<number>();
+  const went = new Map<number, number>();
+  const firstMove = new Map<Unit, { move: string; plot: number }>();
+  for (let round = 1; round <= EXPLORE_ROUNDS; round++) {
+    const seenNow = plotsSeenNow(state, new Set([pass.seat]));
+    const moves: { u: Unit; plot: number; move: string }[] = [];
+    for (const u of pass.units) {
+      if (!live(state, pass, u) || pass.ai.get(u.id) !== AI_EXPLORE || u.movesLeft <= 0) continue;
+      if (UNIT_HP - u.hp > UNIT_HP >> 1) continue;
+      const last = went.get(u.id);
+      if (last !== undefined && u.tileIndex !== last) continue;
+      const t = exploreTarget(state, pass, u, chosen, round === 1, revealed, seenNow);
+      if (!t) continue;
+      chosen.add(t.plot);
+      moves.push({ u, ...t });
+    }
+    for (const m of moves) {
+      moveTo(state, m.u, m.plot, false);
+      if (!firstMove.has(m.u)) firstMove.set(m.u, { move: m.move, plot: m.plot });
+      went.set(m.u.id, m.plot);
+    }
+    if (!moves.length) break;
+  }
+  for (const [u, m] of firstMove) finish(pass, u, m.move, m.plot);
 }
 
 /** WANDER NEAR CITY's radius (0x77bf50: the plots within 5 of the city) */
@@ -1067,11 +1860,11 @@ function minorAiTypeOf(u: Unit): number {
  * (`poolSlots`, slot 0 its founding Settler's), each unit's planning reach
  * taken before any moves, its tactical target list, then the moves in the
  * list's order, each walking the units the moves before it left, in pool
- * order — Support Formation, Attack High Priority, Move to Safety, Attack
- * Medium Priority, Attack Civilians, Promotion, Make Military Formation and
- * Attack Low Priority not ported (the attacks need the combat prediction,
- * Move to Safety the influence map), Heal, Chase Target (no strike), Wander
- * Near City; the homeland's End Turn takes the rest.
+ * order — Attack High Priority, Move to Safety, Attack Medium Priority,
+ * Attack Low Priority, Heal, Chase Target (no strike), Wander Near City
+ * (Support Formation, Attack Civilians, Promotion and Make Military
+ * Formation not ported); the homeland's Move to Safety, then its End Turn
+ * takes the rest.
  */
 export function cityStateTactics(state: GameState, cityState: CityState): void {
   const pool = (cityState.unitPool ??= { size: 1, free: [], dying: [] });
@@ -1079,9 +1872,14 @@ export function cityStateTactics(state: GameState, cityState: CityState): void {
   costsHeld = new Map();
   try {
     const pass = openPass(state, cityState.seat, minorAiTypeOf);
+    attackUnits(state, pass, 'HIGH');
+    moveToSafety(state, pass);
+    attackUnits(state, pass, 'MEDIUM');
+    attackUnits(state, pass, 'LOW');
     heal(state, pass);
     chaseTarget(state, pass);
     wanderNearCity(state, pass, cityState.centerIndex);
+    homelandSafety(state, pass);
     for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
   } finally {
     costsHeld = null;
@@ -1092,10 +1890,10 @@ export function cityStateTactics(state: GameState, cityState: CityState): void {
 /**
  * THE FREE CITIES' TACTICAL TURN (their "FreeCitiesTactics" and
  * "FreeCitiesHomeland" lists, Expansion1_Leaders.xml): their unit pool, then
- * Attack High Priority, Attack Medium Priority, Move to Safety and Attack
- * Low Priority not ported, Wander Near Camp — the camp their signals answer
- * (0x771250, unread for them) read as the unit's Free City, else the
- * nearest — and the homeland's End Turn.
+ * Attack High Priority, Attack Medium Priority, Move to Safety, Attack Low
+ * Priority, Wander Near Camp — the camp their signals answer (0x771250,
+ * unread for them) read as the unit's Free City, else the nearest — and the
+ * homeland's End Turn.
  */
 export function freeCityTactics(state: GameState): void {
   const free = state.freeSeat;
@@ -1105,6 +1903,10 @@ export function freeCityTactics(state: GameState): void {
   costsHeld = new Map();
   try {
     const pass = openPass(state, FREE_SEAT, minorAiTypeOf);
+    attackUnits(state, pass, 'HIGH');
+    attackUnits(state, pass, 'MEDIUM');
+    moveToSafety(state, pass);
+    attackUnits(state, pass, 'LOW');
     wanderNearCamp(state, pass, (u) => freeHome(state, u));
     for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
   } finally {
@@ -1134,15 +1936,19 @@ function openPass(state: GameState, seat: number, aiOf: (u: Unit) => number): Pa
   const units = state.units.filter((u) => u.seat === seat && aiOf(u) >= 0).sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
   for (const u of units) ai.set(u.id, aiOf(u));
-  const reach = new Map<number, Reach[]>();
-  for (const u of units) reach.set(u.id, reachPlots(state, u, PLAN_TURNS));
   const targets = tacticalTargets(state, seat, plotsSeenNow(state, new Set([seat])), null);
-  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan: new Map() };
+  const reach = new Map<number, Reach[]>();
+  const plan = new Map<number, Planner>();
+  for (const u of units) {
+    const p = planUnit(state, u, targets);
+    plan.set(u.id, p);
+    reach.set(u.id, p.reach);
+  }
+  return { seat, strike: false, units, reach, done: new Set(), ai, targets, plan, danger: dangerPlane(state, seat) };
 }
 
 /** the units a stand-in still moves, at the game's moves not yet ported: one
- *  an operation took (its raid), one with a target beside it (Attack Units),
- *  a scout (Explore) */
+ *  an operation took (its raid), a scout (Explore) */
 function standIn(state: GameState, pass: Pass, move: string, pick: (u: Unit, tr: BarbTribe | undefined) => boolean): void {
   // the stand-in walks the units in the order the engine made them
   const mine = new Set(pass.units);
@@ -1175,36 +1981,51 @@ export function barbarianTactics(state: GameState, acting: ReadonlySet<number>):
 }
 
 function tacticalPass(state: GameState, acting: ReadonlySet<number>): void {
-  const units = state.units.filter((u) => isBarbSeat(u.seat) && acting.has(u.id))
+  const all = state.units.filter((u) => isBarbSeat(u.seat) && acting.has(u.id))
     .sort((a, b) => (a.slot ?? 0) - (b.slot ?? 0));
   const ai = new Map<number, number>();
-  for (const u of units) ai.set(u.id, aiTypeOf(state, u));
-  const reach = new Map<number, Reach[]>();
-  for (const u of units) if (ai.get(u.id)! >= AI_EXPLORE) reach.set(u.id, reachPlots(state, u, PLAN_TURNS));
+  for (const u of all) ai.set(u.id, aiTypeOf(state, u));
+  // an operation's units are the operation's
+  const opUnits = new Set<number>();
+  for (const tr of state.barbTribes ?? []) for (const id of tr.op?.units ?? []) opUnits.add(id);
+  const units = all.filter((u) => !opUnits.has(u.id) && tacticalUnit(state, u, ai.get(u.id)!));
   const seen = plotsSeenNow(state, new Set([BARB_SEAT]));
   const ex = state.barbSeat.explored;
   const targets = tacticalTargets(state, BARB_SEAT, seen, ex.length ? ex : null);
-  const pass: Pass = { seat: BARB_SEAT, strike: true, units, reach, done: new Set(), ai, targets, plan: new Map() };
-  // an operation's units are the operation's, not the pass's
-  const opUnits = new Set<number>();
-  for (const tr of state.barbTribes ?? []) for (const id of tr.op?.units ?? []) opUnits.add(id);
+  const reach = new Map<number, Reach[]>();
+  const plan = new Map<number, Planner>();
+  for (const u of all) {
+    if (ai.get(u.id)! < AI_EXPLORE) continue;
+    const p = planUnit(state, u, targets);
+    plan.set(u.id, p);
+    reach.set(u.id, p.reach);
+  }
+  const pass: Pass = { seat: BARB_SEAT, strike: true, units, reach, done: new Set(), ai, targets, plan,
+    danger: dangerPlane(state, BARB_SEAT) };
+  pass.units = all;
   standIn(state, pass, 'Operation', (u) => opUnits.has(u.id));
   for (const id of opUnits) pass.done.add(id);
+  pass.units = units;
   rampage(state, pass);
-  // Attack High Priority
-  standIn(state, pass, 'Attack Units', (u) => (pass.ai.get(u.id) ?? -1) >= AI_COMBAT && attackTargets(state, u).length > 0);
+  attackUnits(state, pass, 'HIGH');
   defendCamps(state, pass);
   attackCivilians(state, pass);
   plunderTraders(state, pass);
   pillage(state, pass, true);
   pillage(state, pass, false);
+  attackUnits(state, pass, 'MEDIUM');
+  moveToSafety(state, pass);
+  attackUnits(state, pass, 'LOW');
   chaseTarget(state, pass);
   wanderNearCamp(state, pass, (u) => {
     const tr = tribeOf(state, u.id);
     return tr?.alive ? tr.plot : -1;
   });
-  // Explore Land (the homeland list)
-  standIn(state, pass, 'HL: Explore', (u) => pass.ai.get(u.id) === AI_EXPLORE);
+  // THE HOMELAND ("Default Barbarian HL") takes every unit left: Move To
+  // Safety, Explore Land
+  pass.units = all;
+  homelandSafety(state, pass);
+  exploreLand(state, pass);
   // End Turn: the rest stand
   for (const u of pass.units) if (live(state, pass, u)) finish(pass, u, 'HL: End Turn');
 }
