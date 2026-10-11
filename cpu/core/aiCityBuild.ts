@@ -34,7 +34,8 @@
  */
 import { AI_BUILDINGS, AI_PROJECTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_VALUE_HORIZON } from '../data/aiValue';
-import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
+import { FX, FX_MIN, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, yieldValue, AI_RATE, type AiValueView } from './aiValue';
+import type { UnitProductionEntry } from './aiUnitProduction';
 import { AMENITY_TIERS, amenityTier, growthFoodNeeded, housingGrowthFactor } from '../data/constants';
 import { AI_YIELD_DEFAULT } from '../data/aiTables';
 import { modifiersValue, type AiModifier } from './aiModifiers';
@@ -134,6 +135,24 @@ export interface CityBuildFacts {
   tribe: boolean;
   /** the player's units (its unit list's count, player +0x12e8 +0xc0) */
   unitCount: number;
+  /** the military AI's unit production table (`aiUnitProduction.ts`) */
+  unitProduction: ReadonlyMap<string, UnitProductionEntry>;
+  /** the city trains units of the domain (0x17d660: a sea unit at a
+   *  coastal city) */
+  trainsDomain(domain: string): boolean;
+  /** the count 0x7b62c0 adds half of to a combat unit stronger than the
+   *  player's trade capacity (player +0x12f0 +0xc0; none at a city-state:
+   *  runs/h1_duelv1124 Cardiff's Warrior reads its table value alone) */
+  combatCount: number;
+  /** the city's extra copies of a unit it trains (0x179dd0) */
+  extraCopies(unit: string): number;
+  /** the promotion class weight (0x723bb0), raw */
+  promotionWeight(promotionClass: string | null): number;
+  /** the player holds the strategic resource, or a city of its has it near
+   *  (0x4aa790, 0x5d45c0) */
+  resourceAccess(resource: string): boolean;
+  /** the player's handicap index (player +0x908) */
+  handicap: number;
 }
 
 /** 0x7b62c0's exits, A UNIT VALUED AT FX(-9999): at or past the horizon;
@@ -372,16 +391,20 @@ export function buildingValue(f: CityBuildFacts, b: AiBuildingRow, t: number, h 
     for (const c of cities) e += valueBetween(amenityPerTurn(f, c), t, h);
     value += b.regionalRange <= 1 ? e : Math.min(e, 50 * FX);
   }
-  // its free units (Unit_BuildingPrereqs) but an Archaeologist, each at its
-  // unit value
-  for (const u of b.units) if (u !== 'UNIT_ARCHAEOLOGIST') value += unitValueExit(f, u, t, h) ?? 0;
+  // its units (Unit_BuildingPrereqs) but an Archaeologist, each at its unit
+  // value (`unitValue`; a unit whose value is not read counts its exits)
+  for (const u of b.units) {
+    if (u === 'UNIT_ARCHAEOLOGIST') continue;
+    value += unitValue(f, AI_UNITS[AI_UNIT_INDEX.get(u)!], t, h) ?? unitValueExit(f, u, t, h) ?? 0;
+  }
   if (b.housing > 0) value += housingValue(f.growth, growthForecast(f.growth), b.housing, t, h);
   value += modifiersValue({ view: f.view, seat: f.seat, start: t, horizon: h, rate: AI_RATE, owner: { cityId: f.cityId, capital: f.capital } },
     b.modifiers);
   return value;
 }
 
-/** One Units row as the Default Specialization pick reads it */
+/** One Units row as the unit value and the Default Specialization pick read
+ *  it (ai_tables.py) */
 export interface AiUnitRow {
   type: string;
   foundCity: boolean;
@@ -390,6 +413,109 @@ export interface AiUnitRow {
   combat: number;
   /** TypeTags CLASS_RECON */
   recon: boolean;
+  rangedCombat: number;
+  bombard: number;
+  antiAir: number;
+  range: number;
+  moves: number;
+  maintenance: number;
+  cost: number;
+  domain: string;
+  /** FormationClass FORMATION_CLASS_CIVILIAN */
+  civilian: boolean;
+  pseudo: string | null;
+  promotionClass: string | null;
+  /** StrategicResource */
+  resource: string | null;
+  trait: string | null;
+  tech: string | null;
+  civic: string | null;
+  district: string | null;
+  /** the Mandatory / plain ObsoleteCivic and ObsoleteTech */
+  obsolete: readonly string[];
+  /** Unit_BuildingPrereqs */
+  buildings: readonly string[];
+  spy: boolean;
+  wmd: boolean;
+  religiousStrength: number;
+  spreadCharges: number;
+  healCharges: number;
+  parkCharges: number;
+  canTrain: boolean;
+  /** Units_XP2 */
+  majorOnly: boolean;
+  maintenanceResource: string | null;
+  maintenanceResourceAmount: number;
+  resourceCost: number;
+}
+
+export const AI_UNIT_INDEX: ReadonlyMap<string, number> = new Map(AI_UNITS.map((u, i) => [u.type, i]));
+
+const COMBAT_PSEUDO = new Set(['PSEUDOYIELD_UNIT_COMBAT', 'PSEUDOYIELD_UNIT_NAVAL_COMBAT', 'PSEUDOYIELD_UNIT_AIR_COMBAT']);
+
+/** 0x5ce970's turns for a unit: the longer of the turns to its technology
+ *  and to its civic, the turns to train it, +10 while the city produces
+ *  something else */
+export function unitTurns(f: CityBuildFacts, u: AiUnitRow): number {
+  let t = Math.max(u.tech ? f.techTurns(u.tech) + 5 : 0, u.civic ? f.civicTurns(u.civic) + 5 : 0);
+  if (!u.mustPurchase) t += f.buildTurns(u.type);
+  if (!u.mustPurchase && f.current !== null && f.current !== u.type) t += 10;
+  return t;
+}
+
+/** 0x7b62c0, A UNIT'S VALUE landing in `t` turns, to horizon `h`: past the
+ *  exits (`unitValueExit`, a domain the city cannot train) by its
+ *  pseudo-yield — a combat unit (PSEUDOYIELD_UNIT_COMBAT, the default, or a
+ *  naval or air one) the military AI's table value (x3 for an entry
+ *  obsolete to the player), plus half the count player +0x12f0 +0xc0 holds where its Combat exceeds the
+ *  player's trade route capacity; an explorer, settler or spy 1.0 plus the
+ *  eras' points as PSEUDOYIELD_GOLDENAGE_POINT; a Trader its worth
+ *  (`traderValue`) through PSEUDOYIELD_UNIT_TRADE — then x (the city's extra
+ *  copies + 1) x the promotion class weight, 0 outright for a strategic
+ *  resource the player cannot reach, through its pseudo-yield, less its
+ *  Maintenance as Gold below handicap 3, paid from `t` to `h`. Null where a
+ *  term it needs is not read (a religious unit, an Archaeologist, a WMD,
+ *  an air unit, a unit with a Units_XP2 maintenance resource, ParkCharges). */
+export function unitValue(f: CityBuildFacts, u: AiUnitRow, t: number, h = AI_VALUE_HORIZON): number | null {
+  const exit = unitValueExit(f, u.type, t, h);
+  if (exit !== null) return exit;
+  if (!f.trainsDomain(u.domain)) return FX_MIN;
+  const pseudo = u.pseudo ?? 'PSEUDOYIELD_UNIT_COMBAT';
+  let v = 0;
+  if (COMBAT_PSEUDO.has(pseudo)) {
+    if (pseudo === 'PSEUDOYIELD_UNIT_AIR_COMBAT') return null;
+    const e = f.unitProduction.get(u.type);
+    v = e?.value ?? 0;
+    if (e?.obsolete) v = fmul(v, 3 * FX);
+    if (u.combat > f.view.tradeRouteCapacity(f.seat)) v += fxConst(f.combatCount * 0.5);
+  } else if (pseudo === 'PSEUDOYIELD_UNIT_TRADE') {
+    const tv = traderValue(f.view, f.seat, 0, t, h);
+    if (tv === null) return null;
+    v = pseudoYieldValue(f.view, f.seat, tv, pseudo);
+  } else if (pseudo === 'PSEUDOYIELD_UNIT_EXPLORER' || pseudo === 'PSEUDOYIELD_UNIT_SETTLER' || pseudo === 'PSEUDOYIELD_UNIT_SPY') {
+    // the eras' points (0x2c43b0) are not read: none for a player outside
+    // the eras record (a city-state)
+    if (f.fullCiv) return null;
+    v = FX;
+  } else {
+    return null;
+  }
+  if (u.wmd || u.maintenanceResource || u.parkCharges > 0) return null;
+  v = fmul(v, (f.extraCopies(u.type) + 1) * FX);
+  v = fmul(v, f.promotionWeight(u.promotionClass));
+  if (u.resource && !f.resourceAccess(u.resource)) return 0;
+  v = pseudoYieldValue(f.view, f.seat, v, pseudo);
+  if (f.handicap < 3) v -= yieldValue(null, null, Math.max(0, u.maintenance) * FX, 'YIELD_GOLD');
+  return presentValue(v, AI_RATE, h) - presentValue(v, AI_RATE, t);
+}
+
+/** THE UNITS TABLE of the city centre (0x5ce970's unit loop): a raw value per
+ *  Units row in database order; null where the value is not read */
+export function unitTable(f: CityBuildFacts): (number | null)[] {
+  return AI_UNITS.map((u) => {
+    const t = unitTurns(f, u);
+    return t < 0 ? FX_MIN : unitValue(f, u, t);
+  });
 }
 
 /** The city centre's value tables (raw, database order) */

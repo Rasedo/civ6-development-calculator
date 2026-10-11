@@ -3473,15 +3473,7 @@ building tables).
   the third power, each product truncated (a = n r, c = n(n-1) r^2, e =
   n(n-1)(n-2) r^3; s = a + c/2 + e fx(1/6)), PV = (s v) / max(r (1 + s),
   fx(0.01)).
-- A unit's value 0x7b62c0: a combat unit (PSEUDOYIELD_UNIT_COMBAT, _NAVAL_,
-  _AIR_) takes the military AI's unit value 0x79ca90 (player AI +0x1290
-  +0x268), x3 when 0x79d2d0 holds, + 0.5 x (player +0x12f0 +0xc0) when its
-  era (Units +0x48) is past the player's (0x4d9320), x (the city's extra
-  copies + 1), x the promotion class weight 0x723bb0 (AiFavoredItems
-  UnitPromotionClasses: MinorCivUnitBuilds RECON -100), through its
-  pseudo-yield, less its Gold maintenance below handicap 3 (player +0x908),
-  then the PV difference; a Trader 0x7a7110 (PSEUDOYIELD_UNIT_TRADE);
-  religious units by their charges and spread.
+- A unit's value 0x7b62c0: the section "C-96 / C-97: the unit value".
 - SETTLED (the present value, on the PLOT ANALYSIS LOG tables of the verbose
   recordings, every building at every T): the shipped routine at rate 4.0 to
   the horizon 50, as called. A city-state's Monument logs X + trunc(X), X =
@@ -3577,11 +3569,10 @@ building tables).
   T to min(T + 30, H) (one discounted turn where they meet), plus a route's
   era score (0x2c4470: the eras record's +0x44, none for a city-state) as
   PSEUDOYIELD_GOLDENAGE_POINT, x4; the analysis reads the K the turn before
-  logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T). The
-  military AI's unit table is built by 0x78e0a0 (entries 0x168 bytes, the
-  value at +0x160, sorted by 0x796070; per known city of the knowledge base
-  +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0); 0x79ca90
-  reads it (0 for a unit it lacks).
+  logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+  0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes'
+  yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the
+  unit table: that is 0x7989e0 (the section "C-96 / C-97: the unit value").
 - HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth
   +0x1788, the rate, population, Housing, T, H): S = the Food surplus less
   the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing
@@ -3644,7 +3635,7 @@ building tables).
   Temple (0%: the Warrior Monk's unit value, a combat unit's). The city's
   percent on a yield (city +0xbc0) is the modifiers' alone, not the
   happiness level's (1127: 477 -> 801 within 0.005).
-- Unread: the military unit table (0x78e0a0) and the unit value's tail, the
+- Unread: the knowledge base's army records and the Combat Desire's strengths (the unit value's inputs), the
   project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries'
   amenities over the player's cities, strategics over the units needing
   them) with CityBuildAI +0x978's counts (0x5d45c0), the events (0x5cd150,
@@ -3653,6 +3644,116 @@ building tables).
   0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellation
   0x5d7640 ("Canceling current build"). About 224 KB of code reaches from
   0x5ce680 and 0x5ce970.
+
+## C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)
+
+`unitValue` / `unitTurns` / `unitTable` in `cpu/core/aiCityBuild.ts`,
+`unitProductionTable` in `cpu/core/aiUnitProduction.ts`; the efficiency
+table `AI_UNIT_EFFICIENCY` in `cpu/data/aiBuildTables.ts`
+(tools/install/ai_tables.py). Check: `cpu/harness/cityBuildLab.ts` (the UNITS
+rows; `--kb -1` the knowledge base of the turn before, `--enginekb` /
+`--nodesire` the engine's own inputs).
+
+- THE TURNS (0x5ce970's unit loop, 0x5cf360..0x5cf6ac): FX(-9999) where the
+  CityBuildAI's CanTrain 0x172820 (the player AI +0x12a0 +0xba8 flag set)
+  refuses; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5,
+  the civics AI's 0x621920 to PrereqCivic + 5) — the +5 (`lea ebx, [rax+5]`)
+  whenever the column is set, the technology held or not —, then the least
+  of the Unit_BuildingPrereqs buildings' turns (+0x258), then, but for
+  MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the
+  city builds another item; negative T values FX(-9999). Measured: the
+  units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows
+  before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike).
+- THE VALUE 0x7b62c0 (out, unit, &rate, T, H, player, city): T >= H, a unit
+  not the player's version (player +0x12e8 +0x1c0), a domain the city cannot
+  train (0x17d660), a non-full, non-tribe player at peace with more than five
+  units, a Spy for a non-full player -> FX(-9999). By the pseudo-yield
+  (Units +0x290, PSEUDOYIELD_UNIT_COMBAT where none):
+  COMBAT / NAVAL / AIR: the military AI's unit production value 0x79ca90
+  (player AI +0x1290 +0x268: a linear find in its 0x168-byte entries, +0x160;
+  0 for a unit it lacks), x3.0 where the entry's obsolete flag (+0x08,
+  0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48)
+  exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such
+  term (its count read 0); AIR + 30.0 where its PrereqDistrict (+0x278) in
+  the city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a
+  city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no
+  RangedCombat (+0x6c). TRADE: 0x7a7110 through PSEUDOYIELD_UNIT_TRADE.
+  RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadCharges (+0x7c) or
+  ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority
+  religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges
+  +0x64, Units_XP2 TourismBomb). ARCHAEOLOGIST: min(artifacts / 56, 10) and
+  the eras' points. EXPLORER / SETTLER / SPY: 1.0 + the eras' points
+  (0x2c43b0) as PSEUDOYIELD_GOLDENAGE_POINT. THE TAIL (0x7b709f): WMDCapable
+  (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1,
+  0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288:
+  1.0 with none; 0 where the class's base +0x708 is 0 — a city-state's RECON,
+  MinorCivUnitBuilds -100 —; else max(base + the +0x778 term, 0.1)); a
+  StrategicResource (+0x2c8) the player holds none of (0x4aa790 ownerships
+  0 and 1) and no city counts near it (CityBuildAI +0x978, 0x5d45c0) ->
+  0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player
+  +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)
+  as Gold — measured 0.5 a Maintenance at a city-state, the unweighted
+  DefaultValue (1124 t28 Archer 431 -> 304, Spearman 290 -> 161 raw); then
+  PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges'
+  tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2
+  ResourceMaintenanceType (+0x50) whose stockpile is out zeroes the value
+  before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
+- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from
+  0x6fae70 at the player AI's turn while 0x79d320 — the built flag +0x28 —
+  is clear): entries, in the Units' order, for each unit the player's version
+  of itself, an obsolete one (0x538460: MandatoryObsoleteCivic +0x238 /
+  Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player
+  holds one (0x4f2c90), a unit not yet trainable only where the player
+  signal +0x168 (0x79ba50) answers; per entry its flags (+0x08 obsolete,
+  +0x0b Units +0x1ba bit 128, +0x0c TraitType +0x2d0, +0x0e a held strategic
+  resource), Cost +0x38, Range +0x68, max(Combat, RangedCombat), Combat, the
+  Units_XP2 maintenance resource and amount, and a per-player vector of 64.
+  The opposition: per Units row of Combat above 0 not obsolete to the player
+  with a combat pseudo-yield (or none), over the player list (0x483b50
+  +0x4a0) the knowledge base's count of it (CivKnowledge 0x5eb650: the
+  player's army records, AI_Knowledge.csv's ARMY lines "UNIT_X count age"),
+  N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums
+  count x efficiency[that row][the entry] (GlobalAI +0x3c8: raw, row the
+  opposing unit), +0x2c the at-war counts, the per-player vector likewise.
+  With N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940,
+  truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the
+  maintenance resource scales it; the player's units of each type counted
+  into +0x20; sorted by 0x79d3a0 (+0x0e, +0x2c, +0x30, strength). The
+  value 0x799b9d computes from the player's counts (+0x510, +0x4a0) feeds
+  asserts only. The city hook 0x79a320 copies the table per city, the
+  +0x2c / +0x30 times the extra copies.
+- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, "Could not
+  find a neutral player"): per pair of Units rows both without strength
+  (max(Combat, RangedCombat, Bombard) 0 and AntiAirCombat 0) 1.0; one
+  without against one with 0.01 / 100.0; else two combat simulations
+  (0x205720) of the neutral player's units, each attacking the other: the
+  damage each takes in both (+0x7c / +0xc4 words), 100 / damage the
+  exchanges to kill, a range advantage ((Range - 1) / the other's moves,
+  rounded up) added where the domains match, AntiAirCombat terms against
+  air; M[a][b] = a's exchanges-to-die over b's. Logged once a game as
+  AI_UnitEfficiency.csv (", %3.2f"), the same in every recording; the port
+  reads that table at its 0.01 (the job is unported).
+- THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee)
+  writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its strengths
+  (+0x398 its own, +0x3f8 the enemy's, +0x458 the others', logged as
+  AI_Military.csv's Regional / Enemy / Other Strength) — below the enemy's
+  (enemy - own) x @0xd55ff0, below a target (target - own) / +0xd8, 20 past
+  the enemy a negative term toward the others' with caps 2.0 / 3.0 —,
+  clamped against +0x7e8, at most 2.0 at peace (+0x4b8 clear), plus the
+  cities' CityBuildAI +0x2d8 as PSEUDOYIELD_STANDING_ARMY. Logged as
+  AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior
+  10.73 -> 11.05 at the same table value; 0.6 at t13 x1.6).
+- MEASURED (`cityBuildLab.ts --logtech --kb -1` over the five verbose
+  duels, every city-state centre UNITS row, the knowledge base of the turn
+  before from AI_Knowledge.csv and the turn's Combat Desire from
+  AI_Military.csv): 59,767 logged values, 57,247 valued by both, 32,988 within
+  0.005 (Scout 2,385 / 2,385, Builder 2,299, Warrior 2,059, Slinger 2,060,
+  Swordsman 1,926, Archer 1,420, Spearman 1,130); on the engine's inputs (its
+  knowledge base the minor's own units, no Combat Desire) 27,209. The rest:
+  the item in hand a turn off (the buildings' lab residue), the table where
+  the knowledge base moves, the support units (Battering Ram 18 / 2,256,
+  Siege Tower, Military Engineer: Combat 0, the 0.01 / 100 rows), the
+  religious, Archaeologist, Rock Band and air units (unported).
 
 ## H-1: the research AI — READ (the choice), PARTLY READ (the value)
 

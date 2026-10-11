@@ -419,13 +419,44 @@ def build_city(rows, modifier) -> str:
             "modifiers": [modifier(r["ModifierId"]) for r in bmods[b]],
         })
     tags = multi("TypeTags", "Type")
+    unit_bld = multi("Unit_BuildingPrereqs", "Unit")
+    uxp2 = keyed(rows("Units_XP2"), "UnitType")
     units = []
     for u, c in in_game_order("Units", "UnitType", keyed(rows("Units"), "UnitType")):
+        x = uxp2.get(u, {})
         units.append({
             "type": u, "foundCity": c.get("FoundCity") == "true", "buildCharges": num(c, "BuildCharges"),
             "mustPurchase": c.get("MustPurchase") == "true", "combat": num(c, "Combat"),
             "recon": any(t.get("Tag") == "CLASS_RECON" for t in tags[u]),
+            "rangedCombat": num(c, "RangedCombat"), "bombard": num(c, "Bombard"), "antiAir": num(c, "AntiAirCombat"),
+            "range": num(c, "Range"), "moves": num(c, "BaseMoves"), "maintenance": num(c, "Maintenance"),
+            "cost": num(c, "Cost"), "domain": c.get("Domain", "DOMAIN_LAND"),
+            "civilian": c.get("FormationClass") == "FORMATION_CLASS_CIVILIAN",
+            "pseudo": c.get("PseudoYieldType"), "promotionClass": c.get("PromotionClass"),
+            "resource": c.get("StrategicResource"), "trait": c.get("TraitType"),
+            "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
+            "obsolete": [c[k] for k in ("MandatoryObsoleteCivic", "MandatoryObsoleteTech", "ObsoleteCivic", "ObsoleteTech")
+                         if c.get(k)],
+            "buildings": [r["PrereqBuilding"] for r in unit_bld[u]],
+            "spy": c.get("Spy") == "true", "wmd": c.get("WMDCapable") == "true",
+            "religiousStrength": num(c, "ReligiousStrength"), "spreadCharges": num(c, "SpreadCharges"),
+            "healCharges": num(c, "ReligiousHealCharges"), "parkCharges": num(c, "ParkCharges"),
+            "canTrain": str(c.get("CanTrain", "")).lower() not in ("false", "0"),
+            "majorOnly": str(x.get("MajorCivOnly", "")).lower() in ("true", "1"),
+            "maintenanceResource": x.get("ResourceMaintenanceType"),
+            "maintenanceResourceAmount": num(x, "ResourceMaintenanceAmount"), "resourceCost": num(x, "ResourceCost"),
         })
+    # the military AI's promotion class lists (AiLists System UnitPromotionClasses
+    # by leader trait, their AiFavoredItems values)
+    pc_lists = {c["ListType"]: c for c in rows("AiLists") if c.get("ListType") and c.get("System") == "UnitPromotionClasses"}
+    pc_by_trait: dict[str, dict[str, int]] = collections.defaultdict(dict)
+    for c in rows("AiFavoredItems"):
+        lst = pc_lists.get(c.get("ListType", ""))
+        if lst and lst.get("LeaderType") and c.get("Item"):
+            pc_by_trait[lst["LeaderType"]][c["Item"]] = num(c, "Value")
+    eff_units, eff = efficiency_table()
+    if eff_units != [u["type"] for u in units]:
+        raise SystemExit("AI_UnitEfficiency.csv's units differ from the Units rows")
     # the database's own rows: the install reader also takes a persona pack's
     # project (PROJECT_COURT_FESTIVAL) the recorded games did not load — their
     # logged PROJECTS rows hold the database's 37
@@ -439,8 +470,34 @@ def build_city(rows, modifier) -> str:
         "import type { AiBuildingRow, AiUnitRow } from '../core/aiCityBuild';\n\n"
         f"export const AI_BUILDINGS: readonly AiBuildingRow[] = {json.dumps(out, indent=1)};\n\n"
         f"export const AI_UNITS: readonly AiUnitRow[] = {json.dumps(units, indent=1)};\n\n"
-        f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n"
+        f"export const AI_PROJECTS: readonly string[] = {json.dumps(projects, indent=1)};\n\n"
+        "/** the promotion class lists by leader trait (AiFavoredItems of the\n"
+        " *  AiLists of System UnitPromotionClasses): class -> Value */\n"
+        "export const AI_PROMOTION_CLASS_LISTS: Readonly<Record<string, Readonly<Record<string, number>>>> = "
+        f"{json.dumps(dict(sorted(pc_by_trait.items())), indent=1)};\n\n"
+        "/** THE UNIT EFFICIENCIES (UnitProduction's m_efficiencies, GlobalAI\n"
+        " *  +0x3c8): row the opposing unit, column the unit valued, AI_UNITS'\n"
+        " *  order, raw 24.8 — the table the game computes once a game (0x79a440)\n"
+        " *  and logs as AI_UnitEfficiency.csv, the same in every recording, read\n"
+        " *  at its printed 0.01 */\n"
+        f"export const AI_UNIT_EFFICIENCY: readonly (readonly number[])[] = [\n"
+        + ",\n".join(" [" + ",".join(str(v) for v in row) + "]" for row in eff) + "\n];\n"
     )
+
+
+def efficiency_table() -> tuple[list[str], list[list[int]]]:
+    """AI_UnitEfficiency.csv beside the recordings: every one the same; each
+    value raw (24.8), the printed two decimals rounded to the nearest step"""
+    texts = {open(f, encoding="utf-8").read() for f in glob.glob(str(RUNS / "h1_duel*.logs" / "AI_UnitEfficiency.csv"))}
+    if len(texts) != 1:
+        raise SystemExit(f"AI_UnitEfficiency.csv: {len(texts)} different tables beside the recordings")
+    lines = [ln for ln in next(iter(texts)).splitlines() if ln.strip()]
+    head = [x.strip() for x in lines[0].split(",")[1:] if x.strip()]
+    rows = []
+    for ln in lines[1:]:
+        p = [x.strip() for x in ln.split(",")]
+        rows.append([round(float(v) * 256) for v in p[1:1 + len(head)]])
+    return head, rows
 
 
 def order_check(policies: list[str]) -> tuple[int, int]:

@@ -76,7 +76,7 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuildFacts, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuildFacts, minorKnownUnits, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
@@ -3129,7 +3129,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
         const pid = ctx.playerOfSeat.get(cs.seat);
         const name = pid === undefined ? undefined : a.cities.find((c) => c.owner === pid)?.name;
         const logged = name === undefined ? undefined : ctx.cityBuildLog.get(`${a.turn}:${pid}:${name}`);
-        if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs)), ctx.cityBuildPer);
+        if (logged) tallyBuildings(ctx.cityBuild, a.turn, pid!, logged, buildingTable(minorBuildFacts(state, cs, minorKnownUnits(state, cs))), ctx.cityBuildPer);
       }
     }
     // the city-states' research AI: each choice its turn made, against the

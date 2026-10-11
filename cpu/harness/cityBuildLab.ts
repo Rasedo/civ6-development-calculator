@@ -22,14 +22,15 @@ import { loadCatalog, type TurnRecord } from './record';
 import { advanceHistory, engineRowOf, importTurn, minorHead, newHistory } from './import';
 import type { CityState, GameState } from '../core/types';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
-import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue } from '../core/aiCityBuild';
-import { minorBuildFacts, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
+import { buildingPerTurn, buildingTable, buildingTurns, buildingValue, defaultSpecialization, growthForecast, housingValue, unitTable, unitTurns, unitValue } from '../core/aiCityBuild';
+import { AI_UNITS } from '../data/aiBuildTables';
+import { minorBuildFacts, minorKnownUnits, minorItemCost, minorItemKey, minorItemPct, minorPickFacts, type MinorItem } from '../core/minorBuild';
 import { researchAnalysis } from '../core/aiResearch';
 import { civicAnalysis } from '../core/aiCivics';
 import { computeCityStats } from '../core/city';
 import { minorCity } from '../core/cityStates';
-import { FX_MIN } from '../core/aiValue';
-import { loadCityBuildCentre, loadCityBuildPicks, loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
+import { FX_MIN, fxConst } from '../core/aiValue';
+import { loadCityBuildCentre, loadCityBuildPicks, loadCityBuildTables, loadKnownUnits, newCityBuildTally, tallyBuildings, tallyRow, type CityBuildTally } from './cityBuildLog';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dump = args[0];
@@ -113,11 +114,31 @@ const tradeVal = new Map<string, number>();
   }
 }
 const zero = args.includes('--zero') ? args[args.indexOf('--zero') + 1].split(',') : [];
+/** AI_Military.csv's Combat Desire (the military AI's PSEUDOYIELD_UNIT_COMBAT
+ *  weight), by `${turn}:${player}` */
+const desire = new Map<string, number>();
+{
+  const path = dump.replace(/\.jsonl$/, '.logs/AI_Military.csv');
+  if (existsSync(path)) {
+    for (const line of readFileSync(path, 'utf8').split('\n')) {
+      const p = line.split(',').map((x) => x.trim());
+      if (/^\d+$/.test(p[0] ?? '') && p.length >= 9) desire.set(`${p[0]}:${p[1]}`, Number(p[8]));
+    }
+  }
+}
+const desireShift = args.includes('--desire') ? Number(args[args.indexOf('--desire') + 1]) : 0;
 
 const tables = loadCityBuildTables(dump);
+const knownUnits = loadKnownUnits(dump);
+// the knowledge base as the turn's analysis reads it: the turn's ARMY lines
+// (--kb -1: the turn before's)
+const kbShift = args.includes('--kb') ? Number(args[args.indexOf('--kb') + 1]) : 0;
+const unitsAll = newCityBuildTally();
+let dbg: unknown = null;
+const unitsPer = new Map<string, CityBuildTally>();
 const centre = loadCityBuildCentre(dump);
 const picks = loadCityBuildPicks(dump);
-const pickTally = { log: { n: 0, ok: 0, miss: [] as string[] }, ours: { n: 0, ok: 0, miss: [] as string[] } };
+const pickTally = { log: { n: 0, ok: 0, miss: [] as string[] }, ours: { n: 0, ok: 0, miss: [] as string[] }, units: { n: 0, ok: 0, miss: [] as string[] } };
 if (!tables.size) throw new Error(`no PLOT ANALYSIS LOG beside ${dump}`);
 const cat = loadCatalog(dump);
 const recs: TurnRecord[] = readFileSync(dump, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as TurnRecord)
@@ -143,7 +164,8 @@ for (let i = 0; i + 1 < recs.length; i++) {
     inHandAtAnalysis(state, cs, player, imp.dumpOfMinor.get(cs)!.name, recs[i], b, stats.total.production);
     cs.research.aiEntries = researchAnalysis(state, cs.seat, stats.total.science);
     cs.research.civicAiEntries = civicAnalysis(state, cs.seat, stats.total.culture);
-    const facts = minorBuildFacts(state, cs);
+    const kb = knownUnits.get(`${turn + kbShift}:${player}`);
+    const facts = minorBuildFacts(state, cs, args.includes('--enginekb') ? minorKnownUnits(state, cs) : (u) => kb?.get(u) ?? 0);
     // the inputs the port does not read, as the game's logs give them: the
     // trade AI's route value (AI_Knowledge.csv) and, under --zero, the
     // pseudo-yields whose weights are not read set to -1.0 (factor 0)
@@ -152,7 +174,9 @@ for (let i = 0; i + 1 < recs.length; i++) {
       const k = tradeVal.get(`${turn - 1}:${player}`);
       facts.view = Object.assign(Object.create(v0) as typeof v0, {
         tradeKnowledge: (s: number) => (s === cs.seat && k !== undefined ? Math.round(k * 256) : v0.tradeKnowledge(s)),
-        pseudoYieldWeight: (s: number, p: string) => (zero.includes(p) ? -256 : v0.pseudoYieldWeight(s, p)),
+        pseudoYieldWeight: (s: number, p: string) => (zero.includes(p) ? -256
+          : !args.includes('--nodesire') && p === 'PSEUDOYIELD_UNIT_COMBAT' && s === cs.seat && desire.has(`${turn + desireShift}:${player}`) ? fxConst(desire.get(`${turn + desireShift}:${player}`)!)
+            : v0.pseudoYieldWeight(s, p)),
       });
     }
     if (args.includes('--logtech')) {
@@ -163,6 +187,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       const was = researching.get(`${turn - 1}:${player}`);
       const left = now && was && now[0] === was[0] ? was[1] : now ? now[1] : 0;
       const ours = facts.techTurns;
+      dbg = { left, now: now?.[0] ?? null };
       facts.techTurns = (tech) => {
         if (!tech) return 0;
         const e = research.get(`${turn}:${player}:${tech}`);
@@ -174,6 +199,19 @@ for (let i = 0; i + 1 < recs.length; i++) {
     }
     const ours = buildingTable(facts);
     tallyBuildings(all, turn, player, logged, ours, per);
+    const loggedUnits = centre.get(`${turn}:${player}:${imp.dumpOfMinor.get(cs)?.name}`)?.UNITS;
+    const oursUnits = unitTable(facts);
+    if (loggedUnits) tallyRow(AI_UNITS.map((u) => u.type), unitsAll, turn, player, loggedUnits, oursUnits, unitsPer);
+    if (rowsOut && loggedUnits) {
+      AI_UNITS.forEach((u, k) => {
+        if (oursUnits[k] === null) return;
+        const g = loggedUnits[k];
+        const o = oursUnits[k] === -9999 * 256 ? -9999 : oursUnits[k]! / 256;
+        if (g <= -9000 && o === -9999) return;
+        const fitT = [...Array(50).keys()].filter((tt) => { const x = unitValue(facts, u, tt); return x !== null && Math.abs(x / 256 - g) < 0.0051; });
+        rows.push({ fam: 'U', dbg, fitT, tech: facts.techTurns(u.tech), civ: facts.civicTurns(u.civic), bt: facts.buildTurns(u.type), t: turn, p: player, b: u.type, log: g, ours: o, T: unitTurns(facts, u), prod: facts.unitProduction.get(u.type)?.value, cur: facts.current, nu: facts.unitCount });
+      });
+    }
     // THE DEFAULT SPECIALIZATION PICK on the turns the log shows it: over the
     // log's own tables (the pick apart from the values), and with our
     // buildings table in place of the log's
@@ -187,8 +225,10 @@ for (let i = 0; i + 1 < recs.length; i++) {
       delete cs.prodItem;
       const pf = minorPickFacts(state, cs, facts);
       cs.prodItem = saved;
-      for (const [tag, bt] of [['log', raw(rows.BUILDINGS)], ['ours', ours]] as const) {
-        const got = defaultSpecialization({ buildings: bt, units: raw(rows.UNITS), projects: raw(rows.PROJECTS) }, pf);
+      const lu = raw(rows.UNITS);
+      const ou = oursUnits.map((x, k) => x ?? lu[k] ?? FX_MIN);
+      for (const [tag, bt, ut] of [['log', raw(rows.BUILDINGS), lu], ['ours', ours, lu], ['units', ours, ou]] as const) {
+        const got = defaultSpecialization({ buildings: bt, units: ut, projects: raw(rows.PROJECTS) }, pf);
         const ok = want === null ? got === null : got !== null && got.type === want.item;
         const t = pickTally[tag];
         t.n += 1;
@@ -237,3 +277,10 @@ for (const [type, t] of [...per].sort((a, b) => b[1].log - a[1].log)) {
 console.log(`TOTAL log ${all.log} both ${all.both} exact ${all.exact} onlyLog ${all.onlyLog} onlyOurs ${all.onlyOurs}`);
 if (args.includes('--json')) writeFileSync(args[args.indexOf('--json') + 1], JSON.stringify({ all, per: Object.fromEntries(per), anyT: Object.fromEntries(anyT) }));
 if (rowsOut) writeFileSync(rowsOut, rows.map((r) => JSON.stringify(r)).join('\n'));
+for (const [type, t] of [...unitsPer].sort((a, b) => b[1].log - a[1].log)) {
+  if (!t.log && !t.onlyOurs) continue;
+  const f = t.first;
+  console.log(`${type.padEnd(34)} log ${String(t.log).padStart(5)} both ${String(t.both).padStart(5)} exact ${String(t.exact).padStart(5)}`
+    + ` onlyLog ${String(t.onlyLog).padStart(4)} onlyOurs ${String(t.onlyOurs).padStart(4)}  ${f ? `t${f.turn} p${f.player} log ${f.log} ours ${f.ours}` : ''}`);
+}
+console.log(`UNITS TOTAL log ${unitsAll.log} both ${unitsAll.both} exact ${unitsAll.exact} onlyLog ${unitsAll.onlyLog} onlyOurs ${unitsAll.onlyOurs}`);

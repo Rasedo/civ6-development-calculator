@@ -91,11 +91,40 @@ export const newCityBuildTally = (): CityBuildTally => ({ log: 0, both: 0, exact
 /** our BUILDINGS table (raw, database order) against the log's row */
 export function tallyBuildings(t: CityBuildTally, turn: number, player: number, logged: readonly number[], ours: readonly number[],
   per?: Map<string, CityBuildTally>): void {
-  AI_BUILDINGS.forEach((row, k) => {
+  tallyRow(AI_BUILDINGS.map((b) => b.type), t, turn, player, logged, ours, per);
+}
+
+/** the knowledge base's unit counts (AI_Knowledge.csv's ARMY lines: per
+ *  player it knows, `UNIT_X count age`), summed over the players, by
+ *  `${turn}:${player}` */
+export function loadKnownUnits(dumpPath: string): Map<string, Map<string, number>> {
+  const out = new Map<string, Map<string, number>>();
+  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
+  if (!existsSync(path)) return out;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const p = line.split(',').map((x) => x.trim());
+    if (p[2] !== 'ARMY') continue;
+    const k = `${p[0]}:${p[1]}`;
+    const m = out.get(k) ?? (out.set(k, new Map()), out.get(k)!);
+    for (const cell of p.slice(4)) {
+      const [u, n] = cell.split(' ');
+      if (u?.startsWith('UNIT_')) m.set(u, (m.get(u) ?? 0) + Number(n));
+    }
+  }
+  return out;
+}
+
+/** a family's table (raw, database order; null an item the port does not
+ *  value, left out) against the log's row */
+export function tallyRow(names: readonly string[], t: CityBuildTally, turn: number, player: number, logged: readonly number[],
+  ours: readonly (number | null)[], per?: Map<string, CityBuildTally>): void {
+  names.forEach((type, k) => {
+    if (ours[k] === null) return;
     const g = logged[k] ?? -9999;
-    const o = ours[k] === FX_MIN ? -9999 : ours[k] / 256;
+    const o = ours[k] === FX_MIN ? -9999 : ours[k]! / 256;
     const gv = g > NONE;
     const ov = o > NONE;
+    const row = { type };
     for (const x of per ? [t, per.get(row.type) ?? (per.set(row.type, newCityBuildTally()), per.get(row.type)!)] : [t]) {
       if (gv) x.log += 1;
       if (gv && ov) {

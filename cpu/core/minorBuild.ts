@@ -61,9 +61,11 @@ import { hexDistance, tilesWithin } from '../../world/hex';
 import { hasRiver, isWater } from '../../world/query';
 import { engineId, gameTypeOf } from '../data/aliases';
 import { DISTRICTS } from '../data/districts';
-import { AI_BUILDINGS } from '../data/aiBuildTables';
-import { AI_BUILDING_INDEX, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
-import { FX, fxOf, turnsAt } from './aiValue';
+import { AI_BUILDINGS, AI_PROMOTION_CLASS_LISTS, AI_UNITS } from '../data/aiBuildTables';
+import { RESOURCES } from '../../world/resources';
+import { unitProductionTable } from './aiUnitProduction';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, constructibleNow, type CityBuildFacts, type PickFacts } from './aiCityBuild';
+import { FX, fxConst, fxOf, turnsAt } from './aiValue';
 import { majorView } from './majorView';
 
 /** The first legal plot in TILE-INDEX order — the GPU pick is the argmax of
@@ -975,8 +977,67 @@ function analysedTurns(entries: readonly { id: string; next: string; turns: numb
   return t < 500 && current !== e.next && current !== id ? t + currentLeft : t;
 }
 
-/** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`) */
-export function minorBuildFacts(state: GameState, cityState: CityState): CityBuildFacts {
+/** A minor's version of a unit (player +0x12e8 +0x1c0): none for a
+ *  civilization's unique unit, a MajorCivOnly one, a unit that founds a
+ *  city, one the database bars from training */
+function minorUnitVersion(u: string): string | null {
+  const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
+  return row && !row.trait && !row.majorOnly && !row.foundCity && row.canTrain ? u : null;
+}
+
+/** The promotion class weight (0x723bb0) of a player whose lists are
+ *  `lists`: 1.0 plus a listed class's Value / 100 — none where that is 0
+ *  (a minor's PROMOTION_CLASS_RECON -100), else at least 0.1 */
+export function promotionWeight(traits: readonly string[], cls: string | null): number {
+  if (!cls) return FX;
+  let w = FX;
+  for (const t of traits) {
+    const v = AI_PROMOTION_CLASS_LISTS[t]?.[cls];
+    if (v !== undefined) w += Math.trunc((v * FX) / 100);
+  }
+  return w === 0 ? 0 : Math.max(w, fxConst(0.1));
+}
+
+/** THE MILITARY AI'S UNIT PRODUCTION TABLE of a minor (`aiUnitProduction.ts`)
+ *  against the units its knowledge base counts (`known`) */
+export function minorUnitProduction(state: GameState, cityState: CityState, known: (unit: string) => number) {
+  const r = cityState.research;
+  const own = new Map<string, number>();
+  for (const u of state.units) {
+    if (u.seat !== cityState.seat) continue;
+    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    own.set(t, (own.get(t) ?? 0) + 1);
+  }
+  const holds = (x: string): boolean => {
+    const t = x.startsWith('TECH_') ? engineId('tech', x, 'TECH_', TECHS) : null;
+    const c = x.startsWith('CIVIC_') ? engineId('civic', x, 'CIVIC_', CIVICS) : null;
+    return (!!t && r.techs.includes(t)) || (!!c && r.civics.includes(c));
+  };
+  return unitProductionTable({
+    isVersion: (u) => minorUnitVersion(u) === u,
+    obsolete: (u) => AI_UNITS[AI_UNIT_INDEX.get(u)!].obsolete.some(holds),
+    owned: (u) => own.get(u) ?? 0,
+    known,
+  });
+}
+
+/** A minor's knowledge base's unit counts as the engine holds them: its own
+ *  units by type (the knowledge base's entry of the player itself,
+ *  AI_Knowledge.csv's ARMY line of its own index); the entries of the other
+ *  players it has seen are not kept */
+export function minorKnownUnits(state: GameState, cityState: CityState): (unit: string) => number {
+  const own = new Map<string, number>();
+  for (const u of state.units) {
+    if (u.seat !== cityState.seat) continue;
+    const t = installType('unit', u.type, 'UNIT_', UNITS);
+    own.set(t, (own.get(t) ?? 0) + 1);
+  }
+  return (unit) => own.get(unit) ?? 0;
+}
+
+/** THE CITY BUILD AI'S VIEW OF A MINOR'S CITY (`aiCityBuild.ts`), its
+ *  knowledge base's unit counts `known` */
+export function minorBuildFacts(state: GameState, cityState: CityState, known: (unit: string) => number): CityBuildFacts {
   const city = minorCity(cityState);
   const stats = computeCityStats(state, city);
   const r = cityState.research;
@@ -1035,14 +1096,20 @@ export function minorBuildFacts(state: GameState, cityState: CityState): CityBui
     amenity,
     // a city-state holds one city
     regionalAmenities: () => [amenity],
-    // a city-state trains no civilization's unique unit
-    unitVersion: (u) => {
-      const id = engineId('unit', u, 'UNIT_', UNITS);
-      return id && !UNITS[id].uniqueTo ? u : null;
-    },
+    unitVersion: minorUnitVersion,
     fullCiv: false,
     tribe: false,
     unitCount: state.units.filter((u) => u.seat === cityState.seat).length,
+    unitProduction: minorUnitProduction(state, cityState, known),
+    trainsDomain: (d) => d !== 'DOMAIN_SEA' || cityNavalCapable(state, city),
+    combatCount: 0,
+    extraCopies: () => 0,
+    promotionWeight: (cls) => promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], cls),
+    resourceAccess: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
+    },
+    handicap: 0,
     growth: {
       surplus: fxOf(stats.foodSurplus),
       housing: stats.housing,

@@ -6,11 +6,12 @@
  * whole number (dll_readings "C-96 / C-97: the city build AI", SETTLED).
  */
 import { describe, expect, it } from 'vitest';
-import { AI_BUILDINGS } from '../../../cpu/data/aiBuildTables';
-import { AI_BUILDING_INDEX, buildingValue, growthForecast, housingValue, type CityBuildFacts } from '../../../cpu/core/aiCityBuild';
+import { AI_BUILDINGS, AI_UNITS } from '../../../cpu/data/aiBuildTables';
+import { unitProductionTable } from '../../../cpu/core/aiUnitProduction';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX, buildingValue, growthForecast, housingValue, unitValue, type CityBuildFacts } from '../../../cpu/core/aiCityBuild';
 import type { AiValueView } from '../../../cpu/core/aiValue';
 
-const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0 } as unknown as AiValueView;
+const view = { yieldWeight: () => 0, pseudoYieldWeight: () => 0, tradeRouteCapacity: () => 0 } as unknown as AiValueView;
 const facts: CityBuildFacts = {
   view, seat: 100, cityId: -1, population: 1, capital: true, districtCount: 1, hasWonder: false, atWar: false, era: 0,
   yieldPct: (y) => (y === 'YIELD_PRODUCTION' ? -50 : 0), version: (b) => b, hasBuilding: () => false,
@@ -18,7 +19,27 @@ const facts: CityBuildFacts = {
   current: null, techTurns: () => 0, civicTurns: () => 0, buildTurns: () => 1,
   amenity: { balance: 0, yields: {} }, regionalAmenities: () => [], unitVersion: (u) => u, fullCiv: false, tribe: false, unitCount: 1,
   growth: { surplus: 2 * 256, housing: 5, population: 1, stored: 0, multiplier: 256 },
+  unitProduction: new Map(), trainsDomain: () => true, combatCount: 0, extraCopies: () => 0, promotionWeight: () => 256,
+  resourceAccess: () => true, handicap: 0,
 };
+
+describe('the city build AI\'s unit value', () => {
+  // runs/h1_duelv1124 Cardiff t2: its knowledge base holds its own two
+  // Warriors; the analysis logs the Warrior 10.73 and the Slinger 8.34, both at
+  // T 13 (3 and 3 turns to train, +10 for the Monument in hand)
+  const table = unitProductionTable({
+    isVersion: () => true, obsolete: () => false, owned: () => 0, known: (u) => (u === 'UNIT_WARRIOR' ? 2 : 0),
+  });
+  const cardiff = { ...facts, unitProduction: table };
+  it('values each unit against the known ones: N over the efficiencies\' sum', () => {
+    expect(table.get('UNIT_WARRIOR')!.value).toBe(256);
+    expect(table.get('UNIT_SLINGER')!.value).toBe(199);
+  });
+  it('prints Cardiff\'s logged Warrior and Slinger', () => {
+    const v = (u: string) => (unitValue(cardiff, AI_UNITS[AI_UNIT_INDEX.get(u)!], 13)! / 256).toFixed(2);
+    expect([v('UNIT_WARRIOR'), v('UNIT_SLINGER')]).toEqual(['10.73', '8.34']);
+  });
+});
 
 describe('the city build AI\'s building value', () => {
   it('prints Cardiff\'s logged Monument ladder (runs/h1_duelv1124 t12 .. t2 at T 1 .. 11)', () => {
