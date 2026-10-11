@@ -234,6 +234,35 @@ export interface AiValueView {
    *  progress kept on it and the city's store, at its Production toward it
    *  times 1 + `extra` raw (24.8) */
   projectTurns(seat: number, cityId: number, project: string, extra: number): number;
+  /** the major civilizations' seats in turn order, the defeated left out */
+  majors(): readonly number[];
+  /** the improved plots of the ResourceType in the seat's territory */
+  resourceHeld(seat: number, resource: string): number;
+  /** the seat's yield of a YieldType per turn, its cities' totals summed */
+  playerYield(seat: number, yieldType: string): number;
+  /** the grievances `holder` holds against `against`, 0 for none */
+  grievances(holder: number, against: number): number;
+  /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
+  militaryStrength(seat: number): number;
+  /** the pair's standing alliance */
+  allied(a: number, b: number): boolean;
+  /** `a`'s standing denouncement of `b` */
+  denouncing(a: number, b: number): boolean;
+  /** a city's Amenity balance (have less needed) and its yields by
+   *  YieldType, as the Amenity value reads them (0x79f7c0) */
+  cityAmenity(seat: number, cityId: number): { balance: number; yields: Readonly<Record<string, number>> };
+  /** the seat's Great Person points a turn toward a class
+   *  (GREAT_PERSON_CLASS_*) */
+  greatPersonPointsPerTurn(seat: number, cls: string): number;
+  /** the seat's diplomatic victory points, and the points a victory takes
+   *  (DIPLOMATIC_VICTORY_POINTS_REQUIRED) */
+  diplomaticPoints(seat: number): number;
+  readonly diplomaticVictoryPoints: number;
+  /** the running scored competitions the seat ranks in the top quarter of
+   *  (its rank at most a quarter of the seats scoring above 0) */
+  competitionLeads(seat: number): number;
+  /** a city may advance the ProjectType now */
+  cityCanProject(seat: number, cityId: number, project: string): boolean;
 }
 
 /** 0x7a7110, A TRADER'S WORTH from turn `start`: none once the seat's trade

@@ -3,17 +3,19 @@
 // over the session (0x628450) against runs/h1_duelv1127's logged sessions,
 // and the outcome the Resolutions lists name (0x622140).
 import { describe, expect, it } from 'vitest';
-import {
-  CONGRESS_AI_STEP, allocateVotes, evaluateResolutions, resolutionPreference, voteCost, votesFor, type ResolutionEval,
-} from '../../../ai/major/congress';
+import { allocateVotes, evaluateResolutions, resolutionPreference, type ResolutionEval } from '../../../ai/major/congress';
+import { voteCost, votesFor } from '../../../cpu/core/congress';
+import { CONGRESS_VOTE_PRICE } from '../../../cpu/data/seats';
 import type { MajorView } from '../../../ai/major/view';
 
 const view = (over: Partial<MajorView> = {}): MajorView =>
-  ({ leaderType: () => 'LEADER_QIN', strategies: () => new Set(), ...over }) as unknown as MajorView;
+  ({ leaderType: () => 'LEADER_QIN', strategies: () => new Set(), majors: () => [0, 1], metTurn: () => 1, playerYield: () => 0,
+    religionFounded: () => null, allied: () => false, atWar: () => false, militaryStrength: () => 0, yieldWeight: () => 256,
+    ...over }) as unknown as MajorView;
 
 describe('the vote price (0x527680 / 0x527d80)', () => {
   it('is 5 through the online speed, whole: 2 x n x (n - 1)', () => {
-    expect(CONGRESS_AI_STEP).toBe(2);
+    expect(CONGRESS_VOTE_PRICE).toBe(2);
     expect(voteCost(1)).toBe(0);
     expect(voteCost(4)).toBe(24);
     expect(voteCost(9)).toBe(144);

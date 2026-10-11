@@ -347,11 +347,12 @@ describe('the action FILE drives the TS civ', () => {
     const target = 3;
     state.seatActions = { [state.turn - 1]: { [civ.seat]: {
       production: [], tech: null, civic: null, units: [],
-      vote: [[0, target, 0], null, null],
+      vote: [[0, target, 0, 0], null, null],
     } } };
     seatPhase(state);
-    expect(civ.congressVote).toEqual([[0, target, 0], null, null]);
-    // `worldCongress` runs at the turn tail and clears the ballot either way
+    expect(civ.congressVote).toEqual([[0, target, 0, 0], null, null]);
+    // `worldCongress` (the Regular Session after the barbarians' turn) clears
+    // the ballot either way
     worldCongress(state);
     expect(civ.congressVote).toBeUndefined();
   });

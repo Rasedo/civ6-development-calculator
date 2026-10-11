@@ -11,7 +11,10 @@
   cases:
     - recording: h1_duelw1124
       value: "A player   reads, as its last turn start before its own activation left them, this   turn's values for the players up to itself and last turn's for the   players after it (runs/h1_duelw1124: Rome, fir"
-  impl: [cpu/core/majorView.ts:militaryStrength, ai/major/view.ts:MajorView]
+  impl:
+    - cpu/core/majorView.ts:militaryStrength
+    - ai/major/view.ts:MajorView
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
   context:
@@ -161,6 +164,7 @@
 - addr: 0x4bf7c0
   kind: function
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
   notes: ["imported: READ in its section, no confirming case found beside it"]

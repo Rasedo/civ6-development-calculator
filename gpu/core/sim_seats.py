@@ -450,7 +450,7 @@ class SimSeats:
         spec: torch.Tensor | None = None,  # [B, RC, nD] citizens PINNED per district; -1 = automatic, SPEC_KEEP = unchanged
         lock: torch.Tensor | None = None,  # [B, L] plots whose citizen pin this seat FLIPS this turn; -1 = padding
         swap: torch.Tensor | None = None,  # [B, K, 2] TILE SWAPS: (claiming city's centre, tile); -1 = padding
-        vote: torch.Tensor | None = None,  # [B, 3, 3] the congress ballot: [outcome, target, extra votes] per slate slot
+        vote: torch.Tensor | None = None,  # [B, 4, 4] the congress ballot: [outcome, target, extra votes, cast order] per slot
         gp_pass: torch.Tensor | None = None,  # [B] the GP class this seat PASSES on (-1 = none)
         nuke: tuple | None = None,  # the MISSILE SILO's launch: (device [B], tile [B]); -1 = none
         beliefs: torch.Tensor | None = None,  # [B, K, 2] (class, index) beliefs the religion adopts; -1 = padding
@@ -1125,8 +1125,8 @@ class SimSeats:
         if citizens is not None:
             self._apply_citizens(row, active, *citizens)
         if vote is not None:
-            # BANKED, not spent: the session runs at the turn tail, after every
-            # seat has had its phase.
+            # BANKED, not spent: the Special Sessions at the turn tail and the
+            # Regular Session after the barbarians' turn read it.
             take = (active & ext).view(-1, 1, 1)
             self.civ_congress_vote[:, row] = torch.where(take, vote.to(torch.long), self.civ_congress_vote[:, row])
         if gp_pass is not None and self._gp_nc > 0:
@@ -6099,25 +6099,100 @@ class SimSeats:
                 fires, torch.where(at.any(dim=1), got, torch.full_like(got, -1)), self.congress_slate[:, s])
         self._rand_range(fires & (world_era >= self._congress_dv_min), 1)
 
+    def _congress_targets(self, sel: torch.Tensor, table: dict, row: int) -> tuple[torch.Tensor, torch.Tensor]:
+        """(mask [B, L], target [B, L]) — the targets a resolution offers major
+        `row` where `sel`, the `congressTargetsOf` twin: the candidates in the
+        game's order filtered live — an alive major met or the row itself, a
+        founded religion's founder, a luxury the map holds, a district within
+        the game era, a class with a person to earn."""
+        B, dev = self.B, self.device
+        f = table["tf"]
+        if f in (1, 5):
+            n = self.n_majors
+            tgt = torch.arange(n, device=dev).unsqueeze(0).expand(B, -1)
+            if f == 1:
+                met = self.seat_met_turn[:, row, :n] >= 0
+                met[:, row] = True
+                mask = self.civ_alive[:, :n] & met
+            else:
+                mask = self.civ_religion_type[:, :n] >= 0
+            return mask & sel.unsqueeze(1), tgt
+        tt = torch.tensor(table["tt"] or [-1], dtype=torch.long, device=dev)
+        mask = torch.ones(B, tt.shape[0], dtype=torch.bool, device=dev) if table["tt"] else torch.zeros(B, 1, dtype=torch.bool, device=dev)
+        if f == 2:
+            for k, t in enumerate(table["tt"]):
+                mask[:, k] = (self.lux_id == t).any(dim=1) if t >= 0 else False
+        elif f == 3:
+            te = torch.tensor(table["te"], dtype=torch.long, device=dev)
+            mask = mask & (te.unsqueeze(0) <= self.game_era.unsqueeze(1))
+        elif f == 4:
+            for k, t in enumerate(table["tt"]):
+                mask[:, k] = (self.gp_offer[:, t] != -2) if (t >= 0 and self._gp_nc > 0) else False
+        return mask & sel.unsqueeze(1), tt.unsqueeze(0).expand(B, -1)
+
+    def _congress_target_draws(self, votes: torch.Tensor, res: tuple[torch.Tensor, torch.Tensor], dv: torch.Tensor,
+                               fires: torch.Tensor) -> torch.Tensor:
+        """`drawTargets`' twin — every ballot naming target -1 on an open slot
+        takes a "Random congress resolution target" draw over the targets the
+        resolution offers its seat: rows in order, each row's ballots in their
+        cast order (field 3, then the slot), before the tally. Returns the
+        ballots with the targets drawn (-1 where the list is empty)."""
+        B, dev = self.B, self.device
+        out = votes.clone()
+        big = 10 ** 9
+        for row in range(self.n_majors):
+            v = out[:, row]
+            live = fires & self.city_alive[:, row].any(dim=1)
+            open_ = torch.stack([res[0] >= 0, res[1] >= 0, dv], dim=1)
+            want = live.unsqueeze(1) & open_ & (v[:, :3, 0] >= 0) & (v[:, :3, 1] < 0)
+            key = torch.where(want, v[:, :3, 3] * 4 + torch.arange(3, device=dev).unsqueeze(0), torch.full_like(v[:, :3, 3], big))
+            for _ in range(3):
+                slot = key.argmin(dim=1)
+                go = key.gather(1, slot.unsqueeze(1)).squeeze(1) < big
+                if not bool(go.count_nonzero()):
+                    break
+                got = torch.full((B,), -1, dtype=torch.long, device=dev)
+                drew = torch.zeros(B, dtype=torch.bool, device=dev)
+                for s in range(3):
+                    at = go & (slot == s)
+                    if not bool(at.count_nonzero()):
+                        continue
+                    if s == 2:
+                        tables = [(at, self._congress_dv_targets)]
+                    else:
+                        tables = [(at & (res[s] == r), t) for r, t in enumerate(self._congress_res)]
+                    for sel, t in tables:
+                        if not bool(sel.count_nonzero()):
+                            continue
+                        mask, tgt = self._congress_targets(sel, t, row)
+                        n = mask.long().sum(dim=1)
+                        k = self._rand_range(sel, n)
+                        pick = mask & ((mask.long().cumsum(dim=1) - 1) == k.unsqueeze(1))
+                        val = torch.where(pick.any(dim=1), tgt.gather(1, pick.long().argmax(dim=1, keepdim=True)).squeeze(1),
+                                          torch.full_like(k, -1))
+                        got = torch.where(sel, val, got)
+                        drew = drew | sel
+                for s in range(3):
+                    at = drew & (slot == s)
+                    out[:, row, s, 1] = torch.where(at, got, out[:, row, s, 1])
+                key.scatter_(1, slot.unsqueeze(1), torch.where(go, torch.full_like(slot, big), key.gather(1, slot.unsqueeze(1)).squeeze(1)).unsqueeze(1))
+        return out
+
     def _world_congress(self) -> None:
-        """The `worldCongress`/`congressSession` mirror — one Regular Session
-        at every congressInterval turn once ANY major is Medieval: two
-        era-eligible resolutions off the rotation, then the Diplomatic Victory
-        resolution from Modern. Mechanics sourced at the catalog
-        (CONGRESS_RESOLUTIONS): the free vote + the 10k favor curve, outcome
-        before target, +1 DVP to every winning-combo voter, refund tiers. The
-        BALLOT rides the wire; a seat that submits none votes the AI line.
-        It sits after every player's turn and before the counter moves, so
-        the schedule reads the turn the session closes (`endTurn`'s
-        position)."""
+        """The `worldCongress`/`congressSession` mirror, after the barbarians'
+        turn on the turn they close (`turn - 1`), on the ballots that turn
+        banked, which it clears — one Regular Session at every
+        congressInterval turn once ANY major is Medieval: the ANNOUNCEMENT of
+        the next session's slate first, then the ballots' target draws, then
+        the two resolutions announced at the session before and the
+        Diplomatic Victory resolution from Modern. Mechanics sourced at the
+        catalog (CONGRESS_RESOLUTIONS): the free vote and the price s n (n -
+        1), outcome before target, +1 DVP to every winning-combo voter,
+        refund tiers. A seat that submits no ballot votes the AI line."""
         votes = self.civ_congress_vote.clone()
-        self.civ_congress_vote[:] = -1  # an intent is for THIS turn
-        # A Special Session may sit on ANY turn once the Congress is open; a
-        # running emergency is settled whether one sat or not.
-        self._special_sessions(votes)
-        self._resolve_emergencies()
-        self._resolve_competition()
-        fires, res0, res1, dv = self._congress_upcoming(int(self.turn))
+        self.civ_congress_vote[:] = -1  # an intent is for ONE turn
+        turn = int(self.turn) - 1
+        fires, res0, res1, dv = self._congress_upcoming(turn)
         if not bool(fires.count_nonzero()):
             return
         # a session whose slate was never announced (the FIRST one, or an
@@ -6127,9 +6202,12 @@ class SimSeats:
             self._congress_draw_slate(first)
             res0 = torch.where(first, self.congress_slate[:, 0], res0)
             res1 = torch.where(first, self.congress_slate[:, 1], res1)
+        # ANNOUNCE the next session's slate (era-eligibility at announcement).
+        self._congress_draw_slate(fires)
+        votes = self._congress_target_draws(votes, (res0, res1), dv, fires)
         self.congress_sessions.add_(fires.long())
         self.last_session_turn.copy_(torch.where(
-            fires, torch.full_like(self.last_session_turn, int(self.turn)), self.last_session_turn))
+            fires, torch.full_like(self.last_session_turn, turn), self.last_session_turn))
         # the standing Migration Treaty detaches from its target's cities,
         # each keeping the residue its growth percent leaves (`City.growthDrift`)
         mig_out, mig_tgt = self._congress_by_id("MIGRATION_TREATY")
@@ -6158,8 +6236,16 @@ class SimSeats:
         if bool(dv.count_nonzero()):
             self._congress_dv(dv, votes)
         self._congress_cancel_banned_intl()
-        # ANNOUNCE the next session's slate (era-eligibility at announcement).
-        self._congress_draw_slate(fires)
+
+    def _emergency_sessions(self) -> None:
+        """`emergencySessions`' twin: a Special Session may sit on ANY turn
+        once the Congress is open, on the ballots the turn's records banked;
+        a running emergency and a running competition are settled whether one
+        sat or not."""
+        votes = self.civ_congress_vote.clone()
+        self._special_sessions(votes)
+        self._resolve_emergencies()
+        self._resolve_competition()
 
     # --- EMERGENCIES -------------------------------------------------------
     #
@@ -7354,20 +7440,20 @@ class SimSeats:
         return a, self._argmax_low(counts)
 
     def _congress_buy(self, row: int, voter: torch.Tensor, want: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """`buyVotes`' twin — EXTRA votes up the sourced curve, the k-th
-        costing congressVoteStep*k, the curve restarting for every resolution.
+        """`buyVotes`' twin — EXTRA votes up the price s x n x (n - 1), the
+        k-th costing 2 s k, the price restarting for every resolution.
         Debits the bank and reports what it took, because the refund tiers pay
-        that back. 64 rungs exhaust only above 20800 favor, beyond any
-        250-turn bank."""
+        that back. 128 extra votes exhaust only above 2 s x 8256 favor (33,024
+        online), beyond any 250-turn bank."""
         B, dev = self.B, self.device
         fav = self.civ_diplo_favor[:, row].clone()
         start = fav.clone()
         extra = torch.zeros(B, dtype=torch.long, device=dev)
-        for k in range(1, 65):
-            can = voter & (extra < want) & (fav >= self._congress_vstep * k)
+        for k in range(1, 129):
+            can = voter & (extra < want) & (fav >= 2 * self._congress_vprice * k)
             if not bool(can.count_nonzero()):
                 break
-            fav = torch.where(can, fav - self._congress_vstep * k, fav)
+            fav = torch.where(can, fav - 2 * self._congress_vprice * k, fav)
             extra = extra + can.long()
         self.civ_diplo_favor[:, row] = torch.where(voter, fav, self.civ_diplo_favor[:, row])
         return extra, torch.where(voter, start - fav, torch.zeros_like(start))

@@ -100,7 +100,7 @@ export const DRAW_SITES: Readonly<Record<string, DrawSite>> = {
   'City Build District Choice': { owner: 'ai', n: [105, 171] },
   'BT Research Choice': { owner: 'ai', cpu: 'researchChoice', gpu: '_rai_choice', dll: '0x763020', n: [108, 121] },
   'Random Civic Choice': { owner: 'ai', cpu: 'civicChoice', gpu: '_cai_choice', dll: '0x626600', n: [1, 0] },
-  'Random congress resolution target': { owner: 'ai', dll: '0x611140', n: [18, 12] },
+  'Random congress resolution target': { owner: 'rule', cpu: 'drawTargets', gpu: '_congress_target_draws', dll: '0x611140', n: [18, 12] },
   'Choose random agenda': { owner: 'ai', n: [3, 3] },
   // a unit's name the AI's behaviour builds for its log (NameManager
   // 0x328760 through 0x327de0, called only from the behaviour tree: "HL:

@@ -5,7 +5,7 @@
  * the extra votes); and its ballot on the game's own slate of that session
  * is scored against the game's log (`<dump>.logs/World_Congress.csv`: per
  * resolution and player the VOTES cast and the OPTIONS taken — the outcome,
- * the target).
+ * the target) and its draw log's target draws (`<dump>.randcalls.csv`).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { congressBallot, type ResolutionEval } from '../../ai/major/congress';
@@ -14,6 +14,8 @@ import { congressSessionDue } from '../core/congress';
 import { worldEraIndex } from '../core/eras';
 import type { GameState, SeatActionRecord } from '../core/types';
 import { CONGRESS_RESOLUTIONS } from '../data/seats';
+import { CONGRESS_TARGET_TABLES } from '../data/congressTargets';
+import { congressCandidates, congressInstallType } from '../core/congressTargets';
 
 /** one player's logged choice on one resolution */
 interface LoggedChoice { votes: number; outcome: number; target: number }
@@ -41,36 +43,48 @@ function readCongressLog(path: string): Map<number, Map<string, Map<number, Logg
   return out;
 }
 
-/** the install's ResolutionType of an engine resolution, null for one the
- *  catalog carries without an install row */
-function installType(index: number): string | null {
-  const src = CONGRESS_RESOLUTIONS[index]?.src as { target?: { where?: string } } | undefined;
-  const m = /ResolutionType=(\S+)/.exec(src?.target?.where ?? '');
-  return m ? m[1] : null;
-}
-
 export interface CongressAiTally {
   /** sessions the port voted in, resolutions scored (both sessions hold them) */
   sessions: number;
   lines: number;
   outcomeEqual: number;
   votesEqual: number;
-  /** the target on the resolutions that name a player */
+  /** the target where the port names one the log's index can be read for */
   targetLines: number;
   targetEqual: number;
-  /** the port's favor against the log's spend */
+  /** the ballots the port leaves to the engine's draw, and the game's
+   *  "Random congress resolution target" draws at those sessions */
+  drawsOurs: number;
+  drawsGame: number;
   misses: string[];
+}
+
+/** the "Random congress resolution target" draws of the game's draw log by
+ *  turn (`<dump>.randcalls.csv`) */
+function readTargetDraws(path: string): Map<number, number> {
+  const out = new Map<number, number>();
+  if (!existsSync(path)) return out;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    if (!line.includes('Random congress resolution target')) continue;
+    const t = Number(line.split(',')[0]);
+    out.set(t, (out.get(t) ?? 0) + 1);
+  }
+  return out;
 }
 
 export class CongressProbe {
   private readonly log: Map<number, Map<string, Map<number, LoggedChoice>>> | null;
-  readonly tally: CongressAiTally = { sessions: 0, lines: 0, outcomeEqual: 0, votesEqual: 0, targetLines: 0, targetEqual: 0, misses: [] };
+  private readonly draws: Map<number, number>;
+  readonly tally: CongressAiTally = {
+    sessions: 0, lines: 0, outcomeEqual: 0, votesEqual: 0, targetLines: 0, targetEqual: 0, drawsOurs: 0, drawsGame: 0, misses: [],
+  };
 
   /** `seats`: the AI majors, seat -> player id; `player`: any seat -> player id */
   constructor(dumpPath: string, private readonly seats: ReadonlyMap<number, number>,
               private readonly player: ReadonlyMap<number, number>) {
     const path = dumpPath.replace(/\.jsonl$/, '.logs/World_Congress.csv');
     this.log = existsSync(path) ? readCongressLog(path) : null;
+    this.draws = readTargetDraws(dumpPath.replace(/\.jsonl$/, '.randcalls.csv'));
   }
 
   get active(): boolean {
@@ -79,34 +93,51 @@ export class CongressProbe {
 
   /**
    * THE BALLOTS of the turn's Regular Session, before the engine's turn:
-   * each AI major's ballot on the engine's slate onto its record of the turn
+   * each AI major's ballot on the engine's slate (and the Diplomatic
+   * Victory resolution where it sits) onto its record of the turn
    * (`records`, by seat), scored against the log's session of `turn`.
    */
   turn(state: GameState, turn: number, inputs: MajorViewInputs, agendasOf: (seat: number) => readonly string[],
        records: Record<number, SeatActionRecord>): void {
     if (!congressSessionDue(state.turn, worldEraIndex(state))) return;
-    const slate = (state.congressSlate ?? []).map((index) => ({ index, type: index >= 0 ? installType(index) : null }));
     const view = majorView(state, inputs);
+    const engine = view.congressSlate().map((index, slot) => ({ slot, index, type: index >= 0 ? congressInstallType(index) : null }))
+      .filter((s): s is { slot: number; index: number; type: string } => s.type !== null);
+    if (view.congressDv()) engine.push({ slot: 2, index: -1, type: 'WC_RES_DIPLOVICTORY' });
     const logged = this.log?.get(turn) ?? this.log?.get(turn + 1);
     this.tally.sessions++;
+    let drawn = 0;
     for (const [seat, pid] of this.seats) {
       if (!view.majors().includes(seat)) continue;
-      const known = slate.filter((s): s is { index: number; type: string } => s.index >= 0 && s.type !== null);
-      const { vote } = congressBallot(view, seat, agendasOf(seat), known);
-      const ballot = slate.map((s) => (s.index >= 0 && s.type ? vote[known.findIndex((k) => k.index === s.index)] : null));
-      (records[seat] ??= { production: [], tech: null, civic: null, units: [] }).vote = ballot;
+      const { vote } = congressBallot(view, seat, agendasOf(seat), engine);
+      (records[seat] ??= { production: [], tech: null, civic: null, units: [] }).vote = vote;
       if (!logged) continue;
       // the game's slate of the session, the engine's index of each (-1 for
-      // one the catalog does not carry)
+      // the Diplomatic Victory resolution and one the catalog lacks), in
+      // slots past the engine's
       const theirs = [...logged.keys()].filter((r) => logged.get(r)?.has(pid))
-        .map((type) => ({ type, index: CONGRESS_RESOLUTIONS.findIndex((_r, i) => installType(i) === type) }));
+        .map((type, k) => ({ slot: k, type, index: CONGRESS_RESOLUTIONS.findIndex((_r, i) => congressInstallType(i) === type) }));
       const own = congressBallot(view, seat, agendasOf(seat), theirs);
-      this.score(turn, pid, view.favor(seat), theirs, own.evals, own.votes, own.vote, logged);
+      drawn += own.targets.filter((x) => x < 0).length;
+      this.score(turn, pid, view.favor(seat), theirs, own.evals, own.votes, own.targets, logged);
+    }
+    if (logged) {
+      this.tally.drawsOurs += drawn;
+      this.tally.drawsGame += this.draws.get(turn) ?? this.draws.get(turn + 1) ?? 0;
     }
   }
 
+  /** the log's index of a target the port names, null where unread */
+  private gameTarget(type: string, target: number): number | null {
+    const t = CONGRESS_TARGET_TABLES[type];
+    if (!t || target < 0) return null;
+    if (t.kind === 'PLAYER') return this.player.get(target) ?? null;
+    if (t.kind === 'RELIGION') return null;
+    return congressCandidates(type).find((c) => c.target === target)?.index ?? null;
+  }
+
   private score(turn: number, pid: number, favor: number, slate: readonly { index: number; type: string }[],
-                evals: readonly ResolutionEval[], votes: Map<string, number>, vote: readonly [number, number, number][],
+                evals: readonly ResolutionEval[], votes: Map<string, number>, targets: readonly number[],
                 logged: Map<string, Map<number, LoggedChoice>>): void {
     slate.forEach((s, k) => {
       const lg = logged.get(s.type)?.get(pid);
@@ -117,17 +148,16 @@ export class CongressProbe {
       const n = votes.get(s.type) ?? 1;
       if (outcome === lg.outcome) t.outcomeEqual++;
       if (n === lg.votes) t.votesEqual++;
-      const kind = s.index >= 0 ? CONGRESS_RESOLUTIONS[s.index]?.target : undefined;
       let targetNote = '';
-      if (kind === 'seat') {
+      const ours = this.gameTarget(s.type, targets[k]);
+      if (ours !== null) {
         t.targetLines++;
-        const ours = this.player.get(vote[k][1]);
         if (ours === lg.target) t.targetEqual++;
-        else targetNote = ` target ours p${ours ?? '?'} log p${lg.target}`;
+        else targetNote = ` target ours ${ours} log ${lg.target}`;
       }
-      if ((outcome !== lg.outcome || n !== lg.votes || targetNote) && t.misses.length < 40) {
+      if ((outcome !== lg.outcome || n !== lg.votes || targetNote) && t.misses.length < 60) {
         t.misses.push(`t${turn} p${pid} ${s.type.replace('WC_RES_', '')}: outcome ours ${outcome} log ${lg.outcome}, votes ours ${n} log ${lg.votes}`
-          + `${targetNote} (favor ${Math.floor(favor)}; values ${(evals[k].values[0] / 256).toFixed(1)} / ${(evals[k].values[1] / 256).toFixed(1)}${evals[k].listed ? ', listed' : ''})`);
+          + `${targetNote}${targets[k] < 0 ? ' (ours drawn)' : ''} (favor ${Math.floor(favor)}; values ${(evals[k].values[0] / 256).toFixed(1)} / ${(evals[k].values[1] / 256).toFixed(1)}${evals[k].listed ? ', listed' : ''})`);
       }
     });
   }
@@ -137,6 +167,7 @@ export class CongressProbe {
 export function congressAiMarkdown(t: CongressAiTally): string[] {
   return ['', "## The majors' AI: the World Congress (ai/major/congress.ts)", '',
     `- Sessions voted: ${t.sessions}; resolutions both sessions hold, per AI major: ${t.lines}.`,
-    `- The outcome as World_Congress.csv's OPTIONS: ${t.outcomeEqual} / ${t.lines}; the votes as its VOTES: ${t.votesEqual} / ${t.lines}; the target on the resolutions naming a player: ${t.targetEqual} / ${t.targetLines}.`,
+    `- The outcome as World_Congress.csv's OPTIONS: ${t.outcomeEqual} / ${t.lines}; the votes as its VOTES: ${t.votesEqual} / ${t.lines}; the target where the port names one: ${t.targetEqual} / ${t.targetLines}.`,
+    `- Target draws at the scored sessions: ours ${t.drawsOurs}, the game's ${t.drawsGame} (RandCalls).`,
     '', 'Misses:', '', ...t.misses.map((m) => `- ${m}`)];
 }

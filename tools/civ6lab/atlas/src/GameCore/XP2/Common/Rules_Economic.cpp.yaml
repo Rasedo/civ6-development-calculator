@@ -38,13 +38,14 @@
     - cpu/data/aiValue.ts:AI_POLICY_HORIZON
     - cpu/data/seats.ts:missionPrice
     - ai/major/congress.ts:CONGRESS_HORIZON
+    - cpu/data/seats.ts:CONGRESS_VOTE_PRICE
   readings:
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
     - "H-1: the upgrade's gold — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - "...VEST_IMPROVED_DEGRADATION 50 − 30 more pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08, t..."
     - "..., \"iNetProduction >= 0\"), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUC..."
@@ -239,9 +240,12 @@
     - recording: h1_duelv1127
       turn: 121
       value: 7 votes cost 84 (85 -> 5 with the turn's +4)
-  impl: [ai/major/congress.ts:voteCost]
+  impl:
+    - ai/major/congress.ts:voteCost
+    - cpu/core/congress.ts:voteCost
+    - cpu/data/seats.ts:CONGRESS_VOTE_PRICE
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x5276c0
   final: 0x371060
@@ -302,9 +306,9 @@
     - recording: h1_duelv1127
       turn: 61
       value: 29 favor buys 4 votes
-  impl: [ai/major/congress.ts:votesFor]
+  impl: [ai/major/congress.ts:votesFor, cpu/core/congress.ts:votesFor]
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x527e30
   final: 0x3715b0

@@ -254,7 +254,7 @@ def extract_record(sim, row: int, prod, dtile, tech, civic, war, war_kind, env_s
         if swaps:
             rec["swapTiles"] = swaps
     if vote is not None:
-        ballot = [[int(vote[b, k, f]) for f in range(3)] for k in range(vote.shape[1])]
+        ballot = [[int(vote[b, k, f]) for f in range(vote.shape[2])] for k in range(vote.shape[1])]
         ballot = [e if e[0] >= 0 else None for e in ballot]
         if any(e is not None for e in ballot):
             rec["vote"] = ballot
@@ -455,11 +455,12 @@ def replay_seat(sim, row: int, rec: dict) -> None:
     vote = None
     if any(e is not None for e in _vt):
         _kn = sim.civ_congress_vote.shape[2]
-        vote = torch.full((sim.B, _kn, 3), -1, dtype=torch.long, device=dev)
+        _nf = sim.civ_congress_vote.shape[3]
+        vote = torch.full((sim.B, _kn, _nf), -1, dtype=torch.long, device=dev)
         for _k, _ent in enumerate(_vt[:_kn]):
             if _ent is None:
                 continue
-            for _f in range(3):
+            for _f in range(_nf):
                 vote[:, _k, _f] = int(_ent[_f])
     _gpv = rec.get("gpPass")
     gp_pass = (torch.full((sim.B,), int(_gpv), dtype=torch.long, device=dev)

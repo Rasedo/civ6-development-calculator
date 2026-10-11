@@ -13658,6 +13658,16 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "ADD_DIPLOMATIC_VICTORY_POINTS"
+     },
+     "attach": {
+      "id": "ADD_DIPLOMATIC_VICTORY_POINTS",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS",
+      "args": {
+       "Amount": "2",
+       "Tooltip": "LOC_DVP_TOOLTIP_DVP_RESOLUTION",
+       "VictoryResolution": "true"
+      }
      }
     }
    ],
@@ -13668,6 +13678,16 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "SUBTRACT_DIPLOMATIC_VICTORY_POINTS"
+     },
+     "attach": {
+      "id": "SUBTRACT_DIPLOMATIC_VICTORY_POINTS",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS",
+      "args": {
+       "Amount": "-2",
+       "Tooltip": "LOC_DVP_TOOLTIP_DVP_RESOLUTION",
+       "VictoryResolution": "true"
+      }
      }
     }
    ]
@@ -13708,6 +13728,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "TARGET_ADD_TRADE_ROUTE"
+     },
+     "attach": {
+      "id": "TARGET_ADD_TRADE_ROUTE",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_TRADE_ROUTE_CAPACITY",
+      "args": {
+       "Amount": "1"
+      }
      }
     },
     {
@@ -13716,6 +13744,15 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "INCREASES_TRADE_TO_GOLD"
+     },
+     "attach": {
+      "id": "INCREASES_TRADE_TO_GOLD",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_TRADE_ROUTE_YIELD_FROM_OTHERS",
+      "args": {
+       "YieldType": "YIELD_GOLD",
+       "Amount": "4"
+      }
      }
     }
    ],
@@ -13726,6 +13763,16 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "INTERNATIONAL_MAJOR_TRADE_ROUTES_DISABLED"
+     },
+     "attach": {
+      "id": "INTERNATIONAL_MAJOR_TRADE_ROUTES_DISABLED",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_TRADE_ROUTE_DISABLE",
+      "args": {
+       "InternationalMajors": "true",
+       "InternationalMinors": "false",
+       "Domestic": "false"
+      }
      }
     }
    ]
@@ -13797,6 +13844,12 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "PLAYERS_EQUALIZE_WMD_COUNTS"
+     },
+     "attach": {
+      "id": "PLAYERS_EQUALIZE_WMD_COUNTS",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_GLOBAL_WMD_STOCKPILE",
+      "args": {}
      }
     }
    ],
@@ -13807,6 +13860,15 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "PLAYER_TARGET_WMD_BAN"
+     },
+     "attach": {
+      "id": "PLAYER_TARGET_WMD_BAN",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_GLOBAL_WMD_STOCKPILE",
+      "args": {
+       "TargetOnly": "true",
+       "Amount": "0"
+      }
      }
     }
    ]
@@ -13907,6 +13969,12 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "ALL_DISTRICTS_CULTURE_BOMB"
+     },
+     "attach": {
+      "id": "ALL_DISTRICTS_CULTURE_BOMB",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_ALL_DISTRICTS_CULTURE_BOMB",
+      "args": {}
      }
     }
    ],
@@ -13917,6 +13985,12 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "NO_CULTURE_BORDER_EXPANSION"
+     },
+     "attach": {
+      "id": "NO_CULTURE_BORDER_EXPANSION",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_CITY_NO_CULTURE_BORDER_EXPANSION",
+      "args": {}
      }
     }
    ]
@@ -14038,6 +14112,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_CITY_GROWTH_BONUS"
+     },
+     "attach": {
+      "id": "WC_RES_CITY_GROWTH_BONUS",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_CITY_GROWTH",
+      "args": {
+       "Amount": "20"
+      }
      }
     },
     {
@@ -14046,6 +14128,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_CITY_LOYALTY_PENALTY"
+     },
+     "attach": {
+      "id": "WC_RES_CITY_LOYALTY_PENALTY",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_CITY_IDENTITY_PER_TURN",
+      "args": {
+       "Amount": "-5"
+      }
      }
     }
    ],
@@ -14056,6 +14146,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_CITY_GROWTH_PENALTY"
+     },
+     "attach": {
+      "id": "WC_RES_CITY_GROWTH_PENALTY",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_CITY_GROWTH",
+      "args": {
+       "Amount": "-20"
+      }
      }
     },
     {
@@ -14064,6 +14162,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_CITY_LOYALTY_BONUS"
+     },
+     "attach": {
+      "id": "WC_RES_CITY_LOYALTY_BONUS",
+      "collection": "COLLECTION_PLAYER_CITIES",
+      "effect": "EFFECT_ADJUST_CITY_IDENTITY_PER_TURN",
+      "args": {
+       "Amount": "5"
+      }
      }
     }
    ]
@@ -14109,6 +14215,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_PLAYER_GRIEVANCES_BUFF"
+     },
+     "attach": {
+      "id": "WC_RES_PLAYER_GRIEVANCES_BUFF",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_PLAYER_GRIEVANCE_GENERATION",
+      "args": {
+       "Amount": "100"
+      }
      }
     }
    ],
@@ -14119,6 +14233,14 @@ export const AI_RESOLUTIONS: readonly AiResolution[] = [
      "effect": "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE",
      "args": {
       "ModifierId": "WC_RES_PLAYER_GRIEVANCES_DEBUFF"
+     },
+     "attach": {
+      "id": "WC_RES_PLAYER_GRIEVANCES_DEBUFF",
+      "collection": "COLLECTION_OWNER",
+      "effect": "EFFECT_ADJUST_PLAYER_GRIEVANCE_GENERATION",
+      "args": {
+       "Amount": "-50"
+      }
      }
     }
    ]
@@ -16497,4 +16619,433 @@ export const AI_GOVERNOR_PROMOTIONS: readonly AiGovernorPromotion[] = [
    }
   ]
  }
+];
+export const AI_DISTRICTS: readonly { type: string; base: boolean; cityCenter: boolean }[] = [
+ {
+  "type": "DISTRICT_CITY_CENTER",
+  "base": true,
+  "cityCenter": true
+ },
+ {
+  "type": "DISTRICT_HOLY_SITE",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_CAMPUS",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_ENCAMPMENT",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_HARBOR",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_AERODROME",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_COMMERCIAL_HUB",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_ENTERTAINMENT_COMPLEX",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_THEATER",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_INDUSTRIAL_ZONE",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_NEIGHBORHOOD",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_AQUEDUCT",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_SPACEPORT",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_WONDER",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_ACROPOLIS",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_BATH",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_HANSA",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_LAVRA",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_MBANZA",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_STREET_CARNIVAL",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_ROYAL_NAVY_DOCKYARD",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_IKANDA",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_SEOWON",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_GOVERNMENT",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_WATER_STREET_CARNIVAL",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_CANAL",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_DAM",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_COTHON",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_SUGUBA",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_OBSERVATORY",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_HIPPODROME",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_OPPIDUM",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_THANH",
+  "base": false,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_PRESERVE",
+  "base": true,
+  "cityCenter": false
+ },
+ {
+  "type": "DISTRICT_DIPLOMATIC_QUARTER",
+  "base": true,
+  "cityCenter": false
+ }
+];
+export const AI_PROJECTS: readonly { type: string; spaceRace: boolean; wmd: boolean; cost: number }[] = [
+ {
+  "type": "PROJECT_REPAIR_OUTER_DEFENSES",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 0
+ },
+ {
+  "type": "PROJECT_LAUNCH_EARTH_SATELLITE",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 900
+ },
+ {
+  "type": "PROJECT_LAUNCH_MOON_LANDING",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 1500
+ },
+ {
+  "type": "PROJECT_MANHATTAN_PROJECT",
+  "spaceRace": false,
+  "wmd": true,
+  "cost": 1000
+ },
+ {
+  "type": "PROJECT_OPERATION_IVY",
+  "spaceRace": false,
+  "wmd": true,
+  "cost": 1000
+ },
+ {
+  "type": "PROJECT_BUILD_NUCLEAR_DEVICE",
+  "spaceRace": false,
+  "wmd": true,
+  "cost": 800
+ },
+ {
+  "type": "PROJECT_BUILD_THERMONUCLEAR_DEVICE",
+  "spaceRace": false,
+  "wmd": true,
+  "cost": 1000
+ },
+ {
+  "type": "PROJECT_CARNIVAL",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_ENCAMPMENT",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_HARBOR",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_INDUSTRIAL_ZONE",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_COMMERCIAL_HUB",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_HOLY_SITE",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_CAMPUS",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_ENHANCE_DISTRICT_THEATER",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_WATER_CARNIVAL",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_BREAD_AND_CIRCUSES",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_WATER_BREAD_AND_CIRCUSES",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 25
+ },
+ {
+  "type": "PROJECT_COTHON_CAPITAL_MOVE",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 100
+ },
+ {
+  "type": "PROJECT_CARBON_RECAPTURE",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_COAL",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 200
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_OIL",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 300
+ },
+ {
+  "type": "PROJECT_CONVERT_REACTOR_TO_URANIUM",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_LAUNCH_MARS_BASE",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 1800
+ },
+ {
+  "type": "PROJECT_LAUNCH_EXOPLANET_EXPEDITION",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 2100
+ },
+ {
+  "type": "PROJECT_ORBITAL_LASER",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 600
+ },
+ {
+  "type": "PROJECT_TERRESTRIAL_LASER",
+  "spaceRace": true,
+  "wmd": false,
+  "cost": 600
+ },
+ {
+  "type": "PROJECT_SEND_AID",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 200
+ },
+ {
+  "type": "PROJECT_TRAIN_ATHLETES",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 200
+ },
+ {
+  "type": "PROJECT_TRAIN_ASTRONAUTS",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 200
+ },
+ {
+  "type": "PROJECT_RECOMMISSION_REACTOR",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_COAL_POWER_PLANT",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_OIL_POWER_PLANT",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_DECOMMISSION_NUCLEAR_POWER_PLANT",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 400
+ },
+ {
+  "type": "PROJECT_LIJIA_FAITH",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 1000
+ },
+ {
+  "type": "PROJECT_LIJIA_FOOD",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 1000
+ },
+ {
+  "type": "PROJECT_LIJIA_GOLD",
+  "spaceRace": false,
+  "wmd": false,
+  "cost": 1000
+ }
+];
+export const AI_PROMOTION_CLASSES: readonly string[] = [
+ "PROMOTION_CLASS_RECON",
+ "PROMOTION_CLASS_MELEE",
+ "PROMOTION_CLASS_RANGED",
+ "PROMOTION_CLASS_SIEGE",
+ "PROMOTION_CLASS_ANTI_CAVALRY",
+ "PROMOTION_CLASS_LIGHT_CAVALRY",
+ "PROMOTION_CLASS_HEAVY_CAVALRY",
+ "PROMOTION_CLASS_AIR_FIGHTER",
+ "PROMOTION_CLASS_AIR_BOMBER",
+ "PROMOTION_CLASS_NAVAL_MELEE",
+ "PROMOTION_CLASS_NAVAL_RANGED",
+ "PROMOTION_CLASS_NAVAL_CARRIER",
+ "PROMOTION_CLASS_NAVAL_RAIDER",
+ "PROMOTION_CLASS_APOSTLE",
+ "PROMOTION_CLASS_INQUISITOR",
+ "PROMOTION_CLASS_SUPPORT",
+ "PROMOTION_CLASS_SPY",
+ "PROMOTION_CLASS_MONK",
+ "PROMOTION_CLASS_ROCK_BAND",
+ "PROMOTION_CLASS_GIANT_DEATH_ROBOT",
+ "PROMOTION_CLASS_NIHANG"
 ];

@@ -20,7 +20,7 @@ import { disasterPhase } from './disasters';
 import { climateTurn, deriveLowlands, standingRemovable } from './climate';
 import { cityStateAt, minorCity, suzerainEffect, suzerainLandPurchaseOffPct } from './cityStates';
 import { minorPhase } from './minorBuild';
-import { seatPhase, freeCitiesPhase, healCities, worldCongress, nextCityName } from './phase';
+import { seatPhase, freeCitiesPhase, healCities, worldCongress, emergencySessions, nextCityName } from './phase';
 import { congressCondemnFavor, congressUdtBlockedDistrict, congressUnitCostMult, CONGRESS_CUR_GOLD, CONGRESS_CUR_PRODUCTION } from './congress';
 import { settleIncursion, promiseIncursion } from './grievance';
 import { PROMISE_CONVERT } from '../data/promises';
@@ -1553,8 +1553,9 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
  * runs/turnorder/): the barbarians' turn, which closes the turn every
  * player has just acted in (the game's draw log puts the camp step and the
  * tribes' rolls after the last player's actions and before the next
- * turn's random-event step: runs/h1_duelw1121 t1-t4); then the turn's
- * random-event step — the storms, the volcano
+ * turn's random-event step: runs/h1_duelw1121 t1-t4); then the World
+ * Congress's Regular Session (its draws the turn's last: runs/h1_duelv1127
+ * t61); then the turn's random-event step — the storms, the volcano
  * roll and the random event (`disasterPhase`) — and the climate step, which
  * the game takes after every player's actions of the turn before and before
  * the first player's start (its draw log, `Logs/RandCalls.csv`: runs/
@@ -1565,13 +1566,14 @@ export function buyTile(state: GameState, cityId: number, tileIndex: number, sea
  * in every record from t31); then the
  * players' starts one
  * at a time in ascending player id — the majors, the city-states, the Free
- * Cities (16 of 16 turns); then the World Congress session
+ * Cities (16 of 16 turns); then the Special Sessions and the emergencies
  * and the heal of every unit and every city, before the counter moves; then,
  * on the new turn, the victory checks. The majors'
  * actions follow, between two turns.
  */
 export function endTurn(state: GameState): void {
   if (state.unitsMode) barbarianPhase(state);
+  worldCongress(state);
   if (state.disasters) disasterPhase(state);
   climateTurn(state);
   if (state.unitsMode) releaseBarbarians(state);
@@ -1584,7 +1586,7 @@ export function endTurn(state: GameState): void {
   minorPhase(state);
   freeCitiesPhase(state);
   theologicalCombatPhase(state);
-  worldCongress(state);
+  emergencySessions(state);
   if (state.unitsMode) refreshUnits(state);
   healCities(state);
 

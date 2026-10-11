@@ -22,8 +22,9 @@ import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_MINOR_IN
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ERAS } from '../data/techs';
 import {
-  FX, discounted, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
+  FX, discounted, fdiv, fmul, fxConst, fxOf, presentValue, pseudoYieldValue, traderValue, valueBetween, whole, yieldValue, type AiPlotView, type AiValueView,
 } from './aiValue';
+import { amenityPerTurn } from './aiCityBuild';
 
 export interface AiRequirement {
   type: string;
@@ -74,10 +75,24 @@ export interface ValueTerms {
    *  evaluation reads none */
   known?: readonly AiCitySubject[];
   /** the other player the evaluation is of (context +0x40): the city-state
-   *  an envoys' value is of (0x7a46c0); absent, none */
-  minor?: number;
+   *  an envoys' value is of (0x7a46c0), the player a resolution's option
+   *  value starts with (0x7b3be0) or its hint names, the major
+   *  COLLECTION_MAJOR_PLAYERS stands on; absent, none */
+  other?: number;
   /** the envoys the evaluation adds to those given (context +0x08) */
   tokens?: number;
+  /** a resolution's target hint (0x67dd40's handlers), in the install's
+   *  types: the luxury (+0x4c), the yield (+0x64), the government (+0x28),
+   *  the great person class (+0x6c), the project (+0x68) */
+  resource?: string;
+  yieldType?: string;
+  government?: string;
+  gpClass?: string;
+  project?: string;
+  /** the policy AI's best card for a slot type (GovernmentSlotType), raw
+   *  24.8, null for none: the cards neither obsolete nor active, unlocked,
+   *  of the slot (any for a wildcard), the most its scores give (0x623b90) */
+  bestPolicy?: (slot: string) => number | null;
 }
 
 /** a city an analysis may stand on: its owner's seat, the engine's city id
@@ -91,7 +106,7 @@ export interface AiCitySubject {
 /** an analysis subject: the player, a city (context +0x70), a district
  *  (+0x78) */
 type Subject =
-  | { kind: 'player' }
+  | { kind: 'player'; other?: number }
   | { kind: 'city'; seat: number; id: number; capital: boolean }
   | { kind: 'district'; cityId: number; type: string }
   | { kind: 'plot'; plot: AiPlotView };
@@ -124,6 +139,9 @@ function subjects(t: ValueTerms, collection: string): Subject[] | null {
     // 0x69f6c0 / 0x69f6e0: with a player in the context, that player once
     // (the first step stands on the context as it is and ends the walk)
     case 'COLLECTION_ALL_PLAYERS': return [{ kind: 'player' }];
+    // 0x6a00f0: the game's majors in order, each alive one setting the
+    // context's other player (+0x40)
+    case 'COLLECTION_MAJOR_PLAYERS': return t.view.majors().map((m) => ({ kind: 'player', other: m }));
     default: return null;
   }
 }
@@ -205,9 +223,9 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // player has given it (0x44c860) and the context's (+0x08) reach
   // MinimumTokens
   REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS: (t, args) =>
-    t.minor !== undefined && t.view.envoys(t.minor, t.seat) + (t.tokens ?? 0) >= (Number(args.MinimumTokens ?? 0) | 0),
+    t.other !== undefined && t.view.envoys(t.other, t.seat) + (t.tokens ?? 0) >= (Number(args.MinimumTokens ?? 0) | 0),
   // 0x6d2470: with an other player in the context (+0x40), not at war with it
-  REQUIREMENT_PLAYER_IS_AT_PEACE: (t) => t.minor !== undefined && !t.view.atWar(t.seat, t.minor),
+  REQUIREMENT_PLAYER_IS_AT_PEACE: (t) => t.other !== undefined && !t.view.atWar(t.seat, t.other),
 };
 
 /** 0x6cf3c0 over the set as 0x6ccec0 builds it: null where a kept
@@ -263,7 +281,188 @@ const span = (t: ValueTerms, v: number): number => presentValue(v, t.rate, t.hor
 const flag = (args: Readonly<Record<string, string>>, name: string, dflt: boolean): boolean =>
   args[name] === undefined ? dflt : args[name] === 'true' || args[name] === '1';
 
+/** the percent `a` (24.8) of `v` (24.8), the fixed-point x a / 100 (0x6c8e60) */
+const pct = (v: number, a: number): number => Math.trunc((v * a) / (100 * FX));
+
+/** the Amenity value's turn in a city of the player (0x79f7c0's, one Amenity) */
+const amenityTurn = (t: ValueTerms, c: { balance: number; yields: Readonly<Record<string, number>> }): number =>
+  amenityPerTurn({ view: t.view, seat: t.seat }, c);
+
 const ANALYZERS: Readonly<Record<string, Analyzer>> = {
+  // 0x6a8320 (the Luxury Policy, A): on the player's own subject, with a
+  // luxury named (+0x4c) of which it holds more than one copy (0x4aa790),
+  // the most one Amenity more is worth over its cities (0x79f7c0) from the
+  // start to the horizon
+  EFFECT_ADJUST_PLAYER_NO_CAP_RESOURCE: (t) => {
+    if (t.other !== t.seat || !t.resource || t.view.resourceHeld(t.seat, t.resource) <= 1) return 0;
+    let best = 0;
+    for (const c of t.view.cities(t.seat)) {
+      best = Math.max(best, valueBetween(amenityTurn(t, t.view.cityAmenity(t.seat, c.id)), t.start, t.horizon, t.rate));
+    }
+    return whole(best);
+  },
+  // 0x6bc050 (the Luxury Policy, B): with a luxury named (+0x4c) the player
+  // holds none of (0x4a93c0), per other major not allied its copies x 100
+  // at war (0x469cd0), 60 where the player denounced it (0x3da8e0), else
+  // 25, raw
+  EFFECT_ADJUST_PLAYER_BAN_RESOURCE: (t) => {
+    if (!t.resource || t.view.resourceHeld(t.seat, t.resource) !== 0) return 0;
+    let v = 0;
+    for (const m of t.view.majors()) {
+      if (m === t.seat || t.view.allied(t.seat, m)) continue;
+      const w = t.view.atWar(t.seat, m) ? 100 : t.view.denouncing(t.seat, m) ? 60 : 25;
+      v += t.view.resourceHeld(m, t.resource) * w;
+    }
+    return v;
+  },
+  // 0x6b47f0 (Mercenary Companies; Amount +0xc, YieldType +8 else the hint
+  // +0x64): a buff (Amount > 0) on the player's own subject — half the
+  // yield the player makes a turn (0x4bf7c0) x the percent, at its weight,
+  // from the start to the horizon; a debuff on another major's subject —
+  // that major's yield x the percent at the player's weight, x 2.0 at war
+  // where the player's military strength is the greater, 0.25 at war
+  // otherwise, 0.33 at peace, from the start to the horizon, the greatest
+  // over the subjects (`SETS`)
+  EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD: (t, args) => {
+    const y = args.YieldType ?? t.yieldType;
+    const a = (Number(args.Amount ?? 0) | 0) * FX;
+    if (!y || t.other === undefined) return 0;
+    if (a > 0) {
+      if (t.other !== t.seat) return 0;
+      const v = yieldValue(t.view, t.seat, pct(fxOf(t.view.playerYield(t.seat, y)), a), y);
+      return whole(valueBetween(fmul(v, fxConst(0.5)), t.start, t.horizon, t.rate));
+    }
+    if (a >= 0 || t.other === t.seat) return 0;
+    const v = yieldValue(t.view, t.seat, pct(fxOf(t.view.playerYield(t.other, y)), a), y);
+    const f = t.view.atWar(t.seat, t.other)
+      ? (t.view.militaryStrength(t.seat) > t.view.militaryStrength(t.other) ? 2 * FX : fxConst(0.25)) : fxConst(Math.fround(0.33));
+    return whole(valueBetween(fmul(v, f), t.start, t.horizon, t.rate));
+  },
+  // 0x6a2270 (Patronage, A): on the player's own subject, the class named
+  // (+0x6c): 0.01 x its points a turn x the Amount, as Gold at its weight,
+  // from the start to the horizon
+  EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT: (t, args) => {
+    if (t.other !== t.seat || !t.gpClass) return 0;
+    const ppt = fmul(fxConst(Math.fround(0.01)), fxOf(t.view.greatPersonPointsPerTurn(t.seat, t.gpClass)));
+    const v = yieldValue(t.view, t.seat, fmul(ppt, (Number(args.Amount ?? 0) | 0) * FX), 'YIELD_GOLD');
+    return whole(valueBetween(v, t.start, t.horizon, t.rate));
+  },
+  // 0x6b0050 (Patronage, B): on the player's own subject, the class named:
+  // the points a turn of every other major not allied less twice the
+  // player's own, as Gold at its weight, from the start to the horizon
+  EFFECT_ADJUST_NO_GREAT_PERSON_POINTS: (t) => {
+    if (t.other !== t.seat || !t.gpClass) return 0;
+    let sum = 0;
+    for (const m of t.view.majors()) {
+      if (m === t.seat) sum -= 2 * fxOf(t.view.greatPersonPointsPerTurn(m, t.gpClass));
+      else if (!t.view.allied(t.seat, m)) sum += fxOf(t.view.greatPersonPointsPerTurn(m, t.gpClass));
+    }
+    return whole(valueBetween(yieldValue(t.view, t.seat, sum, 'YIELD_GOLD'), t.start, t.horizon, t.rate));
+  },
+  // 0x6a3870 (World Ideology; Amount +8, GovernmentSlotType +0xc): with a
+  // government named (+0x28) the player is in, |Amount| x the policy AI's
+  // best card for the slot — on its own subject for a slot gained, on
+  // another major's for a slot lost; a slot lost on its own subject sets
+  // the total to 0 (`SETS`)
+  EFFECT_ADJUST_GOVERNMENT_SLOTS: (t, args) => {
+    const a = Number(args.Amount ?? 0) | 0;
+    if (!t.government || t.other === undefined || t.view.government(t.seat) !== t.government) return 0;
+    if (a < 0 && t.other === t.seat) return Number.NaN;
+    if ((a > 0) !== (t.other === t.seat)) return 0;
+    const best = t.bestPolicy?.(args.GovernmentSlotType ?? '') ?? null;
+    return Math.abs(a) * ((best ?? 0) >> 8);
+  },
+  // 0x6c6d60 (the Diplomatic Victory resolution; Amount +8): P the
+  // player's worth of a victory point (PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT
+  // 1.0), W the points a victory takes. On its own target (+0x40) gaining
+  // points: Amount x 2P, plus W x P / max(1, W - its points - Amount)^2; on
+  // another's losing them: |Amount| x P, plus W x P / r^2, r = max(1, W -
+  // its points + Amount), one less (at least 1) per running competition it
+  // leads (0x25d5f0)
+  EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS: (t, args) => {
+    const a = Number(args.Amount ?? 0) | 0;
+    if (t.other === undefined) return 0;
+    const p = pseudoYieldValue(t.view, t.seat, FX, 'PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT');
+    const w = t.view.diplomaticVictoryPoints;
+    if (t.other === t.seat) {
+      if (a <= 0) return 0;
+      const rem = Math.max(1, w - t.view.diplomaticPoints(t.seat) - a);
+      return whole(a * 2 * p) + whole(fdiv(w * p, rem * rem * FX));
+    }
+    if (a >= 0) return 0;
+    let rem = Math.max(1, w - t.view.diplomaticPoints(t.other) + a);
+    for (let k = t.view.competitionLeads(t.other); k > 0; k--) rem = Math.max(1, rem - 1);
+    return whole(-a * p) + whole(fdiv(w * p, rem * rem * FX));
+  },
+  // 0x6c3bc0 (Public Relations; Amount +8): on its own target (+0x40) with
+  // more grievances: the grievances the player holds against every alive
+  // major x Amount / 100; on another's with fewer: that one's against the
+  // player x Amount / 100; as PSEUDOYIELD_DIPLOMATIC_GRIEVANCE at its weight,
+  // discounted from the start
+  EFFECT_ADJUST_PLAYER_GRIEVANCE_GENERATION: (t, args) => {
+    const a = Number(args.Amount ?? 0) | 0;
+    if (t.other === undefined) return 0;
+    let g = 0;
+    if (t.other === t.seat) {
+      if (a <= 0) return 0;
+      for (const m of t.view.majors()) g += t.view.grievances(t.seat, m) * FX;
+      if (g <= 0) return 0;
+    } else {
+      if (a >= 0) return 0;
+      g = t.view.grievances(t.other, t.seat) * FX;
+    }
+    return whole(discounted(pseudoYieldValue(t.view, t.seat, pct(g, a * FX), 'PSEUDOYIELD_DIPLOMATIC_GRIEVANCE'), t.rate, t.start));
+  },
+  // 0x6b10b0 (Public Works; Amount +8 as fx(Amount x 0.01), ProjectType +0xc
+  // else the hint +0x68): a boost — the subject city's Production x it,
+  // where the city may advance the project and makes Production, at the
+  // player's weight, from the start to the horizon; a cut — the most
+  // Production another major's city able to advance it makes, over the
+  // player's cities (at least 1), negated, x it, likewise
+  EFFECT_ADJUST_PROJECT_PRODUCTION: (t, args, s) => {
+    const project = args.ProjectType ?? t.project;
+    if (!project) return 0;
+    const a = pctOf(args);
+    if (a > 0) {
+      if (s.kind !== 'city' || !t.view.cityCanProject(s.seat, s.id, project)) return 0;
+      const prod = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_PRODUCTION'));
+      if (prod <= 0) return 0;
+      return whole(valueBetween(yieldValue(t.view, t.seat, fmul(prod, a), 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate));
+    }
+    let most = 0;
+    for (const m of t.view.majors()) {
+      if (m === t.seat) continue;
+      for (const c of t.view.cities(m)) {
+        if (!t.view.cityCanProject(m, c.id, project)) continue;
+        most = Math.max(most, fxOf(t.view.cityYield(m, c.id, 'YIELD_PRODUCTION')));
+      }
+    }
+    const per = fdiv(-most, Math.max(1, t.view.cities(t.seat).length) * FX);
+    return whole(valueBetween(yieldValue(t.view, t.seat, fmul(per, a), 'YIELD_PRODUCTION'), t.start, t.horizon, t.rate));
+  },
+  // 0x6bb020 (BuildingType +8, DistrictType +0xc, ProjectType +0x10,
+  // BanDistrictBuildings +0x14): on the player's own subject, per city a
+  // count — the building held +1 else -1; the project's district held -1
+  // else +1; the district held +1 else -1, or with the district's buildings
+  // banned held 2 x its buildings - 3 else -3 — at least 0, x 50, SETTING
+  // the total (`SETS`); on another's subject, or naming none of the three,
+  // it sets 0
+  EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION: (t, args) => {
+    if (t.other !== t.seat) return 0;
+    let n = 0;
+    for (const c of t.view.cities(t.seat)) {
+      if (args.BuildingType) n += t.view.cityHasBuilding(t.seat, c.id, args.BuildingType) ? 1 : -1;
+      if (args.DistrictType) {
+        const has = t.view.cityHasDistrict(t.seat, c.id, args.DistrictType);
+        if (!flag(args, 'BanDistrictBuildings', false)) n += has ? 1 : -1;
+        else n += has ? 2 * t.view.districtBuildingYields(t.seat, args.DistrictType, 'YIELD_PRODUCTION').length - 3 : -3;
+      }
+    }
+    return Math.max(n, 0) * 50;
+  },
+  // 0x6c1a80 (BuildingType +8, DistrictType +0xc, Amount): with neither
+  // named, nothing (the rest of its body unread)
+  EFFECT_ADJUST_BUILDING_PRODUCTION: () => 0,
   // 0x6b8ba0: a city subject only; the yield at the player's weight, valued
   // from the start to the horizon (0x7a2140)
   EFFECT_ADJUST_CITY_YIELD_CHANGE: (t, args, s) => {
@@ -527,6 +726,16 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
   },
 };
 
+/** the analyzers that SET the context's total instead of adding to it:
+ *  0x6b47f0's debuff keeps the greater, 0x6a3870's slot lost on the
+ *  player's own subject sets it to 0 (its analyzer's NaN), 0x6bb020 sets
+ *  it to its value */
+const SETS: Readonly<Record<string, (acc: number, v: number) => number>> = {
+  EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD: (acc, v) => Math.max(acc, v),
+  EFFECT_ADJUST_GOVERNMENT_SLOTS: (acc, v) => (Number.isNaN(v) ? 0 : acc + v),
+  EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION: (_acc, v) => v,
+};
+
 /** the analyzers' slot 2, which the analysis calls where no subject passed
  *  (the rest are a no-op, 0xbe4aa0) */
 const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Record<string, string>>) => number>> = {
@@ -544,7 +753,8 @@ const NONE_ANALYZERS: Readonly<Record<string, (t: ValueTerms, args: Readonly<Rec
  *  copy): a city subject is the city the nested analysis is of (+0x70); any
  *  other leaves the city as it stood */
 const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
-  s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } } : t;
+  s.kind === 'city' ? { ...t, owner: { cityId: s.id, capital: s.capital, seat: s.seat } }
+    : s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : t;
 
 /** One modifier's analysis (0x6cede0): null where it is refused — no
  *  analyzer or collection, or a fourth nested analysis — else the whole
@@ -552,13 +762,14 @@ const onSubject = (t: ValueTerms, s: Subject): ValueTerms =>
  *  each subject (at most 51) its requirement set admits goes to the
  *  analyzer, which adds its whole part, or for EFFECT_ATTACH_MODIFIER
  *  (0x6ab630) sets the total its attached modifier's own analysis on that
- *  subject leaves, where that analysis is not refused. 0 where its
+ *  subject leaves, where that analysis is not refused; an analyzer that
+ *  sets the total (`SETS`) sets it. 0 where its
  *  collection, a requirement evaluator or its effect's analyzer is not read
  *  here. */
 function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
   if (depth >= 4) return null;
   const subs = subjects(t, m.collection);
-  if (m.effect === 'EFFECT_ATTACH_MODIFIER') {
+  if (m.effect === 'EFFECT_ATTACH_MODIFIER' || m.effect === 'EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE') {
     const inner = m.attach;
     if (!inner || !subs) return inner ? 0 : null;
     let acc = 0;
@@ -584,7 +795,7 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
     if (ok === null) return 0;
     if (!ok) continue;
     passed = true;
-    sum += an(t, m.args, s);
+    sum = (SETS[m.effect] ?? ((acc: number, v: number) => acc + v))(sum, an(s.kind === 'player' && s.other !== undefined ? { ...t, other: s.other } : t, m.args, s));
   }
   // no subject passed: the analyzer's slot 2
   if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;
@@ -603,7 +814,7 @@ export function envoyValue(t: ValueTerms, minor: number, tokens: number): number
   if (t.view.atWar(t.seat, minor)) return 0;
   const civ = t.view.minorCivilization(minor);
   const mods = civ ? AI_MINOR_INFLUENCE_MODIFIERS[civ] ?? [] : [];
-  return modifiersValue({ view: t.view, seat: t.seat, start: t.start, horizon: t.horizon, rate: t.rate, minor, tokens }, mods);
+  return modifiersValue({ view: t.view, seat: t.seat, start: t.start, horizon: t.horizon, rate: t.rate, other: minor, tokens }, mods);
 }
 
 /** One modifier's value: its analysis's whole number, 0 where refused */

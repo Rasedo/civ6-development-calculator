@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import type { Seat } from '../../../cpu/core/types';
 import { civsAtWar, seatOf } from '../../../cpu/core/seats';
-import { loyaltyDelta, transferCity, worldCongress } from '../../../cpu/core/phase';
+import { loyaltyDelta, transferCity, emergencySessions, worldCongress } from '../../../cpu/core/phase';
 import { seededGame, settleFirstCity } from '../helpers';
 import {
   EMERGENCIES, EMERGENCY_MILITARY, EMERGENCY_MEMBER_FAVOR, EMERGENCY_TARGET_FAVOR,
   EMERGENCY_MEMBER_CS, EMERGENCY_MEMBER_MP, EMERGENCY_TARGET_LOYALTY,
   EMERGENCY_MEMBER_HEAL, EMERGENCY_TARGET_STRIKE_CS, EMERGENCY_ENVOY_GOLD,
   EMERGENCY_CS_ROUTE_GOLD, SPECIAL_SESSION_COST, SPECIAL_SESSION_GAP, CONGRESS_INTERVAL,
-  EMERGENCY_SLOTS, EMERGENCY_NUCLEAR, EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT,
+  EMERGENCY_SLOTS, EMERGENCY_NUCLEAR, EMERGENCY_NUKE_TARGET_CS, EMERGENCY_NUKE_LOYALTY_CUT, CONGRESS_VOTE_PRICE,
 } from '../../../cpu/data/seats';
 import {
   EMG_CALLED, EMG_PENDING, EMG_RUNNING, EMERGENCY_CITY_STATE, emergencies, emergencyAttackCS,
@@ -82,7 +82,7 @@ describe('emergencies: the trigger and the call', () => {
     const b = state.seats[1] as Seat;
     b.diplomaticFavor = SPECIAL_SESSION_COST + 5;
     state.turn = 7;
-    worldCongress(state);
+    emergencySessions(state);
     const e = emergencies(state)[0];
     expect(e.phase).toBe(EMG_CALLED);
     expect(e.act).toBe(8);
@@ -94,7 +94,7 @@ describe('emergencies: the trigger and the call', () => {
     conquer(state);
     (state.seats[1] as Seat).diplomaticFavor = SPECIAL_SESSION_COST - 1;
     state.turn = 7;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state)[0].phase).toBe(EMG_PENDING);
     expect((state.seats[1] as Seat).diplomaticFavor).toBe(SPECIAL_SESSION_COST - 1);
   });
@@ -105,10 +105,10 @@ describe('emergencies: the trigger and the call', () => {
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.lastSessionTurn = 10;
     state.turn = 10 + SPECIAL_SESSION_GAP - 1;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state)[0].phase).toBe(EMG_PENDING);
     state.turn = 10 + SPECIAL_SESSION_GAP;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state)[0].phase).toBe(EMG_CALLED);
   });
 
@@ -118,7 +118,7 @@ describe('emergencies: the trigger and the call', () => {
     conquer(state);
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.turn = 7;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state)[0].phase).toBe(EMG_PENDING);   // it does not expire
   });
 });
@@ -128,9 +128,9 @@ describe('emergencies: the session, the war and the clock', () => {
     conquer(state);
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.turn = 7;
-    worldCongress(state);          // sponsored
+    emergencySessions(state);          // sponsored
     state.turn = 8;
-    worldCongress(state);          // held
+    emergencySessions(state);          // held
     return emergencies(state)[0];
   }
 
@@ -200,7 +200,7 @@ describe('emergencies: the session, the war and the clock', () => {
     const before = b.diplomaticFavor ?? 0;
     a.cities = a.cities.filter((c) => c.id !== e.city);   // liberated
     state.turn = 9;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state).length).toBe(0);
     expect(b.diplomaticFavor).toBe(before + EMERGENCY_MEMBER_FAVOR);
     expect(b.emgHeal?.[0]).toBe(1);
@@ -215,7 +215,7 @@ describe('emergencies: the session, the war and the clock', () => {
     const a = seatOf(state, 0)!;
     const before = a.diplomaticFavor ?? 0;
     state.turn = e.act;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state).length).toBe(0);
     expect(a.diplomaticFavor).toBe(before + EMERGENCY_TARGET_FAVOR);
     expect(a.emgStrike?.[1]).toBe(1);
@@ -229,12 +229,12 @@ describe('emergencies: the session, the war and the clock', () => {
     conquer(state);
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.turn = 7;
-    worldCongress(state);
+    emergencySessions(state);
     // seat 0 buys enough weight that the NO side outvotes the lone member
-    seatOf(state, 0)!.diplomaticFavor = 10 + 20 + 30;
-    seatOf(state, 0)!.congressVote = [null, null, null, [1, 0, 3]];
+    seatOf(state, 0)!.diplomaticFavor = 2 * CONGRESS_VOTE_PRICE * (1 + 2 + 3);  // three extra votes
+    seatOf(state, 0)!.congressVote = [null, null, null, [1, 0, 3, 0]];
     state.turn = 8;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state).length).toBe(0);
     expect(civsAtWar(state, 0, 1)).toBe(false);
     // the losing side is refunded whole — here the lone yes vote spent nothing
@@ -251,9 +251,9 @@ describe('emergencies: the nuclear terms', () => {
     raiseEmergency(state, EMERGENCY_NUCLEAR, 0, cap.id, [1]);
     (state.seats[1] as Seat).diplomaticFavor = 200;
     state.turn = 7;
-    worldCongress(state);          // sponsored
+    emergencySessions(state);          // sponsored
     state.turn = 8;
-    worldCongress(state);          // held
+    emergencySessions(state);          // held
     const e = emergencies(state)[0];
     expect(e.kind).toBe(EMERGENCY_NUCLEAR);
     expect(e.phase).toBe(EMG_RUNNING);
@@ -266,7 +266,7 @@ describe('emergencies: the nuclear terms', () => {
     const a = seatOf(state, 0)!, b = state.seats[1] as Seat;
     a.cities = a.cities.filter((c) => c.id !== e.city);
     state.turn = 9;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state).length).toBe(0);
     expect(b.emgNukeCS?.[0]).toBe(1);
     expect(b.emgHeal).toBeUndefined();
@@ -282,7 +282,7 @@ describe('emergencies: the nuclear terms', () => {
     const home = b.cities[0];
     const tier = 'CONTENT';
     state.turn = e.act;
-    worldCongress(state);
+    emergencySessions(state);
     expect(emergencies(state).length).toBe(0);
     expect(b.emgNukeCut).toBe(1);
     expect(a.emgNukeCut).toBeUndefined();
@@ -313,7 +313,9 @@ describe('emergencies: the city-state rewards', () => {
 
   it('a Regular Session stamps the quiet clock the Special Session reads', () => {
     const state = twoCivs();
-    state.turn = CONGRESS_INTERVAL;
+    // the session closing the interval turn sits after the next turn's
+    // barbarians
+    state.turn = CONGRESS_INTERVAL + 1;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
     expect(state.lastSessionTurn).toBe(CONGRESS_INTERVAL);

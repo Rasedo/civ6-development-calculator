@@ -860,8 +860,8 @@ def _decide_vote(nobs: list, row: int, device):
     interest: its preference on each slate resolution, free; and on the
     Diplomatic Victory resolution it backs itself or blocks the leader, with
     every point of favor it has. Slot 3 is the SPECIAL session — join every
-    emergency it is not the target of. Returns [B, 4, 3] — [outcome, target,
-    extra votes] per slot — or None on a quiet turn."""
+    emergency it is not the target of. Returns [B, 4, 4] — [outcome, target,
+    extra votes, cast order (the slot)] per slot — or None on a quiet turn."""
     cg = _obs_group(nobs, "congress", device)
     slate = _obs_dense(nobs, "congress", "slate", device)
     special = cg["special"]
@@ -870,7 +870,7 @@ def _decide_vote(nobs: list, row: int, device):
     pref_o = _obs_dense(nobs, "congress", "pref_outcome", device)
     pref_t = _obs_dense(nobs, "congress", "pref_target", device)
     B = len(nobs)
-    out = torch.full((B, 4, 3), -1, dtype=torch.long, device=device)
+    out = torch.full((B, 4, 4), -1, dtype=torch.long, device=device)
     zero = torch.zeros(B, dtype=torch.long, device=device)
     # THE SPECIAL SESSION: the ladder joins every emergency it is not the
     # target of, which is also what a seat with no ballot does.
@@ -890,6 +890,8 @@ def _decide_vote(nobs: list, row: int, device):
         out[:, 2, 0] = torch.where(ok, (lead != row).long(), out[:, 2, 0])
         out[:, 2, 1] = torch.where(ok, lead.clamp(min=0), out[:, 2, 1])
         out[:, 2, 2] = torch.where(ok, want, out[:, 2, 2])
+    for k in range(4):
+        out[:, k, 3] = torch.where(out[:, k, 0] >= 0, torch.full_like(zero, k), out[:, k, 3])
     return out if bool((out[:, :, 0] >= 0).count_nonzero()) else None
 
 

@@ -464,7 +464,7 @@ def _congress(sim, row: int) -> dict:
             ("congress", "leader"): sim._congress_leader(dv),
             ("congress", "special"): sim._special_upcoming(turn),
             ("congress", "favor"): _floored(sim.civ_diplo_favor[:, row]),
-            ("congress", "vote_step"): torch.full((sim.B,), int(sim._congress_vstep), dtype=torch.long, device=sim.device)}
+            ("congress", "vote_step"): torch.full((sim.B,), 2 * int(sim._congress_vprice), dtype=torch.long, device=sim.device)}
 
 
 # the `list` fields that hold ASCENDING INDICES; every other list is dense

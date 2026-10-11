@@ -73,7 +73,7 @@
       turn: 61
       value: runs/h1_duelv1127 Qin's whole favor bought   4 votes at t61 (29), 9 at t101 (149), 7 at t121 (85), and paid 24, 144,   84 (Player_Stats_2's favor balance).
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - "...cost, else the votes floor(F x desire / S) buys; the votes cast max(1, min(want, cap)) (0x59bc40) and their price taken from F (0x527680: s x n x (n - 1), s = 5 through the game speed..."
   review: imported

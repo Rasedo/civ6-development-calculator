@@ -25,7 +25,7 @@ export type DrawLabel =
   | 'Random Event Unit Damage Roll'
   // a player's start and actions
   | 'GetNextBuyablePlot picker' | 'Unit Combat Damage' | 'Unit Capture Chance' | 'Random Promotion'
-  | 'Generating a random new Great Person' | 'World Congress Resolutions'
+  | 'Generating a random new Great Person' | 'World Congress Resolutions' | 'Random congress resolution target'
   | 'Choosing random tech boost to grant based on era' | 'Choosing random civic boost to grant based on era'
   | 'Choosing random tech to grant based on era' | 'Choosing random civic to grant based on era'
   | 'Choosing a Goody Hut Type' | 'Choosing a Sub Type' | 'Choosing a Relic' | 'Choosing a City Name' | 'Choosing a Citizen Name'

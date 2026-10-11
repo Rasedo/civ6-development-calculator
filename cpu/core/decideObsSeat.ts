@@ -6,7 +6,7 @@ import { gpOffer } from './greatPeople';
 import { GP_CLASSES } from '../data/greatPeople';
 import { worldEraIndex } from './eras';
 import { congressSessionDue, congressVoter, dvLeader, preference, specialSessionDue } from './congress';
-import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_STEP } from '../data/seats';
+import { CONGRESS_DV_MIN_ERA, CONGRESS_VOTE_PRICE } from '../data/seats';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import { siloTargets } from './combat';
 import { beliefPicks, canFoundReligion, openBeliefs } from './game';
@@ -51,7 +51,8 @@ function envoyGroup(state: GameState, seat: number): { avail: number; held: numb
  *  sits at the close of the current turn, before the counter moves — its
  *  ANNOUNCED slate and the seat's `preference` per slot, whether it also holds
  *  the Diplomatic Victory resolution and who leads it, whether a Special
- *  Session sits, the seat's favor floored, the vote step. */
+ *  Session sits, the seat's favor floored, the vote step (2 s: the k-th extra vote costs it
+ *  x k). */
 function congressGroup(state: GameState, seat: number): Record<string, unknown> {
   const turn = state.turn;
   const worldEra = worldEraIndex(state);
@@ -73,7 +74,8 @@ function congressGroup(state: GameState, seat: number): Record<string, unknown> 
     leader: dv ? dvLeader(state) : -1,
     special: specialSessionDue(state, turn, worldEra),
     favor: Math.floor(seatOf(state, seat)?.diplomaticFavor ?? 0),
-    vote_step: CONGRESS_VOTE_STEP,
+    // the k-th extra vote costs vote_step x k (`voteCost`)
+    vote_step: 2 * CONGRESS_VOTE_PRICE,
   };
 }
 

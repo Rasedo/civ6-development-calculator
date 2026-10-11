@@ -16,6 +16,7 @@
     - "H-1: the draws per event (`dll_rng.py`)"
     - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - One generator (0x8b6c10, 16-bit max); 224 labelled draw sites.

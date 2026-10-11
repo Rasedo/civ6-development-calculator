@@ -3,6 +3,17 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x25d5f0
+  final: 0x19c640
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...x P + W x P / r^2, r one less per running competition it ranks in the top quarter of, 0x25d5f0); PLAYER_GRIEVANCE_GENERATION 0x6c3bc0 (on itself gaining: its grievances x Amount / 10..."
+  review: imported
 - addr: 0x274010
   final: 0x1abac0
   kind: function
@@ -58,6 +69,17 @@
   context:
     - ...at its best slot value, an appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0...
   review: imported
+- addr: 0x3ffaf0
+  final: 0x2bf180
+  kind: function
+  status: PARTLY
+  impl: [ai/major/congress.ts:congressHint]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...he option, the context): TradingPartners 0x682fb0 (+0x40: the alive majors met, a value 0x3ffaf0 sums of each — its list unread, the port reads 0 —, A the last not at war at or above t..."
+  review: imported
 - addr: 0x487650
   kind: function
   name: recordCongressOption
@@ -68,7 +90,7 @@
       turn: 61
       value: World_Congress.csv OPTIONS rows
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x58aa90
   final: 0x3b4040
@@ -106,9 +128,9 @@
     - recording: h1_duelv1127
       turn: 61
       value: Qin's listed Trade Treaty takes the 4 votes, World Religion 1
-  impl: [ai/major/congress.ts:allocateVotes]
+  impl: [ai/major/congress.ts:allocateVotes, ai/major/congress.ts:castOrder]
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x647bb0
   final: 0x42b1e0
@@ -134,6 +156,19 @@
   context:
     - "...the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged branches give max(X + 20, 20) instead (AI owner an..."
     - "...+0x6320 term (the desires' D of 0, 20, 40 over the records), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81..."
+  review: reviewed
+- addr: 0x682440
+  kind: function
+  name: hintPowerBuilding
+  semantics: A power building by the player's resources (0x4ac140); a field no chooser reads. Writes context +4.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 221
+      value: "Global Energy Treaty: two draws over 3"
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x69f340
   kind: function

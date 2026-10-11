@@ -277,7 +277,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the project value — PARTLY READ (the structure), unported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
@@ -575,11 +575,15 @@
 - addr: 0x7b3be0
   kind: function
   name: resolutionOptionValue
-  semantics: "An option's value: the option's modifier collection (game +0x3978 option 1, +0x3990 option 2) summed through 0x7a4b20 in a context the TargetKind handler 0x67dd40 fills; option outside 1 / 2: -9999. The analyzers of the resolutions' effect types are unread."
-  status: PARTLY
-  impl: [ai/major/congress.ts:optionValue]
+  semantics: "An option's value: the context (0x6ccd50) of the player (+0x40 its id), start 0, horizon 30, the rate; the handler 0x67dd40 fills it (false: 0); the option's modifiers (game +0x3978 / +0x3990) summed through 0x7a4b20."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [ai/major/congress.ts:optionValue, cpu/core/aiModifiers.ts:ValueTerms]
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   review: reviewed
 - addr: 0x7b3e50
   final: 0x531f20

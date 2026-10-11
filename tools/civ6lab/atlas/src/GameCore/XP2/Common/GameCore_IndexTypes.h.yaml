@@ -3,6 +3,19 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x6832f0
+  kind: function
+  name: hintUnitPromotionType
+  semantics: "Per promotion class the units the player knows, its own less those of majors at war with it: option 1 the most, option 2 the least. Writes context +0x58."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 1117 t201
+      value: Military Advisory option 1 names class 1 / 6
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6c8dd0
   kind: function
   status: PARTLY

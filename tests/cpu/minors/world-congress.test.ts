@@ -18,7 +18,7 @@ import { isWater } from '../../../world/query';
 import { BUILT_WONDERS } from '../../../cpu/data/builtWonders';
 import { UNITS } from '../../../cpu/data/units';
 import { GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
-import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_STEP, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
+import { CONGRESS_PUBLIC_RELATIONS, CONGRESS_MILITARY_ADVISORY, CONGRESS_WORLD_RELIGION, CONGRESS_ADVISORY_CS, CONGRESS_WORLD_RELIGION_RS, CONGRESS_WORLD_RELIGION_FAVOR, CONGRESS_VOTE_PRICE, GRIEVANCE_DECAY_BASE } from '../../../cpu/data/seats';
 import { PROMO_CLASSES } from '../../../cpu/data/promotions';
 import { CONGRESS_ESPIONAGE, CONGRESS_PACT_LEVELS, CONGRESS_ARMS_CONTROL } from '../../../cpu/data/seats';
 import { congressPactBanned, congressPactLevels, targetSpaceSize } from '../../../cpu/core/congress';
@@ -28,6 +28,8 @@ import { SPY_OFFENSIVE_MISSIONS, SPY_UNIT, SPY_M_SIPHON_FUNDS, SPY_M_FOMENT_UNRE
 import { addGrievance, grievanceWith, decayGrievances } from '../../../cpu/core/grievance';
 import { congressUnitCS, defenderCS, theoStrength } from '../../../cpu/core/combat';
 import { condemnHeretic } from '../../../cpu/core/game';
+import { holdRng, type DrawLabel } from '../../../cpu/core/rand';
+import { congressTargets } from '../../../cpu/core/congressTargets';
 import { spawnUnit } from '../../../cpu/core/units';
 import { setWar } from '../../../cpu/core/seats';
 
@@ -59,7 +61,7 @@ function medieval(state: ReturnType<typeof newGame>) {
 describe('world congress', () => {
   it('does not convene before the MEDIEVAL era', () => {
     const state = newGame(1);
-    state.turn = CONGRESS_INTERVAL; // a session turn ...
+    state.turn = CONGRESS_INTERVAL + 1; // the session closing an interval turn ...
     seatOf(state, 0)!.diplomaticFavor = 50;
     worldCongress(state);
     expect(state.congressSessions ?? 0).toBe(0); // ... but nobody is Medieval
@@ -69,10 +71,10 @@ describe('world congress', () => {
   it('convenes only on interval turns', () => {
     const state = newGame(1);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL + 1;
+    state.turn = CONGRESS_INTERVAL + 2;
     worldCongress(state);
     expect(state.congressSessions ?? 0).toBe(0);
-    state.turn = CONGRESS_INTERVAL * 2;
+    state.turn = CONGRESS_INTERVAL * 2 + 1;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
   });
@@ -87,7 +89,7 @@ describe('world congress', () => {
     expect(growthPct256(congressGrowthMult(state, 0))).toBe(51);
     expect(growthDetachResidue(congressGrowthMult(state, 0))).toBe(-1);
     expect(growthPct256(0.8)).toBe(-52);
-    state.turn = CONGRESS_INTERVAL * 2;
+    state.turn = CONGRESS_INTERVAL * 2 + 1;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
     for (const c of mine) expect(c.growthDrift).toBe(-1);
@@ -97,7 +99,7 @@ describe('world congress', () => {
   it('a pre-Modern session runs the two-slot slate, spends NO favor, and pays every winning-combo voter', () => {
     const state = newGame(1);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticFavor = 50;
     (state.seats[1] as Seat).diplomaticFavor = 90;
     // the slate is ANNOUNCED state — pin the draw deterministically
@@ -119,7 +121,7 @@ describe('world congress', () => {
     const state = newGame(1);
     (state.seats[1] as Seat).cities = []; // eliminated
     medieval(state);
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
     expect(seatOf(state, 0)!.diplomaticPoints).toBe(2 * DVP_PER_RESOLUTION);
@@ -130,17 +132,18 @@ describe('world congress', () => {
     const state = newGame(1);
     medieval(state);
     seatOf(state, 0)!.research.techs.push('RADIO'); // the world era is Modern
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticPoints = 5; // seat 0 leads
     state.congressSlate = [CONGRESS_UDT, CONGRESS_PATRONAGE]; // pin the announced draw
-    // 65 favor walks 3 extra votes (10+20+30=60, 5 short of the 4th)
+    // 65 favor buys 5 extra votes at s = 2 (4+8+12+16+20 = 60, 4 short of
+    // the 6th)
     seatOf(state, 0)!.diplomaticFavor = 65;
-    // 100 favor walks exactly 4 (10+20+30+40)
-    (state.seats[1] as Seat).diplomaticFavor = 100;
+    // 84 favor buys exactly 6 (4+8+...+24)
+    (state.seats[1] as Seat).diplomaticFavor = 84;
     worldCongress(state);
     // the DV resolution is not a STANDING effect — only the two slates are
     expect(state.congress!.length).toBe(2);
-    // seat 1's B-on-leader (1+4 votes) beats seat 0's A-on-self (1+3):
+    // seat 1's B-on-leader (1+6 votes) beats seat 0's A-on-self (1+5):
     // outcome B wins, so the loser (seat 0) is refunded 100% and the winner
     // keeps nothing and takes +1 DVP; the leader loses CONGRESS_DV_DELTA.
     expect(seatOf(state, 0)!.diplomaticFavor).toBe(65);
@@ -190,7 +193,7 @@ describe('world congress', () => {
   it('the Medieval gate reads ANY civ, not just seat 0', () => {
     const state = newGame(1);
     (state.seats[(0) + 1] as Seat).research.techs.push('APPRENTICESHIP'); // only the civ
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     seatOf(state, 0)!.diplomaticFavor = 5;
     worldCongress(state);
     expect(state.congressSessions).toBe(1);
@@ -434,7 +437,7 @@ describe('world congress: the wider slate', () => {
     medieval(state);
     // the highest polluter has nothing to score, so its own line refuses
     seatOf(state, 0)!.co2 = 100;
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     state.congressSlate = [CONGRESS_COMPETITION, CONGRESS_UDT];
     worldCongress(state);
     const c = competitionOf(state)!;
@@ -631,11 +634,11 @@ describe('the three unwritten resolutions', () => {
     const outcomeWin = (rich: number) => {
       const state = newGame(3);
       medieval(state);
-      state.turn = CONGRESS_INTERVAL;
+      state.turn = CONGRESS_INTERVAL + 1;
       for (const sx of state.seats) {
-        sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
-        sx.congressVote = [[sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0],
-                           [sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0]];
+        sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
+        sx.congressVote = [[sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 0],
+                           [sx.seat === 3 ? rich : 0, 0, sx.seat === 3 ? 2 : 0, 1]];
       }
       worldCongress(state);
       return state.congress!.map((a) => a.outcome);
@@ -645,11 +648,11 @@ describe('the three unwritten resolutions', () => {
 
     const state = newGame(3);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     for (const sx of state.seats) {
-      sx.diplomaticFavor = sx.seat === 3 ? CONGRESS_VOTE_STEP * 6 : 0;  // 1+2 rungs, twice
+      sx.diplomaticFavor = sx.seat === 3 ? 2 * CONGRESS_VOTE_PRICE * 6 : 0;  // 2 extra votes (2 s (1 + 2)), twice
       const target = sx.seat === 3 ? 1 : 0;
-      sx.congressVote = [[0, target, sx.seat === 3 ? 2 : 0], [0, target, sx.seat === 3 ? 2 : 0]];
+      sx.congressVote = [[0, target, sx.seat === 3 ? 2 : 0, 0], [0, target, sx.seat === 3 ? 2 : 0, 1]];
     }
     worldCongress(state);
     // the HIGHER target index wins the tie, which the lower-index rule alone
@@ -665,10 +668,10 @@ describe('arms control', () => {
   function session(wmd: readonly (readonly number[])[], vote: readonly [number, number]) {
     const state = newGame(2);
     medieval(state);
-    state.turn = CONGRESS_INTERVAL;
+    state.turn = CONGRESS_INTERVAL + 1;
     state.congressSlate = [CONGRESS_ARMS_CONTROL, CONGRESS_HERITAGE];
     state.seats.forEach((sx, c) => { sx.wmd = [...wmd[c]]; });
-    for (const sx of state.seats) sx.congressVote = [[vote[0], vote[1], 0], [0, 0, 0]];
+    for (const sx of state.seats) sx.congressVote = [[vote[0], vote[1], 0, 0], [0, 0, 0, 1]];
     worldCongress(state);
     expect(state.congress![0]).toEqual({ res: CONGRESS_ARMS_CONTROL, outcome: vote[0], target: vote[1] });
     return state.seats.map((sx) => [...(sx.wmd ?? [])]);
@@ -700,5 +703,36 @@ describe('arms control', () => {
     for (const sx of state.seats) sx.wmd = [0, 0];
     expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 0, ctx)).toEqual({ outcome: 1, target: 1 });
     expect(congressPreference(state, CONGRESS_ARMS_CONTROL, 1, ctx)).toEqual({ outcome: 1, target: 0 });
+  });
+});
+
+// The game's AI names no target where its hint is not among the targets a
+// resolution offers it (0x611140 ..): one "Random congress resolution
+// target" draw over them; the ballot's target -1 asks the engine for it.
+describe('the target draws', () => {
+  it('a ballot naming target -1 draws over the targets the resolution offers, seats in order, each in its cast order', () => {
+    const state = newGame(1);
+    medieval(state);
+    state.turn = CONGRESS_INTERVAL + 1;
+    state.congressSlate = [CONGRESS_MERCENARY, CONGRESS_UDT];
+    // seat 0 casts the Urban Development ballot first, seat 1 the reverse
+    seatOf(state, 0)!.congressVote = [[1, -1, 0, 1], [0, -1, 0, 0]];
+    (state.seats[1] as Seat).congressVote = [[1, -1, 0, 0], [0, -1, 0, 1]];
+    const lists = [congressTargets(state, 0, CONGRESS_UDT).length, congressTargets(state, 0, CONGRESS_MERCENARY).length,
+      congressTargets(state, 1, CONGRESS_MERCENARY).length, congressTargets(state, 1, CONGRESS_UDT).length];
+    const drawn: number[] = [];
+    holdRng({ point: () => undefined, draw: (_s, max: number, label: DrawLabel) => {
+      if (label === 'Random congress resolution target') drawn.push(max);
+    } });
+    try {
+      worldCongress(state);
+    } finally {
+      holdRng(null);
+    }
+    expect(drawn).toEqual(lists);
+    expect(lists[1]).toBe(3);   // Production, Gold, Faith
+    const merc = state.congress!.find((a) => a.res === CONGRESS_MERCENARY)!;
+    expect(merc.outcome).toBe(1);
+    expect([0, 1, 2]).toContain(merc.target);
   });
 });

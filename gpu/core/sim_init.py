@@ -771,7 +771,7 @@ class SimInit:
         # resolution and the SPECIAL SESSION. -1 in the outcome field = no
         # intent, vote the AI line. `_world_congress` clears it whether a
         # session fires or not.
-        self.civ_congress_vote = torch.full((B, self.n_majors, 4, 3), -1, dtype=torch.long, device=device)
+        self.civ_congress_vote = torch.full((B, self.n_majors, 4, 4), -1, dtype=torch.long, device=device)
         # EMERGENCIES, one fixed table of slots. A live row carries its kind,
         # the offending seat, the contested city id, the phase (0 pending, 1
         # called, 2 running) and the turn that phase acts on; `emg_affected`
@@ -885,17 +885,24 @@ class SimInit:
         self._dvp_win = int(_er2["diploVictoryPoints"])
         # WORLD CONGRESS catalog + magnitudes (data/seats.ts carries the
         # sources). Hard reads — a missing key must fail loud, not default.
+        # each resolution's valid targets (`congressTargets`): the live filter
+        # (0 none, 1 met, 2 onMap, 3 era, 4 gpAvail, 5 founded), the
+        # candidates' engine targets in the game's order and their eras
         self._congress_res = [
-            {"id": str(r["id"]), "min": int(r["min"]), "max": int(r["max"]), "t": int(r["t"])}
-            for r in _er2["congressResolutions"]
+            {"id": str(r["id"]), "min": int(r["min"]), "max": int(r["max"]), "t": int(r["t"]),
+             "tf": int(v["filter"]), "tt": [int(x) for x in v["targets"]], "te": [int(x) for x in v["eras"]]}
+            for r, v in zip(_er2["congressResolutions"], _er2["congressTargets"])
         ]
+        _dvt = _er2["congressDvTargets"]
+        self._congress_dv_targets = {"tf": int(_dvt["filter"]), "tt": [int(x) for x in _dvt["targets"]],
+                                     "te": [int(x) for x in _dvt["eras"]]}
         # A resolution is addressed by NAME: the catalog's ORDER is the wire's,
         # and a body that hard-codes a position breaks silently when one is
         # appended before it.
         self._congress_at = {r["id"]: i for i, r in enumerate(self._congress_res)}
         self._congress_dv_min = int(_er2["congressDvMinEra"])
         self._congress_dv_delta = int(_er2["congressDvDelta"])
-        self._congress_vstep = int(_er2["congressVoteStep"])
+        self._congress_vprice = int(_er2["congressVotePrice"])
         self._c_prod_mult = float(_er2["congressProdMult"])
         self._c_plus100 = float(_er2["congressPlus100"])
         self._c_energy_prod_mult = float(_er2["congressEnergyProdMult"])

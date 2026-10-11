@@ -9,17 +9,21 @@ class SimStep:
         dev = self.device
         # ONE GAME TURN, as Civ 6 runs it (`endTurn`; tools/civ6lab/
         # turn_order_civ6.md, runs/turnorder/): the barbarians' turn, which
-        # closes the turn every player has just acted in; the turn's
+        # closes the turn every player has just acted in; the World
+        # Congress's Regular Session closing that turn; the turn's
         # random-event step — the storms, the volcano roll and the random
         # event — and the climate step, after every player's actions of the
         # turn before and before the first player's start (the game's draw
         # log); then the players' starts one at a time in ascending player id
         # — the majors, the city-states, the Free Cities (16 of 16 turns);
-        # then the World Congress session and the heal of every unit and every
-        # city, before the counter moves; then, on the new turn, the victory
+        # then the Special Sessions and the emergencies and the heal of every
+        # unit and every city, before the counter moves; then, on the new turn, the victory
         # checks; the game era steps before the starts.
         if self.units_mode:
             self._barbarian_phase()
+        # the World Congress's Regular Session closing the turn the players
+        # acted in (`worldCongress`: its draws the turn's last)
+        self._world_congress()
         if self.disasters:
             self._disaster_phase()
         self._climate_turn()
@@ -30,7 +34,7 @@ class SimStep:
         self._free_cities_phase()
 
         self._theological_combat_phase()
-        self._world_congress()
+        self._emergency_sessions()
         # every unit's heal, fortification and movement (`refreshUnits`), then
         # every city's (`healCities`)
         if self.units_mode:

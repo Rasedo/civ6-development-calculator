@@ -49,6 +49,19 @@
   context:
     - "- EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT 0x6a1b80 (parser 0x6a1700: Amount stored as fx(Amount x 0.01f)): a city subject with the distr..."
   review: imported
+- addr: 0x6a2270
+  kind: function
+  name: EFFECT_ADJUST_GREAT_PERSON_POINTS_PERCENT
+  semantics: "Own subject, the class (+0x6c): 0.01 x its points a turn x Amount as Gold."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6a2f70
   final: 0x479ed0
   kind: function
@@ -80,6 +93,22 @@
   context:
     - "...CivicModifiers, the civics AI's 0x7a4b20 term, not wired): EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 READ (Amount x the player's points a token, Player_Influence +0x270, 30 without a playe..."
   review: imported
+- addr: 0x6a3870
+  kind: function
+  name: EFFECT_ADJUST_GOVERNMENT_SLOTS
+  semantics: "In the named government (+0x28): |Amount| x the policy AI's best card for the slot (0x623b90); a slot lost on its own subject sets 0."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiModifiers.ts:SETS
+    - ai/major/congress.ts:bestPolicy
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6a3a80
   kind: function
   name: EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS
@@ -202,6 +231,19 @@
   context:
     - ".../ UNREAD (worth 10 in the scores where the log reads more): the religion pressure term 0x6a8080 (the context city's majority religion is the player's: its pressure 0x1f33e0 x Amount,..."
   review: imported
+- addr: 0x6a8320
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_NO_CAP_RESOURCE
+  semantics: "Own subject, a luxury (+0x4c) held more than once: the most one Amenity more is worth over its cities (0x79f7c0)."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6a8d10
   kind: function
   name: EFFECT_ADJUST_CITY_COMBAT_BONUS
@@ -265,6 +307,7 @@
   impl: [cpu/core/aiModifiers.ts:analysis]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - "...number (+0xc0) as it starts; each subject's analyzer adds to it. EFFECT_ATTACH_MODIFIER 0x6ab630 analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of the context..."
   review: imported
@@ -430,6 +473,19 @@
   context:
     - "...IELD_INFLUENCE, PV(horizon) - PV(start)); EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x P..."
   review: imported
+- addr: 0x6b0050
+  kind: function
+  name: EFFECT_ADJUST_NO_GREAT_PERSON_POINTS
+  semantics: "Own subject, the class: the others' points a turn (not allied) less twice its own, as Gold."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6b0840
   kind: function
   name: EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT
@@ -444,12 +500,19 @@
 - addr: 0x6b10b0
   kind: function
   name: EFFECT_ADJUST_PROJECT_PRODUCTION
-  status: PARTLY
+  semantics: "The project (args else +0x68): a city's Production x the percent, or the most another major's city makes over its cities, negated."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - ..._AMENITY 0x6a1170 (CityBuildAI's 0x7a3d70 / 0x79f7c0), EFFECT_ADJUST_PROJECT_PRODUCTION 0x6b10b0, and the knowledge base's city value 0x7a0ac0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x...
-  review: imported
+  review: reviewed
 - addr: 0x6b2350
   final: 0x464600
   kind: function
@@ -499,6 +562,19 @@
     - "...0x1008], bare, from the start to start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0: the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and..."
     - ...4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b...
   review: imported
+- addr: 0x6b47f0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_BUFF_UNIT_PRODUCTION_YIELD
+  semantics: "A buff on its own subject: half its yield a turn x the percent; a debuff on another's: that one's x the percent x 2.0 / 0.25 at war (military strength), 0.33 at peace; the greatest."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiModifiers.ts:SETS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6b4e80
   final: 0x466b50
   kind: function
@@ -661,6 +737,19 @@
   context:
     - ...weight, 0x7a6690; PV(horizon) - PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); E...
   review: imported
+- addr: 0x6bb020
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_BAN_CITY_PRODUCTION
+  semantics: Per city a count of the building, the project's district, the district; x 50, setting the total.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiModifiers.ts:SETS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6bb1f0
   final: 0x46c620
   kind: function
@@ -675,6 +764,19 @@
   context:
     - "...(0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0: the greatest over the player's cities of the building's value 0x7a7590 from the start..."
   review: imported
+- addr: 0x6bc050
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_BAN_RESOURCE
+  semantics: "A luxury (+0x4c) held none of: per other major not allied its copies x 100 at war, 60 denounced, 25, raw."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6bc9e0
   final: 0x46de60
   kind: function
@@ -809,6 +911,15 @@
     - "...cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 (the Trader's worth with the Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STO..."
     - ...IELD_GOVERNOR @0xf2e214, discounted from the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value 0x7a7110 of Amount, start to horizon).
   review: imported
+- addr: 0x6c1a80
+  kind: function
+  name: EFFECT_ADJUST_BUILDING_PRODUCTION
+  semantics: 0 with neither a building nor a district named; the rest unread.
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6c2720
   final: 0x4732d0
   kind: function
@@ -835,6 +946,19 @@
   context:
     - ...ion (+0xe1 bit 6), pillaged or not; unweighted, span), EFFECT_ADJUST_CITY_INNER_DEFENSE 0x6c2dc0 (Amount, raw, where the context city's centre strikes, 0x249ee0 > 0, and stands), EFF...
   review: reviewed
+- addr: 0x6c3bc0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_GRIEVANCE_GENERATION
+  semantics: "Target +0x40: its grievances (or the target's against it) x Amount / 100 as PSEUDOYIELD_DIPLOMATIC_GRIEVANCE, discounted."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x6c4820
   final: 0x475250
   kind: function
@@ -859,3 +983,16 @@
   context:
     - "- EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8, YieldType +0xc, Amount +0x10): a city subject; Amount weighted,..."
   review: imported
+- addr: 0x6c6d60
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_DIPLOMATIC_VICTORY_POINTS
+  semantics: "Target +0x40: on itself gaining Amount x 2P + W x P / rem^2; on another losing |Amount| x P + W x P / rem^2 (rem less a running competition it leads)."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: the port's option values against World_Congress.csv's OPTIONS and VOTES
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed

@@ -556,7 +556,7 @@ def main() -> None:
             assert cg["dv"] == bool(dv[b]) and cg["leader"] == int(sim._congress_leader(dv)[b]), f"{where}: congress dv/leader"
             assert cg["special"] == bool(sim._special_upcoming(int(sim.turn) + 1)[b]), f"{where}: congress.special"
             assert cg["favor"] == int(math.floor(float(sim.civ_diplo_favor[b, row]))), f"{where}: congress.favor"
-            assert cg["vote_step"] == int(sim._congress_vstep), f"{where}: congress.vote_step"
+            assert cg["vote_step"] == 2 * int(sim._congress_vprice), f"{where}: congress.vote_step"
             for s, r in enumerate(cg["slate"]):
                 want = (-1, -1) if r < 0 else tuple(int(x[b]) for x in sim._congress_pref(r, row))
                 assert (cg["pref_outcome"][s], cg["pref_target"][s]) == want, f"{where}: congress pref slot {s}"

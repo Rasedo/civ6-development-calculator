@@ -12,16 +12,59 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
+- addr: 0x67cce0
+  kind: function
+  name: hintDistrict
+  semantics: "Per base district its buildings the player's cities may construct (0x1714d0), 1 each with the row's +0xe0 bit 7, 6 else: option 1 the most above 0, option 2 the least. Writes context +0x1c."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 161
+      value: Urban Development option 1 names district 0
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x67db60
+  kind: function
+  name: hintFeatureType
+  semantics: The feature with the most of the player's plots by a count per class; writes its HASH, which no valid list holds. Writes context +0x20.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 1128 t181
+      value: "Deforestation: two draws over 3 (jungle, forest, marsh)"
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x67dd40
   final: 0x44ebf0
   kind: function
-  status: PARTLY
+  name: congressHint
+  semantics: "Looks the resolution's AITargetChooser hash up in the handlers 0x67f160 registered and calls it (player, option, context); none: false."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 201
+      value: "Arms Control (no chooser): two draws over 2"
+  impl: [ai/major/congress.ts:congressHint, cpu/core/aiModifiers.ts:ValueTerms]
   readings:
-    - "C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - "...x1e) at the AI's discount rate 0x6fec30, the context filled by the TargetKind's handler 0x67dd40) into +0x18 / +0x1c; then where the player's +0x348[r] (the Resolutions lists: AiLists..."
     - "...x612e50, one per AITargetChooser, chosen by the TargetKind's hash): the handler's hint (0x67dd40) where it names one of the valid targets (the resolution's vfunc +0xd0), else a \"Random..."
     - "...LAYER_BAN_*, ... 20 of them): the port's option values are 0; the TargetKind handlers 0x67dd40 and the target choosers are unread — the port names the engines' own line (`congressTar..."
+  review: reviewed
+- addr: 0x67dea0
+  final: 0x44ecd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nTarget 0x6810a0 (+0x40: a city's +0x3070 == 1 read as losing Loyalty, housing to spare 0x67dea0: Housing above its citizens + 1; A the player where none loses Loyalty and more than ha..."
   review: imported
 - addr: 0x67df10
   kind: function
@@ -31,6 +74,68 @@
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
   review: reviewed
+- addr: 0x67e3d0
+  kind: function
+  name: hintGovernment
+  semantics: Option 1 the player's government; option 2 the government the other majors not allied hold most (2 at war, 1 else), its own left out. Writes context +0x28.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 241
+      value: "World Ideology option 1: Chiefdom holds no Wildcard slot, a draw over 12"
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x67e730
+  kind: function
+  name: hintGreatPersonPatronage
+  semantics: Option 1 the available class the player leads most by points; option 2 the class a rival ahead in points and faster needs the fewest points to recruit in, at war first. Writes context +0x6c.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 1128 t81
+      value: Patronage option 1 names class 5 / 6
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x67ed10
+  kind: function
+  name: hintGreatWorkObjects
+  semantics: "The player's Great Works per object type (0x18ddf0): option 1 the most (from -1), option 2 the least. Writes context +0x30."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 1128 t181
+      value: Heritage Organization option 1 names object 7 / 5
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x67f040
+  kind: function
+  name: hintGrievances
+  semantics: Option 1 the alive major at war or denounced (0x3da8e0) the player holds the most grievances (0x3d8d20) against, above 0; option 2 the player. Writes context +0x40.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 101
+      value: "Public Relations option 1 with no grievance: a draw over the 2 players"
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x67f160
+  final: 0x44fe40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- THE HINTS (0x67f160 registers DiplomaticSupport.cpp's handlers by name; each takes the player, the option,..."
+  review: imported
 - addr: 0x67ff10
   final: 0x450bf0
   kind: function
@@ -44,6 +149,45 @@
   context:
     - ...r declarations 0x6742d0 (one). The action indices are globals of the static initializer 0x67ff10 (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c, Delegation @f2e58c, D...
   review: imported
+- addr: 0x6810a0
+  kind: function
+  name: hintMigration
+  semantics: Cities losing Loyalty (+0x3070 == 1) and with housing to spare (0x67dea0); option 1 the player, else the ally or friend with the most spare less 3 x losing; option 2 the player with one losing, else the ally or friend with the most losing. Writes context +0x40.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 141
+      value: Migration Treaty option 1 names a player
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x6813a0
+  kind: function
+  name: hintMinorCivBonus
+  semantics: "Per city-state bonus type its suzerainties (option 1) or the others' (option 2): the most above 0, else the type with the most city-states. Writes context +0x3c."
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 81
+      value: Sovereignty option 1 names bonus type 0
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
+- addr: 0x681940
+  kind: function
+  name: hintMostCommonLuxury
+  semantics: Option 1 the luxury held most (0x4aa790), above 0; option 2 among those held none of, the one the other alive majors not allied hold most. Writes context +0x4c.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 141
+      value: "Luxury option 1: both name GYPSUM (17)"
+  impl: [ai/major/congress.ts:congressHint, ai/major/congress.ts:h]
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x681b60
   final: 0x452720
   kind: function

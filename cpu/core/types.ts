@@ -330,9 +330,12 @@ export interface SeatActionRecord {
    * engines re-validate every swap (`swapTileOk`) as it lands. */
   swapTiles?: [number, number][];
   /** The WORLD CONGRESS ballot, one entry per slate slot in slate order
-   * (slot 2 is the always-3rd Diplomatic Victory resolution): the outcome
-   * (0 = A, 1 = B), the target index, and how many EXTRA votes to buy up the
-   * favor curve. A slot the record leaves out votes the AI line. */
+   * (slot 2 is the always-3rd Diplomatic Victory resolution, slot 3 the
+   * Special Session): the outcome (0 = A, 1 = B), the target index (-1: a
+   * "Random congress resolution target" draw over the targets the
+   * resolution offers the seat), how many EXTRA votes to buy at the vote
+   * price, and the cast order (the seat's ballots draw their targets in it).
+   * A slot the record leaves out votes the AI line. */
   vote?: CongressVote;
   /** the Great Person class this seat PASSES on this turn (-1/absent none) */
   gpPass?: number;
@@ -361,7 +364,7 @@ export interface SeatActionRecord {
 
 /** One seat's ballot: [outcome, target, extraVotes] per slate slot, or null
  * for a slot this seat leaves to the AI line. */
-export type CongressVote = ([number, number, number] | null)[];
+export type CongressVote = ([number, number, number, number] | null)[];
 
 type SeatActionLog = Record<number, Record<number, SeatActionRecord>>;
 
@@ -830,8 +833,10 @@ export interface Seat {
    *  completed". */
   researchProjectPct?: number;
   /** THIS TURN's World Congress ballot, as the record left it. Written inside
-   * seatPhase and consumed by `worldCongress` at the turn tail, which clears
-   * every seat's whether a session fires or not — an intent is for one turn. */
+   * seatPhase, read by the turn's Special Sessions (`emergencySessions`) and
+   * by the Regular Session that closes the turn (`worldCongress`, after the
+   * barbarians' turn), which clears every seat's whether a session fires or
+   * not — an intent is for one turn. */
   congressVote?: CongressVote;
   /** WON EMERGENCIES, by the seat they were won against — a Military
    * Emergency's +5 healing in that seat's territory, one count per win. */

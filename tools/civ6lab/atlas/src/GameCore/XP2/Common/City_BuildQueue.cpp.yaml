@@ -122,6 +122,15 @@
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
     - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multi..."
   review: imported
+- addr: 0x16f7b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...costliest (+0x20) project of row +0xe8 bit 2 (SpaceRace) one of its cities may advance (0x16f7b0), else, pursuing conquest, of bit 8 (WMD); B, not pursuing the technology victory, the...
+  review: imported
 - addr: 0x170450
   final: 0xf61c0
   kind: function

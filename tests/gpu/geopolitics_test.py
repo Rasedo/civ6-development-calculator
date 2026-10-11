@@ -1247,14 +1247,15 @@ def main() -> None:
     assert int(s6._wond_dvp.sum()) == 7, "the three DVP wonders pay 4, 2 and 1"
     assert s6._wond_slots.sum(dim=0).tolist() == [1, 1, 1, 1],         "one wonder each adds a military, economic, diplomatic and wildcard slot" 
 
-    # not a session turn -> nothing happens, favor untouched
+    # not a session turn -> nothing happens, favor untouched (the session
+    # closing turn t sits on the next turn's step, after the barbarians)
     s6.civ_diplo_favor[:, 0] = 50
-    s6.turn = s6._congress_interval + 1
+    s6.turn = s6._congress_interval + 2
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 0 and int(s6.civ_diplo_favor[0, 0]) == 50, "off-interval turns must do nothing"
 
     # a session turn but nobody is Medieval -> still nothing
-    s6.turn = s6._congress_interval
+    s6.turn = s6._congress_interval + 1
     s6.civ_techs[:, 0].zero_(); s6.civ_techs[:, 1:].zero_(); s6.civ_civics[:, 0].zero_(); s6.civ_civics[:, 1:].zero_()
     s6._world_congress()
     assert int(s6.congress_sessions[0]) == 0, "pre-Medieval sessions must not convene"
@@ -1295,7 +1296,7 @@ def main() -> None:
             _era_ind = _t
             break
     assert _era_ind is not None, "no tech lands exactly on the Industrial era"
-    s7.turn = s7._congress_interval
+    s7.turn = s7._congress_interval + 1
     s7.congress_sessions[:] = 1  # pretend session 1 already ran
     # session 2 convenes on the slate ANNOUNCED at session 1's close — hand it
     # the announcement, computed from the catalog rather than pinned positions
@@ -1321,14 +1322,14 @@ def main() -> None:
             break
     assert _era_mod is not None, "no tech reaches the Modern era"
     assert s8.n_majors >= 3, "the DV poke wants three voters"
-    s8.turn = s8._congress_interval
+    s8.turn = s8._congress_interval + 1
     s8.civ_diplo_points[:, 1] = 5      # seat 1 leads
-    s8.civ_diplo_favor[:, 0] = 65      # walks 3 extra votes (60), 5 short of the 4th
-    s8.civ_diplo_favor[:, 1] = 60      # walks exactly 3
+    s8.civ_diplo_favor[:, 0] = 65      # buys 5 extra votes (4+8+12+16+20 = 60), 4 short of the 6th
+    s8.civ_diplo_favor[:, 1] = 60      # buys exactly 5
     s8.civ_diplo_favor[:, 2] = 0       # the free vote only
     s8._world_congress()
-    # the leader scan finds seat 1 (7 vs 2), seat 1 votes A-on-self weight 4,
-    # seats 0+2 vote B-on-leader weights 4+1: B wins 5-4
+    # the leader scan finds seat 1 (7 vs 2), seat 1 votes A-on-self weight 6,
+    # seats 0+2 vote B-on-leader weights 6+1: B wins 7-6
     assert int(s8.civ_diplo_favor[0, 1]) == 60, "the losing outcome is refunded 100%"
     assert int(s8.civ_diplo_favor[0, 0]) == 5, "a winning-combo voter keeps no refund"
     assert int(s8.civ_diplo_favor[0, 2]) == 0
@@ -1344,7 +1345,7 @@ def main() -> None:
     try:
         s8b._congress_dv_min = 99
         s8b.civ_techs[:, 0].zero_(); s8b.civ_techs[:, 0, _era_mod] = True
-        s8b.turn = s8b._congress_interval
+        s8b.turn = s8b._congress_interval + 1
         s8b.civ_diplo_points[:, 1] = 5
         s8b.civ_diplo_favor[:, 0] = 65
         s8b.civ_diplo_favor[:, 1] = 60
@@ -1389,7 +1390,7 @@ def main() -> None:
     s8.congress_active[:, 1, :] = torch.tensor([2, 1, 0], dtype=torch.long)   # Migration B on seat 0
     s8._eff_version += 1
     s8.city_growth_drift.zero_()
-    s8.turn = 2 * s8._congress_interval
+    s8.turn = 2 * s8._congress_interval + 1
     s8._world_congress()
     _live0 = s8.city_alive[0, 0, : s8.RC]
     assert bool(_live0.any()), "seat 0 must hold a city"

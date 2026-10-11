@@ -5,11 +5,15 @@
  * resolution) are sourced verbatim at the catalog (data/seats.ts).
  *
  * The VOTE rides the wire: `SeatActionRecord.vote` carries one
- * [outcome, target, extra votes] per slate slot, and a seat that submits none
- * falls back to the deterministic self-interest rule below — the AI vote.
- * Both engines only TALLY.
+ * [outcome, target, extra votes, cast order] per slate slot, and a seat that
+ * submits none falls back to the deterministic self-interest rule below. A
+ * ballot naming target -1 takes a "Random congress resolution target" draw
+ * over the targets the resolution offers the seat (`congressTargets`), as the
+ * game's AI does where its hint is not among them (0x611140 ..): seats in
+ * order, each seat's ballots in its cast order, before the tally.
  */
 import { randRange } from './rand';
+import { congressTargets, congressTargetsOf } from './congressTargets';
 import type { CongressVote, DistrictId, GameState, GreatPersonClass, Seat } from './types';
 import { GP_CLASSES } from '../data/greatPeople';
 import { gwCountsByObj } from './greatWorks';
@@ -25,7 +29,7 @@ import { growthDetachResidue } from './city';
 import { NUCLEAR_DEVICES } from '../data/nuclear';
 import {
   CONGRESS_RESOLUTIONS, CONGRESS_UDT, CONGRESS_PATRONAGE, CONGRESS_MIGRATION,
-  CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_STEP,
+  CONGRESS_HERITAGE, CONGRESS_DV_MIN_ERA, CONGRESS_DV_DELTA, CONGRESS_VOTE_PRICE,
   CONGRESS_GPP_MULT, CONGRESS_GROWTH_A, CONGRESS_GROWTH_B, CONGRESS_MIG_LOYALTY,
   CONGRESS_GW_MULT, DVP_PER_RESOLUTION,
   CONGRESS_MERCENARY, CONGRESS_TRADE_POLICY, CONGRESS_POLICY_TREATY,
@@ -268,19 +272,36 @@ export function preference(state: GameState, res: number, seat: number,
   }
 }
 
+/** THE PRICE of `n` votes on one resolution (0x527680): s x n x (n - 1)
+ *  favor, s the vote price (CONGRESS_VOTE_PRICE) — the first vote free */
+export function voteCost(n: number): number {
+  const a = Math.abs(n);
+  return CONGRESS_VOTE_PRICE * (a - 1) * a;
+}
+
+/** THE VOTES `favor` buys (0x527d80): 1 for none, else
+ *  whole((sqrt(4 x favor / s + 1) + 1) x 0.5) in single precision */
+export function votesFor(favor: number): number {
+  if (favor <= 0) return 1;
+  const f = Math.fround;
+  const root = f(Math.sqrt(f(f(f(favor) * 4) / CONGRESS_VOTE_PRICE) + 1));
+  return Math.trunc(f(f(root + 1) * 0.5));
+}
+
 /**
- * BUY EXTRA VOTES up the sourced curve — the k-th extra vote costs
- * CONGRESS_VOTE_STEP*k favor, and the curve restarts for every resolution
- * ("it is thus wise to spend Diplomatic Favor on other resolutions if they are
- * also important"). Stops at the first rung the bank cannot clear. Debits the
- * bank and reports what it took, because the refund tiers pay that back.
+ * BUY EXTRA VOTES up the price (`voteCost`): the k-th extra vote costs
+ * 2 s k favor, and the price restarts for every resolution. Stops at the
+ * first vote the bank cannot clear. Debits the bank and reports what it
+ * took, because the refund tiers pay that back.
  */
 export function buyVotes(sx: Seat, want: number): { extra: number; spent: number } {
   let favor = sx.diplomaticFavor ?? 0;
   let extra = 0, spent = 0;
-  while (extra < want && favor >= CONGRESS_VOTE_STEP * (extra + 1)) {
-    favor -= CONGRESS_VOTE_STEP * (extra + 1);
-    spent += CONGRESS_VOTE_STEP * (extra + 1);
+  while (extra < want) {
+    const step = voteCost(extra + 2) - voteCost(extra + 1);
+    if (favor < step) break;
+    favor -= step;
+    spent += step;
     extra++;
   }
   sx.diplomaticFavor = favor;
@@ -304,7 +325,7 @@ function tally(votes: readonly Vote[], targetSpace: number,
   const tv = new Array<number>(targetSpace).fill(0);
   const tf = new Array<number>(targetSpace).fill(0);
   for (const v of votes) {
-    if (v.outcome !== outcome) continue;
+    if (v.outcome !== outcome || v.target < 0) continue;
     tv[v.target] += v.weight;
     tf[v.target] += spent[v.seat];
   }
@@ -368,7 +389,7 @@ function runResolution(state: GameState, res: number, slot: number,
     const sx = state.seats[c];
     if (sx.cities.length === 0) continue;
     const v = recorded[c]?.[slot];
-    const p = v ? { outcome: clamp(v[0], 1), target: clamp(v[1], space - 1) } : preference(state, res, c, voters[c]);
+    const p = v ? { outcome: clamp(v[0], 1), target: v[1] < 0 ? -1 : clamp(v[1], space - 1) } : preference(state, res, c, voters[c]);
     // NO favor without an intent: the AI free-votes on a regular resolution.
     const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : 0);
     spent[c] = bought.spent;
@@ -454,7 +475,7 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
     if (sx.cities.length === 0) continue;
     const v = recorded[c]?.[CONGRESS_DV_SLOT];
     const outcome = v ? clamp(v[0], 1) : (c === leader ? 0 : 1);
-    const target = v ? clamp(v[1], space - 1) : leader;
+    const target = v ? (v[1] < 0 ? -1 : clamp(v[1], space - 1)) : leader;
     const bought = buyVotes(sx, v ? Math.max(0, Math.trunc(v[2])) : Number.MAX_SAFE_INTEGER);
     spent[c] = bought.spent;
     votes.push({ seat: c, outcome, target, weight: 1 + bought.extra });
@@ -467,16 +488,46 @@ function runDvResolution(state: GameState, recorded: readonly (CongressVote | nu
   if (win.outcome === 0) diploVictoryMoment(state, t.seat);
 }
 
-/** One Regular Session: the ANNOUNCED slate, drawn at the previous session's
- * close as the DLL's session setup 0x598270 draws it — the era-eligible
- * resolutions that are not InjectionOnly, each weight 1: min(3, eligible)
- * "World Congress Resolutions" draws, each over what is left and removing
- * its pick; with three drawn, the first two the previous slate did not hold
- * stand (fewer when it held more), else every one drawn; then ONE draw over
- * the InjectionOnly rows in their era (the Diplomatic Victory resolution from
- * Modern, a lone row: a draw over 1). The Diplomatic Victory resolution then
- * sits every session from Modern. The standing effects REPLACE the previous
- * session's and hold until the next one. `_congress_draw_slate` is the twin. */
+/**
+ * THE TARGET DRAWS of a session's ballots naming target -1: seats in order,
+ * each seat's ballots in its cast order (the 4th field), one "Random congress
+ * resolution target" draw over the targets the resolution offers the seat,
+ * the ballot taking the one drawn (-1 where it offers none). `slate` is the
+ * session's two resolutions, `dv` whether the Diplomatic Victory one sits.
+ * `_congress_target_draws` is the twin.
+ */
+function drawTargets(state: GameState, recorded: readonly (CongressVote | null)[], slate: readonly number[],
+                     dv: boolean): (CongressVote | null)[] {
+  return recorded.map((ballot, c) => {
+    if (!ballot || state.seats[c]?.cities.length === 0) return ballot;
+    const out = ballot.map((v) => (v ? [...v] as [number, number, number, number] : null));
+    const open = (slot: number) => (slot < 2 ? (slate[slot] ?? -1) >= 0 : slot === CONGRESS_DV_SLOT && dv);
+    const order = out.map((v, slot) => ({ v, slot })).filter((x) => x.v && x.slot <= CONGRESS_DV_SLOT && open(x.slot) && x.v[1] < 0)
+      .sort((a, b) => a.v![3] - b.v![3] || a.slot - b.slot);
+    for (const { v, slot } of order) {
+      const list = slot === CONGRESS_DV_SLOT ? congressTargetsOf(state, c, 'WC_RES_DIPLOVICTORY') : congressTargets(state, c, slate[slot]);
+      const k = randRange(state, list.length, 'Random congress resolution target');
+      v![1] = list[k] ?? -1;
+    }
+    return out;
+  });
+}
+
+/** One Regular Session, after the barbarians' turn closes the turn every
+ * player acted in (the game's draw log: the session's draws the last of the
+ * turn, before the next turn's random-event step; runs/h1_duelv1127 t61):
+ * the ANNOUNCEMENT of the next session's slate first — the DLL's session
+ * setup 0x598270 draws it: the era-eligible resolutions that are not
+ * InjectionOnly, each weight 1: min(3, eligible) "World Congress
+ * Resolutions" draws, each over what is left and removing its pick; with
+ * three drawn, the first two the slate voted now did not hold stand (fewer
+ * when it held more), else every one drawn; then ONE draw over the
+ * InjectionOnly rows in their era (the Diplomatic Victory resolution from
+ * Modern, a lone row: a draw over 1) —, then the ballots' target draws
+ * (`drawTargets`), then the votes on the slate announced at the session
+ * before. The Diplomatic Victory resolution sits every session from Modern.
+ * The standing effects REPLACE the previous session's and hold until the
+ * next one. `_congress_draw_slate` is the twin of the draw. */
 export function congressSession(state: GameState, worldEra: number,
                                 recorded: readonly (CongressVote | null)[],
                                 voters: readonly CongressVoterCtx[]): void {
@@ -499,6 +550,10 @@ export function congressSession(state: GameState, worldEra: number,
   // a session whose slate was never announced (the FIRST one, or an
   // announcement that found nothing eligible) draws its own, now
   if (slate[0] === -1 && slate[1] === -1) draw();
+  const voting = [slate[0], slate[1]];
+  // ANNOUNCE the next session's slate (era-eligibility at announcement)
+  draw();
+  const ballots = drawTargets(state, recorded, voting, worldEra >= CONGRESS_DV_MIN_ERA);
   // the standing Migration Treaty detaches from its target's cities, each
   // keeping the residue its growth percent leaves (`City.growthDrift`)
   const migration = congressEffect(state, CONGRESS_MIGRATION);
@@ -507,11 +562,8 @@ export function congressSession(state: GameState, worldEra: number,
     for (const c of citiesOf(state, migration.target)) c.growthDrift = (c.growthDrift ?? 0) + residue;
   }
   state.congress = [];
-  [slate[0], slate[1]].filter((r) => r >= 0)
-    .forEach((res, slot) => runResolution(state, res, slot, recorded, voters));
-  if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, recorded);
-  // ANNOUNCE the next session's slate (era-eligibility at announcement)
-  draw();
+  voting.filter((r) => r >= 0).forEach((res, slot) => runResolution(state, res, slot, ballots, voters));
+  if (worldEra >= CONGRESS_DV_MIN_ERA) runDvResolution(state, ballots);
 }
 
 function congressEffect(state: GameState, res: number): { outcome: number; target: number } | null {

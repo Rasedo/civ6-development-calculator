@@ -16,7 +16,7 @@ import { BELIEF_CATALOGS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIGION_TYPES } fr
 import { TECHS, ERAS } from '../../cpu/data/techs';
 import {
   CONGRESS_BORDER_CONTROL, CONGRESS_INTERVAL, CONGRESS_MERCENARY, CONGRESS_MIGRATION,
-  CONGRESS_MIN_ERA, CONGRESS_VOTE_STEP,
+  CONGRESS_MIN_ERA, CONGRESS_VOTE_PRICE,
 } from '../../cpu/data/seats';
 import type { CityState, GameState } from '../../cpu/core/types';
 
@@ -125,7 +125,7 @@ describe('seat scalar groups', () => {
     // ...but the world is Ancient: the Congress is closed
     expect(SEAT_GROUPS.congress(state, 0)).toEqual({
       slate: [-1, -1], pref_outcome: [-1, -1], pref_target: [-1, -1], dv: false,
-      leader: -1, special: false, favor: 7, vote_step: CONGRESS_VOTE_STEP,
+      leader: -1, special: false, favor: 7, vote_step: 2 * CONGRESS_VOTE_PRICE,
     });
     expect(congressSessionDue(CONGRESS_INTERVAL, CONGRESS_MIN_ERA - 1)).toBe(false);
     expect(congressSessionDue(CONGRESS_INTERVAL + 1, CONGRESS_MIN_ERA)).toBe(false);

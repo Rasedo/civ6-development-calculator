@@ -27,10 +27,17 @@ import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { snipeRing, snipeRing3 } from './unitOrders';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
-import { congressPolicyBlocked, congressVoter, preference as congressPreference } from './congress';
+import { congressPolicyBlocked, congressSessionDue, congressVoter, preference as congressPreference } from './congress';
+import { congressTargets, congressTargetsOf } from './congressTargets';
+import { worldEraIndex } from './eras';
+import { CONGRESS_DV_MIN_ERA, DIPLO_VICTORY_POINTS } from '../data/seats';
+import { GWO_COUNT } from '../data/greatWorks';
+import { gwCountsByObj } from './greatWorks';
+import { UNIT_PROMO_CLASS } from '../data/promotions';
+import { availableBuildings } from './rules';
 import { carryLayout, darkAgeEra, fitPoliciesLoose, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
-import { gpOffer } from './greatPeople';
+import { gpOffer, gpOfferCost, greatPersonPointsPerTurn } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
@@ -48,7 +55,7 @@ import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIG
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unitProdCost } from './game';
+import { availableProjects, beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unitProdCost } from './game';
 import { alliancePayable, dealItemPayable, friendshipPayable, missionOf, missionPayable } from './deals';
 import { DEAL_OPEN_BORDERS } from '../data/seats';
 import { WAR_KIND_FORMAL, WAR_KIND_SURPRISE } from '../data/warKinds';
@@ -97,6 +104,12 @@ const policyType = (id: string): string => gameTypeOf('policy', id, 'POLICY_');
 const govId = (type: string): string | null => engineId('government', type, 'GOVERNMENT_', GOVERNMENTS);
 
 const UNIT_ACTION = unitActionIndex(IMPROVEMENT_IDS);
+
+/** the engine's promotion classes whose install type is not PROMOTION_CLASS_ + id */
+const PROMO_INSTALL: Readonly<Record<string, string>> = {
+  ANTICAV: 'PROMOTION_CLASS_ANTI_CAVALRY', LIGHT_CAV: 'PROMOTION_CLASS_LIGHT_CAVALRY',
+  HEAVY_CAV: 'PROMOTION_CLASS_HEAVY_CAVALRY', ESPIONAGE: 'PROMOTION_CLASS_SPY',
+};
 
 /** a city's strength, its strike (walls standing) and the strike's reach */
 const cityDefence = (state: GameState, c: City): MajorCityDefenceView => ({
@@ -484,6 +497,67 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     denouncing: (i, j) => denounceActive(state, i, j),
     favor: (i) => seatOf(state, i)?.diplomaticFavor ?? 0,
     congressTarget: (i, r) => congressPreference(state, r, i, congressVoter(state, i)).target,
+    congressTargets: (i, r) => congressTargets(state, i, r),
+    congressTargetsOf: (i, type) => congressTargetsOf(state, i, type),
+    congressSlate: () => (congressSessionDue(state.turn, worldEraIndex(state)) ? [...(state.congressSlate ?? [-1, -1])] : [-1, -1]),
+    congressDv: () => congressSessionDue(state.turn, worldEraIndex(state)) && worldEraIndex(state) >= CONGRESS_DV_MIN_ERA,
+    cityStateBonus: (cs) => {
+      const c = seatOf(state, cs) as CityState | undefined;
+      return c ? `MINOR_CIV_BONUS_${c.type.toUpperCase()}` : null;
+    },
+    suzerain: (cs) => {
+      const c = seatOf(state, cs) as CityState | undefined;
+      return c ? suzerainOf(c) : -1;
+    },
+    greatWorksByObject: (i) => {
+      const out = new Array<number>(GWO_COUNT).fill(0);
+      for (const c of citiesOf(state, i)) gwCountsByObj(c).forEach((n, o) => { out[o] += n; });
+      return out;
+    },
+    cityHousing: (i, id) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      return city ? computeCityStats(state, city).housing : 0;
+    },
+    greatPersonPoints: (i, cls) => seat(i).gpp[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
+    greatPersonPrice: (cls) => {
+      const c = cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass;
+      return GP_CLASSES.includes(c) ? gpOfferCost(state, c) : Infinity;
+    },
+    religionFollowers: (i) => {
+      const r = seat(i).religion.type;
+      return r ? cityHolders(state).flatMap((s) => s.cities).filter((c) => c.followedReligion === i).length : 0;
+    },
+    cityBuildable: (i, id) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      return new Set(city ? availableBuildings(state, city).map((b) => gameTypeOf('building', b.id, 'BUILDING_')) : []);
+    },
+    unitPromotionClass: (type) => {
+      const id = engineId('unit', type, 'UNIT_', UNITS);
+      const c = id ? UNIT_PROMO_CLASS[id] : undefined;
+      return c ? PROMO_INSTALL[c] ?? `PROMOTION_CLASS_${c}` : null;
+    },
+    cityAmenity: (i, id) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      if (!city) return { balance: 0, yields: {} };
+      const stats = computeCityStats(state, city);
+      return { balance: stats.amenities.have - stats.amenities.needed,
+        yields: Object.fromEntries(Object.entries(YIELD_KEY).map(([y, k]) => [y, stats.total[k]])) };
+    },
+    greatPersonPointsPerTurn: (i, cls) => greatPersonPointsPerTurn(state, i)[cls.replace(/^GREAT_PERSON_CLASS_/, '') as GreatPersonClass] ?? 0,
+    diplomaticPoints: (i) => seat(i).diplomaticPoints ?? 0,
+    diplomaticVictoryPoints: DIPLO_VICTORY_POINTS,
+    competitionLeads: (i) => {
+      const c = state.competition;
+      if (!c || c.left <= 0) return 0;
+      const scoring = c.score.map((v, s) => ({ v, s })).filter((x) => x.v > 0).sort((a, b) => b.v - a.v || a.s - b.s);
+      const rank = scoring.findIndex((x) => x.s === i);
+      return rank >= 0 && rank <= Math.trunc(scoring.length / 4) ? 1 : 0;
+    },
+    cityCanProject: (i, id, type) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      const p = engineId('project', type, 'PROJECT_', PROJECTS);
+      return !!city && !!p && availableProjects(state, city).some((x) => x.id === p);
+    },
     missionOpen: (i, j) => (isCiv(i) && isCiv(j) && missionPayable(state, i, j)
       ? (missionOf(state, i) === MISSION_EMBASSY ? 'DIPLOACTION_RESIDENT_EMBASSY' : 'DIPLOACTION_DIPLOMATIC_DELEGATION') : null),
     score: (i) => scoreLines(state, seat(i)).reduce((a, b) => a + b, 0),

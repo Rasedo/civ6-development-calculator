@@ -1,7 +1,7 @@
 import type { DistrictId } from '../core/types';
 import type { GpPermKey } from './greatPeople';
 import { srcConst, xml, type SrcMap } from './provenance';
-import { PURCHASE_DIVISOR, scaleByGameSpeed, speedTurns, speedTurnsSrc } from './constants';
+import { COST_MULTIPLIER_PCT, PURCHASE_DIVISOR, scaleByGameSpeed, speedTurns, speedTurnsSrc } from './constants';
 
 /** shorthand: one `GlobalParameters` row's `Value` */
 const gp = (name: string) => xml('GlobalParameters', `Name=${name}`, 'Value');
@@ -903,12 +903,13 @@ export const CONGRESS_RESOLUTIONS: readonly CongressResolutionDef[] =
   RAW_CONGRESS_RESOLUTIONS.map((r) => ({ ...r, src: CONGRESS_SRC[r.id] }));
 
 /** The Urban Development Treaty's target space: the districts
- *  WorldCongress.lua's WC_Validate_UrbanDevelopment offers, in its order —
- *  the City Center first. */
+ *  WorldCongress.lua's WC_Validate_UrbanDevelopment offers, in its order (the
+ *  Districts table's: the City Center first, the Preserve before the
+ *  Diplomatic Quarter). */
 export const UDT_DISTRICTS: readonly DistrictId[] = [
   'CITY_CENTER', 'HOLY_SITE', 'CAMPUS', 'ENCAMPMENT', 'HARBOR', 'AERODROME',
   'COMMERCIAL_HUB', 'ENTERTAINMENT_COMPLEX', 'THEATER_SQUARE', 'INDUSTRIAL_ZONE',
-  'GOVERNMENT_PLAZA', 'WATER_PARK', 'DIPLOMATIC_QUARTER', 'PRESERVE',
+  'GOVERNMENT_PLAZA', 'WATER_PARK', 'PRESERVE', 'DIPLOMATIC_QUARTER',
 ];
 
 export const CONGRESS_UDT = 0;
@@ -960,9 +961,13 @@ export const CONGRESS_DV_MIN_ERA = srcConst('eras.congressDvMinEra', 5,
   xml('Resolutions', 'ResolutionType=WC_RES_DIPLOVICTORY', 'EarliestEra', { expect: 'ERA_MODERN', note: '5 is this engine\'s Modern era index' }));
 export const CONGRESS_DV_DELTA = srcConst('eras.congressDvDelta', 2,
   modArg('ADD_DIPLOMATIC_VICTORY_POINTS'));
-/** The k-th EXTRA vote costs CONGRESS_VOTE_STEP * k favor. */
-export const CONGRESS_VOTE_STEP = srcConst('eras.congressVoteStep', 10,
-  { pedia: 'CIV6 (World Congress): "The cost of each subsequent vote ... scales linearly by a factor of 10" — the vote curve is not an install row' });
+/** The vote price s: n votes on a resolution cost s x n x (n - 1) favor
+ *  (0x527680), s = 5 through the game speed's CostMultiplier, whole
+ *  (0x525400) — so the k-th EXTRA vote costs 2 s k. */
+export const CONGRESS_VOTE_PRICE = srcConst('eras.congressVotePrice', Math.trunc((5 * COST_MULTIPLIER_PCT) / 100),
+  { derived: 'trunc(5 x CostMultiplier / 100), the price s of s x n x (n - 1) favor for n votes', inputs: [
+    xml('GameSpeeds', 'GameSpeedType=GAMESPEED_ONLINE', 'CostMultiplier'),
+    { lab: 'tools/civ6lab/dll_readings.md C-97: the World Congress AI (0x527680 s x n x (n - 1); 0x525400 the speed; runs/h1_duelv1127 World_Congress.csv VOTES against the favor)' }] });
 export const CONGRESS_PROD_MULT = srcConst('eras.congressProdMult', 2,
   { derived: '1 + Amount/100 — the Urban Development Treaty outcome-A +100% district-building production', inputs: [modArg('INCREASE_DISTRICT_BUILDING_PRODUCTION')] });
 export const CONGRESS_GPP_MULT = srcConst('eras.congressGppMult', 2,

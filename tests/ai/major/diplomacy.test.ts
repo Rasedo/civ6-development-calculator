@@ -34,6 +34,11 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     governors: () => [], governorAvailable: () => false, governorTitles: () => 0, governorCanPromote: () => false, cityLoyaltyPerTurn: () => 0, cityStateHasCity: () => false,
     knownCities: () => [], pressureLead: () => 0, players: () => [], borderClosed: () => false, denounced: () => false,
     cityHitPoints: () => null, cityBlow: () => 0, attackTargets: () => [], attackAssignment: () => [], strikeColumn: () => -1,
+    congressTargets: () => [], congressTargetsOf: () => [], congressSlate: () => [-1, -1], congressDv: () => false,
+    cityStateBonus: () => null, suzerain: () => -1, greatWorksByObject: () => [], cityHousing: () => 0, greatPersonPoints: () => 0,
+    greatPersonPrice: () => Infinity, religionFollowers: () => 0, cityBuildable: () => new Set(), unitPromotionClass: () => null,
+    cityAmenity: () => ({ balance: 0, yields: {} }), greatPersonPointsPerTurn: () => 0, diplomaticPoints: () => 0,
+    diplomaticVictoryPoints: 20, competitionLeads: () => 0, cityCanProject: () => false,
     ...over,
   };
 }

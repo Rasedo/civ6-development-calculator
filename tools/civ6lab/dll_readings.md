@@ -6684,26 +6684,124 @@ row the port reads (`cpu/harness/diploSender.ts`).
   threat's (c), Request Assistance, Joint War, Third Party War, the Formal
   War family (0x6690a0), the -10 trust signal's event, the doubling.
 
-## C-97: the World Congress AI — the evaluation, the outcome and the votes READ, the option values and the targets PARTLY READ
+## C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ
 
 Port: `ai/major/congress.ts` (TS only; tables `AI_RESOLUTIONS`,
-`AI_RESOLUTION_LISTS*` from `tools/install/ai_tables.py`); the replay puts
+`AI_RESOLUTION_LISTS*`, `AI_DISTRICTS`, `AI_PROMOTION_CLASSES` from
+`tools/install/ai_tables.py`); the analyzers in the shared value layer
+(`cpu/core/aiModifiers.ts`); the valid targets and the target draw in both
+engines (`cpu/core/congressTargets.ts`, `drawTargets` / `_congress_targets`,
+`_congress_target_draws`; `cpu/data/congressTargets.ts`). The replay puts
 each AI major's ballot on its record (`vote`) at the engine's Regular
 Session and scores its ballot on the game's own slate against
 World_Congress.csv (`cpu/harness/congressAi.ts`).
 
+- THE SESSION'S PLACE: its draws are the turn's last — the slate's "World
+  Congress Resolutions" draws, then the targets' — after every player's and
+  the barbarians' moves and before the next turn's volcano roll
+  (runs/h1_duelv1127 t61, t101, t181). The game draws the slate AT the
+  session and votes on it then (1127 t61: 10, 9, 8 -> 1, 1, 5 = the Trade
+  Treaty, World Religion, Sovereignty; the Trade Treaty and World Religion
+  voted; t81 5, 6, 6 -> Border Control, Sovereignty, Public Relations; the
+  first two voted). The engines announce a session's slate at the session
+  before and vote on it then (the seats' ballots ride the turn's records).
 - THE EVALUATION (0x622140, a CultureAi job; per resolution of the session,
-  entries of 0x20 at +0xa58): each option's value (0x7b3be0, Value_Manager:
-  the option's modifiers — the game's +0x3978 / +0x3990 collections, the
-  ResolutionEffects rows of WhichEffect 1 / 2 — summed through 0x7a4b20
-  from turn 0 to a horizon of 30 (0x1e) at the AI's discount rate 0x6fec30,
-  the context filled by the TargetKind's handler 0x67dd40) into +0x18 / +0x1c;
-  then where the player's +0x348[r] (the Resolutions lists: AiLists System
-  Resolutions owned by a leader's or an agenda's trait, or a strategy) is
-  above 0 the outcome A (+0x14 = 1) with its value the desire (+0x10), below
-  0 the outcome B with its; else the greater, A on a tie.
+  entries of 0x20 at +0xa58): each option's value (0x7b3be0, Value_Manager)
+  into +0x18 / +0x1c; then where the player's +0x348[r] (the Resolutions
+  lists: AiLists System Resolutions owned by a leader's or an agenda's
+  trait, or a strategy) is above 0 the outcome A (+0x14 = 1) with its value
+  the desire (+0x10), below 0 the outcome B with its; else the greater, A
+  on a tie.
+- THE OPTION VALUE (0x7b3be0): a context (0x6ccd50: every hint field -1)
+  of the player (+0x80, +0x40 its id), the start 0, the horizon 30 (0x1e),
+  the rate (0x6fec30); the handler 0x67dd40 of the resolution's
+  AITargetChooser fills it — none (Arms Control) or a handler returning
+  false leaves the value 0 —, then the option's modifiers (the game's
+  +0x3978 / +0x3990, the ResolutionEffects rows of WhichEffect 1 / 2)
+  summed through 0x7a4b20.
+- THE HINTS (0x67f160 registers DiplomaticSupport.cpp's handlers by name;
+  each takes the player, the option, the context): TradingPartners 0x682fb0
+  (+0x40: the alive majors met, a value 0x3ffaf0 sums of each — its list
+  unread, the port reads 0 —, A the last not at war at or above the best,
+  B the last not allied at or below; -1 first), PlayerOrDiploLeader
+  0x682220 (+0x40: A the player, B the met major with the most victory
+  points), BorderControlTarget 0x67c640 (+0x40: A the player, B the last met
+  major whose empire is not adjacent — 0x3ce840: the player's cities with a
+  city of it within DIPLOMACY_ADJACENT_EMPIRE_RANGE 10 number
+  DIPLOMACY_ADJACENT_EMPIRE_CITIES_REQUIRED 2, the globals +0x264 / +0x260),
+  GrievancesType 0x67f040 (+0x40: A the alive major at war or denounced —
+  0x3da8e0, diplomacy +0x9d0 — it holds the most grievances against, above
+  0; B the player), MigrationTarget 0x6810a0 (+0x40: a city's +0x3070 == 1
+  read as losing Loyalty, housing to spare 0x67dea0: Housing above its
+  citizens + 1; A the player where none loses Loyalty and more than half
+  have housing to spare, else the ally or declared friend with the most
+  housing to spare less 3 x losing; B the player where one loses Loyalty,
+  else the ally or friend with the most losing), MostCommonLuxury 0x681940
+  (+0x4c: A the luxury the player holds the most copies of, above 0 —
+  0x4aa790 ownership 0 less reserved; B among those it holds none of, the
+  one the other alive majors not allied hold the most of), UnitBuildYield
+  0x683120 (+0x64: Production (the cached yield a turn), Gold and Faith (the
+  rates); A the least, B the most), Government 0x67e3d0 (+0x28: A the
+  player's government; B the one the other majors not allied hold most, 2 a
+  major at war, its own left out), GreatPersonPatronage 0x67e730 (+0x6c: A
+  the available class it leads most by points over a major, a class it
+  leads every major in first; B where a major not allied holds more points
+  and earns more a turn in a class with a person, the class the nearest
+  such major — at war first — needs the fewest points to recruit in),
+  GreatWorkObjects 0x67ed10 (+0x30: its Great Works per object type, A the
+  most, B the least), MinorCivBonus 0x6813a0 (+0x3c: per bonus type its
+  suzerainties (A) or the others' (B), the most above 0, else the type with
+  the most city-states), ReligiousTarget 0x682c00 (+0x48: A its religion, B
+  the other founder's with the most cities following), UnitPromotionType
+  0x6832f0 (+0x58: per promotion class the units it knows, its own less
+  those of the majors at war with it; A the most, B the least), District
+  0x67cce0 (+0x1c: per base district — row +0xe1 bit 4 and the replacement
+  +0x260 left out — its buildings the player's cities may construct, 1 each
+  where the row's byte +0xe0 has bit 7 — read as CityCenter —, 6 else; A
+  the most above 0, B the least). FeatureType 0x67db60 writes its feature's
+  HASH (+0x20), SpyOperationType 0x682f80 +0x54, PowerBuilding 0x682440 +4:
+  no chooser reads those. Project 0x6826d0 (+0x68): by the victory
+  strategies the player follows (player +0x1290 +0x560, 0x7004c0; the
+  Strategies rows of VICTORY_TECHNOLOGY and VICTORY_CONQUEST): A, pursuing
+  the technology victory, the costliest (+0x20) project of row +0xe8 bit 2
+  (SpaceRace) one of its cities may advance (0x16f7b0), else, pursuing
+  conquest, of bit 8 (WMD); B, not pursuing the technology victory, the
+  costliest SpaceRace project another major's city may advance, else, not
+  pursuing conquest, the costliest WMD one.
+- THE ANALYZERS (the registry 0x6c9640; ten of the twenty resolution
+  effect types registered, the rest worth 0): EFFECT_ATTACH_MODIFIER_TO_
+  PLAYERTYPE is EFFECT_ATTACH_MODIFIER's object (0x6ab630).
+  COLLECTION_MAJOR_PLAYERS (0x6a00f0) walks the game's majors, each alive
+  one setting +0x40. NO_CAP_RESOURCE 0x6a8320 (own subject, a luxury held
+  twice or more: the most one Amenity more is worth over its cities,
+  0x79f7c0); BAN_RESOURCE 0x6bc050 (none held: per other major not allied
+  its copies x 100 at war, 60 denounced, 25, raw, per subject);
+  BUFF_UNIT_PRODUCTION_YIELD 0x6b47f0 (a buff on its own subject: half of
+  its yield a turn x the percent; a debuff on another's: that one's yield x
+  the percent x 2.0 / 0.25 at war by military strength, 0.33 at peace; the
+  greatest over the subjects); GREAT_PERSON_POINTS_PERCENT 0x6a2270 (0.01 x
+  its points a turn of the class, +0x1360 +0x168, x Amount, as Gold);
+  NO_GREAT_PERSON_POINTS 0x6b0050 (the others' points a turn, not allied,
+  less twice its own, as Gold); GOVERNMENT_SLOTS 0x6a3870 (in the named
+  government: |Amount| x the policy AI's best card for the slot, 0x623b90,
+  on its own subject for a slot gained, another's for one lost; a slot lost
+  on its own subject sets 0); PLAYER_DIPLOMATIC_VICTORY_POINTS 0x6c6d60 (P
+  the worth of a point, W the points to win: on itself gaining Amount x 2P +
+  W x P / max(1, W - points - Amount)^2; on another losing |Amount| x P + W
+  x P / r^2, r one less per running competition it ranks in the top
+  quarter of, 0x25d5f0); PLAYER_GRIEVANCE_GENERATION 0x6c3bc0 (on itself
+  gaining: its grievances x Amount / 100; on another losing: that one's
+  against it x Amount / 100; PSEUDOYIELD_DIPLOMATIC_GRIEVANCE, discounted
+  from the start); PROJECT_PRODUCTION 0x6b10b0 (the project from the hint
+  +0x68: a city's Production x the percent, or the most another major's
+  city makes over the player's cities, negated); PLAYER_BAN_CITY_PRODUCTION
+  0x6bb020 (per city a count of the building, the project's district and the
+  district held, x 50, SETTING the total — 0 with none named);
+  BUILDING_PRODUCTION 0x6c1a80 (0 with neither a building nor a district
+  named; the rest unread).
 - THE ORDER (0x61dc50, 0x617d70's comparator): the resolutions a list names
-  first, then the desire, the greatest first.
+  first, then the desire, the greatest first — the cast order; the log's
+  OPTIONS rows run in it.
 - THE VOTES (0x628450, the session's handler): F the player's favor (the
   Congress player +0x110). The cost of the session's wants: the sum over
   the resolutions of the price of whole(desire / 2) votes, at least 1; the
@@ -6715,25 +6813,36 @@ World_Congress.csv (`cpu/harness/congressAi.ts`).
   taken from F (0x527680: s x n x (n - 1), s = 5 through the game speed
   0x525400, whole — 2 online). runs/h1_duelv1127 Qin's whole favor bought
   4 votes at t61 (29), 9 at t101 (149), 7 at t121 (85), and paid 24, 144,
-  84 (Player_Stats_2's favor balance). The engines' extra vote costs 10
-  times its rank (`buyVotes`, CONGRESS_VOTE_STEP): the game's k-th extra vote
-  costs 4k online.
-- THE TARGET (0x611140 .. 0x612e50, one per AITargetChooser, chosen by the
-  TargetKind's hash): the handler's hint (0x67dd40) where it names one of
-  the valid targets (the resolution's vfunc +0xd0), else a "Random congress
-  resolution target" draw over the valid targets' count; the choice and the
-  outcome recorded by 0x487650 (the log's OPTIONS row).
-- PARTLY READ: no analyzer of the modifiers reads a resolution's effect
-  types (EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE, EFFECT_ADJUST_PLAYER_BAN_*,
-  ... 20 of them): the port's option values are 0; the TargetKind handlers
-  0x67dd40 and the target choosers are unread — the port names the engines'
-  own line (`congressTarget`).
+  84 (Player_Stats_2's favor balance). The engines charge the same
+  (`voteCost`, CONGRESS_VOTE_PRICE).
+- THE TARGET (0x611140 .. 0x612e50, one template per TargetKind, differing
+  in the vtable slot of the valid list): on a fresh context (+0x40 -1) the
+  handler runs for the outcome taken; the first field set in the order
+  +0x1c, +0x20, +0x28, +0x6c, +0x30, +0x3c, +0x40, +0x44, +0x68, +0x48,
+  +0x4c, +0x64, +0x58 picks the chooser; none set, the TargetKind's with
+  the hint -1. A hint among the valid targets is applied (0x610440); else ONE
+  "Random congress resolution target" draw over their count (0x8b6c10; a
+  count of 0 still draws) and the drawn index applied (0x487650, the log's
+  OPTIONS row). The valid targets are the ResolutionOptions
+  WorldCongress.lua's ValidationLua handler gives the player (the players
+  met or itself; the luxuries the map holds; Production, Gold, Faith; the
+  three power plants; the governments with a Wildcard slot; the fourteen
+  districts in the game era; the space race and WMD projects; the available
+  great person classes; marsh, forest, jungle; the ten offensive spy
+  operations; seven promotion classes) in database order; a handler the Lua
+  lacks or that sets nothing offers every row — the religions as those
+  founded. RandCalls fit it: 1127 t181 two draws over 10 (the Espionage
+  Pact, whose hint no chooser reads), t201 two over 2 (Arms Control, no
+  chooser), t221 two over 3 (the Global Energy Treaty), t241 one over 12 (a
+  government without a Wildcard slot); 1128 t181 two over 3 (the
+  Deforestation Treaty: jungle 2, forest 3, marsh 5 by index, the drawn 1
+  and 2 the logged 3 and 5).
 - Measured (the action replay, runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128,
-  the port's ballot on the game's slate): the outcome as the
-  log's OPTIONS on 97 / 109 resolutions of the AI majors, the votes as its
-  VOTES on 51 / 109 (every vote past the first wants a desire, the option
-  values the port reads as 0), the target on the resolutions naming a
-  player 16 / 27.
+  the port's ballot on the game's slate, the AI major of each): the
+  outcome as the log's OPTIONS on 103 / 109 resolutions, the votes as its
+  VOTES on 58 / 109 (the Diplomatic Victory resolution's votes run high: its
+  desire), the target where the port names one 60 / 75; the port leaves 31
+  ballots to the draw, the game draws 65 times for both majors.
 
 ## DLL rules the engines contradict
 

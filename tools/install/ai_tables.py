@@ -1,6 +1,6 @@
 """THE AI TABLES — the install rows the game's AI reads, written as TS.
 
-    python tools/install/ai_tables.py            # write ai/major/tables.ts and cpu/data/aiTables.ts
+    python tools/install/ai_tables.py            # write ai/major/tables.ts, cpu/data/aiTables.ts, aiBuildTables.ts, congressTargets.ts
     python tools/install/ai_tables.py --check    # exit 1 when either file is stale
 
 The game's AI reads its own database, not the engine's catalogs.
@@ -42,6 +42,8 @@ OUT = ROOT / "ai" / "major" / "tables.ts"
 OUT_CORE = ROOT / "cpu" / "data" / "aiTables.ts"
 # the city build AI's tables (cpu/core/aiCityBuild.ts)
 OUT_CITY = ROOT / "cpu" / "data" / "aiBuildTables.ts"
+# the World Congress's valid targets (cpu/core/congress.ts)
+OUT_CONGRESS = ROOT / "cpu" / "data" / "congressTargets.ts"
 # the game's own database, as it last loaded the ruleset: its row order
 GAME_DB = pathlib.Path(os.path.expandvars(r"%LOCALAPPDATA%/Firaxis Games/Sid Meier's Civilization VI/Cache/DebugGameplay.sqlite"))
 # the systems the yield weight reads by trait and by strategy, and the one the
@@ -115,8 +117,10 @@ def build() -> str:
         if out["effect"] == "EFFECT_GRANT_ABILITY":
             # the ability's own modifiers, which its analyzer runs
             out["ability"] = [modifier(x) for x in amods[out["args"].get("AbilityType", "")]]
-        if out["effect"] == "EFFECT_ATTACH_MODIFIER" and out["args"].get("ModifierId") in mods:
-            # the modifier it attaches, which its analyzer runs on each subject
+        if (out["effect"] in ("EFFECT_ATTACH_MODIFIER", "EFFECT_ATTACH_MODIFIER_TO_PLAYERTYPE")
+                and out["args"].get("ModifierId") in mods):
+            # the modifier it attaches, which its analyzer (0x6ab630, the
+            # registry's one object for both effects) runs on each subject
             out["attach"] = modifier(out["args"]["ModifierId"])
         sub = reqset(m.get("SubjectRequirementSetId"))
         own = reqset(m.get("OwnerRequirementSetId"))
@@ -431,6 +435,17 @@ def build() -> str:
         + lit("AI_RESOLUTION_LEADER_TRAITS", {k: v for k, v in res_leader.items() if v}, "Readonly<Record<string, readonly string[]>>")
         + lit("AI_RESOLUTION_AGENDA_TRAITS", dict(sorted(ag_traits.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_GOVERNOR_PROMOTIONS", gov_promos, "readonly AiGovernorPromotion[]")
+        + lit("AI_DISTRICTS", [{"type": k, "base": not c.get("TraitType") and (c.get("InternalOnly") or "false").lower() not in ("true", "1"),
+                                "cityCenter": (c.get("CityCenter") or "false").lower() in ("true", "1")}
+                               for k, c in in_game_order("Districts", "DistrictType", keyed(rows("Districts"), "DistrictType"))],
+              "readonly { type: string; base: boolean; cityCenter: boolean }[]")
+        + lit("AI_PROJECTS", [{"type": k, "spaceRace": (c.get("SpaceRace") or "false").lower() in ("true", "1"),
+                               "wmd": (c.get("WMD") or "false").lower() in ("true", "1"), "cost": int(float(c.get("Cost") or 0))}
+                              for k, c in congress_order("Projects", "ProjectType", keyed(rows("Projects"), "ProjectType"))],
+              "readonly { type: string; spaceRace: boolean; wmd: boolean; cost: number }[]")
+        + lit("AI_PROMOTION_CLASSES", [k for k, _ in in_game_order("UnitPromotionClasses", "PromotionClassType",
+                                                                    keyed(rows("UnitPromotionClasses"), "PromotionClassType"))],
+              "readonly string[]")
     )
     # each city-state's modifiers its envoys are worth (the diplomatic AI's
     # +0x6868 list, 0x651490): its leader's traits through the InheritFrom
@@ -491,7 +506,14 @@ def build() -> str:
               "readonly string[]")
     )
     city = build_city(rows, modifier)
-    return major, core, city
+    return major, core, city, build_congress(rows)
+
+
+def congress_order(table: str, key: str, have: dict[str, dict]) -> list[tuple[str, dict]]:
+    """the game's database rows in its order (its index); an install row the
+    game did not load (a pack the recordings ran without) has none"""
+    db = sqlite3.connect(GAME_DB)
+    return [(k, have[k]) for (k,) in db.execute(f"select {key} from {table} order by rowid") if k in have]
 
 
 def in_game_order(table: str, key: str, rows: dict[str, dict]) -> list[tuple[str, dict]]:
@@ -507,6 +529,98 @@ def in_game_order(table: str, key: str, rows: dict[str, dict]) -> list[tuple[str
         raise SystemExit(f"{table}: the install and {GAME_DB.name} differ: "
                          f"{sorted(set(order) ^ set(rows))}")
     return [(k, rows[k]) for k in order]
+
+
+def build_congress(rows) -> str:
+    """the World Congress's valid targets: per resolution, the options
+    DLC/Expansion2/Scripts/WorldCongress.lua's ValidationLua handler gives a
+    player (`options.ResolutionOptions`), its candidates in DATABASE ORDER
+    with their database index; what the handler filters live is a filter
+    the engine applies: `met` (an alive major the player has met, or the
+    player), `onMap` (a luxury the map holds), `era` (a district whose
+    PrereqTech's and PrereqCivic's eras lie at or before the game era),
+    `gpAvail` (a class with a great person still to earn), `founded` (a
+    religion founded). A resolution whose handler the Lua lacks
+    (WC_Validate_RegliousBan) or names none (Sovereignty), or a handler that
+    sets nothing (WC_Validate_GreatWorkObjects), offers every row of its
+    TargetKind's table — the religions as those founded."""
+    def ordered(table, key):
+        return congress_order(table, key, keyed(rows(table), key))
+
+    eras = [k for k, _ in ordered("Eras", "EraType")]
+    tech_era = {k: c.get("EraType") for k, c in keyed(rows("Technologies"), "TechnologyType").items()}
+    civic_era = {k: c.get("EraType") for k, c in keyed(rows("Civics"), "CivicType").items()}
+    wild = {c["GovernmentType"] for c in rows("Government_SlotCounts") if c.get("GovernmentSlotType") == "SLOT_WILDCARD"}
+
+    def pick(table, key, keep, extra=None):
+        return [dict({"type": k, "index": i}, **(extra(c) if extra else {}))
+                for i, (k, c) in enumerate(ordered(table, key)) if keep(k, c)]
+
+    def flag(c, k):
+        return (c.get(k) or "").lower() in ("true", "1")
+
+    def num(c, k):
+        v = c.get(k)
+        return 0 if v in (None, "", "NULL") else int(float(v))
+
+    urban = {"DISTRICT_CITY_CENTER", "DISTRICT_HOLY_SITE", "DISTRICT_CAMPUS", "DISTRICT_ENCAMPMENT", "DISTRICT_HARBOR",
+             "DISTRICT_AERODROME", "DISTRICT_COMMERCIAL_HUB", "DISTRICT_ENTERTAINMENT_COMPLEX", "DISTRICT_THEATER",
+             "DISTRICT_INDUSTRIAL_ZONE", "DISTRICT_GOVERNMENT", "DISTRICT_WATER_ENTERTAINMENT_COMPLEX",
+             "DISTRICT_DIPLOMATIC_QUARTER", "DISTRICT_PRESERVE"}
+
+    def district_era(c):
+        e = [eras.index(tech_era[c["PrereqTech"]]) if c.get("PrereqTech") else 0,
+             eras.index(civic_era[c["PrereqCivic"]]) if c.get("PrereqCivic") else 0]
+        return {"era": max(e)}
+
+    players = {"filter": "met", "entries": []}
+    lists = {
+        "WC_Validate_LuxuryBan": {"filter": "onMap", "entries": pick(
+            "Resources", "ResourceType",
+            lambda k, c: c.get("ResourceClassType") == "RESOURCECLASS_LUXURY" and (num(c, "Frequency") > 0 or num(c, "SeaFrequency") > 0))},
+        "WC_Validate_YieldBan": {"filter": None, "entries": pick(
+            "Yields", "YieldType", lambda k, c: k in ("YIELD_PRODUCTION", "YIELD_GOLD", "YIELD_FAITH"))},
+        "WC_Validate_PowerBuilding": {"filter": None, "entries": pick(
+            "Buildings", "BuildingType",
+            lambda k, c: k in ("BUILDING_COAL_POWER_PLANT", "BUILDING_FOSSIL_FUEL_POWER_PLANT", "BUILDING_POWER_PLANT"))},
+        "WC_Validate_WorldIdeology": {"filter": None, "entries": pick("Governments", "GovernmentType", lambda k, c: k in wild)},
+        "WC_Validate_UrbanDevelopment": {"filter": "era", "entries": pick(
+            "Districts", "DistrictType", lambda k, c: k in urban, district_era)},
+        "WC_Validate_PublicWorks": {"filter": None, "entries": pick(
+            "Projects", "ProjectType", lambda k, c: flag(c, "SpaceRace") or flag(c, "WMD"))},
+        "WC_Validate_Patronage": {"filter": "gpAvail", "entries": pick("GreatPersonClasses", "GreatPersonClassType", lambda k, c: True)},
+        "WC_Validate_DeforestationFeature": {"filter": None, "entries": pick(
+            "Features", "FeatureType", lambda k, c: k in ("FEATURE_MARSH", "FEATURE_FOREST", "FEATURE_JUNGLE"))},
+        "WC_Validate_ESPIONAGE_PACT": {"filter": None, "entries": pick(
+            "UnitOperations", "OperationType",
+            lambda k, c: c.get("CategoryInUI") == "OFFENSIVESPY" and num(c, "BaseProbability") > 0)},
+        "WC_Validate_MILITARY_ADVISORY": {"filter": None, "entries": pick(
+            "UnitPromotionClasses", "PromotionClassType",
+            lambda k, c: k in ("PROMOTION_CLASS_RECON", "PROMOTION_CLASS_MELEE", "PROMOTION_CLASS_RANGED", "PROMOTION_CLASS_ANTI_CAVALRY",
+                               "PROMOTION_CLASS_LIGHT_CAVALRY", "PROMOTION_CLASS_HEAVY_CAVALRY", "PROMOTION_CLASS_SIEGE"))},
+        "WC_Validate_BorderControl": players, "WC_Validate_MigrationTreaty": players, "WC_Validate_ArmsControlTreaty": players,
+        "WC_Validate_TradeTreaty": players, "WC_Validate_DiploVictory": players,
+    }
+    default = {
+        "GREATWORKOBJECT": {"filter": None, "entries": pick("GreatWorkObjectTypes", "GreatWorkObjectType", lambda k, c: True)},
+        "MINORCIVBONUS": {"filter": None, "entries": pick("MinorCivBonuses", "MinorCivBonusType", lambda k, c: True)},
+        "RELIGION": {"filter": "founded", "entries": []},
+    }
+    out = {}
+    for r, c in ordered("Resolutions", "ResolutionType"):
+        t = lists.get(c.get("ValidationLua") or "") or default[c["TargetKind"]]
+        out[r] = {"kind": c["TargetKind"], **t}
+    return ("/**\n * THE WORLD CONGRESS'S VALID TARGETS (cpu/core/congress.ts), written by\n"
+            " * tools/install/ai_tables.py (`build_congress`) from the layered install\n"
+            " * and DLC/Expansion2/Scripts/WorldCongress.lua (`--check` reports a stale\n"
+            " * file): per ResolutionType its TargetKind, the candidates its\n"
+            " * ValidationLua handler offers in DATABASE ORDER with their database\n"
+            " * index, and the filter the engine applies live.\n */\n"
+            "export interface CongressTargetEntry { type: string; index: number; era?: number }\n"
+            "export interface CongressTargetTable {\n  kind: string;\n"
+            "  filter: 'met' | 'onMap' | 'era' | 'gpAvail' | 'founded' | null;\n"
+            "  entries: readonly CongressTargetEntry[];\n}\n\n"
+            f"export const CONGRESS_TARGET_TABLES: Readonly<Record<string, CongressTargetTable>> = {json.dumps(out, indent=1)};\n")
 
 
 def build_city(rows, modifier) -> str:
@@ -727,10 +841,10 @@ def order_check(policies: list[str]) -> tuple[int, int]:
 
 
 def main() -> int:
-    text, core, city = build()
+    text, core, city, congress = build()
     if "--check" in sys.argv:
         bad = 0
-        for path, want in ((OUT, text), (OUT_CORE, core), (OUT_CITY, city)):
+        for path, want in ((OUT, text), (OUT_CORE, core), (OUT_CITY, city), (OUT_CONGRESS, congress)):
             stale = not path.exists() or path.read_text(encoding="utf-8") != want
             print(path.relative_to(ROOT).as_posix(), "STALE" if stale else "OK")
             bad |= stale
@@ -739,6 +853,7 @@ def main() -> int:
     OUT.write_text(text, encoding="utf-8", newline="\n")
     OUT_CORE.write_text(core, encoding="utf-8", newline="\n")
     OUT_CITY.write_text(city, encoding="utf-8", newline="\n")
+    OUT_CONGRESS.write_text(congress, encoding="utf-8", newline="\n")
     names = [line.split('"')[3] for line in text.splitlines() if line.startswith('  "type": "POLICY_')]
     seen, bad = order_check(names)
     print(f"wrote {OUT} ({len(text)} bytes); logged score lines {seen}, out of database order {bad}")

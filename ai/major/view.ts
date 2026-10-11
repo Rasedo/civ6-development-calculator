@@ -203,8 +203,6 @@ export interface MajorView extends AiValueView {
   plotYield(seat: number, plot: number, yieldType: string): number;
   /** the seat sees the ResourceType (its PrereqTech) */
   resourceVisible(seat: number, resource: string): boolean;
-  /** the improved plots of the ResourceType in the seat's territory */
-  resourceHeld(seat: number, resource: string): number;
   /** the plots of the seat's city centres */
   cityPlots(seat: number): readonly number[];
   /** the continent of the seat's original capital, -1 before it has one */
@@ -286,8 +284,6 @@ export interface MajorView extends AiValueView {
 
   // THE DIPLOMATIC VIEW (ai/major/diplomacy.ts). Seats are the engine's: a
   // major's seat, a city-state's seat, the Free Cities' and the barbarians'.
-  /** the major civilizations' seats in turn order, the defeated left out */
-  majors(): readonly number[];
   /** every player in the game in seat order: the majors, the city-states,
    *  the Free Cities (where the game holds them) and the barbarians */
   players(): readonly number[];
@@ -303,8 +299,6 @@ export interface MajorView extends AiValueView {
   hasEmbassy(sender: number, receiver: number): boolean;
   /** open borders `grantor` grants `guest` */
   hasOpenBorders(grantor: number, guest: number): boolean;
-  /** the seat's yield of a YieldType per turn, its cities' totals summed */
-  playerYield(seat: number, yieldType: string): number;
   /** the seat's citizens */
   population(seat: number): number;
   /** the world wonders the seat has built */
@@ -324,8 +318,6 @@ export interface MajorView extends AiValueView {
   tradeRoutesBetween(a: number, b: number): number;
   /** the city-states' seats */
   cityStateSeats(): readonly number[];
-  /** the grievances `holder` holds against `against`, 0 for none */
-  grievances(holder: number, against: number): number;
   /** the seat's military units of a DomainType */
   militaryUnits(seat: number, domain: string): number;
 
@@ -340,8 +332,6 @@ export interface MajorView extends AiValueView {
   /** the seat's handicap, a Difficulties index */
   handicap(seat: number): number;
   techCount(seat: number): number;
-  /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
-  militaryStrength(seat: number): number;
   /** the seat's gold in its treasury */
   treasury(seat: number): number;
   /** the mission `owner` may send `other` now, as the game's CanDoAction
@@ -357,16 +347,39 @@ export interface MajorView extends AiValueView {
   /** the game's CanDeclareWarOn from `owner` on `other`: a surprise war, or a
    *  formal one with `formal` */
   warOpen(owner: number, other: number, formal: boolean): boolean;
-  /** the pair's standing declared friendship / alliance */
+  /** the pair's standing declared friendship (the alliance: `allied`) */
   declaredFriends(a: number, b: number): boolean;
-  allied(a: number, b: number): boolean;
-  /** `a`'s standing denouncement of `b` */
-  denouncing(a: number, b: number): boolean;
   /** the seat's diplomatic favor */
   favor(seat: number): number;
   /** the target the engine's own congress line names for the seat on a
    *  resolution (the engine's CONGRESS_RESOLUTIONS index) */
   congressTarget(seat: number, resolution: number): number;
+  /** the targets an engine resolution offers the seat now, the engine's
+   *  indices in the game's order (`congressTargets`); the Diplomatic
+   *  Victory resolution's by its install type */
+  congressTargets(seat: number, resolution: number): readonly number[];
+  congressTargetsOf(seat: number, type: string): readonly number[];
+  /** the slate the seat's coming session votes on: the engine's resolution
+   *  indices (-1 none), and whether the Diplomatic Victory one sits */
+  congressSlate(): readonly number[];
+  congressDv(): boolean;
+  /** a city-state's MinorCivBonusType and its suzerain (-1 none) */
+  cityStateBonus(cs: number): string | null;
+  suzerain(cs: number): number;
+  /** the seat's Great Works per GreatWorkObjectType row, over its cities */
+  greatWorksByObject(seat: number): readonly number[];
+  /** a city's Housing */
+  cityHousing(seat: number, cityId: number): number;
+  /** the Great Person points the seat holds toward a class
+   *  (GREAT_PERSON_CLASS_*), and the price of the person offered */
+  greatPersonPoints(seat: number, cls: string): number;
+  greatPersonPrice(cls: string): number;
+  /** the cities, any seat's, following the religion the seat founded */
+  religionFollowers(seat: number): number;
+  /** the BuildingTypes a city may construct now (`availableBuildings`) */
+  cityBuildable(seat: number, cityId: number): ReadonlySet<string>;
+  /** a unit type's PromotionClassType, null for none */
+  unitPromotionClass(unitType: string): string | null;
   score(seat: number): number;
   /** the great people of a class (GREAT_PERSON_CLASS_*) the seat has earned */
   greatPeopleOfClass(seat: number, cls: string): number;

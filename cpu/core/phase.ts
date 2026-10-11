@@ -1379,23 +1379,36 @@ function payEmergency(state: GameState, e: Emergency, membersWon: boolean): void
  * has reached CONGRESS_MIN_ERA (Medieval), one Regular Session runs — the
  * mechanics and their sources live at `congressSession` and the catalog
  * (CONGRESS_RESOLUTIONS). The slate keys on the MAX era across civs, the
- * wiki's "topics relevant for the current world". Called from endTurn after
- * every player's turn and before the turn counter moves, so the schedule
- * reads the turn the session closes — the position the GPU mirrors.
+ * wiki's "topics relevant for the current world". The session closes the
+ * turn the players acted in, after the barbarians' turn and before the next
+ * turn's random-event step (the game's draw log puts its draws there:
+ * runs/h1_duelv1127 t61), so endTurn calls it right after `barbarianPhase`
+ * on the turn the barbarians close (`state.turn - 1`), on the ballots that
+ * turn's records banked, which it clears. `_world_congress` is the twin.
  */
 export function worldCongress(state: GameState): void {
   const recorded = state.seats.map((sx) => sx.congressVote ?? null);
-  for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for THIS turn
+  for (const sx of state.seats) sx.congressVote = undefined;  // an intent is for ONE turn
+  const turn = state.turn - 1;
   const worldEra = worldEraIndex(state);
-  // A Special Session may sit on ANY turn once the Congress is open; a running
-  // emergency is settled whether one sat or not.
-  if (worldEra >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
+  if (!congressSessionDue(turn, worldEra)) return;
+  congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
+  state.lastSessionTurn = turn;
+  congressCancelBannedIntl(state);
+}
+
+/**
+ * THE SPECIAL SESSIONS AND THE EMERGENCIES: a Special Session may sit on ANY
+ * turn once the Congress is open, on the ballots the turn's records banked;
+ * a running emergency and a running competition are settled whether one sat
+ * or not. Called from endTurn after every player's start, before the turn
+ * counter moves. `_emergency_sessions` is the twin.
+ */
+export function emergencySessions(state: GameState): void {
+  const recorded = state.seats.map((sx) => sx.congressVote ?? null);
+  if (worldEraIndex(state) >= CONGRESS_MIN_ERA) specialSessions(state, recorded);
   resolveEmergencies(state);
   resolveCompetition(state);
-  if (!congressSessionDue(state.turn, worldEra)) return;
-  congressSession(state, worldEra, recorded, state.seats.map((sx) => congressVoter(state, sx.seat)));
-  state.lastSessionTurn = state.turn;
-  congressCancelBannedIntl(state);
 }
 
 export function transferCity(

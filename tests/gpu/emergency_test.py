@@ -275,7 +275,7 @@ def main() -> None:
     down = blank_votes(sim)
     down[:, tgt, sim._special_slot, 0] = 1        # against
     down[:, tgt, sim._special_slot, 2] = 3        # and buying the weight to carry it
-    sim.civ_diplo_favor[:, tgt] = 60.0
+    sim.civ_diplo_favor[:, tgt] = float(2 * sim._congress_vprice * (1 + 2 + 3))  # three extra votes
     sim._special_sessions(down)
     assert one(sim.emg_kind[:, 0]) == -1, "a voted-down emergency survived"
     assert not bool(sim.war[0, mem, tgt]), "a voted-down emergency still forced a war"

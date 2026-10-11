@@ -234,6 +234,13 @@
   context:
     - "- THE STATE TURN (0x67b6e0, the entries built by 0x67aff0, their terms by 0x67aaf0). Each DiplomaticStateTransitions row out of the state, in table order: REQUIRED when R..."
   review: imported
+- addr: 0x6c8e60
+  final: 0x32dc70
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:pct]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x6fafc0
   kind: function
   name: GrandStrategic
@@ -344,6 +351,9 @@
     - cpu/core/aiCityBuild.ts:amenityPerTurn
     - cpu/core/aiCityBuild.ts:value
     - cpu/core/aiResource.ts:ResourceFacts
+    - cpu/core/aiModifiers.ts:amenityTurn
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:cityAmenity
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
@@ -351,6 +361,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...nce(+0x38) gold subtracted;  then value = PV(v, rate, H) - PV(v, rate, turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca..."
     - ".claude/scratchpad/cb/notes.txt: ...r: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."

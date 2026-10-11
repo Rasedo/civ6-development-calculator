@@ -75,6 +75,22 @@
     - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb..."
     - "- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid by 0x3d7020, whose one caller is Player DoTurn (0x4e465..."
   review: imported
+- addr: 0x3ce840
+  kind: function
+  name: adjacentEmpire
+  semantics: The player's cities with a city of the other within DIPLOMACY_ADJACENT_EMPIRE_RANGE (globals +0x264) number DIPLOMACY_ADJACENT_EMPIRE_CITIES_REQUIRED (+0x260) or more.
+  status: READ
+  cases:
+    - recording: h1_duelv1127
+      turn: 81
+      value: Border Control option 2
+  impl:
+    - ai/major/congress.ts:adjacentEmpire
+    - ai/major/congress.ts:ADJACENT_RANGE
+    - ai/major/congress.ts:h
+  readings:
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
+  review: reviewed
 - addr: 0x3d1450
   final: 0x2a1bd0
   kind: function
@@ -182,15 +198,21 @@
   review: imported
 - addr: 0x3da8e0
   kind: function
-  name: has denounced
+  name: hasDenounced
+  semantics: "Player_Diplomacy +0x9d0[p] >= 0: the player has denounced p (0x3da5e0 the reverse)."
   status: READ
   cases:
     - recording: h1_duelv1127
-      value: "The desires' +20 (+10 Open Borders, -10 Demand   Tribute) at the focus agrees with \"the other's opinion of the owner at the   previous turn above 0\" on 172 / 185 (Qin) and 26 / 28 (Rome) rows of   h1_"
-  impl: [ai/major/view.ts:MajorView, cpu/core/majorView.ts:denounced]
+      turn: 101
+      value: the denounced weight of the luxury ban
+  impl:
+    - ai/major/view.ts:MajorView
+    - cpu/core/majorView.ts:denounced
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "C-97: the sender's pick, the savings, the threat and the focus — the savings, the spacing, the trust term and the focus READ, the threat PARTLY READ"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the World Congress AI — the evaluation, the outcome, the votes, the hints, the option values and the targets READ"
   context:
     - ...0x2a81f0 against GlobalParameters +0x268 through the speed; one at war, or turned away (0x3da8e0), is passed over; else p's AI's value of the owner (p's +0x1280 vt+0x18) above the best...
   review: reviewed
