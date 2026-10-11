@@ -93,6 +93,7 @@ import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
 import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
+import { OperationsProbe, operationsMarkdown, type OperationsTally } from './operationsAi';
 import { GREAT_PEOPLE, gpChargesOf } from '../data/greatPeople';
 import { InferredActions, RecordedActions, activePlayer, type ActionSource, type Decision, type LogTally, type QueueSpec } from './replayActions';
 
@@ -2682,6 +2683,8 @@ export interface ReplayReport {
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   settleAi?: SettleTallies;
+  /** the majors' operations beside the game's operation log */
+  operationsAi?: OperationsTally;
 }
 
 /** one game move's tally (`tallyTactics`): the unit-turns, those the AI
@@ -2839,6 +2842,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   const majorAi = new MajorAiProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
   const settleAi = new SettleProbe(dumpPath, aiSeats, (turn) => strategies.followedBefore(turn));
   const missions = readMissions(dumpPath);
+  const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, (turn) => strategies.followedBefore(turn));
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -2907,6 +2911,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     diplomacy.preTurn(state, recordA.state, read.state);
     strategies.recordContacts(b, ctx.seatOfPlayer);
     settleAi.preTurn(state, recordState);
+    operationsAi.preTurn(a, recordA.state, b);
     recordState = read.state;
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
@@ -3035,6 +3040,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     verifyPolicies(ctx, staged);
     settleAi.postTurn(b);
     imposeMissions(ctx, missions.get(a.turn) ?? []);
+    operationsAi.postTurn(b);
     majorAi.postTurn(state, (seat) => {
       const d = staged.find((x) => seatOfP(ctx, x.player) === seat);
       if (!d) return null;
@@ -3238,6 +3244,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
+  if (operationsAi.active) report.operationsAi = operationsAi.tally;
   if (ctx.cityBuildLog.size) {
     report.cityBuild = ctx.cityBuild;
     report.cityBuildPer = Object.fromEntries(ctx.cityBuildPer);
@@ -3355,5 +3362,6 @@ export function replayMarkdown(r: ReplayReport): string {
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
+  if (r.operationsAi) out.push(...operationsMarkdown(r.operationsAi));
   return out.join('\n') + '\n';
 }

@@ -4,7 +4,7 @@
  * writes the state; the slot rebuild a government change would make is laid
  * on copies (`carryLayout`).
  */
-import type { MajorCityDefenceView, MajorCityView, MajorPlotView, MajorSlotView, MajorView } from '../../ai/major/view';
+import type { MajorCityDefenceView, MajorCityView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
 import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import type { AiCityView, AiDistrictView, AiPlotView } from './aiValue';
@@ -12,22 +12,22 @@ import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights,
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, plotPressure } from './phase';
-import { borderTurnsFrom, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
+import { BARB_SEAT, borderTurnsFrom, campTiles, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
 import { pathTo, reachPlots } from './tactical';
 import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
-import { plotsSeenNow } from './barbarians';
+import { plotsSeenNow, ringPlots } from './barbarians';
 import { cityDefenseStrength, cityStrikeStrength, unitAttackRange } from './combat';
 import { outerPool } from './rules';
 import { unitDomain, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
-import { COST_MULTIPLIER_PCT } from '../data/constants';
+import { COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
 import { congressPolicyBlocked } from './congress';
 import { carryLayout, darkAgeEra, fitPoliciesLoose, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
 import { gpOffer } from './greatPeople';
-import type { City, CityState, DistrictId, GameState, GreatPersonClass, YieldKey } from './types';
+import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
 import { UNIT_HP, UNITS } from '../data/units';
@@ -41,6 +41,7 @@ import { scoreLines } from './score';
 import { domesticTourists, touristsDrawn } from './seatTurn';
 import { PROJECTS } from '../data/projects';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
+import { itemCost } from './game';
 
 /** What the view takes from the majors' AI itself: per major the strategies
  *  it follows (ai/major/strategies.ts), which its weights and its civic list
@@ -149,12 +150,13 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       feature: t.feature ? `FEATURE_${t.feature}` : null, resource: t.resource ? `RESOURCE_${t.resource}` : null,
       owner: tileSeat(t), district: !!t.district || centres.has(t.index), city: centres.has(t.index),
       area: t.area ?? -1, region: t.region ?? -1, continent: t.continent ?? -1,
-      coastal: isCoastalLand(map, t), freshWater: hasFreshWater(map, t),
+      coastal: isCoastalLand(map, t), freshWater: hasFreshWater(map, t), lake: t.terrain === 'LAKE',
     }))),
     plotsWithin: (p, r) => {
       const t = map.tiles[p];
       return tilesWithin(map, t.col, t.row, r).map((x) => x.index);
     },
+    plotsRing: (p, r) => ringPlots(state, p, r),
     plotDistance: (a, b) => {
       const ta = map.tiles[a];
       const tb = map.tiles[b];
@@ -184,8 +186,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       const c = civOf(state, i);
       return c ? gameTypeOf('civilization', c, 'CIVILIZATION_') : null;
     },
-    units: (i) => unitsOf(state, i).map((u) => ({ id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex,
-      founder: !!UNITS[u.type]?.settler })),
+    units: (i) => unitsOf(state, i).map(unitView),
     unitReach: (id, turns) => {
       const u = state.units.find((x) => x.id === id);
       return u ? reachPlots(state, u, turns).map((r) => ({ plot: r.tile, turns: r.turns, moves: r.moves })) : [];
@@ -392,6 +393,23 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       ? touristsDrawn(state.seats, seat(i), o) : 0), 0),
     scienceWonders: (i) => citiesOf(state, i).reduce((n, c) => n + c.wonders.filter((w) => (BUILDINGS[w.id]?.yields?.science ?? 0) > 0).length, 0),
     spaceProjects: (i) => seat(i).projectsDone.filter((id) => PROJECTS[id]?.victory).length,
+    cityBuilds: (i) => citiesOf(state, i).map((c) => {
+      const head = c.queue[0];
+      const unit = head?.kind === 'settler' ? 'UNIT_SETTLER' : head?.kind === 'unit' ? gameTypeOf('unit', head.unit, 'UNIT_') : null;
+      if (!head || !unit) return { plot: c.centerIndex, unitType: null, turnsLeft: -1 };
+      const prod = Math.max(1, computeCityStats(state, c).total.production);
+      return { plot: c.centerIndex, unitType: unit, turnsLeft: Math.max(0, Math.ceil((itemCost(head, state, c) - head.progress) / prod)) };
+    }),
+    bestCombatStrength: (i) => unitsOf(state, i).reduce((m, u) => Math.max(m, UNITS[u.type]?.combat ?? 0), 0),
+    knownUnits: (i, j) => {
+      if (i === j) return unitsOf(state, j).map(unitView);
+      const seen = plotsSeenNow(state, new Set([i]));
+      return unitsOf(state, j).filter((u) => seen[u.tileIndex] && unitVisibleTo(state, u, i)).map(unitView);
+    },
+    barbarianCamps: (i) => [...campTiles(state)].filter((p) => isExplored(state, i, p)).sort((a, b) => a - b),
+    barbarianSeat: () => BARB_SEAT,
+    plotForeignUnits: (i, p) => state.units.filter((u) => u.tileIndex === p && u.seat !== i && !unitsHostile(state, { seat: i }, u)).length,
+    cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population ?? 0,
   };
 }
 
@@ -448,4 +466,12 @@ function militaryStrength(state: GameState, seat: number): number {
   const gold = Math.trunc(seatOf(state, seat)?.treasury ?? 0);
   sum += Math.trunc(Math.trunc((gold * 256) / 6) / 512);
   return sum >> 8;
+}
+
+/** a unit as the majors' AI reads it */
+function unitView(u: Unit): MajorUnitView {
+  const d = UNITS[u.type];
+  return { id: u.id, type: gameTypeOf('unit', u.type, 'UNIT_'), plot: u.tileIndex, founder: !!d?.settler,
+    combat: d?.combat ?? 0, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
+    movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE) };
 }

@@ -41,6 +41,8 @@ export interface MajorPlotView {
   continent: number;
   coastal: boolean;
   freshWater: boolean;
+  /** a Lake plot */
+  lake: boolean;
 }
 
 /** one plot of a unit's planning reach (UnitPlanning): the turn it is
@@ -59,6 +61,22 @@ export interface MajorUnitView {
   plot: number;
   /** Units.FoundCity */
   founder: boolean;
+  /** the unit's combat and ranged strengths (the install's), its damage
+   *  (0 to 100) and its Movement left (24.8 fixed point, as the reach's) */
+  combat: number;
+  ranged: number;
+  /** the ranged attack's Range, 0 for none */
+  range: number;
+  damage: number;
+  movesLeft: number;
+}
+
+/** what a city of the seat produces: the UnitType in its queue's head (null
+ *  for anything else) and the turns to finish it */
+export interface MajorCityBuildView {
+  plot: number;
+  unitType: string | null;
+  turnsLeft: number;
 }
 
 /** a unit of a player at war with the seat, as its danger map reads it:
@@ -101,6 +119,9 @@ export interface MajorView extends AiValueView {
   plots(): readonly MajorPlotView[];
   /** the plots within `radius` of a plot, the plot included */
   plotsWithin(plot: number, radius: number): readonly number[];
+  /** the same plots in the game's ring walk order (0x69010): the plot, then
+   *  each ring from its six corners, each corner walked along its side */
+  plotsRing(plot: number, radius: number): readonly number[];
   plotDistance(a: number, b: number): number;
   /** the seat has revealed the plot */
   revealed(seat: number, plot: number): boolean;
@@ -244,4 +265,21 @@ export interface MajorView extends AiValueView {
   scienceWonders(seat: number): number;
   /** the space race projects the seat has completed */
   spaceProjects(seat: number): number;
+  // THE OPERATIONS' VIEW (ai/major/operations/)
+  /** what each of the seat's cities produces */
+  cityBuilds(seat: number): readonly MajorCityBuildView[];
+  /** the seat's best combat strength (player +0x1330 +0xf0): the largest
+   *  combat strength of its units */
+  bestCombatStrength(seat: number): number;
+  /** the player's units the seat sees now (its own: all of them) */
+  knownUnits(seat: number, player: number): readonly MajorUnitView[];
+  /** the barbarian camps on plots the seat has revealed, in plot order */
+  barbarianCamps(seat: number): readonly number[];
+  /** the barbarians' seat */
+  barbarianSeat(): number;
+  /** the units on the plot of the players not at war with the seat, its own
+   *  left out */
+  plotForeignUnits(seat: number, plot: number): number;
+  /** the citizens of the city whose centre is the plot, 0 for none */
+  cityPopulation(plot: number): number;
 }
