@@ -293,7 +293,7 @@
   cases:
     - recording: 1124
       value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
-  impl: [cpu/core/aiCityBuild.ts:housingFactor]
+  impl: [cpu/core/aiCityBuild.ts:housingFactor, gpu/core/sim_cityvalue.py:_cv_hfactor]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   context:
     - "...' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (..."

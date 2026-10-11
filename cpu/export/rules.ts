@@ -315,7 +315,9 @@ import { IMPROVEMENT_IDS } from '../core/unitActions'; // ONE roster, core-owned
 
 import { RESOURCES } from '../../world/resources';
 import { AI_RESOURCE_EXPORT, aiTechResources } from '../core/aiResource';
-import { AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { AI_DEFAULT_SAVINGS, AI_PSEUDOYIELD_DEFAULT, AI_YIELD_DEFAULT } from '../data/aiTables';
+import { engineId, gameTypeOf } from '../data/aliases';
+import { AI_BUILDINGS, AI_DISTRICTS, AI_FEATURES, AI_IMPROVEMENTS, AI_PROJECTS, AI_RESOURCES, AI_UNITS, AI_UNIT_EFFICIENCY } from '../data/aiBuildTables';
 import { AI_YIELDS } from '../core/aiWeights';
 import type { Era } from '../data/techs';
 import { BARB_CAMPS_PER_MAJOR, BARB_FIRST_TURN_PCT, BARB_CAMP_DIST_CAMP, BARB_CAMP_DIST_CITY, BARB_TECH_PCT, BARB_REGION_MIN,
@@ -1015,6 +1017,31 @@ export function buildRules() {
       pyHappiness: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_HAPPINESS,
       pyLuxury: AI_PSEUDOYIELD_DEFAULT.PSEUDOYIELD_RESOURCE_LUXURY,
       yieldDefault: AI_YIELDS.map((y) => AI_YIELD_DEFAULT[y]),
+    },
+    // the city build AI's value tables (`aiCityBuild.ts`, `aiPlotValue.ts`,
+    // `aiDistrictValue.ts`, `aiProjectValue.ts`, `aiEconomic.ts`): the yields'
+    // and pseudo-yields' DefaultValue by type, the rows in database order (a
+    // project's completion modifiers as their count), the savings' weights,
+    // the military AI's unit efficiencies
+    aiCityBuild: {
+      yieldDefault: AI_YIELD_DEFAULT,
+      pseudoDefault: AI_PSEUDOYIELD_DEFAULT,
+      improvements: AI_IMPROVEMENTS,
+      features: AI_FEATURES,
+      resources: AI_RESOURCES.map((r) => ({ type: r.type, class: r.class, harvests: r.harvests, yields: r.yields })),
+      districts: AI_DISTRICTS,
+      projects: AI_PROJECTS.map((p) => ({ ...p, modifiers: p.modifiers.length })),
+      savings: AI_DEFAULT_SAVINGS.map((s) => s.weight),
+      // a building's modifiers as their count
+      buildings: AI_BUILDINGS.map((b) => ({ ...b, modifiers: b.modifiers.length })),
+      units: AI_UNITS,
+      unitEfficiency: AI_UNIT_EFFICIENCY,
+      // per engine unit (the GPU's unit index) its AI_UNITS row, -1 none: its
+      // own install type, else the one its catalog tag names
+      engineUnitRow: Object.values(UNITS).map((u) => {
+        const t = engineId('unit', 'UNIT_' + u.id, 'UNIT_', UNITS) === u.id ? 'UNIT_' + u.id : gameTypeOf('unit', u.id, 'UNIT_');
+        return AI_UNITS.findIndex((r) => r.type === t);
+      }),
     },
     researchAi: {
       taskBias: RESEARCH_AI_TASK_BIAS,

@@ -1,7 +1,9 @@
-// The AI's district value (cpu/core/aiDistrictValue.ts), the project value
+// The AI's district value (cpu/core/aiDistrictValue.ts), the housing value
+// (cpu/core/aiCityBuild.ts), the project value
 // (cpu/core/aiProjectValue.ts) and the Economic AI's savings and unit
 // purchases (cpu/core/aiEconomic.ts) on stub facts, against the city-states'
-// logged values (AI_CityBuild.csv) of the verbose duels.
+// logged values (AI_CityBuild.csv) of the verbose duels; the GPU twin
+// (tests/gpu/city_value_test.py) pins the same numbers.
 import { describe, expect, it } from 'vitest';
 import { districtValue, type DistrictValueFacts } from '../../../cpu/core/aiDistrictValue';
 import { projectValue, type ProjectValueFacts } from '../../../cpu/core/aiProjectValue';
@@ -10,6 +12,7 @@ import {
   type PurchaseCity,
 } from '../../../cpu/core/aiEconomic';
 import { FX, type AiValueView } from '../../../cpu/core/aiValue';
+import { growthForecast, housingValue, type CityGrowth } from '../../../cpu/core/aiCityBuild';
 
 /** a city-state of the Ancient era: every yield at its DefaultValue, the
  *  district pseudo-yield's weight 0.5 x the era's chronology 1 */
@@ -25,7 +28,7 @@ const at = (v: number): number => Math.round((v / FX) * 100) / 100;
 const plot = (over: Partial<DistrictValueFacts> = {}): DistrictValueFacts => ({
   view, seat: 0, improvement: null, pillaged: false, resource: null, feature: null,
   floodTurns: null, eruptionTurns: null, appeal: 0, besideHousingDistrict: false,
-  unitCost: () => 25, buildsUnit: () => true, extraCharges: () => 0, progressCount: 0, escalation: 1000,
+  unitCost: () => 25, buildsUnit: () => true, extraCharges: () => 0, progressPct: 0, escalation: 1000,
   speedScaled: (n) => Math.floor(n / 2), adjacency: () => 0, housingValue: () => 0, resourceValue: () => 0,
   owned: false, purchaseCost: 25, lake: false, keepsFeature: () => false, district: null, districtPillaged: false,
   isCity: false, districtAdjacency: () => 0, rowsAdjacency: () => 0, otherDistricts: () => [], chronology: 1,
@@ -56,6 +59,32 @@ describe('the district value (0x7a51f0 -> 0x7aaf80)', () => {
     const one = districtValue(plot(), 'DISTRICT_INDUSTRIAL_ZONE', 20, 50);
     const two = districtValue(plot({ regionalCities: () => 1 }), 'DISTRICT_INDUSTRIAL_ZONE', 20, 50);
     expect(two).toBeGreaterThan(one);
+  });
+});
+
+const GROWTHS: [CityGrowth, number[][]][] = [
+  [{ surplus: 3 * FX, housing: 4, population: 2, stored: 5 * FX, multiplier: FX }, [[1679, 323, -2920], [9925, 8569, 2927], [9925, 8569, 2927]]],
+  [{ surplus: 6 * FX + 128, housing: 5, population: 4, stored: 0, multiplier: FX + 64 }, [[18250, 13767, 6335], [48679, 41260, 19007], [48679, 41260, 19007]]],
+  [{ surplus: 2 * FX, housing: 3, population: 3, stored: 10 * FX, multiplier: FX }, [[5148, 4231, 1948], [15446, 12694, 5846], [15446, 12694, 5846]]],
+  [{ surplus: 0, housing: 6, population: 3, stored: 0, multiplier: FX }, [[0, 0, 0], [0, 0, 0], [0, 0, 0]]],
+];
+
+describe('the housing value (0x7a3d70) over the growth forecast (0x5cb570), raw — pinned alike by tests/gpu/city_value_test.py', () => {
+  it('1, 2 and 4 Housing more landing in 0, 5 and 20 turns', () => {
+    for (const [g, want] of GROWTHS) {
+      const fc = growthForecast(g);
+      [1, 2, 4].forEach((hh, i) => expect([0, 5, 20].map((t) => housingValue(g, fc, hh, t, 50))).toEqual(want[i]));
+    }
+  });
+
+  it('the districts carrying Housing, Appeal, a domain and HitPoints on an owned plot', () => {
+    const [g] = GROWTHS[0];
+    const fc = growthForecast(g);
+    const f = plot({ owned: true, purchaseCost: 0, appeal: 2, districtCount: 1, districtCap: 2, housingValue: (hh, t, h) => housingValue(g, fc, hh, t, h) });
+    expect(districtValue(f, 'DISTRICT_NEIGHBORHOOD', 20, 50)).toBe(20467);
+    expect(districtValue(f, 'DISTRICT_INDUSTRIAL_ZONE', 20, 50)).toBe(8774);
+    expect(districtValue({ ...f, cityTrains: () => false, playerTrains: () => false }, 'DISTRICT_HARBOR', 10, 50)).toBe(65133);
+    expect(districtValue(f, 'DISTRICT_ENCAMPMENT', 12, 50)).toBe(33933);
   });
 });
 
@@ -93,6 +122,10 @@ describe('the savings (0x687bf0) and the unit purchases (0x68be60)', () => {
       .map((x) => Math.floor(x * 256) / 256));
     savingsTurn(e, (90 + 2000) * FX, true);
     expect(e.savings[SLOT_PLOTS]).toBe(150 * FX);
+    // no Great Person class left: GREAT_PEOPLE folds into the SLUSH_FUND
+    const [slush, gp] = [e.savings[SLOT_SLUSH], e.savings[3]];
+    savingsTurn(e, e.balance, false);
+    expect([e.savings[SLOT_SLUSH], e.savings[3]]).toEqual([slush + gp, 0]);
   });
 
   const city = (threat: number, cost = 40): PurchaseCity => ({ id: 1, goldCost: () => cost, threat, canPurchase: () => true });

@@ -187,7 +187,7 @@
   cases:
     - recording: 1124
       value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
-  impl: [cpu/core/aiCityBuild.ts:turnsToGrow]
+  impl: [cpu/core/aiCityBuild.ts:turnsToGrow, gpu/core/sim_cityvalue.py:_cv_forecast]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...(code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, non-full non-tribe at peace >5 units, Spy non-ful..."

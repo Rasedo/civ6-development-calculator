@@ -83,7 +83,7 @@
   cases:
     - recording: 1124
       value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
-  impl: [cpu/core/aiCityBuild.ts:growthForecast]
+  impl: [cpu/core/aiCityBuild.ts:growthForecast, gpu/core/sim_cityvalue.py:_cv_forecast]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb4/NOTES.md: ...8709, anyT +4503 (13212), onlyOurs 1318.  DONE (code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, no..."
@@ -304,6 +304,9 @@
     - cpu/core/aiProjectValue.ts:analysed
     - cpu/core/aiProjectValue.ts:projectTable
     - cpu/harness/cityContractLab.ts:evalsOf
+    - gpu/core/sim_cityvalue.py:_cv_project_table
+    - gpu/core/sim_cityvalue.py:_cv_unit_turns
+    - gpu/core/sim_cityvalue.py:_cv_building_turns
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -576,6 +579,7 @@
     - cpu/core/aiContracts.ts:reapContracts
     - cpu/core/aiContracts.ts:takesTurn
     - cpu/harness/cityBuildLog.ts:loadCityBuildPicks
+    - gpu/core/sim_cityvalue.py:_cv_pick
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

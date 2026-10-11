@@ -43,7 +43,7 @@ import { engineId, gameTypeOf, installFeature } from '../data/aliases';
 import { IMPROVEMENTS } from '../data/improvements';
 import { DISTRICTS } from '../data/districts';
 import { BUILDER_COST_STEP, UNITS } from '../data/units';
-import { GAME_COST_ESCALATION, scaleByGameSpeed } from '../data/constants';
+import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data/constants';
 import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
@@ -168,7 +168,7 @@ for (const rec of recs) {
         // a city-state's own version of every unit (no unique one)
         buildsUnit: () => true,
         extraCharges: () => 0,
-        progressCount: Math.max(r.techs.length, r.civics.length),
+        progressPct: gameProgressPct(r.techs.length, r.civics.length),
         escalation: GAME_COST_ESCALATION,
         speedScaled: scaleByGameSpeed,
         adjacency: (impType, y) => {

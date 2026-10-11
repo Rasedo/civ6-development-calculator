@@ -394,7 +394,10 @@
     - recording: 1124
       turn: 9
       value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
-  impl: [ai/major/operations/warValue.ts:regionalStrength, cpu/core/aiMilitary.ts:combatDesire]
+  impl:
+    - ai/major/operations/warValue.ts:regionalStrength
+    - cpu/core/aiMilitary.ts:combatDesire
+    - gpu/core/sim_cityvalue.py:_cv_combat_desire
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"

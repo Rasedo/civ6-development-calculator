@@ -484,6 +484,7 @@ class Rules:
     c_ai_unlocks: torch.Tensor  # long [NC, 3] — what the civics AI's value counts: buildings, districts, wonders (`civicUnlocks`)
     ai_value: dict  # the AI's value tables (`aiValue.ts`): horizon, discountPct, the pseudo-yields, unlockShare
     research_ai: dict  # the research AI's constants (`aiResearch.ts`): taskBias, embarkAll
+    ai_city_build: dict  # the city build AI's value tables (`aiCityBuild.ts`): DefaultValues, the improvements, features, resources, districts, projects, savings
     civic_ai: dict  # the civics AI's constants (`aiCivics.ts`): policyFloor
     c_repeat: torch.Tensor  # bool [NC]
     t_prereqs: list  # list of lists
@@ -735,6 +736,7 @@ def load_rules(path: Path = FIXTURES / "rules.json") -> Rules:
         c_ai_unlocks=torch.tensor([[int(c["aiBuildings"]), int(c["aiDistricts"]), int(c["aiWonders"])] for c in r["civics"]], dtype=torch.long),
         ai_value=r["aiValue"],
         research_ai=r["researchAi"],
+        ai_city_build=r["aiCityBuild"],
         civic_ai=r["civicAi"],
         c_repeat=torch.tensor([bool(c["repeatable"]) for c in r["civics"]], dtype=torch.bool),
         t_prereqs=[t["prereqs"] for t in r["techs"]],

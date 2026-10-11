@@ -3901,7 +3901,10 @@ the tables `AI_RESOURCES` / `AI_IMPROVEMENTS` in `cpu/data/aiBuildTables.ts`
 
 ## C-96: the district value — READ (0x7a51f0, 0x7aaf80's terms below, 0x366df0, the purchase price 0x1b1cb0, 0x1c77c0, 0x1b4450), PARTLY READ (the golden-age term, the claims, modifiers and neighbours terms, the domain's resources path), unwired
 
-Ported in `cpu/core/aiDistrictValue.ts`; measured by
+Ported in `cpu/core/aiDistrictValue.ts` (its GPU twin, with the improvement,
+project, building and unit values, the pick, the Combat Desire and the
+purchase, `gpu/core/sim_cityvalue.py`, paired by tests/gpu/city_value_test.py);
+measured by
 `cpu/harness/plotValueLab.ts --districts` against AI_CityBuild.csv's
 DISTRICTS rows of the five verbose duels: 8,629 of 55,800 within 0.02
 (Commercial Hub 2,077 of 7,627, Harbor 2,849 of 9,896, Industrial Zone
@@ -4166,8 +4169,10 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   Then - the charge + 0x7b1320 + the resource value 0x7a21e0 (1 copy; a
   stockpiled resource's count by 0x7a2140, unread).
 - 0x7a3010: Feature_Removes' rows escalated x + (10x - x) n / 100, n the
-  larger of the civics and techs held (0x5267a0 type 1, GlobalParameters
-  +0x37c), at the speed (0x5254d0), at DefaultValue, discounted T; less a
+  larger of the civics' and techs' percent held (0x399810 / 0x4c9cf0 return
+  100 x held / possible; 0x5267a0 type 1 takes n as given, GlobalParameters
+  +0x37c; the five duels' improvement rows 66,566 -> 75,404 exact over the
+  raw counts), at the speed (0x5254d0), at DefaultValue, discounted T; less a
   Builder's charge (the unit by hash 0x11d57532) and Feature_YieldChanges
   at DefaultValue (Appeal x 0.5 Food more where a neighbour holds a
   district with Housing, 0x79e140; Districts +0x40 Housing) from T to H.

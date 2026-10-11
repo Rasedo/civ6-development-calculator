@@ -48,9 +48,10 @@ export interface PlotValueFacts {
   buildsUnit(unit: string): boolean;
   /** the player's charges a unit carries beyond its three (+0x7b0[u]) */
   extraCharges(unit: string): number;
-  /** the larger of the civics the player has and the techs it has (the
-   *  harvest's escalation, 0x5267a0 type 1) */
-  progressCount: number;
+  /** the game's progress the removal's escalation (0x5267a0 type 1) reads:
+   *  the larger of the civics' and the techs' percent held (0x399810,
+   *  0x4c9cf0; `gameProgressPct`) */
+  progressPct: number;
   /** the game's cost escalation (GlobalParameters +0x37c) and the game
    *  speed's scaling of a lump (0x5254d0) */
   escalation: number;
@@ -112,7 +113,7 @@ export function featureRemovalValue(f: PlotValueFacts, feature: string, t: numbe
   }
   let gain = 0;
   for (const [y, a] of row.removes) {
-    const esc = a + Math.trunc((Math.trunc((a * f.escalation) / 100) - a) * f.progressCount / 100);
+    const esc = a + Math.trunc((Math.trunc((a * f.escalation) / 100) - a) * f.progressPct / 100);
     gain += discounted(atDefault(f.speedScaled(esc), y), AI_RATE, t);
   }
   return gain - chargeCost(f, BUILDER, t) - between(lost, t, h);

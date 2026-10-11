@@ -36,9 +36,11 @@
     - recording: h1_duelw1112
       turn: 49
       value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
+  impl: [cpu/core/aiPlotValue.ts:PlotValueFacts]
   readings:
     - "B-D: the policy-unlock price — CLOSED"
     - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...ckPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
     - "...ase·GAME_COST_ESCALATION(1000)/100 − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an improvement (+0x4..."

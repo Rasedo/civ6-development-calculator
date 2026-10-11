@@ -829,6 +829,7 @@ def _main() -> int:
                 ("suzerain_rules", [py, "tests/gpu/suzerain_rules_test.py"], 2),  # the seven suz-coded perks, strict-suzerain-only
                 ("minor_record", [py, "tests/gpu/minor_record_test.py"], 2),  # the resolved suzerain, the minor's research, its border, Containment, conversion
                 ("research_ai", [py, "tests/gpu/research_ai_test.py"], 2),  # the research AI: its value, its walk, its choice
+                ("city_value", [py, "tests/gpu/city_value_test.py"], 2),  # the city build AI's values, the pick, the Combat Desire, the savings and the purchase
                 ("civic_ai", [py, "tests/gpu/civic_ai_test.py"], 2),  # the civics AI: its value, its walk, its propagation, its choice
                 ("envoy_tiles", [py, "tests/gpu/envoy_tiles_test.py"], 2),  # a minor's plot per envoy received: the slope, the shared border pick, the refusals
                 ("online_costs", [py, "tests/gpu/online_costs_test.py"], 2),  # the online growth and border costs, culture after growth, whole improvement housing, the floodplains, the Great Wall
