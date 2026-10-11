@@ -5,11 +5,15 @@
  * centre first — a line `turn,player,,x y, ...` and its value rows
  * `,,,DISTRICTS|IMPROVEMENTS|BUILDINGS|UNITS|PROJECTS, v, v, ...` in database
  * order (-9999 an item it does not value). Here the city centre's BUILDINGS
- * row, against `aiCityBuild.ts`.
+ * row, against `aiCityBuild.ts`. Read from the recording's log store
+ * (`logStore.ts`), where the blocks are the AI_CityBuild_plot tables.
  */
-import { existsSync, readFileSync } from 'node:fs';
 import { AI_BUILDINGS } from '../data/aiBuildTables';
 import { FX_MIN } from '../core/aiValue';
+import { hasLog, openLogStore } from './logStore';
+
+/** a value row's item the store holds no value for was logged -9999.00 */
+const UNVALUED = -9999;
 
 /** the city centre's BUILDINGS values, by `${turn}:${player}:${city}` */
 export function loadCityBuildTables(dumpPath: string): Map<string, number[]> {
@@ -17,42 +21,28 @@ export function loadCityBuildTables(dumpPath: string): Map<string, number[]> {
 }
 
 /** the city centre's value rows (DISTRICTS, IMPROVEMENTS, BUILDINGS, UNITS,
- *  PROJECTS), by `${turn}:${player}:${city}` */
+ *  PROJECTS), by `${turn}:${player}:${city}`: the first plot of the city's
+ *  first block of the turn */
 export function loadCityBuildCentre(dumpPath: string): Map<string, Record<string, number[]>> {
   const out = new Map<string, Record<string, number[]>>();
-  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_CityBuild.csv');
-  if (!existsSync(path)) return out;
-  const text = readFileSync(path, 'utf8');
-  let key: string | null = null;
-  let centre = false;
-  let at = 0;
-  while (at < text.length) {
-    let end = text.indexOf('\n', at);
-    if (end < 0) end = text.length;
-    const line = text.slice(at, end);
-    at = end + 1;
-    if (line.startsWith(',,,')) {
-      if (key && centre) {
-        const cut = line.indexOf(',', 3);
-        const name = line.slice(3, cut);
-        let rows = out.get(key);
-        if (!rows) out.set(key, (rows = {}));
-        rows[name] = line.slice(cut + 1).split(',').map((x) => x.trim()).filter(Boolean).map(Number);
-      }
-      continue;
-    }
-    if (line.includes('PLOT ANALYSIS LOG')) {
-      const p = line.split(',').map((x) => x.trim());
-      key = `${p[0]}:${p[1]}:${p[2]}`;
-      centre = false;
-      continue;
-    }
-    if (key && /^\d+,\d+,,\d+ \d+,/.test(line)) {
-      centre = !out.has(key) && !centre;
-      continue;
-    }
-    key = null;
+  const db = openLogStore(dumpPath);
+  if (!db || !hasLog(db, 'AI_CityBuild_plot')) return out;
+  const family = new Map(db.prepare('SELECT id, name FROM AI_CityBuild_family').all().map((f) => [Number(f.id), String(f.name)]));
+  const centres = `WITH c AS (SELECT p.id, p.turn, p.player, p.city FROM AI_CityBuild_plot p
+    JOIN (SELECT min(block) AS b FROM AI_CityBuild_plot GROUP BY turn, player, city) m ON p.block = m.b AND p.seq = 0)`;
+  const byPlot = new Map<number, Record<string, number[]>>();
+  for (const r of db.prepare(`${centres} SELECT c.id, c.turn, c.player, c.city, r.family, r.n FROM c
+      JOIN AI_CityBuild_plot_row r ON r.plot = c.id ORDER BY c.id, r.family`).all()) {
+    const key = `${r.turn}:${r.player}:${r.city}`;
+    const rows = out.get(key) ?? (out.set(key, {}), out.get(key)!);
+    rows[family.get(Number(r.family))!] = new Array<number>(Number(r.n)).fill(UNVALUED);
+    byPlot.set(Number(r.id), rows);
   }
+  for (const v of db.prepare(`${centres} SELECT v.plot, v.family, v.item, v.value FROM c
+      JOIN AI_CityBuild_plot_value v ON v.plot = c.id`).all()) {
+    byPlot.get(Number(v.plot))![family.get(Number(v.family))!][Number(v.item)] = Number(v.value);
+  }
+  db.close();
   return out;
 }
 
@@ -60,14 +50,15 @@ export function loadCityBuildCentre(dumpPath: string): Map<string, Record<string
  *  -> the item and its value, or null for "NO BUILDS AT ALL" */
 export function loadCityBuildPicks(dumpPath: string): Map<string, { item: string; value: number } | null> {
   const out = new Map<string, { item: string; value: number } | null>();
-  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_CityBuild.csv');
-  if (!existsSync(path)) return out;
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    if (!line.includes('Default Specialization') && !line.includes('NO BUILDS AT ALL')) continue;
-    const p = line.split(',').map((x) => x.trim());
-    const key = `${p[0]}:${p[1]}:${p[2]}`;
-    out.set(key, p[6] === 'Default Specialization' ? { item: p[5], value: Number(p[9].replace('Value ', '')) } : null);
+  const db = openLogStore(dumpPath);
+  if (!db || !hasLog(db, 'AI_CityBuild')) return out;
+  for (const r of db.prepare(`SELECT turn, player, city, construct, order_source, rest FROM AI_CityBuild
+      WHERE order_source = 'Default Specialization' OR construct LIKE 'NO BUILDS AT ALL%' ORDER BY line`).all()) {
+    const key = `${r.turn}:${r.player}:${r.city}`;
+    out.set(key, r.order_source === 'Default Specialization'
+      ? { item: String(r.construct), value: Number(String(r.rest).split(',')[2].trim().replace('Value ', '')) } : null);
   }
+  db.close();
   return out;
 }
 
@@ -99,18 +90,18 @@ export function tallyBuildings(t: CityBuildTally, turn: number, player: number, 
  *  `${turn}:${player}` */
 export function loadKnownUnits(dumpPath: string): Map<string, Map<string, number>> {
   const out = new Map<string, Map<string, number>>();
-  const path = dumpPath.replace(/\.jsonl$/, '.logs/AI_Knowledge.csv');
-  if (!existsSync(path)) return out;
-  for (const line of readFileSync(path, 'utf8').split('\n')) {
-    const p = line.split(',').map((x) => x.trim());
-    if (p[2] !== 'ARMY') continue;
-    const k = `${p[0]}:${p[1]}`;
+  const db = openLogStore(dumpPath);
+  if (!db || !hasLog(db, 'AI_Knowledge')) return out;
+  for (const r of db.prepare(`SELECT turn, player, other, rest FROM AI_Knowledge WHERE knowledgetype = 'ARMY' ORDER BY line`).all()) {
+    const k = `${r.turn}:${r.player}`;
     const m = out.get(k) ?? (out.set(k, new Map()), out.get(k)!);
-    for (const cell of p.slice(4)) {
-      const [u, n] = cell.split(' ');
+    const cells = [String(r.other ?? ''), ...(r.rest === null ? [] : String(r.rest).split(','))];
+    for (const cell of cells) {
+      const [u, n] = cell.trim().split(' ');
       if (u?.startsWith('UNIT_')) m.set(u, (m.get(u) ?? 0) + Number(n));
     }
   }
+  db.close();
   return out;
 }
 

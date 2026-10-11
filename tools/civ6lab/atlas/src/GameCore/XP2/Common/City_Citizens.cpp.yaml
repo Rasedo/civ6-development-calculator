@@ -1,0 +1,143 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x194d90
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ier entry keeps a tie. The N = unassigned count of the last row's backtrack are assigned (0x194d90).
+  review: imported
+- addr: 0x194fb0
+  final: 0x10fa50
+  kind: function
+  name: ChangeNumUnassigned
+  status: PARTLY
+  impl: [cpu/harness/citizens.ts:replaceAllCitizens]
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "City_Citizens.cpp. `ChangeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnas..."
+  review: imported
+- addr: 0x195940
+  final: 0x10fff0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 105
+      value: "Recorded: 1128 Xi'an t105, the barbarians' UNITOPERATION_PILLAGE on the   Holy Site at t104, the Shrine pillaged, the record's worked plots keep the   district's specialist and the city's Faith 5 = 1 "
+  impl: [cpu/core/city.ts:citySpecialistSlots]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+  context:
+    - ...= x - floor(y/2) + dq, y' = y + dr, x' = q + floor(y'/2), x wrapped), the plot's capacity 0x195940 (0 on the centre, 0 where no yield is above 0, a district's specialist slots, else 1) les...
+    - "- A plot's capacity (0x195940) counts a district's specialist slots as its row's base (+0x54 behind +0x50) plus each..."
+  review: imported
+- addr: 0x195f90
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ld is above 0, a district's specialist slots, else 1) less its workers. An entry's score (0x195f90): food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold onc..."
+  review: imported
+- addr: 0x196320
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1129
+      value: "recorded from runs/h1_duelw1129 on): the InGame Lua answers them per city (`GetCitizens():IsFavoredYield(i)` / `IsDisfavoredYield(i)`;"
+    - recording: 1129
+      value: "Recorded (1129-1130): the AI calls a setter on its cities every turn or two, China mostly with nothing set (\"......\", a re-place under no flags), at times Food favored (1130);"
+    - recording: 1129
+      value: "a start-window row lands after the city turns: re-placing at those rows before the border step costs 112 step.border passes on 1129, before the growth 129 step.growth passes — the city turns bank on t"
+    - recording: 1129
+      value: "`citizens.ts` YieldFlags: a favored flag puts the yield's doubled value in the favored score, a disfavored one drops it) and re-places on a start's wonder annex where the record holds them (1129: step"
+  impl: [cpu/harness/checks.ts:startWin, cpu/harness/checks.ts:annexed]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced cou..."
+    - "...nd writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the event (hash 0xe808a01e) — the city command 0x975920..."
+    - ...count (+0xc), clears the stored next plot (+0x1c) and runs the full citizen reassign 0x196320 on the gaining city (0x1a8f4c) and on a losing one (0x1a903c). Other callers of 0x19632...
+  review: imported
+- addr: 0x196440
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...egative count runs the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassign...
+  review: imported
+- addr: 0x196e30
+  final: 0x110990
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...e forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0...
+  review: imported
+- addr: 0x196f90
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1129
+      value: "recorded from runs/h1_duelw1129 on): the InGame Lua answers them per city (`GetCitizens():IsFavoredYield(i)` / `IsDisfavoredYield(i)`;"
+    - recording: 1129
+      value: "Recorded (1129-1130): the AI calls a setter on its cities every turn or two, China mostly with nothing set (\"......\", a re-place under no flags), at times Food favored (1130);"
+    - recording: 1129
+      value: "a start-window row lands after the city turns: re-placing at those rows before the border step costs 112 step.border passes on 1129, before the growth 129 step.growth passes — the city turns bank on t"
+    - recording: 1129
+      value: "`citizens.ts` YieldFlags: a favored flag puts the yield's doubled value in the favored score, a disfavored one drops it) and re-places on a start's wonder annex where the record holds them (1129: step"
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...d (`favored`, `disfavored`) and on each CityFocusChanged row (one letter per Yields row). 0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0..."
+    - "...ng one (0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy an..."
+  review: imported
+- addr: 0x1970e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1129
+      value: "recorded from runs/h1_duelw1129 on): the InGame Lua answers them per city (`GetCitizens():IsFavoredYield(i)` / `IsDisfavoredYield(i)`;"
+    - recording: 1129
+      value: "Recorded (1129-1130): the AI calls a setter on its cities every turn or two, China mostly with nothing set (\"......\", a re-place under no flags), at times Food favored (1130);"
+    - recording: 1129
+      value: "a start-window row lands after the city turns: re-placing at those rows before the border step costs 112 step.border passes on 1129, before the growth 129 step.growth passes — the city turns bank on t"
+    - recording: 1129
+      value: "`citizens.ts` YieldFlags: a favored flag puts the yield's doubled value in the favored score, a disfavored one drops it) and re-places on a start's wonder annex where the record holds them (1129: step"
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - ...0x196f90 asserts the yield is not favored (+0x38) and writes the disfavored byte (+0x50); 0x1970e0 the converse; each runs the full reassign 0x196320 whatever the value was and fires the e...
+    - "...0x1a903c). Other callers of 0x196320: the favored / disfavored yield setters (0x196f90, 0x1970e0), an improvement laid (0xa4cee0, 0xa4e7a0). Recorded: a city-state's envoy annex re-pla..."
+  review: imported
+- addr: 0x197230
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 13
+      value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"
+    - recording: 1120
+      turn: 13
+      value: 1120 t13 17 / 32 (a defender at 18 HP).
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - DLL rules the engines contradict
+  context:
+    - ...s the full reassign 0x196320 (save the forced counts +0x08, unassign all 0x196440, assign 0x197230, lay the forced counts back 0x196e30), else 0x197230 places the unassigned ones beside th...
+    - "0x197230: need = max(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached f..."
+    - "...P) — the attacker on a tie (0x206d01: `jle`). The experience reads the result after it (0x1975e0 at 0x206e98 / 0x206ee2). Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 ov..."
+  review: imported

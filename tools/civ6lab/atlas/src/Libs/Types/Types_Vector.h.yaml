@@ -1,0 +1,312 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x274010
+  final: 0x1abac0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/phase.ts:freeCityGrantType]
+  readings: ["H-1: draws with no game site"]
+  context:
+    - "...theon pick (`_seat_pantheon_race`) and the Free Cities' grant (\"Free Cities Unit Choice\", 0x274010, one weighted pick: the engines' `freeCityGrantType` / `_free_grant_type` take it as the..."
+  review: imported
+- addr: 0x2d2220
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...(0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the   move 0x962030 to the plot drawn..."
+  context:
+    - "...; the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed 0x2d2220) are never read: ONE \"Random Direction\" draw over the count, the move 0x962030 to the p..."
+  review: imported
+- addr: 0x328de0
+  final: 0x232460
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "runs/h1_duelw1117 and 1118:   21 of 21 foundings past a capital draw over 55, each followed by one   picker draw (unread)."
+  impl: [cpu/core/game.ts:foundCityAt, cpu/data/constants.ts:CITY_NAME_CHOICES]
+  readings: ["H-1: a city's name, a citizen's name — READ"]
+  context:
+    - "- \"Choosing a City Name\" (0x327c30 -> 0x327a70 -> 0x328de0): a city whose founder holds a CapitalName for it (its first) takes it with no draw;..."
+  review: imported
+- addr: 0x58aa90
+  final: 0x3b4040
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/drawSites.ts:DRAW_SITES]
+  readings:
+    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: draws the AI takes, draws the engines lack"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2:...
+    - "- A plot first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Ra..."
+  review: imported
+- addr: 0x5c9700
+  final: 0x3de990
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...adv[YIELD_PRODUCTION] from 0x5d83c0, the YIELD_* list is CityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0...
+  review: imported
+- addr: 0x647bb0
+  final: 0x42b1e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...20   where the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the   +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged   branches give max(X + 20, 20) instead (AI owner and a human..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...C-97): the +0x6320 term (the desires' D of 0,   20, 40 over the records), the focus player +0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against..."
+  context:
+    - "...the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p == the +0x6780 player, set by 0x647bb0 at the AI turn's close); two flagged branches give max(X + 20, 20) instead (AI owner an..."
+    - "...+0x6320 term (the desires' D of 0, 20, 40 over the records), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81..."
+  review: imported
+- addr: 0x69f340
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ValueTerms, cpu/core/aiModifiers.ts:subjects]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- The collections: COLLECTION_ALL_CITIES 0x69f320 / 0x69f340 walks the player's KNOWLEDGE BASE's cities (player +0x12b8, its entries, setting +0x7..."
+  review: imported
+- addr: 0x6f93a0
+  final: 0x4b0120
+  kind: function
+  status: PARTLY
+  impl: [ai/major/settle.ts:RING, ai/major/settle.ts:evaluatePlot]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...lots within 2 of the Matterhorn score as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not revealed the plot or   may no..."
+  context:
+    - "- The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots within 5, 0x6b000): invalid where the player has not revealed the plot o..."
+  review: imported
+- addr: 0x6f9630
+  final: 0x4b03a0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_SiteEval.csv
+      value: "AI_SiteEval.csv logs no score below 0:   the port clamps there."
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...d or a value, the   evaluator the table at 0xf2e740 holds for its condition (0x6f3420..   0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Nearest Enemy /   Friendly City and New Resources — with a th..."
+  context:
+    - "...ue, the evaluator the table at 0xf2e740 holds for its condition (0x6f3420.. 0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Nearest Enemy / Friendly City and New Resources —..."
+  review: imported
+- addr: 0x6fd1d0
+  final: 0x4b25d0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/settle.ts:evaluatePlot]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...ns/h1_duelv1124 t40: the   plots within 2 of the Matterhorn score as without it). - The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots   within 5, 0x6b000): invalid where the player has not r..."
+  context:
+    - "- The evaluation (0x6fd1d0, its ring callback 0x6f93a0 over the plots within 5, 0x6b000): invalid where the player..."
+  review: imported
+- addr: 0x6fde70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...lAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType = one of th...
+  review: imported
+- addr: 0x6fece0
+  final: 0x4b39a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...tem (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait lists (AiLists LeaderType...
+  review: imported
+- addr: 0x702ad0
+  kind: function
+  name: YieldType
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiValueView, cpu/core/aiWeights.ts:yieldWeights]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb/notes.txt: ...alue 0x7a6690  yieldValue = amt * fx(Yields.DefaultValue) (gold .5) * (1 + min(w[y], 9.0)) ; w[y] = 0x702ad0 = sum of 5 parts (player arrays).  + per entry extras: GA points (PSEUDOYIELD_GOLDENAGE_POINT) etc;..."
+    - ".claude/scratchpad/cb/notes.txt: ...religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
+  context:
+    - ...lue 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(w[y], 9.0)), w[y] = 0x702ad0, the sum of five per-player arrays (0x4681a0 +0x340, player +0x1288 +0x528, the AI yiel...
+    - "The weight w[y] (0x702ad0, `this` the player's AI::GrandStrategic at player +0x1290, its members named by the const..."
+    - "- The yield's value (0x7a6690) carries the player's weight w[y] (0x702ad0; its five parts in \"C-96 / C-97: the AI's weights and the modifier evaluator\"); the p..."
+  review: imported
+- addr: 0x715ff0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/danger.ts:out]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0, each plot their strike covers down by   its strengt..."
+  context:
+    - "...ts strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the player's own cities: the centre 0, each plot their strike covers down by i..."
+  review: imported
+- addr: 0x716400
+  final: 0x4c52d0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/danger.ts:unitDanger]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard less COMBAT_BOMBARD_VS_UNIT_STRENGTH..."
+  context:
+    - "...th a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the bombard less COMBAT_BOMBARD_VS_UNI..."
+  review: imported
+- addr: 0x717460
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/st1/reading.md: ...tance, x5 unowned; later ones 100 /   turns where it may found). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) wit..."
+  context:
+    - "...ee Analysis\", \"Barbarian Camp Evaluation\", \"Nearest City Search\", \"AI Influence Map\" (0x717460, with a critical section 0xcc6d60), \"AI Unit Planning\"."
+    - "...e pool (0xf01920, count at +8, read by 0xb2f410) also bounds the influence map's split (0x7176dd) and serves the units' path searches (\"Unable to acquire a path finder, all %d are busy..."
+    - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its fighting units the player sees adds i..."
+  review: imported
+- addr: 0x71fb80
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Military.csv
+      value: "- THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee)   writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its strengths   (+0x398 its own, +0x3f8 the enemy's, +0x458 the ot"
+    - recording: 1124
+      turn: 9
+      value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  notes:
+    - ".claude/scratchpad/cb5/NOTES.md: ...cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhatta..."
+  context:
+    - ...238 GPP_MUSICIAN), the eras' 0x2c4230 points as GOLDENAGE_POINT; the military AI's turn 0x71fb80 writes +0x7e8 for UNIT_COMBAT, NAVAL, EXPLORER, NUCLEAR, STANDING_ARMY, never GPP_GENER...
+    - "- THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee) writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its stren..."
+  review: imported
+- addr: 0x722d70
+  final: 0x4ceb70
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/manager.ts:regions]
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before the turn's triggers: one pe..."
+  review: imported
+- addr: 0x727510
+  final: 0x4d26e0
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The manager (0x722690 -> 0x727510). The candidates (0x722d70, 0x70-byte entries at +0x328), built and evaluated before th..."
+  review: imported
+- addr: 0x747230
+  final: 0x4e67f0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/evaluate.ts:targetsOf]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb5/NOTES.md: ...NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (d..."
+    - ".claude/scratchpad/st1/reading.md: ...p other than a given plot (0x6fe2b0) is the \"Settle   New City\" operation's target (the target list 0x747230, TARGET_SETTLE_   LOCATION); its \"Operation Change Target\" takes the best top other than   the old..."
+  context:
+    - "...an a given plot (0x6fe2b0) is the \"Settle New City\" operation's target (the target list 0x747230, TARGET_SETTLE_ LOCATION); its \"Operation Change Target\" takes the best top other than..."
+    - ...stHaveNukes, MustHaveUnits (player +0x12e8 +0xc0) first; then each target of the walk 0x747230 (an enemy's target needs a value above 0) against each staging plot (player +0x12b8 +0x...
+    - "- The target walk (0x747230): SETTLE — the best region top but the running operation's target, value its score's wh..."
+  review: imported
+- addr: 0x74d320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...h boost's unit choice, the religious units' targets (0x74ea60's list +0x4a0, 0x74cf50 / 0x74d320) and moves, the faith purchases.
+  review: imported
+- addr: 0x763020
+  final: 0x4fa9a0
+  kind: function
+  name: researchChoice
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+    - recording: 1124
+      turn: 1
+      value: "else one draw \"BT Research Choice\" over   the researchable rows in table order (range 5 at 1124 t1: the five roots)."
+  impl:
+    - cpu/core/aiResearch.ts:researchDraw
+    - cpu/core/aiResearch.ts:researchChoice
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_research.py:_rai_choice
+  readings:
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  context:
+    - "...es: a city-state whose research or civic completed picks the next (\"BT Research Choice\" 0x763020: the AI plan's tech, no draw, else ONE uniform draw over every researchable tech; \"Rand..."
+    - "...t (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value b..."
+    - "- THE CHOICE, 0x763020 (key): the comparator 0x75d530 over the entries — the same next step: the larger turns..."
+  review: imported
+- addr: 0x7ec7b0
+  final: 0x554b10
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:findAvailableUnit]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...rength gates over 0x723ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the f..."
+  review: imported
+- addr: 0x7f4e00
+  final: 0x55c550
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:buildUnit]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...ab0 — WEAK to the backup, TOO WEAK FAILURE); Find Available Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the uni..."
+  review: imported
+- addr: 0x81d360
+  final: 0x57cc20
+  kind: function
+  status: PARTLY
+  readings: ["C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...is one weighted pick over the offered routes (weights as read in C-16); \"Spy EscapeRoute\" 0x81d360 is the AI's route choice, which the driver makes."
+  review: imported

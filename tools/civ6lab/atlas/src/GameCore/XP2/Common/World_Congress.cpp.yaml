@@ -1,0 +1,66 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x596b40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 61
+      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
+    - recording: 1117
+      turn: 161
+      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+  readings: ["H-1: the World Congress slate (0x598270) — READ"]
+  context:
+    - "...10, 9, 8; t121, t141: 12, 11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's (called from 0x599275): it walks a database collection (0xad5430: the game's +0xb40 tab..."
+  review: imported
+- addr: 0x598270
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 61
+      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
+    - recording: 1117
+      turn: 161
+      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+  impl:
+    - cpu/core/congress.ts:congressSession
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_congress_draw_slate
+  readings: ["H-1: the World Congress slate (0x598270) — READ"]
+  context:
+    - "## H-1: the World Congress slate (0x598270) — READ"
+    - "...2, 11, 10; t161 on: the 0/1 after them. A second 0/1 from t161 is 0x596b40's (called from 0x599275): it walks a database collection (0xad5430: the game's +0xb40 table), keeps each row whos..."
+  review: imported
+- addr: 0x59a540
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 61
+      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
+    - recording: 1117
+      turn: 161
+      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+  readings: ["H-1: the World Congress slate (0x598270) — READ"]
+  context:
+    - "...— not in play —, weighs each 1 and draws ONE \"World Congress Resolutions\" pick over them (0x59a540), appending the pick at +0x310. The scored competitions fit it: 1117 / 1118 / 1121 all dr..."
+  review: imported
+- addr: 0x59a680
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 61
+      value: "runs/h1_duelw1117 t61, t81, t101: 10, 9, 8;"
+    - recording: 1117
+      turn: 161
+      value: "The scored competitions fit it: 1117 / 1118 / 1121 all draw it at t161, and at t181, after the step, China (player 1) draws two \"Choosing random civic boost to grant based on era\" — the World's Fair's"
+  readings: ["H-1: the World Congress slate (0x598270) — READ"]
+  context:
+    - "...n(3, n) \"World Congress Resolutions\" draws, each over what is left and removing its pick (0x59a680); with three drawn, the first two the previous session did not hold stand, else all drawn..."
+  review: imported

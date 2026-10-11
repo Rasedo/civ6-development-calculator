@@ -1,0 +1,728 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x286530
+  final: 0x1b90c0
+  kind: function
+  name: sev
+  status: READ
+  cases:
+    - recording: 1122
+      turn: 248
+      value: "A fire's Turn 2 (burnt, Food 1) and Turn 6 (regrown, Production 1) rows add to c (1122 t248: the t245 fire at 158, burnt at t247, takes the second removal draw)."
+    - recording: 1123
+      turn: 244
+      value: 1123 t244's eruption adds 3).
+  impl:
+    - cpu/core/disasters.ts:drought
+    - cpu/core/disasters.ts:droughtTile
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventDraws.ts:droughtDraws
+    - gpu/core/sim_economy.py:_drought_tile
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-74: the drought's strike — READ"
+    - "C-74: the sea's rise halts and removes fertility — READ"
+  context:
+    - ...AN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the applier...
+    - "0x286530 (from 0x291a20's drought arm): per plot of the stored footprint (the land plots), each `R..."
+    - "- a drought's strike (0x286530) runs 0xa1c0c0 on each plot after its rows whenever the removal is above 0. 0xa1c0c0 →..."
+  review: imported
+- addr: 0x2867f0
+  final: 0x1b9380
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 217
+      value: "Records: runs/h1_duelw1108   plot 609 (Plains, Volcanic Soil) reads 5 Food at t217 after four Food   draws."
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+    - recording: 1122
+      turn: 248
+      value: "A fire's Turn 2 (burnt, Food 1) and Turn 6 (regrown, Production 1) rows add to c (1122 t248: the t245 fire at 158, burnt at t247, takes the second removal draw)."
+  impl:
+    - cpu/core/disasters.ts:at
+    - cpu/core/disasters.ts:fireStrike
+    - cpu/harness/eventReplay.ts:at
+    - gpu/core/sim_economy.py:_fire_strike
+    - gpu/core/sim_economy.py:_random_event
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "H-1: the plot's event yields and the city yield's percent — READ"
+    - "C-74: the fire — READ"
+    - "C-74: the one-off start — READ"
+    - "C-74: the sea's rise halts and removes fertility — READ"
+  context:
+    - "- The fire's draws: \"C-74: the fire\" below (the strike 0x2867f0, SPREAD)."
+    - ...0 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
+    - "...event's yield gain 0xa190d0 (from the flood 0xa2ed80 \"Boosted Yield Chance\", the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0 \"Fertility Gain Chance\" and 0xa21680): after the..."
+  review: imported
+- addr: 0x286f80
+  final: 0x1b9b10
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 217
+      value: "Records: runs/h1_duelw1108   plot 609 (Plains, Volcanic Soil) reads 5 Food at t217 after four Food   draws."
+    - recording: 1123
+      turn: 243
+      value: "where the removal is above 0 it runs 0xa1c0c0 instead and   takes the removed count off the event's FertilityAdded (1123 t243: the   hurricane's walk after t242's RISE4, damage rows alone;"
+    - recording: 1122
+      turn: 247
+      value: "1122 t247–249);"
+  impl:
+    - cpu/core/climate.ts:stormFertilityHalted
+    - cpu/core/disasters.ts:stormStrike
+    - cpu/core/disasters.ts:stormPlot
+    - cpu/data/climate.ts:ClimatePhase
+    - cpu/data/disasters.ts:STORM_LAST_TURN_PCT
+    - cpu/harness/eventDraws.ts:EventClimate
+    - cpu/harness/eventDraws.ts:stormStrike
+    - gpu/core/sim_economy.py:_storm_halted
+    - gpu/core/sim_economy.py:_storm_strike
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-49: the storm's walk"
+    - "H-1: the plot's event yields and the city yield's percent — READ"
+    - "C-74: the sea's rise halts and removes fertility — READ"
+  context:
+    - "...the name (one draw over the naming player's citizen names, 0x28d400), the first strike 0x286f80 at 100% on a COPY of the record (stored before it, so the stored struck list starts emp..."
+    - ...the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0) share the appliers.
+    - "...imate: the turn's walk 0x28ecd0, one step 0x28c500 (\"Storm Direction\"), the step's strike 0x286f80."
+  review: imported
+- addr: 0x2876c0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1109
+      turn: 110
+      value: "Records: 1109 plot 785's   footprint −1 Food t110–111 (and t121, t133, t209), 1110 plot 887's   EXTREME t64–68."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl: [cpu/core/disasters.ts:disasterPhase]
+  readings:
+    - "C-93: the climate step after the events — CLOSED"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-74: the random-event step's order — READ"
+  context:
+    - "...calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano roll 0x335040, the weights and \"Random Event Roll\" — and only the..."
+    - "...eed's CostMultiplier / 100, truncated: online 2 (MAJOR) and 5 (EXTREME); the clear at 0x28789a when the turn reaches it. Records: 1109 plot 785's footprint −1 Food t110–111 (and t121..."
+    - "...5b8] − 1 + the start turn, a game option 0x72ce2afb first): 0x288f40 — the droughts' tick 0x2876c0 (no draw), every live storm's walk 0x28ecd0, then (a tail jump) every live one-off's turn..."
+  review: imported
+- addr: 0x287c00
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl:
+    - cpu/core/disasters.ts:eventAt
+    - cpu/core/rand.ts:randWeighted
+    - cpu/harness/civ6Random.ts:pickWeighted
+    - cpu/harness/eventReplay.ts:rollBands
+    - gpu/core/sim_masks.py:_rand_weighted
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-74: the random-event step's order — READ"
+    - "C-16: the espionage roll's bands — READ"
+  context:
+    - "...fits all 120 observations: `tests/cpu/harness/ civ6Random.test.ts`). The weighted picker 0x287c00: one draw over the 16-bit total, the first entry whose running sum passes it."
+    - "...the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empty: the empty slot rides it), the event 0x334d30, th..."
+    - "\"Rolling Espionage Result\" draws ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed ro..."
+  review: imported
+- addr: 0x287e80
+  final: 0x1ba750
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 92
+      value: "**This reverses the weighted pick** shipped before (1 + min(d, 15)): runs/h1_duelw1118 t92 and t102 draw over 1, t138 and t151 over 3, where the weights summed 16, 16, 48, 48 (equal weights gave the s"
+  impl:
+    - cpu/core/disasters.ts:droughtCandidate
+    - cpu/core/disasters.ts:droughtStart
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventDraws.ts:droughtDraws
+    - gpu/core/sim_economy.py:_drought_start
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "C-74: the drought's start pick — READ (REVERSED)"
+  context:
+    - "...start (`dll_drought.py`): ONE draw over EVERY candidate plot (\"Pick Drought Start Plot\" 0x287e80) — **REVERSED: a uniform draw**, see \"C-74: the drought's start pick\" below; a candidat..."
+    - 0x287e80 builds the list of every plot whose score 0x28ff20 is above 0 (the area test 0x28aa00 wit...
+  review: imported
+- addr: 0x288020
+  final: 0x1ba8b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+  readings: ["C-74: the fire — READ", "C-74: the one-off start — READ"]
+  context:
+    - "The one-off birth (0x291a20's one-off arm): \"Pick One Off Start Plot\" 0x288020 (skipped when the plot is handed in and passes 0x28ec10, the event's own start test), the..."
+    - "\"Pick One Off Start Plot\" 0x288020 walks every plot in index order and keeps those 0x28aa00 passes with the event's +0x30 (1..."
+  review: imported
+- addr: 0x288250
+  final: 0x1baaa0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      value: "0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on runs/h1_duelw1115 / 1116);"
+    - recording: 1115
+      value: The earlier reading (a weighted draw over plots whose whole disc qualifies) reproduces 1 of the 15 recorded births on 1115;
+    - recording: 1115
+      turn: 45
+      value: "this one 22 of 22 (the replay of `cpu/harness/eventReplay.ts`: hurricanes t45, t69, t74, t103, t109, t163, t209, t243, dust storms t9, t24, t179, blizzards t30, t210, tornado outbreaks t114, t158 on 1"
+    - recording: 1116
+      turn: 13
+      value: t13, t47, t48, t83, t191, t211, t225 on 1116).
+  impl:
+    - cpu/core/disasters.ts:stormStartRadius
+    - cpu/core/disasters.ts:stormStart
+    - cpu/harness/eventDraws.ts:stormStartPlots
+  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)"]
+  context:
+    - "\"Pick Storm Start Plot\" 0x288250 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x..."
+  review: imported
+- addr: 0x288740
+  final: 0x1baf40
+  kind: function
+  status: PARTLY
+  readings: ["B-24r: the governor operations"]
+  context:
+    - "- Carbon: the climate observer 0x288740 takes the AMOUNT of a resource consumed (x CLIMATE_CO2_PERCENT_FROM_UNITS 50% for a uni..."
+  review: imported
+- addr: 0x288f40
+  final: 0x1c8620
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl: [cpu/core/disasters.ts:disasterPhase, gpu/core/sim_economy.py:_disaster_phase]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-93: the climate step after the events — CLOSED"
+    - "C-74: the random-event step's order — READ"
+  context:
+    - "...random-event step 0x338710 is the LAST thing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0),..."
+    - "...0xa55190 calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano roll 0x335040, the weights and \"Random Event Roll\" — an..."
+    - "...38710 (gated whole: turn ≥ [0x5b8] − 1 + the start turn, a game option 0x72ce2afb first): 0x288f40 — the droughts' tick 0x2876c0 (no draw), every live storm's walk 0x28ecd0, then (a tail j..."
+  review: imported
+- addr: 0x289430
+  final: 0x1bb4d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+  impl:
+    - cpu/core/disasters.ts:fireTurn
+    - cpu/core/disasters.ts:disasterPhase
+    - cpu/harness/eventReplay.ts:turns
+    - gpu/core/sim_economy.py:_fire_turn
+  readings: ["C-74: the random-event step's order — READ", "C-74: the fire — READ"]
+  context:
+    - "...(no draw), every live storm's walk 0x28ecd0, then (a tail jump) every live one-off's turn 0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll..."
+    - "...); age 2: the Turn 2 row and the same five; ages 3-5 none; age 6 the Turn 6 row. The tick 0x289430 walks a COPY of the live list each turn, so a fire started inside it waits for the next t..."
+  review: imported
+- addr: 0x28a940
+  final: 0x2209a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 68
+      value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
+    - recording: 1107
+      value: 1107 Kandy's 8 against 4.
+    - recording: h1_duelw1117
+      value: "runs/h1_duelw1117 and 1118:   21 of 21 foundings past a capital draw over 55, each followed by one   picker draw (unread)."
+  impl: [cpu/data/constants.ts:CITY_NAME_CHOICES]
+  readings:
+    - "B-24r: the governor operations"
+    - "C-94: the religious spread — READ"
+    - "H-1: a city's name, a citizen's name — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+  context:
+    - "...CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when it is below the table's size and a HASH otherwise — and the..."
+    - "...item whose Projects row (0xad5f10, +0x1c its index) has a Projects_XP2 row (0xad5fb0 / 0x28a940) — its +0x24, ReligiousPressureModifier (Holy Site Prayers 100, every other row 0). Rec..."
+    - "...he civilization's CityNames rows less the names used, the first max (10, unless the row 0x28a940 returns sets +0x1c) kept, weighted n, n − 1, ... 1: ONE draw over n(n + 1) / 2. runs/h1..."
+  review: imported
+- addr: 0x28aa00
+  final: 0x1bc560
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      value: "0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on runs/h1_duelw1115 / 1116);"
+    - recording: 1115
+      value: The earlier reading (a weighted draw over plots whose whole disc qualifies) reproduces 1 of the 15 recorded births on 1115;
+    - recording: 1115
+      turn: 45
+      value: "this one 22 of 22 (the replay of `cpu/harness/eventReplay.ts`: hurricanes t45, t69, t74, t103, t109, t163, t209, t243, dust storms t9, t24, t179, blizzards t30, t210, tornado outbreaks t114, t158 on 1"
+    - recording: 1116
+      turn: 13
+      value: t13, t47, t48, t83, t191, t211, t225 on 1116).
+  impl: [cpu/core/disasters.ts:stormStart]
+  readings:
+    - "C-49 tail: the storm's start plot — READ (REVERSED)"
+    - "C-74: the one-off start — READ"
+    - "C-74: the drought's start pick — READ (REVERSED)"
+  context:
+    - "...50 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 o..."
+    - "\"Pick One Off Start Plot\" 0x288020 walks every plot in index order and keeps those 0x28aa00 passes with the event's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x..."
+    - "0x287e80 builds the list of every plot whose score 0x28ff20 is above 0 (the area test 0x28aa00 with the row's predicate, times Spacing + 1, less Spacing − d where the nearest live drou..."
+  review: imported
+- addr: 0x28c0d0
+  final: 0x1bd9f0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+  readings: ["C-74: the fire — READ"]
+  context:
+    - ...d when the plot is handed in and passes 0x28ec10, the event's own start test), the naming 0x28c0d0 (no draw), the record (+0x988, stride 0x40) and its index pushed on the live list (+0xa00...
+  review: imported
+- addr: 0x28c500
+  kind: function
+  name: STORM_STEP_COST_OFF
+  status: READ
+  cases:
+    - recording: 1115
+      value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
+  impl:
+    - cpu/core/disasters.ts:stormWalk
+    - cpu/data/disasters.ts:STORM_STEP_COST_ON
+    - cpu/data/disasters.ts:STORM_STEP_COST_OFF
+    - cpu/data/disasters.ts:STORM_MOVEMENT
+    - cpu/harness/eventDraws.ts:stormWalk
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116", "C-49: the storm's walk"]
+  context:
+    - "...holds the quiet turn's draws): percent 50 once turn − start + 1 ≥ Duration; steps of 0x28c500 — one \"Storm Direction\" weighted draw over the PrevailingWinds rows (XML order) whose l..."
+    - "Game_Climate: the turn's walk 0x28ecd0, one step 0x28c500 (\"Storm Direction\"), the step's strike 0x286f80."
+  review: imported
+- addr: 0x28ce90
+  final: 0x1be650
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  readings: ["C-74: the event draw, the volcanoes, the drought", "C-74: the drought's storm bar — READ"]
+  context:
+    - "...e to the nearest live drought's last footprint plot, Spacing 15) (m_aDroughts +0x948 in 0x28ce90) keeps in the list while above 0. No city anchor. Verified: 13 / 13 placed droughts s..."
+    - "...on the list. Droughts (m_aDroughts +0x948) are read only by the spacing score 0x28ff20 → 0x28ce90 (every record, the last footprint plot), which never drops a candidate. Cases: runs/h1_du..."
+  review: imported
+- addr: 0x28d0f0
+  final: 0x1be810
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:mapScaled, cpu/data/disasters.ts:STANDARD_MAP_AREA]
+  readings: ["C-74: the event draw, the volcanoes, the drought"]
+  context:
+    - "...x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warming 0x28da10."
+  review: imported
+- addr: 0x28d1f0
+  final: 0x1be930
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/disasters.ts:stormPreview
+    - cpu/harness/eventDraws.ts:stormPreview
+    - gpu/core/sim_economy.py:_storm_preview
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Storm birth 0x291a20: \"Pick Storm Start Plot\" (above), \"Storm Direction Preview\" (0x28d1f0, a weighted draw over the wind rows at its latitude), the name (one draw over the namin..."
+  review: imported
+- addr: 0x28d400
+  final: 0x1beab0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:stormNamer]
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...wind rows at its latitude), the name (one draw over the naming player's citizen names, 0x28d400), the first strike 0x286f80 at 100% on a COPY of the record (stored before it, so the..."
+  review: imported
+- addr: 0x28d4f0
+  final: 0x1beb50
+  kind: function
+  name: Game_Climate
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 102
+      value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
+    - recording: 1118
+      turn: 218
+      value: 1118 t218   before its level offer);
+    - recording: h1_duelw1118
+      turn: 231
+      value: "Which units: the unit's creation 0x4eeb70   calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or   ExtractsArtifacts (+0x1b9 bit 1, `dll_rowmap.py 0xa6f2b0`) is set and the   player's"
+    - recording: 1122
+      turn: 129
+      value: 1122 t129 and 1124 t248 a Spy, trained and granted by the   Intelligence Agency, a name and no level offer).
+  impl: [cpu/core/disasters.ts:stormNamer, gpu/core/sim_economy.py:_storm_namer]
+  readings: ["H-1: a city's name, a citizen's name — READ"]
+  context:
+    - "...8 t218 before its level offer); a storm takes one for its naming player (Game_Climate 0x28d4f0): the major owning its plot (0x469db0), else the major whose city stands nearest it (0x..."
+  review: imported
+- addr: 0x28d6b0
+  final: 0x1bed10
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
+  impl: [cpu/data/disasters.ts:stormFootprintOffsets]
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  context:
+    - "...with its draw spent; each step strikes; then a Preview draw. The strike: the footprint 0x28d6b0 (centre; Hexes 3 adds NE and NW; 7 the six in direction order; 19 every axial (dq, dr)..."
+  review: imported
+- addr: 0x28da10
+  final: 0x1bf040
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/disasters.ts:warmedWeight]
+  readings: ["C-74: the event draw, the volcanoes, the drought"]
+  context:
+    - "...milies: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warming 0x28da10."
+  review: imported
+- addr: 0x28db00
+  final: 0x1bf100
+  kind: function
+  status: READ
+  cases:
+    - recording: Game_RandomEvents.csv
+      value: "The random-event step writes Game_RandomEvents.csv's sixteen-number row (0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2 (\"Total CO2\"), the categories after."
+    - recording: 1121
+      turn: 189
+      value: "Read as thousands of carbon, the flood rows' warming (ChanceIncreasePerDegree 20, CO2For1DegreeTempRise 500,000 on Duel) picks the game's event on every step the unwarmed table missed: 1121 t189 FLOOD"
+    - recording: 1119
+      turn: 99
+      value: step.eventPick 2,784 -> 2,849 passes over the 26 duels (1119-1128, the recordings with the log), 1126 three lower where its flood rivers' order already fails (t99, t122, t146 ...).
+    - recording: 1119
+      value: Against the sum of the four category columns (buildings', projects', routes', units' raw CO2) read unscaled, the Total column with the deforestation factor laid back picks 2,369 against 2,334 over 111
+  impl: [cpu/harness/randLog.ts:loadClimateLog]
+  readings: ["H-1: the world's carbon in the climate log — READ (the column), the scale a fit"]
+  context:
+    - "...writes Game_RandomEvents.csv's sixteen-number row (0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2 (\"Total CO2\"), the categories after. Read as thousands of carbon..."
+  review: imported
+- addr: 0x28de40
+  final: 0x1bf300
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  impl: [cpu/core/disasters.ts:droughtCandidate, gpu/core/sim_economy.py:_drought_cands]
+  readings:
+    - "C-74 tail: \"under an event\" for a drought start — READ"
+    - "C-74: the drought's storm bar — READ"
+  context:
+    - "0x28de40 (the drought predicate's event test): true when the plot is in any storm record's struck..."
+    - "0x28de40, the drought predicate's \"under an event\" (0x28eb60's last clause), walks EVERY record of..."
+  review: imported
+- addr: 0x28e240
+  final: 0x1bf740
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  readings: ["C-74: the drought's storm bar — READ"]
+  context:
+    - "...) and drops its handle from the live list (+0x8d0) — the record and its struck list stay (0x28e240 rebuilds the live list from +0x58 on a load). So a plot any storm's walk ever struck bars..."
+  review: imported
+- addr: 0x28e740
+  final: 0x1bfbe0
+  kind: function
+  name: RandomEvent_Features
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+  readings: ["C-74: the one-off start — READ"]
+  context:
+    - "...in the event's RandomEvent_Terrains (0x28eab0), the feature in its RandomEvent_Features (0x28e740: a fire's own feature; the meteor lists none and any feature passes); not impassable. ONE..."
+  review: imported
+- addr: 0x28eab0
+  final: 0x1bfe70
+  kind: function
+  name: RandomEvent_Terrains
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+  impl: [cpu/core/disasters.ts:stormStart, cpu/harness/eventDraws.ts:stormTerrain]
+  readings: ["C-74: the one-off start — READ"]
+  context:
+    - "...nfo (unread; no recorded case needs it); the terrain in the event's RandomEvent_Terrains (0x28eab0), the feature in its RandomEvent_Features (0x28e740: a fire's own feature; the meteor lis..."
+  review: imported
+- addr: 0x28eb60
+  final: 0x1bff20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  impl: [cpu/core/disasters.ts:droughtCandidate]
+  readings: ["C-74: the event draw, the volcanoes, the drought", "C-74: the drought's storm bar — READ"]
+  context:
+    - "...below; a candidate is a plot that and its six neighbours all pass the drought predicate 0x28eb60 — no feature, no river (plot byte +0x37), not water and not beside an ocean-sized water..."
+    - "0x28de40, the drought predicate's \"under an event\" (0x28eb60's last clause), walks EVERY record of m_aStorms (+0x8b0..+0x8b8, stride 0x68) and its str..."
+  review: imported
+- addr: 0x28ec10
+  final: 0x1bffd0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+    - recording: h1_duelw1118
+      turn: 22
+      value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
+    - recording: 1117
+      turn: 222
+      value: 1117 t222-229, 1118 t20-29 replayed draw for draw).
+  impl:
+    - cpu/core/disasters.ts:meteorGround
+    - cpu/core/disasters.ts:meteorCandidate
+    - gpu/core/sim_economy.py:_meteor_cands
+  readings:
+    - "C-74: the fire — READ"
+    - "C-74: the one-off start — READ"
+    - "C-74: the fire's spread — READ (the order)"
+  context:
+    - "...f arm): \"Pick One Off Start Plot\" 0x288020 (skipped when the plot is handed in and passes 0x28ec10, the event's own start test), the naming 0x28c0d0 (no draw), the record (+0x988, stride 0..."
+    - "...within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its RandomEvent_Features row: a Forest Fire Woods, a Jungle Fire Rainforest) and the spa..."
+    - "...00 passes with the event's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x28ec10 (the functor 0xd267d0's call, 0x292e10): with AvoidTerritory (+0xc8 bit 1) the plot unown..."
+  review: imported
+- addr: 0x28ecd0
+  kind: function
+  name: Game_Climate
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl:
+    - cpu/core/disasters.ts:disasterPhase
+    - cpu/core/disasters.ts:stormsTurn
+    - cpu/core/disasters.ts:stormWalk
+    - cpu/data/disasters.ts:STORM_MOVEMENT
+    - cpu/harness/eventDraws.ts:stormWalk
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-49: the storm's walk"
+    - "C-93: the climate step after the events — CLOSED"
+    - "C-74: the random-event step's order — READ"
+    - "C-74: the drought's storm bar — READ"
+  context:
+    - "...t step 0x338710 is the LAST thing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0), the weights..."
+    - "- Storm walk 0x28ecd0, on the two turns after birth (a third turn's gap holds the quiet turn's draws): percen..."
+    - "Game_Climate: the turn's walk 0x28ecd0, one step 0x28c500 (\"Storm Direction\"), the step's strike 0x286f80."
+  review: imported
+- addr: 0x28f490
+  final: 0x1c07c0
+  kind: function
+  status: PARTLY
+  readings: ["C-74: the event draw, the volcanoes, the drought"]
+  context:
+    - "...5040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warming 0x28da10."
+  review: imported
+- addr: 0x28ff20
+  final: 0x1c0fc0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 92
+      value: "**This reverses the weighted pick** shipped before (1 + min(d, 15)): runs/h1_duelw1118 t92 and t102 draw over 1, t138 and t151 over 3, where the weights summed 16, 16, 48, 48 (equal weights gave the s"
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  impl: [cpu/core/disasters.ts:droughtStart]
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "C-74: the drought's start pick — READ (REVERSED)"
+    - "C-74: the drought's storm bar — READ"
+  context:
+    - "...water body (0x82a10), Plains / Grassland (hills too), not under an event — its score 0x28ff20 = 1 + min(hex distance to the nearest live drought's last footprint plot, Spacing 15) (..."
+    - 0x287e80 builds the list of every plot whose score 0x28ff20 is above 0 (the area test 0x28aa00 with the row's predicate, times Spacing + 1, less Spac...
+    - "...ots are not on the list. Droughts (m_aDroughts +0x948) are read only by the spacing score 0x28ff20 → 0x28ce90 (every record, the last footprint plot), which never drops a candidate. Cases:..."
+  review: imported
+- addr: 0x290030
+  final: 0x1c10d0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 22
+      value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
+    - recording: 1117
+      turn: 222
+      value: 1117 t222-229, 1118 t20-29 replayed draw for draw).
+  readings: ["C-74: the fire — READ", "C-74: the fire's spread — READ (the order)"]
+  context:
+    - "...RandomEvent_Features row: a Forest Fire Woods, a Jungle Fire Rainforest) and the spacing 0x290030 — starts the SAME event there (0x334d30), its own record and clock, its own birth strike..."
+    - "...ST, SOUTHWEST (`RING_DIRS`). Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the birth..."
+  review: imported
+- addr: 0x2900c0
+  final: 0x1c1160
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      value: "0x28aa00 with that count: 0 fails every plot (TORNADO_FAMILY never starts: 8 of 8 recorded at -1 on runs/h1_duelw1115 / 1116);"
+    - recording: 1115
+      value: The earlier reading (a weighted draw over plots whose whole disc qualifies) reproduces 1 of the 15 recorded births on 1115;
+    - recording: 1115
+      turn: 45
+      value: "this one 22 of 22 (the replay of `cpu/harness/eventReplay.ts`: hurricanes t45, t69, t74, t103, t109, t163, t209, t243, dust storms t9, t24, t179, blizzards t30, t210, tornado outbreaks t114, t158 on 1"
+    - recording: 1116
+      turn: 13
+      value: t13, t47, t48, t83, t191, t211, t225 on 1116).
+  impl: [cpu/core/disasters.ts:stormStart]
+  readings: ["C-49 tail: the storm's start plot — READ (REVERSED)"]
+  context:
+    - "\"Pick Storm Start Plot\" 0x288250 passes 0x2900c0 a COUNT, not a radius: 2 for Hexes ≥ 19, 1 for Hexes ≥ 3, 0 otherwise. 0x28aa00 with that..."
+  review: imported
+- addr: 0x2910d0
+  final: 0x1c2130
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  readings: ["C-74: the random-event step's order — READ"]
+  context:
+    - "...128, never empty: the empty slot rides it), the event 0x334d30, then the history's update 0x2910d0 (no draw). Before the start turn nothing draws, the volcano roll included. The engines (`..."
+  review: imported
+- addr: 0x291870
+  final: 0x1c2890
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+  readings: ["C-74: the fire — READ"]
+  context:
+    - ...ire started inside it waits for the next turn; a record past start + Duration (9) leaves (0x291870).
+  review: imported
+- addr: 0x291940
+  final: 0x1c2990
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+    - recording: 1124
+      turn: 194
+      value: "1124 t194 reads the ground as the step found it — the record after (624's Rainforest cut on the turn before)."
+  readings: ["C-74: the drought's storm bar — READ"]
+  context:
+    - "...0x8b0..+0x8b8, stride 0x68) and its struck list (+0x38..+0x40). A storm's end (0x28ecd0 → 0x291940) clears the record's live flag (+0x58) and drops its handle from the live list (+0x8d0) —..."
+  review: imported
+- addr: 0x291a20
+  final: 0x1c2aa0
+  kind: function
+  name: Game_Climate
+  status: READ
+  cases:
+    - recording: 1109
+      turn: 110
+      value: "Records: 1109 plot 785's   footprint −1 Food t110–111 (and t121, t133, t209), 1110 plot 887's   EXTREME t64–68."
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+    - recording: h1_duelw1124
+      turn: 112
+      value: "Cases: runs/h1_duelw1124 — no drought start at t112 and t115 (the records' predicate passes 277 and 278), and t162 (over 1: 578), t194 (over 3) and t234 (over 3) leave out 277, 278 and 319 while 535, "
+    - recording: 1118
+      value: a drought's plots drawn again (1118's 780, 1123's 388, 1124's 579) are no storm's.
+  impl:
+    - cpu/core/climate.ts:seaPhase
+    - cpu/core/disasters.ts:fireEvent
+    - cpu/core/disasters.ts:fireBirth
+    - cpu/core/disasters.ts:stormNamer
+    - cpu/data/climate.ts:ClimatePhase
+    - cpu/data/disasters.ts:DROUGHT_TURNS
+    - cpu/harness/eventDraws.ts:EventClimate
+    - cpu/harness/eventDraws.ts:stormStartPlots
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "C-74: the fire — READ"
+    - "C-74: the drought's strike — READ"
+    - "C-74: the drought's storm bar — READ"
+    - "C-74: the sea's rise halts and removes fertility — READ"
+  context:
+    - "- Storm birth 0x291a20: \"Pick Storm Start Plot\" (above), \"Storm Direction Preview\" (0x28d1f0, a weighted draw..."
+    - "- A drought's end turn (0x2922ff, beside \"Pick Drought Start Plot\"): the current turn plus 0x5254d0(the row's Duration)..."
+    - "The one-off birth (0x291a20's one-off arm): \"Pick One Off Start Plot\" 0x288020 (skipped when the plot is handed in an..."
+  review: imported

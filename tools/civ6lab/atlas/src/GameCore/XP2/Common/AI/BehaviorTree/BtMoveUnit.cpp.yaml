@@ -1,0 +1,53 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7ee630
+  final: 0x556710
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0...
+  review: imported
+- addr: 0x7ef530
+  final: 0x5575f0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:settle]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...0 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gon...
+  review: imported
+- addr: 0x7efd70
+  final: 0x557e40
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:planFormations]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...e units of the lower-priority unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7...
+  review: imported
+- addr: 0x7f07c0
+  final: 0x558870
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 23
+      value: "Case:   1121 camp (3,19): its Scout reports at t23, takes 47 from China's   Warrior at t24, stands home at t25 three plots from it and raises no   raid (none at boldness 10 on t26 either);"
+  impl: [cpu/core/barbarians.ts:threatened, cpu/data/barbarians.ts:BARB_PROTECT_DAMAGE]
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  context:
+    - "...d City\" node 3, a Concurrent with Move Unit; TreeData Damage Percentage .25): its check 0x7f07c0 counts the node's units whose damage (unit +0xcf0) is at least that share of their he..."
+  review: imported
+- addr: 0x7f0b30
+  final: 0x558b50
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:settle]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...d70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the...
+  review: imported

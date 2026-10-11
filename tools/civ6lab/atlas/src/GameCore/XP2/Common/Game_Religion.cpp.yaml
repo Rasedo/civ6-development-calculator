@@ -1,0 +1,13 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x33fb70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...E PICKS. The pantheon (0x74e2b0, from the AI turn while m_mustFoundPantheon holds, then 0x33fb70): the first strictly highest pantheon entry not taken. A belief for the religion (0x751..."
+  review: imported

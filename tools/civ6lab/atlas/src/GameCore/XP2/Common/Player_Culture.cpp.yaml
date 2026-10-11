@@ -1,0 +1,616 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x391650
+  final: 0x27a220
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...r every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the government's rows, the player's extra slots, the removals, the per- government e..."
+  review: imported
+- addr: 0x392cb0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/policies.ts:choosePolicies]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...n (+0x700 -> +0x758) and returns. The government: every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to..."
+  review: imported
+- addr: 0x3930a0
+  final: 0x27ba20
+  kind: function
+  status: PARTLY
+  impl: [ai/major/policies.ts:choosePolicies]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...saved entry whose SLOT type is the new slot's, spends it and flags its card slotted; 0x3930a0 (the card valid under the government) and the card is written into the slot directly —..."
+    - "...lot admits (0x393400: not banned +0x890, not slotted +0x820, valid under the government 0x3930a0 — the exclusive cards of Policy_GovernmentExclusives_XP2 only in theirs —, the slot's t..."
+    - ...tors but DISTRICT_TYPE_MATCHES and CITY_HAS_BUILDING, the civic list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class availability 0x2f1ed0 (Strategos scores in the port wher...
+  review: imported
+- addr: 0x3932d0
+  final: 0x27bc50
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCivics.ts:researchable]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...·) here — through 0x8c4540; -1 with no Culture, then the cost), a row not researchable (0x3932d0) adds its unowned prerequisites (0x29a250, the install's order: the walk's next step, t..."
+    - "...s not positive; else the higher score, the first on a tie. Its next step, researchable (0x3932d0), is queued; else one draw \"Random Civic Choice\" over the rows neither held nor unres..."
+  review: imported
+- addr: 0x393400
+  final: 0x27bd40
+  kind: function
+  name: CanSlot
+  status: PARTLY
+  impl: [ai/major/policies.ts:choosePolicies]
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- SetSlotPolicy 0x3a3990: CanSlot 0x393400 (refuses a card already flagged slotted), flag the card, signal REMOVED for the card th..."
+    - "...bsolete card, dropped); each policy in order scoring above the bar that CanSlot admits (0x393400: not banned +0x890, not slotted +0x820, valid under the government 0x3930a0 — the exclu..."
+  review: imported
+- addr: 0x393670
+  final: 0x27bf30
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a boost lands as progress — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ropped (`and 0xffffff00`); min(cost - progress, amount) is added to THAT item's progress (0x393670 -> 0x3a1fb0), current or not. The setter completes the item the moment its progress reach..."
+  review: imported
+- addr: 0x3939b0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance, then the v...
+  review: imported
+- addr: 0x393af0
+  final: 0x27c190
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 200
+      value: 1108 Jiaodong -> Rome +4 from its first record t200.
+    - recording: h1_duelw1130
+      value: "The importer's lifetime fold takes a pair's gain as the progress move of the   civic both records research (a city founded after record 1 lands its   Culture by record 2: runs/h1_duelw1130 Rome 3.2968"
+    - recording: 1129
+      turn: 146
+      value: "Open: 1129 Rome   t146-239 reads no dominance at the fold's 108.9 lifetime culture (AUDIT C-94   ASK)."
+  impl:
+    - cpu/core/seatTurn.ts:updateCulturalDominance
+    - gpu/core/sim_seats.py:_update_cultural_dominance
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  context:
+    - ...it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance, then the visiting total is stored (+0x1118).
+    - "- Cultural dominance 0x393af0, per met other player: visiting > the other's domestic sets the pair's flag, < clears i..."
+  review: imported
+- addr: 0x3942d0
+  final: 0x27c7f0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...after, an empty slot last; insertion sort, so ties keep slot order), clear every slot (0x3942d0 with -1: unflag and REMOVED for each card), build the new slots (0x391650: the govern..."
+  review: imported
+- addr: 0x394730
+  final: 0x27c9a0
+  kind: function
+  name: ClearPolicySlot
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...EMOVED for the card the slot held (unflagging it), store, signal ADDED. ClearPolicySlot 0x394730: unflag, REMOVED. The civics command 0x44bb0 (type 0 set one slot, 1 government, 2 cl..."
+  review: imported
+- addr: 0x394830
+  final: 0x27ca80
+  kind: function
+  status: PARTLY
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...l one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance,...
+  review: imported
+- addr: 0x394fa0
+  final: 0x27ce10
+  kind: function
+  name: seats
+  status: PARTLY
+  impl: [cpu/core/seatTurn.ts:touristsDrawn, gpu/core/sim_seats.py:_tourists_drawn]
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...>> 8) / TOURISM_TOURISM_TO_MOVE_ CITIZEN 200) / the number of majors (+0x10d0). Drawn (0x394fa0): the raw count, or raw x citizens(o) / demand when o's citizens fall below the deman..."
+  review: imported
+- addr: 0x396860
+  final: 0x27d3c0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1122
+      turn: 200
+      value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
+  impl: [cpu/core/governors.ts:governorClocks]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+  context:
+    - "- PlayerCulture's turn (0x396860), a major's: the culture lands (lifetime culture +0x1050, 24.8, grows by every gain of..."
+    - "- Player DoTurn 0x4e4560, in order: the culture (+0x1310, 0x396860: the civic progress), the resources (+0x1320, 0x4a8ed0 at 0x4e46c0: the holdings reco..."
+  review: imported
+- addr: 0x398cf0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...k the new slots in order: while more than one slot stands empty (0x3996b0 counts them), 0x398cf0 takes the first saved entry whose SLOT type is the new slot's, spends it and flags its..."
+  review: imported
+- addr: 0x398e70
+  final: 0x27de70
+  kind: function
+  name: PlayerCulture::GetCostToUnlockPolicies
+  status: PARTLY
+  impl: [cpu/core/effects.ts:policyUnlockCost, cpu/data/constants.ts:CIVIC_UNLOCK_MAX_COST]
+  readings: ["B-D: the policy-unlock price — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "`PlayerCulture::GetCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress..."
+  review: imported
+- addr: 0x3990d0
+  final: 0x27e0c0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a boost lands as progress — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...sted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed point: B = 0x161d60 = floor(Boost x cost / 100) (the row's +0x18..."
+  review: imported
+- addr: 0x399260
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...when start >= horizon, or for one held before (PlayerCulture +0x350 [government] != 0, 0x399260) that is not the current; per Government_SlotCounts row, the type's best / 10 (x 0x66...
+  review: imported
+- addr: 0x399690
+  final: 0x27e570
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...ows, \"C-94: the slot rebuild\") and logged. Then each slot of the government in order (0x399690 the count, 0x399ab0 the card): the bar is its card's score (-1.0 with none, or for an o..."
+  review: imported
+- addr: 0x3996b0
+  final: 0x27e590
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nment extras), then walk the new slots in order: while more than one slot stands empty (0x3996b0 counts them), 0x398cf0 takes the first saved entry whose SLOT type is the new slot's, s..."
+  review: imported
+- addr: 0x399810
+  final: 0x27e700
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1112
+      turn: 49
+      value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
+  readings:
+    - "B-D: the policy-unlock price — CLOSED"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...(Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
+    - "..._ESCALATION(1000)/100 − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an improvement (+0x44) A·(100 − H..."
+  review: imported
+- addr: 0x399a90
+  final: 0x27e900
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1103
+      turn: 12
+      value: "A COMPLETION fires the delegate 0x6293e0 — the   government pass 0x625d70, then 0x626600 with the completed civic as the   key — over the entries the AI's last turn left, before this turn's   analysis"
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "- WHEN: the AI's turn (0x620110) chooses with key -1 only where nothing is in hand (0x399a90 = -1). A COMPLETION fires the delegate 0x6293e0 — the government pass 0x625d70, then 0x..."
+  review: imported
+- addr: 0x399ab0
+  kind: function
+  name: GetSlotPolicy
+  status: PARTLY
+  readings:
+    - "C-94: the slot rebuild — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ector of {slot type, policy} pairs (+0x3d8, read at +0x430, count +0x440; `GetSlotPolicy` 0x399ab0); a byte per policy (+0x7c8, read at +0x820) marks it slotted (`IsPolicyActive` 0x39dff0..."
+    - "...ot rebuild\") and logged. Then each slot of the government in order (0x399690 the count, 0x399ab0 the card): the bar is its card's score (-1.0 with none, or for an obsolete card, droppe..."
+  review: imported
+- addr: 0x399b90
+  final: 0x27e960
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/seatTurn.ts:rawTourists]
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...demand when o's citizens fall below the demand — every met player's raw count toward o (0x399b90). Domestic tourists (+0x10b0, \"staycationers\"): citizens less what the others draw (0..."
+  review: imported
+- addr: 0x399c80
+  final: 0x27ea50
+  kind: function
+  status: PARTLY
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tourists (+0x10b0, \"staycationers\"): citizens less what the others draw (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta). Visiting (0x39bee0): the sum of what the p..."
+  review: imported
+- addr: 0x399e10
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  context:
+    - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqT..."
+  review: imported
+- addr: 0x39bee0
+  final: 0x2805b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/seatTurn.ts:visitingTourists, ai/major/view.ts:MajorView]
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s draw (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta). Visiting (0x39bee0): the sum of what the player draws from each other."
+    - ...ists of another major, +0x10b0, > 0 and the player's visiting tourists from met majors, 0x39bee0, >= trunc(max x thr x 0.01f)); Has Taken Capital (0x7bd1c0, also registered for the t...
+  review: imported
+- addr: 0x39c0e0
+  final: 0x2806c0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCivics.ts:turnsLeft, gpu/core/sim_civics.py:_cai_analysis]
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...owned. Else the research AI's three-level walk: each walked row adds its turns left (0x39c0e0: the cost 0x29a010 less the progress kept on it and the bank [+0xb40] — no max(0, ·) he..."
+  review: imported
+- addr: 0x39c1f0
+  final: 0x280770
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+  impl: [cpu/core/minorBuild.ts:techLeft]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...x621920): the civics AI's entry turns plus the turns left on the civic in hand, live (0x39c1f0; -1 with none)."
+  review: imported
+- addr: 0x39c330
+  final: 0x280860
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/boosts.ts:earliestBoostEra
+    - cpu/core/units.ts:amount
+    - cpu/data/civics.ts:CIVIC_TABLE_ORDER
+    - cpu/harness/checks.ts:goodyRewardDraws
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_draw_and_pay_goody
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "0x4ca470 (techs; civics 0x39c330), \"Choosing random tech / civic boost to grant based on era\" — the goody hut's boosts: th..."
+  review: imported
+- addr: 0x39c930
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/boosts.ts:boostPool
+    - cpu/core/production.ts:pct
+    - cpu/data/civics.ts:CIVIC_TABLE_ORDER
+    - cpu/harness/drawSites.ts:DRAW_SITES
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "...: 6 then 5 civics (Code of Laws carries none); 1118 t10, t25, t29 alike. 0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's..."
+  review: imported
+- addr: 0x39cd90
+  final: 0x280fb0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/production.ts:grantFreeResearch
+    - cpu/data/civics.ts:CIVIC_TABLE_ORDER
+    - gpu/core/sim_seats.py:_grant_free_research
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "...ool`, `earliestBoostEra`, `drawBoosts` / `_boost_pool`, `_draw_boosts`). 0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Pers..."
+  review: imported
+- addr: 0x39d190
+  final: 0x281220
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_GovtPolicies.csv
+      value: "Its log is AI_GovtPolicies.csv (0x6255f0: \"%d, %d, Civic, %s, %3.1f, %d\" — the score and the turns of every row with turns at least 0;"
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "H-1: the city-states' quests — READ"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...for a civic that is not in this game\"), past its \"already held / already boosted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the..."
+    - "...Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; the pickers over them in the tables' order (0x84d..."
+    - "...able order at +0x978 (count +0x988): +0 the player, +8 the row, +0xc owned, +0xe boosted (0x39d190), +0xf repeatable, +0x10 its own value, +0x14 its score, +0x18 turns, +0x1c its next step..."
+  review: imported
+- addr: 0x39d1f0
+  final: 0x281280
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "H-1: a minor's research catch-up — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...c that is not in this game\"), past its \"already held / already boosted\" gates (0x39d190 / 0x39d1f0), marks m_abBoostTriggered, finds the item's Boosts row (0x3990d0) and, in the 24.8 fixed..."
+    - ...its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plo...
+    - "...Level is FULL_CIV (0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or the Free Citi..."
+  review: imported
+- addr: 0x39dcd0
+  final: 0x281d60
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...tyBuildAI, city +0x1788, population +0x588, T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"t..."
+  review: imported
+- addr: 0x39df60
+  final: 0x281f60
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...) and returns. The government: every one CanChangeGovernment admits (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0];..."
+  review: imported
+- addr: 0x39dff0
+  final: 0x281ff0
+  kind: function
+  name: IsPolicyActive
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x399ab0); a byte per policy (+0x7c8, read at +0x820) marks it slotted (`IsPolicyActive` 0x39dff0 reads it, so it never shows a lapse). A card's modifiers attach on the \"policy added\" sig..."
+  review: imported
+- addr: 0x39e050
+  final: 0x282030
+  kind: function
+  name: ObsoletePolicies
+  status: PARTLY
+  impl: [ai/major/policies.ts:policyObsolete]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "- The value (0x7b26b0): FX_MIN when start >= horizon or the card is obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is unlocked, 0x39e1e0, or whose RequiresA..."
+  review: imported
+- addr: 0x39e1e0
+  final: 0x282110
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...card is obsolete (0x39e050: an ObsoletePolicies row whose ObsoletePolicy is unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no person left, 0x2f1ed0); 250.0 for a..."
+  review: imported
+- addr: 0x39ec60
+  final: 0x2828e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  impl:
+    - cpu/core/minorBuild.ts:minorCatchUp
+    - cpu/core/seats.ts:majorsAlive
+    - cpu/data/cityStates.ts:MINOR_CATCHUP_PCT
+  readings: ["H-1: a minor's research catch-up — READ"]
+  context:
+    - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every player's object runs when a...
+  review: imported
+- addr: 0x39f610
+  final: 0x282cb0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: trade posts and cultural dominance — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refreshed (0x39f610), then 0x393af0 the dominance, then the visiting total is stored (+0x1118).
+    - "...(+0x10b0, \"staycationers\"): citizens less what the others draw (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta). Visiting (0x39bee0): the sum of what the player draw..."
+  review: imported
+- addr: 0x39fc00
+  final: 0x282f30
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x38..."
+  review: imported
+- addr: 0x3a1ac0
+  final: 0x2841a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/phase.ts:completeResearchNow]
+  readings: ["H-1: a boost lands as progress — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...not. The setter completes the item the moment its progress reaches the cost (0x3a22c5 -> 0x3a1ac0). The cost is never cut. Check: `dll_boost.py`, the recorded current-item boosts of the s..."
+  review: imported
+- addr: 0x3a1fb0
+  final: 0x2844e0
+  kind: function
+  name: PlayerCulture
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  impl:
+    - cpu/core/phase.ts:completeResearchNow
+    - cpu/core/seatTurn.ts:seatCitizens
+    - cpu/harness/import.ts:History
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: a boost lands as progress — READ"
+    - "H-1: a minor's research catch-up — READ"
+    - DLL rules the engines contradict
+  context:
+    - "...e culture lands (lifetime culture +0x1050, 24.8, grows by every gain of civic progress, 0x3a1fb0 — a boost's share included; culture with no civic chosen is held at +0xb40 until one..."
+    - "...0). Domestic tourists (+0x10b0, \"staycationers\"): citizens less what the others draw (0x3a2250 with 0x399c80; 0x39f610 moves it by each refresh's delta). Visiting (0x39bee0): the sum..."
+    - "...0xffffff00`); min(cost - progress, amount) is added to THAT item's progress (0x393670 -> 0x3a1fb0), current or not. The setter completes the item the moment its progress reaches the cost..."
+  review: imported
+- addr: 0x3a25f0
+  final: 0x2849f0
+  kind: function
+  name: SetGovernment
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0..."
+  review: imported
+- addr: 0x3a2bf0
+  final: 0x284e90
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the..."
+  review: imported
+- addr: 0x3a2e30
+  final: 0x285090
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The rebuild (SetGovernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's pol..."
+  review: imported
+- addr: 0x3a3990
+  final: 0x2859c0
+  kind: function
+  name: SetSlotPolicy
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- SetSlotPolicy 0x3a3990: CanSlot 0x393400 (refuses a card already flagged slotted), flag the card, signal REMOV..."
+  review: imported
+- addr: 0x3a3b00
+  final: 0x285b10
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the slot rebuild — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ernment 0x3a25f0; the slot-count changes 0x39fc00, 0x3a2bf0, 0x3a2e30): save the slots (0x3a3b00 into +0x448, std::sort 0x386350 / 0x385b50 by the card's policy row +0x88 link's +0x1c..."
+  review: imported
+- addr: 0x3a3c00
+  final: 0x285c10
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/boosts.ts:boostAmount, gpu/core/sim_economy.py:_boost_amount]
+  readings: ["H-1: a boost lands as progress — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "The trigger 0x4cd900 (techs, \"LOC_NOTIFICATION_TECH_BOOST_MESSAGE\"; civics 0x3a3c00, \"Cannot trigger a boost for a civic that is not in this game\"), past its \"already held /..."
+  review: imported

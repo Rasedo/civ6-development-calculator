@@ -1,0 +1,364 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x66ae10
+  final: 0x4407c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...nd Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war..."
+  context:
+    - ...0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0...
+  review: imported
+- addr: 0x66b220
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160..."
+  context:
+    - ...0 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10...
+  review: imported
+- addr: 0x66b490
+  final: 0x440ea0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...ion rows print \", %3.1f:%3.1f\" = FIRST 0x66cc40 (record +0x48, \"Desired\", the PICK's score), SECOND 0x66b490 (record +0x68, \"Cost\"). 0.0:0.0 = attempt turn. Threat row \"threat:n:trust\" = +0x6560[p] : 0x650550..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...:   action must be in receiver's state lists (+0x2f58[from] +0x20 or +0x40) else reject(2);   value 0x66b490 on +0xca8[from] record: >0 -> reject (2), <=0 -> accept (1).   EMPIRICAL 20/20 (accept.py): accept..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...40 (the evaluation record's +0x48 vector, \"Desired\" in the   record's own dump 0x676510) and SECOND 0x66b490 (+0x68, \"Cost\") of the   record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88). The records are..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...nswers by 0x653f60: an action outside its state's lists   toward the sender refuses; else the value 0x66b490 of its incoming record   (+0xca8[sender]) above 0 refuses, at or below 0 accepts. On acceptance the..."
+  context:
+    - "...aluation record's +0x48 vector, \"Desired\" in the record's own dump 0x676510) and SECOND 0x66b490 (+0x68, \"Cost\") of the record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88). The rec..."
+    - "...0x653f60: an action outside its state's lists toward the sender refuses; else the value 0x66b490 of its incoming record (+0xca8[sender]) above 0 refuses, at or below 0 accepts. On acce..."
+  review: imported
+- addr: 0x66b590
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...D so far - Action registration 0x666620 (delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...+0x28 desire,   +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Dema..."
+  context:
+    - "...re, +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x67..."
+  review: imported
+- addr: 0x66b610
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders..."
+  context:
+    - "...+0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Op..."
+  review: imported
+- addr: 0x66bb50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance..."
+  context:
+    - .../ 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request A...
+  review: imported
+- addr: 0x66bf30
+  final: 0x441ec0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The action indices are globals of the..."
+  context:
+    - ...Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are glob...
+  review: imported
+- addr: 0x66c160
+  final: 0x442170
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declaration..."
+  context:
+    - ...0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war d...
+  review: imported
+- addr: 0x66c800
+  final: 0x4427b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...- / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 /..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...lagged   branches give max(X + 20, 20) instead (AI owner and a human p; both AI).   Demand Tribute (0x66c800): Worth, -10 where +0x6780 names p, + (20 - T in   mode 1) where the owner's military strength (0x4..."
+  context:
+    - ...960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 /...
+    - "...ranches give max(X + 20, 20) instead (AI owner and a human p; both AI). Demand Tribute (0x66c800): Worth, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military str..."
+  review: imported
+- addr: 0x66cc40
+  final: 0x442af0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ....csv, verbose v-runs) Row cell for player q at index 4+q. Action rows print \", %3.1f:%3.1f\" = FIRST 0x66cc40 (record +0x48, \"Desired\", the PICK's score), SECOND 0x66b490 (record +0x68, \"Cost\"). 0.0:0.0 = atte..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...anged (+0x1a) / pending session (0x23c9e0);   for each action a in +0x6168[p] +0x20 list: score X = 0x66cc40; my pref +0x6240[a] <0 -> skip   (DISFAVORED); partner pref (+0x62b0[p] list, stride 0x18) <0 -> sk..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ummary.csv).  - THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\"   is FIRST 0x66cc40 (the evaluation record's +0x48 vector, \"Desired\" in the   record's own dump 0x676510) and SECOND 0x..."
+  context:
+    - "- THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\" is FIRST 0x66cc40 (the evaluation record's +0x48 vector, \"Desired\" in the record's own dump 0x676510) and..."
+  review: imported
+- addr: 0x66cd40
+  final: 0x442bf0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...sy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...e,   +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...40) x   (L - n + 1) / L where n <= L; negated when the caller asks. - THE DESIRES READ: Delegation (0x66cd40) and Embassy: Worth + T, then +20   where the owner's diplomatic AI names p (vt+0x30 = 0x657d90: p..."
+  context:
+    - "...can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Deman..."
+    - "- THE DESIRES READ: Delegation (0x66cd40) and Embassy: Worth + T, then +20 where the owner's diplomatic AI names p (vt+0x30 = 0x..."
+  review: imported
+- addr: 0x66cf30
+  final: 0x442d70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 /..."
+  context:
+    - "...value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders..."
+  review: imported
+- addr: 0x66dda0
+  final: 0x443720
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: .../ 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ice p's or its era (player +0x1358 +0xf8, the Eras   row's ChronologyIndex) is later. Open Borders (0x66dda0): Worth - T, + (40 -   d) x 0.5 (whole part) for the least plot distance d (1..39) between p's   ci..."
+  context:
+    - .../ - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance...
+    - "...its era (player +0x1358 +0xf8, the Eras row's ChronologyIndex) is later. Open Borders (0x66dda0): Worth - T, + (40 - d) x 0.5 (whole part) for the least plot distance d (1..39) betwee..."
+  review: imported
+- addr: 0x66e750
+  final: 0x443f00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static ini..."
+  context:
+    - ...iendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the...
+  review: imported
+- addr: 0x670210
+  final: 0x444c60
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...record m_diploActionEvaluator[p] (+0x2eb8, stride 0x88). The records are   refilled per action by 0x670210: +0x68 from the action's COST functor,   +0x48 from its DESIRE functor, the fourth argument the own..."
+  context:
+    - "..._diploActionEvaluator[p] (+0x2eb8, stride 0x88). The records are refilled per action by 0x670210: +0x68 from the action's COST functor, +0x48 from its DESIRE functor, the fourth argume..."
+  review: imported
+- addr: 0x671650
+  final: 0x445c60
+  kind: function
+  name: stateCost
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...tion 0x666620 (delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (con..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ation @f2e58c, Declare Friendship @f2e594, Propose Trade @f2e5d4). - STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row   of the owner's state toward p for the action (Worth +0x24, Cost..."
+  context:
+    - "- STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row of the owner's state toward p for the action (Worth +0..."
+  review: imported
+- addr: 0x6718a0
+  final: 0x445e00
+  kind: function
+  name: stateWorth
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...tors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-DO: not human-check(0x3da870..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...end \"Processing Action From AI to AI\", spend econ slot 1),   +0xa8 0x66d800 returns 0. - stateWorth 0x6718a0: rows of my state toward p (state +0x68 list), row for action: Worth(+0x24)<<8   sign-clipped by 0x..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...6c,   Delegation @f2e58c, Declare Friendship @f2e594, Propose Trade @f2e5d4). - STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row   of the owner's state toward p for the action (Worth +..."
+  context:
+    - "- STATE WORTH / COST (0x6718a0 / 0x671650): the DiplomaticStateActions row of the owner's state toward p for the actio..."
+  review: imported
+- addr: 0x671b80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...(delegation; embassy 0x6668a0): per action functors   +0x08 0x66b590 COST = stateCost(0x671650) - T(0x671b80)   +0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...0 direction, minus gold cost x 0x7a6690 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0x650550(p), L=trunc(+0x6420 x 0.25) (mode 0), T=10*(L-n+1)/L   if n<=..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ames +0x6320 than its getter   and the save's serializer: its writer is unread. - THE TRUST TERM T (0x671b80): 0 unless the owner's trust of p (+0x6480[p])   is non-zero; else, with n = 1 + the players truste..."
+  context:
+    - "- THE TRUST TERM T (0x671b80): 0 unless the owner's trust of p (+0x6480[p]) is non-zero; else, with n = 1 + the play..."
+  review: imported
+- addr: 0x672210
+  final: 0x445ff0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...:0.0 on an attempt turn (the record reset by the perform). - THE FUNCTORS (registered per action in 0x672210, the list in   `.claude/scratchpad` of this reading, slots +0x08 cost, +0x28 desire,   +0x48 can-do..."
+  context:
+    - "- THE FUNCTORS (registered per action in 0x672210, slots +0x08 cost, +0x28 desire, +0x48 can-do, +0x68 not-ready hook, +0x88 perform, +0x..."
+  review: imported
+- addr: 0x672c40
+  final: 0x446900
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0..."
+  context:
+    - .../ 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations...
+  review: imported
+- addr: 0x672df0
+  final: 0x446ab0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...60; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x6748..."
+  context:
+    - ...y 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 /...
+  review: imported
+- addr: 0x672ef0
+  final: 0x446bb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...er pref (+0x62b0[p] list, stride 0x18) <0 -> skip; X<=0 -> skip;   CanDoAction false -> skip; ready 0x672ef0 (flag +0x6390[p][a] set -> not ready; can-do functor)   false -> \"not ready\" (+0x68 hook); fav = my..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...or p's preference, with desire   <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0:   the per-player per-action flag +0x6390, then the can-do functor); a   favoured action (the owner..."
+  context:
+    - "...eference, with desire <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0: the per-player per-action flag +0x6390, then the can-do functor); a favoured action..."
+  review: imported
+- addr: 0x672f90
+  final: 0x446c50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...0x28 0x66cd40 DESIRE = stateWorth(0x6718a0) + T + 20 if [r14]vt+0x30(other)  (cond unknown)   +0x48 0x672f90 CAN-DO: not human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game C..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...can-do, +0x68 not-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...marked, and the scan   runs again: at most one action per player per turn. - THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI   affords the action's gold cost from savings slot 2 (0x6..."
+  context:
+    - "...x68 not-ready hook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0..."
+    - "- THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI affords the action's gold cost from savings s..."
+  review: imported
+- addr: 0x6730e0
+  final: 0x446da0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0;..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...d the scan   runs again: at most one action per player per turn. - THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI   affords the action's gold cost from savings slot 2 (0x6874d0: slot..."
+  context:
+    - ...Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 /...
+    - "- THE MISSIONS' CAN-DO (0x672f90 / 0x6730e0): an AI owner; the Economic AI affords the action's gold cost from savings slot 2 (0x68..."
+  review: imported
+- addr: 0x6737b0
+  final: 0x447450
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...endship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static initializer 0x..."
+  context:
+    - ...0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the static init...
+  review: imported
+- addr: 0x6742d0
+  final: 0x447ad0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static initializer 0x67ff10   (Embassy @f2e564, Dema..."
+  context:
+    - .../ - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one). The action indices are globals of the static initializer 0x67ff10 (Embassy @f2...
+  review: imported
+- addr: 0x674820
+  final: 0x447d10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friendship   0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance   0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one).   The ac..."
+  context:
+    - ...en Borders 0x66bb50 / 0x66dda0; Declare Friendship 0x66ae10 / 0x66c160 / 0x672c40 / - / 0x674820; Request Assistance 0x66bf30 / 0x66e750 / 0x6737b0; the war declarations 0x6742d0 (one)...
+  review: imported
+- addr: 0x674900
+  final: 0x447df0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...pref>0 || partner pref>0;   best: fav beats non-fav, else higher X (strict >). }   if best: perform 0x674900 on +0x2238[target]; done[target]=1; reset; rescan. One action per target/turn. - Receiver (0x237c60..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...n (the owner's or p's preference) beats any other, else the   higher desire. The best is performed (0x674900), p marked, and the scan   runs again: at most one action per player per turn. - THE MISSIONS' CAN-..."
+  context:
+    - "...er's or p's preference) beats any other, else the higher desire. The best is performed (0x674900), p marked, and the scan runs again: at most one action per player per turn."
+  review: imported
+- addr: 0x674960
+  final: 0x447e50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processing Action From AI to AI\", spend econ slot 1),   +0xa8 0x66d800 returns 0. -..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ot-ready hook, +0x88 perform, +0xa8 fresh value):   Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...nread)   + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the   turn. The perform (0x674960) sends the action (\"Processing Action From AI   to AI\") and spends the cost from savings slot 1 (0x..."
+  context:
+    - "...ook, +0x88 perform, +0xa8 fresh value): Delegation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x6..."
+    - "...GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the turn. The perform (0x674960) sends the action (\"Processing Action From AI to AI\") and spends the cost from savings..."
+  review: imported
+- addr: 0x674a10
+  final: 0x447f00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ation 0x66b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy   0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 /   0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Declare Friends..."
+  context:
+    - ...b590 / 0x66cd40 / 0x672f90 / - / 0x674960; Embassy 0x66b610 / 0x66cf30 / 0x6730e0 / - / 0x674a10; Demand Tribute 0x66b220 / 0x66c800 / 0x672df0; Open Borders 0x66bb50 / 0x66dda0; Decla...
+  review: imported

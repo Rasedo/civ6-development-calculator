@@ -1,0 +1,260 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x14f530
+  final: 0xe1e20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  impl: [cpu/core/barbarians.ts:barbarianTechs, cpu/core/seats.ts:majorsAlive]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "H-1: a minor's research catch-up — READ"
+  context:
+    - "- Techs 0x14f530: the BarbarianFree techs (SAILING, BRONZE_WORKING, SHIPBUILDING) and any tech or civic..."
+    - "...city-state or the Free Cities — it counts the players of the game's list +0xb50 (the list 0x14f530 reads for the barbarians' techs: the majors in the game) holding the item, and where at l..."
+  review: imported
+- addr: 0x14fc30
+  final: 0xe2220
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ing the target owner's handicap) sets the spawn interval to its SpawnRate at the speed (0x14fc30 -> 0x149760, +0x88; 0 or less: the tribe's own). Barbarian Recruit (0x7c7580) under a T..."
+  review: imported
+- addr: 0x14fcc0
+  kind: function
+  name: campStep
+  status: PARTLY
+  impl:
+    - cpu/core/barbarians.ts:campStep
+    - cpu/data/barbarians.ts:BARB_CAMPS_PER_MAJOR
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_barb.py:_barb_camp_step
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b..."
+  review: imported
+- addr: 0x150a30
+  final: 0xe2c50
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:raiseCamp]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x1514a0
+  final: 0xe30f0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context: ["## H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  review: imported
+- addr: 0x151fa0
+  final: 0xe32b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1118
+      turn: 1
+      value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
+    - recording: 1126
+      turn: 3
+      value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
+  impl: [cpu/core/barbarians.ts:campScore]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the player manager's +0x4a0 list, ev..."
+  review: imported
+- addr: 0x152460
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:freeNames, cpu/harness/drawSites.ts:DRAW_SITES]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...VALRY with an unowned Horses plot within ResourceRange 3, else MELEE. \"Barb Tribe Roll\" 0x152460 draws over the kind's names no tribe holds."
+  review: imported
+- addr: 0x152b50
+  final: 0xe3f60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1118
+      turn: 1
+      value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
+    - recording: 1126
+      turn: 3
+      value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
+  impl: [cpu/core/barbarians.ts:campScore]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "...camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to it, 0 when empty — every camp ever raised, so the ne..."
+  review: imported
+- addr: 0x152df0
+  final: 0xe40d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
+  impl: [cpu/core/tactical.ts:rampage]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "- BARBARIAN RAMPAGE (0x778b40): the tribes whose camp a unit took (0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830)..."
+  review: imported
+- addr: 0x152eb0
+  final: 0xe4190
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 92
+      value: "**This reverses the weighted pick** shipped before (1 + min(d, 15)): runs/h1_duelw1118 t92 and t102 draw over 1, t138 and t151 over 3, where the weights summed 16, 16, 48, 48 (equal weights gave the s"
+  readings: ["C-74: the drought's start pick — READ (REVERSED)", "H-1: the city-states' quests — READ"]
+  context:
+    - "...st plot is d < Spacing away) and draws over the list's COUNT, `rand(n)` through the thunk 0x152eb0, indexing the list: the scores are stored and never read. **This reverses the weighted pi..."
+    - "...ic's own test; weight 1 each; one draw \"Selecting a random new quest\" over their count (0x152eb0), the type's record started (0x849400: state 1, the ids, the turn) and its picker (+0x4..."
+  review: imported
+- addr: 0x153290
+  final: 0xe4620
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:campStep, cpu/data/barbarians.ts:BARB_REGION_MIN]
+  readings:
+    - "H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...of it, every later one 1. The regions are the map's Map_Region list (+0x620, filled at 0x153290 from the map's region container, vfunc +0x108): a region is taken when its plot count..."
+    - ...more than 10 plots or on an area (m_area, looked up at the game's time) of more than 10 (0x153290).
+  review: imported
+- addr: 0x153720
+  final: 0xe4970
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per..."
+  review: imported
+- addr: 0x153d60
+  final: 0xe4fb0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/barbarians.ts:tribeFits
+    - cpu/data/barbarians.ts:BARB_SCOUT_WAIT
+    - cpu/data/barbarians.ts:BARB_ISLAND_PLOTS
+    - cpu/data/barbarians.ts:BARB_COAST_WATER
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...154220: the first BarbarianTribes row the camp meets — NAVAL on an AREA under 15 plots (0x153d60 reads the plot's +8, the CvArea pointer Plot:GetArea returns (0x25990), and its +4 plot..."
+  review: imported
+- addr: 0x153ea0
+  final: 0xe50f0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The scout home (Notify Owner 0x7c6fa0 -> 0x153ea0 -> 0x148270): for the scout's tree, threshold RaidingBoldness (BarbarianTribes +0x24, a..."
+  review: imported
+- addr: 0x153ef0
+  final: 0xe5140
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/barbarians.ts:barbScoutLook
+    - cpu/core/types.ts:GameState
+    - cpu/data/barbarians.ts:BARB_SPOT_THROTTLE
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The report (0x153ef0, a barbarian unit's sight of a plot): a tribe's scout (unit +0x1c0 == 2) seeing an owne..."
+    - "- The report's event: 0x153ef0 is bound (0x153b0d) to the game signal at signals +0x10c8, which the unit sight update..."
+  review: imported
+- addr: 0x1540b0
+  final: 0xe52f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:barbBattleBoldness]
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e +0x20): +BARBARIAN_BOLDNESS_PER_TURN (2) each tribe turn (0x148ca3); a battle's dead (0x1540b0 -> 0x148e90: the defender dead, else the attacker): an enemy a tribe's unit killed +PER..."
+  review: imported
+- addr: 0x154220
+  final: 0xe5440
+  kind: function
+  status: READ
+  cases:
+    - recording: 1118
+      turn: 1
+      value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
+    - recording: 1126
+      turn: 3
+      value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
+  impl:
+    - cpu/core/barbarians.ts:campScore
+    - cpu/core/barbarians.ts:tribeFits
+    - cpu/data/barbarians.ts:BARB_TRIBES
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - ...+0x4a0, the AutoVariable at +0x448) takes each new camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to...
+    - "- Tribe kind 0x154220: the first BarbarianTribes row the camp meets — NAVAL on an AREA under 15 plots (0x153d..."
+  review: imported
+- addr: 0x154830
+  final: 0xe5930
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
+  impl: [cpu/core/barbarians.ts:tribeDies, cpu/core/tactical.ts:aiTypeOf]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - ...uts EXPLORE, the rest COMBAT; a camp destroyed turns its tribe's DEFENDER units COMBAT (0x154830).
+    - "...(0x152df0: tribe +0x18 clear, +0x1c the taker's player, written by the camp's removal 0x154830); each of their units, in pool order, takes of the planning's targets of that player th..."
+  review: imported
+- addr: 0x155920
+  final: 0xe6260
+  kind: function
+  status: READ
+  cases:
+    - recording: 1118
+      turn: 1
+      value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
+    - recording: 1126
+      turn: 3
+      value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "...es each new camp's plot index at tribe creation (0x154642) and is cleared only at init (0x155aae); 0x152b50 returns the least plot distance to it, 0 when empty — every camp ever raised..."
+  review: imported
+- addr: 0x155b50
+  final: 0xe6490
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e70); the units it finds join, success; else the missing units go to the tribe's queue (0x155b50 -> 0x149750, +0x90) and it runs again next turn. Success or the limiter's end: Spawn Ch..."
+  review: imported

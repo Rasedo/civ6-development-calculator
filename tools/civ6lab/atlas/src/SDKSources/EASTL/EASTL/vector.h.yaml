@@ -1,0 +1,37 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x193dc0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x10). The pick (0x193dc0) is a table over entries x count: an entry taken where better(cand, old) — old's food bel..."
+  review: imported
+- addr: 0x340490
+  kind: function
+  status: PARTLY
+  impl: [ai/major/religion.ts:religionChoice]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...he job): the leader's FavoredReligions, then the civilization's, the first not founded (0x340490), else \"Random Religion Choice\" over the religions not founded but the pantheon's row a..."
+  review: imported
+- addr: 0x535830
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/units.ts:odds]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x69f6e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:subjects]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...cities (player +0x12b8, its entries, setting +0x70); COLLECTION_ALL_PLAYERS 0x69f6c0 / 0x69f6e0 stands once on the context as it is (the evaluating player); COLLECTION_OWNER 0x69fc90...
+  review: imported

@@ -1,0 +1,145 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x737f90
+  final: 0x4dbea0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/operation.ts:addMember]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x738050
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:recruitUnits, ai/major/operations/recruit.ts:recruitOperation]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...e Unit 0x7ec7b0; Build Unit 0x7f4e00; Recruit Units 0x81c820 (the recruit 0x60a8c0 -> 0x738050: the free units, then the units of the lower-priority unlocked operations); Lock Units..."
+  review: imported
+- addr: 0x7383d0
+  final: 0x4dc3f0
+  kind: function
+  status: PARTLY
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x73a120
+  final: 0x4ddd60
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/manager.ts:startOperation]
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
+  review: imported
+- addr: 0x73a8e0
+  final: 0x4de400
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:targetGone]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...peration Is Ready 0x81a090; Operation Attack 0x80ec10 (SUCCESS once the target is gone, 0x73a8e0; RUNNING with units, else FAILURE); Operation Attack Units 0x80ecf0 (target gone SUCCES...
+  review: imported
+- addr: 0x73abf0
+  final: 0x4de710
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:targetValid]
+  notes:
+    - "imported: cited by the code, in no dll_readings section"
+    - ".claude/scratchpad/cb5/NOTES.md: ...minors. NEXT: KB port (CivKnowledge.cpp 0x5eb8b0/0x5eadb0 from the tactical target list 0x783980 + 0x73abf0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x..."
+  review: imported
+- addr: 0x73b360
+  final: 0x4dee80
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ning lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")."
+  review: imported
+- addr: 0x73b6c0
+  final: 0x4df100
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...unlocked operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation...
+  review: imported
+- addr: 0x73b8a0
+  final: 0x4df2e0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:planFormations]
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - ...operations); Lock Units 0x7f5240; Make Formation 0x7efd70 / 0x7ee630 (pairs 0x73b6c0 -> 0x73b8a0); Operation Move 0x81a130 / 0x816cb0; Settle 0x7f0b30 / 0x7ef530; Operation Is Ready 0x...
+  review: imported
+- addr: 0x73be10
+  kind: function
+  status: PARTLY
+  impl:
+    - ai/major/operations/operation.ts:fitsMaxima
+    - ai/major/operations/recruit.ts:passesOthers
+    - ai/major/operations/recruit.ts:recruitMinimums
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x73c7c0
+  kind: function
+  status: PARTLY
+  impl:
+    - ai/major/operations/operation.ts:unitStrength
+    - ai/major/operations/operation.ts:fitsMaxima
+    - ai/major/operations/recruit.ts:recruitStrength
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x73e610
+  final: 0x4e1620
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The pick: a running operation's valid candidate sets its backup (0x73e610); of the new ones that start themselves the highest Priority (+0x40), then the larger o..."
+    - ...e candidate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
+  review: imported
+- addr: 0x73e870
+  final: 0x4e18f0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:switchToBackup]
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ate is weighed again for the new operation (0x747fa0, vt +8) and switched to (0x73e610, 0x73e870).
+  review: imported
+- addr: 0x73eb60
+  final: 0x4e1bf0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:refreshStrengths]
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...; a type of none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120,..."
+  review: imported
+- addr: 0x73f7d0
+  final: 0x4e2670
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/nodes.ts:refreshStrengths]
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...f none has no limit. The running lines (\"%s running, TARGET\"), the strengths (0x73eb60, 0x73f7d0) and team lines (0x73b360) come first, then the start (0x726470 -> 0x73a120, \"Started\")..."
+  review: imported
+- addr: 0x73fba0
+  final: 0x4e29b0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/operation.ts:OpTeam, ai/major/operations/operation.ts:memberStrength]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported

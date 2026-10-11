@@ -1,0 +1,81 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x939980
+  kind: function
+  name: Game_Quests
+  status: PARTLY
+  impl:
+    - cpu/core/quests.ts:giveQuest
+    - cpu/data/quests.ts:QUEST_MAX_STANDING
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_give_quest
+  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Game_Quests 0x939980 gives a city-state's quests: \"H-1: the city-states' quests\" below."
+    - "- Who is given one (0x939980, client edx, actor r8d): 1 − the pair's standing quests; the type of the pair's last CO..."
+  review: imported
+- addr: 0x939f70
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...target. The standing list is +0x110 (data +0x168), the completed one +0x188 (data +0x1e0; 0x939f70 moves the completed records there and drops the failed). Check: `tools/civ6lab/dll_quests..."
+  review: imported
+- addr: 0x93aaa0
+  final: 0x64bf90
+  kind: function
+  name: Game_Quests
+  status: PARTLY
+  impl: [cpu/data/quests.ts:QUEST_TYPES]
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The logics, registered in this order (0x93aaa0): Convert Capital to Religion, Send Trade Route, Clear Barbarian Camp, Train Unit Type,..."
+  review: imported
+- addr: 0x93ac50
+  final: 0x64c140
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 13
+      value: "Nothing else gives a quest: no cooldown, no   expiry — a pair whose quest ended waits for the next era or meeting   (runs/h1_duelw1117: t13, t17, t31 era + a meeting, t61, t91, t151, t161   a meeting,"
+  impl:
+    - cpu/core/game.ts:endTurn
+    - cpu/core/quests.ts:giveEraQuests
+    - gpu/core/sim_seats.py:_game_era_turn
+    - gpu/core/sim_seats.py:_give_era_quests
+  readings: ["H-1: the city-states' quests — READ"]
+  context:
+    - "- When: the game era's change (0x93ac50, registered on GameEras' signal when the game has eras, the player era's 0x93ad80 other..."
+  review: imported
+- addr: 0x93ad80
+  final: 0x64c200
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 13
+      value: "Nothing else gives a quest: no cooldown, no   expiry — a pair whose quest ended waits for the next era or meeting   (runs/h1_duelw1117: t13, t17, t31 era + a meeting, t61, t91, t151, t161   a meeting,"
+  readings: ["H-1: the city-states' quests — READ"]
+  context:
+    - "...ange (0x93ac50, registered on GameEras' signal when the game has eras, the player era's 0x93ad80 otherwise): every player as client, in the players' order, with every player as actor;..."
+  review: imported
+- addr: 0x93ae70
+  final: 0x64c290
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 13
+      value: "Nothing else gives a quest: no cooldown, no   expiry — a pair whose quest ended waits for the next era or meeting   (runs/h1_duelw1117: t13, t17, t31 era + a meeting, t61, t91, t151, t161   a meeting,"
+  impl: [cpu/core/cityStates.ts:meetCityState, gpu/core/sim_masks.py:_meet_citystates]
+  readings: ["H-1: the city-states' quests — READ"]
+  context:
+    - "...every player as client, in the players' order, with every player as actor; a meeting (0x93ae70): both directions. Nothing else gives a quest: no cooldown, no expiry — a pair whose qu..."
+  review: imported

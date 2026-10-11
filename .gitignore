@@ -20,4 +20,8 @@ __pycache__/
 # H-1 per-turn dumps and full reports (tens of MB; the .report.md and manifests are kept)
 tools/civ6lab/runs/h1_duel*.jsonl
 tools/civ6lab/runs/h1_*.report.json
+# the DLL atlas's rebuilt cross references and annotated dumps (tools/civ6lab/atlas.py)
+tools/civ6lab/atlas/cache/
+# the recordings' log stores (tools/civ6lab/logstore.py rebuilds them from <stem>.logs/)
+tools/civ6lab/runs/*.logs.sqlite
 cpu/core/.h1run.mjs

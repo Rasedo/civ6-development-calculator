@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1f9650
+  final: 0x14e020
+  kind: function
+  status: PARTLY
+  readings: ["C-94: Sovereignty's route yield — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...TION city's route-to-others row of that yield (city +0x1ee0, its vector +0x28 read by 0x1f9650 — MODIFIER_PLAYER_CITIES_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS writes it). A major's city..."
+  review: imported
+- addr: 0x1f99d0
+  final: 0x14e100
+  kind: function
+  name: City_Trade
+  status: PARTLY
+  impl: [cpu/core/tradePath.ts:posts]
+  readings: ["C-20: the Trader's path and range"]
+  context:
+    - ...he ORIGIN city or of a city where the player has a constructed trading post (City_Trade 0x1f99d0, false against a player the owner is at war with) refuels it to TRADE_ROUTE_LAND_RANG...
+  review: imported

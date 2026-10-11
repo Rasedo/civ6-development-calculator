@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x534950
+  final: 0x37ba80
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
+    - recording: 1117
+      value: "then both again at half the ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.) call 0xa28900 only when the ID argument is present, so the vector runs in ID order and no source-pl"
+    - recording: 1118
+      value: 1118's 152, 243, 251, 250, 12).
+    - recording: 1103
+      value: "1103–1124 every river edge and volcano plot as recorded);"
+  impl: [cpu/core/disasters.ts:riverRevealed, cpu/harness/drawSites.ts:DRAW_SITES]
+  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+  context:
+    - "- A plot first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\")..."
+    - "...f the row; it tests no reveal itself. The reveal gate is the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civ..."
+  review: imported

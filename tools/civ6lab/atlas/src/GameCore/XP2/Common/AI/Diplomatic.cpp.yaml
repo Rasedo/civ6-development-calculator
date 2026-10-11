@@ -1,0 +1,109 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x64ba90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ....25) (mode 0), T=10*(L-n+1)/L   if n<=L else 0; flag arg 1 -> +T. mode1 x0.5 / 20; mode2 40. - Pick 0x64ba90 (per turn): done[64]; loop { for each player p (players list): skip done/invalid   (+0x6168[p]+0x18..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...owledge base and the owner's, +10 where +0x6780 names p.   The cost functors: Cost - T. - THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first;   then, repeatedly, every met player p not ye..."
+  context:
+    - "- THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first; then, repeatedly, every met playe..."
+  review: imported
+- addr: 0x650270
+  final: 0x431150
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...the records), the focus player +0x6780 (0x647bb0: the met   major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency   0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writer and   +..."
+  context:
+    - "...ds), the focus player +0x6780 (0x647bb0: the met major ranked by its own AI's vt+0x18 = 0x650270 entry +0x630, recency 0x2a81f0 against GlobalParameters +0x268), the trust +0x6480 writ..."
+  review: imported
+- addr: 0x6504f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...sign-clipped by 0x64efa0/0x6504a0 direction, minus gold cost x 0x7a6690 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0x650550(p), L=trunc(+0x6420 x 0.25)..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...orth >= 0 and drops a   positive gold value) or else p's (+0x62b0); the worth adds +0x6320[p][a]   (0x6504f0). No other instruction of the DLL names +0x6320 than its getter   and the save's serializer: its wr..."
+  context:
+    - ...and drops a positive gold value) or else p's (+0x62b0); the worth adds +0x6320[p][a] (0x6504f0). No other instruction of the DLL names +0x6320 than its getter and the save's serializ...
+  review: imported
+- addr: 0x650550
+  final: 0x431430
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Diplomacy.csv
+      value: "The opinion one major holds of another is its diplomatic modifiers' values summed (24.8 fixed point, the log's number the sum >> 8): AI_Diplomacy.csv (the writer 0x652bb0: per player and per player it"
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...0x66b490 (record +0x68, \"Cost\"). 0.0:0.0 = attempt turn. Threat row \"threat:n:trust\" = +0x6560[p] : 0x650550(p) : +0x6480[p].  ## READ so far - Action registration 0x666620 (delegation; embassy 0x6668a0): per..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...0 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0x650550(p), L=trunc(+0x6420 x 0.25) (mode 0), T=10*(L-n+1)/L   if n<=L else 0; flag arg 1 -> +T. mode1 x0.5..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ess the owner's trust of p (+0x6480[p])   is non-zero; else, with n = 1 + the players trusted more (0x650550) and L =   trunc(+0x6420 x 0.25 / 0.5 / -) for modes 0 / 1 / 2, T = (10 / 20 / 40) x   (L - n + 1)..."
+  context:
+    - "...0x2f58 of the player's diplomacy, and \"Threat and Trust\" as threat:n:trust from +0x6560 / 0x650550 / +0x6480, 24.8). Port: `ai/major/diplomacy.ts` (tables `tools/install/ai_diplomacy_table..."
+    - ...ner's trust of p (+0x6480[p]) is non-zero; else, with n = 1 + the players trusted more (0x650550) and L = trunc(+0x6420 x 0.25 / 0.5 / -) for modes 0 / 1 / 2, T = (10 / 20 / 40) x (L...
+  review: imported
+- addr: 0x652800
+  final: 0x433590
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...Diplomacy.csv's action rows, DiplomacyManager.csv, DiplomacySummary.csv).  - THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\"   is FIRST 0x66cc40 (the evaluation record's +0x48 vector,..."
+  context:
+    - "- THE LOG'S ACTION ROWS (0x652800): per action and player, \", %3.1f:%3.1f\" is FIRST 0x66cc40 (the evaluation record's +0x..."
+  review: imported
+- addr: 0x652bb0
+  final: 0x433820
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Diplomacy.csv
+      value: "The opinion one major holds of another is its diplomatic modifiers' values summed (24.8 fixed point, the log's number the sum >> 8): AI_Diplomacy.csv (the writer 0x652bb0: per player and per player it"
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+  context:
+    - "...es summed (24.8 fixed point, the log's number the sum >> 8): AI_Diplomacy.csv (the writer 0x652bb0: per player and per player it has met, in player order, \"opinion:state\" from +0x330 / +0x..."
+  review: imported
+- addr: 0x653f60
+  final: 0x434a70
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...n. One action per target/turn. - Receiver (0x237c60 delegation handler): if receiver not human: r = 0x653f60 (receiver AI):   action must be in receiver's state lists (+0x2f58[from] +0x20 or +0x40) else rejec..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...E RECEIVER (the Delegation's handler 0x237c60, the Embassy's 0x238330):   an AI receiver answers by 0x653f60: an action outside its state's lists   toward the sender refuses; else the value 0x66b490 of its in..."
+  context:
+    - "...(the Delegation's handler 0x237c60, the Embassy's 0x238330): an AI receiver answers by 0x653f60: an action outside its state's lists toward the sender refuses; else the value 0x66b490..."
+  review: imported
+- addr: 0x6543a0
+  final: 0x434db0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1127
+      value: "Confirmed on every answer   of the five verbose duels (20 / 20): accepted exactly where the   receiver's own logged cost of the action toward the sender is <= 0 —   every refusal in Unfriendly (Cost 7"
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...gged COST (2nd number) toward proposer <= 0.   Accept: gold from->to, mission set. Then proposer AI 0x6543a0 records response: r!=1 -> econ   0x68acd0(slot 2, -cost) (refund); r==0xc -> +0x6338[to][a]=1; alwa..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...st moves from sender to receiver and the mission is set; then the   sender's AI records the answer (0x6543a0: a refusal returns the cost to   savings slot 2; answer 12 sets +0x6338[p][a]). Confirmed on every..."
+  context:
+    - "...rom sender to receiver and the mission is set; then the sender's AI records the answer (0x6543a0: a refusal returns the cost to savings slot 2; answer 12 sets +0x6338[p][a]). Confirmed..."
+  review: imported

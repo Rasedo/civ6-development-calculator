@@ -1,0 +1,182 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x26dcd0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:reachPlots]
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...The planning's reach (AI Unit Planning 0x792c90 -> 0x791e00 -> the breadth-first search 0x26dcd0 for 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrappe...
+  review: imported
+- addr: 0x26df90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/st1/reading.md: ...herwise the larger of combat and ranged) onto the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the l..."
+  context:
+    - ...; bombard less GlobalParameters +0x188) to every plot of its one-turn reach (the search 0x26df90, flags 0x311) and to each plot within its range of those; an aircraft a disk of its r...
+    - ...e larger of combat and ranged) onto the plots of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +0x18bd also...
+  review: imported
+- addr: 0x26e570
+  final: 0x1a6e00
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 9
+      value: "AI_Planning.csv lists them (1124 t9:   the barbarian Warrior at 40:22 holds 39:23 (1/0), China's Warrior there);"
+    - recording: 1124
+      turn: 1
+      value: With them   the planning rows of 1124 t1-60 the reach reproduces exactly went 705 ->   758 of 1,241, the game's plots within ours 862 -> 1,192.
+  readings:
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...or 2 turns, flags 0x115 | 0x800 | 0x100 where the unit has not moved; the valid wrapper 0x26e570 refuses a node past the turn limit): the list at planning +0x30 (16-byte entries x, y,..."
+    - "...centre, an Encampment) as a node whose step spends the Movement left (the valid wrapper 0x26e570: the attack's cost adds the Movement left, 0x1d0 += 0x1d4) and links nothing from it (a..."
+  review: imported
+- addr: 0x26e920
+  final: 0x1a7150
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 52
+      value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
+    - recording: 1117
+      value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl: [cpu/core/tactical.ts:search]
+  readings:
+    - "C-95: a river crossing's Movement — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...out); a land unit whose   player may embark it takes water (a turn starting on the domain's pool:   0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none   (0 of 6,269 of their AI_Planning..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...1121 and 1124 hold a   water plot; the majors' and the minors' do from t62-69). The step's cost   (0x26e920's rules 0x531660..0x530240): into a city at most   CITY_MOVEMENT_COST 1 (0x531660 caps the step, 0x..."
+  context:
+    - "...the movement cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) a..."
+    - "- A step's turns and Movement (0x26e920, in 24.8 fixed point): a parent with no Movement starts the next turn at the domain's f..."
+    - "...nd unit whose player may embark it takes water (a turn starting on the domain's pool: 0x26e920's [r9 + 0x180 + domain*4]); the barbarians' land units take none (0 of 6,269 of their A..."
+  review: imported
+- addr: 0x26ee80
+  final: 0x1a74c0
+  kind: function
+  status: PARTLY
+  readings: ["C-95: a river crossing's Movement — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...empt (0x266470), it adds (+0x50c) << 8 — 2 MP in 24.8 — to the step's cost accumulator (0x26ee80: +0x34 += x through 0xac650). A crossing is the terrain's cost plus 2 (`RIVER_CROSS_MP`..."
+  review: imported
+- addr: 0x26f330
+  final: 0x1a7840
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...er_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair is null), so a node's key is its cost. The op..."
+  review: imported
+- addr: 0x26f7d0
+  final: 0x1a7ce0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The pool's count is set at game init (0x91e590 -> 0x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e4..."
+  review: imported
+- addr: 0x26f980
+  final: 0x1a7e90
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...or the parent began a turn (it spends everything); a zone of control spends everything (0x26f980) — save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0..."
+  review: imported
+- addr: 0x26fe20
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 110
+      value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+  impl:
+    - cpu/core/combat.ts:seizeCivilian
+    - cpu/core/combat.ts:seizable
+    - cpu/core/game.ts:religiousUnitLost
+  readings:
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "H-1: a civilian stepped on — READ"
+    - DLL rules the engines contradict
+  context:
+    - "- A unit's move onto a plot holding a religious unit it kills (0x26fe20 → 0x493f80 with the capture flag 1) swings religion: RELIGION_SPREAD_ UNIT_CAPTURE (g..."
+    - "- The move 0x26fe20 walks the destination plot's units from the last to the first; for each one not dead (+..."
+    - "- A move onto a religious unit (0x26fe20): the engines' melee order onto one only shares its plot (AUDIT C-94 BUILD)."
+  review: imported
+- addr: 0x270980
+  final: 0x1a8da0
+  kind: function
+  status: PARTLY
+  readings: ["C-95: a river crossing's Movement — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nt cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the uni..."
+  review: imported
+- addr: 0x270be0
+  final: 0x1a8f00
+  kind: function
+  status: PARTLY
+  readings: ["C-95: a river crossing's Movement — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not..."
+  review: imported
+- addr: 0x270dd0
+  final: 0x1a9060
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The cost (0x270dd0): 1000 x the step's Movement (0x16e7d0, the 0x3e800 constant); where the step leaves no..."
+  review: imported
+- addr: 0x271490
+  final: 0x30c70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-20: the Trader's path and range"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The path is the least-cost path within that budget (A*, heuristic 0x271490), not a greedy step, and the range is the budget, not a hex distance between the ends."
+    - "...0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both slots null: the total is the known..."
+  review: imported
+- addr: 0x271b50
+  final: 0x1a99b0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, chil...
+  review: imported
+- addr: 0x2720a0
+  final: 0x1a9f00
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:enterable]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported

@@ -1,0 +1,1259 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0xd02108
+  kind: global
+  status: PARTLY
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The path search is the generic CvAStar (Pathfinder_Instance.cpp, the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0..."
+  review: imported
+- addr: 0xd136f4
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x6e3e20 -> +0x748, default +0x760) and the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4); then a Great Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds...
+    - ...ndlers; PlayerAI +0x620; the +0x748 / +0x760 and +0x768 / +0x780 lists; at least -1.0, @0xd136f4; a Great Person class adds the golden-age points its person earns, 0x2c4230, valued as...
+  review: imported
+- addr: 0xd20458
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 71
+      value: "the game turns later (runs/h1_duelv1124: Qin's Naval at t71, the port's   at t48), so the +0x12f0 list and the visibility word are unread."
+  impl: [cpu/data/aiValue.ts:AI_UNLOCK_SHARE]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
+  review: imported
+- addr: 0xd267d0
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      turn: 135
+      value: "Replayed: both recorded meteors land their plot with the pick over the record-before's unowned plots of the terrain list and two draws after it (runs/h1_duelw1115 t135 of 159 plots, runs/h1_duelw1116 "
+  readings: ["C-74: the one-off start — READ"]
+  context:
+    - "...nt's +0x30 (1 for the one-offs: the plot alone) under the predicate 0x28ec10 (the functor 0xd267d0's call, 0x292e10): with AvoidTerritory (+0xc8 bit 1) the plot unowned (its info +0x1c is..."
+  review: imported
+- addr: 0xd2f320
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...1358 +0xf8). The value 0x7a60d0: f = 1 + w, q = 0x655840; f q >= 0 -> f + q, else +-0.1 (@0xd2f320, f's sign) where |q| > |f|, else f + q; the amount x (f x DefaultValue). A followed strat..."
+    - ...yer] +0x14); when q and 1 + w differ in sign and |q| > |1 + w|, the factor is +-0.1 (@0xd2f320).
+  review: imported
+- addr: 0xd2f324
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...h twice the cost in hand; then the heroes) gets a contract, and the boost takes -0.25 (@0xd2f324) once the balance passes its cost, -0.25 more once the Faith per turn (0x496fd0) passes...
+  review: imported
+- addr: 0xd2f32c
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...nothing), x1.5 if favored ([+0x268], the leader's Civics lists' AiFavoredItems; 1.5 at 0xd2f32c).
+  review: imported
+- addr: 0xd55ff0
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: AI_Military.csv
+      value: "- THE COMBAT DESIRE: the military AI's turn (0x71fb80, 0x721302..0x7219ee)   writes the PSEUDOYIELD_UNIT_COMBAT weight (+0x790): from its strengths   (+0x398 its own, +0x3f8 the enemy's, +0x458 the ot"
+    - recording: 1124
+      turn: 9
+      value: "Logged as   AI_Military.csv's Combat Desire (1124 Cardiff: 0.1 at t9 -> the Warrior   10.73 -> 11.05 at the same table value;"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "..._Military.csv's Regional / Enemy / Other Strength) — below the enemy's (enemy - own) x @0xd55ff0, below a target (target - own) / +0xd8, 20 past the enemy a negative term toward the ot..."
+  review: imported
+- addr: 0xd59af0
+  kind: global
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...ty hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5ce910 -> 0x5ce970 once per plot evaluation, 0x78 bytes each, `m_plotEvaluations`..."
+  review: imported
+- addr: 0xd5d420
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - "...HE ANALYSIS, the \"Civic Tree Analysis\" job (0x61fa20 launches the job at +0x838, vtable 0xd5d420; 0x621e20 runs 0x621a20 on each entry): turns := -1, value := 0, next := row; a non-rep..."
+  review: imported
+- addr: 0xd63400
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...hash in the registry 0x6c9640 (EFFECT_ADJUST_CITY_YIELD_CHANGE -> object 0xf03d80, vtable 0xd63400; COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0 runs one over at...
+  review: imported
+- addr: 0xd63490
+  kind: global
+  name: EFFECT_ADJUST_CITY_YIELD_MODIFIER
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...6cf3c0's evaluation of it unread). The other analyzers (EFFECT_ADJUST_CITY_YIELD_MODIFIER 0xd63490 ...) are unread.
+  review: imported
+- addr: 0xd70c98
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - ...th N = 0 every entry reads 1.0. Value +0x160 = N / +0x30 (0x16e940, truncated); x1.25 (@0xd70c98) for a TraitType unit; a shortfall of the maintenance resource scales it; the player's...
+  review: imported
+- addr: 0xd71c30
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good is skipped; a vic..."
+  review: imported
+- addr: 0xdb11b8
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      turn: 6
+      value: "On runs/h1_duelw1116 t6 and t8 the replay needed no roll: no volcano named yet."
+  readings: ["C-74: the volcano roll's gate — READ"]
+  context:
+    - "0x335040 reads the volcano component's counts (vtable 0xdb11b8): +0x68(b) 0xa1d2b0 counts the volcano entries (+0x1a0, stride 0xa0), with b true only th..."
+  review: imported
+- addr: 0xdecb08
+  kind: global
+  status: PARTLY
+  readings: ["C-94: Sovereignty's route yield — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...RADE_ROUTE_BY_CITY_STATE_BONUS_TYPE_MODIFIER (the factory 0xc27d10, the effect's vtable 0xdecb08: apply 0xb468d0 / remove 0xb47620) adds its Amount (WC_RES_MODIFY_CITY_STATE_TRADE_YIEL..."
+  review: imported
+- addr: 0xdece90
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1123
+      value: "The records fix it: distinct resources the owner sees under an unpillaged improvement on the city's plots (runs/h1_duelw1123: Jiaodong's Cotton and Cocoa +2, Chengdu's Coal mine nothing before Industr"
+  readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
+  context:
+    - "EFFECT_ADJUST_YIELD_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0..."
+  review: imported
+- addr: 0xdf85f8
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: 1109
+      turn: 99
+      value: "the records fit \"a   specialty district (RequiresPopulation) completed pays\": an Aqueduct pays   nothing under the dedication (1109 t99, 1110 t107, 1120 t94, 1124 t97),   nor a Dam (1118 t98) nor the "
+  readings:
+    - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+  context:
+    - "...tality's COMMEMORATION_INFRASTRUCTURE_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry..."
+  review: imported
+- addr: 0xefedf0
+  kind: global
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...entry per free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2, 3; the order the DP wal..."
+  review: imported
+- addr: 0xefeef0
+  kind: global
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...free slot of each plot of the city's 37-plot hexspace (0x5cc00 over the tables 0xefedf0 / 0xefeef0: axial dq, dr per index — the centre, then rings 1, 2, 3; the order the DP walks: (0,0) (..."
+  review: imported
+- addr: 0xeff670
+  kind: global
+  status: READ
+  cases:
+    - recording: 1115
+      value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
+    - recording: h1_duelw1119
+      turn: 120
+      value: "**This reverses the engines' walk** of every row over the joined ring of all the wonder's plots (one plot's eruption reads the same either way): runs/h1_duelw1119 t120, Eyjafjallajokull's two plots: t"
+    - recording: 1119
+      turn: 17
+      value: "1119 t17 – t223 (eight eruptions) and 1121's Kilimanjaro (t19, t38, t108, t140, t146, t226: one plot, the soil's label alone) land draw for draw."
+  impl: [cpu/harness/eventDraws.ts:DIR_DQ]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)"
+  context:
+    - "...) whose latitude band holds the plot and whose neighbour exists (DirectionTypes offsets 0xeff670 / 0xeff688: NE (0,+1), E (+1,0), SE (+1,−1), SW (0,−1), W (−1,0), NW (−1,+1) axial, y..."
+    - "...ach damage row, the plot itself (r12 = −1, impassable: no draw) and its six (the table at 0xeff670 / 0xeff688) — and the soil likewise, plot by plot, its draws labelled \"Pillage Improvemen..."
+  review: imported
+- addr: 0xeff688
+  kind: global
+  status: READ
+  cases:
+    - recording: 1115
+      value: "38 of 38   births and first walks (1115: 28, 1116: 10) land the recorded plot and   FertilityAdded."
+    - recording: h1_duelw1119
+      turn: 120
+      value: "**This reverses the engines' walk** of every row over the joined ring of all the wonder's plots (one plot's eruption reads the same either way): runs/h1_duelw1119 t120, Eyjafjallajokull's two plots: t"
+    - recording: 1119
+      turn: 17
+      value: "1119 t17 – t223 (eight eruptions) and 1121's Kilimanjaro (t19, t38, t108, t140, t146, t226: one plot, the soil's label alone) land draw for draw."
+  impl: [cpu/harness/eventDraws.ts:DIR_DQ]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: a natural wonder's eruption — READ (the order; REVERSES the ring walk)"
+  context:
+    - "...itude band holds the plot and whose neighbour exists (DirectionTypes offsets 0xeff670 / 0xeff688: NE (0,+1), E (+1,0), SE (+1,−1), SW (0,−1), W (−1,0), NW (−1,+1) axial, y north), co..."
+    - "...row, the plot itself (r12 = −1, impassable: no draw) and its six (the table at 0xeff670 / 0xeff688) — and the soil likewise, plot by plot, its draws labelled \"Pillage Improvement Chance\"...."
+  review: imported
+- addr: 0xeff730
+  kind: global
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff730: (0,1) (1,0) (1,-1) (0,-1) (-1,0) (-1,1) in the game's (x - y//2, y) — NE, E, SE, SW, W..."
+  review: imported
+- addr: 0xf01920
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ing thread (0x791e00 per unit), else N-1 jobs, chunk 0 inline, then the wait. The pool (0xf01920, count at +8, read by 0xb2f410) also bounds the influence map's split (0x7176dd) and se...
+  review: imported
+- addr: 0xf02c70
+  kind: global
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:DICE_COUNTS, gpu/core/sim_init.py:__init__]
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...pe 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
+    - "...16), a2 = clamp(T − 5, 5, 15), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured), a2..a3−1 (fail,..."
+  review: imported
+- addr: 0xf03d80
+  kind: global
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - .../ CollectionType hash in the registry 0x6c9640 (EFFECT_ADJUST_CITY_YIELD_CHANGE -> object 0xf03d80, vtable 0xd63400; COLLECTION_OWNER ...), the requirement set and the arguments. 0x6cede0...
+  review: imported
+- addr: 0xf04cb0
+  kind: global
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:FX]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0,..."
+  review: imported
+- addr: 0xf0bf40
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 22
+      value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
+    - recording: 1117
+      turn: 222
+      value: 1117 t222-229, 1118 t20-29 replayed draw for draw).
+  readings: ["C-74: the fire's spread — READ (the order)"]
+  context:
+    - "...0x691f0 is the ring walk: from the plot's cube coordinates, the six steps of the table at 0xf0bf40 — (0, 1), (-1, 0), (1, -1), (0, -1), (1, 0), (-1, 1) in (x - y // 2, y) — this grid's SOU..."
+  review: imported
+- addr: 0xf2e080
+  kind: global
+  name: AI_EVENT_GAIN_TECH
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e084
+  kind: global
+  name: AI_EVENT_GAIN_civic
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e088
+  kind: global
+  name: AI_EVENT_UNIT_CAPTURED
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e08c
+  kind: global
+  name: AI_EVENT_DESIRE_SETTLE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e090
+  kind: global
+  name: AI_EVENT_GREAT_PERSON_GAINED
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e094
+  kind: global
+  name: AI_EVENT_MANAGE_SPY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e098
+  kind: global
+  name: AI_EVENT_MANAGE_ARCHAEOLOGIST
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e09c
+  kind: global
+  name: AI_EVENT_NEEDS_RAILROAD
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0a0
+  kind: global
+  name: AI_EVENT_RELIGIOUS_CITY_CONVERTED
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0a4
+  kind: global
+  name: AI_EVENT_FOUNDED_RELIGION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0a8
+  kind: global
+  name: Nearest Enemy City
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0ac
+  kind: global
+  name: Nearest Friendly City
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0b0
+  kind: global
+  name: New Resources
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0b4
+  kind: global
+  name: Inner Ring Yield
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0b8
+  kind: global
+  name: Total Yield
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0bc
+  kind: global
+  name: Coastal
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0c0
+  kind: global
+  name: Fresh Water
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0c4
+  kind: global
+  name: Specific Resource
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0c8
+  kind: global
+  name: Specific Feature
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0cc
+  kind: global
+  name: Resource Class
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0d0
+  kind: global
+  name: Foreign Continent
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0d4
+  kind: global
+  name: Cultural Pressure
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0d8
+  kind: global
+  name: SETTLEMENT_MIN_VALUE_NEEDED
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0dc
+  kind: global
+  name: SETTLEMENT_ADDITIONAL_VALUE_PER_CITY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0e0
+  kind: global
+  name: SETTLEMENT_DECAY_TURNS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0e4
+  kind: global
+  name: SETTLEMENT_DECAY_AMOUNT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0ec
+  kind: global
+  name: SETTLEMENT_CITY_VALUE_MULTIPLIER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0f0
+  kind: global
+  name: First Turn Settler
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0f4
+  kind: global
+  name: Move to Safety
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0f8
+  kind: global
+  name: Explore Land
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e0fc
+  kind: global
+  name: End Turn
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e100
+  kind: global
+  name: Attack High Priority
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e104
+  kind: global
+  name: Attack Medium Priority
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e108
+  kind: global
+  name: Attack Low Priority
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e10c
+  kind: global
+  name: Attack Civilians
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e110
+  kind: global
+  name: Attack District
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e114
+  kind: global
+  name: Leader Formation
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e118
+  kind: global
+  name: Support Formation
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e11c
+  kind: global
+  name: Builder Outside Ring
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e120
+  kind: global
+  name: Defend Camps
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e124
+  kind: global
+  name: Attack Camps
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e12c
+  kind: global
+  name: Make Military Formation
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e130
+  kind: global
+  name: Chase Target
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e134
+  kind: global
+  name: Wander
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e138
+  kind: global
+  name: Pillage Improvement
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e13c
+  kind: global
+  name: Pillage District
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e140
+  kind: global
+  name: Plunder Trader
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e144
+  kind: global
+  name: Gather Goody Hut
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e148
+  kind: global
+  name: Great Person Move
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e14c
+  kind: global
+  name: Promotion
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e150
+  kind: global
+  name: Rock Band Move
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e154
+  kind: global
+  name: Missionary Move
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e158
+  kind: global
+  name: Wander Near Camp
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e15c
+  kind: global
+  name: Religious Combat
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e160
+  kind: global
+  name: Charge Heal
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e164
+  kind: global
+  name: Wander Near City
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e168
+  kind: global
+  name: Coastal Raid
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e16c
+  kind: global
+  name: Found Park
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e170
+  kind: global
+  name: Air Deploy
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e174
+  kind: global
+  name: Air Assault
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e178
+  kind: global
+  name: Air Rebase
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e17c
+  kind: global
+  name: Barbarian Rampage
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e180
+  kind: global
+  name: Zombie Horde Attack
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e184
+  kind: global
+  name: DEFAULT_LAND_SCOUTS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e188
+  kind: global
+  name: DEFAULT_NAVAL_SCOUTS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e18c
+  kind: global
+  name: LAND_SCOUTS_PER_PRIMARY_REGION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e190
+  kind: global
+  name: LAND_SCOUTS_PER_SECONDARY_REGION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e194
+  kind: global
+  name: NAVAL_SCOUTS_FOR_WORLD_EXPLORATION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e198
+  kind: global
+  name: TARGET_FRIENDLY_CITY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e19c
+  kind: global
+  name: TARGET_ENEMY_COMBAT_DISTRICT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1a0
+  kind: global
+  name: TARGET_ENEMY_PASSIVE_DISTRICT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1a4
+  kind: global
+  name: TARGET_NEUTRAL_CITY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1a8
+  kind: global
+  name: TARGET_BARBARIAN_CAMP
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1ac
+  kind: global
+  name: TARGET_NEUTRAL_CIVILIAN_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1b0
+  kind: global
+  name: TARGET_RELIGIOUS_CIVILIAN
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1b4
+  kind: global
+  name: TARGET_TRADER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1b8
+  kind: global
+  name: TARGET_CIVILIAN_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1bc
+  kind: global
+  name: TARGET_LOW_PRIORITY_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1c0
+  kind: global
+  name: TARGET_MEDIUM_PRIORITY_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1c4
+  kind: global
+  name: TARGET_HIGH_PRIORITY_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1c8
+  kind: global
+  name: TARGET_ENEMY_IMPROVEMENT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1cc
+  kind: global
+  name: TARGET_SETTLE_LOCATION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1d0
+  kind: global
+  name: TARGET_GOODY_HUT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1d4
+  kind: global
+  name: TARGET_ALLY_SUPPORT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1d8
+  kind: global
+  name: TARGET_AIR_UNIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1dc
+  kind: global
+  name: TARGET_NAVAL_SUPERIORITY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1e0
+  kind: global
+  name: TARGET_SCRIPT_SUPPLIED
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1e4
+  kind: global
+  name: TARGET_DISASTER_CAPABLE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1ec
+  kind: global
+  name: PSEUDOYIELD_CLEAR_BANDIT_CAMPS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1f0
+  kind: global
+  name: PSEUDOYIELD_CITY_BASE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1f4
+  kind: global
+  name: PSEUDOYIELD_CITY_DEFENSES
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1f8
+  kind: global
+  name: PSEUDOYIELD_CITY_DEFENDING_UNITS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e1fc
+  kind: global
+  name: PSEUDOYIELD_CITY_ORIGINAL_CAPITAL
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e200
+  kind: global
+  name: PSEUDOYIELD_CITY_POPULATION
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e204
+  kind: global
+  name: PSEUDOYIELD_DIPLOMATIC_FAVOR
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR (@0xf2e204) of Amount with the player, span."
+  review: imported
+- addr: 0xf2e208
+  kind: global
+  name: PSEUDOYIELD_DIPLOMATIC_GRIEVANCE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e20c
+  kind: global
+  name: PSEUDOYIELD_DIPLOMATIC_VICTORY_POINT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e210
+  kind: global
+  name: PSEUDOYIELD_GOLDENAGE_POINT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e214
+  kind: global
+  name: PSEUDOYIELD_GOVERNOR
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUDOYIELD_GOVERNOR @0xf2e214, discounted from the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Tr...
+  review: imported
+- addr: 0xf2e218
+  kind: global
+  name: PSEUDOYIELD_GPP_GENERAL
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x7e8 + player AI +0x620 + the lists +0x768 / +0x748) plus, for the GP pseudo-yields (@0xf2e218 GPP_GENERAL .. @0xf2e238 GPP_MUSICIAN), the eras' 0x2c4230 points as GOLDENAGE_POINT;...
+    - ...at -1.0 at least (@0xd136f4); then a Great Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player...
+  review: imported
+- addr: 0xf2e21c
+  kind: global
+  name: PSEUDOYIELD_GPP_ADMIRAL
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e220
+  kind: global
+  name: PSEUDOYIELD_GPP_ENGINEER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e224
+  kind: global
+  name: PSEUDOYIELD_GPP_MERCHANT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e22c
+  kind: global
+  name: PSEUDOYIELD_GPP_SCIENTIST
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e230
+  kind: global
+  name: PSEUDOYIELD_GPP_WRITER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e234
+  kind: global
+  name: PSEUDOYIELD_GPP_ARTIST
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e238
+  kind: global
+  name: PSEUDOYIELD_GPP_MUSICIAN
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...the lists +0x768 / +0x748) plus, for the GP pseudo-yields (@0xf2e218 GPP_GENERAL .. @0xf2e238 GPP_MUSICIAN), the eras' 0x2c4230 points as GOLDENAGE_POINT; the military AI's turn 0x7...
+    - ...least (@0xd136f4); then a Great Person class's pseudo-yield (pseudo index in [@0xf2e218, @0xf2e238]) adds 0x2c4230(player) [the record +0x6c of the 0x2c3660 manager's per-player vector] va...
+  review: imported
+- addr: 0xf2e23c
+  kind: global
+  name: PSEUDOYIELD_HAPPINESS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e240
+  kind: global
+  name: PSEUDOYIELD_INFLUENCE
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...nts a token, Player_Influence +0x270, 30 without a player AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POI...
+  review: imported
+- addr: 0xf2e244
+  kind: global
+  name: PSEUDOYIELD_IMPROVEMENT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e248
+  kind: global
+  name: PSEUDOYIELD_ENVIRONMENT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e24c
+  kind: global
+  name: PSEUDOYIELD_RELIGIOUS_CONVERT_EMPIRE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e250
+  kind: global
+  name: PSEUDOYIELD_UNIT_ARCHAEOLOGIST
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e254
+  kind: global
+  name: PSEUDOYIELD_UNIT_COMBAT
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...the unit's pseudo-yield (Units +0x290, PSEUDOYIELD_UNIT_COMBAT by default; the globals @0xf2e254 COMBAT, 258 NAVAL, 25c AIR, 26c TRADE, 268 RELIGIOUS, 250 ARCHAEOLOGIST, 260 EXPLORER,...
+    - ...nalysis value (0x5d4cd0) and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder...
+    - "...ING_FROM_DISPERSAL 0x6a6d20: the camps x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the..."
+  review: imported
+- addr: 0xf2e258
+  kind: global
+  name: PSEUDOYIELD_UNIT_NAVAL_COMBAT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e25c
+  kind: global
+  name: PSEUDOYIELD_UNIT_AIR_COMBAT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e260
+  kind: global
+  name: PSEUDOYIELD_UNIT_EXPLORER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e264
+  kind: global
+  name: PSEUDOYIELD_UNIT_SETTLER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e268
+  kind: global
+  name: PSEUDOYIELD_UNIT_RELIGIOUS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e26c
+  kind: global
+  name: PSEUDOYIELD_UNIT_TRADE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e270
+  kind: global
+  name: PSEUDOYIELD_UNIT_SPY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e274
+  kind: global
+  name: PSEUDOYIELD_DISTRICT
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ector] valued as PSEUDOYIELD_GOLDENAGE_POINT through 0x7a60d0, and PSEUDOYIELD_DISTRICT (@0xf2e274) adds 0.5 x Eras.ChronologyIndex (+0x1c, `dll_rowmap.py a5f3b0`) of the player's era (0x4..."
+  review: imported
+- addr: 0xf2e278
+  kind: global
+  name: PSEUDOYIELD_WONDER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e27c
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_SCULPTURE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e280
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_PORTRAIT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e284
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_LANDSCAPE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e288
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_RELIGIOUS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e28c
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_ARTIFACT
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e290
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_WRITING
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e294
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_MUSIC
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e298
+  kind: global
+  name: PSEUDOYIELD_GREATWORK_RELIC
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e29c
+  kind: global
+  name: PSEUDOYIELD_DIPLOMATIC_BONUS
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2a0
+  kind: global
+  name: PSEUDOYIELD_NUCLEAR_WEAPON
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2a4
+  kind: global
+  name: PSEUDOYIELD_RESOURCE_LUXURY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2a8
+  kind: global
+  name: PSEUDOYIELD_CIVIC
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2ac
+  kind: global
+  name: PSEUDOYIELD_SPACE_RACE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2b0
+  kind: global
+  name: PSEUDOYIELD_STANDING_ARMY_NUMBER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2b4
+  kind: global
+  name: PSEUDOYIELD_STANDING_ARMY_VALUE
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2b8
+  kind: global
+  name: PSEUDOYIELD_TECHNOLOGY
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2bc
+  kind: global
+  name: PSEUDOYIELD_TOURISM
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e2c0
+  kind: global
+  name: UNIT_BUILDER
+  status: PARTLY
+  notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
+  review: imported
+- addr: 0xf2e740
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: AI_SiteEval.csv
+      value: "AI_SiteEval.csv logs no score below 0:   the port clamps there."
+  impl: [ai/major/settle.ts:term]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...source. - The score (0x702380): per entry with a threshold or a value, the   evaluator the table at 0xf2e740 holds for its condition (0x6f3420..   0x6f37b0, 0x6f9630..0x6fa060), each a whole number << 8: Near..."
+  context:
+    - "...The score (0x702380): per entry with a threshold or a value, the evaluator the table at 0xf2e740 holds for its condition (0x6f3420.. 0x6f37b0, 0x6f9630..0x6fa060), each a whole number..."
+  review: imported
+- addr: 0xf2ed70
+  kind: global
+  status: PARTLY
+  impl: [ai/major/operations/bt.ts:priorityChild]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0xf2f978
+  kind: global
+  status: READ
+  cases:
+    - recording: h1_duelw1104
+      turn: 242
+      value: "Outcome B's −50% (x = 128) quotes 215 → 108, 325 → 163, 227 → 114, 45 → 23 (runs/h1_duelw1104 t242 Biplane, Mechanized Infantry, Anti-Air Gun;"
+    - recording: 1106
+      turn: 62
+      value: 1106 t62 Swordsman;
+  readings: ["H-1: a unit's Production cost in the queue — READ"]
+  context:
+    - "...s does not read 2 through 0xadd5e0 (unread) and the player's +0x1048 equals the global at 0xf2f978 (the currency the resolution names; Production fits the records), the quote is c − ((c <<..."
+  review: imported
+- addr: 0xf2f97c
+  kind: global
+  status: PARTLY
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...food (+0x08) the plot's Food; each yield not disfavored (+0x50) counted twice, Gold once (0xf2f97c = YIELD_GOLD), into favored (+0x0c, the yields m_favoredYields +0x38 holds) or other (+0x...
+  review: imported
+- addr: 0xf2f988
+  kind: global
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...d2d10: list > 0 -> 1, < 0 -> -1) is -1, x2 where 1 (a MustPurchase row of the district @0xf2f988 x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain..."
+  review: imported
+- addr: 0xffd8f1
+  kind: global
+  status: PARTLY
+  impl: [ai/major/settle.ts:FEATURE_RANGE]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x9b6630
+  binary: F
+  kind: global
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the AI's spawn waits: 0x4a10ed's tail jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a..."
+  review: imported

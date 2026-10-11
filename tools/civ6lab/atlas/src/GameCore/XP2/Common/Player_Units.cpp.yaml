@@ -1,0 +1,131 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x4ee3f0
+  final: 0x34c950
+  kind: function
+  name: CanEmbark
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 68
+      value: "Record: 1112 China's Trader to   Preslav at sea t68–72 with Shipbuilding and no Celestial Navigation, the   route paying the water path's 11.4375 from t64."
+  impl: [cpu/core/units.ts:TRADE_WATER_NONE]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched..."
+  review: imported
+- addr: 0x4eeb70
+  final: 0x34d020
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 102
+      value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
+    - recording: 1118
+      turn: 218
+      value: 1118 t218   before its level offer);
+    - recording: h1_duelw1118
+      turn: 231
+      value: "Which units: the unit's creation 0x4eeb70   calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or   ExtractsArtifacts (+0x1b9 bit 1, `dll_rowmap.py 0xa6f2b0`) is set and the   player's"
+    - recording: 1122
+      turn: 129
+      value: 1122 t129 and 1124 t248 a Spy, trained and granted by the   Intelligence Agency, a name and no level offer).
+  impl: [cpu/data/units.ts:CITIZEN_NAMED_UNITS, cpu/harness/checks.ts:doneBefore]
+  readings: ["H-1: a city's name, a citizen's name — READ"]
+  context:
+    - "...l falls 40, 39, 38 ... as storms and Spies take names. Which units: the unit's creation 0x4eeb70 calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or ExtractsArtifac..."
+  review: imported
+- addr: 0x4f23a0
+  final: 0x34ef70
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/promotions.ts:drawPromoOffer
+    - cpu/data/units.ts:PROMO_OFFER_UNITS
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_promo_offer_draw
+  readings: ["H-1: the random promotion offer (0x4f23a0) — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context: ["## H-1: the random promotion offer (0x4f23a0) — READ"]
+  review: imported
+- addr: 0x4f2ac0
+  final: 0x34f4f0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...and the upgrades' gold (0x5376d0, 20.0 at least); PSEUDOYIELD [0xf2e254] of 100 where 0x4f2ac0 names the row; per building the player's version 0.5, a wonder PSEUDOYIELD_WONDER of 0....
+  review: imported
+- addr: 0x4f2af0
+  final: 0x34f520
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - ...ts upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_TOURISM of the +0xe8 list's count; per building 0.5, a wonde...
+  review: imported
+- addr: 0x4f2b20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 25
+      value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
+    - recording: h1_duelw1104
+      turn: 242
+      value: "Outcome B's −50% (x = 128) quotes 215 → 108, 325 → 163, 227 → 114, 45 → 23 (runs/h1_duelw1104 t242 Biplane, Mechanized Infantry, Anti-Air Gun;"
+    - recording: 1106
+      turn: 62
+      value: 1106 t62 Swordsman;
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "H-1: the upgrade's gold — READ"
+    - "H-1: a unit's Production cost in the queue — READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUCTION_PERCENT_COST (+0x74c, 100) / 100, never below 0; cost = base +..."
+    - "...90 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x4f2b20, `m_aCurrentUnitCost`, an int); where c > 0, the row's +0x20 class does not read 2 throug..."
+    - "...nt as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0:..."
+  review: imported
+- addr: 0x4f2b50
+  final: 0x34f550
+  kind: function
+  status: UNREAD
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  context:
+    - ...E_MULTIPLIER x -0.01f cut toward 0; the entries' kinds 1 / 2 add gp +0x198 / +0x17c and 0x4f2b50 terms, unread); the odds min(0.9, ((ours - theirs) / min(best ours, best theirs) + 1) x...
+  review: imported
+- addr: 0x4f2c90
+  final: 0x34f6b0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl: [cpu/core/aiUnitProduction.ts:UnitProductionFacts]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - ...Tech +0x240, ObsoleteCivic +0x248 / Tech +0x250 held) only while the player holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per...
+  review: imported
+- addr: 0x4f2d50
+  final: 0x34f770
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 218
+      value: "runs/h1_duelw1118 t218: a Spy's 17 draws 17..1 after its \"Choosing a Citizen Name\";"
+  readings: ["H-1: the random promotion offer (0x4f23a0) — READ"]
+  context:
+    - "...ts type's `NumRandomChoices` (unit info +0x60: Apostle, Spy, Rock Band 3) is above 0 (and 0x4f2d50 refuses): every row of the player's promotion list (+0x940) whose class is the unit's (0x..."
+  review: imported

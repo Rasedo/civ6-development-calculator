@@ -1,0 +1,319 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x334d30
+  final: 0x23b320
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl: [cpu/core/disasters.ts:fireBirth, cpu/data/disasters.ts:FIRE_SPREAD_P]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-74: the random-event step's order — READ"
+    - "C-74: the fire — READ"
+  context:
+    - "...mEvents order, the empty slot appended last for 10N − Σ), \"Random Event Roll\", the event (0x334d30). On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood..."
+    - "...l\" (0x287c00, over the vector at +0x128, never empty: the empty slot rides it), the event 0x334d30, then the history's update 0x2910d0 (no draw). Before the start turn nothing draws, the v..."
+    - "...Woods, a Jungle Fire Rainforest) and the spacing 0x290030 — starts the SAME event there (0x334d30), its own record and clock, its own birth strike straight away. So one 50% roll a fire-tu..."
+  review: imported
+- addr: 0x335040
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+    - recording: h1_duelw1116
+      turn: 6
+      value: "On runs/h1_duelw1116 t6 and t8 the replay needed no roll: no volcano named yet."
+  impl:
+    - cpu/core/disasters.ts:volcanoRoll
+    - cpu/data/disasters.ts:PERCENT_VOLCANOES_ACTIVE
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventReplay.ts:VolcanoDraws
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-93: the climate step after the events — CLOSED"
+    - "C-74: the random-event step's order — READ"
+    - "C-74: the volcano roll's gate — READ"
+    - "H-1: the volcano roll's branches and order — READ"
+  context:
+    - "...turn's step 0x338710 (gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28..."
+    - "...hing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0), the weights (0x335260, no draw; entries..."
+    - "...the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano roll 0x335040, the weights and \"Random Event Roll\" — and only then the climate component's turn (0x2d1f..."
+  review: imported
+- addr: 0x335260
+  final: 0x23b8b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl:
+    - cpu/core/disasters.ts:randomEvent
+    - cpu/core/disasters.ts:EventTable
+    - cpu/data/disasters.ts:EVENT_OCC_SCALE
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventReplay.ts:rollBands
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-74: the random-event step's order — READ"
+  context:
+    - "...gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f..."
+    - "...the volcano roll (0x335040: one \"Active Volcano Roll\", a choice after a 0), the weights (0x335260, no draw; entries in RandomEvents order, the empty slot appended last for 10N − Σ), \"Rand..."
+    - "...(a tail jump) every live one-off's turn 0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empt..."
+  review: imported
+- addr: 0x336000
+  final: 0x23c3b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+  impl:
+    - cpu/core/disasters.ts:held
+    - cpu/harness/eventDraws.ts:StruckPlot
+    - gpu/core/sim_economy.py:_event_damage
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  context:
+    - ...ce per land unit, CITY_GARRISON once on a complete district with garrison hit points (0x336000), CITY_WALLS once while the walls stand (0x336170); then each RandomEvent_Yields row ov...
+  review: imported
+- addr: 0x336170
+  final: 0x23c520
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+  impl:
+    - cpu/core/disasters.ts:held
+    - cpu/harness/eventDraws.ts:StruckPlot
+    - gpu/core/sim_economy.py:_event_damage
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  context:
+    - "...te district with garrison hit points (0x336000), CITY_WALLS once while the walls stand (0x336170); then each RandomEvent_Yields row over the plots, one \"Boosted Yield Chance\" rand(100)..."
+  review: imported
+- addr: 0x3366a0
+  final: 0x23ca50
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/disasters.ts:unitDamageDraws
+    - cpu/data/disasters.ts:eruptBand
+    - cpu/data/disasters.ts:FIRE_DMG
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventDraws.ts:StruckPlot
+    - gpu/core/sim_economy.py:_unit_damage_draws
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...GED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Fl...
+    - "The unit applier 0x3366a0 takes \"Random Event Unit Damage Roll\" for every unit that passes the alive / domain gates..."
+  review: imported
+- addr: 0x336a50
+  final: 0x23ce00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+  impl:
+    - cpu/core/disasters.ts:DamageKind
+    - cpu/core/disasters.ts:eventDamage
+    - cpu/harness/eventDraws.ts:damageRolls
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"
+    - "C-74: BUILDING_PILLAGED's building — CLOSED"
+    - "C-74: the fire — READ"
+  context:
+    - ..., any owner; one draw rand(100) < Percentage applies the row through the shared applier 0x336a50.
+    - "...the plot, through the city's building pillage 0x193190 directly — not the damage applier 0x336a50 — when the plot's district is owned and not already pillaged. So the plant goes with no d..."
+    - ...illage-false ones, then the district; every event reaches both through the shared applier 0x336a50, so a flood's, an eruption's, a fire's and an accident's act as a storm's.
+  review: imported
+- addr: 0x337210
+  final: 0x23d300
+  kind: function
+  name: IMPROVEMENT_DESTROYED
+  status: PARTLY
+  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  context:
+    - "...o the damage TYPE, not the family: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 ref..."
+  review: imported
+- addr: 0x338710
+  final: 0x23b7f0
+  kind: function
+  name: Game_RandomEvents
+  status: READ
+  cases:
+    - recording: 1116
+      value: "On 1116 39 of 39 floods and on 1115 25 of 25 reproduce the recorded silt with the flood's draws ending on the witness (after the units and districts that spend draws: see below);"
+    - recording: 1116
+      value: "a flood whose replay lands also lands its roll in its row's band (moderate 18–157, major 121–251, 1000-year 264–371 on 1116)."
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+  impl:
+    - cpu/core/disasters.ts:randomEvent
+    - cpu/core/disasters.ts:disasterPhase
+    - gpu/core/sim_economy.py:SimEconomy
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "C-93: the climate step after the events — CLOSED"
+    - "C-74: the random-event step's order — READ"
+  context:
+    - "Game_RandomEvents: the turn's step 0x338710 (gate: turn ≥ start + RANDOM_EVENT_START_TURN − 1), the volcano roll 0x335040, the weight..."
+    - "...barians' completed start of turn T-1 to player 0's start of turn T; the random-event step 0x338710 is the LAST thing to draw there. Its order: the storms' walks (0x288f40 → 0x28ecd0), the..."
+    - "The turn's world step 0xa55190 calls the random-event step 0x338710 — the droughts' tick and the storms' walk (0x288f40: 0x2876c0, 0x28ecd0), the volcano rol..."
+  review: imported
+- addr: 0x339020
+  final: 0x23e460
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      turn: 6
+      value: "On runs/h1_duelw1116 t6 and t8 the replay needed no roll: no volcano named yet."
+  impl:
+    - cpu/core/disasters.ts:volcanoRoll
+    - cpu/data/disasters.ts:EVENT_OCC_SCALE
+    - cpu/harness/eventReplay.ts:EVENT_ROLL_TOTAL
+  readings: ["C-74: the event draw, the volcanoes, the drought", "C-74: the volcano roll's gate — READ"]
+  context:
+    - "...− 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warm..."
+    - "...; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no draw when the named count N' is 0 or N is 0; D = N // (2 × all volcanoes); below Per..."
+  review: imported
+- addr: 0x339960
+  final: 0x23eb10
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 22
+      value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
+    - recording: 1117
+      turn: 222
+      value: 1117 t222-229, 1118 t20-29 replayed draw for draw).
+  impl: [cpu/data/disasters.ts:FIRE_SPREAD_P]
+  readings: ["C-74: the fire — READ", "C-74: the fire's spread — READ (the order)"]
+  context:
+    - "...336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, the event's own start test 0x28ec10 (its RandomEvent_Features row: a For..."
+    - "...THEAST, WEST, NORTHEAST, NORTHWEST, EAST, SOUTHWEST (`RING_DIRS`). Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-..."
+  review: imported
+- addr: 0x33a070
+  final: 0x23f040
+  kind: function
+  name: UNIT_KILLED_CIVILIAN
+  status: PARTLY
+  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  context:
+    - ...a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0...
+  review: imported
+- addr: 0x33a280
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: the replay on 1115 / 1116 places every event without one).
+    - recording: Game_RandomEvents.csv
+      value: "The random-event step writes Game_RandomEvents.csv's sixteen-number row (0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2 (\"Total CO2\"), the categories after."
+    - recording: 1121
+      turn: 189
+      value: "Read as thousands of carbon, the flood rows' warming (ChanceIncreasePerDegree 20, CO2For1DegreeTempRise 500,000 on Duel) picks the game's event on every step the unwarmed table missed: 1121 t189 FLOOD"
+    - recording: 1119
+      turn: 99
+      value: step.eventPick 2,784 -> 2,849 passes over the 26 duels (1119-1128, the recordings with the log), 1126 three lower where its flood rivers' order already fails (t99, t122, t146 ...).
+  impl: [cpu/harness/randLog.ts:loadClimateLog]
+  readings:
+    - "C-74: the random-event step's order — READ"
+    - "H-1: the world's carbon in the climate log — READ (the column), the scale a fit"
+  context:
+    - "...live one-off's turn 0x289430 — the volcano roll 0x335040, the weights 0x335260 (no draw), 0x33a280, \"Random Event Roll\" (0x287c00, over the vector at +0x128, never empty: the empty slot ri..."
+    - "The random-event step writes Game_RandomEvents.csv's sixteen-number row (0x33a280): the turn, the realism, then 0x28db00, the climate's world CO2 (\"Total CO2\"), the catego..."
+  review: imported
+- addr: 0x33a6e0
+  final: 0x23f5e0
+  kind: function
+  name: POPULATION_LOSS
+  status: PARTLY
+  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  context:
+    - ...YED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and UNIT_KILLED_CIVILIAN 0x33...
+  review: imported
+- addr: 0x33a780
+  kind: function
+  name: BUILDING_PILLAGED
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:pillageTileBuildings, gpu/core/sim_economy.py:_pillage_tile_buildings]
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-74: BUILDING_PILLAGED's building — CLOSED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMAGE_LAND / NAVAL 0x3366a0 and...
+    - "The applier 0x33a780 (owned plot, the district's city) asks the district's chooser 0x24af90: nothing on a pill..."
+  review: imported
+- addr: 0x33a910
+  final: 0x23f880
+  kind: function
+  name: DISTRICT_PILLAGED
+  status: PARTLY
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "C-74: BUILDING_PILLAGED's building — CLOSED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ily: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780, POPULATION_LOSS 0x33a6e0 refuse an unowned plot; UNIT_DAMA..."
+    - ...o a Dar-e Mehr atop its Holy Site spares the Temple under it. No draw. DISTRICT_PILLAGED (0x33a910) takes every building of the district but the Pillage-false ones, then the district; ever...
+  review: imported
+- addr: 0x33aba0
+  final: 0x23fb20
+  kind: function
+  name: IMPROVEMENT_PILLAGED
+  status: PARTLY
+  readings: ["C-41: the eruption's soil, the ring and the gates"]
+  context:
+    - "- The owned-plot gate belongs to the damage TYPE, not the family: IMPROVEMENT_PILLAGED 0x33aba0, IMPROVEMENT_DESTROYED 0x337210, DISTRICT_PILLAGED 0x33a910, BUILDING_PILLAGED 0x33a780..."
+  review: imported
+- addr: 0x33b580
+  final: 0x240390
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 22
+      value: "Each neighbour passing 0x339960 (the start test 0x28ec10 and 0x290030 with the row's Hexes) is born at once with its age-0 strike, in that order, and the births tick in it: runs/h1_duelw1118 t22, Rain"
+    - recording: 1117
+      turn: 222
+      value: 1117 t222-229, 1118 t20-29 replayed draw for draw).
+  impl: [cpu/data/disasters.ts:FIRE_SPREAD_P]
+  readings: ["C-74: the fire — READ", "C-74: the fire's spread — READ (the order)"]
+  context:
+    - "SPREAD (0x336a50's last arm → 0x33b580): the plot's neighbours within 1 (0x6b1b0), each that passes 0x339960 — for a one-off, th..."
+    - "...res (`replayEvents`; 1117 t222-229, 1118 t20-29 replayed draw for draw). Units and cities 0x33b580 skips: a city whose established governor's +0xc8 holds (unread which) keeps the fire off..."
+  review: imported

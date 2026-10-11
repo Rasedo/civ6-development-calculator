@@ -1,0 +1,31 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x896c40
+  final: 0x5dce20
+  kind: function
+  name: Terrain_Builder
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 53
+      value: "+0x14 = -1) — runs/h1_duelw1118 t53 woke over 2, t152 slept over 2 with both active;"
+    - recording: 1121
+      turn: 70
+      value: "The wake's gate is the named count less the active: 1121 t70–99 (two volcanoes, one named and active: share 50, named − active 0) draws nothing until the second is named (its \"Random Volcano\", t99)."
+    - recording: 1118
+      turn: 53
+      value: 1118 t53 woke 803 at index 0 of [803, 534], 1117 t154 827 at index 1 of [206, 827], each the generator's placement order;
+    - recording: 1123
+      turn: 35
+      value: 1123 t35 / t130 and 1124 t120 / t211 (eruptions after each) fit [539, 474] and [716, 500].
+  impl: [cpu/core/disasters.ts:volcanoOrder]
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "H-1: the volcano roll's branches and order — READ"
+  context:
+    - "...) — no district, city-centre or wonder gate (the feature goes on through the raw setter 0x896c40; the records' city centres gained the rows' yields and all 105 district plots in the..."
+    - "...ano's feature: TerrainGenerator.lua's SetFeatureType (FEATURE_VOLCANO) -> Terrain_Builder 0x896c40 -> 0xa1e370 -> 0xa19360 appends an entry (a natural wonder's volcano goes to its own list..."
+  review: imported

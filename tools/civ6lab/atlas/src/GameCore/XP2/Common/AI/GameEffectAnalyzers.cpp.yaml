@@ -1,0 +1,660 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x6a0b10
+  final: 0x477ed0
+  kind: function
+  name: EFFECT_ADJUST_GREAT_PERSON_POINTS
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...YIELD_CHANGE 0x6a7d70 (unweighted, no player passed); EFFECT_ADJUST_GREAT_PERSON_POINTS 0x6a0b10 (the class's pseudo-yield, PV(horizon) alone); EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN...
+  review: imported
+- addr: 0x6a1170
+  final: 0x4785c0
+  kind: function
+  name: EFFECT_ADJUST_DISTRICT_AMENITY
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...building's value 0x7a7590 from the start to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBu...
+  review: imported
+- addr: 0x6a1700
+  final: 0x478a20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT 0x6a1b80 (parser 0x6a1700: Amount stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78,..."
+  review: imported
+- addr: 0x6a1b80
+  kind: function
+  name: EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_BUILDING_YIELD_MODIFIERS_FOR_DISTRICT 0x6a1b80 (parser 0x6a1700: Amount stored as fx(Amount x 0.01f)): a city subject with the distr..."
+  review: imported
+- addr: 0x6a2f70
+  final: 0x479ed0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD 0x6a3160 (parser 0x6a2f70: AffectOrigin default true +0x10, AffectDestination default false +0x11): the trade r..."
+  review: imported
+- addr: 0x6a3160
+  kind: function
+  name: EFFECT_ADJUST_TRADE_ROUTE_YIELD
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD 0x6a3160 (parser 0x6a2f70: AffectOrigin default true +0x10, AffectDestination default false +0x1..."
+  review: imported
+- addr: 0x6a3780
+  kind: function
+  name: EFFECT_GRANT_INFLUENCE_TOKEN
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...CivicModifiers, the civics AI's 0x7a4b20 term, not wired): EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 READ (Amount x the player's points a token, Player_Influence +0x270, 30 without a playe..."
+  review: imported
+- addr: 0x6a44b0
+  final: 0x47b220
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...MBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the class +8, its pseudo-yield +0xc, Amount +0x10 kept whole): the Amount read raw a..."
+  review: imported
+- addr: 0x6a4680
+  final: 0x47b3f0
+  kind: function
+  name: EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...EUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4680 (parser 0x6a44b0: the class +8, its pseudo-yield +0xc, Amount +0x10 kept whole): the Am..."
+  review: imported
+- addr: 0x6a4750
+  final: 0x47b4c0
+  kind: function
+  name: EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:NONE_ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...nalyzer's slot 2 (0xbe4aa0, nothing, but for EFFECT_ADJUST_DISTRICT_GREAT_PERSON_POINTS 0x6a4750).
+    - "...0xc, Amount +0x10 kept whole): the Amount read raw as the pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's cu..."
+  review: imported
+- addr: 0x6a49e0
+  kind: function
+  name: _FOR_DOMESTIC
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL and _FOR_DOMESTIC 0x6a49e0: the capacity x Amount, weighted, span."
+  review: imported
+- addr: 0x6a5d20
+  kind: function
+  name: _DISTRICT_HOUSING
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBuildAI's). Unregistered, worth 0: EFFECT..."
+  review: imported
+- addr: 0x6a6d20
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...hted, discounted from the start (0x7a1240); EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL 0x6a6d20: the camps x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFE..."
+  review: imported
+- addr: 0x6a7d70
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHANGE 0x6a7d70 (unweighted, no player passed); EFFECT_ADJUST_GREAT_PERSON_POINTS 0x6a0b10 (the class's...
+  review: imported
+- addr: 0x6a9550
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN 0x6a9550 (a yield filter, context +0x64, -1 or the YieldType): the envoys placed (0x44a440) x..."
+  review: imported
+- addr: 0x6ab400
+  final: 0x4819a0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...yzer adds to it. EFFECT_ATTACH_MODIFIER 0x6ab630 analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of the context (0x142650) on the subject and SETS +0xc0 to that..."
+  review: imported
+- addr: 0x6ab630
+  final: 0x481bd0
+  kind: function
+  name: EFFECT_ATTACH_MODIFIER
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 2
+      value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
+  impl: [cpu/core/aiModifiers.ts:analysis]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...number (+0xc0) as it starts; each subject's analyzer adds to it. EFFECT_ATTACH_MODIFIER 0x6ab630 analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of the context..."
+  review: imported
+- addr: 0x6ab8a0
+  final: 0x481e40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...t, span. EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH..."
+  review: imported
+- addr: 0x6abc40
+  kind: function
+  name: EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...t x the count at the player's weight, span. EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20),..."
+  review: imported
+- addr: 0x6abe40
+  kind: function
+  name: EFFECT_GRANT_UNIT_IN_CITY
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...pseudo-yield, between; slot 2 0x6a4750 half the Amount as fx. EFFECT_GRANT_UNIT_IN_CITY 0x6abe40: the greater of the unit's current cost (0x4f2b20) and its value 0x7b62c0, x Amount, ad..."
+  review: imported
+- addr: 0x6ac690
+  kind: function
+  name: EFFECT_ADJUST_CITY_TOURISM
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ributaries, weighted, between; the parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURIS...
+  review: imported
+- addr: 0x6ac7f0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter): the city-states it is suzerain of (0x44a5a0) x Amount, weighted, spa..."
+  review: imported
+- addr: 0x6acd00
+  kind: function
+  name: EFFECT_ADJUST_DISTRICT_YIELD_CHANGE
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context: ["- EFFECT_ADJUST_DISTRICT_YIELD_CHANGE 0x6acd00: a district subject; Amount bare, span."]
+  review: imported
+- addr: 0x6adb20
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...through the resource value 0x7a21e0), EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per turn 0x4bf7c0 x Amount x the tributaries, weighted, between; th...
+  review: imported
+- addr: 0x6addf0
+  kind: function
+  name: EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier..."
+  review: imported
+- addr: 0x6ae510
+  kind: function
+  name: EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...(the class's pseudo-yield, PV(horizon) alone); EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN 0x6ae510 (PSEUDOYIELD_INFLUENCE, PV(horizon) - PV(start)); EFFECT_ADJUST_DUPLICATE_FIRST_INFLU...
+  review: imported
+- addr: 0x6aee30
+  kind: function
+  name: EFFECT_FEATURE_ADJACENCY
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:adjacencyValue, cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "..., \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, DistrictType): a city with the district counts..."
+  review: imported
+- addr: 0x6afa10
+  kind: function
+  name: EFFECT_ADJUST_PLOT_YIELD
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...owned plots ring 3),   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evaluators TERRAIN/FEATURE/RESOURCE_TYPE/RE..."
+  context:
+    - "...ty's plots of index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD 0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T), unweighted) and the plot evalu..."
+  review: imported
+- addr: 0x6afcd0
+  kind: function
+  name: EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...IELD_INFLUENCE, PV(horizon) - PV(start)); EFFECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x P..."
+  review: imported
+- addr: 0x6b0840
+  kind: function
+  name: EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT 0x6b0840: over the player's units, min(Amount, Units.Maintenance +0x5c), bare Gold, span."
+  review: imported
+- addr: 0x6b2350
+  final: 0x464600
+  kind: function
+  name: EFFECT_ADJUST_UNIT_PRODUCTION
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected..."
+  review: imported
+- addr: 0x6b45a0
+  final: 0x466290
+  kind: function
+  name: EFFECT_ADJUST_POLICY_AMENITY
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x1008], bare, from the start to start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0: the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and..."
+    - ...4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b...
+  review: imported
+- addr: 0x6b5b30
+  final: 0x467720
+  kind: function
+  name: EFFECT_GRANT_ABILITY
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+    - recording: h1_duelw1124
+      turn: 2
+      value: "EFFECT_ATTACH_MODIFIER 0x6ab630   analyses its attached modifier (parser 0x6ab400: ModifierId) in a copy of   the context (0x142650) on the subject and SETS +0xc0 to that analysis's   total — an attac"
+  impl: [cpu/core/aiModifiers.ts:analysis]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...peace >5 units, Spy non-full); free units in buildingValue. - aiModifiers.ts: EFFECT_GRANT_ABILITY (0x6b5b30, nested ability modifiers, ai_tables emits `ability`),   COLLECTION_CITY_TRAINED_UNITS (0x69ffa0),..."
+  context:
+    - "- THE ANALYZERS added (each its whole part): EFFECT_GRANT_ABILITY 0x6b5b30 (per subject the ability's UnitAbilityModifiers analysed in a copy of the context, 0x..."
+    - ...6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b30 (the ability's own modifiers analyzed in a copy of the context, their values summed).
+    - ...ne city's whatever the cities known; Choral Music 75 = 25 + 50). EFFECT_GRANT_ABILITY 0x6b5b30 adds each ability modifier's analysis. Where no subject passes, the analyzer's slot 2 (...
+  review: imported
+- addr: 0x6b5d50
+  final: 0x467940
+  kind: function
+  name: EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION 0x6b5d50 (Amount, StartEra, EndEra): the player's era (0x467eb0) in the window, the city's Pro..."
+  review: imported
+- addr: 0x6b5eb0
+  final: 0x467aa0
+  kind: function
+  name: EFFECT_ADJUST_POLICY_HOUSING
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ch yield's percent change x CityBuildAI's yields +0x1080), EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE...
+    - ...roduction 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b30 (the ability's own m...
+  review: imported
+- addr: 0x6b76f0
+  final: 0x469010
+  kind: function
+  name: EFFECT_TERRAIN_ADJACENCY
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:adjacencyValue, cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...the parser's order; \"span\" PV(H) - PV(T), \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, Distri..."
+  review: imported
+- addr: 0x6b8930
+  final: 0x469fb0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULATION_MODIFIER 0x6b8930 (per resource, or the named one, the player's count of it 0x4aa790 x Amount through the...
+  review: imported
+- addr: 0x6b8ba0
+  final: 0x46a220
+  kind: function
+  name: EFFECT_ADJUST_CITY_YIELD_CHANGE
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ITY_IDENTITY_PER_TURN (the Monument's MONUMENT_LOYALTY). EFFECT_ADJUST_CITY_YIELD_CHANGE (0x6b8ba0): per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140; 0x7a1240..."
+    - "...0 to the AI. Read (each adds the whole part, `sar 8`): EFFECT_ADJUST_CITY_YIELD_CHANGE 0x6b8ba0 (a city subject; the yield at the player's weight, 0x7a6690; PV(horizon) - PV(start), 0..."
+  review: imported
+- addr: 0x6b8e10
+  final: 0x46a490
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...(lab: Barracks 0 -> 219/572 exact on 1124 with it) — SOURCE UNREAD -> ASK. - Stockpile cap analyzer 0x6b8e10: max over resource units' city-centre UNITS values (0x5d4cd0), whole; needs unit table. - Trade kno..."
+  context:
+    - "...s worth with the Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STOCKPILE_CAP 0x6b8e10 READ, not ported (no Amount: the whole part of the best of the city centre's UNITS valu..."
+  review: imported
+- addr: 0x6b9d90
+  final: 0x46b390
+  kind: function
+  name: EFFECT_ADJUST_CITY_YIELD_MODIFIER
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...weight, 0x7a6690; PV(horizon) - PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); E...
+  review: imported
+- addr: 0x6bb1f0
+  final: 0x46c620
+  kind: function
+  name: EFFECT_ADD_RELIGIOUS_BUILDING
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...(0x4f2b20) and its value 0x7b62c0, x Amount, added whole. EFFECT_ADD_RELIGIOUS_BUILDING 0x6bb1f0: the greatest over the player's cities of the building's value 0x7a7590 from the start..."
+  review: imported
+- addr: 0x6bc9e0
+  final: 0x46de60
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...the amount from the start to the horizon when they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSE...
+  review: imported
+- addr: 0x6bdd40
+  final: 0x46ee40
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...t x 0.01), weighted, between, halved (sar 9). EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL 0x6bdd40: min(the knowledge base's camps +0x648, 5) x Amount, Faith weighted, discounted from th..."
+  review: imported
+- addr: 0x6beb00
+  final: 0x46fac0
+  kind: function
+  name: EFFECT_ADJUST_CITY_GROWTH
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount..."
+  review: imported
+- addr: 0x6bef40
+  final: 0x46ff00
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...nfluencePointsThreshold at the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows within 10 of it, 0x5eb0f0 over the..."
+  review: imported
+- addr: 0x6c0490
+  final: 0x471230
+  kind: function
+  name: _BUILDING_HOUSING
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "..._DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBuildAI's). Unregistered, worth 0: EFFECT_ADD_RELIGIOUS_BELIEF_YIELD (ev..."
+  review: imported
+- addr: 0x6c0590
+  final: 0x471320
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...ce, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER 0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold; no unit: the city's Production, City::GetYiel..."
+  review: imported
+- addr: 0x6c09b0
+  final: 0x471740
+  kind: function
+  name: EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...LLECTION_CITY_PLOT_YIELDS (0x69feb0, owned plots ring 3),   EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evalua..."
+  context:
+    - "...UNITS (0x69ffa0: once, the evaluation's city); EFFECT_ADJUST_UNIT_EXPERIENCE_MODIFIER 0x6c09b0 (its parser 0x6c0590 stores Amount x 0.01f as unweighted Gold; no unit: the city's Prod..."
+  review: imported
+- addr: 0x6c0ff0
+  final: 0x471d80
+  kind: function
+  name: EFFECT_ADJUST_TRADE_ROUTE_CAPACITY
+  status: READ
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...NCE_MODIFIER (0x6c09b0), EFFECT_ADJUST_PLOT_YIELD (0x6afa10),   EFFECT_ADJUST_TRADE_ROUTE_CAPACITY (0x6c0ff0), plot evaluators TERRAIN/FEATURE/RESOURCE_TYPE/RESOURCE_VISIBLE/HAS_ANY_IMPROVEMENT. - aiValue.ts:..."
+  context:
+    - "...cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 (the Trader's worth with the Amount's capacity more); EFFECT_ADJUST_PLAYER_RESOURCE_STO..."
+    - ...IELD_GOVERNOR @0xf2e214, discounted from the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value 0x7a7110 of Amount, start to horizon).
+  review: imported
+- addr: 0x6c2720
+  final: 0x4732d0
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...h the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUD...
+  review: imported
+- addr: 0x6c4820
+  final: 0x475250
+  kind: function
+  name: EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_PLAYER_EXTRA_FAVOR_PER_TURN 0x6c4820: PSEUDOYIELD_DIPLOMATIC_FAVOR (@0xf2e204) of Amount with the player, span."
+  review: imported
+- addr: 0x6c5080
+  final: 0x475a50
+  kind: function
+  name: EFFECT_ADJUST_BUILDING_YIELD_CHANGE
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- EFFECT_ADJUST_BUILDING_YIELD_CHANGE 0x6c5080 (args BuildingType +8, YieldType +0xc, Amount +0x10): a city subject; Amount weighted,..."
+  review: imported

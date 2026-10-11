@@ -1,0 +1,46 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5389b0
+  final: 0x37ebb0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's...
+  review: imported
+- addr: 0x538a60
+  final: 0x37ec60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+    - recording: h1_duelw1124
+      turn: 162
+      value: "The drought's −1 Food is read there: the records put it after   the floors — runs/h1_duelw1124 Shenyang, a Grassland centre in the   footprint t162–163, t194–195, t234–235, reads Food 1 and the city's"
+    - recording: 1111
+      turn: 186
+      value: 1111 Shanghai's centre the same (t186, t212, t223).
+    - recording: h1_duelw1131
+      turn: 96
+      value: "Confirmed on the two recorded plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1) reads 1 Faith at t96 after floods of both (the first river's alone: 1;"
+  impl: [cpu/core/city.ts:tileYieldsForCenter, cpu/core/disasters.ts:homeCache]
+  readings:
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "H-1: a city centre's floors — READ"
+    - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+    - "H-1: the Great Bath's Faith per flood — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's   yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the   inner ring; a feature within 2 counted; a resource the player sees..."
+    - ".claude/scratchpad/st1/reading.md: ...a fit), the units' strengths (the install's base, the   routines' modifiers unread), the plot yield 0x538a60 (the engine's   `tileYields` for the seat), ownership type 0 (taken as the improved plots   of the..."
+  context:
+    - "...'s appeal (vcall +0x28); any other source the plot's yield of that type from 0x82280 (→ 0x538a60) with its last flag false less the same with it true, times ScalingFactor / 100 when..."
+    - "- The plot yield 0x538a60 sums the plot's own rows, then, on a plot holding a city (0x81120), raises Food to YIEL..."
+    - "- The plot yield 0x538a60 adds the game effects' per-plot rows (0xc7e9b0, a scan of the plot's (amount, yield) pa..."
+  review: imported

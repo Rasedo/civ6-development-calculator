@@ -1,0 +1,35 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1ae530
+  final: 0x11e9e0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/aiModifiers.ts:adjacencyValue
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nt stored as fx(Amount x 0.01f)): a city subject with the district (context +0x78, else 0x1ae530 by DistrictType); per building of the district type (Districts +0x130 list, the first r..."
+  review: imported
+- addr: 0x1aec20
+  final: 0x11ee20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1109
+      value: Confirmed on runs/h1_duelw1109 ..
+    - recording: 1116
+      value: "1116: 152 of 154 newly listed units standing on one of their player's city centres stand on the predicted city's (the two misses had spent their moves)."
+    - recording: 1116
+      turn: 112
+      value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
+  readings: ["H-1: the great person's spawn — READ"]
+  context:
+    - "...the player's cities (+0x12f0 -> +0xd8, list order); a city holding the class's district (0x1aec20 on city +0x1a48 with (district, true, 0) — completed) and of greater population (+0x588,..."
+  review: imported

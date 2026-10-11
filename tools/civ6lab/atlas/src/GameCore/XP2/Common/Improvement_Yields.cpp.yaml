@@ -1,0 +1,66 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x365720
+  final: 0x25f570
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/yields.ts:districtAdjacency]
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-r...
+    - "- 0x365720 (player, city, district type, yield, plot): the district row's vector of Adjacency_Yiel..."
+  review: imported
+- addr: 0x365ae0
+  final: 0x25f890
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 208
+      value: "Recorded (runs/h1_duelw1118): China's Monastery on plot 781 beside Longxi's Campus and Armagh's Neighborhood reads 2 Faith t208–249 (counting both would pay 3);"
+  impl:
+    - cpu/core/yields.ts:liveDistrict
+    - cpu/core/yields.ts:districtAdjacency
+    - gpu/core/sim_economy.py:_adj_district_count
+    - gpu/core/sim_seats.py:_imp_adjacency
+  readings: ["H-1: the district adjacency — READ"]
+  context:
+    - ...ia 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
+    - "...plot): the district row's vector of Adjacency_YieldChanges rows (+0x100), each through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER..."
+    - "- 0x365ae0, one row (column map from the loader 0xa57930's SELECT: flag byte +0xc0 = AdjacentNatur..."
+  review: imported
+- addr: 0x3664d0
+  final: 0x25fe30
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 208
+      value: "Recorded (runs/h1_duelw1118): China's Monastery on plot 781 beside Longxi's Campus and Armagh's Neighborhood reads 2 Faith t208–249 (counting both would pay 3);"
+  readings: ["H-1: the district adjacency — READ"]
+  context:
+    - "An improvement's adjacency runs the same row evaluator: 0x3664d0 (`improvementDef != nullptr`) walks the improvement's Improvement_Adjacencies rows (+0x11..."
+  review: imported
+- addr: 0x366df0
+  final: 0x260510
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 it...
+    - "- District::GetYield 0x249850 (yield, percent flag): 0 while pillaged; else 0x366df0's adjacency + the district's flat yield bucket (+0x2f0) + its appeal rows (+0x458: yiel..."
+  review: imported
+- addr: 0x367010
+  final: 0x260720
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tTerrain, +0x20 AdjacentResourceClass): 0 unless the row's yield is the one asked and 0x367010 admits it (YieldChange ≠ 0, PrereqTech / PrereqCivic held, ObsoleteTech / ObsoleteCivic..."
+  review: imported

@@ -1,0 +1,105 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7989e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  impl: [cpu/core/aiUnitProduction.ts:unitProductionTable]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  notes:
+    - ".claude/scratchpad/cb5/NOTES.md: ...scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 on PrereqTech/Civic turns), maintenance as plain Gold..."
+  context:
+    - "...x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the section \"C-96 / C-97: the unit value\")."
+    - "- THE UNIT PRODUCTION TABLE 0x7989e0 (AI/UnitProduction.cpp; run from 0x6fae70 at the player AI's turn while 0x79d320 — the..."
+  review: imported
+- addr: 0x79a320
+  final: 0x5236c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...ityBuildAI +0x908), 0x5c9a00, 0x5c9700, 0x5cb570, 0x5ca7e0, the military AI's city hook 0x79a320, and the City Analysis job (0x5ce3f0: the job object at +0xcc0, vtable 0xd59af0 -> 0x5c..."
+    - ...9d computes from the player's counts (+0x510, +0x4a0) feeds asserts only. The city hook 0x79a320 copies the table per city, the +0x2c / +0x30 times the extra copies.
+  review: imported
+- addr: 0x79a440
+  final: 0x5237a0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
+  impl: [cpu/data/aiBuildTables.ts:AI_UNIT_EFFICIENCY]
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, \"Could not find a neutral player\"): per pair of Units rows both without strength..."
+  review: imported
+- addr: 0x79ba50
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - ...r holds one (0x4f2c90), a unit not yet trainable only where the player signal +0x168 (0x79ba50) answers; per entry its flags (+0x08 obsolete, +0x0b Units +0x1ba bit 128, +0x0c TraitT...
+  review: imported
+- addr: 0x79ca90
+  final: 0x524e30
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x promo-class weight 0x723bb0,  p..."
+    - ".claude/scratchpad/cb/notes.txt: ...en PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons..."
+  context:
+    - "..._UNIT_COMBAT where none): COMBAT / NAVAL / AIR: the military AI's unit production value 0x79ca90 (player AI +0x1290 +0x268: a linear find in its 0x168-byte entries, +0x160; 0 for a u..."
+  review: imported
+- addr: 0x79cb30
+  final: 0x524ed0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 17
+      value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...0 for a unit in a formation (+0x1fb8 +0x738 above 1) or carrying the node's Leader Tag (0x79cb30); at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there..."
+  review: imported
+- addr: 0x79d040
+  final: 0x5253e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "- THE EFFICIENCIES (0x79d040 allocates, the job 0x79a440 fills, \"Could not find a neutral player\"): per pair of Unit..."
+  review: imported

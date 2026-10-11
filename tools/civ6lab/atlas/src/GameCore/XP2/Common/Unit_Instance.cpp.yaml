@@ -1,0 +1,191 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x56c690
+  final: 0x3a25f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:canAct]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...6f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a unit with no ranged or bombard s..."
+  review: imported
+- addr: 0x56cb00
+  final: 0x3a2980
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a civilian stepped on — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...mover's player on the victim's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0...."
+  review: imported
+- addr: 0x56d6f0
+  final: 0x3a3120
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the   city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.c..."
+  context:
+    - "...s toward its camp (\"Wander Back to Camp\", mission flag 0x1000). The unit's turn ends (0x56d6f0, 0x570b40)."
+    - ...der onto it (0x962190, flag 0x10), a unit with no ranged or bombard strength then done (0x56d6f0, 0x570b40, 0x77d180); the civilian taken ends the target; then each ranged one within...
+    - "...000, else the skip 0x95eae0 (\"Wander Back to City\", \"Move To\" the city). The turn ends (0x56d6f0, 0x570b40). Confirmed: the turn's \"Random Direction\" draws pair one to one with the AI_..."
+  review: imported
+- addr: 0x56daa0
+  final: 0x3a3480
+  kind: function
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...order, makes each LOW or MEDIUM unit that   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HI..."
+    - ".claude/scratchpad/st1/reading.md: ..., each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard less COMB..."
+  context:
+    - "...gedCombat, row +0x6c, a Bombard is none) with its formation's; +0x1b0 the best Bombard (0x56daa0) beside it. Records: 1120 China's cities strike at 25 from t50 (an Archer made), 40, 60..."
+    - "...es each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56..."
+    - "...t it sees now (0x5033a0) with a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the bombard..."
+  review: imported
+- addr: 0x56dc90
+  final: 0x3a3590
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      value: formation,   0x56dc90) less the wounded loss, less the base, where positive (H-1 1108   Jiaodong 30.8359375 = 29 + 36 - 26 - 2090/256).
+    - recording: 1112
+      turn: 213
+      value: "Records: 1112 China's Mechanized Infantry   made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the   corps upgraded on land at t216 read 95."
+    - recording: 1106
+      turn: 243
+      value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
+    - recording: 1121
+      turn: 191
+      value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
+  readings:
+    - "C-34: the interception's damage, XP, weariness and the answers"
+    - "C-94: the wounded law and the garrison — READ"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...he player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the..."
+  context:
+    - "...l(2 + S_plane / S_interceptor) x its XP percent)), S the Combat column plus corps/army (0x56dc90). Fighter 100 v Bomber 85: 3 before the percent; the measured 4 (Georgia's Fighter) is..."
+    - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where positive (H-1 1108 Jiaodong 30.8359375 = 2..."
+    - "...hero 0x8ffac0) and the era's starting units (0x4580b0 through 0x4c1c10), raises it to 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 pas..."
+  review: imported
+- addr: 0x56e0d0
+  final: 0x3a39a0
+  kind: function
+  name: COMBAT_MAX_HIT_POINTS
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 23
+      value: "Case:   1121 camp (3,19): its Scout reports at t23, takes 47 from China's   Warrior at t24, stands home at t25 three plots from it and raises no   raid (none at boldness 10 on t26 either);"
+    - recording: 1124
+      turn: 13
+      value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"
+    - recording: 1120
+      turn: 13
+      value: 1120 t13 17 / 32 (a defender at 18 HP).
+  readings:
+    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+  context:
+    - "...s the node's units whose damage (unit +0xcf0) is at least that share of their health (0x56e0d0) AND whose plot reads above 0 on the AI's influence map (player +0x12d8, 0x716a90 — its..."
+    - "...bFightWhileEmbarked). Both sides' totals are then summed against COMBAT_MAX_HIT_POINTS (0x56e0d0): where both would fall, the side whose total overshoots further falls and the other is..."
+  review: imported
+- addr: 0x56e130
+  final: 0x3a3a00
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:maxMoves]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...bard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The   type ids (0x5bcb80, each global the..."
+  context:
+    - "...daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an ALLY_SUPPORT. The type ids (0x5bcb80, each g..."
+  review: imported
+- addr: 0x56e3d0
+  final: 0x3a3c70
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...at   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Movement   (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIUM for an A..."
+    - ".claude/scratchpad/st1/reading.md: ...the plots of its 1-turn   planning reach (0x7921e0 -> 0x26df90) and every plot within its range   (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots   beside each reach plot (the ring..."
+  context:
+    - "...tens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twice its Movement (0x56e130) — HIGH for a FRIENDLY_CITY, MEDIU..."
+    - ...of its 1-turn planning reach (0x7921e0 -> 0x26df90) and every plot within its range (0x56e3d0) of them; a unit with the flag +0x18bd also onto the land plots beside each reach plot...
+  review: imported
+- addr: 0x56e3e0
+  final: 0x3a3c80
+  kind: function
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  impl: [cpu/core/units.ts:ranged]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...(an ally's), in list order, makes each LOW or MEDIUM unit that   threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength   within its range (0x56e3d0), any other nearer than twice its Move..."
+    - ".claude/scratchpad/st1/reading.md: ...(0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its   strength (0x716400: bombard > 0 — the combat strength where it tops the   bombard..."
+  context:
+    - "...ts'. The best ranged rises beside the best melee (0x4c1a30): the unit's ranged strength 0x56e3e0 (RangedCombat, row +0x6c, a Bombard is none) with its formation's; +0x1b0 the best Bomb..."
+    - "...s), in list order, makes each LOW or MEDIUM unit that threatens it — one with a ranged (0x56e3e0) or bombard (0x56daa0) strength within its range (0x56e3d0), any other nearer than twic..."
+    - "..., each unit it sees now (0x5033a0) with a combat, ranged or bombard strength (0x56dc90, 0x56e3e0, 0x56daa0): its strength (0x716400: bombard > 0 — the combat strength where it tops the..."
+  review: imported
+- addr: 0x56ee80
+  final: 0x3a4730
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...at half its health or worse whose planning holds no fight it wins (+0x60), a naval one 0x56ee80 holds however hurt; a whole one where the danger exceeds its strength + 20 — and move..."
+  review: imported
+- addr: 0x56ef30
+  final: 0x3a47e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...and, the   gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify   (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside   its own territory heads for its player's nearest ci..."
+  context:
+    - "...gossip strings GOSSIP_LAND/NAVAL_UNIT_LEVEL) holds its plot — fortify (0x95eae0) where 0x56ef30 allows, else sleep (0x9686d0); a hull outside its own territory heads for its player's..."
+  review: imported
+- addr: 0x5705f0
+  final: 0x3a5a60
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a civilian stepped on — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...m's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0. Nothing in it reads the barb..."
+  review: imported

@@ -1,0 +1,14 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x154c0
+  final: 0xfce80
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...— save under flag 0x800. Between two plots the player never revealed (node +0x51 bit 0, 0x154c0) the step costs the parent's or 1 and no rule runs."
+  review: imported

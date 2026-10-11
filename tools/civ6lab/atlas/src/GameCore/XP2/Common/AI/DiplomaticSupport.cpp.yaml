@@ -1,0 +1,17 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x67ff10
+  final: 0x450bf0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/diploState.ts:CHECKS]
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...b0; the war declarations 0x6742d0 (one).   The action indices are globals of the static initializer 0x67ff10   (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c,   Delegation @f2e58c, Declare Fri..."
+  context:
+    - ...r declarations 0x6742d0 (one). The action indices are globals of the static initializer 0x67ff10 (Embassy @f2e564, Demand Tribute @f2e568, Open Borders @f2e56c, Delegation @f2e58c, D...
+  review: imported

@@ -1,0 +1,212 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x467eb0
+  final: 0x2f7ed0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1104
+      turn: 162
+      value: "- A player's era (0x467eb0, the techs object +0xf8) is the highest era of   its techs and civics as of its turn's end: a tech granted in its turn   shows in the next record's era field (1104 t162 → t1"
+    - recording: h1_duelw1117
+      turn: 24
+      value: "runs/h1_duelw1117 t24: China's Slinger     upgraded to an Archer in its start, the envoy to Caguana annexing 702);"
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/quests.ts:playerEra]
+  readings:
+    - "C-94: the game era, the ages and the founding moments — READ"
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "H-1: the city-states' quests — READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- A player's era (0x467eb0, the techs object +0xf8) is the highest era of its techs and civics as of its turn's en..."
+    - "...x6c4); when TOURISM_ADVANCED_ERA_WONDER (GP +0x6c0) is set, plus the owner's era index (0x467eb0) less the wonder's — its PrereqTech's era (+0x210 → +0xc0), else its PrereqCivic's (+..."
+    - "...of its PrereqTech's and PrereqCivic's, none for a unit with neither) the actor's era (0x467eb0: the latest era of its techs and civics); the picker draws \"Choosing random unit..."
+  review: imported
+- addr: 0x467f50
+  final: 0x2f7f50
+  kind: function
+  status: PARTLY
+  readings: ["C-94: Sovereignty's route yield — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...es it). A major's city adds X as it stands. A minor's city with a bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100 where a is the ORIGIN player's Congress entry for that type (...
+  review: imported
+- addr: 0x468060
+  final: 0x2f8060
+  kind: function
+  status: PARTLY
+  readings: ["C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...nit that passes the alive / domain gates BEFORE any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its abilit..."
+  review: imported
+- addr: 0x468100
+  final: 0x2f80a0
+  kind: function
+  status: PARTLY
+  readings: ["C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...BEFORE any immunity: the owner's damage percent (0x468060), the player's event immunity (0x468100), the unit's own counter (+0x1110) and its ability list each zero the damage after the dr..."
+  review: imported
+- addr: 0x4681a0
+  final: 0x2f80e0
+  kind: function
+  name: m_yieldPriorityBoost
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(Gold 0.5) x (1 + min(w[y], 9.0)), w[y] = 0x702ad0, the sum of five per-player arrays (0x4681a0 +0x340, player +0x1288 +0x528, the AI yields' +0x638, +0x7a8, the +0x6b0 list or +0x6c8...
+    - "- AI::Religious m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a..."
+  review: imported
+- addr: 0x4681c0
+  final: 0x3e7b70
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - ...es (+0x7c), ReligiousHealCharges (+0x74), nothing where the player's majority religion (0x4681c0 +0x1c0) is -1, then PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 tourism)...
+    - "...or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCharges +0x64, Units_XP2 TourismBomb). ARC..."
+  review: imported
+- addr: 0x469cd0
+  final: 0x2f9780
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Knowledge.csv
+      value: "The opposition: per Units row of Combat above 0 not obsolete to the player   with a combat pseudo-yield (or none), over the player list (0x483b50   +0x4a0) the knowledge base's count of it (CivKnowled"
+    - recording: 1124
+      turn: 201
+      value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
+  readings:
+    - "H-1: a civilian stepped on — READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...d). - The danger map (InfluenceMap.cpp 0x717460, m_influence): per player at   war with the player (0x469cd0), each unit it sees now (0x5033a0) with a   combat, ranged or bombard strength (0x56dc90, 0x56e3e0,..."
+  context:
+    - ...unit info lacks the +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religi...
+    - "...rds, AI_Knowledge.csv's ARMY lines \"UNIT_X count age\"), N their total (the at-war ones, 0x469cd0, apart); each entry's +0x30 sums count x efficiency[that row][the entry] (GlobalAI +0x3..."
+    - "...giving, by its district (0x810d0): the player's own a FRIENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment)..."
+  review: imported
+- addr: 0x469ce0
+  final: 0x2f9790
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
+  readings:
+    - "H-1: a minor's research catch-up — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ..., +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...plot reads no danger. - THE NON-BARBARIAN PRIORITIES (TacticalAI +0xa8 = 0x787000 for any player   0x469ce0 refuses): over the target list, each FRIENDLY_CITY entry (a   district of the player's own: its cit..."
+  context:
+    - "...and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or the Free Cities — it counts the players of the game's list..."
+    - ...r that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0...
+    - ...M; the barbarians' prioritization (0x786e70, the member at +0xa8 for a barbarian player 0x469ce0) makes HIGH every LOW or MEDIUM unit within BARBARIAN_DEFENSE_ALL_UNITS 4 of a CAMP of...
+  review: imported
+- addr: 0x469d70
+  final: 0x2f9820
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+    - recording: AI_SiteEval.csv
+      value: "AI_SiteEval.csv logs no score below 0:   the port clamps there."
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...gate (pressure   above it), else pressure x value. A failed gate (-9999) is skipped for a   human (0x469d70: the slot status 3) and otherwise adds -100% to the stack:   the score 0. Less the danger << 8. AI_..."
+  context:
+    - "...(0x5d4d70, `defaultSpecialization` in `cpu/core/aiCityBuild.ts`): nothing for a player 0x469d70 names or with an item in the queue (city +0x1e0 / +0x1d0); the contract events first..."
+    - "...ssure above it), else pressure x value. A failed gate (-9999) is skipped for a human (0x469d70: the slot status 3) and otherwise adds -100% to the stack: the score 0. Less the danger..."
+  review: imported
+- addr: 0x469db0
+  final: 0x2f9860
+  kind: function
+  name: FULL_CIV
+  status: READ
+  cases:
+    - recording: 1103
+      value: "Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104), from 382 and 365;"
+    - recording: 1117
+      turn: 102
+      value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
+    - recording: 1118
+      turn: 218
+      value: 1118 t218   before its level offer);
+    - recording: h1_duelw1118
+      turn: 231
+      value: "Which units: the unit's creation 0x4eeb70   calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or   ExtractsArtifacts (+0x1b9 bit 1, `dll_rowmap.py 0xa6f2b0`) is set and the   player's"
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
+  readings:
+    - "C-94: the game era, the ages and the founding moments — READ"
+    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "H-1: a city's name, a citizen's name — READ"
+    - "H-1: a minor's research catch-up — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...ligious; cb3 wrong), +0x1b9 bit 0x40 MakeTradeRoute, bit 2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDE..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...ss after, wanders none: every minor's t1 rows are End Turn). For a   player of a full civilization (0x469db0, CIVILIZATION_LEVEL_FULL_CIV)   only DEFENDER units, round the unit's city (+0x11d0 through 0x36f66..."
+  context:
+    - "...civ test (0x312b00): the plot holds a city whose owner is not the founder, is a full civ (0x469db0, CIVILIZATION_LEVEL_FULL_CIV), the founder has met (0x3daaf0) and the plot is revealed to..."
+    - ...e 1, then Notify Owner) when none runs (+0x38) and the owner is a full civ (0x484a10 -> 0x469db0, hash 0x253718b0); the throttle becomes turn + max(0, BARBARIAN_MAX_THROTTLE_PER_RAID 1...
+    - "...orm takes one for its naming player (Game_Climate 0x28d4f0): the major owning its plot (0x469db0), else the major whose city stands nearest it (0x36f6c0 per player, the first at the..."
+  review: imported
+- addr: 0x469de0
+  final: 0x2f9890
+  kind: function
+  status: PARTLY
+  readings: ["C-94: Sovereignty's route yield — READ"]
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb4/NOTES.md: ...2 FoundCity, +0x1ba bit 0x40 WMDCapable. - 0x469db0 FULL_CIV, 0x469ce0 TRIBE, 0x469d40 FREE_CITIES, 0x469de0 CITY_STATE. - pseudo globals: f2e210 GOLDENAGE_POINT, f2e214 GOVERNOR, f2e218 GPP_GENERAL..f2e238 G..."
+  context:
+    - ...ERS writes it). A major's city adds X as it stands. A minor's city with a bonus type (0x469de0, 0x467f50) adds X x (100 + a) / 100 where a is the ORIGIN player's Congress entry for t...
+  review: imported

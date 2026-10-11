@@ -1,0 +1,135 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x528560
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:policeCover, cpu/data/espionage.ts:SPY_ESCAPE_BASE]
+  readings: ["C-16: the counterspy and the escape"]
+  context:
+    - "...c80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
+  review: imported
+- addr: 0x529450
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:spyCaptured, gpu/core/sim_spy.py:_spy_captured]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x529ab0
+  final: 0x372b40
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/espionage.ts:SPY_ESCAPE_BASE]
+  readings: ["C-16: the counterspy and the escape"]
+  context:
+    - "...rspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
+  review: imported
+- addr: 0x529b60
+  final: 0x372bf0
+  kind: function
+  name: ComputeNeededDieRoll
+  status: PARTLY
+  impl:
+    - cpu/core/espionage.ts:post
+    - cpu/data/espionage.ts:SPY_COUNTERSPY_ROLL
+    - gpu/core/sim_spy.py:_resolve_mission
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Rules_Espionage: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: R..."
+    - "...six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it): a5 = clamp(T, 8, 18), a4 = clamp(T − 2, 7, 17), a..."
+  review: imported
+- addr: 0x52ac80
+  final: 0x373920
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:counterspyPursuing, gpu/core/sim_spy.py:_counterspy_pursuing]
+  readings: ["C-16: the counterspy and the escape"]
+  context:
+    - "...edDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x5..."
+  review: imported
+- addr: 0x52aea0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:spyEscape, gpu/core/sim_spy.py:_spy_escape]
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "..., mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_..."
+    - "...of 256; base 16: 11/29/24/61/61/66) are these bands' floor(count × 256 / 216). An escape (0x52aea0, table 0x52b090): killed 3..v−3, caught v−2..v−1, away v..18, the other three weights 0...."
+  review: imported
+- addr: 0x52b090
+  final: 0x373c30
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/espionage.ts:escapeWeights
+    - cpu/data/espionage.ts:SPY_ESCAPE_BASE
+    - cpu/data/espionage.ts:SPY_ESCAPE_CAPTURE_BAND
+    - gpu/core/sim_spy.py:_escape_weights
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. Check: `dll_escape.py`."
+    - "...11/29/24/61/61/66) are these bands' floor(count × 256 / 216). An escape (0x52aea0, table 0x52b090): killed 3..v−3, caught v−2..v−1, away v..18, the other three weights 0. Before this read..."
+  review: imported
+- addr: 0x52b2a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:missionDraw, gpu/core/sim_spy.py:_mission_draw]
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...age: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b0..."
+    - "...ge Result\" draws ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it):..."
+  review: imported
+- addr: 0x52b5c0
+  final: 0x373f10
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:diceBand, gpu/core/sim_spy.py:_dice_band]
+  readings: ["C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...5), a1 = clamp(T − 7, 4, 14); the weights are the 3d6 counts (0xf02c70, of 216; summed by 0x52b5c0) over 3..a1−1 (killed), a1..a2−1 (captured), a2..a3−1 (fail, must escape), a3..a4−1 (fail..."
+  review: imported
+- addr: 0x52b8f0
+  final: 0x374180
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:missionWeights, gpu/core/sim_spy.py:_mission_weights]
+  readings: ["C-16: the counterspy and the escape", "C-16: the espionage roll's bands — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Rules_Espionage: mission target `ComputeNeededDieRoll` 0x529b60, outcome table 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 →..."
+    - "...ONE weighted pick (0x287c00) over six weights in index order. A mission (0x52b2a0, table 0x52b8f0) with the needed roll T (0x529b60, the pursuing counterspy's term in it): a5 = clamp(T, 8..."
+  review: imported
+- addr: 0x52bf50
+  final: 0x374580
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:rewardCounterspy, gpu/core/sim_spy.py:_reward_counterspy]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x52ce40
+  kind: function
+  name: ResolveEscape
+  status: PARTLY
+  impl:
+    - cpu/core/espionage.ts:spyEscape
+    - cpu/data/espionage.ts:SPY_ESCAPE_BASE
+    - cpu/data/espionage.ts:SPY_ESCAPE_CAPTURE_BAND
+    - gpu/core/sim_spy.py:_spy_escape
+  readings: ["C-16: the counterspy and the escape"]
+  context:
+    - "...le 0x52b8f0, mission roll 0x52b2a0; the counterspy finder 0x52ac80; escape: ResolveEscape 0x52ce40 → 0x52aea0 → table 0x52b090 → target 0x529ab0; police 0x528560; 3d6 counts at 0xf02c70. C..."
+    - "...ure becomes a kill for one civ/district pairing). **ResolveEscape passes no counterspy (0x52cf77 `xor r8d, r8d`): the COUNTERSPY_LEVEL_MODIFIER term is dead code.**"
+  review: imported
+- addr: 0x52d420
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/espionage.ts:rewardCounterspy, gpu/core/sim_spy.py:_reward_counterspy]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported

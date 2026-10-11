@@ -1,0 +1,298 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0xa28900
+  final: 0x72c4c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
+    - recording: 1117
+      value: "then both again at half the ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.) call 0xa28900 only when the ID argument is present, so the vector runs in ID order and no source-pl"
+    - recording: 1118
+      value: 1118's 152, 243, 251, 250, 12).
+    - recording: 1103
+      value: "1103–1124 every river edge and volcano plot as recorded);"
+  impl: [cpu/core/disasters.ts:floodCache]
+  readings: ["H-1: the flood's river walk — READ"]
+  context:
+    - ...fc0 walks the river manager's vector (+0xb8) in its stored order. The vector is filled by 0xa28900, which the SetNEOfRiver / SetWOfRiver / SetNWOfRiver bindings (0x2be20 / 0x2c220 / 0x2bff...
+  review: imported
+- addr: 0xa28eb0
+  final: 0x72c8c0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+  impl: [cpu/harness/eventDraws.ts:StruckPlot]
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  context:
+    - "...the plots, one \"Pillage Improvement Chance\" rand(100) a plot whose owner is not immune (0xa28eb0, TRAIT_AVOID_*); a landed UNIT_DAMAGE_LAND rolls once per land unit, CITY_GARRISON on..."
+  review: imported
+- addr: 0xa292a0
+  final: 0x72cc40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
+    - recording: 1117
+      value: "then both again at half the ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.) call 0xa28900 only when the ID argument is present, so the vector runs in ID order and no source-pl"
+    - recording: 1118
+      value: 1118's 152, 243, 251, 250, 12).
+    - recording: 1103
+      value: "1103–1124 every river edge and volcano plot as recorded);"
+  impl:
+    - cpu/core/disasters.ts:riverRevealed
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventPick.ts:named
+  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+  context:
+    - "...aled to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean\", \"Mountai..."
+    - "...s the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civilization; runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3..."
+  review: imported
+- addr: 0xa29730
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
+    - recording: 1117
+      value: "then both again at half the ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.) call 0xa28900 only when the ID argument is present, so the vector runs in ID order and no source-pl"
+    - recording: 1118
+      value: 1118's 152, 243, 251, 250, 12).
+    - recording: 1103
+      value: "1103–1124 every river edge and volcano plot as recorded);"
+  impl:
+    - cpu/core/disasters.ts:riverRevealed
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/eventPick.ts:named
+  readings: ["H-1: draws the AI takes, draws the engines lack", "H-1: the flood's river walk — READ"]
+  context:
+    - "...first revealed to a player (0x534950, from the sight update 0x58aa90) names its river (0xa29730 → 0xa292a0, \"Random River\") and its territory (0xa36ff0: \"Random Desert\", \"Sea\", \"Ocean..."
+    - "...l itself. The reveal gate is the NAME: a plot first revealed (0x534950) names its rivers (0xa29730 -> \"Random River\" 0xa292a0, an unused name of the namer's civilization; runs/ h1_duelw111..."
+  review: imported
+- addr: 0xa2a4d0
+  final: 0x72d400
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      value: the source by the lowest plot lays to the mouth, each later one to the first laid edge (runs/h1_duelw1115 rivers 151 at 794 and 250 at 839;
+    - recording: 1111
+      value: 1111 296;
+    - recording: 1123
+      value: 1123 480 and 612;
+    - recording: 1112
+      value: 1112 two of three;
+  impl:
+    - cpu/core/disasters.ts:riverShield
+    - cpu/core/disasters.ts:floodRiver
+    - cpu/data/disasters.ts:FLOOD_SEVS
+    - cpu/harness/eventDraws.ts:FloodDraws
+    - cpu/harness/eventReplay.ts:mitigated
+    - gpu/core/sim_economy.py:_flood_river
+  readings:
+    - "C-41: the eruption's soil, the ring and the gates"
+    - "H-1: the flood's river walk — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+  context:
+    - ...UNIT_KILLED_CIVILIAN 0x33a070 do not (the owner only sets the damage percent). Floods (0xa2a4d0), storms (0x286530, 0x2867f0, 0x286f80), eruptions and the accident (0x2d0e00, 0x2d33a0...
+    - "The damage pass 0xa2a4d0 decides the shield: mitigated when the river is unnamed or its list empty, or when the Gr..."
+    - "- MITIGATED_RIVER_FLOOD: the flood (0xa2f200) runs the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owner (0x24b4b0) of the first compl..."
+  review: imported
+- addr: 0xa2aa30
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+  impl: [cpu/harness/eventDraws.ts:floodplainList]
+  readings: ["H-1: the random events' draws — READ, replayed on 1115 / 1116"]
+  context:
+    - "...row's Floodplains — the count FertilityAdded. The plots: the river's Floodplains list (0xa2aa30 → 0xa2aca0): the river's plot list as its edges were laid from the source (the source e..."
+  review: imported
+- addr: 0xa2aca0
+  final: 0x72dc60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+    - recording: h1_duelw1123
+      turn: 78
+      value: "**This revises the earlier walk** (each later edge adding only the plot the next edge up does not border, a plot kept at its first place from the mouth): runs/h1_duelw1123 river 181 at 480 (t78, t128)"
+    - recording: 1113
+      value: "Every other recorded flood of 1113–1124 walks the same list either way (the harness's `floodplainList`)."
+  impl:
+    - cpu/core/disasters.ts:floodplainRun
+    - cpu/data/disasters.ts:FLOODPLAIN_MIN
+    - cpu/harness/eventDraws.ts:floodplainList
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: the Floodplains list — READ (REVISES the river walk)"
+  context:
+    - "...dplains — the count FertilityAdded. The plots: the river's Floodplains list (0xa2aa30 → 0xa2aca0): the river's plot list as its edges were laid from the source (the source edge its own..."
+    - "0xa2aca0 (GenerateFloodplains' per-river pass): the river's plot list as its edges were laid, read..."
+  review: imported
+- addr: 0xa2b200
+  final: 0x72e0b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1115
+      value: the source by the lowest plot lays to the mouth, each later one to the first laid edge (runs/h1_duelw1115 rivers 151 at 794 and 250 at 839;
+    - recording: 1111
+      value: 1111 296;
+    - recording: 1123
+      value: 1123 480 and 612;
+    - recording: 1112
+      value: 1112 two of three;
+  readings: ["H-1: the flood's river walk — READ"]
+  context:
+    - "...flagged +0x28 & 8) stands on a plot of the LIST (0x810d0), or when 0xa2c280 finds a Dam (0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose city holds it (0x81330) —..."
+  review: imported
+- addr: 0xa2b280
+  final: 0x72e130
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+    - recording: h1_duelw1115
+      value: the source by the lowest plot lays to the mouth, each later one to the first laid edge (runs/h1_duelw1115 rivers 151 at 794 and 250 at 839;
+    - recording: 1111
+      value: 1111 296;
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: the flood's river walk — READ"
+  context:
+    - "...lete unpillaged Dam on one of the river's Floodplains, 0xa2c280; the Great Bath on one, 0xa2b280), each RandomEvent_Damages row (XML order) over the plots, one \"Pillage Improvement C..."
+    - "...he shield: mitigated when the river is unnamed or its list empty, or when the Great Bath (0xa2b280: the first building flagged +0x28 & 8) stands on a plot of the LIST (0x810d0), or when 0x..."
+  review: imported
+- addr: 0xa2b410
+  final: 0x72e2c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1131
+      turn: 96
+      value: "Confirmed on the two recorded plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1) reads 1 Faith at t96 after floods of both (the first river's alone: 1;"
+    - recording: h1_duelw1126
+      turn: 54
+      value: runs/h1_duelw1126 473 (rivers 1 and 6) reads 0 at t54 after five floods of river 6, 1 at t59 after river 1's first (the last list's count would read 5).
+  impl: [cpu/core/disasters.ts:homeCache]
+  readings: ["H-1: the Great Bath's Faith per flood — READ"]
+  context:
+    - "...x30, `m_aRiverFloodPlains`) holds the plot (-1 none); 0xa2b4f0 finds that river's record; 0xa2b410(record, -1) counts every flood its record holds (+0x78..+0x80, stride 0x10; a negative fi..."
+  review: imported
+- addr: 0xa2b4f0
+  final: 0x72e3a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1131
+      turn: 96
+      value: "Confirmed on the two recorded plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1) reads 1 Faith at t96 after floods of both (the first river's alone: 1;"
+    - recording: h1_duelw1126
+      turn: 54
+      value: runs/h1_duelw1126 473 (rivers 1 and 6) reads 0 at t54 after five floods of river 6, 1 at t59 after river 1's first (the last list's count would read 5).
+  readings: ["H-1: the Great Bath's Faith per flood — READ"]
+  context:
+    - "...se floodplain plot vector (+0x28..+0x30, `m_aRiverFloodPlains`) holds the plot (-1 none); 0xa2b4f0 finds that river's record; 0xa2b410(record, -1) counts every flood its record holds (+0x7..."
+  review: imported
+- addr: 0xa2b810
+  final: 0x72e5b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1131
+      turn: 96
+      value: "Confirmed on the two recorded plots that lie in two lists: runs/h1_duelw1131 Beijing 534 (rivers 0 and 1) reads 1 Faith at t96 after floods of both (the first river's alone: 1;"
+    - recording: h1_duelw1126
+      turn: 54
+      value: runs/h1_duelw1126 473 (rivers 1 and 6) reads 0 at t54 after five floods of river 6, 1 at t59 after river 1's first (the last list's count would read 5).
+  impl: [cpu/core/disasters.ts:homeCache]
+  readings: ["H-1: the Great Bath's Faith per flood — READ"]
+  context:
+    - ...IELD_PER_FLOOD, the Bath's GREATBATH_FLOODFAITH Amount 1 Faith) is above 0 for the yield, 0xa2b810 walks the river vector in order and returns the id of the FIRST river whose floodplain pl...
+  review: imported
+- addr: 0xa2c060
+  final: 0x72ed30
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1123
+      turn: 78
+      value: "**This revises the earlier walk** (each later edge adding only the plot the next edge up does not border, a plot kept at its first place from the mouth): runs/h1_duelw1123 river 181 at 480 (t78, t128)"
+    - recording: 1113
+      value: "Every other recorded flood of 1113–1124 walks the same list either way (the harness's `floodplainList`)."
+  readings: ["H-1: the Floodplains list — READ (REVISES the river walk)"]
+  context:
+    - "...plot list as its edges were laid, read from the mouth (the reverse flag), each plot asked 0xa2c060 (the Floodplains feature it takes, -1 none): a plot that takes one joins the run, the run..."
+  review: imported
+- addr: 0xa2c280
+  final: 0x72ef50
+  kind: function
+  status: READ
+  cases:
+    - recording: 1116
+      value: two rivers meeting   above a shared mouth (1116 rivers 12 and 178 at plot 480) give two walks,   told apart by which river holds which list.
+    - recording: 1115
+      turn: 46
+      value: "1115 river 181 (446 / 490,   the source edge's owner) separates the source rule from \"shared then   other\": Jiaodong's centre never takes silt (t46, t64, t248)."
+    - recording: h1_duelw1115
+      value: the source by the lowest plot lays to the mouth, each later one to the first laid edge (runs/h1_duelw1115 rivers 151 at 794 and 250 at 839;
+    - recording: 1111
+      value: 1111 296;
+  impl: [cpu/core/disasters.ts:riverShield]
+  readings:
+    - "H-1: the random events' draws — READ, replayed on 1115 / 1116"
+    - "H-1: the flood's river walk — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+  context:
+    - "...xa2f200: unless mitigated (a complete unpillaged Dam on one of the river's Floodplains, 0xa2c280; the Great Bath on one, 0xa2b280), each RandomEvent_Damages row (XML order) over the pl..."
+    - "...80: the first building flagged +0x28 & 8) stands on a plot of the LIST (0x810d0), or when 0xa2c280 finds a Dam (0xa2b200: the district flagged +0x48 & 0x40) on a plot of the list whose cit..."
+    - ...te (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, else the Great Bath's (0xa2c280); a mitigating player fires the game signal (+0xbd0) whose handler 0x3060b0 records the...
+  review: imported
+- addr: 0xa2cfc0
+  final: 0x72fb10
+  kind: function
+  name: ChanceIncreasePerDegree
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      value: "runs/ h1_duelw1118: 7 draws, ranges 5, 4, 3 and 9, 8, 7, 6, one pool per civ;"
+    - recording: 1117
+      value: "then both again at half the ranges), even a call that lays no edge —, and the bindings (0x2c220 &c.) call 0xa28900 only when the ID argument is present, so the vector runs in ID order and no source-pl"
+    - recording: 1118
+      value: 1118's 152, 243, 251, 250, 12).
+    - recording: 1103
+      value: "1103–1124 every river edge and volcano plot as recorded);"
+  impl:
+    - cpu/core/disasters.ts:floodCache
+    - cpu/core/disasters.ts:riverRevealed
+    - cpu/core/disasters.ts:sitePairWeight
+    - cpu/core/disasters.ts:randomEvent
+  readings: ["C-74: the event draw, the volcanoes, the drought", "H-1: the flood's river walk — READ"]
+  context:
+    - "...vent Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warming 0x28da10."
+    - "...·T reaches 100 — the lab's \"holds its cold value while T < ~0.4–0.5\". A flood's weight (0xa2cfc0) warms the BOOSTED weight: w' = trunc(10·Occ) × (100 + boost) // 100, then w' + trunc(T..."
+    - 0xa2cfc0 walks the river manager's vector (+0xb8) in its stored order. The vector is filled by 0xa...
+  review: imported

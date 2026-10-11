@@ -1,0 +1,93 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5301e0
+  final: 0x377de0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/units.ts:riverCharge, cpu/core/units.ts:RIVER_CROSS_MP]
+  readings: ["C-95: a river crossing's Movement — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Its one reader is the movement cost's river term 0x5301e0, called from the three movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when t..."
+  review: imported
+- addr: 0x530240
+  final: 0x377e40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 52
+      value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
+    - recording: 1117
+      value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1   bit 2, `dll_rowmap..."
+  context:
+    - "...city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district with FreeEmbark (Districts +0xe1 bit 2, `..."
+  review: imported
+- addr: 0x530420
+  final: 0x378010
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 52
+      value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
+    - recording: 1117
+      value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COST where a district with FreeE..."
+  context:
+    - ...no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_EMBARK_COST where a district...
+  review: imported
+- addr: 0x530650
+  final: 0x3781e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/combat.ts:seizeCivilian, cpu/core/combat.ts:retreatPlot]
+  readings: ["H-1: a civilian stepped on — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ured: the Great People, the Archaeologist, the Naturalist, the Rock Band) retreats to 0x530650's plot and returns 2, or returns 0 where none is valid; otherwise the type the unit inf..."
+    - "- 0x530650: the nearest of the victim's player's districts (the list at the player's +0x1308 -> +0..."
+  review: imported
+- addr: 0x530880
+  final: 0x378410
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ted on the unit's `m_bEligibleToHeal` (+0x1590) and its plot's relation to the owner (0x530880: 1 own or allied, 2 unowned, 3 another's; the owner's no-neutral / no-foreign flags +0x..."
+  review: imported
+- addr: 0x531510
+  final: 0x379000
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 52
+      value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
+    - recording: 1117
+      value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl:
+    - cpu/core/units.ts:riverCharge
+    - gpu/core/sim_masks.py:_road_terms
+    - gpu/core/sim_tactics.py:_tac_step_cost
+  readings:
+    - "C-95: a river crossing's Movement — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...T 1 (0x531660 caps the step, 0x272ca0), no river   crossing where either plot is a city's or water (0x531510); the embark   rule 0x530420 (land to water) and the disembark 0x530240 waive   MOVEMENT_EMBARK_COS..."
+  context:
+    - "...movement-cost callbacks (0x26e920, 0x270980, 0x270be0): when the step crosses a river (0x531510 on the from / to plots) and the unit is not exempt (0x266470), it adds (+0x50c) << 8 —..."
+    - ...660 caps the step, 0x272ca0), no river crossing where either plot is a city's or water (0x531510); the embark rule 0x530420 (land to water) and the disembark 0x530240 waive MOVEMENT_...
+  review: imported

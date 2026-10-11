@@ -1,0 +1,34 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5419a0
+  final: 0x385c80
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 180
+      value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  context:
+    - ...counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route...
+  review: imported
+- addr: 0x541ae0
+  final: 0x385dc0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+    - recording: 1124
+      turn: 180
+      value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
+  readings:
+    - "H-1: a route's yield per path plot (Hunza) — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  context:
+    - "...0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the post..."
+    - ...no Trading Post there (the route's own yield counts none until t223). The path cache (0x541ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x552...
+  review: imported

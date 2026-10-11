@@ -1,0 +1,104 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x18ddf0
+  final: 0x10bc50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...arser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM, between).
+  review: imported
+- addr: 0x18e0e0
+  final: 0x10bdd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ad), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM, between).
+  review: imported
+- addr: 0x18e160
+  final: 0x10be50
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  context:
+    - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +..."
+  review: imported
+- addr: 0x18e570
+  final: 0x10c0e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiCityBuild.ts:city]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...arts (player arrays).  + per entry extras: GA points (PSEUDOYIELD_GOLDENAGE_POINT) etc; second loop 0x18e570 yields; housing(+0x44)<<8 added raw; maintenance(+0x38) gold subtracted;  then value = PV(v, rate,..."
+  context:
+    - ...e, 0x2c3ed0, 0x2c4290 for a prerequisite of era 5 or later); then a second yields pass (0x18e570), a whole number (player +0x1358 +0xf8) when CanConstruct's three reason fields are all...
+  review: imported
+- addr: 0x18e890
+  final: 0x10c350
+  kind: function
+  name: buildingYieldLookup
+  status: PARTLY
+  impl: [cpu/core/aiCityBuild.ts:buildingPerTurn]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes: ["label: buildingYieldLookup(cityBuildings,bld,yield)"]
+  context:
+    - ...e amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(...
+  review: imported
+- addr: 0x18e930
+  final: 0x10c3f0
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...count, 0x197ff0's array), +2 for a capital (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -...
+  review: imported
+- addr: 0x18e9f0
+  final: 0x10c450
+  kind: function
+  name: City_Buildings
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...Amount +0x10): a city subject; Amount weighted, x0.5 where the city lacks the building (0x18e9f0), span."
+  review: imported
+- addr: 0x18fe60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 105
+      value: "Recorded: 1128 Xi'an t105, the barbarians' UNITOPERATION_PILLAGE on the   Holy Site at t104, the Shrine pillaged, the record's worked plots keep the   district's specialist and the city's Faith 5 = 1 "
+  impl: [cpu/core/city.ts:citySpecialistSlots]
+  readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
+  context:
+    - "...its row's base (+0x54 behind +0x50) plus each building of the district not pillaged (0x18fe60 on the city's buildings +0x1c78: the byte array the Lua IsPillaged binding 0x9847b0 ->..."
+  review: imported
+- addr: 0x18ffe0
+  final: 0x10cd90
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  context:
+    - "- A wonder (0x18e160, and the city walk 0x18ffe0 over the city's wonders): TOURISM_BASE_FROM_WONDER (2, GP +0x6c4); when TOURISM_ADVANCE..."
+  review: imported
+- addr: 0x193190
+  final: 0x10e8b0
+  kind: function
+  status: PARTLY
+  readings: ["C-1: the nuclear accident's plant and the spared unit's draw — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...LDING_POWER_PLANT alone) in the city owning the plot, through the city's building pillage 0x193190 directly — not the damage applier 0x336a50 — when the plot's district is owned and not al..."
+  review: imported

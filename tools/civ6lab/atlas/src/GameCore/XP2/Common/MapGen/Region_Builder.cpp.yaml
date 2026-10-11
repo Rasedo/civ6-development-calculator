@@ -1,0 +1,39 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x886dd0
+  final: 0x5d0f30
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ssable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes every plot the step tes...
+  review: imported
+- addr: 0x887810
+  final: 0x5d16c0
+  kind: function
+  name: Region_Builder
+  status: READ
+  cases:
+    - recording: 1103
+      value: "The camp step's regions are not the continents (every Duel map of 1103–1128 but 1125 is one continent) nor the areas: they are Map_Region objects (Core/Common/MapGen/Map_Region.cpp: +0 id, +4 m_plotCo"
+    - recording: 1126
+      value: the port was checked stage by stage against the DLL itself run under an emulator (unicorn, the analysis 0x86c030 called on each duel's regenerated grid with the map's plot, area and log objects faked)
+  impl: [cpu/core/barbarians.ts:campStep]
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  context:
+    - "...Chokepoints builds — the binding (0x2b500 -> 0x8923f0) jumps straight into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x..."
+  review: imported
+- addr: 0x887aa0
+  final: 0x5d18e0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/barbarians.ts:campStep]
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ounting and stamping each plot it closes, m_area its area) takes every plot the step test 0x887aa0 admits: passable land not yet the flood's own; free between plots off every chokepoint li..."
+  review: imported

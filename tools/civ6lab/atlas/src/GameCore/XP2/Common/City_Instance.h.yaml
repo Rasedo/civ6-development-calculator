@@ -1,0 +1,26 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0xa5c20
+  final: 0x3e8150
+  kind: function
+  name: CityBuildAI
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...y the score lines they miss, with their analyzers and whether they reach CityBuildAI (0xa5c20): `.claude` analysis `anlist.py` / `ancalls.py`."
+  review: imported
+- addr: 0xb48710
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1123
+      value: "The records fix it: distinct resources the owner sees under an unpillaged improvement on the city's plots (runs/h1_duelw1123: Jiaodong's Cotton and Cocoa +2, Chengdu's Coal mine nothing before Industr"
+  readings: ["H-1: Johannesburg's yield per resource type — PARTLY READ"]
+  context:
+    - "...D_BY_NUMBER_OF_RESOURCES (the factory 0xc2e490, the instance vtable 0xdece90): its apply (0xb48710) registers the yield type and Amount on the city's +0x1da8 table (0xc705d0); the count th..."
+  review: imported

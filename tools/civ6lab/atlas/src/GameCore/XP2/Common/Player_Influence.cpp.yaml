@@ -1,0 +1,176 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x449940
+  final: 0x2e8f10
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...or, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then...
+    - "...FECT_ADJUST_DUPLICATE_FIRST_INFLUENCE_TOKEN 0x6afcd0 (a player that may take Influence, 0x449940: the Game +0x3f8 +0x1650 list's count x Player_Influence +0x270 x the amount as PSEUDOY..."
+  review: imported
+- addr: 0x449cc0
+  final: 0x2e9200
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ient != actor, both alive (+0x728), the client a minor and the actor a major (Influence 0x449cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dc...
+  review: imported
+- addr: 0x44a040
+  final: 0x2e94c0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources..."
+  review: imported
+- addr: 0x44a440
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...KEN 0x6a9550 (a yield filter, context +0x64, -1 or the YieldType): the envoys placed (0x44a440) x Amount, weighted, between."
+  review: imported
+- addr: 0x44a5a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ELD_CHANGE_PER_TRIBUTARY 0x6ac7f0 (the same filter): the city-states it is suzerain of (0x44a5a0) x Amount, weighted, span."
+  review: imported
+- addr: 0x44c4b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "The AI sends its envoys in its start, before its cities: the \"one or two border picks more with no plot changing hands\" of the major's start (LAB) are the city-state's annex — runs/h1_duelw1117 t28 (C"
+    - recording: h1_duelw1118
+      turn: 33
+      value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
+  readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
+  context:
+    - ...ation level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, Starti...
+  review: imported
+- addr: 0x44c850
+  final: 0x2ea6e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 85
+      value: "runs/h1_duelw1117 Antananarivo t85-90 and runs/h1_duelw1118 Armagh t83-95: the next-plot scorer's -1 for the Niter beside 339/340 and 872 counts from the turn China (their suzerain) holds Military Eng"
+  readings: ["H-1: a city-state sees its suzerain's resources — READ"]
+  context:
+    - "...yer's own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition, recursively; then the reveal modifiers,..."
+  review: imported
+- addr: 0x44da30
+  final: 0x2eb040
+  kind: function
+  name: Player_Influence
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "The counter ticks at the minor's own turn   starts, the first the one after the levy in the same game turn: every   recorded levy that ran its term came home 14 turns on (   runs/h1_duelw1117-1131, th"
+    - recording: 1117
+      turn: 28
+      value: 1117 t28 -> t42, 1121 t42 -> t56).
+  impl: [cpu/data/cityStates.ts:LEVY_TURNS]
+  readings: ["H-1: the levy's term — READ"]
+  context:
+    - "- Player_Influence 0x44da30 (the minor's levy counter, m_iLevyTurnCounter +0xc90): +1, then against 0x5254d0(LEVY_M..."
+  review: imported
+- addr: 0x44eaa0
+  final: 0x2ebbb0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...rt; +0x270 is the government's InfluencePointsThreshold at the speed, added on adoption 0x44eaa0). PARTLY: Discipline's 0x6bef40 (a combat unit; the barbarians' units the AI knows with..."
+  review: imported
+- addr: 0x44eff0
+  final: 0x2ebe60
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      value: "0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's   owned-resource change to its suzerain — an accumulated resource as owned   (+n to the suzerain, -n to the city-state), any oth"
+    - recording: 1117
+      value: 1117's eight (Antananarivo's Sugar, Caguana) and 1127's   Hattusa show no such amount in the records.
+  impl: [cpu/harness/checks.ts:foundedUnallocated]
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
+  context:
+    - ...ict and plot handlers 0x4ac2e0..0x4ad0d0; an accumulated resource skips it), the copies 0x44eff0 hands a resource's recipients, the power ledger 0x4a7cc0.
+    - "...y-state's own resource change re-hands its copies to its recipients (the signal handler 0x44eff0, Player_Influence.cpp: the luxury and strategic recipient counts +0x8a0 / +0x918 per pl..."
+    - ...ke its turn between the founding and the record; 10 of the 16 that read none did too. 0x44eff0 (Player_Influence, a signal on 0x4a7560) passes a city-state's owned-resource change to...
+  review: imported
+- addr: 0x4501c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "The counter ticks at the minor's own turn   starts, the first the one after the levy in the same game turn: every   recorded levy that ran its term came home 14 turns on (   runs/h1_duelw1117-1131, th"
+    - recording: 1117
+      turn: 28
+      value: 1117 t28 -> t42, 1121 t42 -> t56).
+  readings: ["H-1: the levy's term — READ"]
+  context:
+    - "...online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, the first the..."
+  review: imported
+- addr: 0x4502b0
+  final: 0x2ed1b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      value: "The counter ticks at the minor's own turn   starts, the first the one after the levy in the same game turn: every   recorded levy that ran its term came home 14 turns on (   runs/h1_duelw1117-1131, th"
+    - recording: 1117
+      turn: 28
+      value: 1117 t28 -> t42, 1121 t42 -> t56).
+  readings: ["H-1: the levy's term — READ"]
+  context:
+    - "...ultiplier, 15 online, not GameSpeed_Durations' 21 — and at it the levied units go home (0x4502b0); 0x4501c0 resets it at the levy. The counter ticks at the minor's own turn starts, t..."
+  review: imported
+- addr: 0x450fb0
+  final: 0x2ed850
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - ...A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources off the ol...
+  review: imported
+- addr: 0x451460
+  final: 0x2edbd0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - ...CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it returns) takes the city-state's owned resources off the old suzerain...
+  review: imported
+- addr: 0x451b20
+  final: 0x2edf10
+  kind: function
+  name: Player_Influence
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "- A suzerain CHANGE (Player_Influence 0x451b20, reached from the envoy setters 0x44a040 / 0x450fb0 / 0x451460; old != new or it return..."
+  review: imported

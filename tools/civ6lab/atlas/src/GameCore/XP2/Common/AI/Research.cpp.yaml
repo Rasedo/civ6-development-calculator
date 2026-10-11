@@ -1,0 +1,134 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7604e0
+  final: 0x4f8460
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 1
+      value: a negative   one adds 0), then x1.5 if favored (Rome's Animal Husbandry 90.4 = 60.3 x   1.5 at 1124 t1, China's Masonry -14908.1 = -9938.8 x 1.5).
+  impl:
+    - cpu/core/aiResearch.ts:upstream
+    - cpu/core/aiResearch.ts:propagate
+    - cpu/data/aiResearch.ts:FAVORED_ROWS
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "- THE PROPAGATION, 0x7604e0: a row in reach adds the +0x10 of its unowned prerequisites one and two levels up (each..."
+  review: imported
+- addr: 0x760890
+  final: 0x4f87e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+ Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once: Barbarian Camp Evaluation, Settle City Evaluation (0x4b15..."
+    - "- THE ANALYSIS, 0x761170 (the \"Tech Tree Analysis\" job 0x760890): next := row, turns := -1; a non-repeatable row the player holds is owned, value 0...."
+  review: imported
+- addr: 0x760980
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+  impl:
+    - cpu/core/aiResearch.ts:researchTurnChoice
+    - cpu/core/minorBuild.ts:minorResearch
+    - cpu/core/types.ts:ResearchState
+    - cpu/data/aiResearch.ts:RESEARCH_AI_TASK_BIAS
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  context:
+    - "...h the research in hand — a tracked int (+0x4d0, data +0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research..."
+    - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with..."
+  review: imported
+- addr: 0x7610e0
+  final: 0x4f8f60
+  kind: function
+  name: turnsToResearchTech
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+    - recording: 1124
+      value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts, cpu/core/minorBuild.ts:analysedTurns]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...8 projects, +0x40 units.  building (non-wonder) only at city centre plot; turns r12 = max(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [r..."
+  context:
+    - "...). A building other than a wonder is valued on the city centre only: T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not th..."
+    - "...nstruction not held (Bologna's Campus t16: T 24 = 2 + 12 + 10). The technology's turns (0x7610e0): the research AI's entry turns (+0x1c; 500 at 0 or below), plus the research AI's +0..."
+    - "...0 (the player AI +0x12a0 +0xba8 flag set) refuses; else T = max(the research AI's turns 0x7610e0 to PrereqTech + 5, the civics AI's 0x621920 to PrereqCivic + 5) — the +5 (`lea ebx, [ra..."
+  review: imported
+- addr: 0x761170
+  final: 0x4f8ff0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiResearch.ts:walk]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "- THE ANALYSIS, 0x761170 (the \"Tech Tree Analysis\" job 0x760890): next := row, turns := -1; a non-repeatable row..."
+  review: imported
+- addr: 0x761980
+  final: 0x4f9810
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "- THE TURN, 0x760980: contracts (0x761980 adds a contract's value to the score), the propagation, then: with no research the choi..."
+  review: imported
+- addr: 0x761b70
+  final: 0x4f9990
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
+  impl: [cpu/core/aiResearch.ts:REQUIRED]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...next step, +0x10 its own value, +0x14 its score, +0x18 owned, +0x19 boosted, +0x1a leaf (0x761b70: no row lists it as a prerequisite), +0x1b Repeatable (`Technologies` +0x70 bit 8), +0x1c..."
+  review: imported
+- addr: 0x762b40
+  final: 0x4fa5c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...(AiFavoredItems of the leader's Technologies list) at +0x4b0. Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and..."
+  review: imported
+- addr: 0x762d60
+  final: 0x4fa7e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 6
+      value: "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on   the entries as they stand, then the choice with the row as the key   (1124 t6: minors 2 and 3 pass Writing, Currency and Ir"
+  impl:
+    - cpu/core/aiResearch.ts:researchCompletionChoice
+    - cpu/core/minorBuild.ts:minorResearch
+    - cpu/core/types.ts:ResearchState
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "- A COMPLETION, 0x762d60 (the completed row): the propagation once more on the entries as they stand, then the c..."
+  review: imported

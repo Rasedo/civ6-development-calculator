@@ -1,0 +1,54 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x84dc20
+  final: 0x5a7560
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/quests.ts:zoneTargets, cpu/data/quests.ts:QUEST_DISTRICT_ROWS]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x84e030
+  final: 0x5a7830
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/quests.ts:zoneTargets
+    - cpu/data/quests.ts:QUEST_DISTRICT_ROWS
+    - cpu/data/quests.ts:DISTRICT_SRC
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6), its era..."
+  review: imported
+- addr: 0x84e120
+  final: 0x5a7920
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Zone District Type (0x84e120 / 0x84e030): the actor's own district (0x406c00) with RequiresPopulation (+0xe1 bit 6..."
+  review: imported
+- addr: 0x84e190
+  final: 0x5a7990
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/quests.ts:questDistrictBuilt]
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...picker over them in the table's order (0x84e3e0); done when the actor COMPLETES one (0x84e190; the variant done at the district's placement scores worse on the records, 332 ag...
+  review: imported
+- addr: 0x84e3e0
+  final: 0x5a7aa0
+  kind: function
+  status: PARTLY
+  impl: [cpu/harness/drawSites.ts:DRAW_SITES]
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ounting every one it holds (0x4bdd70); the picker over them in the table's order (0x84e3e0); done when the actor COMPLETES one (0x84e190; the variant done at the district's pla...
+  review: imported

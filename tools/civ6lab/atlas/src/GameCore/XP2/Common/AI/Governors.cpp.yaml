@@ -1,0 +1,24 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x6edfc0
+  final: 0x4a79b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...e / Great Work Collection Analysis (0x4136b0), Espionage (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), T...
+  review: imported
+- addr: 0x6eeee0
+  final: 0x4a85c0
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...T_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUDOYIELD_GOVERNOR @0xf2e214, discounted from the start); E...
+  review: imported

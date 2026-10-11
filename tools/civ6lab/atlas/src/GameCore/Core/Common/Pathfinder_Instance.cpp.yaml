@@ -1,0 +1,93 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x77a50
+  final: 0x57d30
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the axial tables, then the callback's extra neighbours, a port..."
+  review: imported
+- addr: 0x77d10
+  final: 0x57ff0
+  kind: function
+  name: GeneratePath
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings:
+    - "The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...f no region, not impassable (byte +0x3a bit 3) and not water seeds a region, and a flood (0x77d10, the visitor 0x886dd0 counting and stamping each plot it closes, m_area its area) takes e...
+    - "...s the generic CvAStar (Pathfinder_Instance.cpp, the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's he..."
+    - "- The pathfinder (Pathfinder_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (t..."
+  review: imported
+- addr: 0x781e0
+  final: 0x58440
+  kind: function
+  name: GetBest
+  status: PARTLY
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six neighbours from the..."
+    - "...n walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbours in DirectionTypes order (0xeff73..."
+  review: imported
+- addr: 0x78750
+  final: 0x588e0
+  kind: function
+  name: LinkChild
+  status: PARTLY
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...a float midpoint, so a tie lands first or last by the side it scanned from). LinkChild 0x78750: a child is linked only when the valid callback passed; an open child is re-parented on..."
+    - "...game's (x - y//2, y) — NE, E, SE, SW, W, NW), each the valid callback admits (LinkChild 0x78750)."
+  review: imported
+- addr: 0x793f0
+  final: 0x58f30
+  kind: function
+  name: SearchStep
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...the base vtable 0xd02108): GeneratePath 0x77d10 seeds the origin and loops SearchStep 0x793f0 — GetBest 0x781e0 pops the open list's head, the children are made (0x77a50: the six ne..."
+    - "- The pathfinder (Pathfinder_Instance; GeneratePath 0x77d10, one step 0x793f0) is Dijkstra: the pool's instances (0x26f330) carry no heuristic (the +0x30/+0x38 pair..."
+  review: imported
+- addr: 0x79560
+  final: 0x590a0
+  kind: function
+  name: UpdateOpenNode
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:search]
+  readings:
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...allback passed; an open child is re-parented on a STRICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's...
+    - "...st equal). A node re-keyed while open walks toward the head past strictly greater keys (0x79560). The step pops the head (0x781e0: NotifyList 2 then 3, closed) and links its neighbour..."
+  review: imported
+- addr: 0x79660
+  kind: function
+  name: UpdateParents
+  status: PARTLY
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ICTLY cheaper cost (UpdateOpenNode 0x79560), a closed one likewise with UpdateParents 0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490..."
+  review: imported

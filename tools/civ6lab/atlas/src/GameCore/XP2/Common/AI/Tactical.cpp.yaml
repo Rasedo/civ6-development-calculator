@@ -1,0 +1,431 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7702b0
+  final: 0x5024e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...alizedAssignmentProblem.cpp) runs ONE pass over the spots: per spot each unit's gain (λ 0x7702b0: the best of its entries there, dealt / turns, a kill +100 where the target's damage re..."
+  review: imported
+- addr: 0x770710
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...knapsack 0x61ddb0 at capacity 1 takes the first largest positive gain, and the move (λ 0x770710) re-assigns it, the spot's occupant unassigned. Each assigned unit's row: Move = its sp..."
+  review: imported
+- addr: 0x770ce0
+  final: 0x502dc0
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...x240, 0x77d100 from the player's unit evaluator 0x60a8c0 / 0x6092c0), then the moves (0x770ce0) in the order of the player's AiFavoredItems tactical list (Tactics.xml \"Default Barbar..."
+  review: imported
+- addr: 0x771250
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1114
+      turn: 124
+      value: "Their logs hold 11 \"Wander\" rows (runs/h1_duelw1114 t124-127, 1130   t152-154), each after the recording's last snapshot (t123, t151): no   record pins them;"
+    - recording: 1123
+      value: 1123's eight are Attack Units.
+  impl: [cpu/core/tactical.ts:wanderNearCamp, cpu/core/tactical.ts:freeCityTactics]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...b9a0, C-95's reading): a unit with   a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250 —   for the barbarians their tribe's camp; for the Free Cities UNREAD, the   engines read the unit'..."
+  context:
+    - "...0x77b9a0): each unit of AI type above EXPLORE with a tribe (+0x11d0) whose camp stands (0x771250): from its planning reach, the plots of turns 1 with no unit at war with it (0x5862e0)..."
+    - "...'s reading): a unit with a group (+0x11d0 >= 0) whose camp the player's signals answer (0x771250 — for the barbarians their tribe's camp; for the Free Cities UNREAD, the engines read..."
+  review: imported
+- addr: 0x771530
+  final: 0x503520
+  kind: function
+  name: TacticalAI
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:cityStateTactics, cpu/core/tactical.ts:barbarianTactics]
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The pass (TacticalAI 0x771530, a vtable slot): the unit list (+0x240, 0x77d100 from the player's unit evaluator 0x60a..."
+  review: imported
+- addr: 0x771670
+  final: 0x503660
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
+  impl: [cpu/core/tactical.ts:strike]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...lse the nearest (strictly nearer replaces; the list's first of equals), and strikes it (0x771670: a civilian, Trader or religious unit it moves onto; a ranged unit at a fighter or CO..."
+  review: imported
+- addr: 0x773030
+  final: 0x505020
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:chaseTarget]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810),...
+    - "- CHASE TARGET (0x775670 then 0x773030): each land unit (+0x650 == 2) left, in pool order, takes (0x775170, 8) the LOW target..."
+  review: imported
+- addr: 0x773270
+  final: 0x505260
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:attackCivilians]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...her unit goes in; the sort 0x76f210 is on +8, -1 for all — stable), go for it in order (0x773270): each that can act (0x56c690) takes the move order onto it (0x962190, flag 0x10), a..."
+  review: imported
+- addr: 0x7737c0
+  final: 0x5057b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:heal]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...area (plot +8) counted three times as far; strictly nearer   replaces. - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formation (0x8be30), on a pl..."
+  context:
+    - "- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in no formation (0x8be30..."
+  review: imported
+- addr: 0x773fb0
+  final: 0x505fa0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...lot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER_TRADE_ROUTE 0x955950), its turn done, until o..."
+  review: imported
+- addr: 0x774190
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...however hurt; a whole one where the danger exceeds its strength + 20 — and moves them (0x774190, unread)."
+  review: imported
+- addr: 0x774380
+  final: 0x5063d0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:pillage]
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...is turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it until one stands on it and pillages it.
+  review: imported
+- addr: 0x7746a0
+  final: 0x5066f0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:plunderTraders]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...target, the units whose planning holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement kept) and plunders (PLUNDER..."
+  review: imported
+- addr: 0x774e90
+  final: 0x506ec0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/tactical.ts:WANDER_CAMP_RANGE
+    - cpu/core/tactical.ts:defendCamps
+    - gpu/core/sim_tactics.py:_AI_DEFENDER
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...9010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x774e90), the nearest moved to the camp (\"Barb. Camp Defense\", AT the camp). The engines take t..."
+  review: imported
+- addr: 0x775170
+  final: 0x5071a0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/tactical.ts:CHASE_SIGHT
+    - cpu/core/tactical.ts:chaseTarget
+    - gpu/core/sim_tactics.py:_CHASE_RANGE
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...RGET (0x775670 then 0x773030): each land unit (+0x650 == 2) left, in pool order, takes (0x775170, 8) the LOW target standing on its plot, else the LAST of the list within 8 whose plot..."
+  review: imported
+- addr: 0x775340
+  final: 0x507370
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:pillage, cpu/core/tactical.ts:reachers]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...rovement — the units of AI type EXPLORE or above whose planning reaches it this turn (0x775340, 1 turn) in pool order, none standing on a plot of the kind itself (0x774380), go to it..."
+    - "...79240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775340: pool order, a strength to fight with, a DEFENDER held until another unit goes in; the..."
+    - "...ADER (0x77aa20): each TRADER target, the units whose planning holds its plot this turn (0x775340, 1 turn) go for it (0x7746a0): each that can act moves onto it (0x773fb0, its Movement..."
+  review: imported
+- addr: 0x775670
+  final: 0x5076a0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:chaseTarget]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / Distr...
+    - "- CHASE TARGET (0x775670 then 0x773030): each land unit (+0x650 == 2) left, in pool order, takes (0x775170, 8) t..."
+  review: imported
+- addr: 0x775c60
+  final: 0x507c90
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
+  impl: [cpu/core/tactical.ts:rampage, cpu/core/tactical.ts:chaseTarget]
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...h of this turn within its range (1 at least) of the city with none of its own stacking (0x775c60) and logs no row. Shadow check over 1124: of 446 rows the logged target is in the list..."
+    - "...of this turn within its range (1 at least) of the target with none of its own stacking (0x775c60); the row's \"Move To\" is the target's plot."
+  review: imported
+- addr: 0x7784b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...80, AllowedMoves hashes): f2e0f4 Move to Safety, f2e100/104/108 Attack High/Medium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120..."
+    - "- ATTACK UNITS (0x7784b0) — READ, unported: per target of the move's type (LOW also takes RELIGIOUS at war), the..."
+  review: imported
+- addr: 0x778910
+  final: 0x50a870
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e1...
+  review: imported
+- addr: 0x778b40
+  final: 0x50aa90
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Shadow check over   1124: of 446 rows the logged target is in the list for 423 (the rest the   knowledge base's), the pick matches 415 of them;"
+  impl: [cpu/core/tactical.ts:rampage]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - ...ander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
+    - "- Barbarian Rampage (0x778b40), the target list (0x783980), Attack Civilians, Plunder Trader, Chase Target, Attack Un..."
+    - "- BARBARIAN RAMPAGE (0x778b40): the tribes whose camp a unit took (0x152df0: tribe +0x18 clear, +0x1c the taker's pla..."
+  review: imported
+- addr: 0x779010
+  final: 0x50af60
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:WANDER_CAMP_RANGE, cpu/core/tactical.ts:defendCamps]
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...IGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e13...
+    - "- Defend Camps (0x779010): each TARGET_BARBARIAN_CAMP target, the units of AI type DEFENDER within 3 turns (0x77..."
+  review: imported
+- addr: 0x779240
+  final: 0x50b170
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:attackCivilians]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...dium/Low (0x7784b0 with TARGET_HIGH/MEDIUM/LOW_PRIORITY_UNIT), f2e10c Attack Civilians (0x779240), f2e120 Defend Camps (0x779010), f2e124 Attack Camps (0x778910), f2e130 Chase Target (...
+    - "- ATTACK CIVILIANS (0x779240): each CIVILIAN target, the units whose planning holds its plot within two turns (0x775..."
+  review: imported
+- addr: 0x7794b0
+  final: 0x50b3d0
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
+  review: imported
+- addr: 0x779a70
+  final: 0x50b990
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:heal]
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...e move   ids (0x5bbf80, each global the hash of the string loaded before its   store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CI..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...a   plot of another area (plot +8) counted three times as far; strictly nearer   replaces. - HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has   taken damage (+0xcf0 > 0), in no formatio..."
+  context:
+    - "...ds (0x5bbf80, each global the hash of the string loaded before its store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190), f2e164 Wander Near City (0x77bf50)."
+    - "- HEAL (0x779a70, its moves 0x7737c0): each unit (+0x770 clear) that has taken damage (+0xcf0 > 0), in n..."
+  review: imported
+- addr: 0x77a190
+  final: 0x50c0b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...h of the string loaded before its   store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no..."
+  context:
+    - "...tring loaded before its store): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190), f2e164 Wander Near City (0x77bf50)."
+  review: imported
+- addr: 0x77a4b0
+  final: 0x50c3d0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- MOVE TO SAFETY (0x77a4b0) and the influence map (0x717460) — READ, unported: per player at war, each of its figh..."
+  review: imported
+- addr: 0x77a810
+  final: 0x50c6c0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:pillage]
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal...
+    - "- Pillage District / Pillage Improvement (0x77a810): each target of the kind in the tactical target list (0x783980, PARTLY READ: the visib..."
+  review: imported
+- addr: 0x77aa20
+  final: 0x50c8b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tactical.ts:plunderTraders]
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian...
+    - "- PLUNDER TRADER (0x77aa20): each TRADER target, the units whose planning holds its plot this turn (0x775340, 1 tu..."
+  review: imported
+- addr: 0x77ac30
+  final: 0x50cab0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Operation.csv
+      value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...(C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' operations (Naval   Superiority, City Defense, Attack Barb C..."
+  context:
+    - ...rediction), Move to Safety (the influence map), Support Formation 0x77ae80, Promotion 0x77ac30, Attack Civilians' strike, the minors' operations (Naval Superiority, City Defense, Att...
+  review: imported
+- addr: 0x77ae80
+  final: 0x50cd00
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Operation.csv
+      value: "- Not ported (AUDIT C-96): Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' ope"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...Attack High/Medium/Low (C-95's prediction), Move to   Safety (the influence map), Support Formation 0x77ae80, Promotion   0x77ac30, Attack Civilians' strike, the minors' operations (Naval   Superiority, City..."
+  context:
+    - ...h/Medium/Low (C-95's prediction), Move to Safety (the influence map), Support Formation 0x77ae80, Promotion 0x77ac30, Attack Civilians' strike, the minors' operations (Naval Superior...
+  review: imported
+- addr: 0x77b580
+  final: 0x50d400
+  kind: function
+  status: PARTLY
+  readings: ["C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...4 Attack Camps (0x778910), f2e130 Chase Target (0x775670 then 0x773030), f2e134 Wander (0x77b580), f2e138 / f2e13c Pillage Improvement / District (0x77a810), f2e140 Plunder Trader (0x7...
+  review: imported
+- addr: 0x77b9a0
+  final: 0x50d830
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1114
+      turn: 124
+      value: "Their logs hold 11 \"Wander\" rows (runs/h1_duelw1114 t124-127, 1130   t152-154), each after the recording's last snapshot (t123, t151): no   record pins them;"
+    - recording: 1123
+      value: 1123's eight are Attack Units.
+  impl:
+    - cpu/core/tactical.ts:WANDER_CAMP_RANGE
+    - cpu/core/tactical.ts:wanderNearCamp
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_tactics.py:_AI_DEFENDER
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...ngine's candidate count on the   rows the records pin (below). - THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with   a group (+0x11d0 >= 0) whose camp the player's signals answer (0x77..."
+  context:
+    - ...ent / District (0x77a810), f2e140 Plunder Trader (0x77aa20), f2e158 Wander Near Camp (0x77b9a0), f2e168 Coastal Raid (0x7794b0), f2e17c Barbarian Rampage (0x778b40).
+    - "- Wander Near Camp (0x77b9a0): each unit of AI type above EXPLORE with a tribe (+0x11d0) whose camp stands (0x771250..."
+    - "- THE FREE CITIES' Wander Near Camp (0x77b9a0, C-95's reading): a unit with a group (+0x11d0 >= 0) whose camp the player's signals an..."
+  review: imported
+- addr: 0x77bf50
+  final: 0x50dd90
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  impl:
+    - cpu/core/tactical.ts:WANDER_CITY_RANGE
+    - cpu/core/tactical.ts:wanderNearCity
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - cpu/harness/replay.ts:founded
+    - gpu/core/sim_tactics.py:_CHASE_SIGHT
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...ore): f2e128 Heal (0x779a70), f2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-st..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...2e12c Make Military Formation (0x77a190),   f2e164 Wander Near City (0x77bf50). - WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0]   +0xc0, so a city-state's first turn, its Settler f..."
+  context:
+    - ...28 Heal (0x779a70), f2e12c Make Military Formation (0x77a190), f2e164 Wander Near City (0x77bf50).
+    - "- WANDER NEAR CITY (0x77bf50): nothing for a player with no city ([+0x12f0] +0xc0, so a city-state's first turn, its..."
+  review: imported

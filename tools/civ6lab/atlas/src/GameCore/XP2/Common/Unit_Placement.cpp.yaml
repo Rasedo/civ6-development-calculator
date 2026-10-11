@@ -1,0 +1,148 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x585940
+  final: 0x3affd0
+  kind: function
+  name: FindAlternateLocation
+  status: PARTLY
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  impl:
+    - cpu/core/tactical.ts:WANDER_CITY_RANGE
+    - cpu/core/tactical.ts:alternateLocation
+    - gpu/core/sim_tactics.py:_WANDER_CITY_RANGE
+    - gpu/core/sim_tactics.py:_tac_alt_table
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...move 0x962030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none:   FindAlternateLocation (0x585940) round the city within 3, moved to with   flag 0x1000, else the skip 0x95eae0 (\"Wander Back to City..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...'s ASK).   Their logs hold 23 such rows (runs/h1_duelw1114, 1123, 1130). - FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy),   dx outer from -range to range, dy inner, the plot at the..."
+  context:
+    - "...030 to the plot drawn (\"Wander\", \"Move To\" the plot). With none: FindAlternateLocation (0x585940) round the city within 3, moved to with flag 0x1000, else the skip 0x95eae0 (\"Wander Ba..."
+    - "- FIND ALTERNATE LOCATION (0x585940): over the game's axial steps (dx, dy), dx outer from -range to range, dy inner, the pl..."
+  review: imported
+- addr: 0x585d90
+  final: 0x3b0370
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 17
+      value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  context:
+    - "...60), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the goal open,..."
+  review: imported
+- addr: 0x585eb0
+  final: 0x3b0490
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+    - recording: 1124
+      turn: 17
+      value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+  impl:
+    - cpu/core/tactical.ts:stackedAt
+    - cpu/core/tactical.ts:strike
+    - cpu/core/tactical.ts:wanderNearCamp
+    - cpu/core/tactical.ts:wanderNearCity
+    - ai/major/operations/nodes.ts:moveDest
+    - ai/major/operations/nodes.ts:barred
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...hin 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60, the plot's owner +0x60, revealed   0x2d2220)..."
+  context:
+    - "...of turns 1 with no unit at war with it (0x5862e0) and none of its own stacking with it (0x585eb0, the unit itself counted: its own plot is never one), within 5 of the camp and, where t..."
+    - ...he city (0x1deb0), no unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0); the weighted vector's weights (influence 0x716a60, the plot's owner +0x60, revealed...
+    - "...path (0x586360), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class, another player's not at war) — and, the..."
+  review: imported
+- addr: 0x5862e0
+  final: 0x3b0860
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+    - recording: 1124
+      turn: 17
+      value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+  impl:
+    - cpu/core/tactical.ts:enemyAt
+    - cpu/core/tactical.ts:wanderNearCamp
+    - cpu/core/tactical.ts:wanderNearCity
+    - ai/major/operations/nodes.ts:barred
+  readings:
+    - "C-95: the tactical pass — READ (the barbarians' moves; the minors share it)"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...its planning reach   the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it   (0x5862e0), none of its own stacking with it (0x585eb0); the weighted   vector's weights (influence 0x716a60,..."
+  context:
+    - "...(0x771250): from its planning reach, the plots of turns 1 with no unit at war with it (0x5862e0) and none of its own stacking with it (0x585eb0, the unit itself counted: its own plot..."
+    - ...ing reach the plots of turn 1 within 5 of the city (0x1deb0), no unit at war with it (0x5862e0), none of its own stacking with it (0x585eb0); the weighted vector's weights (influence...
+    - "...at least 1 where the goal is barred — no path (0x586360), a visible enemy unit there (0x5862e0), a unit there that keeps it out (0x585eb0 -> 0x585d90: the owner's of a stacking class..."
+  review: imported
+- addr: 0x586360
+  final: 0x3b08e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 17
+      value: "The logged moves agree in form (1124 t17: 3:9 ->   3:9, 3:13 -> 3:11 around a held rally 3:10)."
+  impl: [cpu/core/tactical.ts:alternateLocation, ai/major/operations/nodes.ts:barred]
+  readings:
+    - "H-1: a civilian stepped on — READ"
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...k; the distance max(|dx|, |dy|) where the   signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag   0x40), the player revealed it, no other player's unit on it and none of   its own that it ma..."
+    - ".claude/scratchpad/mu1/readings_c96.md: ...a hull outside   its own territory heads for its player's nearest city (first of equals) —   where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no   influence map: every plot reads no dange..."
+  context:
+    - ...ist at the player's +0x1308 -> +0xd8) other than its own plot where it may be placed (0x586360), a city centre only for a unit of a domain other than land; the first strictly nearest...
+    - ...tance max(|dx|, |dy|) where the signs differ, |dx| + |dy| else); the unit may enter it (0x586360 flag 0x40), the player revealed it, no other player's unit on it and none of its own...
+    - "...tside its own territory heads for its player's nearest city (first of equals) — where 0x586360 (flag 0x10) allows it, PARTLY READ. The engines carry no influence map: every plot read..."
+  review: imported
+- addr: 0x586900
+  final: 0x3b0e80
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 52
+      value: "- THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1"
+    - recording: 1117
+      value: the barbarians' land units take none   (0 of 6,269 of their AI_Planning.csv rows on 1117, 1121 and 1124 hold a   water plot;
+  impl:
+    - cpu/core/tactical.ts:Ground
+    - cpu/core/tactical.ts:reachPlots
+    - gpu/core/sim_tactics.py:_tac_search
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...it. - THE PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a   plot only where 0x586900 lets the unit end — another player's unit at   peace it passes and never ends on (runs/h1_duelw1117..."
+  context:
+    - "...PLANNING'S GROUND, beside the barbarians': the list (0x26d890) keeps a plot only where 0x586900 lets the unit end — another player's unit at peace it passes and never ends on (runs/h1..."
+  review: imported
+- addr: 0x586d40
+  final: 0x3b11b0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/fog.ts:majorLookMeets]
+  readings:
+    - "H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"
+    - "C-97: the majors' meeting — READ (the triggers, the effects), PARTLY READ (the shared sight)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...om 0 to more — newly visible to the barbarian player, not to the scout alone. A move (0x586d40 → 0x58f3f0 with add) adds the new sight before it drops the old, so a plot both sights..."
+    - "...The triggers: a unit placed on a plot another player sees (0x5246f0, from the placement 0x586d40: each player whose visibility count of the plot is above 0); a plot coming into view me..."
+  review: imported

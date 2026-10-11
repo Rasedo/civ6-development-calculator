@@ -1,0 +1,240 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x4c8c40
+  final: 0x333410
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl: [cpu/core/aiResearch.ts:researchable]
+  readings:
+    - "H-1: the random boost and free research pickers — READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  context:
+    - "...olshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each draw erasing its pick — a row the first grant opens is not offered (1117 t226: two..."
+    - ...er to rate x the truncated quotient; with no Science the cost); a row not researchable (0x4c8c40) adds its unowned prerequisites, each level's rows once, the next step the last one add...
+  review: imported
+- addr: 0x4c9cf0
+  final: 0x333d30
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1112
+      turn: 49
+      value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
+  readings:
+    - "B-D: the policy-unlock price — CLOSED"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...ckPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
+    - "...ase·GAME_COST_ESCALATION(1000)/100 − base)·P/100 in integers, P = max(tech %, civic %) (0x4c9cf0 / 0x399810, the 77 / 61 of `gameProgressPct`); on a plot holding an improvement (+0x4..."
+  review: imported
+- addr: 0x4c9f40
+  final: 0x333f10
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...on it [+0x388] and the bank [+0x1e8] read through max(0, ·), ceil over the Science rate 0x4c9f40 — 0x8c4540 compares the remainder to rate x the truncated quotient; with no Science t..."
+  review: imported
+- addr: 0x4ca000
+  final: 0x333fd0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiResearch.ts:researchTurnsLeft]
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...player holds is owned, value 0. Else three levels: each walked row adds its turns left (0x4ca000: the cost 0x353a70 in fixed point less the progress kept on it [+0x388] and the bank..."
+  review: imported
+- addr: 0x4ca120
+  final: 0x334080
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...+0x58) written only by its turn (0x7609d7) and its completion's choice (0x7630ec), each 0x4ca120: the turns left on the research in hand; the analysis reads the value before its own..."
+  review: imported
+- addr: 0x4ca470
+  final: 0x3342e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/boosts.ts:earliestBoostEra
+    - cpu/core/units.ts:amount
+    - cpu/data/boosts.ts:BOOSTLESS_TECHS
+    - cpu/data/techs.ts:TECH_TABLE_ORDER
+    - cpu/harness/checks.ts:goodyRewardDraws
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_draw_and_pay_goody
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "0x4ca470 (techs; civics 0x39c330), \"Choosing random tech / civic boost to grant based on era\" — th..."
+  review: imported
+- addr: 0x4caa50
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/boosts.ts:boostPool
+    - cpu/data/boosts.ts:BOOSTLESS_TECHS
+    - cpu/data/techs.ts:TECH_TABLE_ORDER
+    - cpu/harness/drawSites.ts:DRAW_SITES
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "...Boosts row), t30: 6 then 5 civics (Code of Laws carries none); 1118 t10, t25, t29 alike. 0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\":..."
+  review: imported
+- addr: 0x4caeb0
+  final: 0x334a00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 6
+      value: "runs/h1_duelw1117 t6: 8 Ancient techs (the eleven less Pottery, Animal Husbandry, Mining, which carry no Boosts row), t30: 6 then 5 civics (Code of Laws carries none);"
+    - recording: 1118
+      turn: 10
+      value: 1118 t10, t25, t29 alike.
+    - recording: 1117
+      turn: 26
+      value: "0x4caa50 (civics 0x39c930), the same over the eras lo..hi, era by era, labelled \"..., Player: n\": a Great Person's range, the Dynastic Cycle (the wonder's era: 1117 t26 Stonehenge, 4), Vilnius."
+    - recording: 1117
+      turn: 226
+      value: "0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bolshoi, a Great Person's free tech): ONE pool of the rows researchable before the grants (0x4c8c40), each"
+  impl:
+    - cpu/core/production.ts:grantFreeResearch
+    - cpu/data/techs.ts:TECH_TABLE_ORDER
+    - cpu/harness/checks.ts:goodyRewardDraws
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_grant_free_research
+  readings: ["H-1: the random boost and free research pickers — READ"]
+  context:
+    - "...OSTLESS`, `boostPool`, `earliestBoostEra`, `drawBoosts` / `_boost_pool`, `_draw_boosts`). 0x4caeb0 (civics 0x39cd90), \"Choosing random tech / civic to grant based on era\" (Oxford, the Bols..."
+  review: imported
+- addr: 0x4cb290
+  final: 0x334c60
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Trigger Tech / Civic Boost (0x84d630, 0x84cb90): neither held nor boosted (0x4cb290 / 0x39d190), with a boost, of the actor's era; the pickers over them in the tables' o..."
+  review: imported
+- addr: 0x4cb2f0
+  final: 0x334cc0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  readings:
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "H-1: a minor's research catch-up — READ"
+  context:
+    - ...PrereqTech (+0x60, the player's techs 0x39d1f0) and its second link (+0x68, the civics 0x4cb2f0) held; source 6 (Appeal) reads the plot's appeal (vcall +0x28); any other source the...
+    - "...ivilizationLevel is FULL_CIV (0x469db0, hash 0x253718b0) and the receiver lacks the item (0x4cb2f0 / 0x39d1f0) and is neither FULL_CIV nor TRIBE (0x469ce0, 0xd959ec24) — a city-state or th..."
+  review: imported
+- addr: 0x4cb930
+  final: 0x3352c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  impl:
+    - cpu/core/minorBuild.ts:minorCatchUp
+    - cpu/core/seats.ts:majorsAlive
+    - cpu/data/cityStates.ts:MINOR_CATCHUP_PCT
+  readings: ["H-1: a minor's research catch-up — READ"]
+  context:
+    - 0x4cb930 (techs; civics 0x39ec60, the same body), called from the handler 0x427bf0 that every play...
+  review: imported
+- addr: 0x4cc950
+  final: 0x335c20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1121
+      turn: 4
+      value: "Records: runs/h1_duelw1121 Rome's Code of Laws at its start of t4 puts every minor's and the Free Cities' at 9 of 10 (the log's CivicChanged for players 2, 3, 4 and 62 just before Rome's CivicComplete"
+    - recording: 1124
+      turn: 17
+      value: 1124 Rome's Mining at t17 Cardiff's at 11 of 12.
+    - recording: 1121
+      turn: 4
+      value: A major's progress is not touched (China's Code of Laws 4.59 of 10 at 1121 t4).
+  readings: ["H-1: a minor's research catch-up — READ"]
+  context:
+    - "...ets the receiver's progress on the item to its cost less one ((cost << 8) - 0x100 through 0x4cc950 / 0x3a1fb0), the item in hand or another. Records: runs/h1_duelw1121 Rome's Code of Laws..."
+  review: imported
+- addr: 0x4cd900
+  final: 0x336940
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/boosts.ts:boostAmount, gpu/core/sim_economy.py:_boost_amount]
+  readings: ["H-1: a boost lands as progress — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "The trigger 0x4cd900 (techs, \"LOC_NOTIFICATION_TECH_BOOST_MESSAGE\"; civics 0x3a3c00, \"Cannot trigger a boost f..."
+  review: imported

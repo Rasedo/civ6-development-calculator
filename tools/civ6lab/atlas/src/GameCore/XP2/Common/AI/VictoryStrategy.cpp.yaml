@@ -1,0 +1,146 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7bb3e0
+  final: 0x536530
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "- The apply (0x7bb3e0): the first victory strategy marked exclusive that follows or changes makes every other..."
+  review: imported
+- addr: 0x7bb870
+  final: 0x5366c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...strategy's Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on, 0x7bb870 off). The install has no such row: 0."
+    - ...160 -> 0x7ba440 adds a followed strategy's Strategy_Priorities lists to the same array, 0x7bb870 takes them off. A row adds fx(Value x 0.01) (0x6dd1b0; Favored false subtracts). A ma...
+    - ...he strategy (a disqualified one stays off) and stamps +0x90 = turn + 20 (0x7bf160 on, 0x7bb870 off). The log prints Forbidden / Following / Stopped, and Exclusive for the forced stop...
+  review: imported
+- addr: 0x7bc580
+  final: 0x536b00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "- The evaluation (0x7bc580, vtable 0xd71c30 slot 1, at the player's activation): a strategy disqualified for good..."
+  review: imported
+- addr: 0x7bcd60
+  final: 0x536ee0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:condition]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...nformation (0x7bea40: the player's era >= the row's); Good Faith / Tech / Culture City (0x7bcd60: some city's yield advantage 0x5d83c0, flag 0, >= threshold << 8); Fewer Cities (citi..."
+  review: imported
+- addr: 0x7bce30
+  final: 0x536f60
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...fered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the met majors whose Culture is at most its own >= trunc(n x thr / 100)..."
+  review: imported
+- addr: 0x7bd020
+  final: 0x537150
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x7bd1c0
+  final: 0x5372f0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...ng tourists from met majors, 0x39bee0, >= trunc(max x thr x 0.01f)); Has Taken Capital (0x7bd1c0, also registered for the three \"Diplomatic Victory Points\" names); Leads Military (0x..."
+  review: imported
+- addr: 0x7bd210
+  final: 0x537340
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - ...count; Leads Score; Next Lower Score (0x7bebc0); Has Science Wonders; Has Tech Lead (0x7bd210); Finished Space Project; Is Not Major (0x469db0, CIVILIZATION_LEVEL_FULL_CIV; 0x469ce0...
+  review: imported
+- addr: 0x7bd310
+  final: 0x537440
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...tions, is disqualified. Else each StrategyConditions row in order, through the registry 0x7bd310 (name -> function): a true Exclusive row marks it exclusive, a true Disqualifier disqua..."
+  review: imported
+- addr: 0x7bea40
+  final: 0x538b10
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "- The conditions READ: Is Ancient .. Is Information (0x7bea40: the player's era >= the row's); Good Faith / Tech / Culture City (0x7bcd60: some cit..."
+  review: imported
+- addr: 0x7bebc0
+  final: 0x538c20
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...t x 0.01f + 0.5), read only inside the \"stronger\" count; Leads Score; Next Lower Score (0x7bebc0); Has Science Wonders; Has Tech Lead (0x7bd210); Finished Space Project; Is Not Major (..."
+  review: imported
+- addr: 0x7bec80
+  final: 0x538ce0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Victories.csv
+      value: "measured by the replay's strategy probe (`cpu/harness/strategyAi.ts`) against AI_Victories.csv (\"%d, %d, %s, %s\", the writer 0x7bec80: the turn, the player, the strategy, Following / Exclusive / Stopp"
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...robe (`cpu/harness/strategyAi.ts`) against AI_Victories.csv (\"%d, %d, %s, %s\", the writer 0x7bec80: the turn, the player, the strategy, Following / Exclusive / Stopped / Forbidden; one lin..."
+  review: imported
+- addr: 0x7bf080
+  final: 0x538f20
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:fn]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...ne founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the met majors whose Culture is at most its ow..."
+  review: imported
+- addr: 0x7bf160
+  final: 0x538fb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...\"): a followed strategy's Strategy_YieldPriorities rows add fx(PercentageDelta x 0.01) (0x7bf160 on, 0x7bb870 off). The install has no such row: 0."
+    - ...when the player's handicap, player +0x908, is within its MinDifficulty..MaxDifficulty); 0x7bf160 -> 0x7ba440 adds a followed strategy's Strategy_Priorities lists to the same array, 0x7...
+    - ...he amount x (f x DefaultValue). A followed strategy's lists go to the list system through 0x7bf160 -> 0x7ba440 (the list's SQL rows, each item's own MinDifficulty / MaxDifficulty columns 6...
+  review: imported

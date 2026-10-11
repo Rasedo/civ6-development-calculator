@@ -1,0 +1,263 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x86a460
+  final: 0x5c3570
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...d a triangle unless collinear, (1,2)), merged pairwise until one (0x87eff0 / 0x87ed40 / 0x86a460). A merge's base is the first pair, both sides walked in (r, q) order, whose segment cr...
+  review: imported
+- addr: 0x86b440
+  final: 0x5c3ca0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...of three points (two where n mod 3 leaves one at the start or two at the end; 0x87a470, 0x86b440: edges (0,1), (2,0) and a triangle unless collinear, (1,2)), merged pairwise until one..."
+  review: imported
+- addr: 0x86c030
+  final: 0x5c4570
+  kind: function
+  status: READ
+  cases:
+    - recording: 1103
+      value: "The camp step's regions are not the continents (every Duel map of 1103–1128 but 1125 is one continent) nor the areas: they are Map_Region objects (Core/Common/MapGen/Map_Region.cpp: +0 id, +4 m_plotCo"
+    - recording: 1126
+      value: the port was checked stage by stage against the DLL itself run under an emulator (unicorn, the analysis 0x86c030 called on each duel's regenerated grid with the map's plot, area and log objects faked)
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  context:
+    - ...into Region_Builder 0x887810, which first runs the chokepoint analysis (MapAnalysis.cpp, 0x86c030 on the builder's +0x20) and then floods the regions. XP2 Continents.lua calls it twice (a...
+  review: imported
+- addr: 0x86f1a0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...dual graph (0x872580): a cell per triangle at its circumcentre — the small-map callback 0x86f1a0 (maps up to 106 x 66) computes it in 24.8 fixed point (Math_FixedPointT: float to fixed..."
+  review: imported
+- addr: 0x871d70
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...of the least, the far end counted), keeping the pair and linking both ends. Cleaning (0x871d70) leaves the flagged cells.
+  review: imported
+- addr: 0x871f00
+  final: 0x5c5c30
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...80); each radius shrinks to the nearest obstacle plot over its radius' rings (0x8801d0: 0x871f00 puts the centre in a plot, 0x877890 measures); leaf cells narrower than their neighbour..."
+  review: imported
+- addr: 0x872580
+  final: 0x5c6090
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The dual graph (0x872580): a cell per triangle at its circumcentre — the small-map callback 0x86f1a0 (maps up to..."
+  review: imported
+- addr: 0x873b00
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...whose plots are more than a step apart, the nearest, else the edge nearest the cell (0x873b00); the best does not reset between pairs. 0x87cff0 keeps a pair (offset plots) when the...
+  review: imported
+- addr: 0x8759a0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s, or whose 3r² exceeds 12 and no other cell within r has a radius as large. Linking (0x8759a0): each path of unflagged cells between flagged ones (from the lower end) has its narrow..."
+  review: imported
+- addr: 0x876830
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Chokepoints (0x8783c0): per flagged-1 cell the first triangle holding its point (0x876830, barycentric in fixed); per pair, across each linked cell the triangle edge (of its thr..."
+  review: imported
+- addr: 0x877890
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...t obstacle plot over its radius' rings (0x8801d0: 0x871f00 puts the centre in a plot, 0x877890 measures); leaf cells narrower than their neighbour, then leaves under 1.5, go until no..."
+  review: imported
+- addr: 0x8783c0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Chokepoints (0x8783c0): per flagged-1 cell the first triangle holding its point (0x876830, barycentric in fix..."
+  review: imported
+- addr: 0x878f90
+  final: 0x5c8d80
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...best's edge deleted while the second lies in the circle through the base and the best (0x878f90, a float determinant); between the two sides the in-circle test again. Triangles are...
+  review: imported
+- addr: 0x87a030
+  final: 0x5c95b0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The points (0x87a030): every water or impassable plot, sorted by x, even rows before odd, then y (0x880590),..."
+  review: imported
+- addr: 0x87a1d0
+  final: 0x5c9750
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_ChokePoint.csv
+      value: "The loop runs only when the   map analysis log exists (0x87a381 tests it) — the game's logging is on   (the owner's Logs/AI_ChokePoint.csv is that log), and with it off the   emulated chokepoints diff"
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  context:
+    - "...arrower into the wider (0x87df70). The loop runs only when the map analysis log exists (0x87a381 tests it) — the game's logging is on (the owner's Logs/AI_ChokePoint.csv is that log),..."
+  review: imported
+- addr: 0x87a470
+  final: 0x5c9960
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...n: leaves of three points (two where n mod 3 leaves one at the start or two at the end; 0x87a470, 0x86b440: edges (0,1), (2,0) and a triangle unless collinear, (1,2)), merged pairwise..."
+  review: imported
+- addr: 0x87a6c0
+  final: 0x5c9bb0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...order, whose segment crosses no edge of either side (0x8808f0, X = 2q + r, Y = r); then 0x87a6c0 zips upward: each side's candidates are the base end's neighbours turning left of the b..."
+  review: imported
+- addr: 0x87cff0
+  final: 0x5cab60
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...rest, else the edge nearest the cell (0x873b00); the best does not reset between pairs. 0x87cff0 keeps a pair (offset plots) when the plots its line passes between them (the cube wal...
+  review: imported
+- addr: 0x87d6a0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Marking (0x87d6a0): flag 0 on a cell of other than two neighbours, or whose 3r² exceeds 12 and no other c..."
+  review: imported
+- addr: 0x87df70
+  final: 0x5cb3d0
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_ChokePoint.csv
+      value: "The loop runs only when the   map analysis log exists (0x87a381 tests it) — the game's logging is on   (the owner's Logs/AI_ChokePoint.csv is that log), and with it off the   emulated chokepoints diff"
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  context:
+    - "...f the wider; 0.9 or 0.85 of the other when itself an end), the narrower into the wider (0x87df70). The loop runs only when the map analysis log exists (0x87a381 tests it) — the game's..."
+  review: imported
+- addr: 0x87e150
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_ChokePoint.csv
+      value: "The loop runs only when the   map analysis log exists (0x87a381 tests it) — the game's logging is on   (the owner's Logs/AI_ChokePoint.csv is that log), and with it off the   emulated chokepoints diff"
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  context:
+    - "- Merging (0x87e150, looped): the widest unmerged chokepoint cell takes the cells of its pairs whose radius..."
+  review: imported
+- addr: 0x87ed40
+  final: 0x5cb9c0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...(2,0) and a triangle unless collinear, (1,2)), merged pairwise until one (0x87eff0 / 0x87ed40 / 0x86a460). A merge's base is the first pair, both sides walked in (r, q) order, whose...
+  review: imported
+- addr: 0x87eff0
+  final: 0x5cbc60
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...dges (0,1), (2,0) and a triangle unless collinear, (1,2)), merged pairwise until one (0x87eff0 / 0x87ed40 / 0x86a460). A merge's base is the first pair, both sides walked in (r, q) o...
+  review: imported
+- addr: 0x87f1b0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...sures); leaf cells narrower than their neighbour, then leaves under 1.5, go until none (0x87f1b0, 0x87f5b0).
+  review: imported
+- addr: 0x87f480
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Cells with no neighbour go (0x87f480); each radius shrinks to the nearest obstacle plot over its radius' rings (0x8801d0: 0x..."
+  review: imported
+- addr: 0x87f5b0
+  final: 0x5cbf10
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...af cells narrower than their neighbour, then leaves under 1.5, go until none (0x87f1b0, 0x87f5b0).
+  review: imported
+- addr: 0x87f7a0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Pruning (0x87f7a0): a triangle of touching obstacles goes (all its edges neighbours, |len² − 3| < 0.001,..."
+  review: imported
+- addr: 0x8801d0
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...go (0x87f480); each radius shrinks to the nearest obstacle plot over its radius' rings (0x8801d0: 0x871f00 puts the centre in a plot, 0x877890 measures); leaf cells narrower than their..."
+  review: imported
+- addr: 0x880590
+  final: 0x5ccc20
+  kind: function
+  status: PARTLY
+  readings: ["The map's regions (AnalyzeChokepoints, Region_Builder) — READ, ported"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(0x87a030): every water or impassable plot, sorted by x, even rows before odd, then y (0x880590), as axial (q = x − ⌊y/2⌋, r = y)."
+  review: imported

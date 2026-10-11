@@ -1,0 +1,131 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x74e2b0
+  final: 0x4ec000
+  kind: function
+  status: PARTLY
+  impl: [ai/major/religion.ts:pantheonPick]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- THE PICKS. The pantheon (0x74e2b0, from the AI turn while m_mustFoundPantheon holds, then 0x33fb70): the first strictly h..."
+  review: imported
+- addr: 0x74e390
+  final: 0x4ec0a0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...nalysis start 0x74ea60 (registered for a full civilization only, 0x469db0), 0x751830, 0x74e390, the game's 0x7513f0.
+  review: imported
+- addr: 0x74ea60
+  final: 0x4ec440
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...er (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), Tech Tree Analysis (0x4f87e0). Spawned and waited at once: Barbarian Camp Evaluatio..."
+    - ...t 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civilization only, 0x469db0), 0x751830, 0x74e390, the game's 0x7...
+    - "...elief's analysed modifiers (0x750350, 0x6cef90). The job \"Belief Analysis\" (pushed by 0x74ea60 once every city's CityBuildAI analysis stands, spawned) scores each entry (0x750230 ->..."
+  review: imported
+- addr: 0x74f5a0
+  final: 0x4ecf20
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...m_yieldPriorityBoost (0x4681a0 -> GlobalAI +0x628 per player, data +0x340): Faith only. 0x74f5a0 each turn: 0; when a religious unit is wanted, -0.25 once the faith balance (player +0x..."
+    - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (..."
+    - "- THE FAITH BOOST (0x74f5a0, m_yieldPriorityBoost [Faith]): 0 each turn; for a full civilization's AI with a favore..."
+  review: imported
+- addr: 0x74fbf0
+  final: 0x4ed570
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief A..."
+  review: imported
+- addr: 0x7500d0
+  final: 0x4eda50
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/aiValue.ts:AI_BELIEF_HORIZON, ai/major/religion.ts:beliefScore]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...once every city's CityBuildAI analysis stands, spawned) scores each entry (0x750230 -> 0x7500d0): taken and -1.0 where a pantheon holds it (0x3408d0) or a religion does (0x340950), or..."
+  review: imported
+- addr: 0x750230
+  final: 0x4edbb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...by 0x74ea60 once every city's CityBuildAI analysis stands, spawned) scores each entry (0x750230 -> 0x7500d0): taken and -1.0 where a pantheon holds it (0x3408d0) or a religion does (0..."
+  review: imported
+- addr: 0x750350
+  final: 0x4edcd0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...nhancer 4), +0x10 taken, +0x14 the score (24.8), +0x18 the belief's analysed modifiers (0x750350, 0x6cef90). The job \"Belief Analysis\" (pushed by 0x74ea60 once every city's CityBuildAI..."
+  review: imported
+- addr: 0x750500
+  final: 0x4ede30
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Religious.csv
+      value: "Its log AI_Religious.csv (header 0x750500, writer 0x750e30: \"%d, %d, %s, %3.1f\" per entry)."
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...Analyzers, m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv (header 0x750500, writer 0x750e30: \"%d, %d, %s, %3.1f\" per entry). Port: `ai/major/religion.ts`; measure:..."
+  review: imported
+- addr: 0x750830
+  final: 0x4ee110
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add..."
+  review: imported
+- addr: 0x750e30
+  final: 0x4ee700
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Religious.csv
+      value: "Its log AI_Religious.csv (header 0x750500, writer 0x750e30: \"%d, %d, %s, %3.1f\" per entry)."
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...gedContracts, m_religiousUnitContract). Its log AI_Religious.csv (header 0x750500, writer 0x750e30: \"%d, %d, %s, %3.1f\" per entry). Port: `ai/major/religion.ts`; measure: the action replay..."
+  review: imported
+- addr: 0x750fe0
+  final: 0x4ee820
+  kind: function
+  status: PARTLY
+  impl: [ai/major/religion.ts:foundingBeliefs, ai/major/religion.ts:religionChoice]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- The signals (0x750830): the AI turn 0x74fbf0, the faith boost 0x74f5a0, the founding 0x750fe0, the belief add 0x751430, the Belief Analysis start 0x74ea60 (registered for a full civ..."
+    - "...ss whatever it scores, and once one stands only a better Follower does. The founding (0x750fe0, after waiting for the job): the leader's FavoredReligions, then the civilization's, th..."
+  review: imported

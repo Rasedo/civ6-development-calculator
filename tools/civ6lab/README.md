@@ -532,6 +532,8 @@ One line each; the detail and the evidence are in `reports/`.
 | script | purpose |
 |---|---|
 | `watch.py`, `fleet.py` | play games forward with per-turn readers (`--lua` / `--state` pairs), one instance or a fleet; `--step` holds every observer turn (`turn_lock.lua`) |
+| `logstore.py` | a recording's `<stem>.logs/` as one SQLite file `<stem>.logs.sqlite` (a table per log, AI_CityBuild's PLOT ANALYSIS blocks normalised); `build <stem>\|--all`, `query <stem> "<sql>"`; fleet.py builds it after saving a game's logs, the TS harness reads it through `cpu/harness/logStore.ts` |
+| `atlas.py`, `atlas_check.py` | the DLL atlas (`atlas/`): a function's record by address or name, `coverage`, `gen`; the check that every cited address has a record |
 | `h2h_step.py`, `h2h_fit.py`, `h2h_watchfit.py`, `h2h_savecheck.py`, `h2h_fresh.py`, `h2h_poll.py` | H-2: the turn lock measured — a single hold against a stepped run of the same seeds, a stepped watch's continuity and cost, when a held save reaches the disk, a fresh game, a turn / seat poll (SESSION5 §15) |
 | `cs_analyze.py` | a `cs_watch.lua` log per city-state: units, upgrades (paired through the install's `UnitUpgrades`; a minor's upgrade is free, `MINOR_CIV_GOLD_MILITARY_UPGRADE` 100%), builds, purchases, wars |
 | `rng_fit.py` | fits the LCG transition and the range fold against the recorded streams |

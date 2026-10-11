@@ -1,0 +1,252 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1a8a30
+  final: 0x11b000
+  kind: function
+  name: AnnexPlots
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+    - recording: h1_duelw1117
+      turn: 44
+      value: "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:   production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its   production completes annexes WONDER_FREE_TILES_UPON_COMPLETI"
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+  impl:
+    - cpu/core/cityStates.ts:envoyTiles
+    - cpu/core/production.ts:pct
+    - cpu/data/constants.ts:WONDER_FREE_TILES
+    - cpu/harness/checks.ts:startDraws
+    - gpu/core/sim_seats.py:_wonder_free_tiles
+  readings:
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "H-1: the envoy annex — READ (settles the extra border picks)"
+    - "H-1: a start's own event rows, the wonder's annex, the village a claim takes"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...rs: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), t..."
+    - ...ONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's own grants (China's Dynastic Cycle boost, O...
+    - "...7f0: unowned plots, byte +0x1c 0xff). Its three callers are the border turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1..."
+  review: imported
+- addr: 0x1a8b70
+  final: 0x11b100
+  kind: function
+  name: AnnexPlot
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+    - recording: h1_duelw1117
+      turn: 44
+      value: "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:   production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its   production completes annexes WONDER_FREE_TILES_UPON_COMPLETI"
+    - recording: 1121
+      turn: 41
+      value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
+  impl:
+    - cpu/core/game.ts:buyTile
+    - cpu/core/production.ts:pct
+    - cpu/harness/checks.ts:startWin
+    - cpu/harness/checks.ts:annexed
+  readings:
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "0x1a8b70 annexes one plot to a city (City_Culture.cpp): it writes the city culture's stored next p..."
+    - "...(China's Dynastic Cycle boost, Oxford's techs: runs/h1_duelw1117 t44, t226); the annex 0x1a8b70 clears the city's stored next plot (+0x1c = -1) and counts no culture claim (+0x10 is t..."
+    - "- AnnexPlot 0x1a8b70 (the border turn 0x1a9bc0's claim, AnnexPlots 0x1a8a30 — a wonder's free tiles, a found..."
+  review: imported
+- addr: 0x1a9bc0
+  final: 0x11bcb0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+    - recording: h1_duelw1116
+      value: "turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249 turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one more: a quest's draw aft"
+    - recording: h1_duelw1116
+      value: "The tie list runs in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the r"
+    - recording: h1_duelw1117
+      turn: 44
+      value: "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:   production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its   production completes annexes WONDER_FREE_TILES_UPON_COMPLETI"
+  impl: [cpu/core/phase.ts:cityBorderGrowth, cpu/core/phase.ts:annex, cpu/harness/checks.ts:startDraws]
+  readings:
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "H-1: the start of a player's turn — the border pick (witnesses)"
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "H-1: the border bank in fixed point — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...is non-empty. BASE_MULTIPLIER and DISTANCE_DIVISOR are not read here. The turn's handler 0x1a9bc0 (City_Culture.cpp) banks culture × (100 + percent) / 100 when the civ level annexes with..."
+    - "...stored next plot (+0x1c) to -1 and counts the plot (+0xc). Its callers: the culture turn (0x1a9bc0, which then draws and stores a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each..."
+    - "...xt-plot tie list is not empty (\"GetNextBuyablePlot picker\", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city cou..."
+  review: imported
+- addr: 0x1a9f10
+  final: 0x11be40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+  readings: ["H-1: every draw of a player's start (witnesses, RandCalls.csv)"]
+  context:
+    - ...ff). Its three callers are the border turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches...
+  review: imported
+- addr: 0x1aa7f0
+  final: 0x11bf20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249 turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one more: a quest's draw aft"
+    - recording: h1_duelw1116
+      value: "The tie list runs in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the r"
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+  impl: [cpu/core/city.ts:seenResourceAt, cpu/core/city.ts:borderBestPlots]
+  readings:
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "H-1: the start of a player's turn — the border pick (witnesses)"
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+  context:
+    - 0x1aa7f0 scores every plot within PLOT_INFLUENCE_MAX_ACQUIRE_DISTANCE (5) of the centre that is un...
+    - "...in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the record..."
+    - "- the picker 0x1ab1c0 draws only over a non-empty list (0x1aa7f0: unowned plots, byte +0x1c 0xff). Its three callers are the border turn's two and 0x1..."
+  review: imported
+- addr: 0x1ab060
+  final: 0x11c5d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 40
+      value: "Recorded: 1121 Taiyuan t40-45, 153/256 a turn banking 175/256 at +15%;"
+  readings: ["H-1: the border bank in fixed point — READ"]
+  context:
+    - "- The border turn 0x1a9bc0 banks the city's culture c (1/256 raw, 0x1ab060) scaled by the border percent [+0x14] when not 0: ((c x ((pct + 100) << 8)) >> 8) / (..."
+  review: imported
+- addr: 0x1ab1c0
+  final: 0x11c6e0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's starts take exactly its city count 248 of 249 turns, the three city-states theirs 222, 217 and 248 of 249 (the rest one more: a quest's draw aft"
+    - recording: h1_duelw1116
+      value: "The tie list runs in the scorer's walk over the plots within 5 of the centre, axial dq outer and dr inner (0x1aa7f0) — not tile-index order: replaying each start's picks from the `pre` seed over the r"
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+  impl:
+    - cpu/harness/checks.ts:PICKER
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_seats.py:_seat_border_draw
+  readings:
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "H-1: the start of a player's turn — the border pick (witnesses)"
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+  context:
+    - "...e more if such a wonder lies within 3 of the centre. The lowest cost collects a tie list; 0x1ab1c0 draws one (\"GetNextBuyablePlot picker\") whenever the list is non-empty. BASE_MULTIPLIER a..."
+    - "...e draws once per city whose next-plot tie list is not empty (\"GetNextBuyablePlot picker\", 0x1ab1c0 from the border turn 0x1a9bc0; turn_order_civ6.md A8): on runs/h1_duelw1116 player 0's st..."
+    - "- the picker 0x1ab1c0 draws only over a non-empty list (0x1aa7f0: unowned plots, byte +0x1c 0xff). Its three..."
+  review: imported
+- addr: 0x1ab460
+  final: 0x11c890
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "The AI sends its envoys in its start, before its cities: the \"one or two border picks more with no plot changing hands\" of the major's start (LAB) are the city-state's annex — runs/h1_duelw1117 t28 (C"
+    - recording: h1_duelw1118
+      turn: 33
+      value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
+  readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
+  context:
+    - "...holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, StartingTilesForCity's), E > A annexes E − A plots (AnnexPlots 0x1a8a30, one \"GetNextBuy..."
+  review: imported
+- addr: 0x1aba40
+  final: 0x11cc40
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  context:
+    - "- An improvement (the lens 0x399e10 at 0x39a73c, the city 0x1aba40): its Improvement_Tourism row pays only with its PrereqTech (+0x60, the player's tech..."
+  review: imported
+- addr: 0x1abe50
+  final: 0x11cf80
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a wonder's and an improvement's tourism — PARTLY READ"]
+  context:
+    - "...0 → +0xc8), else 1 — where the owner's is later; then times the city's tourism percent (0x1abe50 on +0x1ac8) over 100 when not 100 (`wonderTourism`, `WONDER_TOURISM_BASE`)."
+  review: imported
+- addr: 0x1abe90
+  final: 0x11cfb0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+  readings: ["H-1: every draw of a player's start (witnesses, RandCalls.csv)"]
+  context:
+    - "...a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them. Replayed (`startDraws`, `resolveStart`, the har..."
+  review: imported
+- addr: 0x1abf40
+  final: 0x11d010
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: "Replayed (`startDraws`, `resolveStart`, the harness's `start.draws`): of the witnessed starts, the count lands exactly with no AI choice in it on 1115 81.1%, 1116 81.5%, 1117 80.4%, 1118 82.2% (of the"
+    - recording: 1117
+      value: On 1117 / 1118 the resolved choices are the game's logged ones on 630 of 631 starts.
+    - recording: h1_duelw1117
+      turn: 28
+      value: "The AI sends its envoys in its start, before its cities: the \"one or two border picks more with no plot changing hands\" of the major's start (LAB) are the city-state's annex — runs/h1_duelw1117 t28 (C"
+    - recording: h1_duelw1118
+      turn: 33
+      value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
+  impl: [cpu/harness/checks.ts:doneBefore]
+  readings:
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "H-1: the envoy annex — READ (settles the extra border picks)"
+  context:
+    - "...r turn's two and 0x1a8a30 (the wonder, the founding 0x1a9f10, the minors' envoy annex 0x1abf40, a unit signal 0x1abe90); no jump or pointer reaches any of them. Replayed (`startDraws`,..."
+    - "0x1abf40, a city-state's culture reacting to influence received: where its civilization level CanA..."
+  review: imported
+- addr: 0x1ac910
+  final: 0x11d590
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+  readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
+  context:
+    - "...res a fresh plot), AnnexPlots(n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purch..."
+  review: imported

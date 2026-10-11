@@ -1,0 +1,47 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1f20e0
+  final: 0x1491e0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the religious spread — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...y player's every city other than the source and adds 0x496980's amount when positive (0x1f20e0, the entry found or appended), then recomputes the target (0x1f6480). A player with no...
+  review: imported
+- addr: 0x1f3050
+  final: 0x149b80
+  kind: function
+  name: CityReligion
+  status: PARTLY
+  impl:
+    - cpu/data/religion.ts:ROUTE_PRESSURE_DESTINATION
+    - cpu/data/religion.ts:gainPopulationPressure
+    - gpu/core/sim_masks.py:_gain_population_pressure
+  readings: ["C-94: the religious spread — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP..."
+  review: imported
+- addr: 0x1f33e0
+  final: 0x149e50
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 68
+      value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
+    - recording: 1107
+      value: 1107 Kandy's 8 against 4.
+  impl:
+    - cpu/core/game.ts:pressureFromCity
+    - cpu/core/game.ts:mult
+    - gpu/core/sim_economy.py:_spread_religious_pressure
+  readings: ["C-94: the religious spread — READ"]
+  context:
+    - ...1225de check) or a Citadel-of-God city of another founder (+0x19e8); the source's step (0x1f33e0) when the target is within the range and the source follows the religion; then the trad...
+    - "- The step 0x1f33e0: ADJACENT_PER_TURN_PRESSURE (gp +0x5d4); x HOLY_CITY_PRESSURE_MULTIPLIER (+0x5e0) on th..."
+  review: imported

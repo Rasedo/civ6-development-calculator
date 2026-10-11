@@ -1,0 +1,168 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x4bb1e0
+  final: 0x32a6f0
+  kind: function
+  name: m_iMilitaryStrength
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      value: "A player   reads, as its last turn start before its own activation left them, this   turn's values for the players up to itself and last turn's for the   players after it (runs/h1_duelw1124: Rome, fir"
+  impl: [cpu/core/majorView.ts:militaryStrength, ai/major/view.ts:MajorView]
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...gth the rank conditions read (PlayerStats m_iMilitaryStrength, data +0x210, computed at 0x4bb1e0, stored as each player's turn starts, before its production): per unit max(Combat, Ra..."
+  review: imported
+- addr: 0x4bc720
+  kind: function
+  status: PARTLY
+  impl: [ai/major/strategies.ts:militaryStrengths]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x4bca20
+  final: 0x32b6e0
+  kind: function
+  name: PlayerStats
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 208
+      value: "What the city's quoted price caches is unread: the records fit every   type's price retaking the completed count at a technology or civic and a   type's own again when a district of it completes (1112"
+    - recording: 1110
+      value: "the ten duels' buy.districtCost +161, 1110 −6 where the record   caught China mid-turn) — `refreshDistrictDiscount`, a LAB line."
+  impl: [cpu/core/game.ts:districtDiscounted]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...'s under-average models): the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty districts over the unlocked specialty types, both li..."
+  review: imported
+- addr: 0x4bcd30
+  final: 0x32b990
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - ...they outnumber), the unit-tag production 0x6bc9e0 (the military AI's unit of the class 0x4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45...
+  review: imported
+- addr: 0x4bd030
+  final: 0x32bb10
+  kind: function
+  name: m_iMaxRangedStrengthTrained
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  impl: [cpu/data/constants.ts:CITY_MIN_STRIKE_CS]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "...ke strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890..."
+  review: imported
+- addr: 0x4bd0d0
+  final: 0x32bb70
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1104
+      value: "the field's writer is unread — the port counts   the seat's military units of the domain (runs/h1_duelw1104: Rome 43+ land   units to Qin's 8, Trajan's Standing Army -6 at 106 = the meeting + 30)."
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...800): Worth, -10 where +0x6780 names p, + (20 - T in   mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats   +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras   row's Ch..."
+  context:
+    - "..._STRENGTH_LEAD (0xb548f0): the same lead test on the player stats' per-domain strength (0x4bd0d0: LAND +0x330, SEA +0x270, AIR +0x2d0), the ratio a float; the field's writer is unread..."
+    - "...h, -10 where +0x6780 names p, + (20 - T in mode 1) where the owner's military strength (0x4bd0d0(-1): PlayerStats +0x210) is above twice p's or its era (player +0x1358 +0xf8, the Eras..."
+  review: imported
+- addr: 0x4bd370
+  final: 0x32be10
+  kind: function
+  name: MinOneCity
+  status: READ
+  cases:
+    - recording: h1_duelw1119
+      turn: 13
+      value: "A Relic, however it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left n"
+    - recording: 1120
+      turn: 83
+      value: 1120 t83 over 24, t92 over 23;
+    - recording: 1123
+      turn: 168
+      value: 1123 t168 over 24).
+  readings: ["H-1: the goody hut's other gates and the Relic — READ"]
+  context:
+    - "...0 flags): bit 3 RequiresUnit — no unit (a culture claim), not eligible; bit 1 MinOneCity (0x4bd370 ≥ 1); bit 2 Relic — 0x497030 finds a slot for a GREATWORKOBJECT_RELIC in the claimer's ci..."
+  review: imported
+- addr: 0x4bdd70
+  final: 0x32c710
+  kind: function
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 208
+      value: "What the city's quoted price caches is unread: the records fit every   type's price retaking the completed count at a technology or civic and a   type's own again when a district of it completes (1112"
+    - recording: 1110
+      value: "the ten duels' buy.districtCost +161, 1110 −6 where the record   caught China mid-turn) — `refreshDistrictDiscount`, a LAB line."
+  impl: [cpu/core/game.ts:districtDiscounted]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "H-1: the city-states' quests — READ"
+  context:
+    - "- The district discount (0x409870's under-average models): the type's count 0x4bdd70 (placed districts included) against 0x4bca20's average, the completed specialty distric..."
+    - ...ost the actor's (0x93e580, 0x93e9e0), below MaxPerPlayer counting every one it holds (0x4bdd70); the picker over them in the table's order (0x84e3e0); done when the actor COMPLETES...
+  review: imported
+- addr: 0x4be720
+  final: 0x32d0c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1114
+      value: "Two majors: +5, 0, -8, -13 (1114 Trajan of Qin: -8 at 27, 0 at 32, +5 at   36)."
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+  context:
+    - "...CY_AGENDA_OPTIMUS_PRINCEPS: compute 0xb4d2b0, arguments 0xb50250): the subject's plots (0x4be720, the plots it owns) against the owner's beyond EquivalentTerritoryPercentage (20) eithe..."
+  review: imported
+- addr: 0x4be880
+  final: 0x32d150
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...gth (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCha..."
+  review: imported
+- addr: 0x4bf7c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...yer and every major it has met (0x483b50's list, 0x3daaf0) with x their yield per turn (0x4bf7c0 on player +0x1330): n, max, mean; n > 1, sd = sqrt(sum (x - mean)^2 / (n - 1)) > 0 and..."
+    - ...EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per turn 0x4bf7c0 x Amount x the tributaries, weighted, between; the parser's scaling unread), EFFECT_ADJ...
+  review: imported
+- addr: 0x4bffa0
+  final: 0x32e560
+  kind: function
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 213
+      value: "Records: 1112 China's Mechanized Infantry   made at sea at t213 (an upgrade, xp 0) left the centres at 80 until the   corps upgraded on land at t216 read 95."
+    - recording: 1106
+      turn: 243
+      value: "it also   clears 1106 t243's Giant Death Robot, 80 checks, which was trained on land   and raised nothing — 0x4bffa0's row test, unnamed, a LAB line)."
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...o 0x56dc90(unit, 0) — the unit's strength as it stands, its formation's in it — where 0x4bffa0 passes the unit row: its domain (row +0x1c) not 1, no tag 0x36c125c9 (no install or DLL..."
+  review: imported

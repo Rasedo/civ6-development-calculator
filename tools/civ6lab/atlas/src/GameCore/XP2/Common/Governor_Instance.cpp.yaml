@@ -1,0 +1,25 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x35d220
+  final: 0x259140
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/governors.ts:governorClocks]
+  readings: ["H-1: the governors' clocks — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...), raises \"Governor Established\" (0x35e5f0); then the neutralize clock (0x35e1f0 > 0 -> 0x35d220(-1), \"returning to service\" at 0); every governor logs GovernorChanged (0x8b9120, hash..."
+  review: imported
+- addr: 0x35df30
+  final: 0x259650
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/governors.ts:governorClocks]
+  readings: ["H-1: the governors' clocks — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0x4e46df, after the culture and the resources, before the city turns) walks the roster: 0x35df30(location, 1) raises the posting's count (+0x28) and, on reaching the type's Establish..."
+  review: imported

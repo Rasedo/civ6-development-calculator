@@ -1,0 +1,43 @@
+# The install's binaries, one line each (tools/civ6lab/atlas.py). Only the two
+# GameCore_XP2 DLLs are mapped (atlas/gen/); the rest carry their purpose alone,
+# read from the file's name, vendor and exports, not from its code.
+- file: DLC/Expansion2/Binaries/Win64/GameCore_XP2_Release.dll
+  purpose: "Gathering Storm's game core, the Release build: the one we read (its asserts name ~800 source files); mapped in atlas/gen"
+- file: DLC/Expansion2/Binaries/Win64/GameCore_XP2_FinalRelease.dll
+  purpose: "Gathering Storm's game core, the shipping build the game loads (no asserts; patched by game.py's replay patch); mapped in atlas/gen, matched to the Release build"
+- file: DLC/Expansion1/Binaries/Win64/GameCore_XP1_FinalRelease.dll
+  purpose: "Rise and Fall's game core, shipping build; loaded only when the Expansion1 ruleset is the newest active one"
+- file: DLC/Expansion1/Binaries/Win64/GameCore_XP1_Release.dll
+  purpose: "Rise and Fall's game core, Release build with asserts"
+- file: Base/Binaries/Win64Steam/GameCore_Base_FinalRelease.dll
+  purpose: "the base game's game core, shipping build; loaded when no expansion ruleset is active"
+- file: Base/Binaries/Win64Steam/CivilizationVI.exe
+  purpose: "the game executable (DirectX 11): the engine — renderer, UI, app options (AppOptions.txt), the job manager and thread pools, the FireTuner socket; loads the ruleset's game-core DLL"
+- file: Base/Binaries/Win64Steam/CivilizationVI_DX12.exe
+  purpose: "the same executable built for DirectX 12"
+- file: Base/Binaries/Win64Steam/Civ6ToolHost_Win64_DX11_FinalRelease.dll
+  purpose: "the SDK tools' engine host (asset and world-builder tools), not loaded by a game"
+- file: Base/Binaries/Win64Steam/DatabaseDLL_FinalRelease.dll
+  purpose: "the database layer: the SQLite Gameplay / FrontEnd databases the XML and SQL rulesets load into"
+- file: Base/Binaries/Win64Steam/HavokScript_FinalRelease.dll
+  purpose: "Havok Script, the Lua virtual machine that runs the UI and gameplay scripts"
+- file: Base/Binaries/Win64Steam/Localization_FinalRelease.dll
+  purpose: "text localization: LOC_ tag lookup and formatting"
+- file: Base/Binaries/Win64Steam/EOSSDK-Win64-Shipping.dll
+  purpose: "Epic Online Services SDK (online services and cross-play)"
+- file: Base/Binaries/Win64Steam/SDL2_FinalRelease.dll
+  purpose: "SDL2: input, controllers, windowing support"
+- file: Base/Binaries/Win64Steam/bink2w64.dll
+  purpose: "Bink 2 video playback (the cinematics)"
+- file: Base/Binaries/Win64Steam/steam_api64.dll
+  purpose: "the Steamworks API"
+- file: Base/Binaries/Win64Steam/FiraxisBugReporter.exe
+  purpose: "the crash reporter (its settings in FiraxisBugReporter.exe.json)"
+- file: Debug/Civ6TunerPlugin.dll
+  purpose: "the FireTuner plugin: the debug socket's panels"
+- file: LaunchPad/LaunchPad.exe
+  purpose: "2K's launcher, shown before the game starts (Qt)"
+- file: "LaunchPad/*.dll, LaunchPad/*/*.dll"
+  purpose: "the launcher's runtime: Qt5 and its plugins, boost, OpenSSL, the AWS SDK, Poco, 7-Zip, CrashRpt, a torrent client, Xsolla, the MSVC runtime"
+- file: "LaunchPad/QtWebEngineProcess.exe, LaunchPad/sendrpt.exe, LaunchPad/7za.exe, LaunchPad/vc_redist.x64.exe"
+  purpose: "the launcher's helpers: Qt's web renderer process, the crash sender, 7-Zip, the MSVC redistributable installer"

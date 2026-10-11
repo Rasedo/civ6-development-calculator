@@ -1,0 +1,131 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x81b90
+  final: 0x5efd0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - Improvement_Yields.cpp. Lua Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0,...
+  review: imported
+- addr: 0x82280
+  final: 0x5f6d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 222
+      value: "The flag   is 0x538a60's fifth argument, unread: which yields it leaves out is the   open question behind 1117 t222 (docs/AUDIT.md C-94)."
+  readings:
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "H-1: a wonder's and an improvement's tourism — PARTLY READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...distance, always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's   yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the   inner ring; a feature within 2 counted; a resource the..."
+  context:
+    - ..._COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then over its six neighbours, each UNOWNED one with a seen resource -1 and with a natur...
+    - "...ds the plot's appeal (vcall +0x28); any other source the plot's yield of that type from 0x82280 (→ 0x538a60) with its last flag false less the same with it true, times ScalingFactor /..."
+    - ...always 0); at distance 1..CITY_MIN_RANGE every yield (the plot's yield for the player, 0x82280 -> 0x538a60) into the total, at 1 into the inner ring; a feature within 2 counted; a re...
+  review: imported
+- addr: 0x82a10
+  final: 0x5fe00
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...promise's plot   (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence..."
+  context:
+    - "...ture, no river (plot byte +0x37), not water and not beside an ocean-sized water body (0x82a10), Plains / Grassland (hills too), not under an event — its score 0x28ff20 = 1 + min(hex..."
+    - "...city holds no aircraft, else 5.0 a free slot; NAVAL FX(-9999) at a city with no water (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE: 0x7a7110 thro..."
+    - "...plot (PROMISE_DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (the..."
+  review: imported
+- addr: 0x82c20
+  final: 0x60010
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...DONT_SETTLE_NEAR_ME, 0xfadf5055). Then: the continent (+0x30),   coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min,   0 with none); the danger (the influence map below, 0x716a90); the..."
+  context:
+    - "...E_NEAR_ME, 0xfadf5055). Then: the continent (+0x30), coastal (0x82a10) and fresh water (0x82c20); the nearest own city (a min, 0 with none); the danger (the influence map below, 0x716..."
+  review: imported
+- addr: 0x82e80
+  final: 0x60270
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
+    - recording: 1116
+      value: 1116 city.tourism 78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
+    - recording: 1110
+      value: "Unexplained: a plot China acquired by purchase reads 0 for the rest of the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached value refreshed on events (the PLOT_APPEAL event instances)"
+    - recording: 1109
+      turn: 225
+      value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
+  readings:
+    - "H-1: the plot's Appeal — READ"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  context:
+    - ...eturns 0, a mountain (terrain 2/5/8/11/14) that + 4; else +1 for its own river (+0x37) or 0x82e80, -1 for its own complete district while pillaged, -1 for its own pillaged improvement (+0...
+    - "...quals) whose ring walk within 4 holds a sea plot not a lake (callback @d6e100: 0x834d0, 0x82e80), value 100, enemy strength the largest best combat strength of the game's majors; BA..."
+  review: imported
+- addr: 0x82e90
+  final: 0x60280
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
+    - recording: 1116
+      value: 1116 city.tourism 78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
+    - recording: 1110
+      value: "Unexplained: a plot China acquired by purchase reads 0 for the rest of the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached value refreshed on events (the PLOT_APPEAL event instances)"
+    - recording: 1109
+      turn: 225
+      value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
+  readings:
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "H-1: the district adjacency — READ"
+    - "H-1: the plot's Appeal — READ"
+  context:
+    - ...ING_COST if it is the barbarian camp (0x362130), else IMPROVEMENT_COST; a natural wonder (0x82e90) NW_COST; YIELD_POINT_COST per yield point to the owner (0x82280); then over its six neig...
+    - "...hen for each of the six neighbours YieldChange per clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts exclud..."
+    - "...0x1800, EFFECT_ADJUST_CITY_APPEAL: Aalto, Correa, the park rows) first; a natural wonder (0x82e90) returns that + 5, a water terrain (0x834d0, the terrain row's water bit) returns 0, a mo..."
+  review: imported
+- addr: 0x834d0
+  final: 0x60820
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "A forest or jungle fire at age 0: the Turn 0 yield row and five damage rows (the pillage pair, the citizen, the civilians, the land units — each land unit its own roll in the applier), six draws: the "
+    - recording: h1_duelw1116
+      value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
+    - recording: 1116
+      value: 1116 city.tourism 78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
+    - recording: 1110
+      value: "Unexplained: a plot China acquired by purchase reads 0 for the rest of the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached value refreshed on events (the PLOT_APPEAL event instances)"
+  readings:
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "Border plot: GetNextBuyablePlot — READ"
+    - "C-74: the fire — READ"
+    - "H-1: the plot's Appeal — READ"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  context:
+    - "...rrying both (or neither) is neither land nor water. Without a district: land = not water (0x834d0). Who writes word +0x14 is unread; the records fix the answers (below)."
+    - ...eveal condition) adds RESOURCE_COST when d <= 3, any other plot adds WATER_COST if water (0x834d0) and RING_COST when d > 3; an improvement adds RING_COST if it is the barbarian camp (0x3...
+    - "...e strike, per plot of the record (a fire is Hexes 1: its plot): unless the plot is water (0x834d0) or impassable (byte +0x3a bit 3), each `RandomEvent_Yields` row whose Turn (+0x30, gated..."
+  review: imported

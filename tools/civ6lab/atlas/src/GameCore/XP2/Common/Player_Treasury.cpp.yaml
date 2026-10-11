@@ -1,0 +1,17 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x4e02e0
+  final: 0x3432e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+  readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
+  context:
+    - "...ader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A purchase made after the turn's culture step so leaves the city with n..."
+  review: imported

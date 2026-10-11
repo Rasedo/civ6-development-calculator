@@ -1,0 +1,142 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x2f1ed0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/quests.ts:gpTargets]
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Recruit Great Person Class (0x84ab50): a class the actor can earn (0x2f1ed0: on offer, not barred by its civilization's or leader's trait — ExcludedGreatPersonCl..."
+    - ...is unlocked, 0x39e1e0, or whose RequiresAvailableGreatPersonClass has no person left, 0x2f1ed0); 250.0 for a Dark Age card in a Dark Age or a Golden Age card in a Golden Age; plus th...
+    - "...he civic list's jobs (0x61ee30), 0x3930a0 itself, the Great Person class availability 0x2f1ed0 (Strategos scores in the port where the game logs none: 4,739 lines)."
+  review: imported
+- addr: 0x2f2a60
+  final: 0x209c80
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - ...b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants a random person of a class from the fi...
+  review: imported
+- addr: 0x2f30c0
+  final: 0x20a1e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...ot Found Religion (0x7bada0: none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the player and the met major..."
+  review: imported
+- addr: 0x2f46a0
+  final: 0x20a8d0
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - ...f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants a random person of a class from the first chronological era. The 9 turn-open...
+  review: imported
+- addr: 0x2f64d0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...on: a Great Admiral a non-wonder district beside water, 0x2f6500) whose offer's era (0x2f64d0) is at most the actor's or its next; the picker over the classes in the table's order..."
+  review: imported
+- addr: 0x2f6500
+  final: 0x20bfa0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1109
+      value: Confirmed on runs/h1_duelw1109 ..
+    - recording: 1116
+      value: "1116: 152 of 154 newly listed units standing on one of their player's city centres stand on the predicted city's (the two misses had spent their moves)."
+    - recording: 1116
+      turn: 112
+      value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
+  impl: [cpu/core/quests.ts:seaSpawn, cpu/harness/import.ts:spentAtSpawn]
+  readings: ["H-1: the great person's spawn — READ", "H-1: the city-states' quests — READ"]
+  context:
+    - "The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70 its district, +0x98 its unit) and the unit's dom..."
+    - "...for the person to arrive on: a Great Admiral a non-wonder district beside water, 0x2f6500) whose offer's era (0x2f64d0) is at most the actor's or its next; the picker over the..."
+  review: imported
+- addr: 0x2f74b0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1109
+      value: Confirmed on runs/h1_duelw1109 ..
+    - recording: 1116
+      value: "1116: 152 of 154 newly listed units standing on one of their player's city centres stand on the predicted city's (the two misses had spent their moves)."
+    - recording: 1116
+      turn: 112
+      value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
+  impl: [cpu/core/greatPeople.ts:recruit]
+  readings: ["C-93: the great person draw", "H-1: the great person's spawn — READ"]
+  context:
+    - ...line's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x...
+    - "The grant 0x2f74b0 asks 0x2f6500 for the spawn plot: the class row (+0x70 its district, +0x98 its unit) and..."
+  review: imported
+- addr: 0x2f7c10
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - "...tes of the earliest era that has any, walking eras forward. Callers: the timeline's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit..."
+  review: imported
+- addr: 0x2f7eb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...on >= threshold); Cannot Found Religion (0x7bada0: none founded, no Prophet offered now 0x2f7eb0, none earned 0x2f30c0); Religion Destroyed (0x7bf080); Good Culture (0x7bce30: the play..."
+  review: imported
+- addr: 0x2f83e0
+  final: 0x20d6a0
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - ...ter a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f4...
+  review: imported
+- addr: 0x2f8890
+  final: 0x20d950
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - ...; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached throu...
+  review: imported
+- addr: 0x2f8c00
+  final: 0x20dbf0
+  kind: function
+  status: PARTLY
+  readings: ["C-93: the great person draw"]
+  context:
+    - ...es the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferred grant queue 0x2f2a60 (reached through the virtual 0x2f46a0) that grants...
+  review: imported
+- addr: 0x2f8f70
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/greatPeople.ts:recruit]
+  readings: ["C-93: the great person draw"]
+  context:
+    - "...allers: the timeline's setup 0x2f7c10; the replacement after a person leaves the timeline 0x2f8f70 (grant 0x2f74b0 via recruit 0x2f8890, patronize 0x2f83e0, reject 0x2f8c00); and a deferre..."
+  review: imported
+- addr: 0x2f94d0
+  kind: function
+  name: Game_GreatPeople
+  status: PARTLY
+  impl: [cpu/harness/drawSites.ts:DRAW_SITES, gpu/core/sim_phase.py:_gp_ensure_offer]
+  readings: ["C-93: the great person draw"]
+  context:
+    - "`Game_GreatPeople` 0x2f94d0 draws ONE uniform pick (\"Generating a random new Great Person\") among the class's candida..."
+  review: imported

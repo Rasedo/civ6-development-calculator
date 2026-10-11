@@ -44,6 +44,7 @@ RUNS = LAB / "runs"
 PY = sys.executable
 sys.path.insert(0, str(LAB))
 import game  # noqa: E402
+import logstore  # noqa: E402
 
 
 # the AI's behaviour-tree trace runs to 150 MB a game and carries no rule
@@ -82,7 +83,8 @@ def save_slice(src: pathlib.Path, start: int, out: pathlib.Path) -> int:
 
 def save_logs(host: str, starts: dict[str, int], dump: pathlib.Path) -> dict[str, int]:
     """Every log's slice of `host`'s Logs folder to `<dump stem>.logs/`;
-    RandCalls.csv also beside the dump."""
+    RandCalls.csv also beside the dump; then the logs' SQLite store
+    `<dump stem>.logs.sqlite` (logstore.py)."""
     folder = dump.with_suffix(".logs")
     folder.mkdir(exist_ok=True)
     rows = {}
@@ -91,6 +93,7 @@ def save_logs(host: str, starts: dict[str, int], dump: pathlib.Path) -> dict[str
             rows[f.name] = save_slice(f, starts.get(f.name, 0), folder / f.name)
     if (folder / "RandCalls.csv").exists():
         dump.with_suffix(".randcalls.csv").write_bytes((folder / "RandCalls.csv").read_bytes())
+    logstore.build(str(dump))
     return rows
 
 

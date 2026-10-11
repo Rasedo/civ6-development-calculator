@@ -1,0 +1,129 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x6dd1b0
+  final: 0x49c3c0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiWeights.ts:listSum]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...iorities lists to the same array, 0x7bb870 takes them off. A row adds fx(Value x 0.01) (0x6dd1b0; Favored false subtracts). A major: DefaultYieldBias (TRAIT_LEADER_MAJOR_CIV) Productio..."
+  review: imported
+- addr: 0x6dd310
+  final: 0x49c460
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 40
+      value: "A natural wonder row adds its   value to ITS OWN feature once per natural wonder in the database (the loop   over the features indexes the row's feature, [r15+0x14], not the loop's):   FEATURE_DEAD_SE"
+  impl: [ai/major/settle.ts:PlotEvalEntry]
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...layer.  - The lists (the generic list loader 0x6d6c80, system \"PlotEvaluations\",   its item handler 0x6dd310): the AiFavoredItems rows of the lists AiLists   binds to a trait of the leader's chain (LeaderTrai..."
+  context:
+    - "...The lists (the generic list loader 0x6d6c80, system \"PlotEvaluations\", its item handler 0x6dd310): the AiFavoredItems rows of the lists AiLists binds to a trait of the leader's chain (..."
+  review: imported
+- addr: 0x6dd9a0
+  final: 0x49c7c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1110
+      value: "Player 0 of   runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234   and Charismatic Leader 18: its agenda's Influence row at 1.25 (the   pseudo-yield weight above)."
+  impl:
+    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
+    - cpu/data/aiValue.ts:AI_BELIEF_HORIZON
+    - cpu/data/aiValue.ts:AI_DISCOUNT_PCT
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...e discount rate, AI_DISCOUNT_RATE x 100 / the speed's CostMultiplier (the initializer 0x6ddb40; 4.0 online, `cpu/data/aiValue.ts`); `m_valueHorizons` (+0x298, data +0x2f0) is filled..."
+    - "...4b20). The discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer (0x6ddb40..0x6ddba3) writes AI_DISCOUNT_RATE (GlobalParameters +0x10, 2.0) through 0x525590 — x 1..."
+    - "...ic +0x7a8 (rebuilt, not saved): the Yields list system (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and t..."
+  review: imported
+- addr: 0x6df230
+  final: 0x49df60
+  kind: function
+  name: GlobalAI
+  status: PARTLY
+  impl: [ai/major/knowledge.ts:yieldDefaults]
+  readings:
+    - "C-97: the AI's knowledge of the map's cities — READ (the record, the update, the statistics, the advantage), PARTLY READ (the city AI's stored yields)"
+  context:
+    - "- The defaults (GlobalAI 0x6df230, once a game): per yield the mean and the sample deviation (24.8) of the plot yields of..."
+  review: imported
+- addr: 0x6dfc70
+  final: 0x49e5b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...odifier evaluator: a building's BuildingModifiers are analysed once, at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]): each entry holds an effect analyzer and a c..."
+  review: imported
+- addr: 0x6e2980
+  final: 0x4a10b0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...): push 0x6e29d0 (EXP_JobManager_PushJobOntoList, list +0x660, job set +0x648), spawn 0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called f..."
+    - "- The FinalRelease DLL the game loads: the AI's spawn 0x4a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a1..."
+    - "...ap is one chunk), and `patch apply` patches the FinalRelease DLL so the AI's spawn waits: 0x4a10ed's tail jumps to a stub in the .text section's file slack (0x9b6630, VirtualSize raised to..."
+  review: imported
+- addr: 0x6e29d0
+  final: 0x4a1100
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The AI's job list (the global AI at game +0x408): push 0x6e29d0 (EXP_JobManager_PushJobOntoList, list +0x660, job set +0x648), spawn 0x6e2980 (EXP_Jo..."
+    - ...he AI's spawn 0x4a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a16e0 (called from Game::Processor::Update 0x4b72a). Spawned with no wait in...
+  review: imported
+- addr: 0x6e3020
+  final: 0x4a16e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...+0x660, job set +0x648), spawn 0x6e2980 (EXP_JobManager_SpawnList; flag +0x3afc), wait 0x6e3020 (EXP_JobManager_Wait), called from Game::Processor::Update at 0x6540f (asserting `!Ge..."
+    - ...a10b0 (flags +0x38ac / +0x38ad, job list +0x410, job set +0x400), push 0x4a1100, wait 0x4a16e0 (called from Game::Processor::Update 0x4b72a). Spawned with no wait in the spawning fun...
+    - ...6630, VirtualSize raised to the raw size) that spawns the list and tail-jumps to the wait 0x4a16e0. The spawn's flag protocol is unchanged (set before the spawn, cleared by the wait); ever...
+  review: imported
+- addr: 0x6e3e20
+  final: 0x4a2310
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x7e8 [p], +0x620 [p], the PseudoYields list system's array (GlobalAI +0x2010, retrieval 0x6e3e20 -> +0x748, default +0x760) and the +0x768 / +0x780 list, held at -1.0 at least (@0xd136f4...
+  review: imported
+- addr: 0x6e3fe0
+  final: 0x4a24e0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...d): the Yields list system (GlobalAI +0x2360, registered in 0x6dd9a0 with the retrieval 0x6e3fe0 -> +0x7a8). 0x6fece0 -> 0x6fde70 applies the leader's and the civilization's trait li..."
+  review: imported

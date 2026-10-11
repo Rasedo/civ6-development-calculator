@@ -1,0 +1,73 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x4d8220
+  final: 0x33cdc0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  context:
+    - "...de vector +0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE writes through 0x4d8220): floor(n x a + a / 2) in 24.8 fixed point (`and ebx, 0xffffff00`), a = Hunza's 0.2 held..."
+  review: imported
+- addr: 0x4d9320
+  final: 0x743c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  context:
+    - "...derValue`): 0 once the player's MakeTradeRoute units (+0x1b9 bit 64) fill its capacity (0x4d9320, + the extra the caller adds); else the trade AI's route value K (its knowledge base +0..."
+    - "...08, 0x79d2d0) is set, + fx(0.5 x (player +0x12f0 +0xc0)) where Combat (+0x48) exceeds 0x4d9320 (PlayerTrade +0xf0) — a city-state's logs read no such term (its count read 0); AIR + 3..."
+    - "...0, AffectDestination default false +0x11): the trade route capacity (PlayerTrade +0xf0, 0x4d9320; the CanTrain capacity test) x Amount, weighted; AffectOrigin: between; else AffectDest..."
+  review: imported
+- addr: 0x4d9620
+  final: 0x33e010
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  context:
+    - ...e player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that EFFECT_ADJUST_PLAYER_TRADE_ROUTE_YIELD_PER_PATH_TILE...
+  review: imported
+- addr: 0x4d9670
+  final: 0x33e050
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  context:
+    - ...e posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that EFFECT_ADJU...
+  review: imported
+- addr: 0x4d9750
+  final: 0x33e0a0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  context:
+    - ...luded); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-tile bonus (0x4d9620, the player trade vector +0xeb8 that E...
+  review: imported

@@ -1,0 +1,131 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5579b0
+  final: 0x392900
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tradePath.ts:TRADE_DEST_REFUEL, cpu/core/tradePath.ts:TRADE_COST_SWITCH]
+  readings:
+    - "C-20: the Trader's path and range"
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
+    - "The range callback 0x5579b0, per edge: r = the from-node's range; a switch (0x558300) caps r at 1; a from-plot holdin..."
+    - ...e range callback), neighbours 0x558d60 / 0x271b50, context 0x558ba0. The range callback 0x5579b0 memoises its answer on the (parent, child) node pair.
+  review: imported
+- addr: 0x557e40
+  final: 0x392ba0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-20: the Trader's path and range"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5..."
+    - "...one likewise with UpdateParents 0x79660, a new one opened. The trade path's callbacks (0x557e40): the destination test 0x271490, destination-valid 0x629460 (1), no heuristic (both s..."
+    - ...x26f7d0) to max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e40 / 0x5582a0) under 0xe09781a7.
+  review: imported
+- addr: 0x5582a0
+  final: 0x393000
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...max(1, the engine's value under hash 0xc181eb6e); the trade-route pool's (0x557e40 / 0x5582a0) under 0xe09781a7.
+  review: imported
+- addr: 0x558300
+  final: 0x393060
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/tradePath.ts:TRADE_COST_SWITCH, cpu/core/tradePath.ts:walk]
+  readings:
+    - "C-20: the Trader's path and range"
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...at TRADE_ROUTE_BASE_RANGE 15 (+ player trade +0x1b0). Per edge: a land<->water switch (0x558300) caps the budget at 1; then a from-plot holding a TradeEmbark district (Districts byte..."
+    - "The range callback 0x5579b0, per edge: r = the from-node's range; a switch (0x558300) caps r at 1; a from-plot holding a TradeEmbark district of the origin city or of a city..."
+  review: imported
+- addr: 0x5583a0
+  final: 0x3930d0
+  kind: function
+  name: IsLand
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
+  impl: [cpu/core/tradePath.ts:walk]
+  readings:
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  context:
+    - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district..."
+    - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or nei..."
+  review: imported
+- addr: 0x558460
+  final: 0x393150
+  kind: function
+  name: IsWater
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
+  impl: [cpu/core/tradePath.ts:walk]
+  readings:
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  context:
+    - "IsLand 0x5583a0 / IsWater 0x558460 (Trade_Movement.cpp): when the plot's virtual +0x40 holds (a district stands there), they..."
+    - "- IsLand 0x5583a0 / IsWater 0x558460 read a district plot's info word +0x14 (masks 4 and 1): both, or neither, is neither la..."
+  review: imported
+- addr: 0x558510
+  final: 0x3931c0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+  readings: ["H-1: the annex, the purchase and the stored next plot — READ"]
+  context:
+    - "...ed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent through 0x4e02e0, then the annex). A pu..."
+  review: imported
+- addr: 0x558900
+  final: 0x393400
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-20: the Trader's path and range"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...s callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_tradepath.py`."
+    - "...(both slots null: the total is the known cost), cost 0x558970, valid 0x558db0, notify 0x558900 (type 5 a no-op; 1, 2, 4 store the child's range off the range callback), neighbours 0x..."
+  review: imported
+- addr: 0x558970
+  final: 0x393470
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/tradePath.ts:COST_LAB
+    - cpu/core/tradePath.ts:TRADE_COST_SWITCH
+    - cpu/core/tradePath.ts:plotTerm
+  readings:
+    - "C-20: the Trader's path and range"
+    - "C-20 tail: the trade path's land and water tests and the switch — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "XP2 Trade_Movement.cpp: the pathfinder's callbacks are installed at 0x557fd0: step cost 0x558970, node valid 0x558db0, node init 0x558900, context 0x558ba0, range 0x5579b0. Check: `dll_t..."
+    - ...city to 3 (+0x1b0); a refuel sets the context's flag +0x1cc. left = r - 1. The step cost 0x558970 swaps its 100 for 10100 (0x558a08) when 0x558300 answers a switch and the flag is clear....
+    - "...n-valid 0x629460 (1), no heuristic (both slots null: the total is the known cost), cost 0x558970, valid 0x558db0, notify 0x558900 (type 5 a no-op; 1, 2, 4 store the child's range off..."
+  review: imported

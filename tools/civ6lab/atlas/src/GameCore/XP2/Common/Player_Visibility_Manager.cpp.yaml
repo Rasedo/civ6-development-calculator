@@ -1,0 +1,67 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x508d50
+  final: 0x35a7f0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the raids — READ (the operation's end unread; the recruit's fresh units a fit)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...signal at signals +0x10c8, which the unit sight update 0x58aa90 raises per plot when 0x508d50 (Player_Visibility_Manager, the count change) answers 2: the plot's visibility count fo..."
+  review: imported
+- addr: 0x50a690
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:AiPlotView, cpu/core/yields.ts:feature]
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...er clause it answers: a natural wonder (0x82e90); the resource AS THE PLAYER SEES IT (0x50a690 with the player's team; artifacts excluded) for AdjacentResource, on water for Adjacent..."
+  review: imported
+- addr: 0x50b180
+  final: 0x35bdc0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1118
+      turn: 1
+      value: "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the   player manager's +0x4a0 list, every living player), camp terrain and   feature, no resource at all (0x35fd60 is asked for"
+    - recording: 1126
+      turn: 3
+      value: "Checked on the recorded ties: 1126 turn 3 (996 and   1041 tie at 52, the log's ranges 2 / 2, the game's pick 996), 1117 turn 8   (687 alone, range 1, where n1 + n2 tied it with 766), 1128 turn 5."
+  impl: [cpu/core/barbarians.ts:allSeers]
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  context:
+    - "- Plot score 0x151fa0: unowned, seen by no living player (0x50b180 walks the player manager's +0x4a0 list, every living player), camp terrain and featur..."
+  review: imported
+- addr: 0x50b2d0
+  final: 0x35bf10
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the barbarians' turn (0x1514a0) — READ (the max camps and the sight LAB)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Camp step 0x14fcc0: target = max camps (+0x110) x the land plots no major sees (0x50b2d0 on hash 0x253718b0) / all land plots, less the standing camps (+0x170); the first step..."
+  review: imported
+- addr: 0x50d390
+  kind: function
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 157
+      value: 1127 Rome t157 (5), China t183 (3).
+  impl:
+    - cpu/core/fog.ts:majorLookMeets
+    - cpu/core/moments.ts:momentKeysHeld
+    - cpu/data/cityStates.ts:KANDY_WONDER_RELICS
+    - cpu/data/seats.ts:MOMENT_CIRCUMNAVIGATED
+  readings:
+    - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+  context:
+    - "...Kandy's MINOR_CIV_KANDY_GRANT_RELIC_BONUS, Amount 1): the visibility manager's reveal 0x50d390 (Player_Visibility_Manager.cpp, the natural-wonder discovery notification), for i below..."
+    - "- WORLD_CIRCUMNAVIGATED: on a plot revealed (0x50d390, the visibility manager), a player without the flag (+0x8a8) whose team has revealed a..."
+  review: imported

@@ -1,0 +1,185 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1b41e0
+  final: 0x123160
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/seatTurn.ts:lumpGrowth, gpu/core/sim_phase.py:_lump_food]
+  readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...0), else 0x197230 places the unassigned ones beside the citizens already working. Growth (0x1b41e0: box - threshold, then the box clamped to the new threshold - 1) places one citizen incre..."
+  review: imported
+- addr: 0x1b4af0
+  final: 0x123860
+  kind: function
+  name: City::GetAmenities
+  status: PARTLY
+  readings:
+    - "H-1: the luxury allocation — READ"
+    - "H-1: a National Park's amenities, stored at the owner's turn — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(+0x12f0 -> +0xd8, walked in order): {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less its luxury amenities 0x1b5210 (its non-luxury amenities), granted 0};"
+    - "- City::GetAmenities 0x1b4af0 sums the luxury amenities 0x1b5210 (a COUNT of the entries of `m_aLuxuryAllocations` (P..."
+  review: imported
+- addr: 0x1b4c10
+  final: 0x1239a0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: a National Park's amenities, stored at the owner's turn — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ty's id, 0x4aa0e0 — a city the last rebuild did not list holds none), the entertainment 0x1b4c10, and stored per-city counts, among them +0x54 of the city's +0x1730 object."
+  review: imported
+- addr: 0x1b5210
+  final: 0x123d90
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the luxury allocation — READ"
+    - "H-1: a National Park's amenities, stored at the owner's turn — READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...: {id +0xf8, population +0x588, the city's amenities 0x1b4af0 less its luxury amenities 0x1b5210 (its non-luxury amenities), granted 0};"
+    - "- City::GetAmenities 0x1b4af0 sums the luxury amenities 0x1b5210 (a COUNT of the entries of `m_aLuxuryAllocations` (Player_Resources +0x460; data +0x4..."
+  review: imported
+- addr: 0x1b55d0
+  final: 0x124010
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      value: "Records (land plots, game `GetAppeal` against the engine, per record): runs/h1_duelw1116 4,700 mismatching plot-turns -> 156, the rest one-turn readings and the cases below;"
+    - recording: 1116
+      value: 1116 city.tourism 78 -> 13, seat.tourism 75 -> 10, city.housing 35 -> 0, plot.yields 66 -> 1.
+    - recording: 1110
+      value: "Unexplained: a plot China acquired by purchase reads 0 for the rest of the game (1110 plots 760/761, 1113 plot 57) — Plot appeal is a cached value refreshed on events (the PLOT_APPEAL event instances)"
+    - recording: 1109
+      turn: 225
+      value: "and a National Park's Tourism (1109 Handan t225-241) read the park's appeal before the Conservation term until t242 — the same cache."
+  readings: ["H-1: the plot's Appeal — READ"]
+  context:
+    - "...nder construction lends nothing; then `Features.Appeal` plus the city's feature modifier (0x1b55d0 on city +0x1788: Amazon), `Terrains.Appeal`, -1 for a pillaged improvement, `Improvements..."
+  review: imported
+- addr: 0x1b5620
+  final: 0x124060
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl:
+    - cpu/core/aiCityBuild.ts:CityGrowth
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...+0x1788, the rate, population, Housing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(le..."
+    - "...span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare Food, between. EFFECT_ADJUST_CITY_ALL_MIL..."
+  review: imported
+- addr: 0x1b5800
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
+  review: imported
+- addr: 0x1b5840
+  final: 0x124190
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  impl: [cpu/core/aiCityBuild.ts:CityGrowth]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...d surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 t..."
+  review: imported
+- addr: 0x1b5f70
+  final: 0x1245e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  readings:
+    - "C-94: the growth modifier — READ (the accumulator's writer unread)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+  context:
+    - ...a7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (...
+    - "- r < 0 → 0; r ×= the housing factor (0x1b5f70), then ×= 0x1b6040 (1 in every record), each a fixed-point multiply."
+    - "...ns, +0x738 withheld, +0x7a8 population; each turn's full update): the current factor g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the..."
+  review: imported
+- addr: 0x1b6040
+  final: 0x124660
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- r < 0 → 0; r ×= the housing factor (0x1b5f70), then ×= 0x1b6040 (1 in every record), each a fixed-point multiply."
+  review: imported
+- addr: 0x1b6120
+  final: 0x1246f0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...g 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
+  review: imported
+- addr: 0x1b6180
+  final: 0x124750
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/city.ts:m256, cpu/harness/import.ts:foldGrowthDrift]
+  readings: ["C-94: the growth modifier — READ (the accumulator's writer unread)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...tyGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c) and occupation 0x1b6120 (+0x20). 0x1b62d0:"
+    - "- r += other (0x1b6180): a game-configuration percent turned to fixed point through float (floor of the value,..."
+  review: imported
+- addr: 0x1b62d0
+  kind: function
+  name: CityGrowth
+  status: READ
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  impl:
+    - cpu/core/aiCityBuild.ts:CityGrowth
+    - cpu/core/city.ts:growth256
+    - cpu/harness/import.ts:foldGrowthDrift
+  readings:
+    - "C-94: the growth modifier — READ (the accumulator's writer unread)"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+  context:
+    - ...value; the cache copy 0xa7b10 (its data 8 bytes into the cache) fills it from CityGrowth 0x1b62d0, beside housing 0x1b5f70 (Lua +0x14), happiness 0x1b5800 (+0x18), other 0x1b6180 (+0x1c)...
+    - ...390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1b62d0, rounded up; -1 with no surplus); then per next citizen while the turn is below 100 (+0...
+  review: imported
+- addr: 0x1b6390
+  final: 0x1249b0
+  kind: function
+  name: turnsToGrow
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  impl: [cpu/core/aiCityBuild.ts:turnsToGrow]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb4/NOTES.md: ...(code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, non-full non-tribe at peace >5 units, Spy non-ful..."
+  context:
+    - ...or g (0x1b5f70); where g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1...
+  review: imported

@@ -10,6 +10,9 @@ GlobalParameters struct: each parameter's field offset, from the loader at
 Addresses are RVAs. Each rule below is ported to a `dll_*.py` check and
 scored on the lab's existing records; the FinalRelease DLL the game runs is
 the same code without asserts (the H-3 readings held on the live game).
+Every address cited here has a record in the DLL atlas (`atlas.py <addr>`:
+the function's bounds, source file, FinalRelease twin, callers, the
+curated record; `atlas_check.py` holds the two in step).
 
 ## B-D: the policy-unlock price — CLOSED
 

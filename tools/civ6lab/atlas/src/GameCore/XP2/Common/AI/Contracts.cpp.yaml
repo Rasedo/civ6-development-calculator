@@ -1,0 +1,26 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5f4be0
+  final: 0x3f96f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "Its log is AI_Research.csv (0x762b40: \"%d, %d, Tech, %s, %3.1f, %s, %d\" — OWNED / RESEARCHING / GOAL / BOOSTED, the score and the turns;"
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...NG / GOAL / BOOSTED, the score and the turns; a row with turns < 0 unowned is not logged; 0x5f4be0 \"Tech Contract %d\")."
+  review: imported
+- addr: 0x5f4cd0
+  final: 0x3f97e0
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...od Adv = adv[YIELD_PRODUCTION] (0x5d83c0 per yield), weights printed from r14+0x908.  contract line 0x5f4cd0; PURCHASE 0x5f3c40; FAITH PURCHASE 0x5f3ee0; queued '... CONTRACT %d' 0x5f3710. YIELD globals: f2f9..."
+  context:
+    - "...ced0, 0x5cd4e0) and their trees' nodes, the contracts (Contracts.cpp: the contract line 0x5f4cd0, the queued line 0x5f3710, PURCHASE 0x5f3c40, FAITH PURCHASE 0x5f3ee0), the cancellatio..."
+  review: imported

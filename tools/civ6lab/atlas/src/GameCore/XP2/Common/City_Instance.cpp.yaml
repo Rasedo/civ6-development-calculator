@@ -1,0 +1,97 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1c5350
+  final: 0x12ff20
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
+    - recording: 1115
+      turn: 3
+      value: "Records:   1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on   5 a turn;"
+    - recording: 1117
+      turn: 7
+      value: 1117 Xi'an's Scout done at 16 of 15, the Builder 0 at t7 and 6 at   t8.
+    - recording: 1117
+      turn: 15
+      value: "B, read with no   item, holds none of the city-states' Production toward the head (the   Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,   a Warrior at 12 + 9 of 20 with on"
+  impl: [cpu/core/city.ts:plainProduction]
+  readings:
+    - "H-1: a district project's yield conversion — READ"
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+  context:
+    - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0x1108 of the city's yield component) a...
+    - "...'s step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Production toward the item), B with none (the city's plain P..."
+  review: imported
+- addr: 0x1c77c0
+  final: 0x131a10
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...score's whole part << 8 (0x6fe2b0); NAVAL_SUPERIORITY — of the player's coastal cities (0x1c77c0) the most populous (+0x588, strictly, the first of equals) whose ring walk within 4 h..."
+  review: imported
+- addr: 0x1c79b0
+  final: 0x131b80
+  kind: function
+  name: ChangePopulation
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 182
+      value: "Recorded:   runs/h1_duelw1128 Taiyuan t182 (grown to 7 on its two luxuries, Displeased,   banks 1175/256 x 1.35;"
+    - recording: h1_duelw1121
+      turn: 186
+      value: runs/h1_duelw1121 t186 (Jiaodong 6 -> 7 on its 3, Displeased), t220   Shenyang, t238 Taiyuan.
+  readings:
+    - "C-94: the religious spread — READ"
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+  context:
+    - "- The population change 0x1f3050 (called from City ChangePopulation 0x1c79b0): a gain of n adds ATHEISM_PRESSURE_PER_POP (gp +0x5d8) x n, `<< 8`, to the entry of th..."
+    - "...angeNumUnassigned` (0x194fb0, called with the population change by City::ChangePopulation 0x1c79b0) adds to m_iNumUnassignedCitizens (+0x68): a negative count runs the full reassign 0x1963..."
+    - "...d the resources step 0x4a8ed0 in Player DoTurn. A city's growth (City::ChangePopulation 0x1c79b0) is neither: the culture its border banks after the growth reads its new size's amenity..."
+  review: imported
+- addr: 0x1cb470
+  final: 0x132cb0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...h through 0x365ae0, SUMMED AS INTEGERS; then the player's modifier-added adjacencies (0x1cb470: MODIFIER_PLAYER_CITIES_TERRAIN_ADJACENCY and kin, entries of 0x30 bytes: terrain, feat..."
+  review: imported
+- addr: 0x1cb8b0
+  kind: function
+  name: City::GetYield
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...x(0, -floor((food256 - consumption(pop) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of e..."
+    - ...- PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHA...
+  review: imported
+- addr: 0x1cbd10
+  kind: function
+  status: READ
+  cases:
+    - recording: 1115
+      value: "- A citizen's yield share (0x1cbd10): population << 8 times   SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide   by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 "
+    - recording: 1108
+      turn: 95
+      value: "A city   yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16   Production at −10% reads 14.40234375 (floor would read 14.3984375)."
+  impl: [cpu/core/city.ts:citizenYield256]
+  readings:
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+  context:
+    - "- A citizen's yield share (0x1cbd10): population << 8 times SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed..."
+  review: imported

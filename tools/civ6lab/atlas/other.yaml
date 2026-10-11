@@ -1,0 +1,58 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x23ce0
+  binary: CivilizationVI.exe
+  kind: function
+  name: GetWorkerCount
+  status: READ
+  cases:
+    - recording: 1117
+      value: "The reading: an AI job that reads shared state while the game-core thread (or another chunk) changes it — City Analysis spawned without a wait, the unit-planning chunks sharing the path-finder pool an"
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  context:
+    - "...system loads, no GlobalParameters row or Lua binding sets them (the Lua `GetWorkerCount` 0x23ce0 only reads), and the jobs are DLL code."
+  review: imported
+- addr: 0x6ca90
+  binary: CivilizationVI.exe
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- The exe (CivilizationVI.exe 0x6ca90, the AppOptions [Performance] reader) sets those hashes: game-core threads (0x7ec3df64)..."
+  review: imported
+- addr: 0x6cb59
+  binary: CivilizationVI.exe
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...n <= 0. MaxJobThreads (the engine's job threads, the main thread included) is read at 0x6cb59.
+  review: imported
+- addr: 0x6cf0a
+  binary: CivilizationVI.exe
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...ical count on AMD family 0x15) less 2; any value is then floored at 2 and capped at 32 (0x6cf0a..0x6cf47, options +0x26c), and the TBB scheduler is initialised with it (Platform_TBBJo...
+  review: imported
+- addr: 0xf86f0
+  binary: CivilizationVI.exe
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...either game-core DLL; the exe reads it back only to log \"Game Core Thread Count = %d.\" (0xf86f0) — MaxGameCoreThreads and GameCoreReserveThreads serialize nothing beyond defaulting th..."
+  review: imported

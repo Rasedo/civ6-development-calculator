@@ -1,0 +1,424 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x7a0ac0
+  final: 0x527c50
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...akes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the po..."
+  review: imported
+- addr: 0x7a10c0
+  final: 0x527fd0
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...x1788, population +0x588, T, H); a building on player +0x1310's list (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield we..."
+  review: imported
+- addr: 0x7a1240
+  final: 0x528140
+  kind: function
+  name: discounted
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:discounted
+    - gpu/core/sim_research.py:_discounted
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
+    - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
+    - "...(0x6b8ba0): per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140; 0x7a1240 when T = H). The Monument's MONUMENT_CULTURE_AT_FULL_LOYALTY (REQUIREMENT_CITY_HAS_FULL_L..."
+  review: imported
+- addr: 0x7a16e0
+  final: 0x528310
+  kind: function
+  name: presentValue
+  status: PARTLY
+  impl:
+    - cpu/core/aiModifiers.ts:adjacencyValue
+    - cpu/core/aiValue.ts:presentValue
+    - gpu/core/sim_research.py:_present_value
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb/notes.txt: ...30(player+0x1290) -> discount rate (GlobalParameters AI_DISCOUNT_RATE=2.0 -> r=0.02 via /25600). PV 0x7a16e0(out,&v,&rate,n): n==0 ->v; n<0 ->0; rate==0 -> v*n; if rate>=50.0 or ((rate*n>>8)*2>>8)>=fx(10): v/..."
+  context:
+    - "...), less Maintenance (+0x38) as Gold; the sum v becomes PV(v, rate, H) - PV(v, rate, T) (0x7a16e0 twice). After it, already discounted: Entertainment (+0x2c) > 0 adds 0x79f7c0 for this..."
+    - "- The present value 0x7a16e0 (FinalRelease 0x528310, the same code): n 0 -> v; n < 0 -> 0; rate 0 -> v n; rate >= 50..."
+    - "...of 0x2c4170(player). Each term is paid from landing to the horizon: PV(H) - PV(turns) (0x7a16e0: a(D-1)/(kD), D = 1 + nk + n(n-1)k²/2 + n(n-1)(n-2)k³ x 0.16667, k = rate/100, a perpet..."
+  review: imported
+- addr: 0x7a2140
+  final: 0x528660
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:valueBetween]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
+    - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
+    - "...LD_CHANGE (0x6b8ba0): per subject, trunc(PV(H) - PV(T)) of yieldValue(Amount, YieldType) (0x7a2140; 0x7a1240 when T = H). The Monument's MONUMENT_CULTURE_AT_FULL_LOYALTY (REQUIREMENT_CITY_..."
+  review: imported
+- addr: 0x7a21e0
+  final: 0x528700
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
+    - ".claude/scratchpad/cb4/NOTES.md: ...aintenance < handicap 3, PV...  NEXT: unit value / military table; DS pick 0x5d4d70; resource value 0x7a21e0; docs (dll_readings, AUDIT); checks; sweep; replays...."
+    - ".claude/scratchpad/cb5/NOTES.md: ...rt units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhattan), resource value 0x7a21e0, GPU twin, swap...."
+  context:
+    - "...e's strengths (the unit value's inputs), the project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries' amenities over the player's cities, strategics over the units needing..."
+    - "...0² or NUCLEAR_WEAPON of 1.0; per improvement the resources near the cities (0x5d45c0 -> 0x7a21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3d..."
+    - ...or the named one, the player's count of it 0x4aa790 x Amount through the resource value 0x7a21e0), EFFECT_ADJUST_PLAYER_YIELD_MODIFIER_PER_TRIBUTARY 0x6adb20 (the player's yield per...
+  review: imported
+- addr: 0x7a2fa0
+  kind: function
+  name: cityArrBC0[yield]
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...+0x2e0) the amount x fx(1 + cityPct[y] 0.01) x fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x...
+  review: imported
+- addr: 0x7a3d70
+  final: 0x5298e0
+  kind: function
+  name: housingValue
+  status: READ
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+    - recording: h1_duelw1117
+      value: "- Measured (the action replay, runs/h1_duelw1117, 1121, 1124, 1127, 1128):   the picks on the log's own scores — pantheons 5 of 5, the religions'   beliefs 17 of 17 (the founding's Follower then a Wor"
+  impl: [cpu/core/aiCityBuild.ts:housingValue]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
+    - ".claude/scratchpad/cb3/NOTES.md: ...whole number only if constructible now. OPEN: GPP general (Barracks/Stable v 0, unsourced), housing 0x7a3d70 forecast, free units FX_MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Ligh..."
+    - ".claude/scratchpad/cb4/NOTES.md: ..., onlyOurs 1318.  DONE (code): - aiCityBuild.ts: CityGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, non-full non-tribe at peac..."
+  context:
+    - ...it 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588, T, H); a building on player +0x1310's li...
+    - "- HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth +0x1788, the rate, population, Ho..."
+    - ...percent change x CityBuildAI's yields +0x1080), EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULAT...
+  review: imported
+- addr: 0x7a4850
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - ...ays, unread), +1.0 where row +0xc0 is set, +5.0 for EmbarkAll (+0x70 bit 4), +5.0 where 0x7a4850 holds; a row of an era before the game's x (game - era + 1), else + PSEUDOYIELD_GOLDENA...
+  review: imported
+- addr: 0x7a4b20
+  final: 0x529ed0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl: [cpu/core/aiModifiers.ts:modifiersValue, ai/major/religion.ts:beliefValue]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
+    - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
+    - "....5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The discount is the GlobalAI's +0x290 (a variable at +0x238): its initializer (0x6d..."
+  review: imported
+- addr: 0x7a4d40
+  final: 0x52a050
+  kind: function
+  name: valueBuildingAtPlot
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...urrent) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H..."
+  context:
+    - "...nd the current item not this one) + each missing prerequisite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisite..."
+  review: imported
+- addr: 0x7a51f0
+  final: 0x52a440
+  kind: function
+  name: valueDistrictAtPlot
+  status: PARTLY
+  notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
+  review: imported
+- addr: 0x7a58f0
+  final: 0x52a8c0
+  kind: function
+  name: valueImprovementAtPlot
+  status: PARTLY
+  notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
+  review: imported
+- addr: 0x7a60d0
+  final: 0x52af40
+  kind: function
+  name: pseudoYieldValue
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl: [cpu/core/aiValue.ts:pseudoYield, cpu/core/aiValue.ts:pseudoYieldValue]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  notes: ["label: pseudoYieldValue(out,&amt,pseudo,playerAI,..)"]
+  context:
+    - ...ds' +0x638, +0x7a8, the +0x6b0 list or +0x6c8); per row also pseudo-yield terms through 0x7a60d0 (PSEUDOYIELD_GOLDENAGE_POINT from 0x2c40b0, 0x2c4350 for Science, 0x2c3ed0, 0x2c4290 fo...
+    - ...counts near it (CityBuildAI +0x978, 0x5d45c0) -> 0 outright; through the pseudo-yield (0x7a60d0); below handicap 3 (player +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338...
+    - "...record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0, 1 + bias), the bias 0x700810 the sum of four per-player..."
+  review: imported
+- addr: 0x7a6690
+  final: 0x52b110
+  kind: function
+  name: yieldValue
+  status: PARTLY
+  impl: [cpu/core/aiValue.ts:yieldValue]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - "label: yieldValue(out,&amt,yield,playerAI): amt*Yields.col1c*(1+min(w[yield],9))"
+    - ".claude/scratchpad/cb/notes.txt: ...r Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPct*.01)>>8)>>8 -> yieldValue 0x7a6690  yieldValue = amt * fx(Yields.DefaultValue) (gold .5) * (1 + min(w[y], 9.0)) ; w[y] = 0x702ad0 = su..."
+    - ".claude/scratchpad/dp2/NOTES.md: ...), row for action: Worth(+0x24)<<8   sign-clipped by 0x64efa0/0x6504a0 direction, minus gold cost x 0x7a6690 (gold yield value),   plus 0x6504f0 term. (partly read) - T 0x671b80: if trust +0x6480[p] != 0: n=0..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...+0x24, Cost +0x18),   less the action's gold cost valued at the owner's Gold weight (0x527610 ->   0x7a6690), both sign-clipped by the owner's preference of the action   (+0x6240, the AiFavoredItems lists; f..."
+  context:
+    - ...hifts each row's integer back to fixed point and applies the adjacency percent per row (0x7a6690) before adding it.
+    - ...fx(1 + bldPct 0.01) (city +0xbc0 through 0x7a2fa0; 0x18e890) through the yield value 0x7a6690 = amount x Yields.DefaultValue (Gold 0.5) x (1 + min(w[y], 9.0)), w[y] = 0x702ad0, the...
+    - ...City Analysis value (0x5d4cd0, capped 50.0), and its upgrade sources' gold (0x5376d0 -> 0x7a6690); PSEUDOYIELD_UNIT_COMBAT of 100 where 0x4f2af0 names the row; PSEUDOYIELD_TOURISM of t...
+  review: imported
+- addr: 0x7a67f0
+  final: 0x52b200
+  kind: function
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...alue port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
+  context:
+    - "...ies in range, capped at 50.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) >..."
+  review: imported
+- addr: 0x7a7110
+  final: 0x52b650
+  kind: function
+  name: traderValue
+  status: READ
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:traderValue]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...pseudoYieldValue(UNIT_COMBAT...), minus maintenance gold if [r15+0x908]<3, then PV diff. trade -> 0x7a7110; religious etc. CONCLUSION so far: full value port needs military AI (0x79ca90), yield-weight parts..."
+    - ".claude/scratchpad/cb4/NOTES.md: ...ANY_IMPROVEMENT. - aiValue.ts: AiPlotView, view.cityOwnedPlots/traders/tradeKnowledge; traderValue (0x7a7110). - majorView.ts: cityYield for a city-state (minorCity), cityOwnedPlots, traders, tradeKnowledge n..."
+  context:
+    - "...ON — `pyglob` over 0x5bbf80, each global stored after the next name's load): a Trader 0x7a7110 through PSEUDOYIELD_UNIT_TRADE; a religious unit from ReligiousStrength (+0x78) x 0.01,..."
+    - "...ater (0x82a10) and no Harbor (0xcbecc739) for a unit of no RangedCombat (+0x6c). TRADE: 0x7a7110 through PSEUDOYIELD_UNIT_TRADE. RELIGIOUS: ReligiousStrength (+0x78) x 0.01, SpreadChar..."
+    - ...om the start); EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0ff0 PARTLY (the Trader's value 0x7a7110 of Amount, start to horizon).
+  review: imported
+- addr: 0x7a7400
+  final: 0x52b7d0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/aiModifiers.ts:ValueTerms
+    - ai/major/religion.ts:evaluationReligion
+    - ai/major/religion.ts:beliefValue
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...n does (0x340950), or where the player's own religion holds a belief of its class; else 0x7a7400(belief, the rate, start 0, `m_valueHorizons`[2] = speed(200) = 100 online). A player..."
+    - "- THE VALUE (0x7a7400): FX(-9999) where start >= horizon; else the modifiers' sum 0x7a4b20 in a context of th..."
+  review: imported
+- addr: 0x7a7590
+  final: 0x52b900
+  kind: function
+  name: valueConstructible
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiCityBuild.ts:buildingPerTurn, cpu/core/aiCityBuild.ts:buildingValue]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - "label: valueConstructible(modifiers+yields)"
+    - ".claude/scratchpad/cb/notes.txt: ...]; g=s+256; if g<256 ->0 else den=max(trunc(rate*g/25600),2); out=((s*v>>8)<<8)/den. BUILDING value 0x7a7590 (generic constructible): per Building_YieldChanges entry: amt<<8 * (fx(1+cityPct[y]*.01)*fx(1+bldPc..."
+  context:
+    - "- A building's or project's value 0x7a7590: per Building_YieldChanges row (Buildings +0x2e0) the amount x fx(1 + cityPct[y] 0.01)..."
+    - "...opulation 1..4; the entertainment term passes ONE Amenity whatever the Entertainment (0x7a8dcd: r9d 1): PSEUDOYIELD_HAPPINESS of 1 where the happiness level holds, else of the levels..."
+    - ...yzer's slot 1, none to slot 2; nesting stops at depth 4. The context (0x6ccd50, filled in 0x7a7590) carries T (+0xb4), H (+0xb8), the rate as a float (+0xbc), the city and the player; 0x7a...
+  review: imported
+- addr: 0x7a9a10
+  final: 0x52caf0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/aiCivics.ts:civicValue
+    - cpu/data/aiCivics.ts:CIVIC_AI_POLICY_FLOOR
+    - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
+  readings:
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+  context:
+    - ...dded at the third level leave the entry out of reach. Else turns = max(0, sum), value = 0x7a9a10, score = value.
+    - "- THE VALUE, 0x7a9a10 (row, &discount, turns, H, player, policies, governments, ...): at or past H, -9999 (th..."
+  review: imported
+- addr: 0x7aaf80
+  final: 0x52d500
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the district adjacency — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...h reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield walk 0x7aaf80 calls the per-row 0x365ae0 itself.
+    - "- The city's walk 0x7aaf80 shifts each row's integer back to fixed point and applies the adjacency percent per row..."
+  review: imported
+- addr: 0x7b0330
+  final: 0x52fd20
+  kind: function
+  status: PARTLY
+  impl: [ai/major/policies.ts:governmentValue]
+  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  context:
+    - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
+    - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."
+  review: imported
+- addr: 0x7b26b0
+  final: 0x5310d0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/policies.ts:policyScore]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "H-1: the civics AI — READ (the choice, the walk, the propagation), PARTLY READ (the value)"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - ...ovement the resources near the cities (0x5d45c0 -> 0x7a21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analy...
+    - ...s, each max(v - v(the current), v / 2) of the government values [+0xb38] (0x621eb0 -> 0x7b26b0, unread); then a civic of an era at or before the game's ([player+0x1358]+0x158 one pas...
+    - "...me era (the player's era object +0x158 -> Eras +0x1c) inside the window; then the value 0x7b26b0(policy, the rate 0x6fec30 = GlobalAI +0x290, start 0, horizon `m_valueHorizons[0]` vi..."
+  review: imported
+- addr: 0x7b28c0
+  final: 0x531290
+  kind: function
+  name: valueProject
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb3/NOTES.md: ...ase +0x6d8), plot-yield modifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: ts..."
+    - ".claude/scratchpad/cb5/NOTES.md: ...f0/0x747230),   Combat Desire (0x71fb80 0x721302..), support units (Ram/Siege Tower), project value 0x7b28c0 (district projects,   Manhattan), resource value 0x7a21e0, GPU twin, swap...."
+  context:
+    - ...its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot with valueHorizons[2]. T beyond the horizon values FX(...
+    - "...records and the Combat Desire's strengths (the unit value's inputs), the project value 0x7b28c0, the resource value 0x7a21e0 (3 KB: luxuries' amenities over the player's cities, strat..."
+  review: imported
+- addr: 0x7b3e50
+  final: 0x531f20
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/aiResearch.ts:techValue
+    - cpu/data/aiResearch.ts:RESEARCH_AI_EMBARK_ALL
+    - cpu/data/aiValue.ts:AI_UNLOCK_SHARE
+  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  context:
+    - "...ntouched: 0 for every row the walk never reached). Else turns = max(0, sum) and value = 0x7b3e50(row, turns, H, discount); score = value."
+    - "- THE VALUE, 0x7b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04..."
+  review: imported
+- addr: 0x7b62c0
+  final: 0x533190
+  kind: function
+  name: valueUnit
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl:
+    - cpu/core/aiCityBuild.ts:CityBuildFacts
+    - cpu/core/aiCityBuild.ts:unitValueExit
+    - cpu/core/aiCityBuild.ts:unitValue
+    - cpu/core/aiModifiers.ts:ANALYZERS
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...req buildings...  value = 0x7a4d40(bld, turns, plot=-9999, horizon=H1=[globalAI+0x2f0][1]) ; units: 0x7b62c0(unit, turns...) horizon H1; wonders H2=[..][2].  rate = &[rbp+0xc8] from 0x6fec30(player+0x1290) ->..."
+    - ".claude/scratchpad/cb/notes.txt: ...turns). regional (+0x2c) via 0x79f7c0 for cities in range. walls/defense terms at +0x54. UNIT value 0x7b62c0: combat units -> base 0x79ca90(military AI unit value) (x3 if 0x79d2d0), era terms, x(copies+1), x..."
+    - ".claude/scratchpad/cb4/NOTES.md: ...tyGrowth/growthForecast (0x5cb570)/housingValue (0x7a3d70)/turnsToGrow (0x1b6390); unitValueExit   (0x7b62c0 exits: T>=H, version, non-full non-tribe at peace >5 units, Spy non-full); free units in buildingVa..."
+    - ".claude/scratchpad/cb4/NOTES.md: ...knowledge K logged in AI_Knowledge.csv \"TRADE, TO x, VAL v\" (0x5ed280); writer unread. - Unit value 0x7b62c0 branches by pseudo; religious branch adds tourism terms (minor TOURISM weight -1 => 0); tail: extra..."
+    - ".claude/scratchpad/cb5/NOTES.md: ....claude/worktrees/cb5 @8a7de4ff. Patch: <wt>/.claude/scratchpad/final.patch.  DONE: the UNIT value (0x7b62c0) + the military AI's unit production table (0x7989e0, cpu/core/aiUnitProduction.ts),   unit T (+5 o..."
+  context:
+    - "...ite building's turns; value = 0x7a4d40(building, T, no plot, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]..."
+    - "...ad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityBuildAI, city +0x1788, population +0x588,..."
+    - "- A unit's value 0x7b62c0: the section \"C-96 / C-97: the unit value\"."
+  review: imported

@@ -1,0 +1,458 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x16e7d0
+  final: 0x27fe90
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/evaluate.ts:mul]
+  readings:
+    - "H-1: a boost lands as progress — READ"
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-95: the unit pathfinder and the planning's reach — READ, confirmed on the Wander draws"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/cb/notes.txt: ...*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8..."
+  context:
+    - "...70, sar 8); the share q = (B<<16) / (cost<<8) (0x16e940, a truncating divide), times 100 (0x16e7d0); plus the player's m_iModifiedBoost (+0xf8, `<< 8`: Dynastic Cycle's 10, a golden Free I..."
+    - "...x t / 256), t = trunc(256 x left / max) (the fixed-point divide 0x16e940 and multiply 0x16e7d0): intact walls let 1 through after the clamp. Then the clamp to [+0x1c, +8]. On the out..."
+    - "...floor(f) << 8 | trunc(frac x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" produ..."
+  review: imported
+- addr: 0x16e940
+  final: 0x705200
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1112
+      turn: 192
+      value: "the engines' floor(256·(10 − d)/10) per city, each city's product floored, is a fit (AUDIT C-94 LAB): runs/h1_duelw1112 Yiyang t192 reads 0.546875 (own 971/256, foreign 918/256 → r 270/256) where the "
+    - recording: 1112
+      value: "recorded terms 2,036 → 2,092 of 2,097 (1112), 2,038 → 2,092 of 2,114 (1106), 1,619 → 1,751 of 1,843 (1110)."
+    - recording: 1115
+      value: "- A citizen's yield share (0x1cbd10): population << 8 times   SCIENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide   by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 "
+    - recording: 1108
+      turn: 95
+      value: "A city   yield's one modifier (0xaa740) truncates toward zero: 1108 Xi'an t95, 16   Production at −10% reads 14.40234375 (floor would read 14.3984375)."
+  readings:
+    - "H-1: the citizen pressure term — PARTLY READ"
+    - "C-94: the growth modifier — READ (the accumulator's writer unread)"
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "H-1: a boost lands as progress — READ"
+    - "H-1: the border bank in fixed point — READ"
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
+  context:
+    - "...rm: both 0 → 0; own 0 → −MAX_LOYALTY; foreign 0 → +MAX_LOYALTY; else r = hi / lo in 24.8 (0x16e940), clamped into [NEUTRAL_RATIO, MAX_RATIO] (gp +0x480 / +0x478, floats cut to 1/256); t =..."
+    - "...ier's Happinesses.GrowthModifier as (percent << 8) / 100 through the fixed-point divide 0x16e940 (an integer idiv: −15% −38, −30% −76);"
+    - "...IENCE / CULTURE_PERCENTAGE_YIELD_PER_POP << 8, then the fixed-point divide by 100 << 8 (0x16e940): floor(pop · pct · 256 / 100) / 256 — Culture 0.3 a citizen reads 76/256 at size 1, 15..."
+  review: imported
+- addr: 0x16eb20
+  final: 0x14a640
+  kind: function
+  name: fx_mul_assign
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1124
+      turn: 3
+      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes:
+    - "label: fx_mul_assign(a*=b)"
+    - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
+  context:
+    - "...xedPointT): fx(f) = floor(f) << 8 | trunc(frac x 256), so fx(0.01) = 2; mul (a b) >> 8 (0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10;..."
+    - "...N 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20), span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth object's surpl..."
+  review: imported
+- addr: 0x16ec10
+  final: 0x321580
+  kind: function
+  name: fx_sub_assign
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - "label: fx_sub_assign(a-=b)"
+    - ".claude/scratchpad/cb/notes.txt: .... fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: DS '%d, %d, %s, , , %s, %s, ,..."
+  context:
+    - "...(0x16eb20 in place, 0x16e7d0), div (a << 8) / b truncated (0x16e940), add 0xac650, sub 0x16ec10; a \"percent\" product is a b / 25600 truncated toward 0 (the /100 magic 0xa3d70a3d70a3..."
+  review: imported
+- addr: 0x16f050
+  final: 0xf5080
+  kind: function
+  name: City_BuildQueue
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
+    - recording: 1115
+      turn: 3
+      value: "Records:   1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on   5 a turn;"
+    - recording: 1117
+      turn: 7
+      value: 1117 Xi'an's Scout done at 16 of 15, the Builder 0 at t7 and 6 at   t8.
+    - recording: 1117
+      turn: 15
+      value: "B, read with no   item, holds none of the city-states' Production toward the head (the   Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,   a Warrior at 12 + 9 of 20 with on"
+  impl:
+    - cpu/core/minorBuild.ts:minorBuild
+    - cpu/core/phase.ts:banked
+    - cpu/core/phase.ts:conv
+    - cpu/core/phase.ts:lacked
+    - cpu/core/phase.ts:milAllyWarPct
+    - gpu/core/sim_phase.py:_seat_city_produce
+  readings:
+    - "H-1: a district project's yield conversion — READ"
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "H-1: a completion's overflow and the item multiplier — READ"
+  context:
+    - ...e city's yield component) and its project id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Pro...
+    - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (the Producti..."
+    - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multi..."
+  review: imported
+- addr: 0x170450
+  final: 0xf61c0
+  kind: function
+  name: CanConstruct
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes: ["label: CanConstruct(city.buildQueue,...)"]
+  context:
+    - "...lain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not MustPurchase (Buildings +0x159 bi..."
+  review: imported
+- addr: 0x172820
+  final: 0xf86d0
+  kind: function
+  name: CanTrain
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+    - recording: 1124
+      value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  notes: ["label: CanTrain(unit)"]
+  context:
+    - ...x5 first); the unit without FoundCity (+0x1b9 bit 2) or BuildCharges (+0x44), CanTrain (0x172820), not MustPurchase (+0x1b9 bit 128). Defensive pick (flags 1, 1; the military AI's +0x4...
+    - "...(0x5ce970's unit loop, 0x5cf360..0x5cf6ac): FX(-9999) where the CityBuildAI's CanTrain 0x172820 (the player AI +0x12a0 +0xba8 flag set) refuses; else T = max(the research AI's turns 0..."
+    - ...a Faith purchase yield, by CityBuildAI's unit value 0x5d4cd0 in a city that may buy it, 0x172820, worth more than its Faith cost valued or with twice the cost in hand; then the heroes)...
+  review: imported
+- addr: 0x177d10
+  kind: function
+  name: City_BuildQueue
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
+    - recording: 1115
+      turn: 3
+      value: "Records:   1115 / 1116 Xi'an, queue empty at t3, a Builder at 0 at t4 and 10 at t5 on   5 a turn;"
+    - recording: 1117
+      turn: 7
+      value: 1117 Xi'an's Scout done at 16 of 15, the Builder 0 at t7 and 6 at   t8.
+    - recording: 1117
+      turn: 15
+      value: "B, read with no   item, holds none of the city-states' Production toward the head (the   Industrial / Militaristic envoy rows are toward-item terms): 1117 Rome t15,   a Warrior at 12 + 9 of 20 with on"
+  impl: [cpu/core/phase.ts:q, cpu/core/types.ts:City, gpu/core/sim_phase.py:_seat_city_produce]
+  readings:
+    - "H-1: a district project's yield conversion — READ"
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+  context:
+    - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0...
+    - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (t..."
+  review: imported
+- addr: 0x179510
+  final: 0xfd020
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
+  readings: ["H-1: a district project's yield conversion — READ"]
+  context:
+    - "...loader 0xa98af0): for each, amount = min(the Production passed in, the item's full cost (0x179510)) x (PercentOfProductionRate << 8) / 100 — fixed point, so the rate is the percent trunca..."
+  review: imported
+- addr: 0x179650
+  final: 0xfd160
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 68
+      value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
+    - recording: 1107
+      value: 1107 Kandy's 8 against 4.
+  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  readings: ["C-94: the religious spread — READ"]
+  context:
+    - "..., then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) names an item whose Projects row (0xad5f10, +0x1c its index) has a Pr..."
+  review: imported
+- addr: 0x179dd0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...e (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON. The tail: x (the city's extra copies + 1, 0x179dd0), the promotion class weight, a strategic resource the player lacks and no city of its..."
+    - "...MDCapable (+0x1ba bit 64) PSEUDOYIELD_NUCLEAR_WEAPON; x (the city's extra copies + 1, 0x179dd0); x the promotion class weight 0x723bb0 (PromotionClass +0x288: 1.0 with none; 0 where..."
+  review: imported
+- addr: 0x17a600
+  final: 0xfdc70
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...431 -> 304, Spearman 290 -> 161 raw); then PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges' tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2 Resource...
+    - "...on weight, PSEUDOYIELD_UNIT_SETTLER, the maintenance, then the settle AI's 0x6fe2b0 and 0x17a600 for a founder — Religious Settlements 198 at t3 against the cost's 40), the building..."
+  review: imported
+- addr: 0x17b1e0
+  final: 0xfe420
+  kind: function
+  name: turnsToBuildBuilding
+  status: PARTLY
+  cases:
+    - recording: AI_Research.csv
+      value: "- The building turns T as the job reads them (`cpu/core/aiCityBuild.ts`,   measured by `cpu/harness/cityBuildLab.ts` on the record of the turn after,   the research turns from AI_Research.csv): the an"
+    - recording: 1124
+      turn: 3
+      value: "the analysis reads the value before   its own turn rewrites it (1124 minors' Walls t3..t12: Masonry's 21 + the   Pottery's turns left as the turn before logged them;"
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...(techTurns 0x7610e0, civicTurns 0x621920) + prereq district turns(+10 if not current) + build turns 0x17b1e0 (+10 if [rbp-0x60] && current != bld) + prereq buildings...  value = 0x7a4d40(bld, turns, plot=-999..."
+  context:
+    - ...ite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own estimate) + 10 while the city builds something else (city +0x2350 se...
+    - "...the record of the turn after's, the record keeping only the whole part; the build turns 0x17b1e0 are 0x8c4540's ceil((cost - progress) / Production toward the item) — the progress ke..."
+  review: imported
+- addr: 0x17b5a0
+  final: 0xfe610
+  kind: function
+  name: turnsToBuildDistrict
+  status: PARTLY
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...T = max(tech turns 0x7610e0, civic turns 0x621920) + the prerequisite district's turns (0x17b5a0, +10 when not the current production) + the build turns (0x17b1e0, the queue's own es...
+  review: imported
+- addr: 0x17b890
+  kind: function
+  name: turnsToBuildProject
+  status: PARTLY
+  notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
+  review: imported
+- addr: 0x17bb40
+  kind: function
+  name: turnsToTrainUnit
+  status: READ
+  cases:
+    - recording: 1124
+      value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
+    - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."
+    - "...eir inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected count 0x5d4750 x its Production [+0x10..."
+  review: imported
+- addr: 0x17c790
+  final: 0xff1b0
+  kind: function
+  name: Cache_City_BuildQueue
+  status: READ
+  cases:
+    - recording: h1_duelw1104
+      turn: 242
+      value: "Outcome B's −50% (x = 128) quotes 215 → 108, 325 → 163, 227 → 114, 45 → 23 (runs/h1_duelw1104 t242 Biplane, Mechanized Infantry, Anti-Air Gun;"
+    - recording: 1106
+      turn: 62
+      value: 1106 t62 Swordsman;
+  impl: [cpu/core/game.ts:mercenaryCost, gpu/core/simbase.py:mercenary_cost]
+  readings: ["H-1: a unit's Production cost in the queue — READ"]
+  context:
+    - "...n int from the city build queue cache's `m_aiUnitCost` (Cache_City_BuildQueue.cpp), which 0x17c790 fills per unit row: c = the owner's unit manager (+0x12e8) current cost array (+0x3c0, 0x..."
+  review: imported
+- addr: 0x17d1a0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "...t check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserves its cost (0x4a7400) where the player's amount less its reservations covers it..."
+  review: imported
+- addr: 0x17d660
+  final: 0xff9f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+    - recording: 1124
+      turn: 28
+      value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
+  impl: [cpu/core/aiCityBuild.ts:CityBuildFacts]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - ...unit not the player's version (player +0x12e8 +0x1c0); a domain the city cannot build (0x17d660); a player that is neither CIVILIZATION_LEVEL_FULL_CIV (0x469db0, hash 0x253718b0) nor...
+    - ...nit not the player's version (player +0x12e8 +0x1c0), a domain the city cannot train (0x17d660), a non-full, non-tribe player at peace with more than five units, a Spy for a non-full...
+  review: imported
+- addr: 0x17e690
+  final: 0x1005d0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      turn: 155
+      value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  impl: [cpu/core/aiCityBuild.ts:PickFacts]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  notes:
+    - ".claude/scratchpad/cb/notes.txt: ...AT ALL').  bestBuilding: value table plotEval(cityCenter)+0x28[bld]; skip if already in queue/has (0x17e690>0); adj via 0x5d2d10(list r15+0x528):    -1 -> +0.5 ; 1 -> +2.0 ; wonder(+0x159&4 && +0x228 == f2f9..."
+  context:
+    - "...rst in table order on a tie). Plain pick (flags 1, 0): the building not queued or held (0x17e690 > 0), CanConstruct (0x170450) true with its reason fields +0x54 / +0x68 clear, not Mu..."
+  review: imported
+- addr: 0x17f070
+  final: 0x100e80
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and no progress (0x17d1a0) reserv..."
+  review: imported
+- addr: 0x17f3a0
+  final: 0x101170
+  kind: function
+  name: City_BuildQueue
+  status: PARTLY
+  impl: [cpu/harness/import.ts:reserved]
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "- The reservation (City_BuildQueue 0x17f3a0 from the front check 0x17f070): a unit at the queue's front with a strategic cost and n..."
+  review: imported
+- addr: 0x17f870
+  final: 0x101500
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 44
+      value: "- each city in the player's order (0x4e4560 -> city turn 0x1fa1d0:   production, growth, the border turn 0x1a9bc0, loyalty): a WONDER its   production completes annexes WONDER_FREE_TILES_UPON_COMPLETI"
+    - recording: h1_duelw1117
+      turn: 217
+      value: "the list emptied, no   draw (runs/h1_duelw1117 t217: Meenakshi at Xi'an with nothing in reach,   none;"
+    - recording: 1123
+      turn: 112
+      value: 1123 t112 two;
+    - recording: 1118
+      turn: 227
+      value: 1118 t227   Kotoku-in two, a Roman unit teleported between).
+  impl:
+    - cpu/core/production.ts:pct
+    - cpu/data/constants.ts:WONDER_FREE_TILES
+    - cpu/harness/checks.ts:wondersInStart
+    - cpu/harness/checks.ts:startDraws
+    - gpu/core/sim_seats.py:_wonder_free_tiles
+  readings:
+    - "H-1: every draw of a player's start (witnesses, RandCalls.csv)"
+    - "H-1: a start's own event rows, the wonder's annex, the village a claim takes"
+  context:
+    - ...WONDER its production completes annexes WONDER_FREE_TILES_UPON_COMPLETION (2) plots (0x17f870, building info +0x158 bit 0x40, -> 0x1a8a30), one picker draw each, before the wonder's...
+    - "- A wonder's annex (0x17f870 → AnnexPlots 0x1a8a30) fires its CityTileOwnershipChanged rows BEFORE the WonderComplet..."
+  review: imported
+- addr: 0x183db0
+  final: 0x1049b0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - "...on-accumulated import / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource chan..."
+  review: imported
+- addr: 0x184ae0
+  final: 0x105270
+  kind: function
+  name: City_BuildQueue
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      turn: 112
+      value: "Records: runs/h1_duelw1108 Aquileia t112-125 7.625 Science = (7 + 9.9 x 38/256) x 0.9, t169-176 16.75 Gold = 12 + 16 x 76/256;"
+  impl:
+    - cpu/core/phase.ts:cost
+    - cpu/core/types.ts:City
+    - cpu/data/projects.ts:projectConversionRate
+    - gpu/core/sim_phase.py:_seat_city_produce
+  readings:
+    - "H-1: a district project's yield conversion — READ"
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+  context:
+    - "...roject id (+0x1360 = -1), then applies the Production (0x16f050), whose ORDER_ADVANCE arm 0x184ae0 walks the project's Project_YieldConversions rows (Project +0x168, loader 0xa98af0): for..."
+    - "...rt / export. Its callers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 fr..."
+  review: imported
+- addr: 0x1853d0
+  final: 0x105850
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 222
+      value: "a slot rebuild during the   city walk (a completion opening a slot: Big Ben, the Alhambra, a Shipyard's   slot) or a card signalled in the actions does not, until the next   ChangeResourceAmount: 1121"
+    - recording: 1121
+      turn: 196
+      value: "1121 t196, Big Ben re-slots Xi'an's cards mid-walk and the Line Infantry   (StrategicResource Niter) it buys after re-ranks them on the new cards —   the unit's strategic cost (0x1856b3 / 0x185a2a) ca"
+  impl:
+    - cpu/core/minorBuild.ts:minorBuild
+    - cpu/core/phase.ts:banked
+    - cpu/core/phase.ts:q
+    - gpu/core/sim_phase.py:_seat_city_produce
+  readings:
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: a completion's overflow and the item multiplier — READ"
+    - "H-1: the cards the luxury allocation ranks on — READ (the order), the triggers partly"
+  context:
+    - "...lers: a production completion's strategic costs (0x18433d building, 0x184d95 project, 0x1856b3 / 0x185a2a unit), a plot's extracted resource changing (0x4ab4d0 from the city, distric..."
+    - ...nt less its reservations covers it (0x4aa790), else leaves the front; the completion (0x1856b3 / 0x185a2a) releases the reservation and charges the stockpile together.
+    - "City_BuildQueue 0x16f050 → 0x1853d0: an item's progress takes (A + the stored overflow) × the item's percent multiplier — 0x1..."
+  review: imported

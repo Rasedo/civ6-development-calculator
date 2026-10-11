@@ -1,0 +1,152 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x5197e0
+  final: 0x366f30
+  kind: function
+  name: Rules_Combat
+  status: PARTLY
+  impl:
+    - cpu/core/combat.ts:xpStrength
+    - cpu/core/combat.ts:interceptFight
+    - cpu/core/promotions.ts:battleXp
+    - gpu/core/sim_masks.py:SimMasks
+    - gpu/core/sim_seats.py:_intercept_fight
+  readings:
+    - "B-89 tail: an air strike's XP — READ, one term open"
+    - "C-34: the interception's damage, XP, weariness and the answers"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBAR..."
+    - "- XP: the interceptor's = 0x5197e0 with the MELEE / UNIT_VS_UNIT types, the kill flag 0 and the interceptor as the DEFENDE..."
+  review: imported
+- addr: 0x51a240
+  final: 0x3674e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 13
+      value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"
+    - recording: 1120
+      turn: 13
+      value: 1120 t13 17 / 32 (a defender at 18 HP).
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the attacker's damage — is never drawn where the defender is embarked (..."
+  review: imported
+- addr: 0x51acb0
+  final: 0x367d90
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ves 100; bombard 100; times / 100 truncated. The bypass flag: no walls-ignore value and 0x51acb0 (the Siege Tower) without the ram. The engines: `districtHit` / `_district_hit` (the..."
+  review: imported
+- addr: 0x51af50
+  final: 0x368030
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ge is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives 100; ranged 50 unless the uni..."
+  review: imported
+- addr: 0x51c2d0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  impl: [cpu/core/combat.ts:cityStrikeStrength, gpu/core/sim_masks.py:_strike_strength]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "...COMBAT_MINIMUM_CITY_STRIKE_STRENGTH 3) plus the city's district attack bonus (+0x1890); 0x51c2d0 takes off the damaged district's loss — the wounded law (0x522630) at COMBAT_WOUNDED_..."
+  review: imported
+- addr: 0x51c810
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 45
+      value: "Records: 1124 t45-77 a barbarian Slinger on Rome's Galleys logs 15 - 12   (a +5 of its own, see below), Archers, Crossbowmen, Rangers and Field   Cannons on ships 17 under;"
+    - recording: 1122
+      turn: 99
+      value: Catapults, Bombards and Trebuchets on ships their   whole Bombard (1122 t99, t125, 1124 t103, t116, t198, 1128 t149, t150).
+    - recording: 1124
+      turn: 14
+      value: "- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's   Scout, t32, t37, t84;"
+    - recording: 1126
+      turn: 75
+      value: 1126 the Archer 2818053 on every shot t75-88;
+  impl:
+    - cpu/core/combat.ts:rangedDomainCS
+    - cpu/data/constants.ts:COMBAT_BOMBARD_VS_UNIT
+    - gpu/core/sim_masks.py:_ranged_domain_cs
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "- A ranged blow's domain term (0x51c810, the unit-vs-unit attack strength): a bombard attack (combat type 0x4fc9163d) loses C..."
+    - ...IER_UNIT_ADJUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
+  review: imported
+- addr: 0x51f070
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 23
+      value: "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the   player's m_bMilitaryCombatAdjacency (+0x1268), which only   EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_B"
+    - recording: 1124
+      turn: 38
+      value: "1124 t38 CombatLog: a barbarian Warrior at 68 HP beside a second logs +4,   its +5 less the wound plus one flanker)."
+    - recording: h1_duelw1127
+      turn: 16
+      value: "So the   gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the   engines' 26, the log's DefenderStrMod −4 where the "
+    - recording: 1124
+      turn: 14
+      value: "- Not explained by this reading (C-94 ASK): a +5 a barbarian unit carries on   some attacks and not others (1124 t14 a Spearman and a Warrior on Rome's   Scout, t32, t37, t84;"
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "...pportLive` / `_flank_support_live` read each player's civics. The defender's composer 0x51f070 calls 0x521ed0 for the combat type 0x5e2f7468 and 0x5228c0 for every other; 0x5228c0 ad..."
+    - ...JUST_COMBAT_STRENGTH, the barbarian traits, the difficulty rows), no term of 0x51c810 / 0x51f070 read here, and the dumps' promotions are empty.
+  review: imported
+- addr: 0x520270
+  kind: function
+  name: visibilityCS
+  status: PARTLY
+  impl: [cpu/core/combat.ts:cityStrikeDefenderCS]
+  readings: ["C-26: the struck unit's terms (install audit)"]
+  context:
+    - "...erm's modifiers and requirements from the layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\")..."
+    - "...TYPE_MATCHES COMBAT_RANGED and NOT attacking: a city's shot is ranged); `visibilityCS` (0x520270)."
+  review: imported
+- addr: 0x5212f0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...(0x6da56a3d) the clamped damage is taken at its percent: melee 15 unless a player flag (0x5212f0) or the ram test (0x51af50, the district's +0x1910 against the support's tier) gives..."
+  review: imported
+- addr: 0x521530
+  final: 0x36c2a0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 23
+      value: "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the   player's m_bMilitaryCombatAdjacency (+0x1268), which only   EFFECT_GRANT_COMBAT_ADJACENCY sets (CIVIC_GRANT_COMBAT_ADJACENCY_B"
+    - recording: 1124
+      turn: 38
+      value: "1124 t38 CombatLog: a barbarian Warrior at 68 HP beside a second logs +4,   its +5 less the wound plus one flanker)."
+    - recording: h1_duelw1127
+      turn: 16
+      value: "So the   gap at runs/h1_duelw1127 t16 — a barbarian Slinger on city-state 3's   Warrior at 51 HP on Floodplains beside a friend, 23 logged and the   engines' 26, the log's DefenderStrMod −4 where the "
+  impl: [cpu/core/combat.ts:FLANK_SUPPORT_CIVIC, gpu/core/sim_masks.py:_flank_support_live]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "- Flanking (0x521530) and Support (0x521ed0, 0x5228c0) are gated on the player's m_bMilitaryCombatAdjacency..."
+  review: imported

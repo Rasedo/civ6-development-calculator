@@ -1,0 +1,71 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x36f420
+  final: 0x265410
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1122
+      turn: 200
+      value: "both give the   same answer on the recorded cases: 1122 t200, Reyna established in   Changsha (Civil Prestige's amenity) leaves the ranking standing to t201   (the rebuild precedes her clock), and the"
+  readings: ["H-1: the luxury allocation's rebuilds — PARTLY READ"]
+  context:
+    - ...'s turn (0x1fa1d0 at 0x4e4813, in the loop over Player_Cities +0x12f0 from 0x4e47bc). 0x36f420 at 0x4e4665 is not the city turn. This REVERSES the earlier reading (cities at 0x4e4665...
+  review: imported
+- addr: 0x36f460
+  final: 0x265450
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1109
+      value: Confirmed on runs/h1_duelw1109 ..
+    - recording: 1116
+      value: "1116: 152 of 154 newly listed units standing on one of their player's city centres stand on the predicted city's (the two misses had spent their moves)."
+    - recording: 1116
+      turn: 112
+      value: "The importer (`spentAtSpawn`) takes a person spent before any record showed its unit to its site in that city: 1116 Ibn Khaldun t112 on Xian's Campus (the city's Districts housing part 3 -> 5 in the n"
+  readings:
+    - "H-1: the great person's spawn — READ"
+    - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+  context:
+    - ...rst city wins a tie) takes the spawn, on its centre (+0x158); none, the capital's centre (0x36f460), else the player's start plot (+0x1398). A sea unit (domain 0) walks the player's distri...
+    - "...tes a Relic through 0x495860 → 0x296c00 (\"Choosing a Relic\") with the player's capital (0x36f460). No record shows it (no Kandy suzerain discovered a wonder in the duels). `revealAroun..."
+  review: imported
+- addr: 0x36f660
+  final: 0xff430
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Tactical.csv
+      value: "Confirmed: the turn's \"Random   Direction\" draws pair one to one with the AI_Tactical.csv rows \"Wander\" and   \"Garrison\", every player's in log order (1,199 of 1,199 turn-pairs of the   five seeds), a"
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+  notes:
+    - ".claude/scratchpad/mu1/readings_c96.md: ...x469db0, CIVILIZATION_LEVEL_FULL_CIV)   only DEFENDER units, round the unit's city (+0x11d0 through 0x36f660),   the garrison test 0x5cdce0 first (\"Garrison\" rows, a draw over one plot);   for anyone else eve..."
+  context:
+    - "...IVILIZATION_LEVEL_FULL_CIV) only DEFENDER units, round the unit's city (+0x11d0 through 0x36f660), the garrison test 0x5cdce0 first (\"Garrison\" rows, a draw over one plot); for anyon..."
+  review: imported
+- addr: 0x36f6c0
+  final: 0x265510
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 102
+      value: A Spy takes   one at its birth (1117 t102, t118, t199 in China's start;
+    - recording: 1118
+      turn: 218
+      value: 1118 t218   before its level offer);
+    - recording: h1_duelw1118
+      turn: 231
+      value: "Which units: the unit's creation 0x4eeb70   calls 0x486bf0 → 0x486c20 where the unit info's Spy (+0x1ba bit 2) or   ExtractsArtifacts (+0x1b9 bit 1, `dll_rowmap.py 0xa6f2b0`) is set and the   player's"
+    - recording: 1122
+      turn: 129
+      value: 1122 t129 and 1124 t248 a Spy, trained and granted by the   Intelligence Agency, a name and no level offer).
+  readings: ["H-1: a city's name, a citizen's name — READ"]
+  context:
+    - "...f0): the major owning its plot (0x469db0), else the major whose city stands nearest it (0x36f6c0 per player, the first at the least distance); none, no draw. China's pool falls 40, 39,..."
+  review: imported

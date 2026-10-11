@@ -1,0 +1,185 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x54ae60
+  final: 0x38a950
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the religious spread — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...e and the source follows the religion; then the trade manager's route source -> target (0x54ae60, TRADE_ROUTE_PRESSURE_FOR_DESTINATION at gp +0x5f8) and target -> source (0x54bae0, _FO...
+  review: imported
+- addr: 0x54bae0
+  final: 0x38b0e0
+  kind: function
+  status: PARTLY
+  readings: ["C-94: the religious spread — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...get (0x54ae60, TRADE_ROUTE_PRESSURE_FOR_DESTINATION at gp +0x5f8) and target -> source (0x54bae0, _FOR_ORIGIN at +0x5fc).
+  review: imported
+- addr: 0x54bdb0
+  final: 0x38b310
+  kind: function
+  name: Trade_Manager
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+  impl: [cpu/core/trade.ts:routeLengthGold]
+  readings: ["H-1: a route's yield per path plot (Hunza) — READ"]
+  context:
+    - "Trade_Manager 0x54bdb0 (a route's yield of one type): the route's path from the trade manager's cache (0x541ae0;..."
+  review: imported
+- addr: 0x54c6c0
+  final: 0x38b870
+  kind: function
+  name: Trade_Manager
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 200
+      value: 1108 Jiaodong -> Rome +4 from its first record t200.
+    - recording: h1_duelw1130
+      value: "The importer's lifetime fold takes a pair's gain as the progress move of the   civic both records research (a city founded after record 1 lands its   Culture by record 2: runs/h1_duelw1130 Rome 3.2968"
+    - recording: 1129
+      turn: 146
+      value: "Open: 1129 Rome   t146-239 reads no dominance at the fold's 108.9 lifetime culture (AUDIT C-94   ASK)."
+  impl:
+    - cpu/core/trade.ts:routeDestLuxuryGold
+    - cpu/core/trade.ts:sovereigntyRouteYields
+    - cpu/core/trade.ts:civCity
+    - cpu/data/cityStates.ts:CITY_STATE_ROUTE_TO_OTHERS
+    - cpu/data/seats.ts:TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE
+    - gpu/core/sim_seats.py:_rk_add
+  readings: ["C-94: trade posts and cultural dominance — READ", "C-94: Sovereignty's route yield — READ"]
+  context:
+    - "...yer: visiting > the other's domestic sets the pair's flag, < clears it, equal keeps it. 0x54c6c0 adds TRADE_ROUTE_GOLD_CULTURAL_DOMINANCE (gp +0x6ec, 4) to a route whose origin's own..."
+    - "- Trade_Manager 0x54c6c0, per yield of a route: X = the DESTINATION city's route-to-others row of that yield (ci..."
+  review: imported
+- addr: 0x54eeb0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
+  impl: [cpu/core/trade.ts:ROUTE_PATH_MULTI_DOMAIN]
+  readings: ["H-1: the trade path's search, its score and the Canal — READ"]
+  context:
+    - "...120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreign, own); any other..."
+  review: imported
+- addr: 0x54ff90
+  final: 0x38dc20
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the city-states' quests — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- Send Trade Route (0x84b520): the actor runs no route to the minor (0x54ff90 == 0); done when the actor starts one to it (0x84b570)."
+  review: imported
+- addr: 0x5500b0
+  final: 0x38dd40
+  kind: function
+  name: Trade_Manager
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+    - recording: h1_duelw1124
+      value: "A Canal is that two-mask plot: runs/h1_duelw1124 Cardiff ->   Xiurong through Shenyang's Canal, 11 plots, 4 water, pays its 6 Gold   district rows twice over (score 23 >= 11) — 12 Gold, which water al"
+  impl:
+    - cpu/core/trade.ts:course
+    - cpu/core/trade.ts:ROUTE_PATH_RAIL
+    - gpu/core/sim_seats.py:_seat_route_income
+  readings:
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: a route's yield per path plot (Hunza) — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  context:
+    - "- Trade_Manager 0x5500b0 counts the Trading Posts on a route's path from index 1 through the destination, own an..."
+    - ...th, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) times the player's own / foreign post bonuses (0x4d9750, 0x4d9670); then the per-path-ti...
+    - "...a city centre (0x81120, the district row's hash). The route's path score (Trade_Manager 0x5500b0 counting, 0x54eeb0 weighing): past the origin, a centre counts its Trading Post (foreig..."
+  review: imported
+- addr: 0x5520a0
+  final: 0x38f6c0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the section \"C-96..."
+  review: imported
+- addr: 0x5526a0
+  final: 0x38f2c0
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1108
+      value: Aquileia -> Rome (5 plots) +1, Aquileia -> Hunza (10) +2, Rome -> Shenyang through Antium (21) +4 (runs/h1_duelw1108;
+    - recording: 1124
+      turn: 180
+      value: "- Unexplained (AUDIT C-94 LAB): 1124's Shenyang -> Bologna (t180) took the   Taiyuan - sea - Granada path although the walk as read labels the shared   plot (40,10) off the cheaper road first with 3 r"
+  readings:
+    - "H-1: a route's yield per path plot (Hunza) — READ"
+    - "H-1: the trade path's search, its score and the Canal — READ"
+  context:
+    - "...one type): the route's path from the trade manager's cache (0x541ae0; else a fresh path, 0x5526a0), n its plots (4-byte entries, both ends included); the posts counted on it (0x5500b0) ti..."
+    - ...41ae0 over the trade network graph's edges, 0x5419a0) answers a pair before any search (0x5526a0); whether an edge holds the reverse route's path is unread.
+  review: imported
+- addr: 0x552d40
+  final: 0x392150
+  kind: function
+  status: PARTLY
+  readings: ["C-94: Sovereignty's route yield — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...100 + a) / 100 where a is the ORIGIN player's Congress entry for that type (0x37b7a0 -> 0x552d40, shifted to 24.8), and nothing when a <= 0 or X <= 0: a minor's row is paid only unde..."
+  review: imported
+- addr: 0x552dd0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 68
+      value: "Record: 1112 China's Trader to   Preslav at sea t68–72 with Shipbuilding and no Celestial Navigation, the   route paying the water path's 11.4375 from t64."
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "...58ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the player's embark list, or a researched technology with EmbarkAll (T..."
+  review: imported
+- addr: 0x553680
+  kind: function
+  status: READ
+  cases:
+    - recording: 1112
+      turn: 68
+      value: "Record: 1112 China's Trader to   Preslav at sea t68–72 with Shipbuilding and no Celestial Navigation, the   route paying the water path's 11.4375 from t64."
+  impl: [cpu/core/units.ts:TRADE_WATER_NONE]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "- The Trader's sea: the trade path's context (0x558ba0) sets +0x1a1 from 0x553680, the player's CanEmbark (0x4ee3f0) of its Trader type (0x552dd0): a game flag, the play..."
+  review: imported
+- addr: 0x5545e0
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/trade.ts:PLUNDER_ROUTE_GOLD
+    - cpu/core/trade.ts:PLUNDER_ROUTE_TURNS
+    - cpu/core/trade.ts:routePlunderGold
+    - cpu/core/trade.ts:routeYieldValue
+    - gpu/core/sim_seats.py:_trade_walk_tick
+  readings: ["B-31r-S1: the plunder payout — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - Trade_Manager plunder 0x5545e0 (yield loop 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, spee...
+  review: imported

@@ -1,0 +1,14 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x48b9d0
+  final: 0x30d330
+  kind: function
+  name: APPOINT_GOVERNOR
+  status: PARTLY
+  readings: ["B-24r: the governor operations"]
+  context:
+    - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up..."
+  review: imported

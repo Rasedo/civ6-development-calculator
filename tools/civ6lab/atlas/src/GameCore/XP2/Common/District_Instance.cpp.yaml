@@ -1,0 +1,261 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x249850
+  final: 0x1905f0
+  kind: function
+  name: District::GetYield
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
+  impl: [cpu/core/moments.ts:adj]
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - ...a Plot:GetAdjacencyYield (binding 0x25600 -> 0x81b90 -> 0x5389b0) and District::GetYield (0x249850) both reach the sum 0x365720 (via 0x366df0, the plot's owner and city); the city's yield...
+    - "- District::GetYield 0x249850 (yield, percent flag): 0 while pillaged; else 0x366df0's adjacency + the district's fla..."
+    - "...EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amount x 0.01..."
+  review: imported
+- addr: 0x249e40
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...e the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player's own cities: the centre 0,..."
+  context:
+    - "...er sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the player's own cities: the..."
+  review: imported
+- addr: 0x249ee0
+  final: 0x190be0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  impl: [cpu/core/combat.ts:cityStrikeStrength, gpu/core/sim_masks.py:_strike_strength]
+  readings:
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
+  context:
+    - "- A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MINIMUM_CITY_S..."
+    - "...h city whose centre the player sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the..."
+  review: imported
+- addr: 0x24a000
+  final: 0x190cc0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 96
+      value: "The record's unit list stands before the in-turn   player's start while the plot reads the gamecore's: a military unit that   start's production completed already garrisons the centre (1127 Rome t96, "
+    - recording: 1119
+      turn: 112
+      value: 1119 t112 an Archer, no   term).
+  readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
+  context:
+    - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's un..."
+  review: imported
+- addr: 0x24a180
+  final: 0x190d90
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      value: formation,   0x56dc90) less the wounded loss, less the base, where positive (H-1 1108   Jiaodong 30.8359375 = 29 + 36 - 26 - 2090/256).
+    - recording: 1121
+      turn: 191
+      value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
+    - recording: 1127
+      turn: 96
+      value: "The record's unit list stands before the in-turn   player's start while the plot reads the gamecore's: a military unit that   start's production completed already garrisons the centre (1127 Rome t96, "
+    - recording: 1119
+      turn: 112
+      value: 1119 t112 an Archer, no   term).
+  impl: [cpu/core/combat.ts:garrisonCS, cpu/harness/checks.ts:luxAtRebuild]
+  readings:
+    - "C-94: the wounded law and the garrison — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+  context:
+    - "- The centre's garrison term (0x24a180): FP(Combat incl. formation, 0x56dc90) less the wounded loss, less the base, where posi..."
+    - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units i..."
+    - "...h (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-tur..."
+  review: imported
+- addr: 0x24aae0
+  final: 0x191400
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...t subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural Philosophy 29 for..."
+  review: imported
+- addr: 0x24ae80
+  final: 0x191680
+  kind: function
+  status: READ
+  cases:
+    - recording: 1127
+      turn: 96
+      value: "The record's unit list stands before the in-turn   player's start while the plot reads the gamecore's: a military unit that   start's production completed already garrisons the centre (1127 Rome t96, "
+    - recording: 1119
+      turn: 112
+      value: 1119 t112 an Archer, no   term).
+  impl: [cpu/harness/checks.ts:luxAtRebuild]
+  readings:
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
+  notes:
+    - ".claude/scratchpad/st1/reading.md: ...in) onto the   plots within its range. Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot bes..."
+  context:
+    - "- A district's GetDefenseStrength (Lua 0x98ca00 -> 0x24ae80) is computed live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's..."
+    - "...he plots within its range. Each such city whose centre the player sees: its strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach (0x249e40) or, with none, 1 on eac..."
+  review: imported
+- addr: 0x24af90
+  final: 0x191750
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/disasters.ts:pillageTileBuildings, gpu/core/sim_economy.py:_pillage_tile_buildings]
+  readings: ["C-74: BUILDING_PILLAGED's building — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "The applier 0x33a780 (owned plot, the district's city) asks the district's chooser 0x24af90: nothing on a pillaged district or an InternalOnly one (Districts +0xe1 bit 4: the City C..."
+  review: imported
+- addr: 0x24b170
+  final: 0x1918e0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 152
+      value: "So a unit in the Encampment garrisons the city: 1121 Xi'an t152, a Field Cannon in its Encampment and a Guru and a Builder on its centre, Retainers pays its amenity (civics part 2);"
+    - recording: 1124
+      turn: 168
+      value: 1124 Xiurong t168;
+    - recording: 1124
+      turn: 157
+      value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
+  impl: [cpu/core/units.ts:cityGarrisons]
+  readings: ["H-1: the garrison requirement — READ"]
+  context:
+    - "...seats a garrison (0x24b820, the districts with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ra..."
+  review: imported
+- addr: 0x24b290
+  final: 0x1919b0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...uilds the law's struct: +0 / +4 the two strengths, +8 the district's maximum hit points 0x24b290, +0xc / +0x10 the outer defense's damage and maximum, +0x14 the pool's hash, +0x1c CO..."
+  review: imported
+- addr: 0x24b4b0
+  final: 0x191b50
+  kind: function
+  status: READ
+  cases:
+    - recording: 1128
+      turn: 160
+      value: "1128 t160 (climate log FLOOD MITIGATED   on the Amur): China +1."
+  readings: ["H-1: a pillaged building's specialist, the centre's defence, three moments — READ"]
+  context:
+    - "...s the damage pass 0xa2a4d0, whose out parameter is the MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, el..."
+  review: imported
+- addr: 0x24b5a0
+  final: 0x191c00
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 40
+      value: "0x24aae0: its buildings') x Amount x 0.01f, bare, span (a city-state's Natural   Philosophy 29 for one Campus of 2, runs/h1_duelw1124 player 4 t40)."
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/majorView.ts:districtYieldOf
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "- EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier) / 100; 0x24aae0: its buildings') x Amo..."
+  review: imported
+- addr: 0x24b820
+  final: 0x191e10
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 152
+      value: "So a unit in the Encampment garrisons the city: 1121 Xi'an t152, a Field Cannon in its Encampment and a Guru and a Builder on its centre, Retainers pays its amenity (civics part 2);"
+    - recording: 1124
+      turn: 168
+      value: 1124 Xiurong t168;
+    - recording: 1124
+      turn: 157
+      value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
+  readings: ["H-1: the garrison requirement — READ"]
+  context:
+    - "...ON_ UNIT, 0xbbb1a0) walks the city's districts (+0x1a48); for each that seats a garrison (0x24b820, the districts with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's b..."
+  review: imported
+- addr: 0x24b960
+  final: 0x191f10
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 97
+      value: "- The walls' term: each wall building's OuterDefenseStrength (+0x44) and   the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the   district's outer damage (+0x8d8) below its outer "
+  readings: ["C-94: the wounded law and the garrison — READ"]
+  context:
+    - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
+  review: imported
+- addr: 0x24c2f0
+  final: 0x1928a0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 201
+      value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...IENDLY_CITY; a player's at war (0x469cd0) a COMBAT_DISTRICT where the district defends (0x24c2f0: a City Center, an Encampment) — and then nothing else of the plot — and a PASSIVE_DIST..."
+  review: imported
+- addr: 0x24c3a0
+  final: 0x192910
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1116
+      turn: 120
+      value: "Record: runs/h1_duelw1116 China — Coal at plot 411 under a Campus placed t120 before the Coal was revealed, plot 322 under a Great Wall, no mine anywhere — powers Beijing's Coal Power Plant (Factory +"
+    - recording: 1116
+      value: Both 3-a-turn sources fit 1116 alike (the ceiling binds);
+    - recording: 1116
+      value: 1116 city.yields 249 -> 112, step.border 114 -> 69;
+    - recording: 1128
+      turn: 160
+      value: "1128 t160 (climate log FLOOD MITIGATED   on the Amur): China +1."
+  readings:
+    - "H-1: the district adjacency — READ"
+    - "H-1: a plot's resource for its owner (strategic access) — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...ct), is complete (District +0xb08, Lua IsComplete 0x9c83d0) and not pillaged (+0xc88, 0x24c3a0); AdjacentTerrain: the plot's terrain (+0x2c) alone; AdjacentFeature (+0x3c); AdjacentI..."
+    - "...s id) is complete (district +0xb08, Lua `District:IsComplete` 0x9c83d0) and not pillaged (0x24c3a0, `IsPillaged`), that district's type; 0x4aaa70 then answers the plot's resource (+0x40, c..."
+    - "...he MITIGATING player — the owner (0x24b4b0) of the first complete (+0xb08), unpillaged (0x24c3a0) Dam on the river's plot list, else the Great Bath's (0xa2c280); a mitigating player..."
+  review: imported

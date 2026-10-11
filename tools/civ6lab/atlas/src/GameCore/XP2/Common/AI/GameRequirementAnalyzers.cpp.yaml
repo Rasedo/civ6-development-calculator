@@ -1,0 +1,158 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x6cfbd0
+  kind: function
+  name: PLAYER_HAS_PANTHEON
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...ith no religion in the context, else its religion +0x1910 is it); PLAYER_HAS_PANTHEON 0x6cfbd0 (the context's player is +0x40's — the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0..."
+  review: imported
+- addr: 0x6cfbf0
+  kind: function
+  name: CITY_FOLLOWS_PANTHEON
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "- The requirements: CITY_FOLLOWS_PANTHEON 0x6cfbf0 (the city's owner +0x1b8 is the context's player); CITY_FOLLOWS_RELIGION 0x6cfcb0 (any..."
+  review: imported
+- addr: 0x6cfcb0
+  kind: function
+  name: CITY_FOLLOWS_RELIGION
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - ...THEON 0x6cfbf0 (the city's owner +0x1b8 is the context's player); CITY_FOLLOWS_RELIGION 0x6cfcb0 (any city with no religion in the context, else its religion +0x1910 is it); PLAYER_H...
+  review: imported
+- addr: 0x6cfcd0
+  final: 0x492160
+  kind: function
+  name: HAS_ANY_IMPROVEMENT
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_ADJUST_TRADE_ROUTE_CAPACITY 0x6c0..."
+  review: imported
+- addr: 0x6d03d0
+  final: 0x492810
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x6d0670
+  final: 0x492ab0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x6d08c0
+  kind: function
+  name: REQUIREMENT_DISTRICT_TYPE_MATCHES
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...so a subject passes only by 0x6cf3c0. Read evaluators: REQUIREMENT_DISTRICT_TYPE_MATCHES 0x6d08c0 (the district subject's type, context +0x78; else the district type the evaluation is of,..."
+  review: imported
+- addr: 0x6d0af0
+  final: 0x492f30
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x6d1140
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
+- addr: 0x6d1970
+  final: 0x493d70
+  kind: function
+  name: RESOURCE_TYPE
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...hted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mi..."
+  review: imported
+- addr: 0x6d1c00
+  kind: function
+  name: RESOURCE_VISIBLE
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...IN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd0 (+0x44) — the Water Mill 121 -> 163 of 1124's; EFFECT_A..."
+  review: imported
+- addr: 0x6d1dd0
+  final: 0x48f400
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...mpassable: half the Amount's PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00,..."
+  review: imported
+- addr: 0x6d27a0
+  final: 0x48fc00
+  kind: function
+  name: PLAYER_IS_RELIGION_FOUNDER
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+  context:
+    - "...0 (the context's player is +0x40's — the evaluating player); PLAYER_IS_RELIGION_FOUNDER 0x6d27a0 (no religion: held; else 0x497cc0). A requirement the registry lacks (PLAYER_HAS_AT_L..."
+  review: imported
+- addr: 0x6d3830
+  final: 0x490c90
+  kind: function
+  name: REQUIREMENT_CITY_HAS_BUILDING
+  status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...+0x78; else the district type the evaluation is of, +0x1c), REQUIREMENT_CITY_HAS_BUILDING 0x6d3830 (a city subject holding it; a wonder (Buildings +0x158 & 0x40) only when the evaluation i...
+  review: imported
+- addr: 0x6d4380
+  final: 0x4917e0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: "COLLECTION_CITY_PLOT_YIELDS (0x69feb0: the city's plots of   index below 0x5cbc0(2) + 18 that it owns) with EFFECT_ADJUST_PLOT_YIELD   0x6afa10 (a plot not impassable: half the Amount's PV(H) - PV(T),"
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd...
+  review: imported

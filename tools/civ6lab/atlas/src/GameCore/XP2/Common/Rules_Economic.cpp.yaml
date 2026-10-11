@@ -1,0 +1,257 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x524e30
+  final: 0x36f140
+  kind: function
+  status: READ
+  cases:
+    - recording: 1108
+      turn: 159
+      value: "A purchase made after the turn's culture step so leaves the city with no stored plot until its next culture turn (the records' -1 after an AI's purchase: 1108 Chengdu t159–162);"
+    - recording: 1121
+      turn: 41
+      value: "Recorded: a city-state's envoy annex re-places before its growth (1121   Hunza t41: 229 annexed, the growth on surplus 3 where the record's set   read 4;"
+  readings:
+    - "H-1: the annex, the purchase and the stored next plot — READ"
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...n) (0x1a8a30: n picker draws, each annexed), the plot swap (0x1ac910), the culture bombs (0x524e30), the Trader's tiles en route (0x558510) and the Gold purchase (0x977aa0: the price spent..."
+    - "...tiles, a founding, a city-state's envoy annex —, the purchase 0x1a7710, a culture bomb 0x524e30) raises the annexed count (+0xc), clears the stored next plot (+0x1c) and runs the full..."
+  review: imported
+- addr: 0x525400
+  final: 0x36f620
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1112
+      turn: 49
+      value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
+    - recording: h1_duelw1117
+      turn: 25
+      value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
+    - recording: h1_duelw1110
+      value: "Player 0 of   runs/h1_duelw1110, 1112 and 1115 reads Diplomatic League 93 / 140 / 234   and Charismatic Leader 18: its agenda's Influence row at 1.25 (the   pseudo-yield weight above)."
+  impl: [cpu/data/aiValue.ts:AI_POLICY_HORIZON]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "H-1: the upgrade's gold — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+  context:
+    - "...VEST_IMPROVED_DEGRADATION 50 − 30 more pillaged, +0x4d bit 0)/100; then the game speed (0x525400 in 1/256, truncated: half online); then the plot's city's harvest percent (+0x1e08, t..."
+    - "..., \"iNetProduction >= 0\"), in 24.8: UPGRADE_BASE_COST (GP +0x740, 10) at the game's speed (0x525400); net = (the new chassis' production cost − the old one's, 0x4f2b20) x UPGRADE_NET_PRODUC..."
+    - "...peed(100), speed(200), 50], speed(x) = x x GameSpeeds.CostMultiplier / 100 (0x5254d0 -> 0x525400): the tables' valueHorizons[1] is 50 online."
+  review: imported
+- addr: 0x5254d0
+  final: 0x36f6f0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1109
+      turn: 110
+      value: "Records: 1109 plot 785's   footprint −1 Food t110–111 (and t121, t133, t209), 1110 plot 887's   EXTREME t64–68."
+    - recording: 1116
+      turn: 6
+      value: "- A barbarian outpost's dispersal (0x52e970): the improvement's DispersalGold   (row +0x38) plus the clearer's `m_axGoldDispersalChange` >> 8, through the   game speed (0x5254d0, CostMultiplier / 100 "
+    - recording: 1116
+      turn: 15
+      value: "- The pantheon's price (0x340c90, at the game's setup): 0x5254d0 of   RELIGION_PANTHEON_MIN_FAITH (gp +0x5cc), stored at +0x128: 12 online (1116   China 15 → 3 at t15)."
+    - recording: h1_duelw1117
+      turn: 25
+      value: "Check: runs/h1_duelw1117 China t25, Slinger (17) to Archer (30): 5 + 2 x 13 = 31, the purse fell 30."
+  impl:
+    - cpu/core/goodyHuts.ts:goodyEligible
+    - cpu/core/trade.ts:PLUNDER_ROUTE_TURNS
+    - cpu/data/aiValue.ts:AI_POLICY_HORIZON
+    - cpu/data/aiValue.ts:AI_BELIEF_HORIZON
+    - cpu/data/barbarians.ts:BarbTribeDef
+    - cpu/data/cityStates.ts:LEVY_TURNS
+    - cpu/data/constants.ts:CAMP_DISPERSAL_GOLD
+    - cpu/data/constants.ts:STOCKPILE_CAP_BASE
+    - cpu/data/disasters.ts:DROUGHT_TURNS
+    - cpu/data/religion.ts:PANTHEON_FAITH_COST
+    - cpu/data/seats.ts:ERA_MIN_TURNS
+    - ai/major/operations/nodes.ts:child
+  readings:
+    - "B-31r-S1: the plunder payout — CLOSED"
+    - "C-94: the game era, the ages and the founding moments — READ"
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+    - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"
+    - "H-1: the upgrade's gold — READ"
+    - "H-1: the goody hut's kind — READ"
+    - "H-1: the luxury allocation's rebuilds — PARTLY READ"
+    - "H-1: the levy's term — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+  context:
+    - "...op 0x554860..0x554a4e, route yields 0x559b30 origin / 0x559bc0 destination, speed scaling 0x5254d0). Check: `dll_plunder.py`."
+    - "...xTurn 0x2c37c0 = start + scale(GameEraMaximumTurns) (Eras_XP1 row +0x24 / +0x2c), scale 0x5254d0 = x × GameSpeeds. CostMultiplier / 100 truncated: online 20 / 30. The first era's start..."
+    - "...drought's end turn (0x2922ff, beside \"Pick Drought Start Plot\"): the current turn plus 0x5254d0(the row's Duration) — the game speed's CostMultiplier / 100, truncated: online 2 (MAJOR..."
+  review: imported
+- addr: 0x525500
+  final: 0x36f720
+  kind: function
+  status: PARTLY
+  impl: [cpu/data/seats.ts:AGE_SLIGHT_PCT]
+  readings: ["C-94: the game era, the ages and the founding moments — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...LDEN_AGE_SCORE_BASE_THRESHOLD 28) and s + scale_SLIGHT(DARK_AGE_SCORE_BASE_THRESHOLD 14) (0x525500 with SCALING_SLIGHT 0x50b150fa: × GameSpeed_Scalings.DefaultCostMultiplier / 100 truncate..."
+  review: imported
+- addr: 0x525590
+  final: 0x36f7b0
+  kind: function
+  name: CostMultiplier
+  status: READ
+  cases:
+    - recording: h1_duelw1118
+      turn: 68
+      value: "Recorded: runs/h1_duelw1118   Armagh, a city-state with a Holy Site, reads GetPressureFromCity 8 on every   record whose queue Prayers heads (t68–85, t116–130, t139–156, t212 on) and   4 on the rest ("
+    - recording: 1107
+      value: 1107 Kandy's 8 against 4.
+  impl: [cpu/data/aiValue.ts:AI_DISCOUNT_PCT]
+  readings:
+    - "C-94: the religious spread — READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  context:
+    - "...RESSURE, the Bishop) + the queue term) / 100, the percents SUMMED, then the game speed (0x525590). The queue term: the city's build queue (+0x2170, head 0x179650; -1 when empty) name..."
+    - "...er (0x6ddb40..0x6ddba3) writes AI_DISCOUNT_RATE (GlobalParameters +0x10, 2.0) through 0x525590 — x 100 / the speed's CostMultiplier ([speed+0x28]) — over the constructor's 0x200 (0x6..."
+  review: imported
+- addr: 0x5256d0
+  final: 0x36f860
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1112
+      turn: 49
+      value: "Records: runs/h1_duelw1112 Xi'an's Rainforest   (Food 10 and Production 10, Features.xml) cleared t49 and t64, +11 and +14   Food at P 15 and 20, its Marsh (Food 20) t74 +31 at P 24 — each landing   i"
+  impl: [cpu/core/economy.ts:lumpValue, cpu/data/constants.ts:HARVEST_IMPROVED_DEGRADATION]
+  readings:
+    - "H-1: the best melee, the drought's turns, the Trader's sea, the harvest's lump, the district discount — READ"
+  context:
+    - "- A harvest's or feature removal's lump: the harvest 0x95fbf0 calls 0x5256d0 once per yield row (`Resource_Harvests.Amount`, `Feature_Removes.Yield`): A = base + (b..."
+  review: imported
+- addr: 0x525b90
+  final: 0x36fc00
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e0 (the sect..."
+  review: imported
+- addr: 0x526330
+  final: 0x3700f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...T). 0x78e0a0 (per known city of the knowledge base +0xe0 entries, the routes' yields 0x526330 / 0x525b90, 0x5520a0) is the trade AI's route walk, not the unit table: that is 0x7989e..."
+  review: imported
+- addr: 0x5267a0
+  final: 0x3703c0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/effects.ts:policyEscalated, cpu/data/constants.ts:GAME_COST_ESCALATION]
+  readings: ["B-D: the policy-unlock price — CLOSED"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...etCostToUnlockPolicies` 0x398e70 (Lua `GetCostToUnlockPolicies` 0x9a2280), the escalation 0x5267a0 (type 1), the progress 0x399810 (civics) / 0x4c9cf0 (techs). Check: `dll_policy.py`."
+  review: imported
+- addr: 0x5275a0
+  final: 0x370f40
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)", "H-1: the luxury allocation — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL inser..."
+    - ...es (0x4a1fd0 -> 0x4a0f60, stable) ascending by non-luxury + granted - amenities needed (0x5275a0), i.e. neediest first, once before the first resource and again after each;
+  review: imported
+- addr: 0x527610
+  final: 0x370fb0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...action (Worth +0x24, Cost +0x18),   less the action's gold cost valued at the owner's Gold weight (0x527610 ->   0x7a6690), both sign-clipped by the owner's preference of the action   (+0x6240, the AiFavored..."
+  context:
+    - ...orth +0x24, Cost +0x18), less the action's gold cost valued at the owner's Gold weight (0x527610 -> 0x7a6690), both sign-clipped by the owner's preference of the action (+0x6240, the...
+  review: imported
+- addr: 0x5276c0
+  final: 0x371060
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  readings:
+    - "H-1: the citizen manager's placement and the yield flags — READ"
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+  context:
+    - "...) << 8) / 256)), food the city's cached food yield (0x1cb8b0, `m_bIsCached`), consumption 0x5276c0 of the new population. One entry per free slot of each plot of the city's 37-plot hexspac..."
+    - "...ousing, T, H): S = the Food surplus less the citizens' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEF..."
+  review: imported
+- addr: 0x5276e0
+  final: 0x371080
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - ...g < 1 a step (0, S(1 - g), pop); the turns to the next citizen 0x1b6390 (the threshold 0x5276e0 less the store +0x80 over S x the overall growth multiplier 0x1b62d0, rounded up; -1 wi...
+  review: imported
+- addr: 0x527a50
+  final: 0x371260
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the luxury allocation — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...e player holds (0x510960), resource index order: reach = the resource's per-copy reach (0x527a50); a no-cap resource (`m_aiNoCapResources` > 0, the Luxury Policy's duplicate) multiplie..."
+  review: imported
+- addr: 0x527ca0
+  final: 0x371420
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1124
+      value: The Sewer 7 -> 47 and the Granary 172 -> 177 of 1124's.
+  impl: [cpu/core/aiCityBuild.ts:housingFactor]
+  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  context:
+    - "...' (0x1b5620: City::GetYield FOOD - 0x5276c0(pop)), housing 0x1b5840 (whole); the factor 0x527ca0(left) = 0 below CITY_HOUSING_LEFT_ZERO_GROWTH (-4), 0.25 to _25PCT (0), 0.5 at _50PCT (..."
+  review: imported
+- addr: 0x527e30
+  final: 0x3715b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 201
+      value: "a   Neighborhood, an Aqueduct none: 1124 t201, the Ironclads pass the   Neighborhood at 17:15 for the Campus at 17:14), complete (+0xb08) and not   pillaged (0x24c3a0);"
+  readings:
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "...lse of the plot — and a PASSIVE_DISTRICT where its type counts toward the city's limit (0x527e30: Districts.RequiresPopulation; a Neighborhood, an Aqueduct none: 1124 t201, the Ironcla..."
+  review: imported

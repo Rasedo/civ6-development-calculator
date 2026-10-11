@@ -1,0 +1,251 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x3bdb10
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the city list's order); oppon..."
+  review: imported
+- addr: 0x3bdbc0
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...plomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the cit..."
+  review: imported
+- addr: 0x3bdc70
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...location 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties keep the city list's or..."
+  review: imported
+- addr: 0x3bdd20
+  final: 0x1d1ed0
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population descending, EASTL insertion under 29: ties k..."
+  review: imported
+- addr: 0x3bddd0
+  final: 0x292690
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...ng, EASTL insertion under 29: ties keep the city list's order); opponent sorts 0x3bde80 / 0x3bddd0. Check: `dll_ww.py`."
+  review: imported
+- addr: 0x3bde80
+  final: 0x292740
+  kind: function
+  status: PARTLY
+  readings: ["B-D-S1: the war-weariness split — CLOSED (structure)"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...on descending, EASTL insertion under 29: ties keep the city list's order); opponent sorts 0x3bde80 / 0x3bddd0. Check: `dll_ww.py`."
+  review: imported
+- addr: 0x3cda00
+  final: 0x29eb40
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 199
+      value: "Recorded:   runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and   no amenity lost at record 200, 424 after its t200 decay and one lost at   record 201 (the growth at t200 on the "
+    - recording: 1128
+      value: "The ledger   (Logs/Player_WarWeariness.csv) carries no turn: each \"Attacking\" row is the   attacker's k-th combat against that player in Logs/CombatLog.csv (China's   18, Rome's 9 on 1128), each \"At W"
+  impl:
+    - cpu/core/weariness.ts:warWearinessLosses
+    - cpu/data/seats.ts:WW_ERA_BASE_FORMAL
+    - cpu/data/seats.ts:WW_LOSS_AT_WAR_CITY
+  readings:
+    - "B-D-S1: the war-weariness split — CLOSED (structure)"
+    - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+  context:
+    - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb..."
+    - "- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid by 0x3d7020, whose one caller is Player DoTurn (0x4e465..."
+  review: imported
+- addr: 0x3d1450
+  final: 0x2a1bd0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: war weariness per combat — PARTLY READ"]
+  context:
+    - .../ 100, X = min(the war's DiplomaticActions WarmongerPercent, the player's cap +0x1a48) (0x3d1450); amount = loc x base x (100 + the player's +0x18c8 + the foe's +0x1808 [+ +0x1868 in...
+  review: imported
+- addr: 0x3d7020
+  final: 0x2a4440
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 199
+      value: "Recorded:   runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and   no amenity lost at record 200, 424 after its t200 decay and one lost at   record 201 (the growth at t200 on the "
+    - recording: 1128
+      value: "The ledger   (Logs/Player_WarWeariness.csv) carries no turn: each \"Attacking\" row is the   attacker's k-th combat against that player in Logs/CombatLog.csv (China's   18, Rome's 9 on 1128), each \"At W"
+  readings:
+    - "B-D-S1: the war-weariness split — CLOSED (structure)"
+    - "H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"
+  context:
+    - "`Player_Diplomacy` allocation 0x3cda00 (from 0x3d7020); requirement 0x5275a0; city sorts 0x3bdd20 / 0x3bdbc0 / 0x3bdc70 / 0x3bdb10 (population..."
+    - "- War weariness's amenity losses (0x3cda00, `warWearinessLosses`) are laid by 0x3d7020, whose one caller is Player DoTurn (0x4e4656, before the resources step 0x4e46c0 and th..."
+  review: imported
+- addr: 0x3d7270
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelw1128
+      turn: 199
+      value: "Recorded:   runs/h1_duelw1128 Xi'an, China's weariness 474 after its t199 attacks and   no amenity lost at record 200, 424 after its t200 decay and one lost at   record 201 (the growth at t200 on the "
+    - recording: 1128
+      value: "The ledger   (Logs/Player_WarWeariness.csv) carries no turn: each \"Attacking\" row is the   attacker's k-th combat against that player in Logs/CombatLog.csv (China's   18, Rome's 9 on 1128), each \"At W"
+  readings: ["H-1: a growth re-ranks no luxury; war weariness's amenities at the processing — READ"]
+  context:
+    - "...(0x4e4656, before the resources step 0x4e46c0 and the cities), after the turn's decay (0x3d7270): a city's loss stands as its owner's last processing laid it. Recorded: runs/h1_duel..."
+  review: imported
+- addr: 0x3d8d20
+  final: 0x2a5950
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1110
+      value: "- NEW_WARMONGER (0xb7eee0, arguments 0xb81dd0): the owner's grievances   against the subject (0x3d8d20), -PercentOfGrievances (20) % of them, no   lower than LowerLimit (-60): the logged -30 after eac"
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+  context:
+    - "...W_WARMONGER (0xb7eee0, arguments 0xb81dd0): the owner's grievances against the subject (0x3d8d20), -PercentOfGrievances (20) % of them, no lower than LowerLimit (-60): the logged -30 a..."
+  review: imported
+- addr: 0x3d8da0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the majors' opinion — the agendas and the first impression READ, the modifiers PARTLY READ"
+  context:
+    - "...-Penalty times the owner's ledger count of the subject's incidents of kind 0xfadf5055 (0x3d8da0) — the logged -3 / -6 / 0; the ledger's writer and expiry are unread."
+  review: imported
+- addr: 0x3d9450
+  kind: function
+  status: UNREAD
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...+0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processing Action From AI to AI\",..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...+ slot 2 >= the cost); CanDoAction; and the last   diplomatic turn with p (diplomacy +0x11b8[p] via 0x3d9450, writer unread)   + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the   turn. The..."
+  context:
+    - ...= the cost); CanDoAction; and the last diplomatic turn with p (diplomacy +0x11b8[p] via 0x3d9450, writer unread) + GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (3, +0x20) below the...
+  review: imported
+- addr: 0x3da560
+  final: 0x2a6a50
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-96: the city-states' tactical pass — READ (Wander Near City, Heal, the non-barbarian priorities, FindAlternateLocation), the families it needs PARTLY READ"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  notes:
+    - "imported: READ in its section, no confirming case found beside it"
+    - ".claude/scratchpad/mu1/readings_c96.md: ...r plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else   NEUTRAL_CITY — each where the player..."
+  context:
+    - "...er (0x783980 0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else NEUTRAL_CITY — each where..."
+    - ...0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency,...
+  review: imported
+- addr: 0x3daaf0
+  final: 0x2a6be0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1103
+      value: "Fit: `step.eraScore` 394 / 482 (1103) and 372 / 480 (1104), from 382 and 365;"
+    - recording: h1_duelw1119
+      turn: 13
+      value: "A Relic, however it comes — a martyred Apostle, a village, Jeanne d'Arc — is created by Game_Culture 0x296c00: ONE \"Choosing a Relic\" draw over the 24 GREATWORK_RELIC rows not yet created, none left n"
+    - recording: 1120
+      turn: 83
+      value: 1120 t83 over 24, t92 over 23;
+    - recording: 1123
+      turn: 168
+      value: 1123 t168 over 24).
+  readings:
+    - "C-94: the game era, the ages and the founding moments — READ"
+    - "C-94: trade posts and cultural dominance — READ"
+    - "H-1: the goody hut's other gates and the Relic — READ"
+    - "H-1: the city-states' quests — READ"
+    - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+  context:
+    - "...the founder, is a full civ (0x469db0, CIVILIZATION_LEVEL_FULL_CIV), the founder has met (0x3daaf0) and the plot is revealed to the founder. Pantheon 0x314840: FIRST_IN_WORLD when no other..."
+    - ...with no civic chosen is held at +0xb40 until one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refre...
+    - "...2 row (+0x18): +0x28 bit 0 CityState — a city-state in the minor list the player has met (0x3daaf0); bit 1 StrategicResources — a RESOURCECLASS_STRATEGIC resource whose condition the playe..."
+  review: imported
+- addr: 0x3dcec0
+  final: 0x2a86c0
+  kind: function
+  status: PARTLY
+  readings:
+    - "H-1: the city-states' quests — READ"
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...49cc0 / 0x449940), the client has met the actor (0x3daaf0) and is not at war with it (0x3dcec0), then the logic's own test; weight 1 each; one draw \"Selecting a random new quest\" ove..."
+    - "...id +0x4c); then per other player — a WAR definition where at war (0x469cd0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); t..."
+  review: imported
+- addr: 0x3dcf50
+  final: 0x2a8740
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelv1124
+      value: "an Archaeologist,   PSEUDOYIELD_UNIT_ARCHAEOLOGIST, skipped) add their value: runs/h1_duelv1124   a city-state's Shrine logs FX(-9999) plus its own value on 124 of the 127   analyses at six units or m"
+    - recording: AI_Knowledge.csv
+      value: "else the trade AI's route value K (its knowledge base +0x6d8, logged as   AI_Knowledge.csv \"TRADE, TO -1, VAL\" by 0x5ed280;"
+    - recording: 1124
+      value: the analysis reads the K the turn before   logged (Lighthouse 96 -> 110, Market 91 -> 107 of 1124's at the same T).
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+  context:
+    - ...l (city +0x5e8 m_bCapital), +1 with a wonder (0x18e930), population / 5 + 1, +2 at war (0x3dcf50), the city's CityBuildAI +0x1b8 where above -1, +4 where any city of the player has i...
+    - "...VEL_FULL_CIV (0x469db0, hash 0x253718b0) nor _TRIBE (0x469ce0, 0xd959ec24), not at war (0x3dcf50) and holding more than five units (player +0x12e8 +0xc0); a Spy (Units +0x1ba bit 2 — t..."
+    - ...21e0); the governments' (+0x130, 0x7b26b0); x1.5 where the row is [+0x12a0]+0xd88 and 0x3dcf50 holds; + the row's modifiers analysed (0x7a4b20). The discount is the GlobalAI's +0x290...
+  review: imported
+- addr: 0x3dd9a0
+  final: 0x2a9030
+  kind: function
+  name: CanDoAction
+  status: PARTLY
+  readings:
+    - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+  notes:
+    - ".claude/scratchpad/dp2/NOTES.md: ...t human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processi..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...DISFAVORED by the owner's or p's preference, with desire   <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0:   the per-player per-action flag +0x6390, then the can-do functor); a   f..."
+    - ".claude/scratchpad/dp2/readings_dp2.md: ...ssistance, Declare Friendship,   the war declarations, Propose Trade and the deals), CanDoAction   (0x3dd9a0), and the checks CanDenounce / CanGoToWar / CanOfferAlliance...."
+  context:
+    - "...by the owner's or p's preference, with desire <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0: the per-player per-action flag +0x6390, then the can-do funct..."
+    - ...Declare Friendship, the war declarations, Propose Trade and the deals), CanDoAction (0x3dd9a0), and the checks CanDenounce / CanGoToWar / CanOfferAlliance.
+  review: imported
+- addr: 0x3de4e0
+  final: 0x2a9b50
+  kind: function
+  status: PARTLY
+  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...acy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency, +0x18, on...
+  review: imported
+- addr: 0x3dfae0
+  final: 0x2aad00
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
+  context:
+    - "...wer Cities (cities <= threshold); Handicap at or below (player +0x908); Major Civ Wars (0x3dfae0: majors at war <= threshold); Is On Island (GrandStrategic +0x4a0); Has Agenda (+0xe20,..."
+  review: imported

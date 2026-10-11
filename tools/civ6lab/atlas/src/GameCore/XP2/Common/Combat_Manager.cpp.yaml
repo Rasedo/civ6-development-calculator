@@ -1,0 +1,239 @@
+# The DLL atlas, curated layer (tools/civ6lab/atlas.py documents the record).
+# Records keyed by GameCore_XP2_Release.dll RVA; `final` the FinalRelease RVA.
+# `review: imported` = bootstrapped from dll_readings.md / code comments / saved
+# labels and not yet reviewed: verify against the disassembly, then edit and
+# set `review: reviewed`.
+- addr: 0x1fb680
+  final: 0x14efa0
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/combat.ts:interceptFight]
+  readings:
+    - "C-34: the interception's damage, XP, weariness and the answers"
+    - "H-1: war weariness per combat — PARTLY READ"
+  context:
+    - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat..."
+    - "- 0x1fb680, per side, the attacker logged \"Attacking\": loc = 1 in lands allied to the unit (GP +0x..."
+  review: imported
+- addr: 0x1fbae0
+  final: 0x14f400
+  kind: function
+  status: PARTLY
+  impl: [cpu/core/combat.ts:spendAttack]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "- An attack ends the attacker's fortification: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0)...."
+  review: imported
+- addr: 0x203cb0
+  final: 0x155510
+  kind: function
+  status: PARTLY
+  impl:
+    - cpu/core/combat.ts:xpStrength
+    - cpu/core/combat.ts:interceptFight
+    - cpu/core/combat.ts:airAnswers
+    - gpu/core/sim_seats.py:_air_answers
+  readings:
+    - "B-89 tail: an air strike's XP — READ, one term open"
+    - "C-34: the interception's damage, XP, weariness and the answers"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "Rules_Combat 0x5197e0 (called by every resolver; the air strike 0x203cb0 picks the combat type 0x204451: BOMBARD when the plane's Bombard > its Ranged). Check: `d..."
+    - "- The air resolver 0x203cb0 (struct: [+0] the plane, [+8] the target, [+0x10] the interceptor, [+0x18] the anti-air..."
+  review: imported
+- addr: 0x204b10
+  final: 0x156120
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 14
+      value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
+  impl: [cpu/core/combat.ts:districtHit, cpu/harness/replayActions.ts:combat]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - ...E_DAMAGE_PERCENT_MELEE 15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the at...
+  review: imported
+- addr: 0x205720
+  final: 0x156ae0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_UnitEfficiency.csv
+      value: "Logged once a game as   AI_UnitEfficiency.csv (\", %3.2f\"), the same in every recording;"
+  readings:
+    - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+  context:
+    - "...ombat 0) 1.0; one without against one with 0.01 / 100.0; else two combat simulations (0x205720) of the neutral player's units, each attacking the other: the damage each takes in both..."
+  review: imported
+- addr: 0x205da0
+  kind: function
+  status: PARTLY
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...: 0x1fbae0 sets its fortify turns to 0 (0x5707b0(attacker, 0)) once the result is made (0x205da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959..."
+  review: imported
+- addr: 0x206080
+  final: 0x156f20
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 14
+      value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
+  impl:
+    - cpu/core/combat.ts:districtHit
+    - cpu/core/combat.ts:cityAssault
+    - cpu/core/combat.ts:attackEncampment
+    - cpu/harness/replayActions.ts:unit
+    - gpu/core/sim_seats.py:_attack_encampment
+    - gpu/core/sim_seats.py:_assault_city
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "- A unit's attack on a city (0x206080, melee) draws three times: 0x519370 the attacker's damage, then 0x519440 the district's..."
+  review: imported
+- addr: 0x206960
+  final: 0x157510
+  kind: function
+  status: READ
+  cases:
+    - recording: 1124
+      turn: 13
+      value: "Records: 1124 t13 a barbarian Warrior at 8 HP (32 taken, 24 over) on a   city-state Warrior at 19 (31 drawn, 12 over): CombatLog 18 / 32, the   Warrior stands at 1;"
+    - recording: 1120
+      turn: 13
+      value: 1120 t13 17 / 32 (a defender at 18 HP).
+  impl:
+    - cpu/core/combat.ts:resolveMutualKill
+    - cpu/core/combat.ts:atkCS
+    - cpu/harness/replayActions.ts:melee
+    - gpu/core/sim_seats.py:_melee_exchange
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - "- The melee result (0x206960, Combat_Manager): the defender's damage is drawn first (0x51a240); the counter — the at..."
+  review: imported
+- addr: 0x207080
+  final: 0x157bb0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1120
+      turn: 50
+      value: "Records:   1120 China's cities strike at 25 from t50 (an Archer made), 40, 60, 70 as   Crossbowmen, Field Cannons and Battleships come;"
+  readings:
+    - "C-26: the struck unit's terms (install audit)"
+    - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
+  context:
+    - "...e layered install; the district-defender strength 0x520270 (called by the district attack 0x207080) carries the diplomatic-visibility (\"ESPIONAGE\") bonus."
+    - "- A city's strike strength (0x207080 → 0x249ee0): max(PlayerStats +0x150, m_iMaxRangedStrengthTrained (0x4bd030), COMBAT_MIN..."
+  review: imported
+- addr: 0x2074b0
+  final: 0x157ef0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1117
+      turn: 14
+      value: "The log carries   one UnitDamageChanged for the three (1117 t14: a barbarian Warrior at 27 HP   on Valletta;"
+  impl: [cpu/core/combat.ts:districtHit, cpu/harness/replayActions.ts:combat]
+  readings: ["H-1: the melee result, a ranged blow's domain, a city's shot — READ"]
+  context:
+    - ...15 (RANGED 50, BOMBARD 100; +0x1a4, +0x1a8, +0x1a0). The ranged (0x204b10) and bombard (0x2074b0) attacks draw twice (hit points, defense) and nothing for the attacker. The log carries...
+  review: imported
+- addr: 0x208b80
+  final: 0x159250
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 191
+      value: "Recorded: 1121 Guangzhou t191, a Line Infantry Corps (75,   16 HP) over an Ironclad (70, 75 HP): 66.6015625 = 60 + 75 − 2150/256 − 60   (the strongest-by-term reading gave 67.5)."
+    - recording: 1121
+      turn: 152
+      value: "So a unit in the Encampment garrisons the city: 1121 Xi'an t152, a Field Cannon in its Encampment and a Guru and a Builder on its centre, Retainers pays its amenity (civics part 2);"
+    - recording: 1124
+      turn: 168
+      value: 1124 Xiurong t168;
+    - recording: 1124
+      turn: 157
+      value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
+  impl:
+    - cpu/core/combat.ts:garrisonCS
+    - cpu/core/tactical.ts:tacticalTargets
+    - cpu/core/tactical.ts:defenderAt
+    - cpu/harness/checks.ts:fresh
+  readings:
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+    - "H-1: the garrison requirement — READ"
+    - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
+    - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
+  context:
+    - "- The centre's garrison term 0x24a180 takes ONE unit, the plot's best defender 0x208b80 (flag 0x10): among the plot's units in its own order the comparator 0x523d60 keeps the..."
+    - "...s with HitPoints: the centre and the Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a Mili..."
+    - "...live: the base 0x24a000 plus the garrison term 0x24a180 over the plot's best defender 0x208b80. The record's unit list stands before the in-turn player's start while the plot reads t..."
+  review: imported
+- addr: 0x209dd0
+  final: 0x15a2b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 152
+      value: "So a unit in the Encampment garrisons the city: 1121 Xi'an t152, a Field Cannon in its Encampment and a Guru and a Builder on its centre, Retainers pays its amenity (civics part 2);"
+    - recording: 1124
+      turn: 168
+      value: 1124 Xiurong t168;
+    - recording: 1124
+      turn: 157
+      value: a military unit its city's production completes garrisons from that city's turn (1124 t157 Taiyuan grows Content).
+  readings: ["H-1: the garrison requirement — READ", "H-1: a civilian stepped on — READ"]
+  context:
+    - "...Encampment) 0x24b170 takes the plot's best defender (0x208b80) where it is a combat unit (0x209dd0: Combat, Ranged or Bombard above 0) and, with a MilitaryFormation argument (+0x90), compa..."
+    - ...'s units from the last to the first; for each one not dead (+0x770), not a combat unit (0x209dd0), whose unit info lacks the +0x1ba bit 2, and whose player the mover's player is at w...
+  review: imported
+- addr: 0x20d280
+  kind: function
+  status: PARTLY
+  readings: ["C-34: the interception's damage, XP, weariness and the answers"]
+  context:
+    - "- War weariness (0x1fb680, from the combat log 0x20d280): it reads only the struct's [+0] and [+8] and the combat's location — the interceptor..."
+  review: imported
+- addr: 0x20e720
+  final: 0x15e6b0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 110
+      value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+  readings:
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...player's +0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary b..."
+  review: imported
+- addr: 0x212500
+  kind: function
+  name: Combat_Manager
+  status: PARTLY
+  impl: [cpu/core/combat.ts:seizeCivilian]
+  readings: ["H-1: a civilian stepped on — READ"]
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...e +0x1ba bit 2, and whose player the mover's player is at war with (0x469cd0), it calls 0x212500(victim, mover, plot, ...); a 0 back destroys the victim (the religion swing 0x493f80 wi...
+    - "- 0x212500: a unit info with the +0x1b8 bit 8 (CanRetreatWhenCaptured: the Great People, the Archa..."
+  review: imported
+- addr: 0x212c30
+  final: 0x1628f0
+  kind: function
+  status: READ
+  cases:
+    - recording: 1121
+      turn: 110
+      value: "Recorded: 1121 t110, a barbarian   on China's Missionary beside Taiyuan, −125 in Xi'an and Taiyuan   (`religiousUnitLost`, the harness replaying the log's kill)."
+  readings:
+    - "H-1: an annex re-places the citizens, the garrison's unit, a religious unit killed on a move — READ"
+  context:
+    - "...+0x4f0 percent; the condemn command (0x89cc00, 0x947f10) and a combat kill (0x20e720, 0x212c30) pass the same flag. Recorded: 1121 t110, a barbarian on China's Missionary beside Taiy..."
+  review: imported

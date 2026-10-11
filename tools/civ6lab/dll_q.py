@@ -1,6 +1,9 @@
 """Read GameCore_XP2_Release.dll with annotations: the h3_dis reader plus
 string labels on every RIP-relative operand and call target, run as a batch
-of queries so the image loads once.
+of queries so the image loads once. Call targets and globals carry the
+atlas's names (`[name]`: a curated record's, else the binary's own) and
+memory operands the atlas's struct fields (`atlas.py`); query the atlas
+first (`atlas.py <addr>`), disassemble what it does not hold.
 
     python tools/civ6lab/dll_q.py "xref PATTERN" "dis RVA [N]" "ann RVA [N]" ...
       xref PAT      strings matching PAT (regex), the functions citing them
@@ -29,6 +32,7 @@ from h3_dis import Dll  # noqa: E402
 DEFAULT = (r"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI"
            r"\DLC\Expansion2\Binaries\Win64\GameCore_XP2_Release.dll")
 RIP = re.compile(r"\[rip ([+-]) 0x([0-9a-f]+)\]")
+FIELD = re.compile(r"\[(?!rsp|rip|esp)\w+(?: \+ \w+(?:\*\d)?)? \+ (0x[0-9a-f]+)\]")
 
 
 class Q:
@@ -38,6 +42,14 @@ class Q:
         for m in re.finditer(rb"[\x20-\x7e]{4,}\x00", self.d.image):
             self.str_at[m.start()] = m.group()[:-1].decode()
         self._flabel: dict[int, str] = {}
+        # the atlas's names (a curated record's, else the binary's own) and
+        # its struct fields, for the XP2 DLLs
+        self.anames: dict[int, str] = {}
+        self.afields: dict[int, list[str]] = {}
+        name = pathlib.Path(path).name
+        if name.startswith("GameCore_XP2_"):
+            import atlas
+            self.anames, self.afields = atlas.label_maps("F" if "FinalRelease" in name else "R")
 
     def sref(self, rva: int) -> str | None:
         s = self.str_at.get(rva)
@@ -66,6 +78,8 @@ class Q:
         if f:
             ss = [s for s in self.fstrings(f) if not s.endswith(".cpp") and "\\" not in s]
             lab = " | ".join(s[:40] for s in ss[:3])
+        if rva in self.anames:
+            lab = f"[{self.anames[rva]}] {lab}".rstrip()
         self._flabel[rva] = lab
         return lab
 
@@ -80,13 +94,22 @@ class Q:
                 f = self.d.func_of(t)
                 if f and f[0] == t:
                     line += f"    ; fn {t:08x} {self.flabel(t)}"
+                elif t in self.anames and self.d.text_rva <= t < self.d.text_rva + len(self.d.text):
+                    line += f"    ; fn {t:08x} {self.flabel(t)}"
+                elif t in self.anames:
+                    line += f"    ; @{t:08x} [{self.anames[t]}]"
                 else:
                     line += f"    ; @{t:08x}"
         elif ins.mnemonic in ("call", "jmp") and ins.op_str.startswith("0x"):
             t = int(ins.op_str, 16) - self.d.base
             f = self.d.func_of(t)
-            if ins.mnemonic == "call" or (f and f[0] == t):
+            if ins.mnemonic == "call" or (f and f[0] == t) or t in self.anames:
                 line += f"    ; {self.flabel(t)}"
+        if self.afields:
+            for m in FIELD.finditer(ins.op_str):
+                off = int(m.group(1), 16)
+                if off in self.afields:
+                    line += f"    ; +{off:#x} {' / '.join(self.afields[off])}"
         return line
 
     def run(self, cmd: str) -> None:
