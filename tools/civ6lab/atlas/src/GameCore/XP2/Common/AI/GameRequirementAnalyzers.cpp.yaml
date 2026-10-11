@@ -121,6 +121,21 @@
   context:
     - "...mpassable: half the Amount's PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00,..."
   review: imported
+- addr: 0x6d2470
+  final: 0x48f920
+  kind: function
+  name: REQUIREMENT_PLAYER_IS_AT_PEACE
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: China at peace with Caguana
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...ntext's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_IS_AT_PEACE 0x6d2470: a context player (+0x40) the player is not at war with. The suzerain requirements are..."
+  review: reviewed
 - addr: 0x6d27a0
   final: 0x48fc00
   kind: function
@@ -156,3 +171,31 @@
   context:
     - ...PV(H) - PV(T), unweighted) and the plot evaluators TERRAIN 0x6d1dd0 (+0x2c), FEATURE 0x6d4380, RESOURCE_TYPE 0x6d1970 (+0x40), RESOURCE_VISIBLE 0x6d1c00, HAS_ANY_IMPROVEMENT 0x6cfcd...
   review: imported
+- addr: 0x6d4490
+  final: 0x4918f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...x5d0 and a posted governor's 0x44caa0) plus the context's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_IS_AT_PEACE 0x6d2470: a context player (+0x40) the player is..."
+  review: imported
+- addr: 0x6d45b0
+  final: 0x491a10
+  kind: function
+  name: REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: Caguana's small influence bonus met with two envoys added
+  impl: [cpu/core/aiModifiers.ts:EVALUATORS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...EN_INFLUENCE_TOKENS, PLAYER_IS_SUZERAIN). REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS 0x6d45b0: the tokens the city-state received from the player (0x44c860, the store +0x5d0 and a..."
+  review: reviewed

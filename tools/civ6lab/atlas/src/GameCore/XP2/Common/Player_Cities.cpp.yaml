@@ -30,6 +30,7 @@
   readings:
     - "H-1: the great person's spawn — READ"
     - "H-1: a drought on a city centre, Monumentality's districts, Kandy's wonder Relic — PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...rst city wins a tie) takes the spawn, on its centre (+0x158); none, the capital's centre (0x36f460), else the player's start plot (+0x1398). A sea unit (domain 0) walks the player's distri...
     - "...tes a Relic through 0x495860 → 0x296c00 (\"Choosing a Relic\") with the player's capital (0x36f460). No record shows it (no Kandy suzerain discovered a wonder in the duels). `revealAroun..."

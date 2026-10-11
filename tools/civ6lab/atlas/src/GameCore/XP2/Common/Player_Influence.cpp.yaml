@@ -79,6 +79,36 @@
   context:
     - "...yer's own reveal bit (+0xf0), then — where its influence component's suzerain (+0x1368 -> 0x44c850) is a player — the SUZERAIN's resource condition, recursively; then the reveal modifiers,..."
   review: imported
+- addr: 0x44c860
+  kind: function
+  name: GetTokensReceived
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
+  impl:
+    - cpu/core/aiModifiers.ts:EVALUATORS
+    - cpu/core/aiValue.ts:AiValueView
+    - cpu/core/majorView.ts:centres
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...AS_GIVEN_INFLUENCE_TOKENS 0x6d45b0: the tokens the city-state received from the player (0x44c860, the store +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach Minimu..."
+  review: imported
+- addr: 0x44caa0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
+  impl: [cpu/core/majorView.ts:centres]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...city-state received from the player (0x44c860, the store +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_I...
+  review: imported
 - addr: 0x44da30
   final: 0x2eb040
   kind: function

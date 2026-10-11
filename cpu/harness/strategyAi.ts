@@ -141,6 +141,12 @@ export class StrategyProbe {
     return this.before.get(turn) ?? new Map();
   }
 
+  /** what each major follows on the engine's lane now: at a pair's start,
+   *  before its turn's update, what `followedBefore` will hold for it */
+  followedNow(): ReadonlyMap<number, ReadonlySet<string>> {
+    return new Map([...this.players.keys()].map((seat) => [seat, new Set(this.lanes.engine.mem.seats.get(seat)?.active ?? [])] as const));
+  }
+
   /** the cities a major's knowledge base holds on the engine's lane, in its
    *  order */
   knownCities(seat: number): readonly KnownCity[] {

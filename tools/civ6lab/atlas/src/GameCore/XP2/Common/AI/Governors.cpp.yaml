@@ -3,16 +3,96 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x6ed750
+  kind: function
+  name: AI::Governors seats
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: Merchant Handan 46 -> Xiurong 69 outgains the Resource Manager's 20, which takes Chengdu (the log's two assignments)
+  impl: [ai/major/governors.ts:assignmentSlots, ai/major/governors.ts:governorAssignment]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- THE SEATS (0x6ed750): the slots — no city, the player's cities, every city-state with a capital in the game..."
+  review: reviewed
 - addr: 0x6edfc0
   final: 0x4a79b0
   kind: function
   status: PARTLY
   readings:
     - "H-1: why a seed does not replay — the AI's worker threads — READ, the replay patch MEASURED"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...e / Great Work Collection Analysis (0x4136b0), Espionage (0x45cf70), Governor Analyzer (0x4a79b0), Victory Conditions + Settle City Evaluation (0x4b13f0), Belief Analysis (0x4ec440), T...
   review: imported
+- addr: 0x6ee100
+  final: 0x4a7ad0
+  kind: function
+  name: AI::Governors turn (choice)
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 23
+      value: China appoints the Ambassador at its 112 over the Educator's 59; t52 / t57 the Educator's Connoisseur / Researcher; t84 the Defender
+  impl: [ai/major/governors.ts:governorChoice, ai/major/governors.ts:governorTurn]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- THE AI TURN (0x6ee100, the second phase): the log (0x6ef6a0: per governor \"%d, %d, %s, %d\" — turn, player, ty..."
+  review: reviewed
+- addr: 0x6ee5f0
+  final: 0x4a7f80
+  kind: function
+  name: AI::Governors analysis (one governor)
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 2
+      value: Defender, Cardinal, Builder, Resource Manager 20 on the capital, Ibrahim 0 (not open to China)
+  impl: [ai/major/governors.ts:GOVERNOR_HORIZON, ai/major/governors.ts:governorAnalysis]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...he player's signal for a full civilization; 0x6eee50 runs it): each governor's analysis 0x6ee5f0, each promotion's score 0x6eedb0."
+    - "- A GOVERNOR'S ANALYSIS (0x6ee5f0): the arrays sized to 1 + the player's cities + the game's city-states (Game +0x1650),..."
+  review: reviewed
+- addr: 0x6eedb0
+  final: 0x4a8490
+  kind: function
+  name: AI::Governors promotion score
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 24
+      value: Messenger 112 once Amani sits at Caguana, 10 before
+  impl:
+    - ai/major/governors.ts:GOVERNOR_HORIZON
+    - ai/major/governors.ts:PROMOTION_START
+    - ai/major/governors.ts:promotionScore
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...ilization; 0x6eee50 runs it): each governor's analysis 0x6ee5f0, each promotion's score 0x6eedb0."
+    - "- A PROMOTION'S SCORE (0x6eedb0 over 0x7b0bb0(promotion, rate, start 0, horizon 100, the player, its GovernorPromotionM..."
+  review: reviewed
+- addr: 0x6eee50
+  final: 0x4a8530
+  kind: function
+  name: Governor Analyzer job
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 2
+      value: every governor's analysis and every promotion's score of the turn
+  impl: [ai/major/governors.ts:governorScores]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...\"Governor Analyzer\" (0x6edfc0 starts it on the player's signal for a full civilization; 0x6eee50 runs it): each governor's analysis 0x6ee5f0, each promotion's score 0x6eedb0."
+  review: reviewed
 - addr: 0x6eeee0
   final: 0x4a85c0
   kind: function
@@ -22,3 +102,58 @@
   context:
     - ...T_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUDOYIELD_GOVERNOR @0xf2e214, discounted from the start); E...
   review: imported
+- addr: 0x6eef10
+  final: 0x4a85f0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: AI_Governors.csv
+      value: "its log AI_Governors.csv, opener 0x6eef10, header \"Game Turn, Player, Governor, Assignment, Promotions\")."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "AI::Governors (AI/Governors.cpp, the player AI's; its log AI_Governors.csv, opener 0x6eef10, header \"Game Turn, Player, Governor, Assignment, Promotions\"). Port: `ai/major/governors..."
+  review: imported
+- addr: 0x6ef120
+  final: 0x4a87b0
+  kind: function
+  name: AI::Governors tables setup
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 1
+      value: eight governors, Ibrahim last; promotions in GovernorPromotions order
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- THE TABLES (0x6ef120 sets them up; a game-synchronized variable each, data at +0x1d0 and +0x280): per govern..."
+  review: reviewed
+- addr: 0x6ef6a0
+  final: 0x4a8b10
+  kind: function
+  name: AI_Governors.csv writer
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 1
+      value: each governor's best slot value and its promotions' scores, player 0's block written twice
+  impl: [ai/major/governors.ts:governorLogLine, cpu/harness/governorAi.ts:readScores]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- THE AI TURN (0x6ee100, the second phase): the log (0x6ef6a0: per governor \"%d, %d, %s, %d\" — turn, player, type, the largest of its slot values'..."
+  review: reviewed
+- addr: 0x6eff30
+  kind: function
+  name: AI::Governors value at a city
+  status: READ
+  cases:
+    - recording: h1_duelw1124
+      turn: 55
+      value: an unmet city-state's slot reads -1
+  impl: [ai/major/governors.ts:governorAssignment]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...r one not appointed now — the turn's appointment counts — or a slot its analysis lacks, 0x6eff30), weight and capacity 1, λ 0x6ed060 (the move: the slot's occupant replaced and retur..."
+  review: reviewed

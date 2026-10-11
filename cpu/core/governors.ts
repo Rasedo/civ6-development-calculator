@@ -116,6 +116,13 @@ function promotionLegal(g: Governor, gIndex: number, promoIndex: number): boolea
   return def.requires.some((r) => hasPromotion(g, GOVERNOR_PROMOTIONS.findIndex((p) => p.id === r)));
 }
 
+/** `promoteGovernor` would take promotion `p` for governor `i` now. */
+export function governorPromotionOpen(state: GameState, seat: number, i: number, p: number): boolean {
+  const s = seatOf(state, seat);
+  const g = s ? governorsOf(s)[i] : undefined;
+  return !!g && promotionLegal(g, i, p) && governorTitlesAvailable(state, seat) > 0;
+}
+
 /** The governor sitting in this city, or -1. */
 export function governorAt(state: GameState, city: City): number {
   // a city-state appoints no governor of its own — Amani sits at a minor on

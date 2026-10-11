@@ -35,3 +35,17 @@
   context:
     - ...cities (player +0x12b8, its entries, setting +0x70); COLLECTION_ALL_PLAYERS 0x69f6c0 / 0x69f6e0 stands once on the context as it is (the evaluating player); COLLECTION_OWNER 0x69fc90...
   review: imported
+- addr: 0x6ecee0
+  kind: function
+  name: "GAP lambda: the start"
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: the Merchant starts on Handan, the Resource Manager on Xiurong
+  impl: [ai/major/governors.ts:governorAssignment]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...ignment 0x8b5bf0 over the governors and the slots, one pass (its last argument), with λ 0x6ecee0 (the start: each assigned governor on its city's slot, the slot's occupant it), λ 0x6ec..."
+  review: reviewed

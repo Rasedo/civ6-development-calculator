@@ -317,6 +317,41 @@ def build() -> str:
         if c.get("CivilizationType"):
             fav_civ[c["CivilizationType"]].append(c["ReligionType"])
 
+    # the governor AI: the governors and the promotions in database order
+    # (the game's governor and promotion lists, AI_Governors.csv's lines, run
+    # in it); a governor's promotions are its GovernorPromotionSets rows in
+    # that order; its own modifiers are its BaseAbility promotions' (the
+    # analysis's query, GlobalAI +0x39c0), a promotion's its
+    # GovernorPromotionModifiers rows ordered by ModifierId (+0x39d8)
+    gov_rows = in_game_order("Governors", "GovernorType", keyed(rows("Governors"), "GovernorType"))
+    promo_rows = in_game_order("GovernorPromotions", "GovernorPromotionType", keyed(rows("GovernorPromotions"), "GovernorPromotionType"))
+    gp_mods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("GovernorPromotionModifiers"):
+        if c.get("GovernorPromotionType"):
+            gp_mods[c["GovernorPromotionType"]].append(c["ModifierId"])
+    gp_sets: dict[str, set[str]] = collections.defaultdict(set)
+    for c in rows("GovernorPromotionSets"):
+        if c.get("GovernorType"):
+            gp_sets[c["GovernorType"]].add(c["GovernorPromotion"])
+    gov_xp2 = keyed(rows("Governors_XP2"), "GovernorType")
+    gov_promos = []
+    for p, c in promo_rows:
+        gov_promos.append({
+            "type": p, "level": int(c.get("Level", 0) or 0), "baseAbility": c.get("BaseAbility") == "true",
+            "governors": [g for g, _ in gov_rows if p in gp_sets[g]],
+            "modifiers": [modifier(m) for m in sorted(gp_mods[p])],
+        })
+    governors_ai = []
+    for g, c in gov_rows:
+        mine = [p for p, _ in promo_rows if p in gp_sets[g]]
+        governors_ai.append({
+            "type": g, "identityPressure": int(c.get("IdentityPressure", 0) or 0),
+            "assignCityState": c.get("AssignCityState") == "true",
+            "assignToMajor": gov_xp2.get(g, {}).get("AssignToMajor") == "true",
+            "trait": c.get("TraitType"), "promotions": mine,
+            "modifiers": [modifier(m) for p in mine if dict(promo_rows)[p].get("BaseAbility") == "true" for m in gp_mods[p]],
+        })
+
     def lit(name, value, typ):
         return f"export const {name}: {typ} = {json.dumps(value, indent=1)};\n"
 
@@ -324,7 +359,7 @@ def build() -> str:
         "/**\n * THE MAJORS' AI TABLES, written by tools/install/ai_tables.py from the\n"
         " * layered install (`--check` reports a stale file). Policies and governments\n"
         " * run in DATABASE ORDER, the index the game's AI loops walk.\n */\n"
-        "import type { AiBelief, AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy, AiStrategyBias } from './types';\n\n"
+        "import type {\n  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy,\n  AiStrategyBias,\n} from './types';\n\n"
         + lit("AI_POLICIES", policies, "readonly AiPolicy[]")
         + lit("AI_GOVERNMENTS", governments, "readonly AiGovernment[]")
         + lit("AI_SLOT_TYPES", slots, "readonly AiSlotType[]")
@@ -346,7 +381,40 @@ def build() -> str:
         + lit("AI_RELIGIONS", religions, "readonly AiReligion[]")
         + lit("AI_FAVORED_RELIGIONS_BY_LEADER", dict(sorted(fav_leader.items())), "Readonly<Record<string, readonly string[]>>")
         + lit("AI_FAVORED_RELIGIONS_BY_CIV", dict(sorted(fav_civ.items())), "Readonly<Record<string, readonly string[]>>")
+        + lit("AI_GOVERNORS", governors_ai, "readonly AiGovernor[]")
+        + lit("AI_GOVERNOR_PROMOTIONS", gov_promos, "readonly AiGovernorPromotion[]")
     )
+    # each city-state's modifiers its envoys are worth (the diplomatic AI's
+    # +0x6868 list, 0x651490): its leader's traits through the InheritFrom
+    # chain and its civilization's (the query 0xe261e0), ordered by
+    # ModifierId, those whose requirements name an INFLUENCE_REQUIREMENT type
+    influence_tags = {c["Type"] for c in rows("TypeTags") if c.get("Tag") == "INFLUENCE_REQUIREMENT"}
+    trait_mods: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("TraitModifiers"):
+        if c.get("TraitType"):
+            trait_mods[c["TraitType"]].append(c["ModifierId"])
+    civ_level = {c["CivilizationType"]: c.get("StartingCivilizationLevelType") for c in rows("Civilizations") if c.get("CivilizationType")}
+    civ_leader = {c["CivilizationType"]: c["LeaderType"] for c in rows("CivilizationLeaders") if c.get("CivilizationType")}
+    civ_traits_all: dict[str, list[str]] = collections.defaultdict(list)
+    for c in rows("CivilizationTraits"):
+        if c.get("CivilizationType"):
+            civ_traits_all[c["CivilizationType"]].append(c["TraitType"])
+
+    def influenced(mid):
+        m = mods.get(mid, {})
+        return any(reqs.get(r, {}).get("RequirementType") in influence_tags
+                   for key in ("SubjectRequirementSetId", "OwnerRequirementSetId") for r in rset_reqs[m.get(key, "")])
+
+    minor_influence = {}
+    for civ, level in civ_level.items():
+        if level != "CIVILIZATION_LEVEL_CITY_STATE" or civ not in civ_leader:
+            continue
+        tree, x = [], civ_leader[civ]
+        while x and x not in tree:
+            tree.append(x)
+            x = inherit.get(x)
+        ids = sorted({m for lt in tree for t in ltraits[lt] for m in trait_mods[t]} | {m for t in civ_traits_all[civ] for m in trait_mods[t]})
+        minor_influence[civ] = [modifier(m) for m in ids if influenced(m)]
     core = (
         "/**\n * THE AI VALUE LAYER'S TABLES (cpu/core/aiValue.ts), written by\n"
         " * tools/install/ai_tables.py from the layered install (`--check` reports a\n"
@@ -355,7 +423,7 @@ def build() -> str:
         " * and the AI lists the weights sum: System Yields and YieldSensitivities by\n"
         " * trait — a leader's traits through its InheritFrom chain, a civilization's\n"
         " * —, those and PseudoYields by strategy (Strategy_Priorities).\n */\n"
-        "import type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
+        "import type { AiModifier } from '../core/aiModifiers';\nimport type { AiListRef, AiListItem } from '../core/aiValue';\n\n"
         + lit("AI_YIELD_DEFAULT", yields, "Readonly<Record<string, number>>")
         + lit("AI_PSEUDOYIELD_DEFAULT", pseudo, "Readonly<Record<string, number>>")
         + lit("AI_GP_CLASS_PSEUDOYIELD", gpc, "Readonly<Record<string, string>>")
@@ -368,6 +436,9 @@ def build() -> str:
         + lit("AI_STRATEGY_YIELD_PRIORITIES", strat_yields,
               "readonly { strategy: string; yield: string; pct: number }[]")
         + lit("AI_DIFFICULTIES", difficulties, "readonly string[]")
+        + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
+        + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace") == "true"],
+              "readonly string[]")
     )
     city = build_city(rows, modifier)
     return major, core, city

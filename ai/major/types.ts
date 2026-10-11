@@ -92,6 +92,30 @@ export interface AiReligion {
   customName: boolean;
 }
 
+/** a Governors row as the governor AI reads it: IdentityPressure,
+ *  AssignCityState, Governors_XP2's AssignToMajor, its TraitType, its
+ *  promotions (GovernorPromotionSets in GovernorPromotions order) and its own
+ *  modifiers (its BaseAbility promotions') */
+export interface AiGovernor {
+  type: string;
+  identityPressure: number;
+  assignCityState: boolean;
+  assignToMajor: boolean;
+  trait: string | null;
+  promotions: readonly string[];
+  modifiers: readonly AiModifier[];
+}
+
+/** a GovernorPromotions row: its Level, BaseAbility, the governors whose set
+ *  holds it and its modifiers ordered by ModifierId */
+export interface AiGovernorPromotion {
+  type: string;
+  level: number;
+  baseAbility: boolean;
+  governors: readonly string[];
+  modifiers: readonly AiModifier[];
+}
+
 export interface AiSlotType {
   type: string;
   /** AllowsAnyPolicy: the Wildcard */

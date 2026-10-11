@@ -3,7 +3,10 @@
  * layered install (`--check` reports a stale file). Policies and governments
  * run in DATABASE ORDER, the index the game's AI loops walk.
  */
-import type { AiBelief, AiFeature, AiGovernment, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy, AiStrategyBias } from './types';
+import type {
+  AiBelief, AiFeature, AiGovernment, AiGovernor, AiGovernorPromotion, AiPlotEvalItem, AiPolicy, AiReligion, AiSlotType, AiStrategy,
+  AiStrategyBias,
+} from './types';
 
 export const AI_POLICIES: readonly AiPolicy[] = [
  {
@@ -13392,3 +13395,1519 @@ export const AI_FAVORED_RELIGIONS_BY_LEADER: Readonly<Record<string, readonly st
  ]
 };
 export const AI_FAVORED_RELIGIONS_BY_CIV: Readonly<Record<string, readonly string[]>> = {};
+export const AI_GOVERNORS: readonly AiGovernor[] = [
+ {
+  "type": "GOVERNOR_THE_DEFENDER",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_REDOUBT",
+   "GOVERNOR_PROMOTION_GARRISON_COMMANDER",
+   "GOVERNOR_PROMOTION_DEFENSE_LOGISTICS",
+   "GOVERNOR_PROMOTION_EMBRASURE",
+   "GOVERNOR_PROMOTION_AIR_DEFENSE_INITIATIVE",
+   "GOVERNOR_PROMOTION_EDUCATOR_ARMS_RACE_PROPONENT"
+  ],
+  "modifiers": [
+   {
+    "id": "DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_INNER_DEFENSE",
+    "args": {
+     "Amount": "5"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_AMBASSADOR",
+  "identityPressure": 8,
+  "assignCityState": true,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_AMBASSADOR_MESSENGER",
+   "GOVERNOR_PROMOTION_AMBASSADOR_EMISSARY",
+   "GOVERNOR_PROMOTION_AMBASSADOR_AFFLUENCE",
+   "GOVERNOR_PROMOTION_LOCAL_INFORMANTS",
+   "GOVERNOR_PROMOTION_AMBASSADOR_FOREIGN_INVESTOR",
+   "GOVERNOR_PROMOTION_AMBASSADOR_PUPPETEER"
+  ],
+  "modifiers": [
+   {
+    "id": "MESSENGER_GRANT_FREE_ENVOYS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED",
+    "args": {
+     "Amount": "2"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_CARDINAL",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_CARDINAL_BISHOP",
+   "GOVERNOR_PROMOTION_CARDINAL_GRAND_INQUISITOR",
+   "GOVERNOR_PROMOTION_CARDINAL_LAYING_ON_OF_HANDS",
+   "GOVERNOR_PROMOTION_CARDINAL_CITADEL_OF_GOD",
+   "GOVERNOR_PROMOTION_CARDINAL_PATRON_SAINT",
+   "GOVERNOR_PROMOTION_CARDINAL_DIVINE_ARCHITECT"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_BISHOP_PRESSURE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_PRESSURE",
+    "args": {
+     "Amount": "100"
+    }
+   },
+   {
+    "id": "CARDINAL_BISHOP_FAITH_DISTRICT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "2"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_RESOURCE_MANAGER",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_GROUNDBREAKER",
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_SURPLUS_LOGISTICS",
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_EXPEDITION",
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_INDUSTRIALIST",
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_BLACK_MARKETEER",
+   "GOVERNOR_PROMOTION_RESOURCE_MANAGER_VERTICAL_INTEGRATION"
+  ],
+  "modifiers": [
+   {
+    "id": "GROUNDBREAKER_BONUS_HARVEST_YIELDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RESOURCE_HARVEST_BONUS",
+    "args": {
+     "Amount": "50"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_BUILDER",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_BUILDER_GUILDMASTER",
+   "GOVERNOR_PROMOTION_ZONING_COMMISSIONER",
+   "GOVERNOR_PROMOTION_AQUACULTURE",
+   "GOVERNOR_PROMOTION_REINFORCED_INFRASTRUCTURE",
+   "GOVERNOR_PROMOTION_WATER_WORKS",
+   "GOVERNOR_PROMOTION_PARKS_RECREATION"
+  ],
+  "modifiers": [
+   {
+    "id": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES_UNIT_MODIFIER"
+    },
+    "attach": {
+     "id": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES_UNIT_MODIFIER",
+     "collection": "COLLECTION_CITY_TRAINED_UNITS",
+     "effect": "EFFECT_ADJUST_UNIT_BUILD_CHARGES",
+     "args": {
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "UnitType": "UNIT_BUILDER"
+        }
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_EDUCATOR",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_EDUCATOR_LIBRARIAN",
+   "GOVERNOR_PROMOTION_EDUCATOR_CONNOISSEUR",
+   "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER",
+   "GOVERNOR_PROMOTION_EDUCATOR_GRANTS",
+   "GOVERNOR_PROMOTION_MERCHANT_CURATOR",
+   "GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE"
+  ],
+  "modifiers": [
+   {
+    "id": "LIBRARIAN_SCIENCE_YIELD_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_MODIFIER",
+    "args": {
+     "Amount": "15",
+     "YieldType": "YIELD_SCIENCE"
+    }
+   },
+   {
+    "id": "LIBRARIAN_CULTURE_YIELD_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_MODIFIER",
+    "args": {
+     "Amount": "15",
+     "YieldType": "YIELD_CULTURE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_THE_MERCHANT",
+  "identityPressure": 8,
+  "assignCityState": false,
+  "assignToMajor": false,
+  "trait": null,
+  "promotions": [
+   "GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION",
+   "GOVERNOR_PROMOTION_MERCHANT_HARBORMASTER",
+   "GOVERNOR_PROMOTION_MERCHANT_FORESTRY_MANAGEMENT",
+   "GOVERNOR_PROMOTION_MERCHANT_TAX_COLLECTOR",
+   "GOVERNOR_PROMOTION_MERCHANT_CONTRACTOR",
+   "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY"
+  ],
+  "modifiers": [
+   {
+    "id": "LAND_ACQUISITION_FASTER_PLOT_ANNEXING",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION",
+    "args": {
+     "Amount": "20"
+    }
+   },
+   {
+    "id": "FOREIGN_EXCHANGE_GOLD_FROM_FOREIGN_TRADE_PASSING_THROUGH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_FROM_FOREIGN_TRADE_ROUTES_PASSING_THROUGH",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "3"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_IBRAHIM",
+  "identityPressure": 8,
+  "assignCityState": true,
+  "assignToMajor": true,
+  "trait": "TRAIT_LEADER_SULEIMAN_GOVERNOR",
+  "promotions": [
+   "GOVERNOR_PROMOTION_PASHA",
+   "GOVERNOR_PROMOTION_HEAD_FALCONER",
+   "GOVERNOR_PROMOTION_SERASKER",
+   "GOVERNOR_PROMOTION_KHASS_ODA_BASHI",
+   "GOVERNOR_PROMOTION_CAPOU_AGHA",
+   "GOVERNOR_PROMOTION_GRAND_VISIER"
+  ],
+  "modifiers": [
+   {
+    "id": "PASHA_BONUS_UNIT_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ }
+];
+export const AI_GOVERNOR_PROMOTIONS: readonly AiGovernorPromotion[] = [
+ {
+  "type": "GOVERNOR_PROMOTION_REDOUBT",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "DEFENDER_ADJUST_CITY_DEFENSE_STRENGTH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_INNER_DEFENSE",
+    "args": {
+     "Amount": "5"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_GARRISON_COMMANDER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "GARRISON_COMMANDER_ADJUST_CITY_COMBAT_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_COMBAT_BONUS",
+    "args": {
+     "Amount": "5"
+    }
+   },
+   {
+    "id": "PRESTIGE_IDENTITY_PRESSURE_TO_DOMESTIC_CITIES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE",
+    "args": {
+     "Amount": "4",
+     "DomesticCities": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_DEFENSE_LOGISTICS",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "DEFENSE_LOGISTICS_BONUS_STRATEGICS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "DEFENSE_LOGISTICS_SIEGE_PROTECTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_SIEGE_PROTECTION",
+    "args": {
+     "Protected": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EMBRASURE",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "CITY_DEFENDER_ADJUST_ATTACKS_PER_TURN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ATTACKS_PER_TURN",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "CITY_DEFENDER_FREE_PROMOTIONS",
+    "collection": "COLLECTION_CITY_TRAINED_UNITS",
+    "effect": "EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE",
+    "args": {
+     "Amount": "-1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AIR_DEFENSE_INITIATIVE",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "AIR_DEFENSE_INITIATIVE_ANTI_AIR_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS",
+    "args": {
+     "Amount": "25"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_ARMS_RACE_PROPONENT",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_DEFENDER"
+  ],
+  "modifiers": [
+   {
+    "id": "EDUCATOR_FASTER_MANHATTAN_PROJECT_RESEARCH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+    "args": {
+     "ProjectType": "PROJECT_MANHATTAN_PROJECT",
+     "Amount": "30"
+    }
+   },
+   {
+    "id": "EDUCATOR_FASTER_NUCLEAR_DEVICE_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+    "args": {
+     "ProjectType": "PROJECT_BUILD_NUCLEAR_DEVICE",
+     "Amount": "30"
+    }
+   },
+   {
+    "id": "EDUCATOR_FASTER_OPERATION_IVY_RESEARCH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+    "args": {
+     "ProjectType": "PROJECT_OPERATION_IVY",
+     "Amount": "30"
+    }
+   },
+   {
+    "id": "EDUCATOR_FASTER_THERMONUCLEAR_DEVICE_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PROJECT_PRODUCTION",
+    "args": {
+     "ProjectType": "PROJECT_BUILD_THERMONUCLEAR_DEVICE",
+     "Amount": "30"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AMBASSADOR_MESSENGER",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "MESSENGER_GRANT_FREE_ENVOYS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED",
+    "args": {
+     "Amount": "2"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AMBASSADOR_EMISSARY",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "EMISSARY_IDENTITY_PRESSURE_TO_FOREIGN_CITIES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GOVERNOR_IDENTITY_PRESSURE",
+    "args": {
+     "Amount": "2",
+     "ForeignCities": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AMBASSADOR_AFFLUENCE",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "AFFLUENCE_COPY_LUXURIES_FOR_IMPORT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GOVERNOR_ADJUST_CITY_COPY_LUXURIES_FOR_IMPORT",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_LOCAL_INFORMANTS",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "LOCAL_INFORMANTS_SPY_DEFENSE_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_SPY_BONUS",
+    "args": {
+     "Amount": "3"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AMBASSADOR_FOREIGN_INVESTOR",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "FOREIGN_INVESTOR_COPY_STRATEGICS_FOR_IMPORT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GOVERNOR_ADJUST_CITY_COPY_STRATEGICS_FOR_IMPORT",
+    "args": {}
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AMBASSADOR_PUPPETEER",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_AMBASSADOR"
+  ],
+  "modifiers": [
+   {
+    "id": "AMBASSADOR_ADJUST_CITY_ENVOY_MODIFIER",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED_MODIFIER",
+    "args": {
+     "Percent": "100"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_BISHOP",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_BISHOP_FAITH_DISTRICT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "CARDINAL_BISHOP_PRESSURE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_PRESSURE",
+    "args": {
+     "Amount": "100"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_GRAND_INQUISITOR",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_GRAND_INQUISITOR_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGIOUS_COMBAT_BONUS",
+    "args": {
+     "Amount": "10"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_LAYING_ON_OF_HANDS",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_LAYING_ON_OF_HANDS_HEAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_EXTRA_HEAL_GOVERNOR",
+    "args": {
+     "Amount": "100"
+    }
+   },
+   {
+    "id": "CARDINAL_LAYING_ON_OF_HANDS_RELIGIOUS_HEAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGIOUS_HEAL",
+    "args": {
+     "Amount": "100"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_CITADEL_OF_GOD",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_CITADEL_OF_GOD_COMBAT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_IGNORE_COMBAT",
+    "args": {
+     "Enable": "true"
+    }
+   },
+   {
+    "id": "CARDINAL_CITADEL_OF_GOD_FAITH_FINISH_BUILDINGS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_GRANT_CITY_YIELD_PERCENT_BUILDING_CREATED_COST",
+    "args": {
+     "YieldType": "YIELD_FAITH",
+     "BuildingProductionPercent": "25",
+     "IncludeWonder": "false"
+    }
+   },
+   {
+    "id": "CARDINAL_CITADEL_OF_GOD_PRESSURE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_IGNORE_PRESSURE",
+    "args": {
+     "Enable": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_PATRON_SAINT",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_PATRON_SAINT_PROMOTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RELIGION_EXTRA_PROMOTIONS",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CARDINAL_DIVINE_ARCHITECT",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_CARDINAL"
+  ],
+  "modifiers": [
+   {
+    "id": "CARDINAL_FAITH_PURCHASE_DISTRICT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CAN_FAITH_PURCHASE_DISTRICTS",
+    "args": {
+     "CanPurchase": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_GROUNDBREAKER",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "GROUNDBREAKER_BONUS_HARVEST_YIELDS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_RESOURCE_HARVEST_BONUS",
+    "args": {
+     "Amount": "50"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_SURPLUS_LOGISTICS",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "SURPLUS_LOGISTICS_EXTRA_GROWTH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_GROWTH",
+    "args": {
+     "Amount": "20"
+    }
+   },
+   {
+    "id": "SURPLUS_LOGISTICS_TRADE_ROUTE_FOOD",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS",
+    "args": {
+     "YieldType": "YIELD_FOOD",
+     "Amount": "2",
+     "Domestic": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_EXPEDITION",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "EXPEDITION_ADJUST_SETTLERS_CONSUME_POPULATION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_SETTLER_CONSUME_POP",
+    "args": {
+     "Enabled": "false"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_INDUSTRIALIST",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "INDUSTRIALIST_COAL_POWER_PLANT_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+    "args": {
+     "BuildingType": "BUILDING_COAL_POWER_PLANT",
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "INDUSTRIALIST_NUCLEAR_POWER_PLANT_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+    "args": {
+     "BuildingType": "BUILDING_POWER_PLANT",
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "INDUSTRIALIST_OIL_POWER_PLANT_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+    "args": {
+     "BuildingType": "BUILDING_FOSSIL_FUEL_POWER_PLANT",
+     "YieldType": "YIELD_PRODUCTION",
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "INDUSTRIALIST_RESOURCE_POWER_PROVIDED",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR",
+    "args": {
+     "Amount": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_BLACK_MARKETEER",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "BLACK_MARKETEER_STRATEGIC_RESOURCE_COST_DISCOUNT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_STRATEGIC_RESOURCE_REQUIREMENT_MODIFIER",
+    "args": {
+     "Amount": "80"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_RESOURCE_MANAGER_VERTICAL_INTEGRATION",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_RESOURCE_MANAGER"
+  ],
+  "modifiers": [
+   {
+    "id": "VERTICAL_INTEGRATION_PRODUCTION_REGIONAL_STACKING",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ALLOWED_INCOMING_REGIONAL_STACKING",
+    "args": {
+     "YieldType": "YIELD_PRODUCTION"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_BUILDER_GUILDMASTER",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ATTACH_MODIFIER",
+    "args": {
+     "ModifierId": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES_UNIT_MODIFIER"
+    },
+    "attach": {
+     "id": "GUILDMASTER_ADDITIONAL_BUILDER_CHARGES_UNIT_MODIFIER",
+     "collection": "COLLECTION_CITY_TRAINED_UNITS",
+     "effect": "EFFECT_ADJUST_UNIT_BUILD_CHARGES",
+     "args": {
+      "Amount": "1"
+     },
+     "subjectReqs": {
+      "test": "ALL",
+      "reqs": [
+       {
+        "type": "REQUIREMENT_UNIT_TYPE_MATCHES",
+        "inverse": false,
+        "args": {
+         "UnitType": "UNIT_BUILDER"
+        }
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_ZONING_COMMISSIONER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "ZONING_COMMISSIONER_FASTER_DISTRICT_CONSTRUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_AQUACULTURE",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "AQUACULTURE_CAN_BUILD_FISHERY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ALLOWED_IMPROVEMENT",
+    "args": {
+     "ImprovementType": "IMPROVEMENT_FISHERY"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_REINFORCED_INFRASTRUCTURE",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "REINFORCED_INFRASTRUCTURE_PREVENET_STRUCTURAL_DAMAGE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_PREVENT_STRUCTURAL_DAMAGE",
+    "args": {
+     "Prevent": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_WATER_WORKS",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "WATER_WORKS_AQUEDUCT_HOUSING",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_HOUSING",
+    "args": {
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_AQUEDUCT"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "WATER_WORKS_CANAL_AMENITY",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_CANAL"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "WATER_WORKS_DAM_AMENITY",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_AMENITY",
+    "args": {
+     "Amount": "1"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_DAM"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "WATER_WORKS_NEIGHBORHOOD_HOUSING",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_HOUSING",
+    "args": {
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_NEIGHBORHOOD"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_PARKS_RECREATION",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_BUILDER"
+  ],
+  "modifiers": [
+   {
+    "id": "PARKS_RECREATION_CAN_BUILD_CITY_PARK",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ALLOWED_IMPROVEMENT",
+    "args": {
+     "ImprovementType": "IMPROVEMENT_CITY_PARK"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_LIBRARIAN",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "LIBRARIAN_CULTURE_YIELD_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_MODIFIER",
+    "args": {
+     "Amount": "15",
+     "YieldType": "YIELD_CULTURE"
+    }
+   },
+   {
+    "id": "LIBRARIAN_SCIENCE_YIELD_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_MODIFIER",
+    "args": {
+     "Amount": "15",
+     "YieldType": "YIELD_SCIENCE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_CONNOISSEUR",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "CONNOISSEUR_CULTURE_CITIZEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION",
+    "args": {
+     "Amount": "1",
+     "YieldType": "YIELD_CULTURE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_RESEARCHER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "RESEARCHER_SCIENCE_CITIZEN",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_PER_POPULATION",
+    "args": {
+     "Amount": "1",
+     "YieldType": "YIELD_SCIENCE"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_GRANTS",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "EDUCATOR_INCREASE_CITY_GREAT_PERSON_POINT_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_GREAT_PERSON_POINTS_MODIFIER",
+    "args": {
+     "Amount": "100"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_CURATOR",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "CURATOR_DOUBLE_LANDSCAPE_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_LANDSCAPE",
+     "ScalingFactor": "200"
+    }
+   },
+   {
+    "id": "CURATOR_DOUBLE_MUSIC_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_MUSIC",
+     "ScalingFactor": "200"
+    }
+   },
+   {
+    "id": "CURATOR_DOUBLE_PORTRAIT_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_PORTRAIT",
+     "ScalingFactor": "200"
+    }
+   },
+   {
+    "id": "CURATOR_DOUBLE_RELIGIOUS_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_RELIGIOUS",
+     "ScalingFactor": "200"
+    }
+   },
+   {
+    "id": "CURATOR_DOUBLE_SCULPTURE_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_SCULPTURE",
+     "ScalingFactor": "200"
+    }
+   },
+   {
+    "id": "CURATOR_DOUBLE_WRITING_TOURISM",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_TOURISM",
+    "args": {
+     "GreatWorkObjectType": "GREATWORKOBJECT_WRITING",
+     "ScalingFactor": "200"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_EDUCATOR_SPACE_INITIATIVE",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_EDUCATOR"
+  ],
+  "modifiers": [
+   {
+    "id": "EDUCATOR_FASTER_SPACE_RACE_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION",
+    "args": {
+     "Amount": "30"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "FOREIGN_EXCHANGE_GOLD_FROM_FOREIGN_TRADE_PASSING_THROUGH",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_YIELD_FROM_FOREIGN_TRADE_ROUTES_PASSING_THROUGH",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "3"
+    }
+   },
+   {
+    "id": "LAND_ACQUISITION_FASTER_PLOT_ANNEXING",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_HARBORMASTER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "HARBORMASTER_BONUS_COMMERCIAL_HUB_ADJACENCY",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "100"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_COMMERCIAL_HUB"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "id": "HARBORMASTER_BONUS_HARBOR_ADJACENCY",
+    "collection": "COLLECTION_CITY_DISTRICTS",
+    "effect": "EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "100"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_DISTRICT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "DistrictType": "DISTRICT_HARBOR"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_FORESTRY_MANAGEMENT",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_APPEAL",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_FEATURE_NO_IMPROVEMENT_APPEAL_GOVERNOR",
+    "args": {
+     "Amount": "1"
+    }
+   },
+   {
+    "id": "FORESTRY_MANAGEMENT_FEATURE_NO_IMPROVEMENT_GOLD",
+    "collection": "COLLECTION_CITY_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "Amount": "2",
+     "YieldType": "YIELD_GOLD"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_HAS_ANY_IMPROVEMENT",
+       "inverse": true,
+       "args": {}
+      },
+      {
+       "type": "REQUIREMENT_PLOT_HAS_ANY_FEATURE",
+       "inverse": false,
+       "args": {}
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_TAX_COLLECTOR",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "TAX_COLLECTOR_ADJUST_CITIZEN_GPT",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS",
+    "args": {
+     "Amount": "2"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_CONTRACTOR",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "CONTRACTOR_ENABLE_DISTRICT_PURCHASE",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_CAN_PURCHASE_DISTRICTS",
+    "args": {
+     "CanPurchase": "true"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_MERCHANT_RENEWABLE_ENERGY",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_THE_MERCHANT"
+  ],
+  "modifiers": [
+   {
+    "id": "RENEWABLE_ENERGY_IMPROVEMENT_BUILDING_GOLD",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_BUILDING_YIELD_CHANGE",
+    "args": {
+     "BuildingType": "BUILDING_HYDROELECTRIC_DAM",
+     "YieldType": "YIELD_GOLD",
+     "Amount": "2"
+    }
+   },
+   {
+    "id": "RENEWABLE_ENERGY_IMPROVEMENT_PLOTS_GOLD",
+    "collection": "COLLECTION_CITY_PLOT_YIELDS",
+    "effect": "EFFECT_ADJUST_PLOT_YIELD",
+    "args": {
+     "YieldType": "YIELD_GOLD",
+     "Amount": "2"
+    },
+    "subjectReqs": {
+     "test": "ANY",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ImprovementType": "IMPROVEMENT_SOLAR_FARM"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ImprovementType": "IMPROVEMENT_WIND_FARM"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ImprovementType": "IMPROVEMENT_OFFSHORE_WIND_FARM"
+       }
+      },
+      {
+       "type": "REQUIREMENT_PLOT_IMPROVEMENT_TYPE_MATCHES",
+       "inverse": false,
+       "args": {
+        "ImprovementType": "IMPROVEMENT_GEOTHERMAL_PLANT"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_PASHA",
+  "level": 0,
+  "baseAbility": true,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "PASHA_BONUS_UNIT_PRODUCTION",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION",
+    "args": {
+     "Amount": "20"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_HEAD_FALCONER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "HEAD_FALCONER_ADJUST_CITY_COMBAT_BONUS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_CITY_FRIENDLY_COMBAT_BONUS",
+    "args": {
+     "Amount": "5"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_SERASKER",
+  "level": 1,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "SERASKER_ADJUST_GOVERNOR_COMBAT_DISTRICT",
+    "collection": "COLLECTION_PLAYER_UNITS",
+    "effect": "EFFECT_ADJUST_UNIT_AGAINST_DISTRICT_COMBAT_BONUS",
+    "args": {
+     "Amount": "10"
+    },
+    "subjectReqs": {
+     "test": "ALL",
+     "reqs": [
+      {
+       "type": "REQUIREMENT_PLOT_ADJACENT_TO_OWNER",
+       "inverse": false,
+       "args": {
+        "MinDistance": "0",
+        "MaxDistance": "10"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_KHASS_ODA_BASHI",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "KHASS_ODA_BASHI_ADJUST_ALLIANCE_POINTS",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GOVERNOR_ALLIANCE_POINTS",
+    "args": {
+     "Amount": "2"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_CAPOU_AGHA",
+  "level": 2,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "CAPOU_AGHA_ADJUST_GRIEVANCES",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_GOVERNOR_GRIEVENCE_SCORE",
+    "args": {
+     "Score": "1",
+     "Turns": "1"
+    }
+   }
+  ]
+ },
+ {
+  "type": "GOVERNOR_PROMOTION_GRAND_VISIER",
+  "level": 3,
+  "baseAbility": false,
+  "governors": [
+   "GOVERNOR_IBRAHIM"
+  ],
+  "modifiers": [
+   {
+    "id": "GRAND_VIZIER_ADJUST_IGNORE_CULTURAL_IDENTITY",
+    "collection": "COLLECTION_OWNER",
+    "effect": "EFFECT_ADJUST_IGNORE_IDENTITY_PRESSURE",
+    "args": {
+     "Ignore": "true"
+    }
+   }
+  ]
+ }
+];

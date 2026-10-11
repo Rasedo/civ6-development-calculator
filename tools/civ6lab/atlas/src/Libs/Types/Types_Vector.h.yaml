@@ -37,6 +37,14 @@
   context:
     - "- \"Choosing a City Name\" (0x327c30 -> 0x327a70 -> 0x328de0): a city whose founder holds a CapitalName for it (its first) takes it with no draw;..."
   review: imported
+- addr: 0x35e320
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...at its best slot value, an appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0...
+  review: imported
 - addr: 0x58aa90
   final: 0x3b4040
   kind: function
@@ -88,6 +96,20 @@
   context:
     - "- The collections: COLLECTION_ALL_CITIES 0x69f320 / 0x69f340 walks the player's KNOWLEDGE BASE's cities (player +0x12b8, its entries, setting +0x7..."
   review: imported
+- addr: 0x6ed060
+  kind: function
+  name: "GAP lambda: the move"
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: the Resource Manager unseated from Xiurong takes Chengdu
+  impl: [ai/major/governors.ts:governorAssignment]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...appointment counts — or a slot its analysis lacks, 0x6eff30), weight and capacity 1, λ 0x6ed060 (the move: the slot's occupant replaced and returned) and the knapsack 0x616570 -> 0x61..."
+  review: reviewed
 - addr: 0x6f93a0
   final: 0x4b0120
   kind: function

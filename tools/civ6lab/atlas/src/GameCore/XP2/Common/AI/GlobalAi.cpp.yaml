@@ -68,6 +68,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...odifier evaluator: a building's BuildingModifiers are analysed once, at GlobalAI's start (0x6dfc70 -> 0x6cef90 into GlobalAI +0x3948[building]): each entry holds an effect analyzer and a c..."

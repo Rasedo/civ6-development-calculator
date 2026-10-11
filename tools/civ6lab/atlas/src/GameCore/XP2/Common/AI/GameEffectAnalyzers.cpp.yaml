@@ -24,6 +24,7 @@
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...building's value 0x7a7590 from the start to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBu...
   review: imported
@@ -79,6 +80,15 @@
   context:
     - "...CivicModifiers, the civics AI's 0x7a4b20 term, not wired): EFFECT_GRANT_INFLUENCE_TOKEN 0x6a3780 READ (Amount x the player's points a token, Player_Influence +0x270, 30 without a playe..."
   review: imported
+- addr: 0x6a3a80
+  kind: function
+  name: EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN 0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (the resource value 0x7a21e0), EF...
+  review: imported
 - addr: 0x6a44b0
   final: 0x47b220
   kind: function
@@ -133,6 +143,7 @@
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_INTERNATIONAL and _FOR_DOMESTIC 0x6a49e0: the capacity x Amount, weighted, span."
@@ -147,6 +158,7 @@
       value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...to the horizon. EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (0x79f7c0), _DISTRICT_HOUSING 0x6a5d20 and _BUILDING_HOUSING 0x6c0490 (0x7a3d70, CityBuildAI's). Unregistered, worth 0: EFFECT..."
   review: imported
@@ -164,6 +176,15 @@
   context:
     - "...hted, discounted from the start (0x7a1240); EFFECT_ADJUST_PLAYER_HEALING_FROM_DISPERSAL 0x6a6d20: the camps x ceil(Amount / 10) as PSEUDOYIELD_UNIT_COMBAT (@0xf2e254), the same. EFFE..."
   review: imported
+- addr: 0x6a7510
+  kind: function
+  name: EFFECT_ADJUST_CITY_ATTACKS_PER_TURN
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...10, EFFECT_ADJUST_CITY_SIEGE_PROTECTION 0x6a9650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN 0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and EFFECT_ADJUST_CITY_EXTRA_ACCUMULATI...
+  review: imported
 - addr: 0x6a7d70
   kind: function
   name: EFFECT_ADJUST_PLAYER_YIELD_CHANGE
@@ -172,6 +193,23 @@
   readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
   context:
     - ...100) x the percent x 0.01f, weighted, the same span); EFFECT_ADJUST_PLAYER_YIELD_CHANGE 0x6a7d70 (unweighted, no player passed); EFFECT_ADJUST_GREAT_PERSON_POINTS 0x6a0b10 (the class's...
+  review: imported
+- addr: 0x6a8080
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ".../ UNREAD (worth 10 in the scores where the log reads more): the religion pressure term 0x6a8080 (the context city's majority religion is the player's: its pressure 0x1f33e0 x Amount,..."
+  review: imported
+- addr: 0x6a8d10
+  kind: function
+  name: EFFECT_ADJUST_CITY_COMBAT_BONUS
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...b0, and the knowledge base's city value 0x7a0ac0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x6a8d10, EFFECT_ADJUST_CITY_SIEGE_PROTECTION 0x6a9650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN 0x...
   review: imported
 - addr: 0x6a9550
   kind: function
@@ -183,6 +221,24 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN 0x6a9550 (a yield filter, context +0x64, -1 or the YieldType): the envoys placed (0x44a440) x..."
+  review: imported
+- addr: 0x6a9650
+  kind: function
+  name: EFFECT_ADJUST_CITY_SIEGE_PROTECTION
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...c0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x6a8d10, EFFECT_ADJUST_CITY_SIEGE_PROTECTION 0x6a9650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN 0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6...
+  review: imported
+- addr: 0x6a9e80
+  kind: function
+  name: EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...ty's great works, PSEUDOYIELD_TOURISM, between), EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJ...
   review: imported
 - addr: 0x6ab400
   final: 0x4819a0
@@ -228,17 +284,18 @@
 - addr: 0x6abc40
   kind: function
   name: EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION
-  status: PARTLY
+  status: READ
   cases:
-    - recording: h1_duelw1124
+    - recording: h1_duelw1117
       turn: 3
-      value: "BOTH WALKS TAKE THE   PLOT'S OFFSET (x, y) AS AXIAL, standing on the plot at column x + y/2 of   the row (runs/h1_duelw1124 t3, China's capital at (3,10): no Desert within   3 of it, four within 3 of "
+      value: Land Acquisition 3 on the capital's Culture, halved
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings:
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...t x the count at the player's weight, span. EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x 0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20),..."
-  review: imported
+  review: reviewed
 - addr: 0x6abe40
   kind: function
   name: EFFECT_GRANT_UNIT_IN_CITY
@@ -259,6 +316,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ributaries, weighted, between; the parser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURIS...
@@ -308,6 +366,15 @@
   context:
     - "- EFFECT_ADJUST_DISTRICT_YIELD_MODIFIER 0x6addf0: a district subject; its yield 0x24b5a0 (0x249850: its own yields x (100 + its modifier..."
   review: imported
+- addr: 0x6ae390
+  kind: function
+  name: EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...FFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (the resource value 0x7a21e0), EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE 0x6af1e0.
+  review: imported
 - addr: 0x6ae510
   kind: function
   name: EFFECT_ADJUST_INFLUENCE_POINTS_PER_TURN
@@ -330,6 +397,15 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "..., \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, DistrictType): a city with the district counts..."
+  review: imported
+- addr: 0x6af1e0
+  kind: function
+  name: EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...CCUMULATION 0x6ae390 (the resource value 0x7a21e0), EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE 0x6af1e0.
   review: imported
 - addr: 0x6afa10
   kind: function
@@ -365,6 +441,15 @@
   context:
     - "- EFFECT_ADJUST_UNIT_MAINTENANCE_DISCOUNT 0x6b0840: over the player's units, min(Amount, Units.Maintenance +0x5c), bare Gold, span."
   review: imported
+- addr: 0x6b10b0
+  kind: function
+  name: EFFECT_ADJUST_PROJECT_PRODUCTION
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ..._AMENITY 0x6a1170 (CityBuildAI's 0x7a3d70 / 0x79f7c0), EFFECT_ADJUST_PROJECT_PRODUCTION 0x6b10b0, and the knowledge base's city value 0x7a0ac0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x...
+  review: imported
 - addr: 0x6b2350
   final: 0x464600
   kind: function
@@ -375,6 +460,31 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- PARTLY (their inputs unported): EFFECT_ADJUST_UNIT_PRODUCTION 0x6b2350 (per city, the train turns 0x17bb40 at and without the bonus, CityBuildAI's expected..."
+  review: imported
+- addr: 0x6b2850
+  final: 0x464880
+  kind: function
+  name: EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: Ambassador 112 at Caguana
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...THERS (the international analyzer 0x6a49e0), EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED 0x6b2850 (the context city's owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RA...
+  review: reviewed
+- addr: 0x6b2b70
+  final: 0x464ba0
+  kind: function
+  name: EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...20 per district it reserves a plot for), EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR 0x6b2b70 (the power value 0x7a67f0), EFFECT_ADJUST_DISTRICT_HOUSING 0x6a5d20 / EFFECT_ADJUST_DIS...
   review: imported
 - addr: 0x6b45a0
   final: 0x466290
@@ -389,6 +499,21 @@
     - "...0x1008], bare, from the start to start + the train turns), EFFECT_ADJUST_POLICY_AMENITY 0x6b45a0 (0x79f7c0: the Happiness level before and after, PSEUDOYIELD_HAPPINESS of the step and..."
     - ...4bcd30, CityBuildAI's production 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b...
   review: imported
+- addr: 0x6b4e80
+  final: 0x466b50
+  kind: function
+  name: EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 112
+      value: Bishop 91 = two districts x 45.6 (the log's 95 with the pressure term)
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...citizens +0x588 of the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2),..."
+  review: reviewed
 - addr: 0x6b5b30
   final: 0x467720
   kind: function
@@ -440,6 +565,21 @@
     - ...ch yield's percent change x CityBuildAI's yields +0x1080), EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE...
     - ...roduction 0x6c8dd0, PSEUDOYIELD_UNIT_COMBAT), the policy amenity 0x6b45a0 and housing 0x6b5eb0 (C-96's evaluator 0x79f7c0 / 0x7a3d70), the ability grant 0x6b5b30 (the ability's own m...
   review: imported
+- addr: 0x6b6460
+  final: 0x468050
+  kind: function
+  name: EFFECT_ADJUST_CITY_YIELD_PER_POPULATION
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: Connoisseur / Researcher 160 at Xi'an's 7 citizens
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...he prose's \"plus 0.5\" read 0x16eb20 as an add), EFFECT_ADJUST_CITY_YIELD_PER_POPULATION 0x6b6460 and EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS 0x6b8150 (Amount x the context city's citiz..."
+  review: reviewed
 - addr: 0x6b76f0
   final: 0x469010
   kind: function
@@ -455,6 +595,21 @@
   context:
     - "...the parser's order; \"span\" PV(H) - PV(T), \"between\" 0x7a2140): EFFECT_TERRAIN_ADJACENCY 0x6b76f0 and EFFECT_FEATURE_ADJACENCY 0x6aee30 (Amount, YieldType, Terrain/FeatureType, Distri..."
   review: imported
+- addr: 0x6b8150
+  final: 0x4698a0
+  kind: function
+  name: EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 130
+      value: Tax Collector at the Merchant's city, 237 of 249 lines
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...ECT_ADJUST_CITY_YIELD_PER_POPULATION 0x6b6460 and EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS 0x6b8150 (Amount x the context city's citizens +0x588 of the yield, unweighted, span), EFFECT_...
+  review: reviewed
 - addr: 0x6b8930
   final: 0x469fb0
   kind: function
@@ -500,7 +655,9 @@
   name: EFFECT_ADJUST_CITY_YIELD_MODIFIER
   status: PARTLY
   impl: [cpu/core/aiModifiers.ts:ANALYZERS]
-  readings: ["C-97: the government and policy choice — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...weight, 0x7a6690; PV(horizon) - PV(start), 0x7a2140); EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (min(City::GetYield 0x1cb8b0, 100) x the percent x 0.01f, weighted, the same span); E...
   review: imported
@@ -540,6 +697,35 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
   context:
     - "...t x 0.01), weighted, between, halved (sar 9). EFFECT_ADJUST_PLAYER_FAITH_FROM_DISPERSAL 0x6bdd40: min(the knowledge base's camps +0x648, 5) x Amount, Faith weighted, discounted from th..."
+  review: imported
+- addr: 0x6be2d0
+  final: 0x46f310
+  kind: function
+  name: EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: Space Initiative 66 on the replayed state (the log 111 under its science weight)
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's owner's PSEUDOYIELD_SPACE_RACE @0xf2e2ac of 1.0 at its weight; per...
+    - "...r's: its pressure 0x1f33e0 x Amount, raw), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (per SpaceRace project the owner has not completed: PSEUDOYIELD_SPACE_RACE 1.0 weighted..."
+  review: reviewed
+- addr: 0x6be5b0
+  final: 0x46f580
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "..., m_aiNumProjectsAdvanced 0x4be7b0; else, where the build turns at the Amount (parser 0x6be5b0: whole, 30) lifted fall before the horizon, the value discounted (0x7a1240) at them les..."
   review: imported
 - addr: 0x6beb00
   final: 0x46fac0
@@ -634,6 +820,21 @@
   context:
     - ...h the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's point value 0x6eeee0 -> 0x6ed2d0, unread, as PSEUD...
   review: imported
+- addr: 0x6c2dc0
+  final: 0x473af0
+  kind: function
+  name: EFFECT_ADJUST_CITY_INNER_DEFENSE
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 182
+      value: Defender 25 at a walled city, 248 of 249 lines
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...ion (+0xe1 bit 6), pillaged or not; unweighted, span), EFFECT_ADJUST_CITY_INNER_DEFENSE 0x6c2dc0 (Amount, raw, where the context city's centre strikes, 0x249ee0 > 0, and stands), EFF...
+  review: reviewed
 - addr: 0x6c4820
   final: 0x475250
   kind: function

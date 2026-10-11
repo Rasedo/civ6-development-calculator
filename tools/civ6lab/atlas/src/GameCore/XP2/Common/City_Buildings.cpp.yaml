@@ -9,6 +9,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...arser's scaling unread), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM, between).
@@ -19,6 +20,7 @@
   status: PARTLY
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - ...ad), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (a Great Work type's slots 0x18ddf0 and filled 0x18e0e0 in the city, PSEUDOYIELD_TOURISM, between).

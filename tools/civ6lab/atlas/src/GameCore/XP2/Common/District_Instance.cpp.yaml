@@ -45,10 +45,13 @@
     - cpu/core/combat.ts:cityStrikeStrength
     - gpu/core/sim_masks.py:_strike_strength
     - cpu/core/tactical.ts:dangerPlane
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiValue.ts:AiValueView
   readings:
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"
     - "C-95: the danger map and Move to Safety — READ, ported (the safe plot's two unread tests below)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - ".claude/scratchpad/st1/reading.md: .... Each such city whose centre the player sees: its   strength (0x24ae80) on the centre, its strike (0x249ee0) over its reach   (0x249e40) or, with none, 1 on each plot beside it (0x715ff0). Then the   player'..."
   context:
@@ -120,7 +123,10 @@
     - recording: 1119
       turn: 112
       value: 1119 t112 an Archer, no   term).
-  impl: [cpu/harness/checks.ts:luxAtRebuild, cpu/core/tactical.ts:dangerPlane]
+  impl:
+    - cpu/harness/checks.ts:luxAtRebuild
+    - cpu/core/tactical.ts:dangerPlane
+    - cpu/core/aiModifiers.ts:ANALYZERS
   readings:
     - "H-1: a pillaged building's specialist, the centre's defence, three moments — READ"
     - "C-97: the settle site evaluation — READ (the score, the choices), PARTLY READ (the danger, the plot yield)"

@@ -33,6 +33,8 @@
   readings:
     - "C-97: the victory manager's strategies — READ (the evaluation, the apply, the conditions below), PARTLY READ (three conditions, the island's count)"
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
+    - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...the knowledge base's update 0x783980 from a per-plot visibility word > 0) above 0.5 (0xd20458) sets +0x440 and decides: coastal plots >= trunc(total x 20 / 100) sets the island, els..."
   review: imported
@@ -225,6 +227,18 @@
   context:
     - "...tality's COMMEMORATION_INFRASTRUCTURE_QUEST): the factory 0xc25910, the effect vtable 0xdf85f8, its player apply 0xb83b00 → 0x2bf3e0 adds the Amount to the era manager's player entry..."
   review: imported
+- addr: 0xe261e0
+  kind: string
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...s): its leader's InheritFrom chain's and its civilization's trait modifiers (the query @0xe261e0, ORDER BY ModifierId) whose requirements name a type tagged INFLUENCE_REQUIREMENT (Ty..."
+  review: imported
 - addr: 0xefedf0
   kind: global
   status: PARTLY
@@ -322,7 +336,9 @@
   kind: global
   status: PARTLY
   impl: [cpu/core/aiValue.ts:FX]
-  readings: ["H-1: the research AI — READ (the choice), PARTLY READ (the value)"]
+  readings:
+    - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...b3e50 (args: row, &discount, turns, H, player, the row's record +0x530): past H, -9999 (0xf04cb0). The own term: PSEUDOYIELD_TECHNOLOGY of 1.0 (0x7a60d0: amount x DefaultValue x max(0,..."
   review: imported
@@ -1200,6 +1216,8 @@
   kind: global
   name: PSEUDOYIELD_SPACE_RACE
   status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: a saved global name (.claude/scratchpad/cb/gnames.json)"]
   review: imported
 - addr: 0xf2e2b0
@@ -1271,6 +1289,7 @@
 - addr: 0xf2f97c
   kind: global
   status: PARTLY
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS]
   readings: ["H-1: the citizen manager's placement and the yield flags — READ"]
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:

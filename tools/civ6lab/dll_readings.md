@@ -5673,8 +5673,9 @@ m_managedContracts, m_religiousUnitContract). Its log AI_Religious.csv
   on the city AI's plot evaluations holding the feature (0x5d2df0, +0xcf8
   0x78 each); Amount x the count at the player's weight, span.
   EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION 0x6abc40 (Amount as fx(x
-  0.01f), 0x6ab8a0): the city's Culture x it, weighted, + 0.5 (0x16eb20),
-  span. EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth
+  0.01f), 0x6ab8a0): the context city's (+0x70; none, nothing) Culture x
+  it, weighted, x 0.5 (0x16eb20 is the multiply, @0xd20458 = 0.5f), span
+  ("C-97: the governor AI"). EFFECT_ADJUST_CITY_GROWTH 0x6beb00 (+0x64 cleared): the growth
   object's surplus (0x1b5620), 2.0 with no city, x fx(Amount x 0.01), bare
   Food, between. EFFECT_ADJUST_CITY_ALL_MILITARY_UNITS_PRODUCTION 0x6b5d50
   (Amount, StartEra, EndEra): the player's era (0x467eb0) in the window, the
@@ -5779,6 +5780,174 @@ the pantheon, the religion founded and its beliefs are the record's
   Delegation at 10 Gold needs T or a weight of 1.0 to clear Neutral's 10).
   The founding's religion (`religionChoice`) names the record's on 5 / 5
   (Qin's favoured Taoism).
+
+## C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ
+
+AI::Governors (AI/Governors.cpp, the player AI's; its log AI_Governors.csv,
+opener 0x6eef10, header "Game Turn, Player, Governor, Assignment,
+Promotions"). Port: `ai/major/governors.ts` over `MajorView`; measure: the
+action replay's governor section (`cpu/harness/governorAi.ts`), which lands
+an AI major's `governors` decision through the port's turn and imposes the
+record's roster only where it differs. MEASURED on the replayed state
+(runs/h1_duelw1117 / 1121 / 1124 / 1127 / 1128): appointments and
+promotions as the log's on 8/19, 6/18, 9/21, 6/17, 8/11 turns; assignments
+6/9, 4/10, 4/12, 9/10, 5/6. The misses trace to the replayed inputs (the
+engine's civics and so its titles, a city-state not yet met, the strategies'
+weights, the cities' yields) and to the analyzers below left unread.
+
+- THE TABLES (0x6ef120 sets them up; a game-synchronized variable each,
+  data at +0x1d0 and +0x280): per governor in the Governors table's order
+  (0xad57f0; the duels' eight, Ibrahim last) 0x40 bytes — +0x8 the governor,
+  +0x10 the slots' cities ({owner, type 2, city id}, `m_cityIds`), +0x28 the
+  slots' values (`m_values`, 24.8); per promotion in the GovernorPromotions
+  order (0xad5830) 0x38 bytes, +0x30 its score. A governor's promotions are
+  its GovernorPromotionSets rows in the GovernorPromotions order (the log's
+  order: Messenger, Emissary, Affluence, Local Informants...; the XML's set
+  order differs).
+- THE JOB "Governor Analyzer" (0x6edfc0 starts it on the player's signal for
+  a full civilization; 0x6eee50 runs it): each governor's analysis 0x6ee5f0,
+  each promotion's score 0x6eedb0.
+- A GOVERNOR'S ANALYSIS (0x6ee5f0): the arrays sized to 1 + the player's
+  cities + the game's city-states (Game +0x1650), every id {-1, 2, -1} and
+  every value 0; nothing more for a governor neither appointed (0x433450) nor
+  open to the player (0x4316f0: no TraitType, or a trait its civilization or
+  leader holds; a secret society's governor its society's). Slot 0 (no
+  city): the value 0x7b0e40(city none) divided by the secret society's level
+  (1.0 for every other governor, 0x16e940). Slot 1 + i: the player's i-th
+  city (its cities' list +0xd8). For a governor with AssignCityState
+  (+0x48 bit 0): slot 1 + cities + k the k-th city-state's capital where it
+  has one (0x36f460) and the player has met it (0x3daaf0), else left as it
+  was.
+- THE VALUE IN A SLOT (0x7b0e40(governor, rate, start 0, horizon 100 — the
+  literal `push 0x64` —, the player, the city, the governor's modifiers)):
+  - no city: 10.0, 20.0 for a Governors_XP2 AssignToMajor governor;
+  - a city for an AssignToMajor governor: FX(-9999) (@0xf04cb0);
+  - a city holding another governor (the player's assignment list +0x58,
+    {owner, type 2, city} -> governor +4), or not the player's: 0;
+  - the player's city else: its Loyalty a turn (0x19d200 on city +0x2a78,
+    the identity sum), less the governor's IdentityPressure (+0x20) where it
+    sits there; where that is at or below 0, its loss as a yield from the
+    turn the governor would establish (start + 5 where it does not sit
+    there) to the horizon (0x7a2140), at least 20.0; where the Loyalty is
+    below 0 and the governor's IdentityPressure lifts it above, the city's
+    value (0x79fef0, unread) more;
+  - then the governor's modifiers — its BaseAbility promotions' (the query
+    "SELECT ModifierId FROM GovernorPromotionModifiers gpm inner join
+    GovernorPromotions gp ... where gps.GovernorType = ? and gp.BaseAbility
+    = 1", GlobalAI +0x39c0, built 0x6dfc70) — summed (0x7a4b20) in a context
+    of the player, the city (+0x70), the governor (+0x24), start, horizon
+    and rate.
+  runs/h1_duelw1117 China t2..t30: Defender, Cardinal, Builder, Resource
+  Manager 20 on its capital (10 before its first city), Educator 38 = 20 +
+  Librarian's 18, Merchant 23 = 20 + Land Acquisition's 3, Ambassador 112
+  at Caguana (two envoys' worth, no base: a city-state's city is not the
+  player's).
+- A PROMOTION'S SCORE (0x6eedb0 over 0x7b0bb0(promotion, rate, start 0,
+  horizon 100, the player, its GovernorPromotionModifiers by ModifierId,
+  GlobalAI +0x39d8)): from 5.0, over the governors whose set holds it: -1.0
+  (and done) where one is not appointed; else the best of its level x 250.0
+  for a secret society's governor (0 else) plus the modifiers' sum in a
+  context of the player and the city that governor sits in (0x432d80, none
+  where it sits in none). The score is at least 10.0 (runs/h1_duelw1117
+  t24: Messenger 112 once Amani sits at Caguana, 10 before).
+- THE AI TURN (0x6ee100, the second phase): the log (0x6ef6a0: per
+  governor "%d, %d, %s, %d" — turn, player, type, the largest of its slot
+  values' whole part — then ", %d:%s" per promotion, its score's whole part;
+  some players' turn writes it twice, the blocks equal); a human player
+  stops there. While the player holds a title for an appointment or a
+  promotion (0x430ee0: spent below earned, and a governor of the list not
+  appointed — Ibrahim, whom only Suleiman appoints, always is; 0x431ac0): over
+  the governors in order, an unappointed one at its best slot value, an
+  appointed one at each promotion of its set it does not hold (0x35e320) and
+  may take (0x431400) at the promotion's score; the first strictly highest
+  above 0 is appointed (APPOINT_GOVERNOR 0xa68659ab) or promoted
+  (PROMOTE_GOVERNOR 0x7d3da99d), executed at once (0x48a330 / 0x49a50). One
+  action a turn: a player with two titles spends the second the turn after.
+- THE SEATS (0x6ed750): the slots — no city, the player's cities, every
+  city-state with a capital in the game's list (met or not) — and the
+  generalized assignment 0x8b5bf0 over the governors and the slots, one pass
+  (its last argument), with λ 0x6ecee0 (the start: each assigned governor on
+  its city's slot, the slot's occupant it), λ 0x6ece40 (the gain: the
+  governor's value there whole, -1 for one not appointed now — the turn's
+  appointment counts — or a slot its analysis lacks, 0x6eff30), weight and
+  capacity 1, λ 0x6ed060 (the move: the slot's occupant replaced and
+  returned) and the knapsack 0x616570 -> 0x61ddb0 (at capacity 1 the first
+  largest gain above 0). Per slot in order, per governor in order: its gain
+  is its value there, less its value where it sits when that is elsewhere;
+  the winner takes the slot unless it sits there, the slot's previous
+  occupant left without a slot — the occupant record of the slot the winner
+  left is not cleared. Every governor left on a slot is assigned there
+  (ASSIGN_GOVERNOR 0xf97c278b: owner, governor, city), the operation
+  changing nothing where it already sits (runs/h1_duelw1117 t205: Merchant
+  Handan 46 -> Xiurong 69 outgains the Resource Manager's 20 there, which
+  then takes Chengdu — the log's two assignments).
+- THE ANALYZERS the governors' modifiers reach (each a registry entry of
+  0x6c9640: the effect's static object, its vtable's slot 1). READ:
+  EFFECT_ADJUST_CITY_YIELD_MODIFIER 0x6b9d90 (on the context's city +0x70,
+  the context's yield filter +0x64), EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION
+  0x6abc40 (the context city's Culture x fx(Amount x 0.01) weighted, HALVED
+  by 0x16eb20 @0xd20458 = 0.5f, span — the prose's "plus 0.5" read 0x16eb20
+  as an add), EFFECT_ADJUST_CITY_YIELD_PER_POPULATION 0x6b6460 and
+  EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS 0x6b8150 (Amount x the context city's
+  citizens +0x588 of the yield, unweighted, span),
+  EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1,
+  0, 0): the city's districts not InternalOnly (+0xe1 bit 2), complete
+  (+0xb08) and RequiresPopulation (+0xe1 bit 6), pillaged or not;
+  unweighted, span), EFFECT_ADJUST_CITY_INNER_DEFENSE 0x6c2dc0 (Amount,
+  raw, where the context city's centre strikes, 0x249ee0 > 0, and stands),
+  EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS (the international analyzer
+  0x6a49e0), EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED 0x6b2850 (the
+  context city's owner's envoys' worth 0x7a46c0 at Amount),
+  EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's
+  owner's PSEUDOYIELD_SPACE_RACE @0xf2e2ac of 1.0 at its weight; per project
+  with Projects +0xe8 bit 1 — SpaceRace, bit 0 OuterDefenseRepair, the
+  SELECT's booleans in order — the value whole where the owner advanced it,
+  m_aiNumProjectsAdvanced 0x4be7b0; else, where the build turns at the
+  Amount (parser 0x6be5b0: whole, 30) lifted fall before the horizon, the
+  value discounted (0x7a1240) at them less at the turns without; the build
+  turns 0x17b890 add the Amount RAW to 1.0 fixed point, 30 being +11.7%,
+  over the city's Production x the project's modifier 0x17a8c0 — the queue's
+  per-project modifier +0x2f0 and its district's 0x178c50 —, the cost
+  0x17a680 (OuterDefenseRepair's own; else the cost progression model: game
+  progress 1, 8; 0x5254d0's speed) less the progress kept +0x260 and the
+  store +0x1f4, through 0x8c4540. Every space project counts whether the
+  city may build it: China's Space Initiative 66 at t28 of
+  runs/h1_duelw1117 on the replayed state, the log's 111 under its
+  science-victory weight).
+- AN ENVOYS' WORTH (0x7a46c0(n, rate, start, horizon, the player, the
+  city-state, the city-state's +0x1280 +0x6868 list)): 0 at war with it
+  (0x469cd0); else the list's modifiers summed (0x7a4b20) in a fresh context
+  of the player, the city-state (+0x40) and n envoys (+0x08). The list
+  (0x651490, the city-state's diplomatic AI's): its leader's InheritFrom
+  chain's and its civilization's trait modifiers (the query @0xe261e0,
+  ORDER BY ModifierId) whose requirements name a type tagged
+  INFLUENCE_REQUIREMENT (TypeTags: PLAYER_HAS_GIVEN_INFLUENCE_TOKENS,
+  PLAYER_IS_SUZERAIN). REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS 0x6d45b0:
+  the tokens the city-state received from the player (0x44c860, the store
+  +0x5d0 and a posted governor's 0x44caa0) plus the context's n reach
+  MinimumTokens (parser 0x6d4490, stoi); REQUIREMENT_PLAYER_IS_AT_PEACE
+  0x6d2470: a context player (+0x40) the player is not at war with. The
+  suzerain requirements are not in the registry, so a suzerain bonus's set
+  keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two
+  envoys, t28 186 with Amani's two counted).
+- PARTLY / UNREAD (worth 10 in the scores where the log reads more): the
+  religion pressure term 0x6a8080 (the context city's majority religion is
+  the player's: its pressure 0x1f33e0 x Amount, raw), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION
+  0x6be2d0 (per SpaceRace project the owner has not completed: PSEUDOYIELD_SPACE_RACE
+  1.0 weighted, discounted at the build turns 0x17b890 with the Amount
+  percent less without, where they fall before the horizon; a completed one
+  its value), EFFECT_ADJUST_CITY_TOURISM 0x6ac690 (0x18ddf0 / 0x18e0e0 over
+  the city's great works, PSEUDOYIELD_TOURISM, between),
+  EFFECT_ADJUST_ALL_DISTRICTS_PRODUCTION 0x6a9e80 (CityBuildAI's district
+  value 0x5d4a20 per district it reserves a plot for), EFFECT_ADJUST_RESOURCE_POWER_PROVIDED_GOVERNOR
+  0x6b2b70 (the power value 0x7a67f0), EFFECT_ADJUST_DISTRICT_HOUSING
+  0x6a5d20 / EFFECT_ADJUST_DISTRICT_AMENITY 0x6a1170 (CityBuildAI's 0x7a3d70
+  / 0x79f7c0), EFFECT_ADJUST_PROJECT_PRODUCTION 0x6b10b0, and the knowledge
+  base's city value 0x7a0ac0 behind EFFECT_ADJUST_CITY_COMBAT_BONUS 0x6a8d10,
+  EFFECT_ADJUST_CITY_SIEGE_PROTECTION 0x6a9650, EFFECT_ADJUST_CITY_ATTACKS_PER_TURN
+  0x6a7510, EFFECT_ADJUST_CITY_AIR_DEFENSE_BONUS 0x6a3a80, and
+  EFFECT_ADJUST_CITY_EXTRA_ACCUMULATION 0x6ae390 (the resource value
+  0x7a21e0), EFFECT_ADJUST_UNIT_GRANT_EXPERIENCE 0x6af1e0.
 
 ## DLL rules the engines contradict
 

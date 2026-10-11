@@ -216,6 +216,24 @@ export interface AiValueView {
   /** the trade AI's expected route value (the knowledge base's +0x6d8,
    *  AI_Knowledge.csv's TRADE VAL), raw; null where it is not read */
   tradeKnowledge(seat: number): number | null;
+  atWar(seat: number, other: number): boolean;
+  /** the envoys `seat` holds in a city-state (its tokens received from it,
+   *  0x44c860) */
+  envoys(cityState: number, seat: number): number;
+  /** a city-state's CivilizationType */
+  minorCivilization(cityState: number): string | null;
+  /** a city's citizens (City +0x588) */
+  cityCitizens(seat: number, cityId: number): number;
+  /** a city's finished specialty districts, pillaged or not (0x1ae8f0) */
+  citySpecialtyDistricts(seat: number, cityId: number): number;
+  /** a city's centre strikes (0x249ee0 above 0: its walls stand) */
+  cityStrikes(seat: number, cityId: number): boolean;
+  /** the times the seat completed a ProjectType (player +0x1330, 0x4be7b0) */
+  projectCompletions(seat: number, project: string): number;
+  /** the turns a city builds a ProjectType in (0x17b890): its cost less the
+   *  progress kept on it and the city's store, at its Production toward it
+   *  times 1 + `extra` raw (24.8) */
+  projectTurns(seat: number, cityId: number, project: string, extra: number): number;
 }
 
 /** 0x7a7110, A TRADER'S WORTH from turn `start`: none once the seat's trade

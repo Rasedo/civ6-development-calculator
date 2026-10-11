@@ -55,6 +55,20 @@
     - "...0x2f58 of the player's diplomacy, and \"Threat and Trust\" as threat:n:trust from +0x6560 / 0x650550 / +0x6480, 24.8). Port: `ai/major/diplomacy.ts` (tables `tools/install/ai_diplomacy_table..."
     - ...ner's trust of p (+0x6480[p]) is non-zero; else, with n = 1 + the players trusted more (0x650550) and L = trunc(+0x6420 x 0.25 / 0.5 / -) for modes 0 / 1 / 2, T = (10 / 20 / 40) x (L...
   review: imported
+- addr: 0x651490
+  final: 0x4322c0
+  kind: function
+  name: AI::Diplomatic init (influence modifiers +0x6868)
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: "The   suzerain requirements are not in the registry, so a suzerain bonus's set   keeps its peace term alone (runs/h1_duelw1117 t20..t27: Caguana 112 for two   envoys, t28 186 with Amani's two counted)"
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...a fresh context of the player, the city-state (+0x40) and n envoys (+0x08). The list (0x651490, the city-state's diplomatic AI's): its leader's InheritFrom chain's and its civilizati..."
+  review: reviewed
 - addr: 0x652800
   final: 0x433590
   kind: function

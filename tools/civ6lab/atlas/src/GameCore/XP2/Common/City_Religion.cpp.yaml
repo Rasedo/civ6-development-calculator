@@ -40,7 +40,9 @@
     - cpu/core/game.ts:pressureFromCity
     - cpu/core/game.ts:mult
     - gpu/core/sim_economy.py:_spread_religious_pressure
-  readings: ["C-94: the religious spread — READ"]
+  readings:
+    - "C-94: the religious spread — READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - ...1225de check) or a Citadel-of-God city of another founder (+0x19e8); the source's step (0x1f33e0) when the target is within the range and the source follows the religion; then the trad...
     - "- The step 0x1f33e0: ADJACENT_PER_TURN_PRESSURE (gp +0x5d4); x HOLY_CITY_PRESSURE_MULTIPLIER (+0x5e0) on th..."

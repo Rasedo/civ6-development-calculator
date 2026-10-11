@@ -66,7 +66,7 @@ const SPACE_INITIATIVE_PROJECT_PCT: Readonly<Record<string, number>> =
   Object.fromEntries(Object.keys(SPACE_RACE_PROJECT).map((p) => [p, 30]));
 
 /** the install's own name for each governor's role. */
-const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
+export const GOVERNOR_INSTALL_ID: Readonly<Record<GovernorId, string>> = {
   REYNA: 'GOVERNOR_THE_MERCHANT', VICTOR: 'GOVERNOR_THE_DEFENDER',
   AMANI: 'GOVERNOR_THE_AMBASSADOR', MAGNUS: 'GOVERNOR_THE_RESOURCE_MANAGER',
   MOKSHA: 'GOVERNOR_THE_CARDINAL', LIANG: 'GOVERNOR_THE_BUILDER',
@@ -257,7 +257,7 @@ interface GovernorPromotionDef {
  * Reinforced Materials = REINFORCED_INFRASTRUCTURE, Renewable Subsidizer =
  * MERCHANT_RENEWABLE_ENERGY.
  */
-const PROMO_INSTALL_ID: Readonly<Record<string, string>> = {
+export const PROMO_INSTALL_ID: Readonly<Record<string, string>> = {
   LAND_ACQUISITION: 'GOVERNOR_PROMOTION_MERCHANT_LAND_ACQUISITION',
   HARBORMASTER: 'GOVERNOR_PROMOTION_MERCHANT_HARBORMASTER',
   FORESTRY_MANAGEMENT: 'GOVERNOR_PROMOTION_MERCHANT_FORESTRY_MANAGEMENT',

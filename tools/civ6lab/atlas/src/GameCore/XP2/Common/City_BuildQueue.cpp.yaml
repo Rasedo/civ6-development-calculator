@@ -46,6 +46,7 @@
     - "H-1: the melee result, a ranged blow's domain, a city's shot — READ"
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...28, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0 (@f04cb0 = 0xffd8f100).  LOG: AI_CityBuild.csv lines: D..."
   context:
@@ -66,6 +67,7 @@
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - "label: fx_mul_assign(a*=b)"
     - ".claude/scratchpad/cb/notes.txt: ...| trunc((f-floor)*256)&0xff ; fx(0.01)=2 (!), fx(0.5)=128, fx(1/6 const 0.16667)=42. fx_mul a*b>>8 (0x16eb20 assign, 0x16e7d0 new), fx_div (a<<8)/b trunc (0x16e940), add 0xac650, sub 0x16ec10. FX_MIN=-9999.0..."
@@ -181,6 +183,18 @@
     - City_BuildQueue.cpp. The queue's turn 0x177d10 reads the city's Production (0x1c5350), CLEARS the city's per-yield conversion vector (+0...
     - "- The queue's step (City_BuildQueue 0x177d10 → 0x16f050) reads the city's Production twice through 0x1c5350: A with the head's id (t..."
   review: imported
+- addr: 0x178c50
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...roject's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game..."
+  review: imported
 - addr: 0x179510
   final: 0xfd020
   kind: function
@@ -260,6 +274,32 @@
     - ...431 -> 304, Spearman 290 -> 161 raw); then PV(H) - PV(T); a FoundCity unit's 0x6fe2b0 + 0x17a600 turns; ParkCharges' tourism (0 where the culture AI +0x6f8 > 0); a Units_XP2 Resource...
     - "...on weight, PSEUDOYIELD_UNIT_SETTLER, the maintenance, then the settle AI's 0x6fe2b0 and 0x17a600 for a founder — Religious Settlements 198 at t3 against the cost's 40), the building..."
   review: imported
+- addr: 0x17a680
+  final: 0xfdca0
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x17a680 (OuterDefenseRepair's own; else the cost progression model: game progress 1, 8; 0x5254d..."
+  review: imported
+- addr: 0x17a8c0
+  final: 0xfde60
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: "Every space project counts whether the   city may build it: China's Space Initiative 66 at t28 of   runs/h1_duelw1117 on the replayed state, the log's 111 under its   science-victory weight)."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...o 1.0 fixed point, 30 being +11.7%, over the city's Production x the project's modifier 0x17a8c0 — the queue's per-project modifier +0x2f0 and its district's 0x178c50 —, the cost 0x1..."
+  review: imported
 - addr: 0x17b1e0
   final: 0xfe420
   kind: function
@@ -291,9 +331,11 @@
   kind: function
   name: turnsToBuildProject
   status: PARTLY
-  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
-  notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
-  review: imported
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value — PARTLY READ (the structure), unported"
+  review: reviewed
 - addr: 0x17bb40
   kind: function
   name: turnsToTrainUnit

@@ -180,6 +180,7 @@
     - "H-1: the goody hut's other gates and the Relic — READ"
     - "H-1: the city-states' quests — READ"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...the founder, is a full civ (0x469db0, CIVILIZATION_LEVEL_FULL_CIV), the founder has met (0x3daaf0) and the plot is revealed to the founder. Pantheon 0x314840: FIRST_IN_WORLD when no other..."
     - ...with no civic chosen is held at +0xb40 until one is), then per other player it has met (0x3daaf0) the tourism toward it is banked (0x394830 / 0x3939b0, +0xc68) and its tourists refre...

@@ -118,6 +118,16 @@ export interface MajorCityView {
   originalOwner: number;
 }
 
+/** a governor of the seat's roster (Player_Governors), in the game's type
+ *  names: its promotions held (the BaseAbility one with the appointment) and
+ *  the city it sits in, a city-state's as its seat with id -1, null for none */
+export interface MajorGovernorView {
+  type: string;
+  appointed: boolean;
+  promotions: ReadonlySet<string>;
+  city: { seat: number; id: number } | null;
+}
+
 export interface MajorView extends AiValueView {
   /** the map's plots by index */
   plots(): readonly MajorPlotView[];
@@ -220,7 +230,6 @@ export interface MajorView extends AiValueView {
   leader(seat: number): string | null;
   /** the turn `seat` met `other`, null while they have not met */
   metTurn(seat: number, other: number): number | null;
-  atWar(seat: number, other: number): boolean;
   /** turns the pair has been at peace since their last war (or since they
    *  met when they never fought) */
   peaceTurns(seat: number, other: number): number;
@@ -250,8 +259,6 @@ export interface MajorView extends AiValueView {
   tradeRoutesBetween(a: number, b: number): number;
   /** the city-states' seats */
   cityStateSeats(): readonly number[];
-  /** the envoys `seat` holds in a city-state */
-  envoys(cityState: number, seat: number): number;
   /** the grievances `holder` holds against `against`, 0 for none */
   grievances(holder: number, against: number): number;
   /** the seat's military units of a DomainType */
@@ -300,4 +307,20 @@ export interface MajorView extends AiValueView {
   plotForeignUnits(seat: number, plot: number): number;
   /** the citizens of the city whose centre is the plot, 0 for none */
   cityPopulation(plot: number): number;
+
+  // THE GOVERNOR AI'S VIEW (ai/major/governors.ts)
+  /** the seat's governors, one per GovernorType the engine carries */
+  governors(seat: number): readonly MajorGovernorView[];
+  /** the governor is open to the seat (0x4316f0: no TraitType, or one its
+   *  civilization or leader holds) */
+  governorAvailable(seat: number, type: string): boolean;
+  /** the Governor Titles the seat holds unspent */
+  governorTitles(seat: number): number;
+  /** the seat may promote the governor with the GovernorPromotionType now
+   *  (0x431400: appointed, a title, not held, its prerequisites) */
+  governorCanPromote(seat: number, type: string, promotion: string): boolean;
+  /** an own city's Loyalty a turn (0x19d200), fixed point */
+  cityLoyaltyPerTurn(seat: number, cityId: number): number;
+  /** the city-state holds its city */
+  cityStateHasCity(cityState: number): boolean;
 }

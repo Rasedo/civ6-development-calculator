@@ -11,6 +11,16 @@
   context:
     - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which takes an INDEX when i..."
   review: imported
+- addr: 0x430ee0
+  final: 0x2dd760
+  kind: function
+  status: PARTLY
+  impl: [ai/major/governors.ts:governorChoice]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...player stops there. While the player holds a title for an appointment or a promotion (0x430ee0: spent below earned, and a governor of the list not appointed — Ibrahim, whom only Sule..."
+  review: imported
 - addr: 0x430fa0
   final: 0x2dd820
   kind: function
@@ -19,6 +29,40 @@
   readings: ["B-24r: the governor operations"]
   context:
     - "- APPOINT_GOVERNOR (0x48c219 -> CanAppoint 0x430fa0 -> Appoint 0x430590): the PARAM_GOVERNOR_TYPE value is looked up by 0x28a940, which tak..."
+  review: imported
+- addr: 0x431400
+  final: 0x2ddbb0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/view.ts:MajorView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ...appointed one at each promotion of its set it does not hold (0x35e320) and may take (0x431400) at the promotion's score; the first strictly highest above 0 is appointed (APPOINT_GOV...
+  review: imported
+- addr: 0x4316f0
+  final: 0x2dddd0
+  kind: function
+  name: Player_Governors CanAppoint (open to the player)
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 1
+      value: Ibrahim (TRAIT_LEADER_SULEIMAN_GOVERNOR) scores 0 for China
+  impl: [ai/major/view.ts:MajorView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...lue 0; nothing more for a governor neither appointed (0x433450) nor open to the player (0x4316f0: no TraitType, or a trait its civilization or leader holds; a secret society's governor..."
+  review: reviewed
+- addr: 0x431ac0
+  final: 0x2de100
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...a governor of the list not appointed — Ibrahim, whom only Suleiman appoints, always is; 0x431ac0): over the governors in order, an unappointed one at its best slot value, an appointe..."
   review: imported
 - addr: 0x432980
   final: 0x2de6a0
@@ -34,6 +78,19 @@
     - ...recomputed by 0x4ab6e0, then 0x4a6110 rebuilds the allocation), the governors' clocks (0x432980 at 0x4e46df), and only then each city's turn (0x1fa1d0 at 0x4e4813, in the loop over Pl...
     - "- 0x432980 (from Player DoTurn 0x4e46df, after the culture and the resources, before the city turn..."
   review: imported
+- addr: 0x432d80
+  final: 0x2de990
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 24
+      value: "The score is at least 10.0 (runs/h1_duelw1117   t24: Messenger 112 once Amani sits at Caguana, 10 before)."
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...plus the modifiers' sum in a context of the player and the city that governor sits in (0x432d80, none where it sits in none). The score is at least 10.0 (runs/h1_duelw1117 t24: Mess..."
+  review: imported
 - addr: 0x433180
   final: 0x2ded40
   kind: function
@@ -43,4 +100,13 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...on, 1) raises the posting's count (+0x28) and, on reaching the type's EstablishTurns (0x433180), raises \"Governor Established\" (0x35e5f0); then the neutralize clock (0x35e1f0 > 0 ->..."
+  review: imported
+- addr: 0x433450
+  final: 0x2def90
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...every id {-1, 2, -1} and every value 0; nothing more for a governor neither appointed (0x433450) nor open to the player (0x4316f0: no TraitType, or a trait its civilization or leade..."
   review: imported

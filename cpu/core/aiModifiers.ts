@@ -18,7 +18,7 @@
  * set holds), TEST_ANY when one does (an empty set fails), TEST_NONE when
  * none does.
  */
-import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD } from '../data/aiTables';
+import { AI_GOVERNMENT_INFLUENCE_THRESHOLD, AI_GP_CLASS_PSEUDOYIELD, AI_MINOR_INFLUENCE_MODIFIERS, AI_SPACE_RACE_PROJECTS } from '../data/aiTables';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { ERAS } from '../data/techs';
 import {
@@ -73,6 +73,11 @@ export interface ValueTerms {
    *  player's knowledge base, its entries in order; absent where the
    *  evaluation reads none */
   known?: readonly AiCitySubject[];
+  /** the other player the evaluation is of (context +0x40): the city-state
+   *  an envoys' value is of (0x7a46c0); absent, none */
+  minor?: number;
+  /** the envoys the evaluation adds to those given (context +0x08) */
+  tokens?: number;
 }
 
 /** a city an analysis may stand on: its owner's seat, the engine's city id
@@ -196,6 +201,13 @@ const EVALUATORS: Readonly<Record<string, Evaluator>> = {
   // 0x6d27a0: with no religion in the context, held; else the context's
   // player founded it (0x497cc0)
   REQUIREMENT_PLAYER_IS_RELIGION_FOUNDER: (t) => (t.religion ?? -1) < 0 || t.view.religionFounded(t.seat) === t.religion,
+  // 0x6d45b0: with an other player in the context (+0x40), the envoys the
+  // player has given it (0x44c860) and the context's (+0x08) reach
+  // MinimumTokens
+  REQUIREMENT_PLAYER_HAS_GIVEN_INFLUENCE_TOKENS: (t, args) =>
+    t.minor !== undefined && t.view.envoys(t.minor, t.seat) + (t.tokens ?? 0) >= (Number(args.MinimumTokens ?? 0) | 0),
+  // 0x6d2470: with an other player in the context (+0x40), not at war with it
+  REQUIREMENT_PLAYER_IS_AT_PEACE: (t) => t.minor !== undefined && !t.view.atWar(t.seat, t.minor),
 };
 
 /** 0x6cf3c0 over the set as 0x6ccec0 builds it: null where a kept
@@ -344,6 +356,68 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     whole(span(t, yieldValue(t.view, t.seat, t.view.tradeRouteCapacity(t.seat) * amountOf(args), args.YieldType ?? ''))),
   EFFECT_ADJUST_TRADE_ROUTE_YIELD_FOR_DOMESTIC: (t, args) =>
     whole(span(t, yieldValue(t.view, t.seat, t.view.tradeRouteCapacity(t.seat) * amountOf(args), args.YieldType ?? ''))),
+  EFFECT_ADJUST_TRADE_ROUTE_YIELD_TO_OTHERS: (t, args) =>
+    whole(span(t, yieldValue(t.view, t.seat, t.view.tradeRouteCapacity(t.seat) * amountOf(args), args.YieldType ?? ''))),
+  // 0x6b6460: a subject and the context's city (+0x70); Amount x the city's
+  // citizens (+0x588) of the yield, unweighted (no player passed),
+  // PV(horizon) - PV(start)
+  EFFECT_ADJUST_CITY_YIELD_PER_POPULATION: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    return whole(span(t, yieldValue(null, null, t.view.cityCitizens(c.seat, c.id) * amountOf(args), args.YieldType ?? '')));
+  },
+  // 0x6b8150: as the per-citizen yield, in Gold (@0xf2f97c)
+  EFFECT_ADJUST_CITY_GOLD_FROM_CITIZENS: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    return whole(span(t, yieldValue(null, null, t.view.cityCitizens(c.seat, c.id) * amountOf(args), 'YIELD_GOLD')));
+  },
+  // 0x6b4e80: a subject and the context's city; Amount x the city's
+  // finished specialty districts (0x1ae8f0: not the centre, complete,
+  // counting toward the limit, pillaged or not) of the yield, unweighted,
+  // PV(horizon) - PV(start)
+  EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    return whole(span(t, yieldValue(null, null, t.view.citySpecialtyDistricts(c.seat, c.id) * amountOf(args), args.YieldType ?? '')));
+  },
+  // 0x6c2dc0: a subject and the context's city whose centre strikes
+  // (0x249ee0 above 0) and stands (0x24ae80 above 0): Amount, raw
+  EFFECT_ADJUST_CITY_INNER_DEFENSE: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city' || !t.view.cityStrikes(c.seat, c.id)) return 0;
+    return Number(args.Amount ?? 0) | 0;
+  },
+  // 0x6be2d0: a subject and the context's city; the space race's worth to
+  // its owner (PSEUDOYIELD_SPACE_RACE 1.0 at its weight); per SpaceRace
+  // project, the owner having completed it that worth whole, else, where
+  // the city builds it within the horizon at the Production lifted by the
+  // Amount — whole, read as the raw of a 24.8 fraction (0x17b890 adds it to
+  // 1.0: 30 is +11.7%) —, the worth discounted at those turns less at the
+  // turns without it
+  EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    const v = pseudoYieldValue(t.view, c.seat, FX, 'PSEUDOYIELD_SPACE_RACE');
+    let sum = 0;
+    for (const p of AI_SPACE_RACE_PROJECTS) {
+      if (t.view.projectCompletions(c.seat, p) !== 0) {
+        sum += whole(v);
+        continue;
+      }
+      const t0 = t.view.projectTurns(c.seat, c.id, p, 0);
+      const t1 = t.view.projectTurns(c.seat, c.id, p, Number(args.Amount ?? 0) | 0);
+      if (t1 < t.horizon) sum += whole(discounted(v, t.rate, t1) - discounted(v, t.rate, t0));
+    }
+    return sum;
+  },
+  // 0x6b2850: a subject, the context's city (+0x70) and a player; the
+  // city's owner's envoys' worth (0x7a46c0) at Amount
+  EFFECT_GOVERNOR_ADJUST_CITY_TOKENS_GRANTED: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    return whole(envoyValue(t, c.seat, Number(args.Amount ?? 0) | 0));
+  },
   // 0x6a9550: the envoys placed x the amount, at the player's weight, from
   // the start to the horizon
   EFFECT_ADJUST_PLAYER_YIELD_CHANGE_PER_USED_INFLUENCE_TOKEN: (t, args) =>
@@ -392,13 +466,16 @@ const ANALYZERS: Readonly<Record<string, Analyzer>> = {
     if (s.kind !== 'city' || !t.view.cityOwnedPlots(s.seat, s.id).some((p) => p.feature === args.FeatureType)) return 0;
     return adjacencyValue(t, args, s, (p) => t.view.plotFeature(p) === args.FeatureType);
   },
-  // 0x6abc40: a city subject with a player; the city's Culture (City::GetYield)
-  // x fx(Amount x 0.01), at the player's weight, plus 0.5 (0x16eb20),
-  // PV(horizon) - PV(start)
-  EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION: (t, args, s) => {
-    if (s.kind !== 'city') return 0;
-    const culture = fxOf(t.view.cityYield(s.seat, s.id, 'YIELD_CULTURE'));
-    const v = yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE') + fxConst(0.5);
+  // 0x6abc40: a subject, a player and the context's city (+0x70, none
+  // adds nothing); that city's Culture (City::GetYield) x fx(Amount x
+  // 0.01), at the player's weight, halved (0x16eb20 by 0.5f), PV(horizon) -
+  // PV(start) (runs/h1_duelw1117 t3: China's Land Acquisition 3 on its
+  // capital's Culture)
+  EFFECT_ADJUST_CITY_CULTURE_BORDER_EXPANSION: (t, args) => {
+    const c = ownerCity(t);
+    if (!c || c.kind !== 'city') return 0;
+    const culture = fxOf(t.view.cityYield(c.seat, c.id, 'YIELD_CULTURE'));
+    const v = fmul(yieldValue(t.view, t.seat, fmul(pctOf(args), culture), 'YIELD_CULTURE'), fxConst(0.5));
     return whole(span(t, v));
   },
   // 0x6beb00: a city subject's Food surplus (its growth object's 0x1b5620),
@@ -512,6 +589,21 @@ function analysis(t: ValueTerms, m: AiModifier, depth: number): number | null {
   // no subject passed: the analyzer's slot 2
   if (!passed) sum += NONE_ANALYZERS[m.effect]?.(t, m.args) ?? 0;
   return sum;
+}
+
+/**
+ * THE WORTH OF `tokens` ENVOYS AT A CITY-STATE (0x7a46c0): nothing at war
+ * with it; else its modifiers that envoys reach (its leader's and its
+ * civilization's trait modifiers with an INFLUENCE_REQUIREMENT, the
+ * diplomatic AI's +0x6868 list) summed (0x7a4b20) in a fresh context of the
+ * player, the city-state (+0x40) and the envoys added (+0x08), from the
+ * context's start to its horizon.
+ */
+export function envoyValue(t: ValueTerms, minor: number, tokens: number): number {
+  if (t.view.atWar(t.seat, minor)) return 0;
+  const civ = t.view.minorCivilization(minor);
+  const mods = civ ? AI_MINOR_INFLUENCE_MODIFIERS[civ] ?? [] : [];
+  return modifiersValue({ view: t.view, seat: t.seat, start: t.start, horizon: t.horizon, rate: t.rate, minor, tokens }, mods);
 }
 
 /** One modifier's value: its analysis's whole number, 0 where refused */

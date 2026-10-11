@@ -90,9 +90,10 @@ import { loadCombatLog, loadRandLog, randLogPath, type RandLog } from './randLog
 import { streamHold, type StreamHold } from './streamHold';
 import { holdRng, rngHold } from '../core/rand';
 import { seedMoments, stateChecks, transitionChecks, type CheckResult } from './checks';
-import { engineId, gameHash } from '../data/aliases';
+import { engineId, gameHash, gameTypeOf } from '../data/aliases';
 import { MajorAiProbe, majorAiMarkdown, type MajorAiTally } from './majorAi';
 import { ReligionProbe, religionAiMarkdown, type ReligionAiTally } from './religionAi';
+import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
 import { SettleProbe, settleMarkdown, type SettleTallies } from './settleAi';
 import { StrategyProbe, recordMilitary, strategyMarkdown, type ContactTally, type StrategyTally } from './strategyAi';
@@ -205,6 +206,9 @@ interface Ctx {
   cityBuildLog: Map<string, number[]>;
   cityBuild: CityBuildTally;
   cityBuildPer: Map<string, CityBuildTally>;
+  /** the majors' governor AI, whose turn an AI major's `governors` decision
+   *  lands (`GovernorProbe`) */
+  governorAi: GovernorProbe;
 }
 
 /** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
@@ -1786,30 +1790,46 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         const g = seatOf(next.state, seat)?.governors;
         if (!s || !g) { count(ctx, 'governors', 'refused', d.player); break; }
         const roster = governorsOf(s);
+        // an AI major's governors are its AI's: the port's turn through the
+        // engine's verbs, the record's roster where it differs
+        const port = ctx.governorAi.turnOf(seat);
+        const was = roster.map((e) => ({ ...e }));
+        if (port) applyGovernorTurn(state, seat, port);
+        let changed = 0;
+        let equal = 0;
         g.forEach((x, i) => {
           const from = x.cityId >= 0 ? next.state.seats[seat]?.cities.find((c) => c.id === x.cityId) : undefined;
           const to = from ? cityAt(state, from.centerIndex) : undefined;
           const cityId = to && to.seat === seat ? to.id : -1;
           const e = roster[i];
-          const same = () => x.appointed === e.appointed && x.promotions === e.promotions
-            && cityId === e.cityId && x.minorId === e.minorId;
-          if (same()) return;
-          if (x.appointed && !e.appointed) appointGovernor(state, seat, i);
-          for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
-            if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) promoteGovernor(state, seat, i, p);
-          }
-          if (cityId >= 0 || x.minorId >= 0) {
-            if (cityId !== e.cityId || x.minorId !== e.minorId) {
-              assignGovernor(state, seat, i, x.minorId >= 0 ? { minorId: x.minorId } : { cityId });
+          const sameAs = (r: Governor) => x.appointed === r.appointed && x.promotions === r.promotions
+            && cityId === r.cityId && x.minorId === r.minorId;
+          const same = () => sameAs(e);
+          if (sameAs(was[i]) && same()) return;
+          changed++;
+          if (!port) {
+            if (x.appointed && !e.appointed) appointGovernor(state, seat, i);
+            for (let p = 0; p < GOVERNOR_PROMOTIONS.length; p++) {
+              if (promotionBit(x.promotions, p) && !promotionBit(e.promotions, p)) promoteGovernor(state, seat, i, p);
+            }
+            if (cityId >= 0 || x.minorId >= 0) {
+              if (cityId !== e.cityId || x.minorId !== e.minorId) {
+                assignGovernor(state, seat, i, x.minorId >= 0 ? { minorId: x.minorId } : { cityId });
+              }
             }
           }
-          if (same()) { count(ctx, 'governors', 'applied'); return; }
+          if (same()) {
+            equal++;
+            count(ctx, 'governors', 'applied');
+            return;
+          }
           // the record's roster, on the engine's clock where the posting
           // stands (a record reads an unestablished governor's full count)
           const kept = e.appointed && e.cityId === cityId && e.minorId === x.minorId && cityId + x.minorId > -2;
           roster[i] = { ...x, cityId, establishTurns: kept ? e.establishTurns : x.establishTurns };
-          count(ctx, 'governors', 'fallback', d.player);
+          count(ctx, 'governors', 'fallback', d.player, port ? 'the port roster differs' : undefined);
         });
+        if (port) ctx.governorAi.rosterCheck(state.turn, d.player, changed, equal, 'the port roster differs from record t+1');
         break;
       }
       case 'routes': {
@@ -2263,6 +2283,16 @@ function matchNewUnits(ctx: Ctx, b: TurnRecord): void {
       free.splice(free.indexOf(best), 1);
     }
   }
+}
+
+/** the record's name of an engine city (LOC_CITY_NAME_ dropped): the city
+ *  of record t+1 on its centre; a city-state's its own */
+function recordCityName(ctx: Ctx, seat: number, id: number): string {
+  const minor = ctx.state.cityStates.find((m) => m.seat === seat);
+  if (minor) return minor.name.toUpperCase().replace(/[ -]/g, '_');
+  const c = seatOf(ctx.state, seat)?.cities.find((x) => x.id === id);
+  const r = c ? cityAt(ctx.next.state, c.centerIndex) : undefined;
+  return (r ? ctx.next.dumpOfCity.get(r)?.name ?? '?' : '?').replace(/^LOC_CITY_NAME_/, '');
 }
 
 /** THE GOVERNORS are their player's decisions (`governors`): what the
@@ -2769,6 +2799,7 @@ export interface ReplayReport {
   contacts?: ContactTally;
   majorAi?: MajorAiTally;
   religionAi?: ReligionAiTally;
+  governorAi?: GovernorAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   settleAi?: SettleTallies;
@@ -2942,6 +2973,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     tactical: loadTactical(dumpPath), barbTally: report.barbTactics, minorTally: report.minorTactics, minorDraws: report.minorDraws,
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
+    governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
   };
   // the record's units in the importer's order
   let k = 0;
@@ -2990,6 +3022,10 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     ctx.researchBefore = new Map([...state.seats, ...state.cityStates].map((s) => [s.seat, s.research.tech]));
     ctx.civicBefore = new Map([...state.seats, ...state.cityStates].map((s) => [s.seat, s.research.civic]));
     const ds = source.decisions(a, b, cat);
+    // the AI majors' governor turns, on the state their AI turn t reads:
+    // the active player's as the pair opens
+    ctx.governorAi.clear();
+    ctx.governorAi.aiTurn(state, a.turn, (p) => p === activePlayer(a), (s, id) => recordCityName(ctx, s, id));
     stream.actions(a.turn);
     applyPhase(ctx, ds, 'before', b, a);
     // the active player's units stand where its actions left them before its
@@ -3154,7 +3190,21 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     const live = new Set(state.units);
     ctx.engineKilled = new Set([...ctx.units].filter(([, u]) => !live.has(u)).map(([k]) => k));
     fortifyOrders(ctx, a, b);
+    // ...the others' after their turn start, the engine's turn
+    {
+      // their turn starts' civics stand before their AI turns
+      const starts = turnStartCompletions(ctx, b, a.turn);
+      ctx.governorAi.aiTurn(state, a.turn, (p) => p !== activePlayer(a), (s, id) => recordCityName(ctx, s, id),
+        (seat) => new Set([...(seatOf(state, seat)?.research.civics ?? []), ...(starts.get(seat)?.civics ?? [])]
+          .filter((c) => c in CIVICS).map((c) => gameTypeOf('civic', c, 'CIVIC_'))));
+    }
     applyPhase(ctx, ds, 'after', b, b);
+    // an AI major's governor turn where record t+1 holds its roster as it
+    // was: the record's
+    for (const p of ctx.governorAi.actedAlone(new Set(ds.filter((d) => d.kind === 'governors').map((d) => d.player)))) {
+      count(ctx, 'governors:alone', 'fallback', p, 'the port acted, the record did not');
+      ctx.governorAi.rosterCheck(a.turn, p, 1, 0, 'the port acted, the record did not');
+    }
     // an army due home the record shows no return of comes home at its
     // minor's start all the same
     releaseLevies(state);
@@ -3328,6 +3378,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   if (majorAi.active) report.majorAi = majorAi.tally;
   if (religionAi.active) report.religionAi = religionAi.tally;
+  if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   if (settleAi.active) report.settleAi = settleAi.tally;
   if (operationsAi.active) report.operationsAi = operationsAi.tally;
@@ -3447,6 +3498,7 @@ export function replayMarkdown(r: ReplayReport): string {
   if (r.strategies) out.push(...strategyMarkdown(r.strategies, r.contacts));
   if (r.majorAi) out.push(...majorAiMarkdown(r.majorAi));
   if (r.religionAi) out.push(...religionAiMarkdown(r.religionAi));
+  if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));
   if (r.operationsAi) out.push(...operationsMarkdown(r.operationsAi));

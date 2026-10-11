@@ -4,14 +4,17 @@
  * writes the state; the slot rebuild a government change would make is laid
  * on copies (`carryLayout`).
  */
-import type { MajorCityDefenceView, MajorCityView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
+import type { MajorCityDefenceView, MajorCityView, MajorGovernorView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
 import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
-import { fxOf, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
+import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
 import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/aliases';
 import { isExplored } from './fog';
-import { CITY_STRIKE_RANGE, plotPressure } from './phase';
+import { CITY_STRIKE_RANGE, loyaltyPerTurn, plotPressure } from './phase';
+import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
+import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
+import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
 import { BARB_SEAT, borderTurnsFrom, campTiles, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
 import { pathTo, reachPlots } from './tactical';
 import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
@@ -24,7 +27,7 @@ import { COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
 import { congressPolicyBlocked } from './congress';
-import { carryLayout, darkAgeEra, fitPoliciesLoose, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
+import { carryLayout, darkAgeEra, fitPoliciesLoose, getModifiers, governmentBit, governmentSlots, governmentsOpen, inDarkAge, makeYieldCtx, seatGovernment, type YieldCtx,
   unlockedPolicyIds } from './effects';
 import { gpOffer } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
@@ -32,7 +35,7 @@ import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
 import { UNIT_HP, UNITS } from '../data/units';
 import { civicAnalysis } from './aiCivics';
-import { envoysOf, hasMet, minorCity, suzerainOf } from './cityStates';
+import { envoysHere, envoysOf, hasMet, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
 import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency, tileYields } from './yields';
@@ -44,7 +47,7 @@ import { BELIEF_CATALOGS, BELIEF_SLOTS, PANTHEON_FAITH_COST, PANTHEON_IDS, RELIG
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from './appeal';
 import { DEFAULT_HANDICAP } from '../data/barbarians';
-import { beliefPicks, canFoundReligion, itemCost, settlerCost, unitProdCost } from './game';
+import { beliefPicks, canFoundReligion, itemCost, projectCost, settlerCost, unitProdCost } from './game';
 
 /** What the view takes from the majors' AI itself: per major the strategies
  *  it follows (ai/major/strategies.ts), which its weights and its civic list
@@ -417,9 +420,11 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       return runs(i, j) + runs(j, i);
     },
     cityStateSeats: () => state.cityStates.map((c) => c.seat),
+    // GetTokensReceived (0x44c860): the store and the tokens a governor
+    // posted there brings (0x44caa0)
     envoys: (cs, i) => {
       const c = seatOf(state, cs) as CityState | undefined;
-      return c?.envoys?.[i] ?? 0;
+      return c ? envoysHere(state, c, i) : 0;
     },
     grievances: (i, j) => Math.max(0, grievanceWith(state, i, j)),
     militaryUnits: (i, domain) => unitsOf(state, i).filter((u) => {
@@ -478,6 +483,78 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     barbarianSeat: () => BARB_SEAT,
     plotForeignUnits: (i, p) => state.units.filter((u) => u.tileIndex === p && u.seat !== i && !unitsHostile(state, { seat: i }, u)).length,
     cityPopulation: (p) => cityHolders(state).flatMap((s) => s.cities).find((c) => c.centerIndex === p)?.population ?? 0,
+    governors: (i): MajorGovernorView[] => governorsOf(seat(i)).map((g, k) => {
+      const minor = g.minorId >= 0 ? state.cityStates.find((m) => m.id === g.minorId) : undefined;
+      const promotions = new Set<string>();
+      if (g.appointed) {
+        GOVERNOR_PROMOTIONS.forEach((p, j) => {
+          if (p.governor === GOVERNORS[k].id && (p.tier === 0 || promotionBit(g.promotions, j))) promotions.add(PROMO_INSTALL_ID[p.id]);
+        });
+      }
+      return {
+        type: GOVERNOR_INSTALL_ID[GOVERNORS[k].id], appointed: g.appointed, promotions,
+        city: g.cityId >= 0 ? { seat: i, id: g.cityId } : minor ? { seat: minor.seat, id: -1 } : null,
+      };
+    }),
+    // the engine's roster is the seven governors every seat may appoint
+    governorAvailable: (_i, type) => GOVERNORS.some((g) => GOVERNOR_INSTALL_ID[g.id] === type),
+    // a title civic the caller's moment holds and the state does not yet
+    // grants its title too
+    governorTitles: (i) => {
+      const held = inputs.civicsHeld?.(i);
+      const own = seat(i).research.civics;
+      return governorTitlesAvailable(state, i)
+        + (held ? GOVERNOR_TITLE_CIVICS.filter((c) => !own.includes(c) && held.has(gameTypeOf('civic', c, 'CIVIC_'))).length : 0);
+    },
+    governorCanPromote: (i, type, promotion) => {
+      const k = GOVERNORS.findIndex((g) => GOVERNOR_INSTALL_ID[g.id] === type);
+      const p = GOVERNOR_PROMOTIONS.findIndex((x) => PROMO_INSTALL_ID[x.id] === promotion);
+      return k >= 0 && p >= 0 && governorPromotionOpen(state, i, k, p);
+    },
+    cityLoyaltyPerTurn: (i, id) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      if (!city) return 0;
+      const stats = computeCityStats(state, city);
+      return fxOf(loyaltyPerTurn(state, city, stats.amenities.tier.name, governedCityIds(seat(i)).has(id), stats.foodSurplus < 0));
+    },
+    minorCivilization: (cs) => {
+      const minor = seatOf(state, cs) as CityState | undefined;
+      if (!minor || !isCityStateSeat(cs)) return null;
+      return CITY_STATE_SUZERAIN_BONUS[minor.name]?.civ ?? `CIVILIZATION_${minor.name.toUpperCase().replace(/[ -]/g, '_')}`;
+    },
+    cityCitizens: (i, id) => {
+      const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
+      return city?.population ?? 0;
+    },
+    citySpecialtyDistricts: (i, id) => {
+      const city = citiesOf(state, i).find((c) => c.id === id);
+      return city ? city.districts.filter((d) => d.type !== 'CITY_CENTER' && map.tiles[d.tileIndex].districtComplete && DISTRICTS[d.type].countsTowardLimit).length : 0;
+    },
+    cityStrikes: (i, id) => {
+      const minor = isCityStateSeat(i) ? (seatOf(state, i) as CityState | undefined) : undefined;
+      const city = minor ? minorCity(minor) : citiesOf(state, i).find((c) => c.id === id);
+      return !!city && outerPool(state, city) > 0;
+    },
+    projectCompletions: (i, type) => {
+      const id = engineId('project', type, 'PROJECT_', PROJECTS);
+      return id ? seat(i).projectsDone.filter((x) => x === id).length : 0;
+    },
+    projectTurns: (i, cityId, type, extra) => {
+      const city = citiesOf(state, i).find((c) => c.id === cityId);
+      const id = engineId('project', type, 'PROJECT_', PROJECTS);
+      if (!city || !id) return -1;
+      // the Production toward the project as the turn step pays it
+      const mult = (1 + governorSum(state, city, (e) => e.projectProdPct?.[id]) / 100) * getModifiers(state, i).projectProdMult
+        * suzerainProjectMult(state, i) * (1 + (seat(i).researchProjectPct ?? 0) / 100);
+      const rate = fmul(fxOf(computeCityStats(state, city).total.production * mult), FX + extra);
+      const kept = city.queue.find((q) => q.kind === 'project' && q.project === id)?.progress ?? 0;
+      return turnsAt(fxOf(projectCost(state, i, id, city) - kept - (city.productionBank ?? 0)), rate);
+    },
+    cityStateHasCity: (cs) => {
+      const minor = seatOf(state, cs) as CityState | undefined;
+      return !!minor && !!minorCity(minor);
+    },
   };
 }
 

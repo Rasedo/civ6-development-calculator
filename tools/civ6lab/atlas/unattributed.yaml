@@ -134,6 +134,15 @@
   context:
     - "...0.0; the Buildings_XP2 row (0x28a940 on 0xad50d0: +0x28 > 0 -> 0x7a67f0, +0x48 bit 1 -> 0x39110); each free unit (+0x298) through 0x7b62c0; Housing (+0x34) > 0 through 0x7a3d70 (CityB..."
   review: imported
+- addr: 0x49a50
+  final: 0x38990
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...NOR 0xa68659ab) or promoted (PROMOTE_GOVERNOR 0x7d3da99d), executed at once (0x48a330 / 0x49a50). One action a turn: a player with two titles spends the second the turn after."
+  review: imported
 - addr: 0x5cbc0
   final: 0x447d0
   kind: function
@@ -1454,6 +1463,18 @@
   context:
     - "...s stays unread (LAB). The \"Random congress resolution target\" draws after them (16 sites, 0x611140..) are the AI's targets. The engines (`congressSession` / `_congress_draw_slate`) follow,..."
   review: imported
+- addr: 0x616570
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: "Every governor left on a slot is assigned there   (ASSIGN_GOVERNOR 0xf97c278b: owner, governor, city), the operation   changing nothing where it already sits (runs/h1_duelw1117 t205: Merchant   Handan"
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...ty 1, λ 0x6ed060 (the move: the slot's occupant replaced and returned) and the knapsack 0x616570 -> 0x61ddb0 (at capacity 1 the first largest gain above 0). Per slot in order, per gove..."
+  review: imported
 - addr: 0x6182e0
   final: 0x40de20
   kind: function
@@ -1467,14 +1488,21 @@
   review: imported
 - addr: 0x61ddb0
   kind: function
-  status: PARTLY
+  name: knapsack at capacity 1
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: the first largest gain above 0 takes the slot
+  impl: [ai/major/governors.ts:governorAssignment]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...erkill (health - damage) + 100; minus its value where it stands assigned), the knapsack 0x61ddb0 at capacity 1 takes the first largest positive gain, and the move (λ 0x770710) re-assig..."
-  review: imported
+  review: reviewed
 - addr: 0x629460
   final: 0x393620
   kind: function
@@ -1691,6 +1719,7 @@
   readings:
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- The registry (`reg.py` over 0x6c9640): 211 effect names, 27 collections, 66 requirements; the effects the policies and gover..."
@@ -1761,6 +1790,20 @@
   context:
     - "- The lists (the generic list loader 0x6d6c80, system \"PlotEvaluations\", its item handler 0x6dd310): the AiFavoredItems rows of the l..."
   review: imported
+- addr: 0x6ece40
+  kind: function
+  name: "GAP lambda: the gain"
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 205
+      value: the Merchant's gain at Xiurong 69 - 46 = 23 over the Resource Manager's 20
+  impl: [ai/major/governors.ts:governorAssignment]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...ecee0 (the start: each assigned governor on its city's slot, the slot's occupant it), λ 0x6ece40 (the gain: the governor's value there whole, -1 for one not appointed now — the turn's..."
+  review: reviewed
 - addr: 0x6f3420
   kind: function
   status: PARTLY
@@ -2991,6 +3034,24 @@
   name: DB.Features
   status: PARTLY
   notes: ["imported: a saved label (.claude/scratchpad/cb/labels.json), no reading"]
+  review: imported
+- addr: 0xad57f0
+  final: 0x7d0c80
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...riable each, data at +0x1d0 and +0x280): per governor in the Governors table's order (0xad57f0; the duels' eight, Ibrahim last) 0x40 bytes — +0x8 the governor, +0x10 the slots' citie..."
+  review: imported
+- addr: 0xad5830
+  final: 0x7d0cc0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...the slots' values (`m_values`, 24.8); per promotion in the GovernorPromotions order (0xad5830) 0x38 bytes, +0x30 its score. A governor's promotions are its GovernorPromotionSets row..."
   review: imported
 - addr: 0xad5a50
   final: 0x7d0ee0

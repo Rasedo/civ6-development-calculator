@@ -70,6 +70,8 @@ function stubView(over: Partial<MajorView> = {}): MajorView {
     mapCities: () => [], plotsSeen: () => new Set(), startPlots: () => [], handicap: () => 3, playerEra: () => 0, techCount: () => 0,
     militaryStrength: () => 0, score: () => 0, greatPeopleOfClass: () => 0, greatPersonOffered: () => false, greatWorksMade: () => 0,
     domesticTourists: () => 0, visitingTourists: () => 0, scienceWonders: () => 0, spaceProjects: () => 0,
+    minorCivilization: () => null, cityCitizens: () => 0, citySpecialtyDistricts: () => 0, cityStrikes: () => false, projectCompletions: () => 0, projectTurns: () => -1,
+    governors: () => [], governorAvailable: () => false, governorTitles: () => 0, governorCanPromote: () => false, cityLoyaltyPerTurn: () => 0, cityStateHasCity: () => false,
     ...over,
   };
 }

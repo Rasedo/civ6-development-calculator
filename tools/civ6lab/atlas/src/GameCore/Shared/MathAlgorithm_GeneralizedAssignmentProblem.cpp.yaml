@@ -13,10 +13,11 @@
     - recording: h1_duelw1124
       turn: 1-249
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
-  impl: [cpu/core/tactical.ts:assignAttacks]
+  impl: [ai/major/governors.ts:governorAssignment, cpu/core/tactical.ts:assignAttacks]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e dealt, or whose received would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0, MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the spots: per sp..."

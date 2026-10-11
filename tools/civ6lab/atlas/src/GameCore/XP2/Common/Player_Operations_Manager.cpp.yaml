@@ -3,6 +3,15 @@
 # `review: imported` = bootstrapped from dll_readings.md / code comments / saved
 # labels and not yet reviewed: verify against the disassembly, then edit and
 # set `review: reviewed`.
+- addr: 0x48a330
+  final: 0x30c100
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...POINT_GOVERNOR 0xa68659ab) or promoted (PROMOTE_GOVERNOR 0x7d3da99d), executed at once (0x48a330 / 0x49a50). One action a turn: a player with two titles spends the second the turn afte..."
+  review: imported
 - addr: 0x48b9d0
   final: 0x30d330
   kind: function

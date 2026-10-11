@@ -131,11 +131,19 @@
   review: imported
 - addr: 0x4be7b0
   kind: function
-  status: PARTLY
-  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  name: PlayerStats m_aiNumProjectsAdvanced
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: 0 for every space project
+  impl: [cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value — PARTLY READ (the structure), unported"
   context:
-    - "...t H: FX(-9999). A row with MaxPlayerInstances (+0x30 / +0x34) the player has completed (0x4be7b0): FX(-9999)."
-  review: imported
+    - "...ooleans in order — the value whole where the owner advanced it, m_aiNumProjectsAdvanced 0x4be7b0; else, where the build turns at the Amount (parser 0x6be5b0: whole, 30) lifted fall bef..."
+  review: reviewed
 - addr: 0x4be880
   final: 0x32d150
   kind: function

@@ -20,11 +20,19 @@
 - addr: 0x1ae8f0
   final: 0x11eb20
   kind: function
-  status: PARTLY
-  readings: ["C-96: the project value — PARTLY READ (the structure), unported"]
+  name: City_Districts count (flags)
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 112
+      value: two complete specialty districts
+  impl: [cpu/core/aiModifiers.ts:ANALYZERS, cpu/core/aiValue.ts:AiValueView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-96: the project value — PARTLY READ (the structure), unported"
   context:
-    - "...t 1), where the city's +0x1880 count is above 0: that count x the population (+0x588) x 0x1ae8f0 x 10.0."
-  review: imported
+    - "...the yield, unweighted, span), EFFECT_ADJUST_CITY_YIELD_PER_DISTRICT 0x6b4e80 (Amount x 0x1ae8f0(1, 1, 1, 0, 0): the city's districts not InternalOnly (+0xe1 bit 2), complete (+0xb08..."
+  review: reviewed
 - addr: 0x1aec20
   final: 0x11ee20
   kind: function

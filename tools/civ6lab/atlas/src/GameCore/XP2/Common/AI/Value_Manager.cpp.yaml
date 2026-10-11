@@ -7,7 +7,9 @@
   final: 0x527c50
   kind: function
   status: PARTLY
-  readings: ["C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"]
+  readings:
+    - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...akes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's camp order (the po..."
@@ -40,6 +42,7 @@
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
     - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...7, k = rate/100, a perpetuity a/k past nk >= 10; the horizon itself one discounted turn 0x7a1240, (1-k)^n with -0.16667). Then: per unlocked unit the player's version, 10 x the cities'..."
     - ...yer AI, as PSEUDOYIELD_INFLUENCE @0xf2e240 with the player, discounted from the start 0x7a1240); EFFECT_ADJUST_PLAYER_GOVERNOR_POINTS 0x6c2720 PARTLY (Amount x the governor AI's poin...
@@ -85,6 +88,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...NonFoodYieldModifier change on the city's yield, at least 1.0, from T to the horizon (0x7a2140) — the Arena; a city-state's gold per turn counts its city's Gold (the Economic boost;..."
     - "...part to context +0xc0; \"span\" is PV(horizon) - PV(start) by two 0x7a16e0 calls, \"between\" 0x7a2140; \"weighted\" a yield through 0x7a6690 with the player, \"bare\" without):"
@@ -101,6 +105,7 @@
     - "H-1: the research AI — READ (the choice), PARTLY READ (the value)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-96: the resource value and the research value's resources — READ (bonus, luxury, the call), PARTLY READ (the strategic stockpile terms)"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/cb3/NOTES.md: ...odifiers (Lighthouse/Shipyard), units (0x78e0a0 military table),  projects 0x7b28c0, resource value 0x7a21e0, districts/improvements, scorer/DS pick/events/contracts, swap. CHECKS: tsc OK, vitest green (after..."
@@ -138,6 +143,7 @@
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
     - ".claude/scratchpad/cb3/NOTES.md: ...whole number only if constructible now. OPEN: GPP general (Barracks/Stable v 0, unsourced), housing 0x7a3d70 forecast, free units FX_MIN sums,  trader value (knowledge base +0x6d8), plot-yield modifiers (Ligh..."
@@ -147,6 +153,25 @@
     - "- HOUSING 0x7a3d70 (`housingValue`, args: CityBuildAI, the city's growth +0x1788, the rate, population, Ho..."
     - ...percent change x CityBuildAI's yields +0x1080), EFFECT_ADJUST_POLICY_HOUSING 0x6b5eb0 (0x7a3d70 on CityBuildAI and the city's housing +0x1788), EFFECT_ADJUST_PLAYER_RESOURCE_ACCUMULAT...
   review: imported
+- addr: 0x7a46c0
+  final: 0x529c60
+  kind: function
+  name: envoys' worth at a city-state
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 20
+      value: Caguana 112 for two envoys
+  impl:
+    - cpu/core/aiModifiers.ts:ANALYZERS
+    - cpu/core/aiModifiers.ts:ValueTerms
+    - cpu/core/aiModifiers.ts:envoyValue
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - ..._GOVERNOR_ADJUST_CITY_TOKENS_GRANTED 0x6b2850 (the context city's owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's...
+    - "- AN ENVOYS' WORTH (0x7a46c0(n, rate, start, horizon, the player, the city-state, the city-state's +0x1280 +0x6868 l..."
+  review: reviewed
 - addr: 0x7a4850
   kind: function
   status: PARTLY
@@ -162,7 +187,11 @@
     - recording: 1124
       turn: 28
       value: "below handicap 3 (player   +0x908) less Maintenance (+0x5c) less player +0x13a0 +0x338 (at least 0)   as Gold — measured 0.5 a Maintenance at a city-state, the unweighted   DefaultValue (1124 t28 Arch"
-  impl: [cpu/core/aiModifiers.ts:modifiersValue, ai/major/religion.ts:beliefValue]
+  impl:
+    - cpu/core/aiModifiers.ts:modifiersValue
+    - ai/major/religion.ts:beliefValue
+    - cpu/core/aiModifiers.ts:envoyValue
+    - ai/major/governors.ts:governorValue
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -172,6 +201,7 @@
     - "C-97: the government and policy choice — the choice READ, the values PARTLY READ"
     - "C-97: the religion AI — the belief scores READ (the job, the value, the analysis's attach), the picks READ, the analyzers PARTLY READ"
     - "C-96: the project value — PARTLY READ (the structure), unported"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   context:
     - "...st (0x39dcd0) through 0x7a10c0 (a Gold value per plot of a walk); the modifiers through 0x7a4b20 (\"the AI's yield weights and the modifier evaluator\" below). Column offsets from the..."
     - ...ceMaintenanceType (+0x50) whose stockpile is out zeroes the value before the modifiers (0x7a4b20, the per-unit list GlobalAI +0x3a50).
@@ -258,7 +288,9 @@
   final: 0x52b200
   kind: function
   status: PARTLY
-  readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
+  readings:
+    - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...alue port needs military AI (0x79ca90), yield-weight parts (0x702ad0), modifier evaluator (0x79f7c0/0x7a67f0/0x7a3d70/0x7b1320), horizons (saved state, dynamic)...."
   context:
@@ -363,6 +395,44 @@
     - "...its (0x392cb0: unlocked 0x39df60, not the current) and the current, in order, valued by 0x7b0330 to valueHorizons[0]; the first strictly highest; a different one is commanded (civics..."
     - "- The government's value (0x7b0330): FX_MIN when start >= horizon, or for one held before (PlayerCulture +0x350 [governmen..."
   review: imported
+- addr: 0x7b0bb0
+  final: 0x5300f0
+  kind: function
+  name: promotion value
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 28
+      value: Connoisseur 160 = 7 citizens x 22.8
+  impl:
+    - ai/major/governors.ts:NEW_POSTING_TURNS
+    - ai/major/governors.ts:PROMOTION_FLOOR
+    - ai/major/governors.ts:promotionScore
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- A PROMOTION'S SCORE (0x6eedb0 over 0x7b0bb0(promotion, rate, start 0, horizon 100, the player, its GovernorPromotionModifiers by Mo..."
+  review: reviewed
+- addr: 0x7b0e40
+  final: 0x530330
+  kind: function
+  name: governor value in a slot
+  status: READ
+  cases:
+    - recording: h1_duelw1117
+      turn: 3
+      value: Merchant 23 = 20 + Land Acquisition 3; Educator 30 = 20 + Librarian 10
+  impl:
+    - ai/major/governors.ts:GOVERNOR_HORIZON
+    - ai/major/governors.ts:NEW_POSTING_TURNS
+    - ai/major/governors.ts:NO_CITY_BASE_MAJOR
+    - ai/major/governors.ts:governorValue
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "...leader holds; a secret society's governor its society's). Slot 0 (no city): the value 0x7b0e40(city none) divided by the secret society's level (1.0 for every other governor, 0x16e94..."
+    - "- THE VALUE IN A SLOT (0x7b0e40(governor, rate, start 0, horizon 100 — the literal `push 0x64` —, the player, the city,..."
+  review: reviewed
 - addr: 0x7b26b0
   final: 0x5310d0
   kind: function

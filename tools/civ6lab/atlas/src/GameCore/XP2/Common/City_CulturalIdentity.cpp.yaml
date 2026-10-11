@@ -17,6 +17,16 @@
   context:
     - "...f0 over CITIZEN_IDENTITY_PRESSURE_RADIUS_CUTOFF, gp +0xf0 = 10, with the per-plot functor 0x19b090) into its loyalty term: both 0 → 0; own 0 → −MAX_LOYALTY; foreign 0 → +MAX_LOYALTY; else..."
   review: imported
+- addr: 0x19d200
+  final: 0x114c80
+  kind: function
+  status: PARTLY
+  impl: [ai/major/view.ts:MajorView]
+  readings:
+    - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+  context:
+    - "- the player's city else: its Loyalty a turn (0x19d200 on city +0x2a78, the identity sum), less the governor's IdentityPressure (+0x20) wher..."
+  review: imported
 - addr: 0x19d470
   final: 0x114d90
   kind: function
