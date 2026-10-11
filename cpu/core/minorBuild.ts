@@ -958,7 +958,7 @@ function minorItemOf(type: string): MinorItem | null {
 /** The install type of an engine row: its own type where that names it
  *  (a civilization's unique row maps onto the row it replaces, never the
  *  reverse), else the type its catalog tag names */
-function installType(kind: string, id: string, prefix: string, known: object): string {
+export function installType(kind: string, id: string, prefix: string, known: object): string {
   return engineId(kind, prefix + id, prefix, known) === id ? prefix + id : gameTypeOf(kind, id, prefix);
 }
 
@@ -979,7 +979,7 @@ function minorItemType(cityState: CityState): string | null {
  *  hand where its walk does not lead through it (runs/h1_duelv1124: a
  *  city-state's Walls at t3 lands at Masonry's 21 turns plus the 4 left on
  *  its Pottery as its turn before set them) */
-function analysedTurns(entries: readonly { id: string; next: string; turns: number; owned: boolean }[],
+export function analysedTurns(entries: readonly { id: string; next: string; turns: number; owned: boolean }[],
   id: string | null, held: readonly string[], current: string | null, currentLeft: number): number {
   if (!id || held.includes(id)) return 0;
   const e = entries.find((x) => x.id === id);

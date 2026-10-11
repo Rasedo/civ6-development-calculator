@@ -56,7 +56,7 @@ function heldOrQueued(state: GameState, seat: number, id: string): boolean {
  *  Military Engineer likewise; an Archaeologist while it holds none and none
  *  is on order; a Trader while none is on order; the siege support chassis
  *  whenever trainable. Undefined for every other unit: the combat rule. */
-function unitGates(state: GameState, seat: number): Map<string, () => boolean> {
+export function unitGates(state: GameState, seat: number): Map<string, () => boolean> {
   const out = new Map<string, () => boolean>();
   let builder: boolean | undefined;
   let engineer: boolean | undefined;

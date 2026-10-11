@@ -95,6 +95,8 @@ import { ReligionProbe, religionAiMarkdown, type ReligionActions, type ReligionA
 import { GovernorProbe, applyGovernorTurn, governorAiMarkdown, type GovernorAiTally } from './governorAi';
 import { CongressProbe, congressAiMarkdown, type CongressAiTally } from './congressAi';
 import { GreatPeopleProbe, greatPeopleAiMarkdown, type GreatPeopleAiTally } from './greatPeopleAi';
+import { CityBuildProbe, cityBuildAiMarkdown, type CityBuildAiTally } from './majorCityBuildAi';
+import { majorItemType } from '../core/majorCityBuild';
 import { holdCongressBallots } from '../core/congress';
 import { enhanceRecord, foundingRecord, pantheonRecord } from '../../ai/major/religion';
 import { DiplomacyProbe, diplomacyMarkdown, type DiplomacyTally } from './majorDiplomacy';
@@ -221,6 +223,9 @@ interface Ctx {
   /** the majors' governor AI, whose turn an AI major's `governors` decision
    *  lands (`GovernorProbe`) */
   governorAi: GovernorProbe;
+  /** the majors' city production AI, asked at each production decision of
+   *  an AI major's empty city (`CityBuildProbe`) */
+  cityBuildAi: CityBuildProbe;
 }
 
 /** THE RESEARCH AI MEASURED: the choices the engine's research AI made (a
@@ -1018,6 +1023,8 @@ function applyQueue(ctx: Ctx, d: Extract<Decision, { kind: 'queue' }>): void {
     return;
   }
   const items = d.items.map((s) => ({ s, q: queueItem(ctx, seat, city, s) })).filter((x): x is { s: QueueSpec; q: QueueItem } => !!x.q);
+  // an AI major's empty city: its production AI's pick beside the record's
+  ctx.cityBuildAi.decide(ctx.state, ctx.state.turn, city, recordCityName(ctx, seat, city.id), majorItemType(items[0]?.q));
   const head = city.queue[0];
   const keep = head && items[0] && itemKey(head) === itemKey(items[0].q);
   for (const q of city.queue.slice(keep ? 1 : 0)) if (q.progress > 0) ctx.retained.set(`${city.centerIndex}|${itemKey(q)}`, q.progress);
@@ -2928,6 +2935,7 @@ export interface ReplayReport {
   governorAi?: GovernorAiTally;
   congressAi?: CongressAiTally;
   greatPeopleAi?: GreatPeopleAiTally;
+  cityBuildAi?: CityBuildAiTally;
   /** the majors' opinion of each other beside the game's diplomacy log */
   diplomacy?: DiplomacyTally;
   /** the AI majors' own diplomatic sending */
@@ -3118,6 +3126,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     civicAi: report.civicAi, civicScores: report.civicScores, civicBefore: new Map(), aiCivicLog: loadAiCivicLog(dumpPath), majorCivicEntries: new Map(),
     cityBuildLog: loadCityBuildTables(dumpPath), cityBuild: newCityBuildTally(), cityBuildPer: new Map(),
     governorAi: new GovernorProbe(dumpPath, aiSeats, () => strategies.followedNow()),
+    cityBuildAi: new CityBuildProbe(dumpPath, aiSeats, aiInputs),
     religionPort: { seats: new Set(aiSeats.keys()), probe: religionAi, inputs: {}, pantheonTurn: new Map(), mustFound: new Set() },
   };
   // the record's units in the importer's order
@@ -3543,6 +3552,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   if (ctx.governorAi.active) report.governorAi = ctx.governorAi.tally;
   if (congressAi.active) report.congressAi = congressAi.tally;
   report.greatPeopleAi = greatPeopleAi.tally;
+  report.cityBuildAi = ctx.cityBuildAi.tally;
   report.religionActions = religionAi.actions;
   if (diplomacy.active) report.diplomacy = diplomacy.tally;
   report.sender = sender.tally;
@@ -3667,6 +3677,7 @@ export function replayMarkdown(r: ReplayReport): string {
   if (r.governorAi) out.push(...governorAiMarkdown(r.governorAi));
   if (r.congressAi) out.push(...congressAiMarkdown(r.congressAi));
   if (r.greatPeopleAi) out.push(...greatPeopleAiMarkdown(r.greatPeopleAi));
+  if (r.cityBuildAi) out.push(...cityBuildAiMarkdown(r.cityBuildAi));
   if (r.diplomacy) out.push(...diplomacyMarkdown(r.diplomacy));
   if (r.sender) out.push(...senderMarkdown(r.sender));
   if (r.settleAi) out.push(...settleMarkdown(r.settleAi));

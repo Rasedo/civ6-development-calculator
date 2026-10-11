@@ -580,6 +580,7 @@
     - cpu/core/aiContracts.ts:takesTurn
     - cpu/harness/cityBuildLog.ts:loadCityBuildPicks
     - gpu/core/sim_cityvalue.py:_cv_pick
+    - ai/major/cityBuild.ts:cityPick
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
