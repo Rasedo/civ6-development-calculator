@@ -669,6 +669,7 @@ def build_city(rows, modifier) -> str:
             "outerDefenseStrength": num(c, "OuterDefenseStrength"), "defenseModifier": num(c, "DefenseModifier"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
             "wonder": c.get("IsWonder") == "true", "placement": c.get("RequiresPlacement") == "true",
+            "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
             "maxPlayerInstances": num(c, "MaxPlayerInstances", -1), "maxWorldInstances": num(c, "MaxWorldInstances", -1),
             "trait": c.get("TraitType"), "replaces": replaces.get(b),
             "capital": c.get("Capital") == "true", "religion": c.get("EnabledByReligion") == "true",
@@ -694,7 +695,8 @@ def build_city(rows, modifier) -> str:
         x = uxp2.get(u, {})
         units.append({
             "type": u, "foundCity": c.get("FoundCity") == "true", "buildCharges": num(c, "BuildCharges"),
-            "mustPurchase": c.get("MustPurchase") == "true", "combat": num(c, "Combat"),
+            "mustPurchase": c.get("MustPurchase") == "true", "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
+            "combat": num(c, "Combat"),
             "recon": any(t.get("Tag") == "CLASS_RECON" for t in tags[u]),
             "rangedCombat": num(c, "RangedCombat"), "bombard": num(c, "Bombard"), "antiAir": num(c, "AntiAirCombat"),
             "range": num(c, "Range"), "moves": num(c, "BaseMoves"), "maintenance": num(c, "Maintenance"),

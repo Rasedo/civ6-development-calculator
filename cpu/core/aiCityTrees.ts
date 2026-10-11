@@ -19,10 +19,10 @@
 import { AI_CITY_TREES } from '../data/aiCityTrees';
 import { AI_BUILDINGS, AI_DISTRICTS, AI_IMPROVEMENTS, AI_UNITS } from '../data/aiBuildTables';
 import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
-import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataInt, dataTag, tick,
+import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, compileTree, dataBool, dataTag, tick,
   type BtHandler, type BtNode, type BtRun } from './behaviorTree';
-import { CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, CP_ACCEPTED, CP_CANCELLED, contractById, reapContracts, submitContract,
-  type AiContract, type ContractBook, type ContractCity } from './aiContracts';
+import { CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_IN_PROGRESS, buildUnitNode, contractManagerNode, prereqsOf, reapContracts,
+  treeContractOf, type AiContract, type ContractBook, type ContractCity, type ContractNodeWorld } from './aiContracts';
 import { FX, FX_MIN } from './aiValue';
 
 /** CityEvents' slots the events use */
@@ -205,15 +205,6 @@ export interface CityTreeWorld {
   trace?(tree: CityTree, root: number, updates: readonly string[]): void;
 }
 
-/** an item's prerequisite technology and civic (its row in the AI tables),
- *  null for none */
-export function prereqsOf(item: { building?: string; unit?: string; improvement?: string; district?: string }): { tech: string | null; civic: string | null } {
-  const r = item.building ? AI_BUILDINGS[AI_BUILDING_INDEX.get(item.building) ?? -1]
-    : item.unit ? AI_UNITS[AI_UNIT_INDEX.get(item.unit) ?? -1]
-      : item.improvement ? AI_IMPROVEMENTS.find((x) => x.type === item.improvement)
-        : item.district ? AI_DISTRICTS.find((x) => x.type === item.district) : undefined;
-  return { tech: r?.tech ?? null, civic: r?.civic ?? null };
-}
 
 const NODES = new Map<string, BtNode[]>();
 function treeNodes(name: string): BtNode[] {
@@ -476,99 +467,24 @@ const decodeTrigger: BtHandler<Ctx> = {
   },
 };
 
-/** each contract's check (0x7f2220) for the Contract Manager: IN PROGRESS
- *  keeps it RUNNING where it blocks (alive); CLAIMED or ACCEPTED waits (not
- *  alive), FAILED past the turn limit; COMPLETED SUCCEEDS where it blocks or
- *  counts turns (alive); any other leaves the tree and FAILS (alive) */
-function checkContract(ctx: Ctx, c: AiContract, over: boolean, block: boolean, counts: boolean, st: { v: number }): boolean {
-  if (c.progress === CP_IN_PROGRESS) {
-    if (block && (st.v === BT_FRESH || st.v === BT_SUCCESS || st.v === BT_FAILURE)) st.v = BT_RUNNING;
-    return true;
-  }
-  if (c.progress === CP_CLAIMED || c.progress === CP_ACCEPTED) {
-    if (over) {
-      c.progress = CP_FAILED;
-      ctx.tree.contracts = ctx.tree.contracts.filter((id) => id !== c.id);
-      st.v = st.v === BT_RUNNING ? BT_RUNNING : BT_FAILURE;
-    }
-    if (block && st.v === BT_SUCCESS) st.v = BT_RUNNING;
-    return false;
-  }
-  if (c.progress === CP_COMPLETED) {
-    if (block || counts) st.v = Math.max(st.v, BT_SUCCESS);
-    return true;
-  }
-  ctx.tree.contracts = ctx.tree.contracts.filter((id) => id !== c.id);
-  st.v = Math.max(st.v, BT_FAILURE);
-  return true;
+/** what the shared contract nodes read of a city tree: the seat's book, the
+ *  tree, its cities, the city's own buildings and districts */
+function contractWorld(ctx: Ctx): ContractNodeWorld {
+  const { w } = ctx;
+  return {
+    book: ctx.ai, tree: ctx.tree, turn: w.turn, cities: w.cities, newContractId: () => w.newContractId(),
+    clearProduction: (city) => w.clearProduction(city), techHeld: (x) => w.techHeld(x), civicHeld: (x) => w.civicHeld(x),
+    holds: (item) => (item.building ? ctx.city.buildingHeld(item.building) : item.district ? ctx.city.districtHeld(item.district) : false),
+    submitted: (city, k) => {
+      const name = w.cities.find((x) => x.id === city.id)?.name ?? '';
+      w.log(`${w.turn}, ${w.seat}, ${name}, , CONTRACT ${k.id}, SUBMITTED, ${k.unit ?? 'NO_UNIT'}, ${k.building ?? 'NO_BUILDING'}, `
+        + `${k.district ?? 'NO_DISTRICT'}, VALUE ${(k.value / FX).toFixed(1)}, ${k.treeName}`);
+    },
+  };
 }
 
 /** the tree's contract by the id a tag holds (0x7cb8b0: the tree's own) */
-function treeContract(ctx: Ctx, id: unknown): AiContract | undefined {
-  if (typeof id !== 'number' || !ctx.tree.contracts.includes(id)) return undefined;
-  return contractById(ctx.ai, id);
-}
-
-// CONTRACT MANAGER DECORATOR (0x7f17a0; its parent function 0x7f1500)
-const contractManager: BtHandler<Ctx> = {
-  update(node, run, ctx) {
-    const m = run.mem[node.index];
-    const one = dataTag(node, 'Contract');
-    const multi = dataTag(node, 'Multi-Contracts');
-    if (!one && !multi) return BT_ERROR;
-    const limit = dataInt(node, 'Turn Limit');
-    if (limit === undefined) return BT_ERROR;
-    const remaining = dataInt(node, 'Turns Remaining') ?? -1;
-    if (limit < 0 && remaining < 0) return BT_ERROR;
-    const block = dataBool(node, 'Block While Running') ?? true;
-    m.next = node.firstChild;
-    m.counter = ((m.counter as number | undefined) ?? 0) + 1;
-    const over = (m.counter as number) > limit && limit >= 0;
-    const st = { v: BT_FRESH };
-    let alive = true;
-    let near = false;
-    let has = false;
-    const look = (id: unknown): void => {
-      const c = treeContract(ctx, id);
-      if (!c) return;
-      alive = checkContract(ctx, c, over, block, remaining >= 0, st) && alive;
-      if (remaining >= 0 && c.turns >= 0 && c.turns < remaining) near = true;
-      has = true;
-    };
-    if (one) look(run.blackboard.get(one));
-    if (multi) for (const id of list(run.blackboard.get(multi))) look(id);
-    if (alive) m.counter = 0;
-    if (st.v === BT_FAILURE) {
-      const fail = (id: unknown): void => {
-        const c = treeContract(ctx, id);
-        if (c) c.progress = CP_FAILED;
-      };
-      if (one) fail(run.blackboard.get(one));
-      if (multi) for (const id of list(run.blackboard.get(multi))) fail(id);
-      m.next = node.end;
-      return st.v;
-    }
-    if (st.v === BT_SUCCESS) {
-      if (block) m.next = node.end;
-      return st.v;
-    }
-    if (block && (st.v === BT_RUNNING || has)) {
-      m.next = node.end;
-      return BT_RUNNING;
-    }
-    if (remaining < 0) return st.v;
-    if (near) return BT_FRESH;
-    m.next = node.end;
-    return BT_RUNNING;
-  },
-  child(_node, _run, own, s) {
-    const v = Math.max(own === BT_FRESH ? s : own, s);
-    return { own: v, finished: v !== BT_FRESH };
-  },
-  next(node, run) {
-    return (run.mem[node.index].next as number | undefined) ?? node.firstChild;
-  },
-};
+const treeContract = (ctx: Ctx, id: unknown): AiContract | undefined => treeContractOf(ctx.ai, ctx.tree, id);
 
 // ADD GOAL TECH (0x7e7d20; its execution 0x7e7200): the technologies and
 // civics the desired items need that the player lacks; none SUCCEEDS; else
@@ -609,66 +525,6 @@ const addGoalTech: BtHandler<Ctx> = {
   },
 };
 
-// BUILD UNIT (0x7f4e00; its execution 0x7f4240)
-const buildUnit: BtHandler<Ctx> = {
-  update(node, run, ctx) {
-    const m = run.mem[node.index];
-    m.submit = false;
-    const units = list(tagOf(run, node, 'Desired Units')).map(String);
-    const buildings = list(tagOf(run, node, 'Desired Buildings')).map(String);
-    const districts = list(tagOf(run, node, 'Desired Districts')).map(String);
-    if (!units.length && !buildings.length && !districts.length) return BT_ERROR;
-    if (treeContract(ctx, tagOf(run, node, 'Contract ID'))) return BT_RUNNING;
-    if (m.contract !== undefined && m.contract !== -1) return BT_FAILURE;
-    const unit = units[0] ?? null;
-    const building = buildings[0] ?? null;
-    const district = districts[0] ?? null;
-    const { w } = ctx;
-    // the city already holds the building or the district
-    if (building && ctx.city.buildingHeld(building)) return BT_SUCCESS;
-    if (district && ctx.city.districtHeld(district)) return BT_SUCCESS;
-    if (!unit && !building && !district) return BT_SUCCESS;
-    const ok = (p: { tech: string | null; civic: string | null }) => (!p.tech || w.techHeld(p.tech)) && (!p.civic || w.civicHeld(p.civic));
-    if ((unit && ok(prereqsOf({ unit }))) || (building && ok(prereqsOf({ building }))) || (district && ok(prereqsOf({ district })))) {
-      m.submit = true;
-      return BT_RUNNING;
-    }
-    return BT_FAILURE;
-  },
-  execute(node, run, ctx) {
-    const m = run.mem[node.index];
-    if (!m.submit) return;
-    if (treeContract(ctx, m.contract)) return;
-    const units = list(tagOf(run, node, 'Desired Units')).map(String);
-    const buildings = list(tagOf(run, node, 'Desired Buildings')).map(String);
-    const districts = list(tagOf(run, node, 'Desired Districts')).map(String);
-    const value = Number(tagOf(run, node, 'Unit Value')) || 0;
-    const cityTag = tagOf(run, node, 'Required City(-1 for any city)');
-    const loc = tagOf(run, node, 'Desired Location');
-    const c: AiContract = {
-      id: ctx.w.newContractId(), tree: ctx.tree.id, treeName: ctx.tree.name,
-      unit: districts.length ? null : units[0] ?? null,
-      building: districts.length || units.length ? null : buildings[0] ?? null,
-      district: districts[0] ?? null,
-      plot: typeof loc === 'number' ? loc : -1,
-      value: value * FX, city: districts.length || !units.length ? (typeof cityTag === 'number' ? cityTag : -1) : -1,
-      maxTurns: 0, turns: -1, progress: CP_CLAIMED,
-      assign: !(dataBool(node, 'Release Unit When Built') ?? false),
-    };
-    ctx.tree.contracts.push(c.id);
-    m.contract = c.id;
-    const { ai, w } = ctx;
-    submitContract(ai, c, w.cities, w.turn, (city) => w.clearProduction(city),
-      (city, k) => w.log(contractLineFor(w, city, k)));
-    if (c.progress === CP_ACCEPTED) setTag(run, node, 'Contract ID', c.id);
-  },
-};
-
-function contractLineFor(w: CityTreeWorld, city: ContractCity, c: AiContract): string {
-  const name = w.cities.find((x) => x.id === city.id)?.name ?? '';
-  return `${w.turn}, ${w.seat}, ${name}, , CONTRACT ${c.id}, SUBMITTED, ${c.unit ?? 'NO_UNIT'}, ${c.building ?? 'NO_BUILDING'}, `
-    + `${c.district ?? 'NO_DISTRICT'}, VALUE ${(c.value / FX).toFixed(1)}, ${c.treeName}`;
-}
 
 // RESERVE PLOT (0x7f7da0): the plot, which must be one of the player's, its
 // evaluation reserved for the tree at its value (0x5d74c0: another running
@@ -881,9 +737,9 @@ export const CITY_NODES: Readonly<Record<string, BtHandler<Ctx>>> = {
   'Purchase Plot': purchasePlot,
   'Has Player Ability': hasPlayerAbility,
   'Decode Trigger': decodeTrigger,
-  'Contract Manager Decorator': contractManager,
+  'Contract Manager Decorator': contractManagerNode<Ctx>(contractWorld),
   'Add Goal Tech': addGoalTech,
-  'Build Unit': buildUnit,
+  'Build Unit': buildUnitNode<Ctx>(contractWorld),
   'Reserve Plot': reservePlot,
   'Check Plot': checkPlot,
   'Find Available Unit': findAvailableUnit,

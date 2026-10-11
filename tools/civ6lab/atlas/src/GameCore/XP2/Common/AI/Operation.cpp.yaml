@@ -96,6 +96,7 @@
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...t list (+0x60), the tribe's next turn starting it at CityAttackBoldness. The tree done, 0x73a840 finds the operation's tree gone and the manager ends it (\"Operation complete\", 0x725000..."
@@ -118,19 +119,23 @@
 - addr: 0x73aa60
   final: 0x4de580
   kind: function
+  name: an operation ready
   status: PARTLY
+  impl: [ai/major/operations/manager.ts:warOperationReady]
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "- OPERATION MOVE'S EXECUTION (0x816cb0): none where the operation's teams gather (0x73aa60: op +0x5d0, or every team's 0x73ab20) and the update found it arrived; per team its mem..."
-  review: imported
+  review: reviewed
 - addr: 0x73ab20
   final: 0x4de640
   kind: function
   status: PARTLY
   readings:
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...MOVE'S UPDATE (0x81a130). Per team (the first one only for the head's test): a team the 0x73ab20 check passes with no member skipped; the goal its slot (Move To: 0 the rally +0xe8, 1 t..."

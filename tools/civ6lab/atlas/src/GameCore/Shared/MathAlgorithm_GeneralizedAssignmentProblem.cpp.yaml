@@ -15,12 +15,13 @@
       value: "the action replay: 206 of 330 Attack Units rows take the logged move and attack; 5 seeds 70 of 126 end plots"
   impl:
     - ai/major/governors.ts:governorAssignment
-    - cpu/core/tactical.ts:assignTo
+    - cpu/core/aiAssignment.ts:generalizedAssignment
     - cpu/core/tactical.ts:assignTo
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...e dealt, or whose received would kill the unit, is dropped. The Generalized Assignment (0x8b5bf0, MathAlgorithm_GeneralizedAssignmentProblem.cpp) runs ONE pass over the spots: per sp..."

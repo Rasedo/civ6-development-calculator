@@ -40,6 +40,7 @@
   impl: [ai/major/governors.ts:governorChoice, ai/major/governors.ts:governorTurn]
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "- THE AI TURN (0x6ee100, the second phase): the log (0x6ef6a0: per governor \"%d, %d, %s, %d\" — turn, player, ty..."
   review: reviewed

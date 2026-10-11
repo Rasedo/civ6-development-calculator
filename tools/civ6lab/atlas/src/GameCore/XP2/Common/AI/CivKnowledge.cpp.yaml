@@ -69,6 +69,7 @@
     - recording: h1_duelv1124
       turn: 43
       value: minor 3 Regional 20 / Enemy 30 -> desire 0.5 + 0.2 standing army = 0.7 (AI_Military.csv)
+  impl: [ai/major/operations/warValue.ts:regionalStrength]
   readings:
     - "C-96: the knowledge base's army records and the Combat Desire — READ (the records, the update, the desire), PARTLY READ (the signals' looks, the standing-army count)"
   context:

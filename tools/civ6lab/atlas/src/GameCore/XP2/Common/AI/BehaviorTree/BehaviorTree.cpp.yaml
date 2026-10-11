@@ -31,7 +31,7 @@
   final: 0x5401d0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:treeContract]
+  impl: [cpu/core/aiCityTrees.ts:treeContract, cpu/core/aiContracts.ts:treeContractOf]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x7cbca0

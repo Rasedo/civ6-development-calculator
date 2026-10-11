@@ -58,6 +58,11 @@ export interface Operation {
   triggerValue: number;
   /** the units locked to the operation (Lock Units) */
   locked: boolean;
+  /** its units may be built for it (op +0x5d8, AllowUnitConstruction: set
+   *  by an Operation Diplomacy that desires war) */
+  allowUnitConstruction: boolean;
+  /** the contracts its tree made (their ids in the seat's book) */
+  contracts: number[];
   /** the formations Make Formation made: a civilian and its escort, which
    *  move as one */
   formations: [number, number][];

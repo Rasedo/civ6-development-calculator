@@ -25,6 +25,7 @@ import type { AiGovernor } from './types';
 import type { MajorGovernorView, MajorView } from './view';
 import { AI_RATE, FX, FX_MIN, valueBetween, whole } from '../../cpu/core/aiValue';
 import { modifiersValue, type ValueTerms } from '../../cpu/core/aiModifiers';
+import { generalizedAssignment } from '../../cpu/core/aiAssignment';
 
 /** the horizon every governor and promotion value runs to: the literal 100
  *  both callers pass (0x6ee5f0, 0x6eedb0 — `push 0x64`) */
@@ -254,22 +255,11 @@ export function governorAssignment(view: MajorView, seat: number, scores: Govern
     at[i] = s;
     occupant[s] = i;
   });
-  for (let s = 0; s < slots.length; s++) {
-    let pick = -1;
-    let gain = -Infinity;
-    for (let i = 0; i < AI_GOVERNORS.length; i++) {
-      const v = at[i] === -1 || at[i] === s ? value(i, s) : value(i, s) - value(i, at[i]);
-      if (v > gain) {
-        gain = v;
-        pick = i;
-      }
-    }
-    if (pick < 0 || gain <= 0 || at[pick] === s) continue;
+  generalizedAssignment(AI_GOVERNORS.length, slots.length, at, (i, s) => value(i, s), (i, s) => {
     const old = occupant[s];
-    occupant[s] = pick;
-    at[pick] = s;
-    if (old >= 0) at[old] = -1;
-  }
+    occupant[s] = i;
+    return old;
+  }, 1);
   return { slots, at };
 }
 

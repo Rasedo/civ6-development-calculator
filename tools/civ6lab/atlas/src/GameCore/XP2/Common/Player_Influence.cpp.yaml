@@ -63,6 +63,7 @@
     - recording: h1_duelw1118
       turn: 33
       value: runs/h1_duelw1118 t33 (Armagh's two), t66, t113, t148 (Kumasi's two before China's seven cities).
+  impl: [ai/major/view.ts:MajorView]
   readings: ["H-1: the envoy annex — READ (settles the extra border picks)"]
   context:
     - ...ation level CanAnnexTilesWithReceivedInfluence (+0x28 bit 4), with E the envoys it holds (0x44c4b0, every giver) and A its annexed count past its starting tiles (+0xc less 0x1ab460, Starti...

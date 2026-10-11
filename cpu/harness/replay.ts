@@ -3104,6 +3104,8 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   diplomacy.attach(aiInputs, (seat) => strategies.knownCities(seat), sender);
   const missions = readMissions(dumpPath);
   const operationsAi = new OperationsProbe(dumpPath, aiSeats, cat, first.seatOfPlayer, aiInputs);
+  // the wars of the AI majors' diplomatic sending read their operations' AI
+  if (operationsAi.active) sender.war = operationsAi.warHooks();
   const ctx: Ctx = {
     state, cat, W: recs[0].head.W, seatOfPlayer: first.seatOfPlayer, playerOfSeat: first.playerOfSeat,
     units: new Map(), retained: new Map(), pendingMinors: new Map(), next: first, tally: new Map(), fellBack: new Map(), imposed: new Map(), reasons: new Map(),
@@ -3183,7 +3185,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     diplomacy.preTurn(state, recordA.state, read.state);
     strategies.recordContacts(b, ctx.seatOfPlayer);
     settleAi.preTurn(state, recordState);
-    operationsAi.preTurn(a, recordA.state, b);
+    operationsAi.preTurn(a, recordA.state, b, read.state);
     recordState = read.state;
     // the generator: held at each witnessed point (`streamHold`)
     const seed = turnSeed(b);
@@ -3309,7 +3311,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       applyMissions(ctx, recMissions, diplomacy, strat, (seat) => !sender.isSender(seat));
       applyTransitions(ctx, diplomacy, sender, strat);
       const picks = sender.turn(state, a.turn, strat, (o, x) => diplomacy.stateOf(o, x), (x) => diplomacy.agendasOf(x),
-        (x) => strategies.knownCities(x));
+        (x) => strategies.knownCities(x), (o, x) => diplomacy.opinionOf(o, x));
       sender.compare(a.turn, picks, recMissions);
       applySenderPicks(ctx, picks, recMissions, sender, diplomacy, strat);
       sender.close(state, (o, x) => diplomacy.opinionOf(o, x));

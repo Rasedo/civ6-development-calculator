@@ -9,6 +9,10 @@ import { compileTree, newRun, BT_FAILURE, BT_SUCCESS } from '../../../cpu/core/b
 import type { MajorKnownCityView, MajorPlotView, MajorUnitView, MajorView } from '../../../ai/major/view';
 import type { OpTeam, Operation } from '../../../ai/major/operations/operation';
 import type { OpsContext } from '../../../ai/major/operations/nodes';
+import { balance, regionalStrength, type WarValueInputs } from '../../../ai/major/operations/warValue';
+import { generalizedAssignment } from '../../../cpu/core/aiAssignment';
+import { FX } from '../../../cpu/core/aiValue';
+import type { KnownUnit } from '../../../ai/major/operations/knowledge';
 
 const W = 12;
 const H = 12;
@@ -27,7 +31,7 @@ function dist(a: number, b: number): number {
 }
 
 const unit = (id: number, plot: number, over: Partial<MajorUnitView> = {}): MajorUnitView => ({
-  id, type: 'UNIT_WARRIOR', plot, founder: false, combat: 20, ranged: 0, range: 0, damage: 0, movesLeft: 512, baseMoves: 2, bombard: 0, ...over,
+  id, type: 'UNIT_WARRIOR', plot, founder: false, combat: 20, ranged: 0, range: 0, damage: 0, movesLeft: 512, baseMoves: 2, bombard: 0, domain: 'land', ...over,
 });
 
 function view(over: Partial<MajorView>): MajorView {
@@ -102,5 +106,30 @@ describe('Is At War (0x7edde0)', () => {
   it('counts the operation\'s enemy alone', () => {
     expect(ASSAULT_NODES['Is At War'].update(nodes[0], run, ctx([2], 1))).toBe(BT_FAILURE);
     expect(ASSAULT_NODES['Is At War'].update(nodes[0], run, ctx([1, 2], 1))).toBe(BT_SUCCESS);
+  });
+});
+
+describe('the war value\'s balance (0x7b7830)', () => {
+  const rec = (plot: number, combat: number, seen: number): KnownUnit => ({ id: plot, owner: 1, type: 'UNIT_WARRIOR', plot, combat, ranged: 0, damage: 0, seen });
+  const inputs = (records: KnownUnit[]): WarValueInputs => ({ army: () => [], records: () => records, turn: 10 });
+  const strengths = (s: number, t: number) => view({
+    militaryStrength: (q: number) => (q === 0 ? s : t), cityPlots: () => [at(1, 1)], militaryYardstick: () => 20,
+  });
+  it('the regional strength sums the records seen within two turns that pass the yardstick less 20', () => {
+    expect(regionalStrength(strengths(0, 0), 0, 1, inputs([rec(at(2, 2), 30, 9), rec(at(3, 3), 25, 7), rec(at(4, 4), 0, 10)]))).toBe(30);
+  });
+  it('a weak region costs its own strength, else the smaller army where the target is within 30', () => {
+    expect(balance(strengths(100, 80), 0, 1, inputs([]))).toBe((-0 + 20) * FX);
+    expect(balance(strengths(100, 80), 0, 1, inputs([rec(at(2, 2), 30, 10)]))).toBe((-80 + 20) * FX);
+    expect(balance(strengths(100, 200), 0, 1, inputs([rec(at(2, 2), 60, 10)]))).toBe((-100 - 200) * FX);
+  });
+});
+
+describe('the generalized assignment (0x8b5bf0)', () => {
+  it('each slot takes the first largest positive gain and an unseated agent loses its slot', () => {
+    const g = [[5, 1], [7, 2]];
+    const at = [-1, -1];
+    generalizedAssignment(2, 2, at, (i, j) => g[i][j], () => -1, 3);
+    expect(at).toEqual([1, 0]);
   });
 });

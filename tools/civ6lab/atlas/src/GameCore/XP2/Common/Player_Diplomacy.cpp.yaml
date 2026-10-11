@@ -189,12 +189,25 @@
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes:
     - "imported: READ in its section, no confirming case found beside it"
     - ".claude/scratchpad/mu1/readings_c96.md: ...r plot owner (0x783980   0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's   (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else   NEUTRAL_CITY — each where the player..."
   context:
     - "...er (0x783980 0x783ec5..0x7856a5): the player's own district FRIENDLY_CITY, an ally's (0x3da560) ALLY_SUPPORT, a player at war COMBAT/PASSIVE_DISTRICT, else NEUTRAL_CITY — each where..."
     - ...0 = diplomacy 0x3dcec0) or flagged (+0xc58 / +0xd18, unread), an ALLY one where allied (0x3da560, 0x3de4e0); then each allowed definition with EnemyType NONE (one with ActiveEmergency,...
+  review: imported
+- addr: 0x3da770
+  final: 0x2a6c50
+  kind: function
+  status: READ
+  cases:
+    - recording: AI_Diplomacy.csv
+      value: "The replay's   sender and OperationsProbe share the seat's operations AI: the fitted   feed from AI_Diplomacy.csv is gone."
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - ...number at most the +0xb50 list's size >> 1 and the player is neither a declared friend (0x3da770) nor an ally (0x3da560), PrepareForWarWith(player, 1) (0x724f30). The pick skips a pl...
   review: imported
 - addr: 0x3da8e0
   kind: function
@@ -294,6 +307,7 @@
   status: PARTLY
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ...t human-check(0x3da870 on +0x1300), econ 0x6874d0(cost, slot 2, frac 0.5),         game CanDoAction 0x3dd9a0, a count +0x20 + 0x3d9450(to) < [f28c78]+0x110   +0x68 noop, +0x88 0x674960 PERFORM (send \"Processi..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...DISFAVORED by the owner's or p's preference, with desire   <= 0, refused by the game's CanDoAction (0x3dd9a0), or NOT READY (0x672ef0:   the per-player per-action flag +0x6390, then the can-do functor); a   f..."

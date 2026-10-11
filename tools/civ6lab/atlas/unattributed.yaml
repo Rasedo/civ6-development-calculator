@@ -1495,7 +1495,7 @@
     - recording: h1_duelv1124
       turn: 84
       value: Granada's Harbor contract CANCELLED
-  impl: [cpu/core/aiContracts.ts:inHandCheck]
+  impl: [cpu/core/aiContracts.ts:inHandCheck, ai/major/operations/manager.ts:updateContracts]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -1595,6 +1595,21 @@
   context:
     - "...0 runs each city's listener 0x5d6050 in city order: a city that may take it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and clears its production (0x175d10) where..."
   review: reviewed
+- addr: 0x5f6830
+  final: 0x3fb0c0
+  kind: function
+  name: a contract the economic AI may buy (vt +0x80)
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 2
+      value: "A Settle City Op contract no city may take waits ACCEPTED to   the Contract Manager's turn limit: runs/h1_duelv1128 China's Settle New   City started t2, failed at its limit t13 with no city's SUBMITT"
+  impl: [cpu/core/aiContracts.ts:goldPurchasable]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - "...ct for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD (vt +0x80 0x5f6830; a building flagged +0x159 & 0x10 declines) it takes into its purchase list and makes..."
+  review: reviewed
 - addr: 0x600b00
   final: 0x3fda30
   kind: function
@@ -1687,7 +1702,7 @@
     - recording: h1_duelw1117
       turn: 205
       value: the first largest gain above 0 takes the slot
-  impl: [ai/major/governors.ts:governorAssignment]
+  impl: [ai/major/governors.ts:governorAssignment, cpu/core/aiAssignment.ts:generalizedAssignment]
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -2341,6 +2356,7 @@
     - "C-97: the operations — the manager READ (no-enemy candidates), the war candidates unread"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...om the behaviour tree — \"HL: Rock Band Move\" (0x710f40) and the CITY_ASSAULT operation (0x722690), each building a unit's name for its log (the band template over 118 and 155): the AI'..."
@@ -2369,9 +2385,15 @@
   name: warOperationReady
   semantics: "The military AI's operations (+0x318): one of the type (5) against the player (+0x2a0) past its state; the operation's states unread."
   status: PARTLY
-  impl: [ai/major/diploActions.ts:DesireInputs, ai/major/diploActions.ts:canDo]
+  impl:
+    - ai/major/diploActions.ts:DesireInputs
+    - ai/major/diploActions.ts:canDo
+    - ai/major/operations/manager.ts:surpriseWarReady
+    - ai/major/operations/manager.ts:warOperationReady
+    - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   review: reviewed
 - addr: 0x724dd0
   final: 0x4d0610
@@ -2571,6 +2593,7 @@
     - cpu/core/tactical.ts:reachAt
     - gpu/core/sim_tactics.py:_barb_reach_at
     - cpu/core/tactical.ts:strikers
+    - ai/major/view.ts:MajorView
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: Attack Units — READ, ported"
@@ -2579,6 +2602,13 @@
   context:
     - ...x775340; for MEDIUM / LOW a ranged unit's spot at exactly its range with Movement left, 0x78fa10), the targets of that type within 5 of it (0x76eb50), each unit's spots per target from...
   review: reviewed
+- addr: 0x793300
+  final: 0x51dd50
+  kind: function
+  status: PARTLY
+  impl: [ai/major/view.ts:MajorView]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x79d2d0
   final: 0x525590
   kind: function
@@ -2676,14 +2706,21 @@
   name: warValue
   semantics: "The war value: 0x7b7ab0 (855 instructions: the plots, units and cities) + 0x7b7830 unless the flag + 0x7b87b0 (PSEUDOYIELD_DIPLOMATIC_BONUS) where a casus belli is named; the parts unread."
   status: PARTLY
-  impl: [ai/major/diploActions.ts:desire, ai/major/diploActions.ts:worth]
+  impl:
+    - ai/major/diploActions.ts:DesireInputs
+    - ai/major/diploActions.ts:desire
+    - ai/major/diploActions.ts:worth
+    - ai/major/operations/warValue.ts:warValue
+    - cpu/harness/diploSender.ts:WarHooks
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   review: reviewed
 - addr: 0x7b87b0
   final: 0x534950
   kind: function
-  status: PARTLY
+  name: the war value's casus belli term
+  status: READ
   cases:
     - recording: 1127
       turn: 62
@@ -2693,9 +2730,10 @@
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...-9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread), max(X, 5) where p's rank is 1 or withi..."
-  review: imported
+  review: reviewed
 - addr: 0x7b8a30
   final: 0x534c10
   kind: function
@@ -2866,15 +2904,20 @@
 - addr: 0x7e9120
   final: 0x551580
   kind: function
-  status: PARTLY
+  name: Build Military Improvement (execution)
+  status: READ
   cases:
     - recording: AI_Diplomacy.csv
       value: the war declarations' desire functors (the   replay feeds PrepareForWarWith from AI_Diplomacy.csv);
+  impl:
+    - ai/major/operations/assault.ts:ASSAULT_NODES
+    - ai/major/operations/assault.ts:buildMilitaryImprovement
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - ...executions of Siege City (0x811e80), Pillage (0x811390), Build Military Improvement (0x7e9120), Air Assault (0x80fb50), Attack City (district targets in the assignment); the war dec...
-  review: imported
+  review: reviewed
 - addr: 0x7e9670
   final: 0x551a80
   kind: function
@@ -2895,6 +2938,7 @@
     - ai/major/operations/assault.ts:buildMilitaryImprovement
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...e, ERROR with no enemy, SUCCESS with units, else FAILURE. BUILD MILITARY IMPROVEMENT (0x7e9b10) — ERROR with neither Defensive Improvement nor a Specific Improvement; else it picks a..."
   review: reviewed
@@ -2933,7 +2977,7 @@
 - addr: 0x7f1500
   kind: function
   status: PARTLY
-  impl: [ai/major/operations/nodes.ts:contractManager, cpu/core/aiCityTrees.ts:contractManager]
+  impl: [cpu/core/aiContracts.ts:contractManagerNode]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -3013,10 +3057,14 @@
     - recording: h1_duelv1124
       turn: 93
       value: Granada's contract 236 gone past its limit with no FAILED line
-  impl: [ai/major/operations/nodes.ts:over, cpu/core/aiCityTrees.ts:checkContract]
+    - recording: h1_duelv1128
+      turn: 13
+      value: Settle New City, Operation complete at the turn limit 10
+  impl: [cpu/core/aiContracts.ts:checkContract, cpu/core/aiContracts.ts:contractManagerNode]
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - ...ame speed, 0x5254d0), Contract Manager 0x7f1500 (update 0x7f17a0, each contract's check 0x7f2220).
   review: reviewed
@@ -3050,7 +3098,7 @@
   final: 0x55ba40
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:buildUnit]
+  impl: [cpu/core/aiContracts.ts:buildUnitNode]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -3274,16 +3322,36 @@
   context:
     - "...st's unit entries (0x80b9b0: CIVILIAN through HIGH) narrowed to those near (0x80bd20 -> 0x80c080: not the player's own, of a player at war or the operation's enemy — a civilian of anyo..."
   review: reviewed
+- addr: 0x80f0d0
+  final: 0x56f170
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/assault.ts:airAssaultExecute]
+  notes: ["imported: cited by the code, in no dll_readings section"]
+  review: imported
 - addr: 0x80f280
   final: 0x56f320
   kind: function
   name: "Attack City's targets: districts within 3"
   status: PARTLY
+  impl: [ai/major/operations/assault.ts:CITY_ATTACK_RANGE]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes: [read; no recorded decision of the five verbose duels tells it apart yet]
   context:
     - "...members alive with Movement left; the COMBAT_DISTRICT targets within 3 of the target (0x80f280); the assignment (bytes 0, 1) logged \"Operation City Attack\" and carried out."
+  review: reviewed
+- addr: 0x80f6b0
+  final: 0x56f690
+  kind: function
+  name: Siege City's assignment gain
+  status: PARTLY
+  impl: [ai/major/operations/assault.ts:siegeCityExecute]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - "...agents, the generalized assignment 0x8b5bf0 (three passes; the start 0x80f9d0, the gain 0x80f6b0 — its multiplier the store at [rsp + 0x28] that dis.sh dropped —, the move 0x80f4a0) lo..."
   review: reviewed
 - addr: 0x814840
   final: 0x574440
@@ -3561,6 +3629,16 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...05da0). Fortification grows only in the Fortify operation's tick (0x95ebb0, 0x960800, 0x959830: +1 to FORTIFY_TURN_MAX), as the C-94 BUILD line says. The engines: `spendAttack` / `_s..."
+  review: imported
+- addr: 0x95a010
+  final: 0x665ab0
+  kind: function
+  status: PARTLY
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - ...loader 0xac6bb0) with DefenseModifier above 0; the run's unit (+0x20) builds it (+0x24, 0x95a010).
   review: imported
 - addr: 0x95b100
   final: 0x666620
@@ -3983,6 +4061,7 @@
   status: PARTLY
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...), the value 0x7a58f0(impr, rate, T, horizon, plot, city). The Improvements row (loader 0xac6bb0, its SELECT alphabetical): AirSlots +0x2c, Appeal +0x30, DefenseModifier +0x34, Dispe..."
   review: reviewed

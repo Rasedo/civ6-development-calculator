@@ -11,18 +11,19 @@ import type { City, CityState, GameState, Tile, Unit } from './types';
 import { DIRECTION_TYPES, axialToOffset, hexDistance, neighborTile, offsetToAxial, tileAt, tilesWithin } from '../../world/hex';
 import { isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { COMBAT_BOMBARD_VS_UNIT, COST_MULTIPLIER_PCT, MP_SCALE } from '../data/constants';
-import { UNITS, UNIT_HP } from '../data/units';
+import { CITY_MAX_HP, UNITS, UNIT_HP } from '../data/units';
+import { CITY_STATE_MAX_HP } from '../data/cityStates';
 import { DISTRICTS } from '../data/districts';
 import { IMPROVEMENTS } from '../data/improvements';
 import {
-  canEmbark, cliffBlocksStep, encampmentBlocks, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
+  canEmbark, cityAtIndex, cliffBlocksStep, encampmentBlocks, inEnemyZoc, stepCost, stepUnit, unitDomain, unitFullMoves, unitIsNoncombat, unitReligious,
   unitsHostile, unitVisibleTo,
   waterEnterable,
 } from './units';
 import { BARB_SEAT, FREE_SEAT, NO_SEAT, cityHolders, civsAtWar, isBarbSeat, isCityStateSeat, isCiv, isTerritorial, seatOf, tileCity, tileSeat } from './seats';
 import { OPEN_BORDERS_CIVIC } from '../data/seats';
 import { randRange } from './rand';
-import { cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, meleeUnitStrengths, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeStrength, coastalRaid, damageExpected, hostilePillage, hostileRangedStrike, hostileUnitAct, meleeAttack, meleeUnitStrengths, predictCityBlow, rangedUnitStrengths, stackDefender, unitAttackRange } from './combat';
 import { CITY_STRIKE_RANGE } from './phase';
 import { outerPool } from './rules';
 import { cityStateAt, minorCity } from './cityStates';
@@ -963,6 +964,15 @@ function pillage(state: GameState, pass: Pass, districts: boolean): void {
   }
 }
 
+/** a district target's hit points: a City Center's, a major's city or a
+ *  city-state's; null for none */
+export function districtHealth(state: GameState, tile: number): { max: number; hp: number } | null {
+  const held = cityAtIndex(state, tile);
+  if (held) return { max: CITY_MAX_HP, hp: held.city.hp };
+  const cs = cityStateAt(state, tile);
+  return cs && cs.centerIndex === tile ? { max: CITY_STATE_MAX_HP, hp: cs.hp ?? CITY_STATE_MAX_HP } : null;
+}
+
 /** a unit of a player at war with the unit holds the plot to fight it (0x208b80) */
 function defenderAt(state: GameState, unit: Unit, p: number): boolean {
   return state.units.some((x) => x.tileIndex === p && onMap(x) && unitDomain(x.type) === 'military' && unitsHostile(state, unit, x));
@@ -1265,14 +1275,16 @@ function strikers(state: GameState, pass: Pass, plot: number): Unit[] {
  *  damage it would deal, the turn of the blow, its worth as last weighed */
 interface Claim { unit: number; target: number; dealt: number; turns: number; value: number }
 interface AssignSpot { tile: number; claims: Claim[]; holder: number; holderTarget: number }
-interface AssignTarget { target: Target; unit: Unit; health: number; damage: number; units: number[]; barb: boolean }
+interface AssignTarget { target: Target; unit: Unit | null; health: number; damage: number; units: number[]; barb: boolean }
 /** one unit's assignment (0x38 entries): its spot, the plot it strikes (-1
  *  where the blow falls on a later turn), where it stands, its damage */
 export interface Assigned { unit: Unit; move: number; attack: number; from: number; damage: number; civilian: boolean }
 
 /**
  * THE ASSIGNMENT (0x776140) of `units` to the spots of `targets`:
- *  - each target's health (1.1 x its whole, less its damage);
+ *  - each target's health (1.1 x its whole, less its damage): a unit's, a
+ *    district's (a City Center's hit points; its blow the predicted one,
+ *    `predictCityBlow`, the blow back unread and none);
  *  - each unit with Movement left: per target its planning's spots (in
  *    order), save — but against a HIGH target — one where the damage it
  *    takes in the blow and the blow back passes the damage it deals in both,
@@ -1294,9 +1306,16 @@ export interface Assigned { unit: Unit; move: number; attack: number; from: numb
 export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: Target[], exchange: boolean, survive: boolean): Assigned[] {
   const tg: AssignTarget[] = [];
   for (const t of targets) {
-    const v = targetUnit(state, t)!;
-    tg.push({ target: t, unit: v, health: Math.floor(UNIT_HP * ATTACK_HEALTH_256 / 256) - (UNIT_HP - healthOf(v)),
-      damage: 0, units: [], barb: isBarbSeat(v.seat) });
+    const v = targetUnit(state, t);
+    if (v) {
+      tg.push({ target: t, unit: v, health: Math.floor(UNIT_HP * ATTACK_HEALTH_256 / 256) - (UNIT_HP - healthOf(v)),
+        damage: 0, units: [], barb: isBarbSeat(v.seat) });
+      continue;
+    }
+    const d = districtHealth(state, t.tile);
+    if (!d) continue;
+    tg.push({ target: t, unit: null, health: Math.floor(d.max * ATTACK_HEALTH_256 / 256) - (d.max - d.hp),
+      damage: 0, units: [], barb: isBarbSeat(t.seat) });
   }
   const spots: AssignSpot[] = [];
   units.forEach((u, i) => {
@@ -1307,9 +1326,10 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     tg.forEach((T, k) => {
       const E = p.entries.find((e) => e.target === T.target);
       if (!E) return;
+      const dealt = T.unit ? E.dealt : predictCityBlow(state, u, T.target.tile);
       for (const s of E.spots) {
         const takes = E.taken + s.backTaken;
-        if (T.target.type !== 'HIGH' && ((exchange && takes > E.dealt + s.backDealt) || (survive && takes > healthOf(u)))) continue;
+        if (T.target.type !== 'HIGH' && ((exchange && takes > dealt + s.backDealt) || (survive && takes > healthOf(u)))) continue;
         if (pass.ai.get(u.id) === AI_DEFENDER && s.tile !== u.tileIndex) continue;
         if (s.turns === 1 && moved && s.tile !== u.tileIndex) continue;
         const dom = unitDomain(u.type);
@@ -1317,7 +1337,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
           && !(x.seat === u.seat && x.movesLeft > 0) && unitDomain(x.type) === dom)) continue;
         let sp = spots.find((x) => x.tile === s.tile);
         if (!sp) spots.push((sp = { tile: s.tile, claims: [], holder: -1, holderTarget: -1 }));
-        sp.claims.push({ unit: i, target: k, dealt: E.dealt, turns: s.turns, value: 0 });
+        sp.claims.push({ unit: i, target: k, dealt, turns: s.turns, value: 0 });
       }
     });
   });
@@ -1395,7 +1415,7 @@ export function assignTo(state: GameState, pass: Pass, units: Unit[], targets: T
     const c = S.claims.find((x) => x.unit === i && tg[x.target].units.includes(i));
     if (!c) return null;
     const T = tg[c.target];
-    return { unit: u, move: S.tile, attack: c.turns === 1 ? T.unit.tileIndex : -1, from: u.tileIndex,
+    return { unit: u, move: S.tile, attack: c.turns === 1 ? (T.unit ? T.unit.tileIndex : T.target.tile) : -1, from: u.tileIndex,
       damage: UNIT_HP - healthOf(u), civilian: T.target.type === 'CIVILIAN' };
   });
   return mergeSort(out, (a, b) => assignedBefore(state, a, b)).filter((a): a is Assigned => a !== null);

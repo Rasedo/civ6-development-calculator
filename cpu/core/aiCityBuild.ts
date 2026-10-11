@@ -56,6 +56,8 @@ export interface AiBuildingRow {
   district: string | null;
   wonder: boolean;
   placement: boolean;
+  /** PurchaseYield YIELD_GOLD */
+  goldPurchase: boolean;
   maxPlayerInstances: number;
   maxWorldInstances: number;
   trait: string | null;
@@ -483,6 +485,8 @@ export interface AiUnitRow {
   foundCity: boolean;
   buildCharges: number;
   mustPurchase: boolean;
+  /** PurchaseYield YIELD_GOLD */
+  goldPurchase: boolean;
   combat: number;
   /** TypeTags CLASS_RECON */
   recon: boolean;

@@ -185,7 +185,7 @@
   final: 0xfb9b0
   kind: function
   status: PARTLY
-  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld]
+  impl: [cpu/core/aiCityTrees.ts:CityTreeWorld, cpu/core/aiContracts.ts:ContractNodeWorld]
   readings:
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
   notes: ["imported: READ in its section, no confirming case found beside it"]
@@ -383,11 +383,12 @@
   cases:
     - recording: 1124
       value: "Measured: the   units with a PrereqTech logged at our T + 5 on 253 of 260 1124 Archer rows   before the +5 (Spearman, Heavy Chariot, Catapult, Crossbowman alike)."
-  impl: [cpu/core/aiContracts.ts:ContractCity]
+  impl: [cpu/core/aiContracts.ts:ContractCity, cpu/core/majorView.ts:prod]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
     - "C-96 / C-97: the AI's yield weights and the modifier evaluator — READ (agendas' lists, the other analyzers unread)"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...t, valueHorizons[1]). A unit: 0x7b62c0(unit, T from its prerequisites and train turns 0x17bb40, +10 likewise, valueHorizons[1]); a project 0x7b28c0; a wonder 0x7a4d40 at its plot wit..."
     - "...buildings' turns (+0x258), then, but for MustPurchase (+0x1b9 bit 128), the train turns 0x17bb40 and +10 while the city builds another item; negative T values FX(-9999). Measured: the..."

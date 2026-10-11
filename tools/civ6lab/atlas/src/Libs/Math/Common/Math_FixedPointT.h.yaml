@@ -400,6 +400,8 @@
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
     - "C-97: the operations — the manager and its candidates READ, the staging list and City Defense's start unread"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...0), reached from a city of the player (its build AI's +0x870 set), value the city value 0x79fef0 (the \"CITY VALUES\" lines; unread), enemy strength 0x5eadb0 within 3 where the player'..."
     - "...0xb58, the port takes the player's cities), the WAR / ALLY gates' flags, the city value 0x79fef0 (with 0x7a0ac0), City Defense's start (0x5cced0 \"Defense %s\"), the knowledge base's c..."
@@ -407,6 +409,7 @@
 - addr: 0x7b7830
   final: 0x5340b0
   kind: function
+  name: the war value's balance
   status: PARTLY
   cases:
     - recording: 1127
@@ -415,14 +418,17 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
+  impl: [ai/major/operations/warValue.ts:balance]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...s (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread), max(X, 5) w..."
-  review: imported
+  review: reviewed
 - addr: 0x7b7ab0
   final: 0x534220
   kind: function
+  name: the war value's spoils
   status: PARTLY
   cases:
     - recording: 1127
@@ -431,11 +437,13 @@
     - recording: 1109
       turn: 200
       value: "The record's six   wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,   1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not   run."
+  impl: [ai/major/operations/warValue.ts:spoils]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...more majors (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760: 0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is named; the parts unread),..."
-  review: imported
+  review: reviewed
 - addr: 0x8c4540
   kind: function
   name: turnsAt

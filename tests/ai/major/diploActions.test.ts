@@ -21,7 +21,7 @@ function view(over: Partial<MajorView> = {}): MajorView {
 }
 
 const inputs = (state: string) => ({ state, delegationPrice: 10, embassyPrice: 25, distance: null, nearVictory: false,
-  warOperation: false });
+  warOperation: false, war: null });
 
 describe('the threat and trust terms (0x671b80 / 0x671ef0)', () => {
   it('T is the weight at rank 1 of two majors met, negated without the flag, 0 where the preference rules it out', () => {
@@ -90,15 +90,15 @@ describe('the pick, the perform and the answer', () => {
     const v = view();
     savingsTurn(senderOf(mem, 1), 90 * 256);
     const ins = new Map([[0, inputs('DIPLO_STATE_NEUTRAL')]]);
-    const picks = pickActions(v, mem, 1, ins, [], gaps);
+    const picks = pickActions(v, mem, 1, ins, [], gaps, () => undefined);
     expect(picks.map((p) => p.action)).toEqual([ACTION_DELEGATION]);
     const rec = performAction(v, mem, 1, picks[0], 10, 25, 9);
     expect(rec.offer).toEqual([0, [[9, 0, 0]], []]);
-    expect(pickActions(view({ turn: 73 }), mem, 1, ins, [], gaps)).toEqual([]);
+    expect(pickActions(view({ turn: 73 }), mem, 1, ins, [], gaps, () => undefined)).toEqual([]);
     const plots = mem.seats.get(1)!.savings[2];
     recordAnswer(mem, 1, ACTION_DELEGATION, false, 10, 25);
     expect(mem.seats.get(1)!.savings[2]).toBe(plots + 10 * 256);
-    expect(pickActions(view({ turn: 74 }), mem, 1, ins, [], gaps).length).toBe(1);
+    expect(pickActions(view({ turn: 74 }), mem, 1, ins, [], gaps, () => undefined).length).toBe(1);
   });
 
   it('focuses the met major whose opinion of the owner is highest above 0', () => {

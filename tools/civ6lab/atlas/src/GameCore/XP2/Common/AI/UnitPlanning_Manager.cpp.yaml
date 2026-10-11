@@ -42,12 +42,15 @@
     - cpu/core/tactical.ts:coastalRaids
     - cpu/core/tactical.ts:moveExec
     - cpu/core/tactical.ts:homelandPlunder
+    - ai/major/operations/assault.ts:pillageExecute
+    - ai/major/view.ts:MajorView
   readings:
     - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
     - "C-95: Coastal Raid — READ, ported"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
     - "C-95: the homeland's Plunder Trader — READ, ported"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - ...Pillage 0x803250, Naval Escort 0x817f60; Operation Move's unit tactical block (+0x1fc0, 0x791300); the city assault nodes (Can Alpha City, Is At War, Operation Diplomacy, Operation Pil...
   review: reviewed

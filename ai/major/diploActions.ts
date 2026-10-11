@@ -53,8 +53,9 @@
  * (`DiploActionGaps`): the actions whose desire it does not read, a
  * favoured action's desire and cost (twice the reading on runs/h1_duelv1121
  * Qin's Gossip rows; the doubling instruction unread), the threat's (a) and
- * (c), the war value (0x7b7760) and the military AI's war operation the
- * war's can-do asks.
+ * (c). The wars' desires read the war value (operations/warValue.ts), their
+ * can-do the military AI's war operation (0x723db0), their not-ready hook
+ * its PrepareForWarWith.
  */
 import {
   DIPLO_PREFERENCE_AGENDA_TRAITS, DIPLO_PREFERENCE_LEADER_TRAITS, DIPLO_PREFERENCE_LISTS,
@@ -63,6 +64,7 @@ import {
 import type { MajorView } from './view';
 import { FX, yieldValue } from '../../cpu/core/aiValue';
 import { SLOT_PLOTS, SLOT_UNITS, canAfford, newEconomicMemory, spend, type EconomicMemory } from '../../cpu/core/aiEconomic';
+import { AI_VALUE_HORIZON } from '../../cpu/data/aiValue';
 import type { SeatActionRecord } from '../../cpu/core/types';
 
 export const ACTION_DELEGATION = 'DIPLOACTION_DIPLOMATIC_DELEGATION';
@@ -73,6 +75,7 @@ export const ACTION_FRIENDSHIP = 'DIPLOACTION_DECLARE_FRIENDSHIP';
 export const ACTION_ALLIANCE = 'DIPLOACTION_ALLIANCE';
 export const ACTION_DENOUNCE = 'DIPLOACTION_DENOUNCE';
 export const ACTION_SURPRISE_WAR = 'DIPLOACTION_DECLARE_SURPRISE_WAR';
+export const ACTION_WAR_MINOR = 'DIPLOACTION_DECLARE_WAR_MINOR_CIV';
 
 /** GlobalParameters AI_TURNS_BETWEEN_PEACE_OFFERS (+0x20) */
 export const AI_TURNS_BETWEEN_OFFERS = 3;
@@ -208,6 +211,9 @@ export interface DesireInputs {
   /** a war operation of the owner's military AI against the other ready to
    *  strike (0x723db0) */
   warOperation: boolean;
+  /** the war value of a war on the other (0x7b7760, its flag a favoured
+   *  war), null where the port does not reach it */
+  war: ((favoured: boolean) => number) | null;
 }
 
 /** STATE WORTH / COST (0x6718a0 / 0x671650): the state's row for the action
@@ -278,12 +284,60 @@ export function desire(view: MajorView, mem: DiploActionMemory, owner: number, o
   if (action === ACTION_SURPRISE_WAR) {
     if (warsOf(view, owner) > 1) return -FX;
     if (inp.pref < 0) return WAR_DISFAVOURED;
-    bump(gaps, 'the war value 0x7b7760');
-    return null;
+    if (!inp.war) {
+      bump(gaps, 'the war value 0x7b7760');
+      return null;
+    }
+    const x = inp.war(inp.pref > 0);
+    const n = threatRank(view, owner, other);
+    return n === 1 || Math.fround(metCount(view, owner) * 0.25) >= n ? Math.max(x, 5 * FX) : x;
   }
   if (action === ACTION_DENOUNCE || action.startsWith('DIPLOACTION_KEEP_PROMISE_')) return 0;
   bump(gaps, `${action}: its desire`);
   return null;
+}
+
+/** the envoys' worth's window (0x66d9d0's 0x7a46c0 call): from turn 5 to
+ *  the GlobalAI's m_valueHorizons[1] */
+const ENVOY_WORTH_START = 5;
+
+/**
+ * THE CITY-STATE WAR'S DESIRE (0x66d9d0) of `owner` toward the city-state
+ * `minor`, raw 24.8: -9999 disfavoured (the owner's preference, else the
+ * city-state's of the owner at -1); else X the war value (favoured where a
+ * preference is +1). Holding at most one envoy there: X less the envoys'
+ * worth (unfavoured: the owner's envoys there, 0x7a46c0) and 800 where the
+ * owner is allied with the suzerain, 200 where it is a declared friend of
+ * it. Holding more: 0 unless the most envoys any player holds there pass
+ * its own (by more than 2 unfavoured); past them X where favoured, else X
+ * where the suzerain is a major the owner regards below -5 or fights, else
+ * 0. `opinion` is the owner's of a major (its diplomatic AI's vt +0x50).
+ */
+export function minorWarDesire(view: MajorView, owner: number, minor: number, pref: number, war: (favoured: boolean) => number,
+                               envoyWorth: (start: number, horizon: number) => number, opinion: (major: number) => number): number {
+  if (pref < 0) return WAR_DISFAVOURED;
+  const favoured = pref > 0;
+  if (view.majors().includes(minor) || minor === view.barbarianSeat()) return 0;
+  const tokens = view.envoys(minor, owner);
+  const x = war(favoured);
+  let cut = 0;
+  if (!favoured) {
+    cut = envoyWorth(ENVOY_WORTH_START, AI_VALUE_HORIZON);
+    const suz = view.suzerainOf(minor);
+    if (suz >= 0) {
+      if (view.allied(owner, suz)) cut += 800 * FX;
+      else if (view.declaredFriends(owner, suz)) cut += 200 * FX;
+    }
+  }
+  if (tokens <= 1) return x - cut;
+  if (view.mostEnvoys(minor) <= tokens + (favoured ? 0 : 2)) return 0;
+  if (favoured) return x;
+  const suz = view.suzerainOf(minor);
+  for (const q of view.majors()) {
+    if (q !== suz) continue;
+    if (opinion(q) < -5 || view.atWar(owner, q)) return x;
+  }
+  return 0;
 }
 
 /**
@@ -331,9 +385,13 @@ export type PickInputs = Omit<DesireInputs, 'pref' | 'focus'>;
  * majors it has met, its state toward each): the actions whose desire the
  * port reads, each where its can-do passes. A best action the engine
  * cannot send (Open Borders, Demand Tribute) still takes the major's turn.
+ * A war the game lets the owner declare (CanDoAction) whose can-do the
+ * military AI's operation does not yet meet is NOT READY: its hook
+ * (`notReady`, 0x6744a0 -> 0x6742d0) runs and the action is passed over.
  */
 export function pickActions(view: MajorView, mem: DiploActionMemory, owner: number, inputs: ReadonlyMap<number, PickInputs>,
-                            agendas: readonly string[], gaps: DiploActionGaps): PickedAction[] {
+                            agendas: readonly string[], gaps: DiploActionGaps,
+                            notReady: (other: number, action: string) => void): PickedAction[] {
   const s = senderOf(mem, owner);
   const out: PickedAction[] = [];
   for (const [other, inp] of inputs) {
@@ -344,7 +402,13 @@ export function pickActions(view: MajorView, mem: DiploActionMemory, owner: numb
       if (pref < 0) continue;
       const d = desire(view, mem, owner, other, action, { ...inp, pref, focus: s.focus }, gaps);
       if (d === null || d <= 0) continue;
-      if (!canDo(view, s, owner, other, action, inp, gaps)) continue;
+      // a war the game lets the owner declare whose operation is not ready:
+      // the action's not-ready hook (0x6742d0)
+      if (action === ACTION_SURPRISE_WAR && view.warOpen(owner, other, false) && !inp.warOperation) {
+        notReady(other, action);
+        continue;
+      }
+      if (!canDo(view, s, owner, other, action, inp)) continue;
       const favoured = pref > 0;
       if (best && (bestFavoured && !favoured)) continue;
       if (best && bestFavoured === favoured && d <= best.desire) continue;
@@ -360,13 +424,8 @@ export function pickActions(view: MajorView, mem: DiploActionMemory, owner: numb
  *  Surprise War's (0x673800) the game's CanDeclareWarOn and the military
  *  AI's war operation ready against the other; Open Borders the game's
  *  CanDoAction; Demand Tribute stands on its desire */
-function canDo(view: MajorView, s: SenderMemory, owner: number, other: number, action: string, inp: PickInputs,
-               gaps: DiploActionGaps): boolean {
-  if (action === ACTION_SURPRISE_WAR) {
-    if (!view.warOpen(owner, other, false)) return false;
-    if (!inp.warOperation) bump(gaps, 'the war operation 0x723db0');
-    return inp.warOperation;
-  }
+function canDo(view: MajorView, s: SenderMemory, owner: number, other: number, action: string, inp: PickInputs): boolean {
+  if (action === ACTION_SURPRISE_WAR) return view.warOpen(owner, other, false) && inp.warOperation;
   if (action !== ACTION_DELEGATION && action !== ACTION_EMBASSY) {
     return action === ACTION_DEMAND_TRIBUTE || (action === ACTION_OPEN_BORDERS && view.actionOpen(owner, other, action) === true);
   }

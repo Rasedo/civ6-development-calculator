@@ -18,7 +18,10 @@
   kind: function
   name: a unit with Movement left
   status: PARTLY
-  impl: [cpu/core/tactical.ts:canAct]
+  impl:
+    - cpu/core/tactical.ts:canAct
+    - ai/major/operations/assault.ts:attackCityExecute
+    - ai/major/operations/assault.ts:operationAttackExecute
   readings:
     - "C-95: the attack plots in the reach, the target list, the rampage, the civilians, the traders, the chase — READ"
     - "C-95: the barbarians' raid — READ (\"Raid City\"'s nodes), ported (the Defend Units' moves, the rally and the team's readiness below unread)"
@@ -35,6 +38,13 @@
   notes: ["imported: READ in its section, no confirming case found beside it"]
   context:
     - "...mover's player on the victim's plot with the victim's build charges (+0xed0, through 0x56cb00) and damage (+0xcf0, 0x5705f0) and embarked state, the victim removed (1); no type: 0...."
+  review: imported
+- addr: 0x56d6c0
+  final: 0x3a30f0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/view.ts:reachOf]
+  notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x56d6f0
   final: 0x3a3120

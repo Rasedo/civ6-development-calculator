@@ -21,10 +21,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { applySeatUnitOrders } from '../core/phase';
 import { majorView, type MajorViewInputs } from '../core/majorView';
-import { seatOf } from '../core/seats';
+import { citiesOf, seatOf } from '../core/seats';
+import { computeCityStats } from '../core/city';
 import { spawnUnit, unitFullMoves } from '../core/units';
 import type { GameState, Seat } from '../core/types';
-import { newOpsAi, operationsTurn, opsOf, prepareForWarWith, remapUnits, type OpsAi } from '../../ai/major/operations/manager';
+import { newOpsAi, notReadyHook, operationsTurn, opsOf, peaceMade, remapUnits, surpriseWarReady, type OpsAi } from '../../ai/major/operations/manager';
+import { knownArmy } from '../../ai/major/operations/knowledge';
+import { warValue } from '../../ai/major/operations/warValue';
+import type { MajorView } from '../../ai/major/view';
+import type { WarHooks } from './diploSender';
 import { opUnits } from '../../ai/major/operations/operation';
 import { engineRowOf } from './import';
 import { gameTypeOf } from '../data/aliases';
@@ -48,49 +53,20 @@ function kindOf(line: string): string {
   if (note.startsWith('Operation Move')) return 'move';
   if (note.startsWith('Operation Change Target')) return 'changeTarget';
   if (note.startsWith('Operation Recruit') || note.startsWith('No recruits') || note.startsWith('Recruiting')) return 'recruit';
-  if (note.startsWith('Op Attack Units') || note.startsWith('Operation Attack Units') || note.startsWith('Attack Target')) return 'attack';
+  if (note.startsWith('Op Attack Units') || note.startsWith('Operation Attack Units')) return 'attack';
+  if (note.startsWith('Attack Target')) return 'attackTarget';
+  if (note.startsWith('Operation City Attack')) return 'cityAttack';
+  if (note.startsWith('Operation Siege City')) return 'siege';
+  if (note.startsWith('Operation Pillage City')) return 'pillage';
+  if (note.startsWith('Operation Air Attack')) return 'air';
   if (note.startsWith('Operation Protect Units')) return 'protect';
   return 'other';
 }
 
-const KINDS = ['started', 'running', 'team', 'recruit', 'move', 'changeTarget', 'attack', 'protect', 'complete', 'other'] as const;
+const KINDS = ['started', 'running', 'team', 'recruit', 'move', 'changeTarget', 'attack', 'attackTarget', 'cityAttack', 'siege',
+  'pillage', 'air', 'protect', 'complete', 'other'] as const;
 
 const norm = (s: string): string => s.replace(/\s+$/, '');
-
-/** the players each major prepares for war with from a turn on: two turns
- *  after its AI_Diplomacy.csv first shows a war declaration toward the
- *  player with a positive desire (the diplomatic AI's pick of a declaration
- *  not ready calls PrepareForWarWith, 0x6742d0; a fit: the soonest first
- *  candidate against a player follows the first desire by two turns, 1117
- *  t18 -> t20 and t32 -> t34, 1121 t29 -> t31)
- *  — by `${player}`, [turn, target] in turn order */
-function readPrepares(path: string): Map<number, [number, number][]> {
-  const out = new Map<number, [number, number][]>();
-  if (!existsSync(path)) return out;
-  let cols: string[] = [];
-  const seen = new Set<string>();
-  for (const raw of readFileSync(path, 'utf8').split('\n')) {
-    const f = raw.replace(/\r$/, '').split(',').map((x) => x.trim());
-    if (f[0] === 'Game Turn') {
-      cols = f;
-      continue;
-    }
-    const action = f[2] ?? '';
-    if (!/^DIPLOACTION_DECLARE_.*WAR/.test(action)) continue;
-    const turn = Number(f[0]);
-    const player = Number(f[1]);
-    for (let i = 3; i < f.length && i < cols.length; i++) {
-      const v = f[i];
-      if (!v.includes(':') || !(Number(v.split(':')[0]) > 0)) continue;
-      const target = Number(cols[i]);
-      const k = `${player}:${target}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      (out.get(player) ?? out.set(player, []).get(player)!).push([turn + 2, target]);
-    }
-  }
-  return out;
-}
 
 /** the "CITY VALUES" lines by `${turn}:${player}`: [city name, value] */
 function readCityValues(path: string): Map<string, [string, number][]> {
@@ -145,11 +121,15 @@ export interface OperationsTally {
   cityValues: { log: number; ours: number; equal: number; equalBefore: number; firstMiss?: string; misses: string[] };
 }
 
-interface EvalTally { turns: number; turnsEqual: number; log: number; ours: number; logEnemy: number; firstMiss?: string; misses: string[] }
+interface EvalTally {
+  turns: number; turnsEqual: number; log: number; ours: number; logEnemy: number; firstMiss?: string; misses: string[];
+  /** per player>enemy, the first turn of a candidate against it: the log's, ours */
+  first: Record<string, [number | null, number | null]>;
+}
 
 const newFamily = (): FamilyTally => ({ turns: 0, turnsEqual: 0, kinds: Object.fromEntries(KINDS.map((k) => [k, { log: 0, ours: 0, turnsEqual: 0, turns: 0 }])),
   plots: 0, plotsEqual: 0, misses: [] });
-const newEvals = (): EvalTally => ({ turns: 0, turnsEqual: 0, log: 0, ours: 0, logEnemy: 0, misses: [] });
+const newEvals = (): EvalTally => ({ turns: 0, turnsEqual: 0, log: 0, ours: 0, logEnemy: 0, misses: [], first: {} });
 const newTally = (): OperationsTally => ({ families: Object.fromEntries(FAMILIES.map((f) => [f, newFamily()])),
   evals: newEvals(), warEvals: newEvals(), cityValues: { log: 0, ours: 0, equal: 0, equalBefore: 0, misses: [] } });
 
@@ -159,7 +139,10 @@ export class OperationsProbe {
   private readonly log: Map<string, string[]>;
   private readonly evalLog: Map<string, string[]>;
   private readonly cityValueLog: Map<string, [string, number][]>;
-  private readonly prepares: Map<number, [number, number][]>;
+  /** per seat, the view its operations' turn left and the players it was at
+   *  war with */
+  private readonly lastView = new Map<number, MajorView>();
+  private readonly wars = new Map<number, Set<number>>();
   private readonly ais = new Map<number, OpsAi>();
   /** the record unit keys of the last record state's engine units, by seat */
   private keys = new Map<number, string>();
@@ -174,7 +157,31 @@ export class OperationsProbe {
     this.log = readLog(`${logs}AI_Operation.csv`, () => true);
     this.evalLog = readLog(`${logs}AI_Operation_Eval.csv`, (r) => !/^-?\d+, (CITY VALUES|MINOR CIV LEVY),/.test(r));
     this.cityValueLog = readCityValues(`${logs}AI_Operation_Eval.csv`);
-    this.prepares = readPrepares(`${logs}AI_Diplomacy.csv`);
+  }
+
+  /** what the wars' desires and can-do read of the seats' operations */
+  warHooks(): WarHooks {
+    return {
+      // on the view the seat's operations' turn left (its knowledge base)
+      value: (view, owner, other, favoured) => {
+        const ai = this.ais.get(owner);
+        const v = this.lastView.get(owner) ?? view;
+        const records = (p: number) => (ai ? knownArmy(ai.army, p) : []);
+        return warValue(v, owner, other, favoured, {
+          army: (p) => (p === owner ? v.units(owner) : records(p)), records, turn: v.turn,
+        });
+      },
+      // on the view the seat's operations' turn left: their units' ids
+      ready: (_view, owner, other) => {
+        const ai = this.ais.get(owner);
+        const v = this.lastView.get(owner);
+        return !!ai && !!v && surpriseWarReady(ai, v, other);
+      },
+      notReady: (view, owner, other) => {
+        const ai = this.ais.get(owner);
+        if (ai) notReadyHook(ai, view, other);
+      },
+    };
   }
 
   get active(): boolean {
@@ -193,15 +200,18 @@ export class OperationsProbe {
   }
 
   /** at the pair's start, the AI's turn on record t (`state`, the import of
-   *  `rec`; `next` record t+1). Record t is read before the AI major's start
-   *  of turn: the units its cities finish at that start (a unit record t+1
-   *  holds that record t does not, of the type a city of the seat finishes
-   *  this turn) stand at their city as its turn begins. */
-  preTurn(rec: TurnRecord, state: GameState, next: TurnRecord): void {
+   *  `rec`; `next` record t+1, `nextState` its import). Record t is read
+   *  before the AI major's start of turn: the units its cities finish at that
+   *  start (a unit record t+1 holds that record t does not, of the type a
+   *  city of the seat finishes this turn) stand at their city as its turn
+   *  begins, the other cities bank the turn's production; what a city
+   *  produces once its turn's choice is made is record t+1's. */
+  preTurn(rec: TurnRecord, state: GameState, next: TurnRecord, nextState: GameState): void {
     if (!this.active) return;
     const keys = this.unitKeys(rec);
     const copy = structuredClone(state);
     const had = new Set(rec.units.map((u) => `${u.owner}:${u.id}`));
+    const built = new Map<number, { city: number; unit: number; type: string }[]>();
     for (const [seat, player] of this.seats) {
       const view = majorView(copy, this.inputs(copy.turn));
       const due = view.cityBuilds(seat).filter((b) => b.unitType && b.turnsLeft <= 1);
@@ -211,8 +221,17 @@ export class OperationsProbe {
         const k = type ? due.findIndex((b) => b.unitType === gameTypeOf('unit', type, 'UNIT_')) : -1;
         if (!type || k < 0) continue;
         const made = spawnUnit(copy, type, due[k].plot, seat);
-        if (made) keys.set(made.id, `${u.owner}:${u.id}`);
+        if (made) {
+          keys.set(made.id, `${u.owner}:${u.id}`);
+          built.set(seat, [...built.get(seat) ?? [], { city: due[k].city, unit: made.id, type: due[k].unitType! }]);
+        }
         due.splice(k, 1);
+      }
+      // the turn start's production: a city that finished its unit moves on
+      // to its next item, any other banks the turn's production
+      for (const c of citiesOf(copy, seat)) {
+        if ((built.get(seat) ?? []).some((b) => b.city === c.id)) c.queue = c.queue.slice(1);
+        else if (c.queue[0]) c.queue[0].progress += computeCityStats(copy, c).total.production;
       }
     }
     const byKey = new Map([...keys].map(([id, k]) => [k, id]));
@@ -229,18 +248,24 @@ export class OperationsProbe {
       if (!seatOf(copy, seat)) continue;
       let ai = this.ais.get(seat);
       if (!ai) this.ais.set(seat, (ai = newOpsAi(seat)));
-      // the diplomatic AI's preparations for war, from its log
-      for (const [from, target] of this.prepares.get(player) ?? []) {
-        const s = this.seatOfPlayer.get(target);
-        if (from <= turn && s !== undefined) prepareForWarWith(ai, s, true);
-      }
       let view = majorView(copy, this.inputs(turn));
+      const after = majorView(nextState, this.inputs(turn));
+      // a peace the seat made since its last turn (0x650890)
+      const now = new Set(view.players().filter((p) => p !== seat && view.atWar(seat, p)));
+      for (const p of this.wars.get(seat) ?? []) if (!now.has(p)) peaceMade(ai, p);
+      this.wars.set(seat, now);
       const out = operationsTurn(ai, {
         turn,
         view: () => view,
         act: (rows) => {
           applySeatUnitOrders(copy, seatOf(copy, seat) as Seat, rows);
           view = majorView(copy, this.inputs(turn));
+        },
+        built: built.get(seat) ?? [],
+        producing: (city) => {
+          const plot = view.cityBuilds(seat).find((b) => b.city === city)?.plot;
+          const k = after.cityBuilds(seat).findIndex((b) => b.plot === plot);
+          return k < 0 ? null : after.contractCities(seat)[k].current;
         },
       });
       const ours = out.lines.map(norm);
@@ -254,9 +279,10 @@ export class OperationsProbe {
         const ev = (this.evalLog.get(`${turn}:${player}`) ?? []).join(' | ');
         console.error(`   eval log  ${ev}\n   eval ours ${out.evals.join(' | ')}`);
         console.error(`   units ${view.units(seat).map((u) => `${u.id}:${u.type}@${u.plot}`).join(' ')}`);
-        console.error(`   contracts ${[...ai.contracts.values()].map((c) => `${c.id}:${c.unitType}:${c.state}:${c.turnsLeft}:op${c.op}:before[${c.before}]`).join(' ')}`);
+        console.error(`   contracts ${ai.book.contracts.map((c) => `${c.id}:${c.unit}:${c.progress}:tree${c.tree}:turns${c.turns}`).join(' ')}`);
         console.error(`   ops ${opsOf(ai).map((o) => `${o.def.name}#${o.id}[${o.teams.map((t) => t.members.join(',')).join('|')}]`).join(' ')}`);
       }
+      this.lastView.set(seat, view);
       this.compare(turn, player, ours);
       // the eval lines name the enemy by the game's player id
       const playerOf = new Map([...this.seatOfPlayer].map(([p, s]) => [s, p]));
@@ -337,6 +363,11 @@ export class OperationsProbe {
     const logs = all.filter(pick);
     const ours = mine.filter(pick);
     e.logEnemy += all.length - logs.length;
+    if (!noEnemy) {
+      const enemy = (l: string) => `${player}>${l.split(',')[0]}`;
+      for (const l of logs) (e.first[enemy(l)] ??= [null, null])[0] ??= turn;
+      for (const l of ours) (e.first[enemy(l)] ??= [null, null])[1] ??= turn;
+    }
     if (!logs.length && !ours.length) return;
     e.turns++;
     e.log += logs.length;
@@ -372,6 +403,7 @@ export function operationsMarkdown(t: OperationsTally): string[] {
   out.push(`Candidates against no enemy (AI_Operation_Eval.csv, enemy -1): turns ${e.turns}, every line equal ${e.turnsEqual}; lines log ${e.log}, ours ${e.ours}; first miss: ${e.firstMiss ?? '-'}.`);
   const w = t.warEvals;
   out.push('', `Candidates against an enemy (the war candidates): turns ${w.turns}, every line equal ${w.turnsEqual}; lines log ${w.log}, ours ${w.ours}; first miss: ${w.firstMiss ?? '-'}.`);
+  out.push('', `First war candidate per player>enemy (log / ours): ${Object.entries(w.first).map(([k, [a, b]]) => `${k} t${a ?? '-'} / t${b ?? '-'}`).join('; ') || '-'}.`);
   const cv = t.cityValues;
   out.push('', `CITY VALUES lines: log ${cv.log}, ours ${cv.ours}; equal (within 0.1) ${cv.equal}; ours equal to the log's of the turn before ${cv.equalBefore}; first miss: ${cv.firstMiss ?? '-'}.`);
   for (const family of FAMILIES) {

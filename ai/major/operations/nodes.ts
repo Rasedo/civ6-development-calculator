@@ -10,24 +10,11 @@ import { BT_ERROR, BT_FAILURE, BT_FRESH, BT_RUNNING, BT_SUCCESS, dataBool, dataF
   type BtHandler, type BtRun } from '../../../cpu/core/behaviorTree';
 import { NO_PLOT, addMember, hasAiType, memberStrength, moveTo, opUnits, targetGone, teamReady, unitsById, xy, type Operation } from './operation';
 import { desiredStrength, recruitOperation } from './recruit';
-import { ASSAULT_NODES, attackUnitsExecute, updateTeam } from './assault';
+import { ASSAULT_NODES, attackUnitsExecute, operationAttackExecute, updateTeam } from './assault';
 import { canFoundAt } from '../settle';
 import type { MajorUnitView, MajorView } from '../view';
-
-/** a production request an operation's Build Unit made (a CityBuildAI
- *  contract): Submitted until a city takes it up, Building while one does,
- *  Done once its unit stands, Failed when dropped */
-export interface Contract {
-  id: number;
-  unitType: string;
-  state: 'submitted' | 'building' | 'done' | 'failed';
-  /** the building city's turns to finish, -1 while none builds it */
-  turnsLeft: number;
-  /** the units of the type the seat held when it was made */
-  before: number[];
-  /** the operation it was made for: its unit joins it when built */
-  op: number;
-}
+import { CP_ACCEPTED, CP_CLAIMED, CP_IN_PROGRESS, CP_SUBMITTED, buildUnitNode, contractManagerNode, treeContractOf,
+  type ContractNodeWorld } from '../../../cpu/core/aiContracts';
 
 /** a request an operation's Operation Diplomacy made of the diplomatic AI
  *  (a diplomatic contract, contract manager +0x368 type 4): the
@@ -53,8 +40,8 @@ export interface OpsContext {
   assigned(): ReadonlySet<number>;
   /** the seat's other operations */
   others(): readonly Operation[];
-  contracts: Map<number, Contract>;
-  newContract(unitType: string): Contract;
+  /** what the shared contract nodes read of the operation's tree */
+  contractWorld(): ContractNodeWorld;
   /** the seat's diplomatic requests standing, by id */
   diplomacy: ReadonlyMap<number, DiplomacyRequest>;
   requestDiplomacy(action: string, enemy: number, value: number): number;
@@ -182,89 +169,6 @@ const findAvailableUnit: BtHandler<OpsContext> = {
   },
 };
 
-// CONTRACT MANAGER DECORATOR (0x7f17a0 update, 0x7f1500 child)
-const contractManager: BtHandler<OpsContext> = {
-  update(node, run, ctx) {
-    const m = run.mem[node.index];
-    const contractTag = dataTag(node, 'Contract');
-    const turnLimit = dataInt(node, 'Turn Limit');
-    const remaining = dataInt(node, 'Turns Remaining') ?? -1;
-    if (!contractTag || turnLimit === undefined) return BT_ERROR;
-    const block = dataBool(node, 'Block While Running') ?? true;
-    m.next = node.firstChild;
-    m.counter = ((m.counter as number | undefined) ?? 0) + 1;
-    const over = (m.counter as number) > turnLimit && turnLimit >= 0;
-    // each contract's check (0x7f2220): in progress, the turn limit past
-    // cancels it (FAILURE), else it is not alive; done, it SUCCEEDS where the
-    // decorator blocks or counts turns remaining; gone, it FAILS
-    let status = BT_FRESH;
-    let alive = true;
-    let near = false;
-    let has = false;
-    const id = run.blackboard.get(contractTag);
-    const c = typeof id === 'number' ? ctx.contracts.get(id) : undefined;
-    if (c) {
-      if (c.state === 'submitted' || c.state === 'building') {
-        if (over) {
-          c.state = 'failed';
-          status = status === BT_RUNNING ? BT_RUNNING : BT_FAILURE;
-        }
-        if (block && status === BT_SUCCESS) status = BT_RUNNING;
-        alive = false;
-      } else if (c.state === 'done') {
-        if (block || remaining >= 0) status = Math.max(status, BT_SUCCESS);
-      } else {
-        run.blackboard.delete(contractTag);
-        status = Math.max(status, BT_FAILURE);
-      }
-      has = true;
-      if (remaining >= 0 && c.turnsLeft >= 0 && c.turnsLeft <= remaining) near = true;
-    }
-    if (alive) m.counter = 0;
-    if (status === BT_FAILURE) {
-      if (c) c.state = 'failed';
-      m.next = node.end;
-      return BT_FAILURE;
-    }
-    if (status === BT_SUCCESS) {
-      if (block) m.next = node.end;
-      return BT_SUCCESS;
-    }
-    if (block && (status === BT_RUNNING || has)) {
-      m.next = node.end;
-      return BT_RUNNING;
-    }
-    if (remaining < 0) return status;
-    if (near) return BT_FRESH;
-    m.next = node.end;
-    return BT_RUNNING;
-  },
-  child(_node, _run, own, s) {
-    const v = Math.max(own === BT_FRESH ? s : own, s);
-    return { own: v, finished: v !== BT_FRESH };
-  },
-  next(node, run) {
-    return (run.mem[node.index].next as number | undefined) ?? node.firstChild;
-  },
-};
-
-// BUILD UNIT (0x7f4e00): the operation's production request, a contract
-// for the first of the desired units; RUNNING while it stands
-const buildUnit: BtHandler<OpsContext> = {
-  update(node, run, ctx) {
-    const tag = dataTag(node, 'Contract ID');
-    const id = tag ? run.blackboard.get(tag) : undefined;
-    if (typeof id === 'number' && ctx.contracts.get(id)) return BT_RUNNING;
-    const listTag = dataTag(node, 'Desired Units');
-    const listed = listTag ? run.blackboard.get(listTag) : undefined;
-    if (!Array.isArray(listed) || listed.length === 0) return BT_FAILURE;
-    const type = String(listed[0]);
-    const c = ctx.newContract(type);
-    if (tag) run.blackboard.set(tag, c.id);
-    return BT_RUNNING;
-  },
-};
-
 // RECRUIT UNITS (0x81c820 update; the recruit 0x60a8c0 -> 0x738050)
 const recruitUnits: BtHandler<OpsContext> = {
   update(node, run, ctx) {
@@ -304,10 +208,13 @@ const recruitUnits: BtHandler<OpsContext> = {
   },
 };
 
-/** the unit type of the operation's open production request, null for none */
+/** the unit type of the operation's open production request (a contract
+ *  of its tree still before COMPLETED), null for none */
 function contractFor(ctx: OpsContext): string | null {
-  for (const c of ctx.contracts.values()) {
-    if (c.op === ctx.op.id && (c.state === 'submitted' || c.state === 'building')) return c.unitType;
+  const w = ctx.contractWorld();
+  for (const id of ctx.op.contracts) {
+    const c = treeContractOf(w.book, w.tree, id);
+    if (c?.unit && [CP_CLAIMED, CP_SUBMITTED, CP_ACCEPTED, CP_IN_PROGRESS].includes(c.progress)) return c.unit;
   }
   return null;
 }
@@ -643,15 +550,15 @@ export const OP_NODES: Readonly<Record<string, BtHandler<OpsContext>>> = {
   'Operation Defend Units': success,
   'Operation Change Target': changeTarget,
   'Find Available Unit': findAvailableUnit,
-  'Contract Manager Decorator': contractManager,
-  'Build Unit': buildUnit,
+  'Contract Manager Decorator': contractManagerNode<OpsContext>((ctx) => ctx.contractWorld()),
+  'Build Unit': buildUnitNode<OpsContext>((ctx) => ctx.contractWorld()),
   'Recruit Units': recruitUnits,
   'Operation Move': operationMove,
   'Lock Units': lockUnits,
   'Make Formation': makeFormation,
   'Operation Attack Units': { ...operationAttackUnits, execute: attackUnitsExecute },
   ...ASSAULT_NODES,
-  'Operation Attack': operationAttack,
+  'Operation Attack': { ...operationAttack, execute: operationAttackExecute },
   'Naval Patrol': navalUnitsRunning,
   'Naval Pillage': navalUnitsRunning,
   'Naval Choose Target': navalChooseTarget,

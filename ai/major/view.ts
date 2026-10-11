@@ -8,6 +8,7 @@
  * is the shared `AiValueView`.
  */
 import type { AiValueView } from '../../cpu/core/aiValue';
+import type { ContractCity } from '../../cpu/core/aiContracts';
 
 export interface MajorSlotView {
   /** the slot's GovernmentSlotType */
@@ -74,11 +75,15 @@ export interface MajorUnitView {
   baseMoves: number;
   /** its bombard strength, 0 for none */
   bombard: number;
+  /** its domain (Units +0x650): land, sea or air */
+  domain: 'land' | 'sea' | 'air';
 }
 
 /** what a city of the seat produces: the UnitType in its queue's head (null
  *  for anything else) and the turns to finish it */
 export interface MajorCityBuildView {
+  /** the city's id */
+  city: number;
   plot: number;
   unitType: string | null;
   turnsLeft: number;
@@ -332,6 +337,10 @@ export interface MajorView extends AiValueView {
   /** the seat's handicap, a Difficulties index */
   handicap(seat: number): number;
   techCount(seat: number): number;
+  /** the technologies the seat holds, install types */
+  techsHeld(seat: number): ReadonlySet<string>;
+  /** PlayerStats' m_iMilitaryStrength (0x4bb1e0) */
+  militaryStrength(seat: number): number;
   /** the seat's gold in its treasury */
   treasury(seat: number): number;
   /** the mission `owner` may send `other` now, as the game's CanDoAction
@@ -345,7 +354,7 @@ export interface MajorView extends AiValueView {
    *  not carry */
   actionOpen(owner: number, other: number, action: string): boolean | null;
   /** the game's CanDeclareWarOn from `owner` on `other`: a surprise war, or a
-   *  formal one with `formal` */
+   *  formal one with `formal`; on a city-state its own war */
   warOpen(owner: number, other: number, formal: boolean): boolean;
   /** the pair's standing declared friendship (the alliance: `allied`) */
   declaredFriends(a: number, b: number): boolean;
@@ -398,6 +407,11 @@ export interface MajorView extends AiValueView {
   // THE OPERATIONS' VIEW (ai/major/operations/)
   /** what each of the seat's cities produces */
   cityBuilds(seat: number): readonly MajorCityBuildView[];
+  /** the seat's cities as the contracts read them (aiContracts.ts): the
+   *  item each produces, what it may train, its turns to build an item; the
+   *  CityBuildAI's threat flag (+0x1b8), its production turn (+0x2600) and its
+   *  values (+0xa48, the analysis) unread for a major and none */
+  contractCities(seat: number): readonly ContractCity[];
   /** the seat's best combat strength (PlayerStats +0xf0, 0x4d9320: the
    *  strongest melee strength it has trained, m_iMaxMeleeStrengthTrained) */
   bestCombatStrength(seat: number): number;
@@ -457,4 +471,54 @@ export interface MajorView extends AiValueView {
   /** the unit action column that strikes the plot from where the unit stands
    *  (ATTACK_d beside it, SNIPE_k / SNIPE3_k at range), -1 for none */
   strikeColumn(unitId: number, plot: number): number;
+  // THE WAR DESIRES' VIEW (ai/major/operations/warValue.ts)
+  /** the unit a civilian of the install type becomes captured
+   *  (UnitCaptures BecomesUnitType), null for none */
+  capturedAs(unitType: string): string | null;
+  /** the military AI's yardstick B: max(1, the strongest melee trained,
+   *  max(the strongest ranged trained, COMBAT_MINIMUM_CITY_STRIKE_STRENGTH)) */
+  militaryYardstick(seat: number): number;
+  /** the seat's weapons of mass destruction held */
+  wmdCount(seat: number): number;
+  /** the city-state's suzerain, -1 none */
+  suzerainOf(cityState: number): number;
+  /** the most envoys any player holds in the city-state
+   *  (GetMostTokensReceived 0x44c4b0) */
+  mostEnvoys(cityState: number): number;
+  // THE ASSAULT EXECUTIONS' VIEW
+  /** the unit planning's spot for a plot (0x791300 -> 0x78fa10): the first
+   *  plot of its reach (in the planning's order) exactly `range` from the
+   *  plot, within `turns`, with Movement left there where `needMoves` asks,
+   *  that no other unit of its kind holds (its own plot aside); -1 none */
+  planSpot(unitId: number, plot: number, turns: number, needMoves: boolean, range: number): number;
+  /** the unit planning's spots against the target on the plot (its entry,
+   *  +0x48): each spot and its turns, in the planning's order */
+  attackSpots(unitId: number, plot: number): readonly { plot: number; turns: number }[];
+  /** the units on the plot (Plot +0x4c) */
+  plotUnitCount(plot: number): number;
+  /** the plot beside one in the game's direction (0 NORTHEAST .. 5
+   *  NORTHWEST), -1 off the map */
+  adjacentPlot(plot: number, dir: number): number;
+  /** a river runs on the plot's edge in the game's direction */
+  riverEdge(plot: number, dir: number): boolean;
+  /** the city centre on the plot is encircled (its heal stopped) */
+  encircled(plot: number): boolean;
+  /** the unit planning's reach of a plot (0x793300): its turns and its
+   *  Movement left there; null out of reach */
+  reachOf(unitId: number, plot: number): { turns: number; moves: number } | null;
+  /** the unit exerts a zone of control (0x56d6c0: not embarked, +0x1410) */
+  exertsZoc(unitId: number): boolean;
+  /** the improvements Improvements marks CanBuildOutsideTerritory with a
+   *  DefenseModifier (+0x108 bit 0x40, +0x34 above 0), install types */
+  defensiveImprovements(): readonly string[];
+  /** the air unit's strike on the plot (AIR_STRIKE_k, or AIR_PILLAGE_k on
+   *  an improvement) as its action column, -1 out of its reach */
+  airStrikeColumn(unitId: number, plot: number, improvement: boolean): number;
+  /** the plots the air unit may rebase to, each with its action column */
+  rebaseOptions(unitId: number): readonly { plot: number; column: number }[];
+  /** the unit's build charges left (+0xed0) */
+  buildCharges(unitId: number): number;
+  /** the unit is of the improvement's ValidBuildUnits and the seat may build
+   *  it (0x35ede0: its unlock) */
+  unitBuildsImprovement(seat: number, unitId: number, improvement: string): boolean;
 }

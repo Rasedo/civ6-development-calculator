@@ -17,8 +17,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import {
   ACTION_ALLIANCE, ACTION_DELEGATION, ACTION_DEMAND_TRIBUTE, ACTION_EMBASSY, ACTION_FRIENDSHIP, ACTION_OPEN_BORDERS,
-  ACTION_SURPRISE_WAR, actionCost, aiActionsIn, dealStruck, desire, type DiploActionMemory, focusTurn, newDiploActionGaps,
-  newDiploActionMemory, performAction, performFriendship, pickActions, preference, recordAnswer, senderOf, threat,
+  ACTION_SURPRISE_WAR, ACTION_WAR_MINOR, actionCost, aiActionsIn, dealStruck, desire, type DiploActionMemory, focusTurn,
+  minorWarDesire, newDiploActionGaps, newDiploActionMemory, performAction, performFriendship, pickActions, preference,
+  recordAnswer, senderOf, threat,
   type DesireInputs, type PickedAction, type PickInputs,
 } from '../../ai/major/diploActions';
 import type { KnownCity } from '../../ai/major/knowledge';
@@ -28,6 +29,21 @@ import { FX } from '../core/aiValue';
 import { DEAL_FRIENDSHIP, DEAL_MISSION, DELEGATION_COST, EMBASSY_COST } from '../data/seats';
 import type { GameState } from '../core/types';
 import type { MajorView } from '../../ai/major/view';
+import { AI_RATE } from '../core/aiValue';
+import { envoyValue } from '../core/aiModifiers';
+
+/** what the wars' desires and can-do read of the operations' AI (the
+ *  military AI's war value inputs, its war operation 0x723db0, its
+ *  PrepareForWarWith through the not-ready hook) */
+export interface WarHooks {
+  /** the war value of `owner`'s war on `other` (0x7b7760) */
+  value(view: MajorView, owner: number, other: number, favoured: boolean): number;
+  /** a war operation of `owner` against `other` ready, a member within 2 of
+   *  its march point (0x723db0(other, 1, 2, 5)) */
+  ready(view: MajorView, owner: number, other: number): boolean;
+  /** the war declaration's not-ready hook (0x6742d0) */
+  notReady(view: MajorView, owner: number, other: number): void;
+}
 
 /** a logged action row: desire and cost per other player, x 10 rounded */
 type ActionLog = Map<string, [number, number]>;
@@ -74,6 +90,19 @@ function readDeals(path: string): Map<number, [number, number][]> {
   return out;
 }
 
+/** the record's war declarations (DiplomacySummary.csv "Individual
+ *  Declaring War on Team START"): `t<turn> <declarer>><team>`, its kind */
+function readWars(path: string): string[] {
+  const out: string[] = [];
+  if (!existsSync(path)) return out;
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const c = line.split(',').map((x) => x.trim());
+    if (c[3] !== 'Individual Declaring War on Team START') continue;
+    out.push(`t${c[0]} ${c[1]}>${c[2].replace(/^Team /, '')} ${c[4]}`);
+  }
+  return out;
+}
+
 /** a proposal of the record (player ids) */
 export interface RecordProposal { kind: 'delegation' | 'embassy'; from: number; to: number; accepted: boolean }
 
@@ -88,6 +117,10 @@ export interface SenderTally {
   kinds: Record<string, SenderKindTally>;
   /** turns an AI major's pick was taken by an action the engine cannot send */
   unsent: Record<string, number>;
+  /** the wars the port's picks declare: owner>other at the turn, player ids */
+  wars: string[];
+  /** the record's declarations by the AI majors */
+  recordWars: string[];
   /** logged desire / cost lines of the read actions, equal to 0.1 */
   desireLines: number;
   desireEqual: number;
@@ -108,7 +141,20 @@ export class DiploSender {
   private readonly gaps = newDiploActionGaps();
   private readonly log: { actions: ActionLog; threats: Map<string, number> } | null;
   private readonly deals: Map<number, [number, number][]>;
-  readonly tally: SenderTally = { kinds: {}, unsent: {}, desireLines: 0, desireEqual: 0, costLines: 0, costEqual: 0,
+  /** the operations' AI the wars read, null where the replay runs none */
+  war: WarHooks | null = null;
+  /** per owner>other, the turn the owner's diplomatic entry for the other
+   *  was made (the turn it met it) */
+  private readonly entries = new Map<string, number>();
+
+  /** the owner's entry for the other made this turn: the pick passes it
+   *  over (its +0x1a, unchanged this turn, unset) */
+  private fresh(view: MajorView, turn: number, owner: number, other: number): boolean {
+    const k = `${owner}>${other}`;
+    if (!this.entries.has(k) && view.metTurn(owner, other) !== null) this.entries.set(k, turn);
+    return this.entries.get(k) === turn;
+  }
+  readonly tally: SenderTally = { kinds: {}, unsent: {}, wars: [], recordWars: [], desireLines: 0, desireEqual: 0, costLines: 0, costEqual: 0,
     threatLines: 0, threatEqual: 0, byAction: {}, misses: [], gaps: {} };
 
   /** `seats`: the AI majors, seat -> the record's player id; `player`: any
@@ -118,6 +164,8 @@ export class DiploSender {
     const base = dumpPath.replace(/\.jsonl$/, '.logs/');
     this.log = existsSync(base + 'AI_Diplomacy.csv') ? readActionLog(base + 'AI_Diplomacy.csv') : null;
     this.deals = readDeals(base + 'DiplomacySummary.csv');
+    const pids = new Set([...seats.values()].map(String));
+    this.tally.recordWars = readWars(base + 'DiplomacySummary.csv').filter((w) => pids.has(w.split(' ')[1].split('>')[0]));
   }
 
   /** the majors' sending memory, which the state turn's transitions read */
@@ -144,9 +192,10 @@ export class DiploSender {
     const theirs = known.filter((k) => k.owner === other).map((k) => k.plot);
     let d: number | null = null;
     for (const a of own) for (const b of theirs) d = Math.min(d ?? Infinity, view.plotDistance(a, b));
-    // the port's operations AI runs no war operation
+    const war = this.war;
     return { state: st, delegationPrice: DELEGATION_COST, embassyPrice: EMBASSY_COST, distance: d,
-      nearVictory: this.nearVictory(turn, owner, other), warOperation: false };
+      nearVictory: this.nearVictory(turn, owner, other), warOperation: war ? war.ready(view, owner, other) : false,
+      war: war ? (favoured) => war.value(view, owner, other, favoured) : null };
   }
 
   /** the deals the record's majors struck at `turn` by `owner`'s proposal:
@@ -170,7 +219,8 @@ export class DiploSender {
    */
   turn(state: GameState, turn: number, inputs: MajorViewInputs,
        stateOf: (owner: number, other: number) => string | null, agendasOf: (seat: number) => readonly string[],
-       known: (seat: number) => readonly KnownCity[]): (PickedAction & { owner: number })[] {
+       known: (seat: number) => readonly KnownCity[],
+       opinionOf: (owner: number, other: number) => number): (PickedAction & { owner: number })[] {
     const view = majorView(state, inputs);
     const out: (PickedAction & { owner: number })[] = [];
     for (const [owner, pid] of this.seats) {
@@ -184,15 +234,65 @@ export class DiploSender {
         ins.set(other, this.pickInputs(view, turn, owner, other, st, known(owner)));
         this.score(view, owner, pid, other, turn, ins.get(other)!, agendasOf(owner));
       }
-      const picks = pickActions(view, this.mem, owner, ins, agendasOf(owner), this.gaps);
+      const war = this.war;
+      for (const other of view.majors()) if (other !== owner) this.fresh(view, turn, owner, other);
+      const picks = pickActions(view, this.mem, owner, ins, agendasOf(owner), this.gaps, (o) => {
+        if (!this.fresh(view, turn, owner, o)) war?.notReady(view, owner, o);
+      });
+      if (war) picks.push(...this.minorWars(view, turn, owner, pid, agendasOf(owner), war, (q) => opinionOf(owner, q)));
       for (const p of picks) {
         if (p.action === ACTION_DELEGATION || p.action === ACTION_EMBASSY) out.push({ ...p, owner });
+        else if (p.action === ACTION_SURPRISE_WAR || p.action === ACTION_WAR_MINOR) this.tally.wars.push(`t${turn} ${pid}>${this.player.get(p.target)}`);
         else this.tally.unsent[p.action] = (this.tally.unsent[p.action] ?? 0) + 1;
       }
       this.strike(turn, owner);
     }
     this.tally.gaps = Object.fromEntries(this.gaps.unread);
     return out;
+  }
+
+  /**
+   * THE CITY-STATES IN THE PICK, their war alone (the other actions of a
+   * city-state's states unread): per city-state met before this turn, the
+   * war's desire
+   * (0x66d9d0), scored against the log; passed over disfavoured or at 0 and
+   * below; the game refusing the war, invalid; its operation not ready, the
+   * not-ready hook; else picked.
+   */
+  private minorWars(view: MajorView, turn: number, owner: number, pid: number, agendas: readonly string[], war: WarHooks,
+                    opinion: (major: number) => number): PickedAction[] {
+    const out: PickedAction[] = [];
+    for (const cs of view.cityStateSeats()) {
+      if (view.metTurn(owner, cs) === null || view.atWar(owner, cs)) continue;
+      const pref = preference(view, owner, agendas, ACTION_WAR_MINOR);
+      const tokens = view.envoys(cs, owner);
+      const d = minorWarDesire(view, owner, cs, pref, (fav) => war.value(view, owner, cs, fav),
+        (start, horizon) => envoyValue({ view, seat: owner, start, horizon, rate: AI_RATE }, cs, tokens), opinion);
+      this.scoreOne(turn, pid, this.player.get(cs), ACTION_WAR_MINOR, d);
+      if (this.fresh(view, turn, owner, cs) || pref < 0 || d <= 0) continue;
+      if (!view.warOpen(owner, cs, false)) continue;
+      if (!war.ready(view, owner, cs)) {
+        war.notReady(view, owner, cs);
+        continue;
+      }
+      out.push({ target: cs, action: ACTION_WAR_MINOR, desire: d });
+    }
+    return out;
+  }
+
+  /** one desire against the log's row */
+  private scoreOne(turn: number, pid: number, oid: number | undefined, action: string, d: number): void {
+    const logged = this.log?.actions.get(`${turn}:${pid}:${action}:${oid}`);
+    if (!logged || (logged[0] === 0 && logged[1] === 0)) return;
+    const row = (this.tally.byAction[action] ??= [0, 0, 0, 0]);
+    this.tally.desireLines++;
+    row[0]++;
+    if (Math.abs(d / 256 - logged[0]) < 0.051) {
+      this.tally.desireEqual++;
+      row[1]++;
+    } else if (this.tally.misses.length < 40) {
+      this.tally.misses.push(`t${turn} ${pid}->${oid} ${action.replace('DIPLOACTION_', '')}: ours ${(d / 256).toFixed(2)} log ${logged[0]}`);
+    }
   }
 
   /** the mission's offer as the owner's action (the perform) */
@@ -285,6 +385,7 @@ export function senderMarkdown(t: SenderTally): string[] {
   const out = ['', '## The majors\' AI: diplomatic sending (ai/major/diploActions.ts)', '',
     '| kind | record | port | matching | first divergence |', '|---|---:|---:|---:|---|'];
   for (const [k, v] of Object.entries(t.kinds)) out.push(`| ${k} | ${v.record} | ${v.port} | ${v.matching} | ${v.firstDivergence ?? '-'} |`);
+  out.push('', `- War declarations: the port's picks ${t.wars.length ? t.wars.join(', ') : 'none'}; the record's ${t.recordWars.length ? t.recordWars.join(', ') : 'none'}.`);
   out.push('', `- Picks taken by an action the engine does not send: ${JSON.stringify(t.unsent)}.`,
     `- Logged desires of the read actions: ${t.desireEqual} / ${t.desireLines} equal; costs ${t.costEqual} / ${t.costLines}; threats ${t.threatEqual} / ${t.threatLines}.`,
     `- Per action (desires, costs): ${Object.entries(t.byAction).map(([a, [n, e, cn, ce]]) => `${a.replace('DIPLOACTION_', '')} ${e} / ${n}, ${ce} / ${cn}`).join('; ')}.`,

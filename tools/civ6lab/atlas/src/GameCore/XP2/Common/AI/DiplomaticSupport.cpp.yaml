@@ -217,6 +217,7 @@
   impl: [ai/major/diploState.ts:transitionAction]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   review: reviewed
 - addr: 0x681e80
   final: 0x4529c0

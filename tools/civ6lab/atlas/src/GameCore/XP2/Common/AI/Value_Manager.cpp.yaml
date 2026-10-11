@@ -243,11 +243,14 @@
       turn: 20
       value: Caguana 112 for two envoys
   impl:
+    - ai/major/diploActions.ts:ENVOY_WORTH_START
+    - ai/major/diploActions.ts:minorWarDesire
     - cpu/core/aiModifiers.ts:ANALYZERS
     - cpu/core/aiModifiers.ts:ValueTerms
     - cpu/core/aiModifiers.ts:envoyValue
   readings:
     - "C-97: the governor AI — the analysis, the choice and the seats READ, the analyzers PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - ..._GOVERNOR_ADJUST_CITY_TOKENS_GRANTED 0x6b2850 (the context city's owner's envoys' worth 0x7a46c0 at Amount), EFFECT_ADJUST_SPACE_RACE_PROJECTS_PRODUCTION 0x6be2d0 (the context city's...
     - "- AN ENVOYS' WORTH (0x7a46c0(n, rate, start, horizon, the player, the city-state, the city-state's +0x1280 +0x6868 l..."

@@ -161,6 +161,17 @@
   context:
     - "...gth (+0x78) x 0.01, SpreadCharges (+0x7c) or ReligiousHealCharges (+0x74) by the counts 0x4be880, 0 with no majority religion (0x4681c0 +0x1c0) — and PSEUDOYIELD_TOURISM terms (ParkCha..."
   review: imported
+- addr: 0x4bf200
+  final: 0x5147d0
+  kind: function
+  status: PARTLY
+  impl: [ai/major/operations/warValue.ts:KNOWN_WMD]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  notes: ["imported: READ in its section, no confirming case found beside it"]
+  context:
+    - "...re its negative passes the value; with any known WMD of the player (PlayerStats +0x11f0 0x4bf200) or the diplomacy's +0xf30 flag: -10000 without the owner's own, then at most 0; with t..."
+  review: imported
 - addr: 0x4bf7c0
   kind: function
   status: PARTLY

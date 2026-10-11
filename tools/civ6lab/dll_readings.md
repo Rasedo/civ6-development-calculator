@@ -4062,7 +4062,10 @@ operations' contracts, the improvement values below, the purchases).
   it (vt +0x98 0x5f6050) lists it (+0x3a8), logs its SUBMITTED line, and
   clears its production (0x175d10) where the value passes CityBuildAI
   +0xa48 and the production was set this turn or the last (city +0x2600);
-  any taker makes it ACCEPTED. 0x5d4d70's head: an ACCEPTED contract the
+  the economic AI's listener 0x68ab40 takes a unit or building contract
+  it may buy with gold; any taker makes it ACCEPTED (SUBMITTED lines 259
+  exact before the economic AI's listener, 283 with it; queue lines 133,
+  COMPLETED 127 both). 0x5d4d70's head: an ACCEPTED contract the
   city may take is valued (vt +0x68 0x5f5d50: the higher of its value and
   the city's analysis value; districts always "producing") and held in hand
   (+0x398) where higher; any other logs its line (vt +0xa8 0x5f4cd0) and
@@ -6057,9 +6060,9 @@ AI_Knowledge.csv).
   player in AI_Diplomacy.csv, or later (1117 China -> 3: desire t18, eval
   t20; 1127 -> 3: t48, t49; eleven pairs over the five verbose duels), and
   it stays (1117 China's candidates against Caguana t20 .. t56 with no war
-  declared and the desires negative from t21). The replay sets it two
-  turns after the first desire, a LAB fit (1117 t18 -> t20, t32 -> t34;
-  1121 t29 -> t31; 1127 -> 3 the one pair a turn after).
+  declared and the desires negative from t21). The replay sets it from
+  the pick's hook ("the war desires, the war operation's readiness and the
+  assault's executions" below).
 - THE DISTRICT WALK (0x747230, COMBAT_DISTRICT / PASSIVE): an enemy needed;
   each known city of the enemy with a valid plot; TargetParameter 0 skips a
   city whose districts' defenses and walls (0x5eb600: per district +0x14 > 0
@@ -6237,18 +6240,159 @@ AI_Knowledge.csv).
   502, 176 / 528, 72 / 799, 72 / 695, 21 / 356, the misses the knowledge
   base's army memory and the lead's per-city sources. The log's candidates
   fall silent on turns the desire holds (1117 China -> 3: 46 eval turns
-  over 228 desire turns), unread. The assignment weighs the unit targets
-  only (a district target's health in 0x7704e0 unread).
+  over 228 desire turns), unread.
 - PARTLY READ / unread (AUDIT C-97): the +0xd18 gate flag; the trade AI's
   city list (CityBuildAI +0x870: the port takes every known city); the land
   strength +0x2d0's writer; the loyalty lead's per-city sources (0x19b5f0,
   0x19bbb0, 0x19b820); the culture AI's great-work values (+0x7b8); the war
-  record +0xc's writer; the team update's danger and attack strengths; the
-  executions of Siege City (0x811e80), Pillage (0x811390), Build Military
-  Improvement (0x7e9120), Air Assault (0x80fb50), Attack City (district
-  targets in the assignment); the war declarations' desire functors (the
-  replay feeds PrepareForWarWith from AI_Diplomacy.csv); Is City Threatened
-  and Garrison City (City Defense's tree, its start 0x5cced0).
+  record +0xc's writer; the team update's danger and attack strengths; Is
+  City Threatened and Garrison City (City Defense's tree, its start
+  0x5cced0).
+
+## C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread
+
+Ported in `ai/major/operations/warValue.ts` (the war value),
+`ai/major/diploActions.ts` (the Surprise War's and the city-state war's
+desires, the pick's not-ready hook), `ai/major/operations/manager.ts`
+(PrepareForWarWith from the hook, the readiness 0x723db0, the contracts on
+`cpu/core/aiContracts.ts`), `ai/major/operations/assault.ts` (the
+executions), `cpu/core/aiAssignment.ts` (the generalized assignment) and
+`cpu/core/tactical.ts` (the district targets); measured by the replay's
+DiplomaticSender (the desire rows, the war declarations) and
+OperationsProbe (the first war candidate per player and enemy, the
+execution families) on runs/h1_duelv1117 / 1121 / 1124 / 1127 / 1128.
+
+- THE CHAIN FROM A DESIRE TO THE FLAG: the pick 0x64ba90 walks each action
+  toward a player whose desire is above 0: CanDoAction (0x3dd9a0) failing
+  is "action invalid"; passing it, 0x672ef0 (the not-ready flag +0x6390
+  0x650460, then the action's can-do functor 0x672e40) false is "not
+  ready" and calls the action's +0x68 hook through 0x6744a0 — for the war
+  declarations 0x6742d0: where the majors of the +0xfa0 list the owner
+  fights or is prepared against (0x672bb0) number at most the +0xb50
+  list's size >> 1 and the player is neither a declared friend (0x3da770)
+  nor an ally (0x3da560), PrepareForWarWith(player, 1) (0x724f30). The
+  pick skips a player whose entry it made this turn (+0x1a). The flag
+  clears in 0x650890 (a game signal's handler between the two, taken as
+  their peace; it also completes the operations whose enemy the owner no
+  longer fights, +0x138 below 4) and OnDenouncePlayer (0x681c10) sets it.
+  The AI's turn (the callbacks of 0x6096c0 in push order) runs the
+  diplomacy (0x64ba90) before the operations (0x722690). The replay's
+  sender and OperationsProbe share the seat's operations AI: the fitted
+  feed from AI_Diplomacy.csv is gone.
+- THE WAR VALUE (0x7b7760) = the spoils 0x7b7ab0 + the balance 0x7b7830
+  unless the war is favoured + 0x7b87b0 where a casus belli is named (its
+  amount 0 in the declarations' calls). THE SPOILS: the largest current
+  unit cost (m_aCurrentUnitCost) of what a known civilian of the player
+  becomes when captured (UnitCaptures BecomesUnitType); each known city of
+  the player valued (0x79fef0) x (1 + 0.02 x GrandStrategic +0x204), sorted
+  ascending, summed v_i / rank, the rank from n + 1 down to 2 (a negative
+  value skipped, its rank spent); x 0.5 per other major and x 0.8 per
+  city-state the owner fights where the player is a major, x 0.75 / x 0.9
+  where it is a city-state; x 1.25 per major and x 1.1 per city-state the
+  player fights; the war record (knowledge base +0x668[p] +0xc) a floor
+  where positive, a cut to 0 where its negative passes the value; with any
+  known WMD of the player (PlayerStats +0x11f0 0x4bf200) or the diplomacy's
+  +0xf30 flag: -10000 without the owner's own, then at most 0; with the
+  owner's and none of the player's, at least 0; nothing known -9999.
+  THE BALANCE: S, T the two players' military strengths (+0x210), R the
+  military AI's m_regionalMilitaryStrength[p] (mil +0x588, 0x71fb80's
+  second loop: the knowledge base's records of the player's units seen
+  within two turns in the areas of the owner's cities, each max(Combat,
+  RangedCombat) where it passes the yardstick less 20): -R where T / 4 > R,
+  else -min(S, T) where T + 30 > S; + (S - T) x (2 where S <= T, else 1);
+  + the deal items between them (0x64d320).
+- THE CITY-STATE WAR'S DESIRE (0x66d9d0): -9999 disfavoured; else the war
+  value (favoured where the preference is +1); at most one envoy there:
+  less, unfavoured, the envoys' worth (0x7a46c0: start 5, the horizon
+  m_valueHorizons[1]) and 800 allied with its suzerain / 200 a declared
+  friend of it; more envoys: 0 unless the most envoys any player holds
+  there pass the owner's by more than 2 (unfavoured; 0 favoured), then the
+  war value favoured, else where the suzerain is a major the owner regards
+  below -5 or fights.
+- THE READINESS (0x723db0(p, needReady, dist, slot)): the first active
+  operation (+0x318, 0x73a840) against p decides: with needReady, ready
+  (0x73aa60: +0x5d0, its contract gone, or every team ready 0x73ab20) or
+  its units may be built (+0x630, the data of autovar +0x5d8 that Operation
+  Diplomacy sets on Desires War); slot -1 yes; else a living member of a
+  team (+0x230, 0x118 each; members +0x18) within dist of the team's goal
+  slot (+0xe8 + 8 x slot). The wars' can-do 0x673800: CanDeclareWarOn and,
+  flagged, 0x723db0(p, 1, 2, 5) — a member within 2 of the march point.
+- THE CONTRACTS of the operations' trees are the city build AI's
+  (`cpu/core/aiContracts.ts`): Build Unit 0x7f4e00 and the Contract
+  Manager 0x7f17a0 are the city trees' nodes. The submission's signal
+  +0x270 also runs the economic AI's listener (0x68ab40, connected in
+  0x6892d0): a contract for a unit or a building — no district — whose
+  PurchaseYield is YIELD_GOLD (vt +0x80 0x5f6830; a building flagged
+  +0x159 & 0x10 declines) it takes into its purchase list and makes
+  ACCEPTED. A Settle City Op contract no city may take waits ACCEPTED to
+  the Contract Manager's turn limit: runs/h1_duelv1128 China's Settle New
+  City started t2, failed at its limit t13 with no city's SUBMITTED line,
+  its next contract (34) SUBMITTED at Xi'an t14. A contract's turns are
+  the queue's turns left (0x17bb40) as the player's turn start left them;
+  the city queues it on its turn's choice, before the trees tick.
+- THE EXECUTIONS: OPERATION ATTACK (0x80c180; Simple Operation Attack,
+  the camps): per team with a target, each member alive with Movement left:
+  beyond its reach (max(1, range)) to the planner's spot (0x791300: the
+  first reach entry exactly `reach` from the target within 2 turns,
+  stackable or its own plot) "Attack Target Move", none found straight to
+  the target "Attack Target Move Direct" (Move -9999:-9999); a ranged
+  member at the target where it holds units (Plot +0x4c) "Attack Target
+  Range Attack"; each member left onto the target "Attack Target Melee
+  Attack". ATTACK CITY (0x8109e0): the members with Movement left against
+  the COMBAT_DISTRICT targets within 3 of the target (0x80f280) through
+  the assignment 0x776140 (unequal blows dropped, no suicide), logged
+  "Operation City Attack, type, x:y, Move, Attack"; a district target's
+  health (0x776140 type 3) floor(maxHP x ATTACK_HEALTH / 256) - damage,
+  its blow the city combat prediction. SIEGE CITY (0x811e80): without
+  ABILITY_AUTO_SIEGE, the six plots around the city (0x812950: domain,
+  passable, connected) as slots, the members with Movement left and no
+  bombard as agents, the generalized assignment 0x8b5bf0 (three passes;
+  the start 0x80f9d0, the gain 0x80f6b0 — its multiplier the store at
+  [rsp + 0x28] that dis.sh dropped —, the move 0x80f4a0) logged "From,
+  Goal:, Move"; encircled (0x24bf70) the ranged members strike "Operation
+  Siege City Attack". PILLAGE (0x811390): Pillage Districts, Pillage
+  Improvements and Get Goody Huts as the run's flags, a member pillaging
+  where it stands. AIR ASSAULT (0x80fb50): the air members by priority
+  strike or rebase. BUILD MILITARY IMPROVEMENT (update 0x7e9b10, execute
+  0x7e9120): a defensive improvement is one CanBuildOutsideTerritory
+  (+0x108 & 0x40, the loader 0xac6bb0) with DefenseModifier above 0; the
+  run's unit (+0x20) builds it (+0x24, 0x95a010).
+- THE GENERALIZED ASSIGNMENT (0x8b5bf0) at weight and capacity 1: per pass,
+  per slot in order, each agent's gain there (where it sits elsewhere, its
+  gain there less its gain where it sits), the first largest above 0 takes
+  the slot, unseating its holder; passes repeat while one moved. The
+  governors' seats (0x6ee100) run it once.
+- MEASURED (the action replay on the five verbose duels; the war value on
+  the replay's own city values and strengths): the Surprise War's desire
+  rows 504 / 682 (1117 88 / 88, 1121 123 / 123, 1124 22 / 161, 1127
+  188 / 188, 1128 83 / 122 - most rows the floor 5.0 or -9999); the
+  city-state war's 0 / 158, its war value off with the city values
+  (CITY VALUES within 0.1 27 / 502 .. 176 / 528) and the envoys' worth
+  1.22 times ours (runs/h1_duelv1121 Qin toward 2: the log's Surprise War
+  row less its city-state war row 45.0 t29 - t36, 67.0 t37; ours 37, 55).
+  The first war candidate per player and enemy 3 of 14 on the log's turn
+  (1117 1>3 t20, 1>4 t34; 1121 1>2 t31), the others early (1124 1>3 t13 /
+  log t17, 1127 1>4 t5 / t14) or a turn off (1128 1>3 t68 / t69). The
+  execution families: "Attack Target" lines log / ours 1124 5 / 0, 1127
+  4 / 0, 1117 0 / 2, 1128 0 / 12 within the replayed turns (the camps'
+  operation the log runs as Barb Camp Tech Boost); "Operation City
+  Attack" 17 and "Operation Siege City" 3 are 1128's Attack Walled City
+  (t121), which the port does not start: its Attack Enemy City of t68
+  holds the enemy where the game's turned INVALID at once (t69). The
+  record's six wars (Qin's Surprise Wars on Rome, runs/h1_duelw1109 t200,
+  1110 t124, 1112 t200, 1118 t239, 1120 t216, 1128 t196): the port
+  declares none; its first war candidate against Rome comes before each
+  (t186, t100, t188, t196, t116, t167), no operation of it reaching
+  its march point. Settle New City's turns with every line equal, before
+  the shared contracts / with them: 1117 38 / 38, 1121 19 / 25, 1124
+  33 / 30, 1127 34 / 14, 1128 35 / 27 (1128 t13's end at the turn limit
+  now the game's; 1127 t22's recruit is City Defense's, unported).
+- PARTLY READ / unread (AUDIT C-97): GrandStrategic +0x204's writer (the
+  leader's war factor, read 0); the diplomacy's +0xf30 and the known WMD
+  counts' writers (none); the deal items 0x64d320 (none); the war record
+  +0xc's writer (every WAR line logs 0.00); 0x650890's signal (taken as the
+  peace); Siege City's first part (the ZOC-ignoring units' adjacent move);
+  the air units' contract.
 
 ## C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ
 
@@ -6845,17 +6989,12 @@ row the port reads (`cpu/harness/diploSender.ts`).
   inputs; 1127 Rome toward Qin 10.8 = 0 + 0.8 + 10.
 - THE SURPRISE WAR (registered 0x669310, each functor bound to the war type):
   the desire (0x66e950) -1 for a full civ at war with two or more majors
-  (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760:
-  0x7b7ab0 + 0x7b7830 unless the flag + 0x7b87b0 where a casus belli is
-  named; the parts unread), max(X, 5) where p's rank is 1 or within ceil(+0x6420
-  x 0.25). 1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while
+  (0x3dfae0); disfavoured -9999 (@f04cb0); else X the war value (0x7b7760,
+  below), max(X, 5) where p's rank is 1 or within ceil(+0x6420 x 0.25). 1127 Rome toward Qin: -9999 at rank 2 (t62), 5.0 at rank 1 while
   X is -9999, 798 at t94. The can-do (0x673800): CanDeclareWarOn(0x4396d725)
   and the military AI's war operation against p ready (0x723db0(p, 1, 2, 5):
   the operations +0x318 of type 5 against +0x2a0 past their state). The
-  perform (0x675ae0) sends the declaration 0x4396d725. The record's six
-  wars (all Qin's Surprise Wars on Rome: 1109 t200, 1110 t124, 1112 t200,
-  1118 t239, 1120 t216, 1128 t196) stand on the operation the port does not
-  run.
+  perform (0x675ae0) sends the declaration 0x4396d725.
 - DENOUNCE AND THE PROMISES: the desire 0x66d800 returns 0 — never picked;
   the denouncement comes from the state machine.
 - THE TRANSITIONS' CHECKS (0x67ff10): CanDeclareFriendship (0x67c740)
@@ -6908,8 +7047,7 @@ row the port reads (`cpu/harness/diploSender.ts`).
   1,070 / 1,365 (1,037), the gain 1117's, whose allowed rows weigh the
   desires now read. The transitions sent no friendship and no denouncement, as the
   record's majors made none.
-- PARTLY READ: the war value 0x7b7760's parts, the military AI's war
-  operations (0x723db0 / 0x723cf0) and GoToWar's preparation, Propose
+- PARTLY READ: the military AI's 0x723cf0 and GoToWar's preparation, Propose
   Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460:
   the last action + AI_TURNS_BETWEEN_TRADES), the alliance's offer, the
   victories' progress (the threat's (a), the near-victory flags), the

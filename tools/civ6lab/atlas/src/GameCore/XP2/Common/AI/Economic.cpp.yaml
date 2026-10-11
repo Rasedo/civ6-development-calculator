@@ -47,6 +47,40 @@
     - "- AI::Economic m_yieldPriorityBoost (player +0x1288, data +0x528): Gold only. 0x687bf0 each turn: 0, or fx(-0.2) x the gold per turn (player +0x13a0 +0x1b8) while that is neg..."
     - "- THE ECONOMIC AI'S SAVINGS (0x687bf0, each AI turn): the treasury's change since the last balance (+0x1b8) shared over the f..."
   review: reviewed
+- addr: 0x6892d0
+  final: 0x457b80
+  kind: function
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 2
+      value: "A Settle City Op contract no city may take waits ACCEPTED to   the Contract Manager's turn limit: runs/h1_duelv1128 China's Settle New   City started t2, failed at its limit t13 with no city's SUBMITT"
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - "...bmission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose PurchaseYield is YIELD_GOLD..."
+  review: imported
+- addr: 0x68ab40
+  final: 0x458ac0
+  kind: function
+  name: the economic AI's contract listener
+  status: READ
+  cases:
+    - recording: h1_duelv1128
+      turn: 2
+      value: "A Settle City Op contract no city may take waits ACCEPTED to   the Contract Manager's turn limit: runs/h1_duelv1128 China's Settle New   City started t2, failed at its limit t13 with no city's SUBMITT"
+    - recording: h1_duelv1128
+      turn: 13
+      value: Settle New City's contract, no city's SUBMITTED line, failed at its turn limit
+  impl: [cpu/core/aiContracts.ts:goldPurchasable, cpu/core/aiContracts.ts:submitContract]
+  readings:
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below), the purchase and the City Defense tree unread"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+    - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
+  context:
+    - ...the production was set this turn or the last (city +0x2600); the economic AI's listener 0x68ab40 takes a unit or building contract it may buy with gold; any taker makes it ACCEPTED (SU...
+    - "...city trees' nodes. The submission's signal +0x270 also runs the economic AI's listener (0x68ab40, connected in 0x6892d0): a contract for a unit or a building — no district — whose Pu..."
+  review: reviewed
 - addr: 0x68acd0
   kind: function
   name: spend

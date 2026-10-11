@@ -5,7 +5,7 @@
  * on copies (`carryLayout`).
  */
 import type { MajorCityDefenceView, MajorCityView, MajorGovernorView, MajorKnownCityView, MajorPlotView, MajorSlotView, MajorUnitView, MajorView } from '../../ai/major/view';
-import { directionTo, hexDistance, tilesWithin } from '../../world/hex';
+import { DIRECTION_TYPES, directionTo, hexDistance, neighborTile, tilesWithin } from '../../world/hex';
 import { hasFreshWater, isCoastalLand, isImpassable, isWater } from '../../world/query';
 import { FX, fmul, fxOf, turnsAt, type AiCityView, type AiDistrictView, type AiPlotView } from './aiValue';
 import { AI_YIELDS, type AiWeightInputs, followedStrategies, pseudoYieldWeights, yieldWeights } from './aiWeights';
@@ -14,16 +14,17 @@ import { isExplored } from './fog';
 import { CITY_STRIKE_RANGE, denounceOpen, loyaltyPerTurn, plotPressure, plotPressureLead, warGate } from './phase';
 import { governedCityIds, governorPromotionOpen, governorSum, governorsOf, governorTitlesAvailable } from './governors';
 import { GOVERNORS, GOVERNOR_INSTALL_ID, GOVERNOR_PROMOTIONS, GOVERNOR_TITLE_CIVICS, PROMO_INSTALL_ID, promotionBit } from '../data/governors';
-import { CITY_STATE_MAX_HP, CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
-import { BARB_SEAT, borderTurnsFrom, campTiles, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
-import { assignTo, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
-import { IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
+import { CITY_STATE_SUZERAIN_BONUS } from '../data/cityStates';
+import { BARB_SEAT, borderTurnsFrom, campTiles, cityStateOfSeat, cityHolders, citiesOf, civOf, civsAtWar, delegationWith, denounceActive, seatsAllied, seatsFriends, hiddenResourcesFor, homeContinent, isCiv, isCityStateSeat, leaderOf, majorityReligionOf, metTurnWith, MISSION_DELEGATION, MISSION_EMBASSY, peaceTurnWith, seatOf, tileSeat, unitsOf } from './seats';
+import { assignTo, districtHealth, pathTo, planUnit, reachPlots, tacticalTargets, type Pass, type Target } from './tactical';
+import { AIR_REBASE_COLS, AIR_STRIKE_COLS, IMPROVEMENT_IDS, unitActionIndex } from './unitActions';
+import { airPillageTargets, airStrikeTargets, rebaseTargets } from './air';
 import { plotsSeenNow, ringPlots } from './barbarians';
-import { cityDefenseStrength, cityStrikeStrength, predictCityBlow, unitAttackRange } from './combat';
+import { cityDefenseStrength, cityStrikeStrength, encircled, predictCityBlow, unitAttackRange } from './combat';
 import { outerPool } from './rules';
-import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, traderCost, unitDomain, unitsHostile, unitVisibleTo } from './units';
+import { borderClosedTo, builderCost, cityAtIndex, embarkTechMoves, trainableUnits, traderCost, unitDomain, unitExertsZoc, unitsHostile, unitVisibleTo } from './units';
 import { CIVICS } from '../data/civics';
-import { COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
+import { CITY_MIN_STRIKE_CS, COST_MULTIPLIER_PCT, EMBARK_MOVES, MP_SCALE } from '../data/constants';
 import { snipeRing, snipeRing3 } from './unitOrders';
 import { GP_CLASSES, GREAT_PEOPLE } from '../data/greatPeople';
 import { GOVERNMENTS, GOVERNMENT_LIST, POLICIES, POLICY_LIST, type SlotKind } from '../data/policies';
@@ -41,9 +42,13 @@ import { gpOffer, gpOfferCost, greatPersonPointsPerTurn } from './greatPeople';
 import type { City, CityState, DistrictId, GameState, GreatPersonClass, Unit, YieldKey } from './types';
 import { BUILDINGS, effectiveBuilding } from '../data/buildings';
 import { DISTRICTS } from '../data/districts';
-import { CITY_MAX_HP, UNIT_HP, UNITS } from '../data/units';
+import { UNIT_HP, UNITS } from '../data/units';
+import { IMPROVEMENTS } from '../data/improvements';
+import type { ImprovementId } from './types';
+import { computeUnlocks } from './effects';
+import type { ContractCity } from './aiContracts';
 import { civicAnalysis } from './aiCivics';
-import { cityStateAt, envoysHere, envoysOf, hasMet, minorCity, suzerainOf, suzerainProjectMult } from './cityStates';
+import { cityStateAt as cityStateAtPlot, envoysHere, envoysOf, hasMet, minorCity, minorWarGate, suzerainOf, suzerainProjectMult } from './cityStates';
 import { grievanceWith } from './grievance';
 import { tradeCapacity } from './trade';
 import { buildingPillaged, buildingVariantAdjacency, effectiveAdjacency, tileYields } from './yields';
@@ -478,6 +483,7 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     handicap: (i) => seatOf(state, i)?.handicap ?? DEFAULT_HANDICAP,
     playerEra: (i) => inputs.playerEra?.(i) ?? civEraIndex(seat(i).research.techs, seat(i).research.civics),
     techCount: (i) => seat(i).research.techs.length,
+    techsHeld: (i) => new Set(seat(i).research.techs.map((t) => gameTypeOf('tech', t, 'TECH_'))),
     militaryStrength: (i) => militaryStrength(state, i),
     treasury: (i) => seatOf(state, i)?.treasury ?? 0,
     actionOpen: (i, j, action) => {
@@ -491,7 +497,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (action === 'DIPLOACTION_DENOUNCE') return denounceOpen(state, i, j);
       return null;
     },
-    warOpen: (i, j, formal) => warGate(state, i, j, formal ? WAR_KIND_FORMAL : WAR_KIND_SURPRISE).ok,
+    warOpen: (i, j, formal) => (isCityStateSeat(j) ? minorWarGate(state, cityStateOfSeat(j), i).ok
+      : warGate(state, i, j, formal ? WAR_KIND_FORMAL : WAR_KIND_SURPRISE).ok),
     declaredFriends: (i, j) => seatsFriends(state, i, j),
     allied: (i, j) => seatsAllied(state, i, j),
     denouncing: (i, j) => denounceActive(state, i, j),
@@ -579,9 +586,41 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     cityBuilds: (i) => citiesOf(state, i).map((c) => {
       const head = c.queue[0];
       const unit = head?.kind === 'settler' ? 'UNIT_SETTLER' : head?.kind === 'unit' ? gameTypeOf('unit', head.unit, 'UNIT_') : null;
-      if (!head || !unit) return { plot: c.centerIndex, unitType: null, turnsLeft: -1 };
+      if (!head || !unit) return { city: c.id, plot: c.centerIndex, unitType: null, turnsLeft: -1 };
       const prod = Math.max(1, computeCityStats(state, c).total.production);
-      return { plot: c.centerIndex, unitType: unit, turnsLeft: Math.max(0, Math.ceil((itemCost(head, state, c) - head.progress) / prod)) };
+      return { city: c.id, plot: c.centerIndex, unitType: unit, turnsLeft: Math.max(0, Math.ceil((itemCost(head, state, c) - head.progress) / prod)) };
+    }),
+    contractCities: (i) => citiesOf(state, i).map((c): ContractCity => {
+      const head = c.queue[0];
+      const current = !head ? null
+        : head.kind === 'settler' ? { unit: 'UNIT_SETTLER', building: null, district: null }
+          : head.kind === 'unit' ? { unit: gameTypeOf('unit', head.unit, 'UNIT_'), building: null, district: null }
+            : head.kind === 'building' ? { unit: null, building: gameTypeOf('building', head.building, 'BUILDING_'), district: null }
+              : head.kind === 'district' ? { unit: null, building: null, district: gameTypeOf('district', head.district, 'DISTRICT_') }
+                : null;
+      const trainable = new Set(trainableUnits(state, i, c).map((d) => gameTypeOf('unit', d.id, 'UNIT_')));
+      const prod = Math.max(1, computeCityStats(state, c).total.production);
+      return {
+        id: c.id, underThreat: false, current, productionTurn: -1, currentValue: 0,
+        buildingBlocked: () => false, districtBlocked: () => false,
+        canTrain: (u) => trainable.has(u),
+        trainsSea: [...trainable].some((u) => !!UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? '']?.naval),
+        // the queue's turns left (0x17bb40): the item in production counts
+        // its progress
+        buildTurns: (item) => {
+          const id = item.unit ? engineId('unit', item.unit, 'UNIT_', UNITS) : undefined;
+          if (!id) return 0;
+          const done = head && current?.unit === item.unit ? head.progress : 0;
+          return Math.max(0, Math.ceil((unitProdCost(state, i, id, UNITS[id].cost) - done) / prod));
+        },
+        itemValue: () => 0,
+        unitRow: (u) => {
+          const d = UNITS[engineId('unit', u, 'UNIT_', UNITS) ?? ''];
+          return { combat: d?.combat ?? 0, buildCharges: d?.charges ?? 0, sea: !!d?.naval, mustPurchase: false, recon: false };
+        },
+        buildingRow: () => ({ defensive: false, mustPurchase: false }),
+        districtDefensive: () => false,
+      };
     }),
     bestCombatStrength: (i) => seatOf(state, i)?.bestMeleeCS ?? 0,
     knownUnits: (i, j) => {
@@ -670,10 +709,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
     borderClosed: (i, p) => borderClosedTo(state, i, map.tiles[p]),
     denounced: (i, j) => denounceActive(state, i, j),
     cityHitPoints: (p) => {
-      const held = cityAtIndex(state, p);
-      if (held) return { max: CITY_MAX_HP, damage: CITY_MAX_HP - held.city.hp };
-      const cs = cityStateAt(state, p);
-      return cs && cs.centerIndex === p ? { max: CITY_STATE_MAX_HP, damage: CITY_STATE_MAX_HP - (cs.hp ?? CITY_STATE_MAX_HP) } : null;
+      const d = districtHealth(state, p);
+      return d ? { max: d.max, damage: d.max - d.hp } : null;
     },
     cityBlow: (id, p) => {
       const u = state.units.find((x) => x.id === id);
@@ -697,9 +734,8 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
         pass.plan.set(u.id, p);
         pass.reach.set(u.id, p.reach);
       }
-      // the assignment weighs the targets standing as units (a district's
-      // health in it unread)
-      return assignTo(state, pass, units, targets.filter((t, k) => keep(k) && !!t.unit && state.units.includes(t.unit)), even, survive)
+      // a unit target the turn's blows already took is gone from the list
+      return assignTo(state, pass, units, targets.filter((t, k) => keep(k) && (!t.unit || state.units.includes(t.unit))), even, survive)
         .map((a) => ({ unit: a.unit.id, from: a.from, move: a.move, attack: a.attack }));
     },
     strikeColumn: (id, p) => {
@@ -712,6 +748,85 @@ export function majorView(state: GameState, inputs: MajorViewInputs = {}): Major
       if (k2 >= 0) return UNIT_ACTION[`SNIPE_${k2}`] ?? -1;
       const k3 = d === 3 ? snipeRing3(state, here).indexOf(p) : -1;
       return k3 >= 0 ? UNIT_ACTION[`SNIPE3_${k3}`] ?? -1 : -1;
+    },
+    capturedAs: (type) => {
+      const id = engineId('unit', type, 'UNIT_', UNITS);
+      const to = id ? UNITS[id].capturedAs : undefined;
+      return to ? gameTypeOf('unit', to, 'UNIT_') : null;
+    },
+    militaryYardstick: (i) => {
+      const s = seatOf(state, i);
+      return Math.max(1, s?.bestMeleeCS ?? 0, Math.max(s?.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS));
+    },
+    wmdCount: (i) => (seatOf(state, i)?.wmd ?? []).reduce((a, b) => a + b, 0),
+    suzerainOf: (cs) => {
+      const c = seatOf(state, cs) as CityState | undefined;
+      return c ? suzerainOf(c) : -1;
+    },
+    planSpot: (id, p, turns, needMoves, range) => {
+      const u = state.units.find((x) => x.id === id);
+      if (!u) return -1;
+      const at = map.tiles[p];
+      const dom = unitDomain(u.type);
+      const fights = (x: Unit) => (UNITS[x.type]?.combat ?? 0) > 0;
+      for (const r of planUnit(state, u, targetsOf(u.seat)).reach) {
+        const t = map.tiles[r.tile];
+        if (hexDistance(map, t.col, t.row, at.col, at.row) !== range || r.turns > turns || (needMoves && r.moves <= 0)) continue;
+        if (r.tile === u.tileIndex) return r.tile;
+        if (!state.units.some((x) => x !== u && x.tileIndex === r.tile && unitDomain(x.type) === dom && fights(x) === fights(u))) return r.tile;
+      }
+      return -1;
+    },
+    attackSpots: (id, p) => {
+      const u = state.units.find((x) => x.id === id);
+      if (!u) return [];
+      const e = planUnit(state, u, targetsOf(u.seat)).entries.find((x) => x.target.tile === p);
+      return e ? e.spots.map((s) => ({ plot: s.tile, turns: s.turns })) : [];
+    },
+    plotUnitCount: (p) => state.units.filter((u) => u.tileIndex === p && u.hp > 0).length,
+    adjacentPlot: (p, dir) => neighborTile(map, map.tiles[p], DIRECTION_TYPES[dir])?.index ?? -1,
+    riverEdge: (p, dir) => (map.tiles[p].riverMask & (1 << DIRECTION_TYPES[dir])) !== 0,
+    encircled: (p) => {
+      const held = cityAtIndex(state, p);
+      if (held) return encircled(state, map.tiles[p], held.holder.seat);
+      const cs = cityStateAtPlot(state, p);
+      return !!cs && cs.centerIndex === p && encircled(state, map.tiles[p], cs.seat);
+    },
+    reachOf: (id, p) => {
+      const u = state.units.find((x) => x.id === id);
+      const r = u ? planUnit(state, u, targetsOf(u.seat)).reach.find((x) => x.tile === p) : undefined;
+      return r ? { turns: r.turns, moves: r.moves } : null;
+    },
+    defensiveImprovements: () => Object.values(IMPROVEMENTS).filter((d) => d.outsideTerritory && (d.defenseCS ?? 0) > 0)
+      .map((d) => gameTypeOf('improvement', d.id, 'IMPROVEMENT_')),
+    buildCharges: (id) => state.units.find((x) => x.id === id)?.charges ?? 0,
+    airStrikeColumn: (id, p, improvement) => {
+      const u = state.units.find((x) => x.id === id);
+      if (!u) return -1;
+      const k = (improvement ? airPillageTargets : airStrikeTargets)(state, u, AIR_STRIKE_COLS).indexOf(p);
+      return k < 0 ? -1 : UNIT_ACTION[`${improvement ? 'AIR_PILLAGE' : 'AIR_STRIKE'}_${k}`] ?? -1;
+    },
+    rebaseOptions: (id) => {
+      const u = state.units.find((x) => x.id === id);
+      return u ? rebaseTargets(state, u, AIR_REBASE_COLS).map((p, k) => ({ plot: p, column: UNIT_ACTION[`REBASE_${k}`] ?? -1 })) : [];
+    },
+    unitBuildsImprovement: (i, id, imp) => {
+      const u = state.units.find((x) => x.id === id);
+      const key = engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS) as ImprovementId | undefined;
+      const def = key ? IMPROVEMENTS[key] : undefined;
+      if (!u || !def) return false;
+      // CIV6 (Legion): the Roman Fort is the FORT row, laid without its tech
+      if (UNITS[u.type]?.fortBuilder) return def.id === 'FORT';
+      return u.type === (def.engineer ? 'MILITARY_ENGINEER' : 'BUILDER') && computeUnlocks(state, i).improvements.has(def.id);
+    },
+    exertsZoc: (id) => {
+      const u = state.units.find((x) => x.id === id);
+      return !!u && unitExertsZoc(u);
+    },
+    mostEnvoys: (cs) => {
+      const c = seatOf(state, cs) as CityState | undefined;
+      if (!c) return 0;
+      return Math.max(0, ...state.seats.map((s) => envoysHere(state, c, s.seat)));
     },
   };
 }
@@ -809,5 +924,5 @@ function unitView(state: GameState, u: Unit): MajorUnitView {
     combat: d?.combat ?? 0, ranged: d?.ranged?.strength ?? 0, range: d?.ranged?.range ?? 0, damage: UNIT_HP - u.hp,
     movesLeft: Math.trunc(u.movesLeft * 256 / MP_SCALE),
     baseMoves: u.embarked && !d?.naval ? EMBARK_MOVES + embarkTechMoves(state, u.seat) : d?.moves ?? 0,
-    bombard: d?.bombard ?? 0 };
+    bombard: d?.bombard ?? 0, domain: d?.air ? 'air' : d?.naval ? 'sea' : 'land' };
 }

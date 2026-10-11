@@ -14,24 +14,28 @@
   review: imported
 - addr: 0x64ba90
   kind: function
+  name: the diplomatic sender's pick
   status: PARTLY
   impl: [ai/major/diploActions.ts:pickActions]
   readings:
     - "C-97: the majors' diplomatic actions — the pick, the state machine and the receiver READ, the evaluator's terms PARTLY READ"
     - "C-97: the proposals and the religion's choices as seat actions — the price READ, the receiver's value READ but the trust term"
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   notes:
     - ".claude/scratchpad/dp2/NOTES.md: ....25) (mode 0), T=10*(L-n+1)/L   if n<=L else 0; flag arg 1 -> +T. mode1 x0.5 / 20; mode2 40. - Pick 0x64ba90 (per turn): done[64]; loop { for each player p (players list): skip done/invalid   (+0x6168[p]+0x18..."
     - ".claude/scratchpad/dp2/readings_dp2.md: ...owledge base and the owner's, +10 where +0x6780 names p.   The cost functors: Cost - T. - THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first;   then, repeatedly, every met player p not ye..."
   context:
     - "- THE PICK (0x64ba90, the diplomatic AI turn): the state turn below first; then, repeatedly, every met playe..."
-  review: imported
+  review: reviewed
 - addr: 0x64d320
   final: 0x42ef50
   kind: function
   status: PARTLY
+  impl: [ai/major/operations/warValue.ts:WMD_FLAG]
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...0 / 0x723cf0) and GoToWar's preparation, Propose Trade's desire (the deal AI 0x82dff0 / 0x64d320) and its can-do (0x673460: the last action + AI_TURNS_BETWEEN_TRADES), the alliance's o..."
   review: imported
@@ -70,6 +74,7 @@
       value: "no answer 0xc between the AI majors: the missions retry"
   readings:
     - "C-97: the other actions' desires, the trust and the transitions — the friendship, the alliance, the trust, the threat term and the transitions READ; the war value, the deals and the victories' progress PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   review: reviewed
 - addr: 0x6504a0
   kind: function
@@ -117,6 +122,7 @@
 - addr: 0x650890
   final: 0x431530
   kind: function
+  name: the diplomatic AI's handler clearing PrepareForWarWith
   status: PARTLY
   cases:
     - recording: 1117
@@ -131,11 +137,13 @@
     - recording: 1117
       turn: 18
       value: The replay sets it two   turns after the first desire, a LAB fit (1117 t18 -> t20, t32 -> t34;
+  impl: [ai/major/operations/manager.ts:peaceMade, cpu/harness/operationsAi.ts:after]
   readings:
     - "C-97: the war operations — the war candidates, the city value's frame, the assault nodes and Attack Units READ; the loyalty lead's sources, the team update's danger and the assault's executions PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...r at most half the +0xb50 list and the player is neither a declared friend nor an ally; 0x650890 clears it. The log shows it: every war candidate's first eval line comes the turn aft..."
-  review: imported
+  review: reviewed
 - addr: 0x651490
   final: 0x4322c0
   kind: function

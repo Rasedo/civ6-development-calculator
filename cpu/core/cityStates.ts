@@ -530,7 +530,9 @@ export function assignEnvoy(state: GameState, cityStateId: number, seat: number)
  * ally: 50 (to every civ that has at least 1 Envoy in that city-state, but is
  * not its Suzerain)". `sueForPeaceWithCityState` below is the inverse verb.
  */
-export function declareWarOnCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
+/** the gates a war on a city-state passes: met, not at war, no peace treaty
+ *  binding, no ban */
+export function minorWarGate(state: GameState, cityStateId: number, seat: number): RuleResult {
   const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId);
   if (!cityState) return { ok: false, reason: 'No such city-state.' };
   if (!hasMet(cityState, seat)) return { ok: false, reason: 'You have not met this city-state.' };
@@ -542,6 +544,13 @@ export function declareWarOnCityState(state: GameState, cityStateId: number, sea
   if (warBanned(state, seat, cityState.seat, true)) {
     return { ok: false, reason: 'This civilization may not declare war on a city-state.' };
   }
+  return { ok: true };
+}
+
+export function declareWarOnCityState(state: GameState, cityStateId: number, seat: number): RuleResult {
+  const gate = minorWarGate(state, cityStateId, seat);
+  if (!gate.ok) return gate;
+  const cityState = (state.cityStates ?? []).find((c) => c.id === cityStateId)!;
   setWar(state, cityState.seat, seat, true);
   // CIV6: war cancels the routes with the new enemy, both ways; the Traders
   // return.

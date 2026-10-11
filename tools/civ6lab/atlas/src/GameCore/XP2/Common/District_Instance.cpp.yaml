@@ -236,6 +236,17 @@
   context:
     - "...OuterDefenseStrength (+0x44) and the city's enhanced-walls bonus (+0x1888), paid while 0x24b960 holds: the district's outer damage (+0x8d8) below its outer maximum — a breached peri..."
   review: imported
+- addr: 0x24bf70
+  final: 0x1924e0
+  kind: function
+  name: a city encircled
+  status: PARTLY
+  impl: [ai/major/operations/assault.ts:siegeCityExecute, cpu/core/combat.ts:encircled]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - "...0x28] that dis.sh dropped —, the move 0x80f4a0) logged \"From, Goal:, Move\"; encircled (0x24bf70) the ranged members strike \"Operation Siege City Attack\". PILLAGE (0x811390): Pillage D..."
+  review: reviewed
 - addr: 0x24c2f0
   final: 0x1928a0
   kind: function

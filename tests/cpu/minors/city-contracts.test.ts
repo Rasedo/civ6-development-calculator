@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, cityContracts, contractEligible, inHandCheck,
+  CP_ACCEPTED, CP_CANCELLED, CP_CLAIMED, CP_COMPLETED, CP_FAILED, CP_IN_PROGRESS, CP_SUBMITTED, cityContracts, contractEligible, inHandCheck,
   newContractBook, queueContract, reapContracts, submitContract, takesTurn, type AiContract, type ContractCity,
 } from '../../../cpu/core/aiContracts';
 import {
@@ -54,6 +54,21 @@ describe('the contracts (Contracts.cpp)', () => {
     const d = contract({ id: 2 });
     submitContract(book, d, [city({ productionTurn: 8, currentValue: 10 * FX })], 10, (x) => cleared.push(x.id), () => undefined);
     expect(cleared).toEqual([7]);
+  });
+
+  it('the economic AI takes a contract for a unit or a non-wonder building it may buy with gold, never a district', () => {
+    const none = [city({ canTrain: () => false, buildingBlocked: () => true, districtBlocked: () => true })];
+    const book = newContractBook();
+    const make = (over: Partial<AiContract>) => {
+      const c = contract(over);
+      submitContract(book, c, none, 1, () => undefined, () => undefined);
+      return c.progress;
+    };
+    expect(make({ id: 1, unit: 'UNIT_SETTLER', building: null })).toBe(CP_ACCEPTED);
+    expect(make({ id: 2, building: 'BUILDING_MONUMENT' })).toBe(CP_ACCEPTED);
+    expect(make({ id: 3, building: 'BUILDING_PYRAMIDS' })).toBe(CP_SUBMITTED);
+    expect(make({ id: 4, unit: 'UNIT_MISSIONARY', building: null })).toBe(CP_SUBMITTED);
+    expect(make({ id: 5, building: null, district: 'DISTRICT_CAMPUS' })).toBe(CP_SUBMITTED);
   });
 
   it('the Default Specialization takes the highest valued contract it may still take, logs the others, and a released one leaves silently', () => {

@@ -6,11 +6,17 @@
 - addr: 0x80c180
   final: 0x56c360
   kind: function
+  name: Operation Attack (execution)
   status: PARTLY
-  readings: ["C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"]
+  impl:
+    - ai/major/operations/assault.ts:moveOnto
+    - ai/major/operations/assault.ts:operationAttackExecute
+  readings:
+    - "C-97: the behaviour trees — READ (the interpreter), the nodes PARTLY READ"
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
   context:
     - "...unread: the port finds none and skips its children); the executions of Operation Attack 0x80c180 (Attack Target Move / Melee / Range lines), Attack Units 0x80ceb0, Defend Units 0x80d..."
-  review: imported
+  review: reviewed
 - addr: 0x80ceb0
   kind: function
   name: opAttackUnits

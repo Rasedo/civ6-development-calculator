@@ -62,3 +62,13 @@
   context:
     - "...ignment 0x8b5bf0 over the governors and the slots, one pass (its last argument), with λ 0x6ecee0 (the start: each assigned governor on its city's slot, the slot's occupant it), λ 0x6ec..."
   review: reviewed
+- addr: 0x80f9d0
+  kind: function
+  name: Siege City's assignment start
+  status: PARTLY
+  impl: [ai/major/operations/assault.ts:siegeCityExecute]
+  readings:
+    - "C-97: the war desires, the war operation's readiness and the assault's executions — the war value, the not-ready hook, the readiness and the executions READ; the leader's war factor, the WMD flags, the deal items and the war record's writer unread"
+  context:
+    - "...nd no bombard as agents, the generalized assignment 0x8b5bf0 (three passes; the start 0x80f9d0, the gain 0x80f6b0 — its multiplier the store at [rsp + 0x28] that dis.sh dropped —, th..."
+  review: reviewed
