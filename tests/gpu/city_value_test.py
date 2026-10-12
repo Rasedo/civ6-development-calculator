@@ -61,7 +61,7 @@ class Plot:
     def pseudo_w(self, p):
         return 0
 
-    def improvement(self):
+    def plot_improvement(self):
         return self.o["improvement"]
 
     def resource(self):
@@ -70,7 +70,7 @@ class Plot:
     def feature(self):
         return self.o["feature"]
 
-    def pillaged(self):
+    def plot_pillaged(self):
         return int(self.o["pillaged"])
 
     def flood_turns(self):
@@ -138,10 +138,10 @@ class District(Plot):
     def keeps_feature(self, d):
         return False
 
-    def district(self):
+    def plot_district(self):
         return self.o["district"]
 
-    def district_pillaged(self):
+    def plot_district_pillaged(self):
         return 0
 
     def is_city(self):

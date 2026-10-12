@@ -4,18 +4,18 @@
     python tests/gpu/minor_purse_test.py
 
 The TS twins are tests/cpu/minors/minor-purse.test.ts and
-tests/cpu/city/free-city-build.test.ts. Fitted to C-38's and C-60's census
-(tools/civ6lab/minor_play_census.py):
-  1. the episode's Builder purchase rate is drawn once, from its slots
-  2. the minor's Gold pays its units' upkeep and stops at 0
-  3. a Builder is bought when none stands and the treasury covers it
-  4. a military unit is bought at its military count's rate above the floor,
-     three times it after a loss, never at eight or more
-  5. a Warrior Monk is bought with Faith where the majority religion allows
-  6. one upgrade per research completion, first in slot order, flat price
-  7. a city-state's unit wanders on one draw over its reach near its city
-  8. the Free City banks its Production and trains, raises and repairs down
-     its build table; its units wander near it
+tests/cpu/city/free-city-build.test.ts:
+  1. the minor's Gold pays its units' upkeep and stops at 0
+  2. a city its knowledge base sees a barbarian army beside is threatened
+     and buys its unit list's first unit while its savings or, threatened,
+     its balance meet the price (`_minor_purchases`); an unthreatened one
+     buys nothing
+  3. one upgrade per research completion, first in slot order, flat price
+  4. a city-state's unit wanders on one draw over its reach near its city
+  5. the Free City banks its Production with nothing in hand and its AI
+     queues its Default Specialization's pick; the item completes at its
+     price; a unit lands, the walls fill their pool; on seed9001 its tables
+     and picks are the TS twin's numbers; its units wander near it
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "gpu"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import load_rules, fixture_paths  # noqa: E402
-from core.simbase import FREE_SEAT  # noqa: E402
+from core.simbase import BARB_SEAT, FREE_SEAT  # noqa: E402
 from warmup import warm_base, opened  # noqa: E402
 import free_city_test as fct  # noqa: E402
 
@@ -97,20 +97,6 @@ def price(sim, unit: str, mult: float) -> float:
     return float(sim._purchase_step(torch.tensor([float(sim._type_cost[UNI.index(unit)]) * mult]))[0])
 
 
-def test_plan(rules, path) -> None:
-    sim = build(rules, path)
-    s = a_minor(sim)
-    sim.citystate_army_cap[B0, s] = -1
-    sim._minor_plan(s)
-    slots = [int(x) for x in rules.citystate["builderBuySlots"]]
-    rate = int(sim.citystate_builder_buy[B0, s])
-    assert rate in slots, rate
-    rng = int(sim.rng_state[B0])
-    sim._minor_plan(s)
-    assert int(sim.citystate_builder_buy[B0, s]) == rate and int(sim.rng_state[B0]) == rng
-    print("  1 plan OK — the Builder purchase rate drawn once, from its slots")
-
-
 def test_upkeep(rules, path) -> None:
     sim = build(rules, path)
     s = a_minor(sim)
@@ -127,137 +113,47 @@ def test_upkeep(rules, path) -> None:
     sim._minor_economy(s)
     got = float(sim.citystate_treasury[B0, s])
     assert got >= 0.0 and abs(got - max(0.0, gold - upkeep)) < 1e-9, (got, gold, upkeep)
-    print("  2 upkeep OK — the units' Maintenance out of the city's Gold, never below 0")
+    print("  1 upkeep OK — the units' Maintenance out of the city's Gold, never below 0")
 
 
-def pillage_for_repair(sim, s: int) -> None:
-    """a pillaged Monument the minor repairs first: its production is off
-    the Builder (`_minor_trains_builder`)"""
-    row = sim._CITY_MINOR0 + s
-    b = BLD.index("MONUMENT")
-    sim.city_bldg[B0, row, 0, b] = True
-    sim.city_bldg_pillaged[B0, row, 0, b] = True
-    sim.citystate_repair_wait[B0, s] = False
-
-
-def test_builder_buy(rules, path) -> None:
-    sim = build(rules, path)
-    s = a_minor(sim)
-    clear_army(sim, s)
-    sim.citystate_builder_buy[B0, s] = 1000
-    p = float(sim._purchase_step(sim._builder_cost(sim.citystate_builders_trained[:, s]).double()
-                                 * float(sim.rules.gold_purchase_mult))[B0])
-    bt = int(sim.citystate_builders_trained[B0, s])
-    sim.citystate_treasury[B0, s] = p + 50.0
-    # the Builder row trains one while none stands: no purchase
-    assert bool(sim._minor_builder_work(s)[B0]) and bool(sim._minor_trains_builder(s)[B0])
-    sim._minor_purchases(s)
-    assert "BUILDER" not in kinds(sim, s), kinds(sim, s)
-    clear_army(sim, s)
-    sim.citystate_treasury[B0, s] = p + 50.0
-    # a pillaged building's repair takes the production: the Builder is bought
-    pillage_for_repair(sim, s)
-    sim._minor_purchases(s)
-    assert kinds(sim, s) == ["BUILDER"], kinds(sim, s)
-    assert float(sim.citystate_treasury[B0, s]) == 50.0
-    assert int(sim.citystate_builders_trained[B0, s]) == bt + 1
-    sim.citystate_treasury[B0, s] = 1000.0
-    sim._minor_purchases(s)
-    assert kinds(sim, s).count("BUILDER") == 1, "a second Builder was bought"
-    # a rate of 0 still draws; a treasury short of the price asks nothing
-    sim = build(rules, path)
-    clear_army(sim, s)
-    pillage_for_repair(sim, s)
-    sim.citystate_builder_buy[B0, s] = 0
-    sim.citystate_treasury[B0, s] = 500.0
-    rng = int(sim.rng_state[B0])
-    sim._minor_purchases(s)
-    assert kinds(sim, s) == [] and int(sim.rng_state[B0]) != rng
-    sim.citystate_treasury[B0, s] = 10.0
-    rng = int(sim.rng_state[B0])
-    sim._minor_purchases(s)
-    assert int(sim.rng_state[B0]) == rng
-    # every owned plot improved: no work, no Builder bought, until one is pillaged
-    sim = build(rules, path)
-    clear_army(sim, s)
-    pillage_for_repair(sim, s)
-    own = (sim.tile_seat[B0] == 100 + s)
-    own[int(sim.citystate_center[B0, s])] = False
-    sim.improvement[B0][own] = 0
-    sim.pillaged[B0][own] = False
-    assert not bool(sim._minor_builder_work(s)[B0]), "an improved territory still offers work"
-    sim.citystate_treasury[B0, s] = 500.0
-    sim._minor_purchases(s)
-    assert "BUILDER" not in kinds(sim, s), kinds(sim, s)
-    sim.pillaged[B0, int(own.nonzero()[0])] = True
-    assert bool(sim._minor_builder_work(s)[B0]), "a pillaged improvement is work"
-    print("  3 Builder purchase OK — none standing, the price covered, the episode's rate")
-
-
-def test_military_buy(rules, path) -> None:
-    sim = build(rules, path)
-    s = a_minor(sim)
-    clear_army(sim, s)
-    give(sim, s, "BUILDER")
-    give(sim, s, "WARRIOR")
-    bp = int(rules.citystate["militaryBuyBp"][1])
-    floor = float(rules.citystate["militaryBuyFloor"])
-    sim.citystate_treasury[B0, s] = floor - 1
-    rng = int(sim.rng_state[B0])
-    sim._minor_purchases(s)
-    assert int(sim.rng_state[B0]) == rng, "a treasury under the floor drew"
-    sim.citystate_treasury[B0, s] = 500.0
-    seek(sim, lambda r: r >= bp)
-    sim._minor_purchases(s)
-    assert len(kinds(sim, s)) == 2
-    seek(sim, lambda r: r < bp)
-    sim._minor_purchases(s)
-    assert kinds(sim, s).count("SLINGER") == 1, kinds(sim, s)
-    assert float(sim.citystate_treasury[B0, s]) == 500.0 - price(sim, "SLINGER", float(sim.rules.gold_purchase_mult))
-    # three times the rate after a loss
-    sim = build(rules, path)
-    clear_army(sim, s)
-    give(sim, s, "BUILDER")
-    give(sim, s, "WARRIOR")
-    sim.citystate_treasury[B0, s] = 500.0
-    sim.citystate_loss_turn[B0, s] = int(sim.turn) - 1
-    mult = int(rules.citystate["lossBuyMult"])
-    seek(sim, lambda r: bp <= r < bp * mult)
-    sim._minor_purchases(s)
-    assert len(kinds(sim, s)) == 3, kinds(sim, s)
-    print("  4 military purchase OK — the count's rate over the floor, tripled after a loss")
-
-
-def test_monk_buy(rules, path) -> None:
-    sim = build(rules, path)
-    s = a_minor(sim)
-    if sim._monk_idx < 0:
-        print("  5 Warrior Monk SKIPPED — no Warrior Monk in the catalog")
-        return
-    clear_army(sim, s)
-    give(sim, s, "BUILDER")
-    row = sim._CITY_MINOR0 + s
-    sim.civ_follower[B0, 0] = sim._monk_follower
-    sim.city_pressure[B0, row, 0].zero_()
-    sim.city_pressure[B0, row, 0, 0] = 100_000
-    sim.city_bldg[B0, row, 0, sim._shrine_bidx] = True
-    sim.city_bldg[B0, row, 0, sim._temple_bidx] = True
+def threaten(sim, s: int) -> None:
+    """six barbarian Horsemen in minor `s`'s knowledge base, two plots from
+    its centre"""
     ctr = int(sim.citystate_center[B0, s])
-    hs = next(int(n) for n in sim.neigh[ctr].tolist() if n >= 0 and int(sim.district[B0, n]) < 0)
-    sim.district[B0, hs] = sim._hs_idx
-    sim.district_complete[B0, hs] = True
-    sim.city_dist_tile[B0, row, 0, sim._hs_idx] = hs
-    sim._bldg_version += 1
-    sim._eff_version += 1
-    assert bool(sim._minor_monk_ok(s)[B0]), "the monk's city is not eligible"
-    mp = price(sim, "WARRIOR_MONK", float(sim.rules.faith_purchase_mult))
-    sim.citystate_faith[B0, s] = mp + 7.0
-    sim.citystate_treasury[B0, s] = 0.0
-    seek(sim, lambda r: r < int(rules.citystate["militaryBuyBp"][0]))
-    sim._minor_purchases(s)
-    assert kinds(sim, s).count("WARRIOR_MONK") == 1, kinds(sim, s)
-    assert float(sim.citystate_faith[B0, s]) == 7.0
-    print("  5 Warrior Monk OK — bought with Faith where the majority religion allows")
+    ring = [t for t in range(sim.T) if int(sim.pair_dist[ctr, t]) == 2][:6]
+    assert len(ring) == 6
+    sim.citystate_kb_slot[B0, s] = -2
+    for k, t in enumerate(ring):
+        sim.citystate_kb_slot[B0, s, k] = -1
+        sim.citystate_kb_owner[B0, s, k] = BARB_SEAT
+        sim.citystate_kb_type[B0, s, k] = UNI.index("HORSEMAN")
+        sim.citystate_kb_seen[B0, s, k] = int(sim.turn)
+        sim.citystate_kb_plot[B0, s, k] = t
+
+
+def test_threatened_buys(rules, path) -> None:
+    sim = build(rules, path)
+    s = a_minor(sim)
+    clear_army(sim, s)
+    threaten(sim, s)
+    assert int(sim._minor_threat(s)[B0]) > -1, "six Horsemen beside the city did not threaten it"
+    sim.citystate_treasury[B0, s] = 2000.0
+    sim.citystate_ai_on[B0, s] = True
+    sim._minor_ai_turn(s)
+    assert int(sim.citystate_threat[B0, s]) > -1
+    assert kinds(sim, s), "the threatened city bought nothing"
+    assert float(sim.citystate_treasury[B0, s]) < 2000.0
+    got = kinds(sim, s)
+    # an unthreatened city buys nothing
+    sim = build(rules, path)
+    clear_army(sim, s)
+    sim.citystate_kb_slot[B0, s] = -2
+    sim.citystate_treasury[B0, s] = 2000.0
+    sim.citystate_ai_on[B0, s] = True
+    sim._minor_ai_turn(s)
+    assert int(sim.citystate_threat[B0, s]) == -1
+    assert kinds(sim, s) == [] and float(sim.citystate_treasury[B0, s]) == 2000.0
+    print(f"  2 purchases OK — threatened, it buys {got}; unthreatened, nothing")
 
 
 def test_upgrades(rules, path) -> None:
@@ -287,7 +183,7 @@ def test_upgrades(rules, path) -> None:
     sim._minor_upgrades(s, one * 2)
     assert UNI[int(sim.major_unit_type[B0, b])] == up
     assert float(sim.citystate_treasury[B0, s]) == 100.0 - gold
-    print("  6 upgrades OK — one per completion, first in slot order, the flat price")
+    print("  3 upgrades OK — one per completion, first in slot order, the flat price")
 
 
 def test_wander(rules, path) -> None:
@@ -321,7 +217,7 @@ def test_wander(rules, path) -> None:
     assert int(sim.rng_state[B0]) == s1, "not one draw"
     assert int(sim.major_unit_tile[B0, u]) == tiles[((s1 >> 16) * (len(tiles) & 0xFFFF)) >> 16]
     assert int(sim.unit_pslot[B0, u + sim.POOL_LO["major"]]) >= 0, "no pool slot"
-    print("  7 wander OK — one draw over the reach's plots near the city, the one drawn")
+    print("  4 wander OK — one draw over the reach's plots near the city, the one drawn")
 
 
 def test_free_city(rules, path) -> None:
@@ -331,38 +227,49 @@ def test_free_city(rules, path) -> None:
     F = sim.FREE_ROW
     act = torch.zeros(sim.B, dtype=torch.bool)
     act[B0] = True
-    # the Free Cities' own research (its row FR), holding what the table's rows ask
     for t in ("POTTERY", "ARCHERY", "MASONRY"):
         sim.citystate_techs[B0, sim.FR, TECHS.index(t)] = True
-    techs, civics = sim.citystate_techs[:, sim.FR], sim.citystate_civics[:, sim.FR]
-    train = sim._trainable_in(techs, civics, sim._free_any_res)
-    units0 = len(fct.free_units(sim))
+    # nothing in hand: the Production banks, and the AI queues its pick
+    sim._q_clear(torch.tensor([B0]), F, j)
+    sim.city_prod_bank[B0, F, j] = 0.0
     prod = torch.full((sim.B,), 5.0, dtype=torch.float64)
-    sim._free_city_build(j, act, prod, techs, civics, train)
-    assert float(sim.city_free_pot[B0, F, j]) == 5.0 and len(fct.free_units(sim)) == units0
-    sim._free_city_build(j, act, prod * 20, techs, civics, train)
+    sim._free_city_build(j, act, prod)
+    assert float(sim.city_prod_bank[B0, F, j]) == 5.0
+    head = int(sim.city_current[B0, F, j, 0])
+    assert head >= 0, "the Free City's AI queued nothing"
+    sim._free_city_build(j, act, torch.full((sim.B,), 3.0, dtype=torch.float64))
+    if int(sim.city_current[B0, F, j, 0]) == head:
+        assert float(sim.city_progress[B0, F, j, 0]) == 8.0 and float(sim.city_prod_bank[B0, F, j]) == 0.0
+    # the item completes at its price: the Monument rises, 2 left in the bank
+    mon = BLD.index("MONUMENT")
+    sim._q_clear(torch.tensor([B0]), F, j)
+    one = torch.zeros(sim.B, dtype=torch.bool)
+    one[B0] = True
+    sim._q_push(F, torch.full((sim.B,), j, dtype=torch.long), one, torch.full((sim.B,), mon, dtype=torch.long),
+                torch.zeros(sim.B, dtype=torch.float64))
+    sim.city_progress[B0, F, j, 0] = float(sim.rules_dev.b_cost[mon]) - 1
+    sim.city_prod_bank[B0, F, j] = 0.0
+    sim._free_city_build(j, act, torch.full((sim.B,), 3.0, dtype=torch.float64))
+    assert bool(sim.city_bldg[B0, F, j, mon]) and float(sim.city_prod_bank[B0, F, j]) == 2.0
+    assert int(sim.city_current[B0, F, j, 0]) != mon
+    # a unit lands on or beside the centre; the walls fill their pool
+    units0 = len(fct.free_units(sim))
+    arc = UNI.index("ARCHER")
+    sim._q_clear(torch.tensor([B0]), F, j)
+    sim._q_push(F, torch.full((sim.B,), j, dtype=torch.long), one, torch.full((sim.B,), sim.UNIT_BASE + arc, dtype=torch.long),
+                torch.full((sim.B,), float(sim._type_cost[arc]), dtype=torch.float64))
+    sim.city_progress[B0, F, j, 0] = float(sim._type_cost[arc])
+    sim._free_city_build(j, act, torch.ones(sim.B, dtype=torch.float64))
     got = fct.free_units(sim)
     assert len(got) == units0 + 1 and UNI[got[-1][1]] == "ARCHER", got
-    assert int(sim.unit_free_city[B0, got[-1][0]]) == -1, "a trained unit carries a grant's mark"
-    assert float(sim.city_free_pot[B0, F, j]) == 105.0 - float(sim._type_cost[UNI.index("ARCHER")])
-    # the Monument, then the Granary
-    sim.city_free_pot[B0, F, j] = 0.0
-    sim._free_city_build(j, act, prod * 20, techs, civics, train)
-    assert bool(sim.city_bldg[B0, F, j, BLD.index("MONUMENT")])
-    sim._free_city_build(j, act, prod * 20, techs, civics, train)
-    assert bool(sim.city_bldg[B0, F, j, BLD.index("GRANARY")])
-    # the walls fill their pool; a breach is repaired at the HP it puts back
-    sim._free_city_build(j, act, prod * 20, techs, civics, train)
-    assert bool(sim.city_bldg[B0, F, j, BLD.index("ANCIENT_WALLS")])
+    walls = BLD.index("ANCIENT_WALLS")
+    sim._q_clear(torch.tensor([B0]), F, j)
+    sim._q_push(F, torch.full((sim.B,), j, dtype=torch.long), one, torch.full((sim.B,), walls, dtype=torch.long),
+                torch.zeros(sim.B, dtype=torch.float64))
+    sim.city_progress[B0, F, j, 0] = float(sim.rules_dev.b_cost[walls])
+    sim._free_city_build(j, act, torch.ones(sim.B, dtype=torch.float64))
     mx = int(sim._free_walls_max(j)[B0])
-    assert int(sim.city_outer_hp[B0, F, j]) == mx > 0
-    sim.city_outer_hp[B0, F, j] = mx - 30
-    sim.city_last_hit[B0, F, j] = int(sim.turn) - 10
-    sim.city_free_pot[B0, F, j] = 0.0
-    sim._free_city_build(j, act, torch.full_like(prod, 29.0), techs, civics, train)
-    assert int(sim.city_outer_hp[B0, F, j]) == mx - 30
-    sim._free_city_build(j, act, torch.full_like(prod, 1.0), techs, civics, train)
-    assert int(sim.city_outer_hp[B0, F, j]) == mx and float(sim.city_free_pot[B0, F, j]) == 0.0
+    assert bool(sim.city_bldg[B0, F, j, walls]) and int(sim.city_outer_hp[B0, F, j]) == mx > 0
     # its units wander near it in its own phase
     before = [t for _s, _u, t in fct.free_units(sim)]
     for k in range(6):
@@ -372,20 +279,63 @@ def test_free_city(rules, path) -> None:
     assert any(t != b for (_s, _u, t), b in zip(after, before)), "no Free Cities unit wandered"
     assert all(int(sim.pair_dist[centre, t]) <= 6 for _s, _u, t in after)
     assert all(int(sim.unit_seat[B0, s_]) == FREE_SEAT for s_, _u, _t in after)
-    print("  8 Free City OK — the pot, the ranged class, Monument and Granary, walls and their repair, the wander")
+    print("  5 Free City OK — the bank and the pick, the Monument at its price, the Archer, the walls, the wander")
+
+
+def test_free_city_pick(rules) -> None:
+    """seed9001's opening, a second city for seat 0 on plot 652 (population
+    3) revolting: the Free City's tables and its picks over eight steps of 5
+    Production — the numbers tests/cpu/city/free-city-build.test.ts pins"""
+    from core.simbase import FIXTURES
+    from core.sim_cityvalue import _FreeFacts
+    sim = opened(rules, FIXTURES / "seed9001.json", 0)
+    tile = 652
+    one = torch.ones(sim.B, dtype=torch.bool)
+    sim._spawn_unit(0, one, torch.full((sim.B,), tile, dtype=torch.long), sim._settler_idx)
+    ext = sim.seat_ext.clone()
+    sim.seat_ext[:, 0] = True
+    smap = sim._seat_slot_map(0)
+    typ = sim.unit_type.gather(1, smap.clamp(min=0))
+    tl = sim.unit_tile.gather(1, smap.clamp(min=0))
+    sim._apply_seat_unit_actions(0, torch.where((smap >= 0) & (typ == sim._settler_idx) & (tl == tile),
+                                                torch.full_like(smap, sim._A_FOUND), torch.full_like(smap, -1)))
+    sim.seat_ext.copy_(ext)
+    col = int(sim.city_alive[B0, 0].nonzero()[-1])
+    assert int(sim.city_center[B0, 0, col]) == tile
+    sim.city_pop[B0, 0, col] = 3
+    flip = torch.zeros(sim.B, sim.RC, dtype=torch.bool)
+    flip[B0, col] = True
+    sim._seat_loyalty_flips(0, flip)
+    F = sim.FREE_ROW
+    j = int(sim.centre_slot_at[B0, tile])
+    f = _FreeFacts(sim, j)
+    fx_min = -9999 * 256
+    bt = [int(v[0]) for v in sim._cv_building_table(f) if int(v[0]) != fx_min]
+    ut = [int(v[0]) for v, read in sim._cv_unit_table(f) if bool(read[0]) and int(v[0]) != fx_min]
+    assert (len(bt), sum(bt), len(ut), sum(ut)) == (19, 70346, 33, 48795), (len(bt), sum(bt), len(ut), sum(ut))
+    act = torch.zeros(sim.B, dtype=torch.bool)
+    act[B0] = True
+    seq = []
+    for _ in range(8):
+        sim._free_city_build(j, act, torch.full((sim.B,), 5.0, dtype=torch.float64))
+        code = int(sim.city_current[B0, F, j, 0])
+        name = (BLD[code] if 0 <= code < sim.NB else UNI[code - sim.UNIT_BASE] if code >= sim.UNIT_BASE else "-")
+        seq.append((name, float(sim.city_progress[B0, F, j, 0]), float(sim.city_prod_bank[B0, F, j])))
+    want = [("MONUMENT", 0.0, 5.0), ("MONUMENT", 10.0, 0.0), ("MONUMENT", 15.0, 0.0), ("MONUMENT", 20.0, 0.0),
+            ("MONUMENT", 25.0, 0.0), ("SCOUT", 0.0, 0.0), ("SCOUT", 5.0, 0.0), ("SCOUT", 10.0, 0.0)]
+    assert seq == want, seq
+    print("  6 Free City's pick OK — seed9001's revolt: the tables and eight steps as the TS twin pins")
 
 
 def main() -> int:
     rules = load_rules()
     path = fixture_paths()[0]
-    test_plan(rules, path)
     test_upkeep(rules, path)
-    test_builder_buy(rules, path)
-    test_military_buy(rules, path)
-    test_monk_buy(rules, path)
+    test_threatened_buys(rules, path)
     test_upgrades(rules, path)
     test_wander(rules, path)
     test_free_city(rules, path)
+    test_free_city_pick(rules)
     print("BATTERY OK minor_purse")
     return 0
 

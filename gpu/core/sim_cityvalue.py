@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .simbase import *  # noqa: F401,F403 — torch, constants, helpers: the shared floor
-from .sim_research import _FX, _discounted, _fmul, _fx_const, _present_value, _turns_at
+from .sim_research import _FX, _discounted, _fmul, _fx_const, _fx_const_t, _present_value, _turns_at
 
 # THE CITY BUILD AI'S VALUES (cpu/core/aiPlotValue.ts, aiDistrictValue.ts,
 # aiProjectValue.ts, aiCityBuild.ts's growth forecast and housing value,
@@ -45,6 +45,17 @@ def _f32(x: float) -> float:
     return struct.unpack("f", struct.pack("f", x))[0]
 
 
+def _engine_rows(rows: list, engine: list, n: int) -> torch.Tensor:
+    """[n] per engine index the AI row naming it, a row no civilization
+    owns before one that does; -1 none"""
+    out = [-1] * max(n, 1)
+    for trait in (False, True):
+        for k, (r, e) in enumerate(zip(rows, engine)):
+            if 0 <= e < n and out[e] < 0 and bool(r.get("trait")) == trait:
+                out[e] = k
+    return torch.tensor(out, dtype=torch.long)
+
+
 def _between(a: torch.Tensor, t: torch.Tensor, h: torch.Tensor, r: int) -> torch.Tensor:
     """PV(h) - PV(t) of `a` a turn"""
     return _present_value(a, r, h) - _present_value(a, r, t)
@@ -85,10 +96,16 @@ class SimCityValue:
             "reads": {k: set(v) for k, v in cb["modifierReads"].items()},
             "engine": cb["engineIndex"],
             "promo_minor": {k: int(v) for k, v in cb["minorPromotionWeights"].items()},
+            "promo_free": {k: int(v) for k, v in cb["freePromotionWeights"].items()},
+            "default_handicap": int(cb["defaultHandicap"]),
             "plot_names": cb["plotNames"],
             # per engine district its install type (the row no civilization owns)
             "dist_name": dict(reversed([(e, r["type"]) for r, e in zip(cb["districts"], cb["engineIndex"]["district"])
                                         if e >= 0 and not r["trait"]])),
+            # per engine building and district its AI row (the row no
+            # civilization owns first), -1 none
+            "building_row": _engine_rows(cb["buildings"], cb["engineIndex"]["building"], len(self.rules.b_cost)),
+            "district_row": _engine_rows(cb["districts"], cb["engineIndex"]["district"], len(self.rules.districts)),
         }
         self._cv_cache = cached
         # the rows the tables value (a civilization's own building and a wonder
@@ -346,8 +363,8 @@ class SimCityValue:
             return torch.full_like(like, _FX_MIN)
         unit = self._cv_build_unit(f, row)
         none = unit < 0
-        cur, res, feat = f.improvement(), f.resource(), f.feature()
-        pill = _t(f.pillaged(), like).bool()
+        cur, res, feat = f.plot_improvement(), f.resource(), f.feature()
+        pill = _t(f.plot_pillaged(), like).bool()
         if cur == imp:
             rep = (f.resource_value(res, 1, t, h) if res else torch.zeros_like(like)) + self._cv_improvement_yields(f, imp, t, h)
             out = torch.where(pill, rep, torch.zeros_like(rep))
@@ -386,10 +403,17 @@ class SimCityValue:
     # -- the district value (aiDistrictValue.ts) ---------------------------
 
     def _cv_rows_value(self, f, district: str) -> torch.Tensor:
+        """a district's per-turn value from its adjacency rows, once per facts
+        holding a memo (`rows_memo`) and district"""
+        memo = getattr(f, "rows_memo", None)
+        if memo is not None and district in memo:
+            return memo[district]
         like = f.like()
         v = torch.zeros_like(like)
         for y in _YIELDS:
             v = v + self._cv_yield(_t(f.rows_adjacency(district, y), like) * _FX, y, f.yield_w(y))
+        if memo is not None:
+            memo[district] = v
         return v
 
     def _cv_district_body(self, f, district: str, t: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
@@ -409,7 +433,11 @@ class SimCityValue:
         own = self._cv_rows_value(f, district)
         best = own.clone()
         for d in f.other_districts(district):
-            best = torch.maximum(best, self._cv_rows_value(f, d))
+            # a name, or (name, the elements it stands for)
+            if isinstance(d, tuple):
+                best = torch.where(d[1], torch.maximum(best, self._cv_rows_value(f, d[0])), best)
+            else:
+                best = torch.maximum(best, self._cv_rows_value(f, d))
         v = v + own
         if not row["aqueduct"]:
             v = v - torch.where(best > own, best, torch.zeros_like(best))
@@ -422,7 +450,7 @@ class SimCityValue:
         chron = _fmul(_t(f.chronology(), like) * _FX, pd)
         may = torch.ones_like(like, dtype=torch.bool) if not row["requiresPopulation"] else _t(f.district_cap(), like) > _t(f.district_count(), like)
         v = v + torch.where(may, _fmul(torch.full_like(like, _fx_const(0.5)), chron), torch.zeros_like(chron))
-        here = f.district() == district
+        here = f.plot_district() == district
         if here:
             v = v + chron
         if row["regionalRange"] > 0:
@@ -491,7 +519,7 @@ class SimCityValue:
         price = _discounted(self._cv_yield(_t(f.purchase_cost(), like) * _FX, "YIELD_GOLD"), r, t)
         value = value - torch.where(owned, torch.zeros_like(price), price)
         zero = torch.zeros_like(like, dtype=torch.bool)
-        feat, res, cur = f.feature(), f.resource(), f.improvement()
+        feat, res, cur = f.feature(), f.resource(), f.plot_improvement()
         if feat and not f.keeps_feature(district):
             if not T["feat"].get(feat, {}).get("removable"):
                 zero = torch.ones_like(zero)
@@ -501,12 +529,12 @@ class SimCityValue:
                 zero = torch.ones_like(zero)
             value = value + self._cv_harvest(f, res, t, h)
         if cur:
-            pill = _t(f.pillaged(), like).bool()
+            pill = _t(f.plot_pillaged(), like).bool()
             old = self._cv_improvement_yields(f, cur, t, h) if cur in T["imp"] else torch.zeros_like(like)
             if res:
                 old = old + f.resource_value(res, -1, t, h)
             value = value - torch.where(pill, torch.zeros_like(old), old)
-        repair = (f.district() == district) & _t(f.district_pillaged(), like).bool()
+        repair = (f.plot_district() == district) & _t(f.plot_district_pillaged(), like).bool()
         value = value + torch.where(repair & _t(f.is_city(), like).bool(), torch.full_like(value, 12500 * _FX), torch.zeros_like(value))
         value = value + self._cv_district_body(f, district, t, h)
         value = torch.where(repair, value * 2, value)
@@ -750,9 +778,19 @@ class SimCityValue:
     def _cv_unit_table(self, f) -> list:
         """THE UNITS TABLE of the city centre: per Units row (value, read)"""
         out = []
+        like = f.like()
+        hz = f.value_horizon()
         for u in self._cv_tables()["unit_rows"]:
+            # a unit not the player's own version, or landing past the
+            # horizon, values FX(-9999) whatever the rest reads
+            if f.unit_version(u["type"]) != u["type"]:
+                out.append((torch.full_like(like, _FX_MIN), torch.ones_like(like, dtype=torch.bool)))
+                continue
             t = self._cv_unit_turns(f, u["type"])
-            v, read = self._cv_unit(f, u["type"], t, torch.full_like(t, f.value_horizon()))
+            if bool(((t >= hz) | (t < 0)).all()):
+                out.append((torch.full_like(t, _FX_MIN), torch.ones_like(t, dtype=torch.bool)))
+                continue
+            v, read = self._cv_unit(f, u["type"], t, torch.full_like(t, hz))
             neg = t < 0
             out.append((torch.where(neg, torch.full_like(v, _FX_MIN), v), read | neg))
         return out
@@ -889,9 +927,12 @@ class SimCityValue:
         if b["entertainment"] > 0:
             cities = [f.amenity()] if b["regionalRange"] <= 1 else f.regional_amenities(b["regionalRange"])
             e = torch.zeros_like(like)
-            for bal, ys in cities:
+            for c in cities:
+                # (balance, yields), or with the elements the city stands for
+                bal, ys = c[0], c[1]
                 a = self._cv_amenity_per_turn(f, _t(bal, like), ys)
-                e = e + torch.where(t == h, _discounted(a, r, t), _present_value(a, r, h) - _present_value(a, r, t))
+                add = torch.where(t == h, _discounted(a, r, t), _present_value(a, r, h) - _present_value(a, r, t))
+                e = e + (torch.where(c[2], add, torch.zeros_like(add)) if len(c) > 2 else add)
             value = value + (e if b["regionalRange"] <= 1 else e.clamp(max=50 * _FX))
         for u in b["units"]:
             if u == "UNIT_ARCHAEOLOGIST":
@@ -915,16 +956,39 @@ class SimCityValue:
                 continue
             no = self._cv_refused(f, b)
             t = self._cv_building_turns(f, b)
-            v = self._cv_building(f, b["type"], t, torch.full_like(t, f.value_horizon()))
+            hz = f.value_horizon()
+            # refused, or landing past the horizon: FX(-9999)
+            if bool((no | (t < 0) | (t >= hz)).all()):
+                out.append(torch.full_like(t, _FX_MIN))
+                continue
+            v = self._cv_building(f, b["type"], t, torch.full_like(t, hz))
             out.append(torch.where(no | (t < 0), torch.full_like(v, _FX_MIN), v))
         return out
 
     # -- the Default Specialization pick (aiCityBuild.ts) ------------------
 
-    def _cv_pick(self, buildings: list, units: list, projects: list, p):
+    def _cv_pick(self, buildings: list, units: list, projects: list, p, bests=None):
         """0x5d4d70, `defaultSpecialization` over the tables (lists of [...]
-        tensors, database order) and the pick facts `p`: per element the
-        kind (0 building, 1 unit, 2 project, -1 none), the row, the value"""
+        tensors, database order) and the pick facts `p` (its three bests,
+        `_cv_bests`, where read already): per element the kind (0 building,
+        1 unit, 2 project, -1 none), the row, the value"""
+        (b_idx, b_val), (u_idx, u_val), (p_idx, p_val) = bests or self._cv_bests(buildings, units, projects, p)
+        like = buildings[0]
+        kind = torch.full_like(like, -1)
+        row = torch.full_like(like, -1)
+        val = torch.full_like(like, _FX_MIN)
+        is_p = p_idx >= 0
+        kind, row, val = torch.where(is_p, 2, kind), torch.where(is_p, p_idx, row), torch.where(is_p, p_val, val)
+        is_u = (u_idx >= 0) & (u_val >= p_val)
+        kind, row, val = torch.where(is_u, 1, kind), torch.where(is_u, u_idx, row), torch.where(is_u, u_val, val)
+        is_b = (b_idx >= 0) & (b_val >= u_val) & (b_val >= p_val)
+        kind, row, val = torch.where(is_b, 0, kind), torch.where(is_b, b_idx, row), torch.where(is_b, b_val, val)
+        return kind, row, val
+
+    def _cv_bests(self, buildings: list, units: list, projects: list, p):
+        """`specializationBests` (0x5d0860, 0x5d2600, 0x5d1f10): the best
+        building, unit and project, each (row, value) per element (-1 and
+        FX(-9999) none; the defensive pick values no project: 0)"""
         T = self._cv_tables()
         like = buildings[0]
         defense = _t(p.defense(), like).bool()
@@ -957,16 +1021,7 @@ class SimCityValue:
             take = ~defense & _t(p.can_produce(pr["type"]), like).bool() & (projects[k] > p_val)
             p_val = torch.where(take, projects[k], p_val)
             p_idx = torch.where(take, torch.full_like(p_idx, k), p_idx)
-        kind = torch.full_like(like, -1)
-        row = torch.full_like(like, -1)
-        val = torch.full_like(like, _FX_MIN)
-        is_p = p_idx >= 0
-        kind, row, val = torch.where(is_p, 2, kind), torch.where(is_p, p_idx, row), torch.where(is_p, p_val, val)
-        is_u = (u_idx >= 0) & (u_val >= p_val)
-        kind, row, val = torch.where(is_u, 1, kind), torch.where(is_u, u_idx, row), torch.where(is_u, u_val, val)
-        is_b = (b_idx >= 0) & (b_val >= u_val) & (b_val >= p_val)
-        kind, row, val = torch.where(is_b, 0, kind), torch.where(is_b, b_idx, row), torch.where(is_b, b_val, val)
-        return kind, row, val
+        return (b_idx, b_val), (u_idx, u_val), (p_idx, p_val)
 
     # -- the military AI's Combat Desire (aiMilitary.ts) ---------------------
 
@@ -1142,7 +1197,10 @@ class SimCityValue:
         if collection in ("COLLECTION_OWNER", "COLLECTION_CITY_TRAINED_UNITS"):
             return [{"kind": "city", "mask": one}]
         if collection == "COLLECTION_PLAYER_CITIES":
-            return [{"kind": "city", "mask": one}] * int(f.player_cities())
+            n = f.player_cities()
+            if torch.is_tensor(n):
+                return [{"kind": "city", "mask": n > k} for k in range(int(n.max()) if n.numel() else 0)]
+            return [{"kind": "city", "mask": one}] * int(n)
         if collection == "COLLECTION_CITY_DISTRICTS":
             return [{"kind": "district", "type": d, "mask": _t(held, like).bool()} for d, held in f.city_districts()]
         if collection == "COLLECTION_CITY_PLOT_YIELDS":
@@ -1456,16 +1514,7 @@ class _MinorFacts:
             dev = sim.device
             eng = self.E["unit"]
             version = torch.tensor([self.unit_version(r["type"]) is not None for r in rows], dtype=torch.bool, device=dev)
-            have_t, have_c = sim.citystate_techs[:, s], sim.citystate_civics[:, s]
-            obs = torch.zeros(sim.B, nu, dtype=torch.bool, device=dev)
-            for k, r in enumerate(rows):
-                for o in r["obsolete"]:
-                    ti = self.E["tech"].get(o, -1)
-                    ci = self.E["civic"].get(o, -1)
-                    if ti >= 0:
-                        obs[:, k] |= have_t[:, ti]
-                    if ci >= 0:
-                        obs[:, k] |= have_c[:, ci]
+            obs = self._obsolete()
             mine = self._mine()
             owned = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
             for k, ei in enumerate(eng):
@@ -1474,6 +1523,25 @@ class _MinorFacts:
             known = sim._cv_known(s)
             return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known)
         return self._get("uprod", build)
+
+    def _obsolete(self):
+        """[B, NU_ai] per AI unit row: obsolete to the player (0x538460, its
+        ObsoleteTech or ObsoleteCivic or their Mandatory columns held)"""
+        def build():
+            sim, s = self.sim, self.s
+            rows = self.T["unit_rows"]
+            have_t, have_c = sim.citystate_techs[:, s], sim.citystate_civics[:, s]
+            obs = torch.zeros(sim.B, len(rows), dtype=torch.bool, device=sim.device)
+            for k, r in enumerate(rows):
+                for o in r["obsolete"]:
+                    ti = self.E["tech"].get(o, -1)
+                    ci = self.E["civic"].get(o, -1)
+                    if ti >= 0:
+                        obs[:, k] |= have_t[:, ti]
+                    if ci >= 0:
+                        obs[:, k] |= have_c[:, ci]
+            return obs
+        return self._get("obs", build)
 
     def unit_production(self, u):
         v, entry = self._production_table()
@@ -1571,6 +1639,9 @@ class _MinorFacts:
         return torch.where(none, torch.zeros_like(t), t)
 
     def tech_turns(self, t):
+        return self._get(("tt", t), lambda: self._tech_turns(t))
+
+    def _tech_turns(self, t):
         sim, s = self.sim, self.s
         return self._analysed(t, self.E["tech"], sim.citystate_techs[:, s], sim.citystate_cur_tech[:, s],
                               sim.citystate_ai_left_seen[:, s],
@@ -1589,6 +1660,9 @@ class _MinorFacts:
         return torch.where(cur >= 0, left, torch.full_like(left, -1))
 
     def civic_turns(self, c):
+        return self._get(("ct", c), lambda: self._civic_turns(c))
+
+    def _civic_turns(self, c):
         sim, s = self.sim, self.s
         return self._analysed(c, self.E["civic"], sim.citystate_civics[:, s], sim.citystate_cur_civic[:, s],
                               self._get("civic_left", self._civic_left),
@@ -1656,7 +1730,11 @@ class _MinorFacts:
     def build_turns(self, item):
         """the turns the item takes at the city's Production under its
         percent, from the progress it keeps and the overflow store; 500 for
-        an item the minor has no row for"""
+        an item the minor has no row for (once per item while the item in
+        hand stands)"""
+        return self._get(("bt", item, getattr(self.sim, "_mi_ver", 0)), lambda: self._build_turns(item))
+
+    def _build_turns(self, item):
         sim, s = self.sim, self.s
         k = self._item_key(item)
         if k < 0:
@@ -1855,3 +1933,336 @@ class _MinorFacts:
         t = sim.city_dist_tile[:, self.row, 0, dv]
         t0 = t.clamp(min=0).unsqueeze(1)
         return (t >= 0) & sim.district_complete.gather(1, t0).squeeze(1) & ~sim._fallout().gather(1, t0).squeeze(1)
+
+
+class _FreeFacts(_MinorFacts):
+    """A Free City as the city build AI reads it (`freeCityBuildFacts` over
+    `majorBuildFacts`, `freeCityProjectFacts`, `freeCityPickFacts`): the
+    Free City in column `j` of the Free Cities' row, the Free Cities'
+    research (its row `FR`), no government, no combat units counted against
+    its trade, TRAIT_LEADER_FREE_CITIES' promotion lists, the majors' default
+    trait alone for its versions, the default handicap; its units in the
+    hostile pool; no knowledge base's units known; its queue the city's"""
+
+    def __init__(self, sim, j: int):
+        super().__init__(sim, sim.FR)
+        self.row = sim.FREE_ROW
+        self.j = j
+        self.seat = FREE_SEAT
+
+    # the value view: the Gold weight of a seat losing Gold (`yieldWeights`:
+    # its gold per turn, the Free Cities' cities' Gold less their units'
+    # upkeep, x -0.2 while below 0)
+    def yield_w(self, y):
+        if y != "YIELD_GOLD":
+            return 0
+        def build():
+            sim = self.sim
+            tot = self._stats()[0]
+            alive = sim.city_alive[:, self.row, : tot.shape[1]]
+            gold = (tot[:, :, 2] * alive.double()).sum(dim=1)
+            m = self._mine()
+            up = (sim._unit_maintenance(sim.barb_unit_type, sim.barb_unit_formation, None).double() * m.double()).sum(dim=1)
+            gpt = gold - up
+            return torch.where(gpt < 0, _fmul(torch.full_like(gpt, _fx_const(-0.2), dtype=torch.long), _fx_const_t(gpt)),
+                               torch.zeros_like(gpt, dtype=torch.long))
+        return self._get("gold_w", build)
+
+    def _total(self, k: int) -> torch.Tensor:
+        return self._stats()[0][:, self.j, k]
+
+    def _mine(self):
+        sim = self.sim
+        return sim.barb_unit_alive & (sim.barb_unit_seat == FREE_SEAT)
+
+    def population(self):
+        return self.sim.city_pop[:, self.row, self.j].long()
+
+    def capital(self):
+        return 0
+
+    def district_count(self):
+        return (self.sim.city_dist_tile[:, self.row, self.j] >= 0).sum(dim=1)
+
+    def has_wonder(self):
+        return (self.sim.city_wonder[:, self.row, self.j] >= 0).any(dim=1)
+
+    def at_war(self):
+        return self.sim.war[:, self.row].any(dim=1)
+
+    def yield_pct(self, y):
+        return 0
+
+    def unit_version(self, u):
+        r = self.T["unit"].get(u)
+        return u if r is not None and r["canTrain"] and not r["trait"] else None
+
+    def has_building(self, b):
+        bi = self._building_index(b)
+        if bi < 0:
+            return self._bools(False)
+        return self.sim.city_bldg[:, self.row, self.j, bi]
+
+    def _district_done(self, dv: int):
+        sim = self.sim
+        t = sim.city_dist_tile[:, self.row, self.j, dv]
+        return (t >= 0) & sim.district_complete.gather(1, t.clamp(min=0).unsqueeze(1)).squeeze(1)
+
+    def worship_is(self, b):
+        return self.sim._worship_offered(self.row)[:, self.j] == self._building_index(b)
+
+    def _centre(self):
+        return self.sim.city_center[:, self.row, self.j]
+
+    def ground_refuses(self, b):
+        bi = self._building_index(b)
+        if bi < 0:
+            return 1
+        if bi == int(self.sim._barrier_bidx):
+            return self.sim._city_lowland_count(self.row)[:, self.j] == 0
+        return 0
+
+    def amenity(self):
+        tot = self._stats()[0][:, self.j]
+        bal = self.sim._amen_balance_of[self.row][:, self.j]
+        ys = {y: tot[:, k] for k, y in enumerate(_YIELDS)}
+        return bal.long(), ys
+
+    def regional_amenities(self, r):
+        """the Free Cities' cities within `r` of the centre, each with the
+        games it stands in"""
+        sim = self.sim
+        tot = self._stats()[0]
+        ctr = self._centre().clamp(min=0)
+        out = []
+        for c in range(tot.shape[1]):
+            cc = sim.city_center[:, self.row, c]
+            near = sim.city_alive[:, self.row, c] & (cc >= 0) & (sim.pair_dist[ctr, cc.clamp(min=0)].long() <= r)
+            bal = sim._amen_balance_of[self.row][:, c]
+            out.append((bal.long(), {y: tot[:, c, k] for k, y in enumerate(_YIELDS)}, near))
+        return out
+
+    def _production_table(self):
+        def build():
+            sim = self.sim
+            rows = self.T["unit_rows"]
+            nu = len(rows)
+            dev = sim.device
+            eng = self.E["unit"]
+            version = torch.tensor([self.unit_version(r["type"]) is not None for r in rows], dtype=torch.bool, device=dev)
+            obs = self._obsolete()
+            mine = self._mine()
+            owned = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
+            for k, ei in enumerate(eng):
+                if ei >= 0:
+                    owned[:, k] = (mine & (sim.barb_unit_type == ei)).sum(dim=1)
+            known = torch.zeros(sim.B, nu, dtype=torch.long, device=dev)
+            return sim._cv_unit_production(version.unsqueeze(0).expand(sim.B, -1), obs, owned, known)
+        return self._get("uprod", build)
+
+    def trains_domain(self, d):
+        if d == "DOMAIN_SEA":
+            return self.sim._naval_capable(self.row)[:, self.j]
+        return 1
+
+    def trade_route_capacity(self):
+        return 0
+
+    def promotion_weight(self, c):
+        return self.T["promo_free"].get(c, _FX) if c else _FX
+
+    def handicap(self):
+        return self.T["default_handicap"]
+
+    def growth(self):
+        def build():
+            sim = self.sim
+            total, eff, _need, _tier, _lux = self._stats()
+            pop = sim.city_pop[:, self.row, self.j].double()
+            surplus = total[:, self.j, 0] - pop * sim.rules.food_per_citizen
+            housing = sim._seat_housing(self.row)[1][:, self.j]
+            e = eff[:, self.j]
+            mult = torch.where(surplus > 0, torch.floor(e / surplus.clamp(min=1e-9) * _FX + 0.5), torch.full_like(surplus, _FX))
+            return {"surplus": torch.floor(surplus * _FX + 0.5).long(), "housing": torch.floor(housing).long(),
+                    "population": pop.long(), "stored": torch.floor(sim.city_growth[:, self.row, self.j].double() * _FX + 0.5).long(),
+                    "multiplier": mult.long()}
+        return self._get("growth", build)
+
+    # the item in hand: the queue's head, a code of the production layout
+    def _item_key(self, item: str) -> int:
+        sim = self.sim
+        if item.startswith("BUILDING_"):
+            return self._building_index(item)
+        if item.startswith("DISTRICT_"):
+            dv = self._didx(item)
+            si = next((k for k, sc in enumerate(sim._scaffold) if int(sc[0]) == dv), -1) if dv >= 0 else -1
+            return -1 if si < 0 else sim.DISTRICT_BASE + si
+        if item.startswith("UNIT_"):
+            ui = self._uidx(item)
+            return -1 if ui < 0 else sim.UNIT_BASE + ui
+        pi = self._pidx(item)
+        return -1 if pi < 0 else sim.PROJECT_BASE + pi
+
+    def producing(self):
+        return self.sim.city_current[:, self.row, self.j, 0] >= 0
+
+    def current_is(self, item):
+        k = self._item_key(item)
+        return (self.sim.city_current[:, self.row, self.j, 0] == k) & (k >= 0)
+
+    def _civic_left(self):
+        """the turns left on the civic in hand at the Free Cities' Culture
+        (-1 with none)"""
+        sim, s = self.sim, self.s
+        cur = sim.citystate_cur_civic[:, s]
+        cost = sim._research_cost(True).gather(1, cur.clamp(min=0).unsqueeze(1)).squeeze(1).long()
+        prog = torch.floor(sim.citystate_civic_prog[:, s].double() * _FX + 0.5).long()
+        tot = self._stats()[0]
+        alive = sim.city_alive[:, self.row, : tot.shape[1]]
+        rate = torch.floor((tot[:, :, 4] * alive.double()).sum(dim=1) * _FX + 0.5).long()
+        left = _turns_at(cost * _FX - prog, rate)
+        return torch.where(cur >= 0, left, torch.full_like(left, -1))
+
+    def _item_cost(self, item: str):
+        """`itemPrice` of the Free City's queue item [B] f64"""
+        sim = self.sim
+        row = self.row
+        B = sim.B
+        if item.startswith("UNIT_"):
+            ui = self._uidx(item)
+            if ui == sim._builder_idx:
+                return sim._builder_cost(torch.zeros(B, dtype=torch.long, device=sim.device)).double()
+            if ui == sim._trader_idx:
+                return sim._trader_cost(row).double()
+            return sim._type_cost[ui].double().expand(B)
+        if item.startswith("BUILDING_"):
+            bi = self._building_index(item)
+            if bi == int(sim._barrier_bidx):
+                return sim._flood_barrier_cost(row)[:, self.j].double()
+            return sim.rules_dev.b_cost.to(torch.float64)[bi].expand(B)
+        pct = sim._progress_pct_of(sim.citystate_techs[:, self.s].sum(dim=1), sim.citystate_civics[:, self.s].sum(dim=1))
+        if item.startswith("DISTRICT_"):
+            dv = self._didx(item)
+            return sim._progress_cost(int(sim._mb_d_base[dv]), int(sim._mb_d_k[dv]), pct).double()
+        pi = self._pidx(item)
+        if pi == sim._repair_proj_idx:
+            return sim._free_repair(self.j)[1]
+        prow = sim._proj_rows[pi]
+        if int(prow["pgb"]) >= 0:
+            return sim._progress_cost(int(prow["pgb"]), int(prow["pk"]), pct).double()
+        return torch.full((B,), float(max(int(prow["pc"]), 0)), dtype=torch.float64, device=sim.device)
+
+    def _item_pct(self, item: str):
+        return torch.zeros(self.sim.B, dtype=torch.float64, device=self.sim.device)
+
+    def build_turns(self, item):
+        """the turns the item takes at the city's Production from the
+        progress the queue holds on it and the bank; 500 for an item the city
+        has no row for"""
+        sim = self.sim
+        k = self._item_key(item)
+        if k < 0:
+            return 500
+        head = sim.city_current[:, self.row, self.j, 0]
+        progress = torch.where(head == k, sim.city_progress[:, self.row, self.j, 0].double(), torch.zeros(sim.B, dtype=torch.float64, device=sim.device))
+        progress = progress + sim.city_prod_bank[:, self.row, self.j].double()
+        cost = self._item_cost(item)
+        rate = torch.floor(self._total(1) * _FX + 0.5).long()
+        return _turns_at(torch.floor(cost * _FX).long() - torch.floor(progress * _FX + 0.5).long(), rate)
+
+    def player_cities(self):
+        sim = self.sim
+        return sim.city_alive[:, self.row].sum(dim=1)
+
+    def city_districts(self):
+        sim = self.sim
+        out = [("DISTRICT_CITY_CENTER", self._centre() >= 0)]
+        for dv, name in sorted(self.T["dist_name"].items()):
+            out.append((name, sim.city_dist_tile[:, self.row, self.j, dv] >= 0))
+        return out
+
+    def plot_valid(self):
+        def build():
+            sim = self.sim
+            d = self._disk()
+            d0 = d.clamp(min=0)
+            own = (sim.tile_seat.gather(1, d0) == self.row) & (sim.tile_city.gather(1, d0) == sim.city_id[:, self.row, self.j].unsqueeze(1))
+            return (d >= 0) & (self._centre() >= 0).unsqueeze(1) & own
+        return self._get("plots", build)
+
+    def city_strikes(self):
+        sim = self.sim
+        mx = sim._free_walls_max(self.j).long()
+        return torch.minimum(sim.city_outer_hp[:, self.row, self.j].long(), mx) > 0
+
+    def traders(self):
+        return 0
+
+    def trade_capacity(self):
+        return 0
+
+    def unit_cost(self, u):
+        ui = self._uidx(u)
+        if ui < 0:
+            return 0
+        return self._item_cost(u).long() if ui in (self.sim._builder_idx, self.sim._trader_idx) else int(self.sim._type_cost[ui])
+
+    def can_construct(self, b):
+        sim = self.sim
+        bi = self._building_index(b)
+        if bi < 0:
+            return self._bools(False)
+        f_t, f_c = sim.citystate_techs[:, self.s], sim.citystate_civics[:, self.s]
+        return sim._free_building_ok(self.j, bi, f_t, f_c) & sim._cv_constructible(self, self.T["bld"][b])
+
+    def can_train(self, u):
+        """CanTrain of a Free City: the Free Cities' research unlocks the
+        unit, no civilization's unique, none faith-bought, spawned or a spy,
+        no Trader or Settler, none asking a strategic resource (the Free
+        Cities ignore no requirement and hold no stockpile), a naval unit at a
+        coastal centre, no air unit"""
+        sim, s = self.sim, self.s
+        ui = self._uidx(u)
+        if ui < 0:
+            return self._bools(False)
+        spy = bool(sim.rules.units[ui]["spy"])
+        if (int(sim._type_uniq[ui]) >= 0 or bool(sim._type_faith_only[ui]) or bool(sim._type_spawn_only[ui]) or spy
+                or ui == sim._trader_idx or ui == sim._settler_idx or int(sim._type_air[ui]) > 0):
+            return self._bools(False)
+        if int(sim._type_resource[ui]) >= 0 and not sim._free_any_res:
+            return self._bools(False)
+        ok = self._bools(True)
+        ti, ci = int(sim._type_tech[ui]), int(sim._type_civic[ui])
+        if ti >= 0:
+            ok = ok & sim.citystate_techs[:, s, ti]
+        if ci >= 0:
+            ok = ok & sim.citystate_civics[:, s, ci]
+        if bool(sim.unit_naval[ui]):
+            ok = ok & sim._naval_capable(self.row)[:, self.j]
+        return ok
+
+    def can_produce(self, p):
+        sim = self.sim
+        pi = self._pidx(p)
+        if pi < 0 or pi != sim._repair_proj_idx:
+            return self._bools(False)
+        return sim._free_repair(self.j)[0]
+
+    def queue_item(self, kind: torch.Tensor, row: torch.Tensor):
+        """the pick (kind 0 building, 1 unit, 2 project; the AI row) as the
+        queue's code and its price (`majorQueueItem`), -1 none"""
+        sim = self.sim
+        T = self.T
+        code = torch.full_like(row, -1)
+        cost = torch.zeros(sim.B, dtype=torch.float64, device=sim.device)
+        for k in sorted(set(row[kind >= 0].tolist())):
+            for kd, rows in ((0, T["bld_rows"]), (1, T["unit_rows"]), (2, T["proj_rows"])):
+                m = (kind == kd) & (row == k)
+                if not bool(m.any()) or k >= len(rows):
+                    continue
+                key = self._item_key(rows[k]["type"])
+                if key < 0:
+                    continue
+                code = torch.where(m, key, code)
+                cost = torch.where(m, self._item_cost(rows[k]["type"]), cost)
+        return code, cost

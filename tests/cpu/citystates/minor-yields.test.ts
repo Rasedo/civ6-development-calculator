@@ -19,7 +19,7 @@ import { spawnUnit } from '../../../cpu/core/units';
 import { BUILDINGS } from '../../../cpu/data/buildings';
 import { CITIZEN_SCIENCE } from '../../../cpu/data/constants';
 import { UNITS } from '../../../cpu/data/units';
-import { LEVY_TURNS, MINOR_BUILD_ROWS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
+import { LEVY_TURNS, MINOR_PRODUCTION_PCT } from '../../../cpu/data/cityStates';
 import { tilesWithin } from '../../../world/hex';
 import type { CityState, CityStateType, GameState } from '../../../cpu/core/types';
 
@@ -79,11 +79,7 @@ describe("the minor's city rides the yield walk", () => {
     minorDistrict(state, cs, 'CAMPUS', 1);
     cs.buildings = ['LIBRARY'];
     state.turn = 1;
-    // nothing on its build table wanted: a spent Builder stands, every drawn
-    // row is never, and it keeps no army
-    spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat)!.charges = 0;
-    cs.buildFrom = MINOR_BUILD_ROWS.map((row) => (row.from ? -1 : 0));
-    cs.armyCap = 0;
+    // its first turn: nothing in hand yet (its AI picks after the step)
     const y = computeCityStats(state, minorCity(cs)).total;
     minorPhase(state);
     // the Science and the Culture wait in the overflow under the research

@@ -440,13 +440,17 @@ def main() -> None:
                and int(utribe[0, s]) >= 0 and bool(sim.tribe_alive[0, int(utribe[0, s])])
                and not has_target(sim, s)]
     assert raiders, "no barbarian fighter stands"
-    r = raiders[0]
-    here = int(sim.barb_unit_tile[0, r])
     land, _ = sim._tac_enter(BARB_SEAT)
-    spot = [n for n in sim.neigh[here].tolist()
-            if n >= 0 and bool(land[0, n]) and int(sim.military_at[0, n]) < 0 and int(sim.tmove[0, n]) == 0
-            and int(sim.improvement[0, n]) < 0 and int(sim.district[0, n]) < 0]
-    assert spot, "no open plot beside the raider"
+
+    def open_beside(u: int) -> list[int]:
+        here = int(sim.barb_unit_tile[0, u])
+        return [n for n in sim.neigh[here].tolist()
+                if n >= 0 and bool(land[0, n]) and int(sim.military_at[0, n]) < 0 and int(sim.tmove[0, n]) == 0
+                and int(sim.improvement[0, n]) < 0 and int(sim.district[0, n]) < 0]
+    # the first raider with an open flat plot beside it
+    r = next((u for u in raiders if open_beside(u)), raiders[0])
+    spot = open_beside(r)
+    assert spot, "no open plot beside any raider"
     t = spot[0]
     farm = sim.FARM
     sim.improvement[0, t] = farm
@@ -467,31 +471,37 @@ def main() -> None:
     sim._barb_slots()
     sim._barb_reset_mp()
     ai, utribe = sim._tac_ai()
-    pick = None
-    for s in barb_units(sim):
-        k = int(utribe[0, s])
-        if (int(ai[0, s]) == 3 and k >= 0 and bool(sim.tribe_alive[0, k]) and not bool(sim.barb_unit_op[0, s])
-                and not has_target(sim, s)):
+    eligible = [s for s in barb_units(sim)
+                if int(ai[0, s]) == 3 and int(utribe[0, s]) >= 0 and bool(sim.tribe_alive[0, int(utribe[0, s])])
+                and not bool(sim.barb_unit_op[0, s]) and not has_target(sim, s)]
+    assert eligible, "no unit of a standing camp's tribe"
+    # the first such unit whose turn is the wander (one draw; another may
+    # flee a danger first)
+    base = sim.snapshot()
+    pick, cands, s1 = None, [], 0
+    for s in eligible:
+        sim.restore(base)
+        camp = int(sim.tribe_plot[0, int(utribe[0, s])])
+        sim._barb_reset_mp()
+        order, _ = scalar_search(sim, 0, s, 2, False)
+        foreign = sim._tac_foreign(BARB_SEAT)[0]
+        mil = sim.military_at[0]
+        cands = [t for t, n in order if n == 1 and not bool(foreign[t])
+                 and not (int(mil[t]) >= 0 and int(sim.unit_seat[0, int(mil[t])]) == BARB_SEAT)
+                 and int(sim.pair_dist[camp, t]) <= 5
+                 and (int(sim.tile_seat[0, camp]) < 0 or (int(sim.tile_seat[0, t]) == int(sim.tile_seat[0, camp])
+                                                          and int(sim.tile_city[0, t]) == int(sim.tile_city[0, camp])))]
+        if not cands:
+            continue
+        state0 = int(sim.rng_state[0])
+        acting = torch.zeros_like(sim.barb_unit_alive)
+        acting[0, s] = True
+        sim._barbarian_tactics(acting)
+        s1 = (state0 * 1103515245 + 12345) & 0xFFFFFFFF
+        if int(sim.rng_state[0]) == s1:
             pick = s
             break
-    assert pick is not None, "no unit of a standing camp's tribe"
-    camp = int(sim.tribe_plot[0, int(utribe[0, pick])])
-    sim._barb_reset_mp()
-    order, _ = scalar_search(sim, 0, pick, 2, False)
-    foreign = sim._tac_foreign(BARB_SEAT)[0]
-    mil = sim.military_at[0]
-    cands = [t for t, n in order if n == 1 and not bool(foreign[t])
-             and not (int(mil[t]) >= 0 and int(sim.unit_seat[0, int(mil[t])]) == BARB_SEAT)
-             and int(sim.pair_dist[camp, t]) <= 5
-             and (int(sim.tile_seat[0, camp]) < 0 or (int(sim.tile_seat[0, t]) == int(sim.tile_seat[0, camp])
-                                                      and int(sim.tile_city[0, t]) == int(sim.tile_city[0, camp])))]
-    assert cands, "the wandering unit has no plot to wander to"
-    state0 = int(sim.rng_state[0])
-    acting = torch.zeros_like(sim.barb_unit_alive)
-    acting[0, pick] = True
-    sim._barbarian_tactics(acting)
-    s1 = (state0 * 1103515245 + 12345) & 0xFFFFFFFF
-    assert int(sim.rng_state[0]) == s1, "the wander took other than one draw"
+    assert pick is not None, "no unit near its camp wandered on one draw"
     want = cands[((s1 >> 16) * (len(cands) & 0xFFFF)) >> 16]
     assert int(sim.barb_unit_tile[0, pick]) == want, (
         f"the unit wandered to {int(sim.barb_unit_tile[0, pick])}, the draw names {want}")

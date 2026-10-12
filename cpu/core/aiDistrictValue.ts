@@ -102,10 +102,16 @@ function fxOfFloat(x: number): number {
 }
 
 /** a district's per-turn value from its adjacency rows (0x365ae0 per row
- *  and yield, at the player's value) */
+ *  and yield, at the player's value), once per facts and district */
+const ROWS = new WeakMap<DistrictValueFacts, Map<string, number>>();
 function rowsValue(f: DistrictValueFacts, district: string): number {
-  let v = 0;
+  let m = ROWS.get(f);
+  if (!m) ROWS.set(f, (m = new Map()));
+  let v = m.get(district);
+  if (v !== undefined) return v;
+  v = 0;
   for (const y of YIELDS) v += yieldValue(f.view, f.seat, f.rowsAdjacency(district, y) * FX, y);
+  m.set(district, v);
   return v;
 }
 

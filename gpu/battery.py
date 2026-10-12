@@ -998,7 +998,8 @@ def _main() -> int:
                 ("gp_pass", [py, "tests/gpu/gp_pass_test.py"], 4),  # the Great Person pass: the fee, the discount, the lockout, the rival's claim
                 ("beliefs", [py, "tests/gpu/beliefs_test.py"], 4),  # a religion's four belief classes, the Worship buildings, the Mosque and the Dar-e Mehr
                 ("belief_effects", [py, "tests/gpu/belief_effects_test.py"], 4),  # Lay Ministry, Sacred Places, Missionary Zeal, Monastic Isolation, Holy Waters, the Dar-e Mehr's eras
-                ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's own walls, type district and Harbor, and the conquest carry; its Trader, repair, projects, worship, Flood Barrier, paving and ships
+                ("minor_builds", [py, "tests/gpu/minor_builds_test.py"], 4),  # the city-state's step on the item in hand: its rows, the store, walls, district at its plot, Builder, repair, projects, worship, Flood Barrier; its AI's pick, a fresh city's no events, a trained unit to its tree
+                ("minor_ai", [py, "tests/gpu/minor_ai_test.py"], 4),  # the city-states' city AI over seed9001's opening, every minor's AI state against the TS pins
                 ("minor_trade", [py, "tests/gpu/minor_trade_test.py"], 4),  # the city-state's trade routes: capacity, destination, income, round trip, war
                 ("minor_purse", [py, "tests/gpu/minor_purse_test.py"], 4),  # the minor's upkeep, purchases, upgrades and walker; the Free City's build table and walk
                 ("alliance_levels", [py, "tests/gpu/alliance_levels_test.py"], 4),  # typed alliances: points, levels and the fifteen-effect table

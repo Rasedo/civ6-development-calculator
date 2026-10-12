@@ -324,7 +324,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       districtTie: () => turnDraws.shift() ?? 0,
       plotCity: (plot) => {
         const t = state.map.tiles[plot];
-        return t.ownerSeat === seat ? (t.ownerCity ?? -1) : -1;
+        return t.ownerSeat === seat ? (t.ownerCity ?? -2) : -2;
       },
       reachable: () => true,
       distance: (x, y) => hexDistance(state.map, state.map.tiles[x].col, state.map.tiles[x].row, state.map.tiles[y].col, state.map.tiles[y].row),

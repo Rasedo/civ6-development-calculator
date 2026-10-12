@@ -1,15 +1,21 @@
 /**
- * THE FREE CITY'S OWN PLAY (C-60): its build table — the city-state
- * production model over the Free Cities' census (`FREE_CITY_BUILD_ROWS`) —
- * read against the world era's research, and its units' walk. The GPU twin is
- * tests/gpu/minor_purse_test.py's Free City scenes.
+ * THE FREE CITY'S OWN PLAY (C-60): its production — the item in hand its AI's
+ * Default Specialization picked on an empty queue (`freeCityBuild`) — and its
+ * units' walk. The GPU twin is tests/gpu/minor_purse_test.py's Free City
+ * scenes.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { makeState, makeMap, tileAtCoords } from '../helpers';
 import { foundCity } from '../../../cpu/core/game';
+import { loadWorld } from '../../../cpu/world/load';
+import { freeCityBuildFacts } from '../../../cpu/core/majorCityBuild';
+import { buildingTable, unitTable } from '../../../cpu/core/aiCityBuild';
+import { FX_MIN } from '../../../cpu/core/aiValue';
+import { spawnUnit } from '../../../cpu/core/units';
+import type { WorldFile } from '../../../world/file';
 import { flipCity, freeCitiesPhase } from '../../../cpu/core/phase';
 import { freeCityBuild } from '../../../cpu/core/minorBuild';
-import { spawnUnit } from '../../../cpu/core/units';
 import { wallsMax } from '../../../cpu/core/rules';
 import { FREE_SEAT } from '../../../cpu/core/seats';
 import { BUILDINGS } from '../../../cpu/data/buildings';
@@ -28,63 +34,76 @@ function scene(): { state: GameState; city: City } {
 
 const freeUnits = (state: GameState) => state.units.filter((u) => u.seat === FREE_SEAT);
 
-/** the Free Cities' own research, holding what the table's rows ask */
+/** the Free Cities' own research */
 function research(state: GameState) {
   const r = state.freeSeat!.research;
   r.techs = ['POTTERY', 'ARCHERY', 'MASONRY'];
   return r;
 }
 
-describe("the Free City's build table", () => {
-  it('reads its own research: no ranged unit before Archery', () => {
-    const { state, city } = scene();
-    freeCityBuild(state, city, 100, state.freeSeat!.research);
-    expect(freeUnits(state).some((u) => u.type === 'ARCHER')).toBe(false);
+describe("the Free City's production", () => {
+  it("seed9001's revolt: its tables and its picks over eight steps of 5 Production (the GPU twin's numbers)", () => {
+    const state = loadWorld(JSON.parse(readFileSync('seeder/worlds/seed9001.world.json', 'utf-8')) as WorldFile);
+    for (const s of state.seats) {
+      const u = state.units.find((x) => x.seat === s.seat && x.type === 'SETTLER');
+      if (u) foundCity(state, u.tileIndex, s.seat);
+    }
+    spawnUnit(state, 'SETTLER', 652, 0);
+    const born = foundCity(state, 652, 0).city!;
+    born.population = 3;
+    flipCity(state, born);
+    const city = state.freeSeat!.cities[0];
+    const f = freeCityBuildFacts(state, city);
+    const bt = buildingTable(f).filter((v) => v !== FX_MIN);
+    const ut = unitTable(f).filter((v): v is number => v !== null && v !== FX_MIN);
+    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([19, 70346, 33, 48795]);
+    const seq: unknown[] = [];
+    for (let k = 0; k < 8; k++) {
+      freeCityBuild(state, city, 5);
+      const q = city.queue[0];
+      seq.push([q?.kind === 'building' ? q.building : q?.kind === 'unit' ? q.unit : '-', q?.progress ?? 0, city.productionBank ?? 0]);
+    }
+    expect(seq).toEqual([['MONUMENT', 0, 5], ['MONUMENT', 10, 0], ['MONUMENT', 15, 0], ['MONUMENT', 20, 0], ['MONUMENT', 25, 0],
+      ['SCOUT', 0, 0], ['SCOUT', 5, 0], ['SCOUT', 10, 0]]);
   });
 
-  it('banks its Production and trains the ranged class it lacks, paying where the unit lands', () => {
+  it('banks its Production with nothing in hand, then its AI picks an item for the next step', () => {
     const { state, city } = scene();
-    // the revolt's pair is melee: no ranged unit calls the city home
-    expect(freeUnits(state).length).toBe(2);
-    const r = research(state);
-    freeCityBuild(state, city, 5, r);
-    expect(city.freePot).toBe(5);
-    expect(freeUnits(state).length).toBe(2);
-    freeCityBuild(state, city, 100, r);
-    const trained = freeUnits(state).filter((u) => u.type === 'ARCHER');
-    expect(trained.length).toBe(1);
-    expect(trained[0].freeCity).toBeUndefined();
-    expect(city.freePot).toBe(105 - UNITS.ARCHER.cost);
+    research(state);
+    city.queue = [];
+    city.productionBank = 0;
+    freeCityBuild(state, city, 5);
+    expect(city.productionBank).toBe(5);
+    expect(city.queue.length).toBe(1);
+    const q = city.queue[0];
+    freeCityBuild(state, city, 3);
+    // the step paid the Production and the bank into the item (or completed it)
+    expect(city.queue[0] === q ? q.progress : 8).toBe(8);
+    expect(city.productionBank).toBe(city.queue[0] === q ? 0 : city.productionBank);
   });
 
-  it('raises a Monument, then a Granary, once a ranged unit calls it home', () => {
+  it('completes the item in hand at its price: a building rises, the queue empties for the next pick', () => {
     const { state, city } = scene();
-    spawnUnit(state, 'ARCHER', city.centerIndex, FREE_SEAT);
-    const r = research(state);
-    freeCityBuild(state, city, 100, r);
+    research(state);
+    city.queue = [{ kind: 'building', building: 'MONUMENT', progress: BUILDINGS.MONUMENT.cost - 1 }];
+    city.productionBank = 0;
+    freeCityBuild(state, city, 3);
     expect(city.buildings).toContain('MONUMENT');
-    expect(city.freePot).toBe(100 - BUILDINGS.MONUMENT.cost);
-    freeCityBuild(state, city, 100, r);
-    expect(city.buildings).toContain('GRANARY');
+    expect(city.productionBank).toBe(2);
+    expect(city.queue[0]?.kind === 'building' && city.queue[0].building === 'MONUMENT').toBe(false);
   });
 
-  it('raises its walls and fills the pool, and repairs a breach at the HP it puts back', () => {
+  it('a unit lands on or beside the centre; the walls fill their pool', () => {
     const { state, city } = scene();
-    spawnUnit(state, 'ARCHER', city.centerIndex, FREE_SEAT);
-    city.buildings.push('MONUMENT', 'GRANARY');
-    const r = research(state);
-    freeCityBuild(state, city, 100, r);
+    research(state);
+    const before = freeUnits(state).length;
+    city.queue = [{ kind: 'unit', unit: 'ARCHER', progress: UNITS.ARCHER.cost }];
+    freeCityBuild(state, city, 1);
+    expect(freeUnits(state).length).toBe(before + 1);
+    city.queue = [{ kind: 'building', building: 'ANCIENT_WALLS', progress: BUILDINGS.ANCIENT_WALLS.cost }];
+    freeCityBuild(state, city, 1);
     expect(city.buildings).toContain('ANCIENT_WALLS');
-    const max = wallsMax(state, city);
-    expect(city.outerHp).toBe(max);
-    city.outerHp = max - 30;
-    city.lastHitTurn = state.turn - 10;
-    city.freePot = 0;
-    freeCityBuild(state, city, 29, r);
-    expect(city.outerHp).toBe(max - 30);
-    freeCityBuild(state, city, 1, r);
-    expect(city.outerHp).toBe(max);
-    expect(city.freePot).toBe(0);
+    expect(city.outerHp).toBe(wallsMax(state, city));
   });
 
   it("walks the Free Cities' units around the city in its own phase", () => {

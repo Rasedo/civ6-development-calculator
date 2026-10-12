@@ -312,7 +312,7 @@ def contract_eligible(ai: CityAi, s: int, j: torch.Tensor, w) -> torch.Tensor:
     max_t = _cget(ai.c_max_turns, s, j)
     plot = _cget(ai.c_plot, s, j)
     threat = _b(w.under_threat(), j)
-    ok_city = (city == -1) | (city == _l(w.city_id(), j))
+    ok_city = (city == -1) | (city == _l(w.home_city(), j))
     over = (max_t > 0) & (_l(w.build_turns(unit, bld, dist), j) > max_t)
     done = prog == CP_COMPLETED
     # a building
@@ -403,7 +403,7 @@ def queue_contract(ai: CityAi, s: int, j: torch.Tensor, w, queued: torch.Tensor,
     _cset(ai.c_progress, s, j, CP_IN_PROGRESS, mask)
     _cset(ai.c_progress, s, j, CP_FAILED, mask & ~queued)
     ok = mask & queued
-    _cset(ai.c_city, s, j, _l(w.city_id(), j), ok)
+    _cset(ai.c_city, s, j, _l(w.home_city(), j), ok)
     _cset(ai.c_queued, s, j, True, ok)
     return ok
 
@@ -590,7 +590,7 @@ def building_event(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     neg = torch.full_like(like, -1)
     start_tree(ai, s, SLOT_UNIT_OR_BUILDING, [
         torch.where(take_u, ui, neg), torch.where(take_b, bi, neg), neg, neg, neg,
-        torch.where(take_b, bt, ut), torch.where(take_b, bc, uc), _l(w.city_id(), like)], take_b | take_u)
+        torch.where(take_b, bt, ut), torch.where(take_b, bc, uc), _l(w.home_city(), like)], take_b | take_u)
 
 
 def _reserved(ai: CityAi, s: int, plots: torch.Tensor):
@@ -633,7 +633,7 @@ def improvement_event(ai: CityAi, s: int, w, best_improvement: torch.Tensor, mas
     go = go & (j >= 0) & (v > 0)
     plot = ev["plot"].gather(1, j.clamp(min=0).unsqueeze(1)).squeeze(1)
     neg = torch.full_like(plot, -1)
-    start_tree(ai, s, SLOT_IMPROVEMENT, [neg, neg, neg, best_improvement, plot, neg, neg, _l(w.city_id(), plot)], go)
+    start_tree(ai, s, SLOT_IMPROVEMENT, [neg, neg, neg, best_improvement, plot, neg, neg, _l(w.home_city(), plot)], go)
 
 
 def choose_district(ai: CityAi, s: int, w, mask: torch.Tensor):
@@ -679,7 +679,7 @@ def district_event(ai: CityAi, s: int, w, mask: torch.Tensor) -> None:
     go = go & (d >= 0)
     t, c = _lacking(w, *_prereqs(ai, "district", torch.where(go, d, torch.full_like(d, -1))))
     neg = torch.full_like(d, -1)
-    start_tree(ai, s, SLOT_DISTRICT, [neg, neg, d, neg, plot, t, c, _l(w.city_id(), d)], go)
+    start_tree(ai, s, SLOT_DISTRICT, [neg, neg, d, neg, plot, t, c, _l(w.home_city(), d)], go)
 
 
 def pick_improvement(ai: CityAi, s: int, w, mask: torch.Tensor) -> torch.Tensor:
@@ -862,7 +862,7 @@ def _u_reserve_plot(c: _Ctx, i: int, at: torch.Tensor) -> torch.Tensor:
     none = (plot == NONE) | (plot < 0)
     p = torch.where(none, 0, plot)
     owner = _l(w.plot_city(p), p)
-    no_city = ~none & (owner != _l(w.city_id(), p))
+    no_city = ~none & (owner != _l(w.home_city(), p))
     val = c.tag(i, "Value")
     val = torch.where(val == NONE, 0, val) * _FX
     rp = ai.r_plot[:, s]

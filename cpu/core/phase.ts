@@ -981,7 +981,8 @@ function joinFromFreeCity(state: GameState, city: City): void {
  *  treasury banks the Gold those same stats make, in array order, then pays
  *  its units' upkeep and meets the `bankruptcy` that may force. Then each
  *  city takes its grant when one falls due,
- *  puts the same stats' Production into its build table (`freeCityBuild`),
+ *  puts the same stats' Production into its item and its AI picks the next
+ *  on an empty queue (`freeCityBuild`),
  *  fires the ranged strikes any walled city fires and runs
  *  `freeCityLoyaltyDelta` (its heal is the turn's end's, `healCities`) — its
  *  cities press a religion they follow on that religion's founder's turn
@@ -1033,10 +1034,9 @@ export function freeCitiesPhase(state: GameState): void {
     free.cities.forEach((city, i) => { stats[i] = computeCityStats(state, city, lux2, mods2); });
   }
   const joiners: City[] = [];
-  const research = free.research;
   [...free.cities].forEach((city, i) => {
     freeCityGrant(state, city);
-    freeCityBuild(state, city, stats[i].total.production, research);
+    freeCityBuild(state, city, stats[i].total.production);
     cityStrikes(state, city, cityStrikeStrength(state, city));
     const next = (city.loyalty ?? LOYALTY_MAX) + freeCityLoyaltyDelta(state, city);
     city.loyalty = Math.max(0, Math.min(LOYALTY_MAX, next));

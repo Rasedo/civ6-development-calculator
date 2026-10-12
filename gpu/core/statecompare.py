@@ -975,17 +975,64 @@ CITY_STATE = {
     "minorBuildProject": lambda sim, b, rows: [int(sim.citystate_build_proj[b, s]) for s in rows],
     "minorRepairWait": lambda sim, b, rows: [1 if bool(sim.citystate_repair_wait[b, s]) else 0 for s in rows],
     "minorRoutes": lambda sim, b, rows: [_routes_of(sim, b, 100 + s) for s in rows],
-    "minorBuildFrom": lambda sim, b, rows: [[int(x) for x in sim.citystate_build_from[b, s].tolist()] for s in rows],
-    "minorArmyCap": lambda sim, b, rows: [int(sim.citystate_army_cap[b, s]) for s in rows],
-    "minorBuilderBuyRate": lambda sim, b, rows: [int(sim.citystate_builder_buy[b, s]) for s in rows],
-    "minorArmySeen": lambda sim, b, rows: [int(sim.citystate_army_seen[b, s]) for s in rows],
-    "minorLossTurn": lambda sim, b, rows: [int(sim.citystate_loss_turn[b, s]) for s in rows],
+    "minorProdSite": lambda sim, b, rows: [int(sim.citystate_prod_site[b, s]) for s in rows],
+    "minorProdSet": lambda sim, b, rows: [[int(sim.citystate_prod_set_turn[b, s]), int(sim.citystate_prod_set_value[b, s])] for s in rows],
+    "minorThreat": lambda sim, b, rows: [int(sim.citystate_threat[b, s]) for s in rows],
+    "minorSavings": lambda sim, b, rows: [[int(x) for x in sim.citystate_savings[b, s].tolist()] + [int(sim.citystate_balance[b, s])]
+                                          for s in rows],
+    "minorAiSlots": lambda sim, b, rows: [[int(x) for x in sim.cai_slots[b, s].tolist()] for s in rows],
+    "minorAiTrees": lambda sim, b, rows: [_ai_trees(sim, b, s) for s in rows],
+    "minorContracts": lambda sim, b, rows: [_ai_contracts(sim, b, s) for s in rows],
+    "minorReservations": lambda sim, b, rows: [
+        [x for r in sorted((int(p), int(t), int(v)) for p, t, v in zip(sim.cai_r_plot[b, s].tolist(), sim.cai_r_tree[b, s].tolist(),
+                                                                        sim.cai_r_value[b, s].tolist()) if p >= 0) for x in r]
+        for s in rows],
+    "minorAiHand": lambda sim, b, rows: [[int(sim.cai_in_hand[b, s]), int(sim.cai_c_serial[b, s]), int(sim.cai_t_serial[b, s]),
+                                          int(bool(sim.citystate_ai_on[b, s]))] for s in rows],
     "minorBuildersTrained": lambda sim, b, rows: [int(sim.citystate_builders_trained[b, s]) for s in rows],
     "minorBestMeleeCS": lambda sim, b, rows: [int(sim.citystate_best_melee[b, s]) for s in rows],
     "minorBestRangedCS": lambda sim, b, rows: [int(sim.citystate_best_ranged[b, s]) for s in rows],
     "warTurns": lambda sim, b, rows: [_war_clock_line(sim, b, 100 + s) for s in rows],
     "treatyTurns": lambda sim, b, rows: [_treaty_clock_line(sim, b, 100 + s) for s in rows],
 }
+
+
+def _ai_trees(sim, b: int, s: int) -> list[int]:
+    """per slot the running tree: [id, its living units as plot x 1000 +
+    unit index sorted (-1 padded to 4), its trigger's unit, building,
+    district, improvement rows, plot, tech, civic] (-1s for none)"""
+    out: list[int] = []
+    lo = sim.POOL_LO["major"]
+    for k in range(sim.cai_slots.shape[2]):
+        if not bool(sim.cai_tr_alive[b, s, k]):
+            out += [-1] * 12
+            continue
+        units = sorted(int(sim.unit_tile[b, int(u)]) * 1000 + int(sim.unit_type[b, int(u)])
+                       for u in sim.cai_tr_units[b, s, k].tolist()
+                       if int(u) >= lo and bool(sim.unit_alive[b, int(u)]) and int(sim.unit_seat[b, int(u)]) == 100 + s)
+        tr = [int(x) for x in sim.cai_tr_trigger[b, s, k].tolist()]
+        out += [int(sim.cai_tr_id[b, s, k])] + (units + [-1] * 4)[:4] + tr[:7]
+    return out
+
+
+def _ai_contracts(sim, b: int, s: int) -> list[int]:
+    """the contracts by id: [id, tree, unit, building, district rows, goal
+    kind, goal, plot, value, city, most turns, turns, progress, assign,
+    queued, held by its tree, listed]"""
+    rows = []
+    for j in range(sim.cai_c_id.shape[2]):
+        cid = int(sim.cai_c_id[b, s, j])
+        if cid < 0:
+            continue
+        tree = int(sim.cai_c_tree[b, s, j])
+        live = any(bool(sim.cai_tr_alive[b, s, k]) and int(sim.cai_tr_id[b, s, k]) == tree for k in range(sim.cai_tr_id.shape[2]))
+        rows.append([cid, tree, int(sim.cai_c_unit[b, s, j]), int(sim.cai_c_building[b, s, j]), int(sim.cai_c_district[b, s, j]),
+                     int(sim.cai_c_goal_kind[b, s, j]), int(sim.cai_c_goal[b, s, j]), int(sim.cai_c_plot[b, s, j]),
+                     int(sim.cai_c_value[b, s, j]), int(sim.cai_c_city[b, s, j]), int(sim.cai_c_max_turns[b, s, j]),
+                     int(sim.cai_c_turns[b, s, j]), int(sim.cai_c_progress[b, s, j]), int(bool(sim.cai_c_assign[b, s, j])),
+                     int(bool(sim.cai_c_queued[b, s, j])), int(bool(sim.cai_c_in_tree[b, s, j]) and live),
+                     int(bool(sim.cai_c_listed[b, s, j]))])
+    return [x for r in sorted(rows) for x in r]
 
 
 def _gw_rows(sim, b, rows):
@@ -1120,7 +1167,6 @@ CITY = {
         [float(x) for x in sim.city_free_press[b, c, s].tolist()] for c, s in rows
     ],
     "foundedTurn": _cty("city_founded_turn"),
-    "freePot": _cty("city_free_pot"),
     "freeGrantTurns": _cty("city_free_grant"),
     "freeAllowed": lambda sim, b, rows: [[i for i, on in enumerate(sim.city_free_allowed[b, c, s].tolist()) if on]
                                          for c, s in rows],

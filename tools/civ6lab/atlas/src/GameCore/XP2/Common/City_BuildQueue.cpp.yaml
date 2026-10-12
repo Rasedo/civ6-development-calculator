@@ -113,6 +113,7 @@
     - cpu/core/phase.ts:lacked
     - cpu/core/phase.ts:milAllyWarPct
     - gpu/core/sim_phase.py:_seat_city_produce
+    - gpu/core/sim_minors.py:_minor_build
   readings:
     - "H-1: a district project's yield conversion — READ"
     - "H-1: the build queue's overflow, the yields' fixed point, the dispersal Gold, the pantheon's price — READ"

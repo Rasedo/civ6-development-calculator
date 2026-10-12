@@ -17,7 +17,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/harness/cityContractLab.ts:bests]
+  impl: [cpu/harness/cityContractLab.ts:bests, cpu/core/minorBuild.ts:minorQueueOk]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...lue fx).  pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuildi..."
@@ -28,7 +28,7 @@
   final: 0x3df220
   kind: function
   status: PARTLY
-  impl: [cpu/harness/cityContractLab.ts:bests]
+  impl: [cpu/harness/cityContractLab.ts:bests, cpu/core/minorBuild.ts:minorQueueOk]
   notes: ["imported: cited by the code, in no dll_readings section"]
   review: imported
 - addr: 0x5ca450
@@ -39,6 +39,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
+  impl: [cpu/core/minorBuild.ts:minorQueueOk]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...lding if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value table pl..."
@@ -53,7 +54,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/harness/cityContractLab.ts:bests]
+  impl: [cpu/harness/cityContractLab.ts:bests, cpu/core/minorBuild.ts:minorQueueOk]
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project. CanConstruct checks 0x5c9ea0/0x5ca5a0/0x5ca450;  fail -> 0x5d2810 fallback ('Generic Offense' / 'NO BUILDS AT ALL').  bestBuilding: value..."
@@ -100,7 +101,11 @@
     - recording: h1_duelv1128
       turn: 15
       value: "Xi'an threatened by the barbarians' Warrior and Scout: City Defense, Started"
-  impl: [cpu/core/operations/cityThreat.ts:cityThreat, cpu/core/operations/manager.ts:cityDefense]
+  impl:
+    - cpu/core/operations/cityThreat.ts:cityThreat
+    - cpu/core/operations/manager.ts:cityDefense
+    - cpu/core/minorCityAi.ts:minorThreat
+    - gpu/core/sim_minorai.py:_minor_threat
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-97: City Defense and the assault target's validity — the city's threat, the defence event, Is City Threatened, Garrison City and the district target's validity READ; the threat's level terms, the garrison's swap and the team's unit to build unread"
@@ -272,7 +277,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiEconomic.ts:purchaseTurn]
+  impl: [cpu/core/aiEconomic.ts:purchaseTurn, gpu/core/sim_minorai.py:_minor_purchases]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -337,6 +342,8 @@
     - gpu/core/sim_cityvalue.py:_cv_unit_turns
     - gpu/core/sim_cityvalue.py:_cv_building_turns
     - cpu/core/minorBuild.ts:minorTables
+    - cpu/core/minorCityAi.ts:minorPlotEvals
+    - gpu/core/sim_minorai.py:_minor_plot_evals
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96 / C-97: the unit value — READ (the combat, trade, explorer branches, the tail, the military AI's unit production), PARTLY READ (its inputs)"
@@ -366,6 +373,9 @@
     - cpu/core/aiCityTrees.ts:CityTreeCity
     - cpu/core/aiCityTrees.ts:buildingEvent
     - cpu/harness/cityContractLab.ts:eventBuilding
+    - cpu/core/minorCityAi.ts:eventBuilding
+    - gpu/core/sim_cityvalue.py:_cv_bests
+    - gpu/core/sim_minorai.py:event_building
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...in gnames.json (value = string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv &&..."
@@ -381,7 +391,10 @@
     - recording: h1_duelv1127
       turn: 2
       value: Hattusa's draw 1 takes the later 109.41 plot
-  impl: [cpu/core/aiCityTrees.ts:chooseDistrict]
+  impl:
+    - cpu/core/aiCityTrees.ts:chooseDistrict
+    - cpu/harness/drawSites.ts:DRAW_SITES
+    - gpu/core/sim_minorai.py:district_tie
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"
@@ -409,7 +422,10 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiCityBuild.ts:defaultSpecialization, cpu/core/aiCityBuild.ts:specializationBests]
+  impl:
+    - cpu/core/aiCityBuild.ts:defaultSpecialization
+    - cpu/core/aiCityBuild.ts:specializationBests
+    - gpu/core/sim_cityvalue.py:_cv_bests
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...= string BEFORE the previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv && bv>=pv; else unit if u..."
@@ -430,6 +446,9 @@
     - cpu/core/aiCityTrees.ts:CityTreeCity
     - cpu/core/aiCityTrees.ts:buildingEvent
     - cpu/harness/cityContractLab.ts:eventUnit
+    - cpu/core/minorCityAi.ts:eventUnit
+    - gpu/core/sim_cityvalue.py:_cv_bests
+    - gpu/core/sim_minorai.py:event_unit
   readings: ["C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"]
   notes:
     - ".claude/scratchpad/cb/notes.txt: ...e previous lea; fixed).  DS CHOOSER 0x5d4d70: bestBuilding=0x5d0860, bestProject=0x5d1f10, bestUnit=0x5d2600 (each returns idx, value fx).  pick building if bv>=uv && bv>=pv; else unit if uv>=pv; else project..."
@@ -445,7 +464,7 @@
     - recording: h1_duelv1124
       turn: 155
       value: "of the   log's own-table misses 78 are the log's NO BUILDS where we pick (a valued   building the queue refuses — runs/h1_duelv1124 Cardiff t155..t157 holds an   unfilled Factory contract of t125 —, o"
-  impl: [cpu/core/aiEconomic.ts:purchasePick]
+  impl: [cpu/core/aiEconomic.ts:purchasePick, gpu/core/sim_minorai.py:_minor_purchases]
   readings:
     - "C-96 / C-97: the city build AI — the choice READ, the values PARTLY READ"
     - "C-96: the city events, trees and contracts — READ (the events, the slots, the contract states, the city's list, the Default Specialization's head, the queue, the nodes below, the purchases, City Defense's start), the threat's writer and the operation unread"

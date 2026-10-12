@@ -1,6 +1,8 @@
 export * from '../../world/types';
 import type { ResearchEntry } from './aiResearch';
 import type { CivicEntry } from './aiCivics';
+import type { CityAi } from './aiCityTrees';
+import type { EconomicMemory } from './aiEconomic';
 import type { GreatWork } from '../data/greatWorks';
 import type { QuestType } from '../data/quests';
 import type { DistrictId, GameMap, YieldKey } from '../../world/types';
@@ -147,9 +149,6 @@ export interface City {
    *  Loyalty pressure on it since the Free City became independent". Held
    *  only while the city is Free. */
   freePressure?: number[];
-  /** A FREE CITY's build pot: its Production, banked until the Free City
-   *  build table's next item is covered (`freeCityBuild`). */
-  freePot?: number;
   /** A FREE CITY's count of turns toward its next grant (`freeCityGrant`). */
   freeGrantTurns?: number;
   /** A FREE CITY's allowed units (`freeCityAllowed`, its record's, made at
@@ -1156,25 +1155,25 @@ export interface CityState extends Seat {
   outerHp?: number;
   /** the item in hand (`minorItemKey`), its progress, the progress kept on
    *  each item it switched away from, and the overflow store a completion or
-   *  an idle step leaves for the next step (`minorBuild`). */
+   *  an idle step leaves for the next step (`minorBuild`); a district's plot
+   *  (`prodSite`); the turn its AI set the item and the item's value then
+   *  (city +0x2600, CityBuildAI +0xa48, `minorAiTurn`). */
   prodItem?: string;
   prodProgress?: number;
   prodRetained?: Record<string, number>;
   prodOverflow?: number;
+  prodSite?: number;
+  prodSetTurn?: number;
+  prodSetValue?: number;
+  /** its city AI (`minorAiTurn`): the events' slots, the trees, the
+   *  contracts and reservations (`CityAi`), the Economic AI's savings
+   *  (`EconomicMemory`), the city's threat (CityBuildAI +0x1b8, -1 none) */
+  cityAi?: CityAi;
+  economy?: EconomicMemory;
+  threat?: number;
   /** the yield its last build step converted from a district project
    *  (`City.projectYield`, which `minorCity` hands its city) */
   projectYield?: ProjectYield;
-  /** the episode's draws (`minorPlan`): per `MINOR_BUILD_ROWS` row, the turn
-   *  from which it wants its item (-1 never, 0 for a row that draws none),
-   *  and the army it keeps. Absent = not drawn yet. */
-  buildFrom?: number[];
-  armyCap?: number;
-  /** the episode's Builder purchase rate, per mille (`minorPlan`) */
-  builderBuyRate?: number;
-  /** the minor's military count at the end of its last turn, and the turn a
-   *  count below it was first seen — the loss window its purchases read */
-  armySeen?: number;
-  lossTurn?: number;
   /** the minor city's GOLD and FAITH: what its yield walk pays, less its
    *  units' upkeep, spent on purchases and upgrades (`minorPhase`). A Seat's
    *  own fields, declared here so the census compares them for a minor

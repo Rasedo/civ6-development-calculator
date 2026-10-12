@@ -272,6 +272,35 @@ export function majorPickFacts(state: GameState, city: City, facts: CityBuildFac
   };
 }
 
+/** THE CITY BUILD AI'S VIEW OF A FREE CITY: a major's view of the city
+ *  over the Free Cities' seat, but no full civilization, its trait
+ *  TRAIT_LEADER_FREE_CITIES' promotion lists, its research and civics turns
+ *  its own research AI's analysis (`minorResearch`'s entries, as a
+ *  city-state's), no strategic stockpile, no government, no combat units
+ *  counted against its trade */
+export function freeCityBuildFacts(state: GameState, city: City): CityBuildFacts {
+  const f = majorBuildFacts(state, city, () => 0);
+  const r = seatOf(state, city.seat)!.research;
+  const techEntries = (r.aiEntries ?? []).map((e) => ({ id: e.tech, next: e.next, turns: e.turns, owned: e.owned }));
+  const civicEntries = (r.civicAiEntries ?? []).map((e) => ({ id: e.civic, next: e.next, turns: e.turns, owned: e.owned }));
+  const culture = citiesOf(state, city.seat).reduce((n, c) => n + computeCityStats(state, c).total.culture, 0);
+  const civicLeft = r.civic ? turnsAt(researchCost(state, r.civic, true, city.seat) * FX - fxOf(r.civicProgress), fxOf(culture)) : -1;
+  const centre = state.map.tiles[city.centerIndex];
+  return {
+    ...f,
+    fullCiv: false,
+    governmentTier: 0,
+    combatCount: 0,
+    promotionWeight: (cls) => promotionWeight(['TRAIT_LEADER_FREE_CITIES'], cls),
+    resourceAccess: (res) => {
+      const id = engineId('resource', res, 'RESOURCE_', RESOURCES);
+      return !!id && tilesWithin(state.map, centre.col, centre.row, 3).some((t) => t.resource === id);
+    },
+    techTurns: (t) => analysedTurns(techEntries, t && engineId('tech', t, 'TECH_', TECHS), r.techs, r.tech, r.aiLeftSeen ?? 0),
+    civicTurns: (c) => analysedTurns(civicEntries, c && engineId('civic', c, 'CIVIC_', CIVICS), r.civics, r.civic, civicLeft),
+  };
+}
+
 /** the production column of an install type in a major's city (-1 none) */
 export function majorItemColumn(state: GameState, city: City, type: string): number {
   return queueItemColumn(majorQueueItem(state, city.seat, city, type) ?? undefined);

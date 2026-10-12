@@ -81,10 +81,14 @@ export interface CityAi extends ContractBook {
   techContracts: Record<number, string>;
   /** per plot purchase contract id its plot (Purchase Plot) */
   plotContracts: Record<number, number>;
+  /** the ids the seat's next contract and next tree take */
+  nextContract: number;
+  nextTree: number;
 }
 
 export const newCityAi = (): CityAi => ({
   contracts: [], city: {}, inHand: {}, trees: [], slots: {}, reservations: [], techContracts: {}, plotContracts: {},
+  nextContract: 1, nextTree: 100,
 });
 
 /** the tech and civic contracts whose goal the player now holds COMPLETED,
@@ -169,7 +173,7 @@ export interface CityTreeWorld {
   /** the cheapest unit type the city may train that builds the improvement
    *  (Check Plot), null none */
   builderType(improvement: string): string | null;
-  /** the city id a plot belongs to, -1 none */
+  /** the city id a plot belongs to, -2 none (a city-state's one city is -1) */
   plotCity(plot: number): number;
   /** a unit can reach the plot */
   reachable(unit: TreeUnit, plot: number): boolean;

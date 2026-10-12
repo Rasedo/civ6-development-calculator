@@ -77,10 +77,14 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorItem, holdMinorOrders, minorBuildFacts, minorKnownUnits, minorBuilderLays, minorBuyUnit, minorUpgradeUnit, type MinorItem, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorBuildFacts, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
+import { traceMinorAi } from '../core/minorCityAi';
+import { newCityAi } from '../core/aiCityTrees';
+import { newEconomicMemory, savingsTurn } from '../core/aiEconomic';
+import { FX } from '../core/aiValue';
 import { advanceHistory, aliasOrPrefixed, engineRowOf, importTurn, minorHead, newHistory, type History, type Imported } from './import';
 import { loadCityBuildTables, newCityBuildTally, tallyBuildings, type CityBuildTally } from './cityBuildLog';
 import { buildingTable } from '../core/aiCityBuild';
@@ -1517,6 +1521,9 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // a city-state's founding (`placeCityStateAt`, the engine's setup step)
     const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot);
     Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research });
+    // the game's city AI took its first look the turn the city was founded,
+    // which runs no events: its next turn runs them
+    placed.cityAi = newCityAi();
     state.cityStates.sort((a, b) => a.id - b.id);
     if (settler) disbandUnit(state, settler.id);
     count(ctx, 'found:minor', 'applied');
@@ -1559,13 +1566,17 @@ function applyBuyUnit(ctx: Ctx, d: Extract<Decision, { kind: 'buyUnit' }>, rec: 
   const actor = seatOf(state, seat) as Seat | undefined;
   const city = cityAt(state, d.city);
   const id = engineRowOf(ctx.cat, 'unit', d.type);
-  // a city-state's purchase is its AI's, through the minor's own verb
+  // a city-state's purchase is its AI's, made in its turn (`minorAiTurn`):
+  // the unit it bought stands for the record's (`matchNewUnits`); where it
+  // bought none the record's is imposed at the record's price
   const minor = state.cityStates.find((c) => c.centerIndex === d.city && c.seat === seat);
   if (minor) {
-    const u = id ? minorBuyUnit(state, minor, id, d.currency) : undefined;
-    if (u) ctx.units.set(d.unit, u);
-    else spawnRecorded(ctx, rec, d.unit);
-    return void count(ctx, 'minorAi:buy', u ? 'applied' : 'fallback', d.player, u ? undefined : `${id} at ${minor.treasury} gold, ${minor.faith} faith`);
+    if (unitOf(ctx, d.unit)) return void count(ctx, 'minorAi:buy', 'applied', d.player);
+    const price = id ? minorUnitPrice(state, minor, id, d.currency) : 0;
+    if (d.currency === 'gold') minor.treasury -= price;
+    else minor.faith -= price;
+    spawnRecorded(ctx, rec, d.unit);
+    return void count(ctx, 'minorAi:buy', 'fallback', d.player, `${id}: the engine bought none (threat ${minor.threat ?? -1}, gold ${minor.treasury})`);
   }
   const kind = `buyUnit:${d.currency}`;
   if (!actor || !city || !id || city.seat !== seat) {
@@ -1693,10 +1704,21 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // minor's lays it as a minor's does
         const builder = d.unit ? unitOf(ctx, d.unit) : undefined;
         const actor = seatOf(state, seat) as Seat | undefined;
+        // a city-state's improvement is its trees' Builder's, laid in its turn
+        if (isCityStateSeat(seat)) {
+          if (t.improvement === want) { count(ctx, 'minorAi:improve', 'applied', d.player); break; }
+          t.improvement = want;
+          t.pillaged = false;
+          if (builder && (builder.charges ?? 0) > 0) {
+            builder.charges = (builder.charges ?? 0) - 1;
+            if (builder.charges <= 0) disbandUnit(state, builder.id);
+          }
+          count(ctx, 'minorAi:improve', 'fallback', d.player, `plot ${d.plot}: the engine laid none of ${want}`);
+          break;
+        }
         if (builder && actor && valid.includes(want as never) && (builder.charges ?? 0) > 0) {
           builder.tileIndex = d.plot;
-          if (isCityStateSeat(seat)) minorBuilderLays(state, builder, d.plot, want);
-          else if (seat < state.seats.length) {
+          if (seat < state.seats.length) {
             const ii = IMPROVEMENT_IDS.indexOf(want);
             const code = ii < 0 ? -1 : ii < DEDICATED_IMPROVEMENTS ? 13 + ii : 18 + ii - DEDICATED_IMPROVEMENTS;
             const row = unitsOf(state, seat).map((u) => (u === builder ? code : -1));
@@ -2098,7 +2120,11 @@ const res = buyTile(state, city.id, d.plot, seat);        if (!res.ok) setTileOw
         // completed grants its Great Person, a minor's harvest completes its
         // item) is the record's
         matchNewUnits(ctx, b);
-        if ((d.why === 'trained' && major) || unitOf(ctx, d.unit)) break;
+        if (d.why === 'trained' && major) break;
+        if (unitOf(ctx, d.unit)) {
+          if (!major) count(ctx, 'minorAi:unitNew', 'applied', d.player);
+          break;
+        }
         // a captive is the seizure's (`seize`)
         if (ds.some((x) => x.kind === 'seize' && x.into === d.unit)) break;
         spawnRecorded(ctx, b, d.unit);
@@ -2596,6 +2622,30 @@ function syncDraws(ctx: Ctx, b: TurnRecord, tribesBefore: number): boolean {
   return campsHeld;
 }
 
+/** THE CITY-STATES' BUILDS: each city-state's item in hand after its turn
+ *  (its AI's pick, `minorAiTurn`) against record t+1's queue head; nothing
+ *  imposed */
+function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
+  for (const cs of ctx.state.cityStates) {
+    const c = b.cities.find((x) => x.y * ctx.W + x.x === cs.centerIndex);
+    const head = c ? minorHead(ctx.cat, c, ctx.W) : undefined;
+    if (!head) continue;
+    const record = minorItemKey(head);
+    const ours = cs.prodItem ?? '';
+    const kind = record ? record.slice(0, record.indexOf(':')) : 'none';
+    const k = (tally.byKind[kind] ??= { turns: 0, same: 0 });
+    tally.turns += 1;
+    k.turns += 1;
+    if (ours === record) {
+      tally.same += 1;
+      k.same += 1;
+    } else {
+      tally.first ??= { turn: b.turn, player: ctx.playerOfSeat.get(cs.seat) ?? -1, ours, record };
+      if (tally.samples.length < 60) tally.samples.push(`t${b.turn} p${ctx.playerOfSeat.get(cs.seat)} ${ours || "none"} / ${record || "none"} (progress ${Math.round(cs.prodProgress ?? 0)})`);
+    }
+  }
+}
+
 /** the plots whose improvement the engine's own city-state, Free City or
  *  barbarian scripts changed in the turn take the record's: their builders'
  *  and raiders' decisions */
@@ -2913,6 +2963,9 @@ export interface ReplayReport {
   /** the city-states' and the Free Cities' moves (`minorAi`) */
   minorTactics: Record<string, BarbTally>;
   minorDraws: MinorDrawTally;
+  /** the city-states' items in hand after their turn against record t+1's
+   *  queue heads (`minorBuilds`) */
+  minorBuilds: MinorBuildTally;
   /** where the replay stopped short of the last record, and why */
   stopped?: string;
   /** why the engine refused the decisions it refused, by kind and reason */
@@ -2959,6 +3012,18 @@ export interface BarbTally {
   plot: number;
   firstMove?: number;
   firstPlot?: number;
+}
+
+/** the city-states' builds: the minor-turns compared, those whose item in
+ *  hand after its turn is record t+1's queue head, per the record's item kind
+ *  (unit, building, district, project, none), the first turn one differed */
+export interface MinorBuildTally {
+  turns: number;
+  same: number;
+  byKind: Record<string, { turns: number; same: number }>;
+  first?: { turn: number; player: number; ours: string; record: string };
+  /** the first differing minor-turns, each "tTURN pPLAYER ours / record" */
+  samples: string[];
 }
 
 /** the city-states' "Random Direction" draws: the turns whose draws pair
@@ -3064,18 +3129,19 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
     civicAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
     civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
-    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 } };
+    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] } };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);
   const stream = streamHold(first.state, recs, first.playerOfSeat, history);
   holdRng(stream);
-  holdMinorItem(minorItems(recs, cat));
+  if (TRACE.has('minorAi')) traceMinorAi((l) => console.error(l));
   // a city-state's army moves and fights as the record's moves and battles
-  // say (`syncUnits`, `battle`), its Builders lay what the record's
-  // improvements carry (`improve`), it buys what the log's purchases name
-  // (`buyUnit`) and its Trader goes where the record's routes run (`routes`);
-  // its units' tactical turn runs on a copy beside the record (`minorAi`)
+  // say (`syncUnits`, `battle`) and its Trader goes where the record's
+  // routes run (`routes`); its units' tactical turn runs on a copy beside
+  // the record (`minorAi`). What its city builds and buys and its trees'
+  // Builders' work are its AI's own (`minorAiTurn`), set against the record
+  // after its turn (`minorBuilds`, `buyUnit`, `improve`, `unitNew`)
   holdMinorOrders(true);
   holdCityStrikes(true);
   holdLevies(true);
@@ -3091,6 +3157,17 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     if (seat !== undefined && state.seats[seat]) state.seats[seat].handicap = LAB_HANDICAP;
   }
   seedMoments(state, first, history);
+  // the city-states' city AI ran on the game's turns before the import's:
+  // its first look ran no events (none contracted), its savings took the
+  // treasury; it stands as that turn left it
+  if (state.turn > 1) {
+    for (const cs of state.cityStates) {
+      if (cs.centerIndex < 0) continue;
+      cs.cityAi = newCityAi();
+      cs.economy = newEconomicMemory();
+      savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), false);
+    }
+  }
   // the AI majors: every major the record's first turn names no human
   const aiSeats = new Map<number, number>();
   const majorSeats = new Map<number, number>();
@@ -3353,6 +3430,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       count(ctx, isBarbSeat(u.seat) ? 'barb:unit' : 'minorAi:unit', 'fallback', ctx.playerOfSeat.get(u.seat));
     }
     undoMinorPlots(ctx, improvements);
+    minorBuilds(ctx, b, report.minorBuilds);
     // REPLAY_TRACE=minorProd: each city-state's item, purse, units and research after the engine's turn
     if (TRACE.has('minorProd')) {
       for (const cs of state.cityStates) {
@@ -3540,7 +3618,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
   }
   report.subsystems = Object.fromEntries(Object.entries(report.subsystems).sort(([x], [y]) => x.localeCompare(y)));
   holdRng(null);
-  holdMinorItem(null);
+  traceMinorAi(null);
   holdMinorCatchUp(null);
   holdResearchEra(null);
   holdMinorOrders(false);
@@ -3568,22 +3646,6 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     report.cityBuildPer = Object.fromEntries(ctx.cityBuildPer);
   }
   return report;
-}
-
-/**
- * THE CITY-STATES' ITEMS: what a city-state's city builds is its AI's pick,
- * taken after its step (on a completion, or idle), so the item its step of
- * turn t works is the one record t shows at its queue's head (runs/h1_duelw1117
- * Caguana: the Monument done in the step of t15, the Warrior at 0 in record
- * t16 and at 16 in t17). The engine's own build step works it.
- */
-function minorItems(recs: readonly TurnRecord[], cat: Catalog) {
-  const byTurn = new Map(recs.map((r) => [r.turn, r]));
-  return (state: GameState, cs: CityState): MinorItem | undefined => {
-    const rec = byTurn.get(state.turn);
-    const c = rec?.cities.find((x) => x.y * rec.head.W + x.x === cs.centerIndex);
-    return rec && c ? minorHead(cat, c, rec.head.W) : undefined;
-  };
 }
 
 /** the replay report as Markdown: per subsystem the turns held, the first
@@ -3640,6 +3702,14 @@ export function replayMarkdown(r: ReplayReport): string {
     const row = (k: string, x: CityBuildTally) => `| ${k} | ${x.log} | ${x.both} | ${x.exact} | ${x.onlyLog} | ${x.onlyOurs} | ${x.first ? `t${x.first.turn} p${x.first.player} ${x.first.log} / ${x.first.ours}` : '-'} |`;
     out.push(row('all', c));
     for (const [k, x] of Object.entries(r.cityBuildPer ?? {}).sort(([, a], [, b]) => b.log - a.log).slice(0, 40)) out.push(row(k, x));
+  }
+  {
+    const mb = r.minorBuilds;
+    out.push('', '## The city-states\' builds', '', 'Each city-state\'s item in hand after its turn (its AI\'s pick) against record t+1\'s queue head, by the',
+      'record\'s item; nothing imposed.', '', '| record item | minor-turns | same |', '|---|---:|---:|');
+    for (const [k, x] of Object.entries(mb.byKind).sort()) out.push(`| ${k} | ${x.turns} | ${x.same} |`);
+    out.push(`| all | ${mb.turns} | ${mb.same} |`, '', `First differing: ${mb.first ? `t${mb.first.turn} p${mb.first.player} ours ${mb.first.ours || 'none'} / record ${mb.first.record || 'none'}` : '-'}.`);
+    out.push('', 'The first differing (ours / record):', '', ...mb.samples.map((x) => `- ${x}`));
   }
   if (Object.keys(r.minorTactics ?? {}).length) {
     const d = r.minorDraws;

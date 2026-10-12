@@ -797,7 +797,8 @@ class SimPhase:
         at 0 as a minor's does (`_seat_upkeep_and_bankruptcy`). Then
         each city takes its grant when one falls due (`_free_city_grant`),
         puts the same
-        walk's Production into its build table (`_free_city_build`), fires the
+        walk's Production into its queue and on an empty one queues its
+        Default Specialization's pick (`_free_city_build`), fires the
         ranged strikes any walled city fires (`_city_strikes`) and runs its
         loyalty (its heal is the turn's end's, `_heal_cities`): CIV6 (IDENTITY_PER_TURN_FROM_FREE_CITIES)
         the flat base, the pressure term with every Free City's citizens on
@@ -864,15 +865,13 @@ class SimPhase:
         lmax = float(self.rules.seats["loyaltyMax"])
         alive_c = alive.clone()
         joins = torch.zeros(B, self.RC, dtype=torch.bool, device=dev)
-        f_techs, f_civics = self.citystate_techs[:, self.FR], self.citystate_civics[:, self.FR]
-        f_train = self._trainable_in(f_techs, f_civics, self._free_any_res)
         for j in range(self.RC):
             act = alive_c[:, j]
             if not bool(act.count_nonzero()):
                 continue
             jc = torch.full((B,), j, dtype=torch.long, device=dev)
             self._free_city_grant(act, j)
-            self._free_city_build(j, act, prod[:, j].double(), f_techs, f_civics, f_train)
+            self._free_city_build(j, act, prod[:, j].double())
             self._city_strikes(row, jc, act)
             here = self.city_center[bidx, row, jc].clamp(min=0)
             own = self._citizen_pressure_from(here, row)
@@ -3205,6 +3204,17 @@ class SimPhase:
             live = moved < getattr(self, counter).unsqueeze(1)
             kbl = torch.where(mine_kb, torch.where(live, moved + lo, torch.full_like(kbl, -1)), kbl)
             kb.copy_(kbl.reshape(kb.shape).to(kb.dtype))
+        # the city AI's trees name their units by slot: a living unit's moves
+        # with it, a dead one's leaves the tree
+        if prefix == "major" and self.S > 0:
+            tu = self.cai_tr_units
+            tl = tu.reshape(B, -1)
+            mine_t = (tl >= lo) & (tl < hi)
+            if bool(mine_t.count_nonzero()):
+                moved = inv.gather(1, (tl - lo).clamp(min=0, max=U - 1))
+                live = moved < getattr(self, counter).unsqueeze(1)
+                tl = torch.where(mine_t, torch.where(live, moved + lo, torch.full_like(tl, -1)), tl)
+                tu.copy_(tl.reshape(tu.shape))
         for m in ("military_at", "civilian_at", "support_at", "embarked_at"):
             at = getattr(self, m)
             mine = (at >= lo) & (at < hi)

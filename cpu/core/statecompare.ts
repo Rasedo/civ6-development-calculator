@@ -81,7 +81,10 @@ import { buildingCostIn, outerPool } from './rules';
 import { governorsOf } from './governors';
 import { BUILT_WONDERS } from '../data/builtWonders';
 import { GW_LAYOUT_W } from '../data/greatWorks';
-import { CITY_STATE_TYPES, CITY_STATE_MAX_HP, MINOR_BUILD_ROWS } from '../data/cityStates';
+import { CITY_STATE_TYPES, CITY_STATE_MAX_HP } from '../data/cityStates';
+import { AI_DISTRICTS, AI_IMPROVEMENTS } from '../data/aiBuildTables';
+import { AI_BUILDING_INDEX, AI_UNIT_INDEX } from './aiCityBuild';
+import { engineId } from '../data/aliases';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, WORSHIP_BELIEFS, ENHANCER_BELIEFS, RELIGION_TYPES, unconvertedOf } from '../data/religion';
 import { grantedMoves, unitStackSlot } from './units';
 import { GOODY_KINDS } from '../data/goodyHuts';
@@ -177,12 +180,60 @@ class Acc {
 
 const LAYOUT = prodLayout();
 const TECH_IDX = new Map(Object.keys(TECHS).map((id, i) => [id, i]));
+/** FX(-9999), raw: the value of an item no AI turn set */
+const FX_MIN_RAW = -9999 * 256;
+const DISTRICT_ROW = new Map(AI_DISTRICTS.map((r, i) => [r.type, i]));
+const IMPROVEMENT_ROW = new Map(AI_IMPROVEMENTS.map((r, i) => [r.type, i]));
+/** a technology's or civic's install type as the engine's index, -1 none */
+const techCode = (t: string | null): number => (t ? idx(TECH_IDX, engineId('tech', t, 'TECH_', TECHS) ?? '') : -1);
+const civicCode = (c: string | null): number => (c ? idx(CIVIC_IDX, engineId('civic', c, 'CIVIC_', CIVICS) ?? '') : -1);
+/** a minor's city AI's slots (its one city, id -1) */
+const cityAiSlots = (cs: CityState): number[] => [...(cs.cityAi?.slots[-1] ?? [-1, -1, -1, -1, -1, -1])];
+/** per slot its running tree: [id, its living units as plot x 1000 + unit
+ *  index sorted (-1 padded to 4), trigger: unit, building, district,
+ *  improvement rows, plot, tech, civic] */
+function cityAiTrees(cs: CityState, state: GameState): number[] {
+  const out: number[] = [];
+  for (let k = 0; k < 6; k++) {
+    const t = cs.cityAi?.trees.find((x) => x.slot === k && !x.done);
+    if (!t) {
+      out.push(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
+      continue;
+    }
+    // its living units by plot and type (a unit's id is the engine's own)
+    const units = state.units.filter((u) => u.seat === cs.seat && t.units.includes(u.id))
+      .map((u) => u.tileIndex * 1000 + (UNIT_IDX.get(u.type) ?? 999)).sort((a, b) => a - b);
+    const tr = t.trigger;
+    out.push(t.id, ...[0, 1, 2, 3].map((i) => units[i] ?? -1),
+      tr.unit ? AI_UNIT_INDEX.get(tr.unit) ?? -1 : -1, tr.building ? AI_BUILDING_INDEX.get(tr.building) ?? -1 : -1,
+      tr.district ? DISTRICT_ROW.get(tr.district) ?? -1 : -1, tr.improvement ? IMPROVEMENT_ROW.get(tr.improvement) ?? -1 : -1,
+      tr.plot, techCode(tr.tech), civicCode(tr.civic));
+  }
+  return out;
+}
+/** the minor's contracts by id, each [id, tree, unit, building, district
+ *  rows, goal kind (1 tech, 2 civic, 3 plot), goal, plot, value, city, most
+ *  turns, turns, progress, assign, queued, held by its tree, listed] */
+function cityAiContracts(cs: CityState): number[] {
+  const ai = cs.cityAi;
+  if (!ai) return [];
+  const listed = new Set(ai.city[-1] ?? []);
+  return [...ai.contracts].sort((a, b) => a.id - b.id).flatMap((c) => {
+    const goal = ai.techContracts[c.id];
+    const kind = goal === undefined ? (ai.plotContracts[c.id] !== undefined ? 3 : 0) : goal.startsWith('TECH_') ? 1 : 2;
+    const tree = ai.trees.find((t) => t.id === c.tree);
+    return [c.id, c.tree, c.unit ? AI_UNIT_INDEX.get(c.unit) ?? -1 : -1, c.building ? AI_BUILDING_INDEX.get(c.building) ?? -1 : -1,
+      c.district ? DISTRICT_ROW.get(c.district) ?? -1 : -1, kind, kind === 1 ? techCode(goal) : kind === 2 ? civicCode(goal) : -1,
+      c.plot, c.value, c.city, c.maxTurns, c.turns, c.progress, c.assign ? 1 : 0, c.queued ? 1 : 0,
+      tree && tree.contracts.includes(c.id) ? 1 : 0, listed.has(c.id) ? 1 : 0];
+  });
+}
 const CIVIC_IDX = new Map(Object.keys(CIVICS).map((id, i) => [id, i]));
 const BUILDING_IDX = new Map(LAYOUT.buildings.map((id, i) => [id, i]));
 const UNIT_IDX = new Map(LAYOUT.units.map((id, i) => [id, i]));
 const PROJECT_IDX = new Map(Object.keys(PROJECTS).map((id, i) => [id, i]));
 
-/** a minor's item key (`minorItemKey`) as the GPU's index (`_minor_switch`):
+/** a minor's item key (`minorItemKey`) as the GPU's index (`_minor_set_item`):
  *  a unit its chassis, then a building, a district, a project, a pillaged
  *  building's repair */
 function minorItemIdx(key: string): number {
@@ -877,11 +928,17 @@ const CITY_STATE_G: Record<string, Extractor> = {
   minorBuildProject: overCityStates((cityState) => (cityState.buildProject ? Object.keys(PROJECTS).indexOf(cityState.buildProject) : -1)),
   minorRepairWait: overCityStates((cityState) => (cityState.repairWait ? 1 : 0)),
   minorRoutes: overCityStates((cityState, state) => routeRowsOf(state, cityState)),
-  minorBuildFrom: overCityStates((cityState) => cityState.buildFrom ?? MINOR_BUILD_ROWS.map(() => 0)),
-  minorArmyCap: overCityStates((cityState) => cityState.armyCap ?? -1),
-  minorBuilderBuyRate: overCityStates((cityState) => cityState.builderBuyRate ?? -1),
-  minorArmySeen: overCityStates((cityState) => cityState.armySeen ?? -1),
-  minorLossTurn: overCityStates((cityState) => cityState.lossTurn ?? -1),
+  minorProdSite: overCityStates((cityState) => cityState.prodSite ?? -1),
+  minorProdSet: overCityStates((cityState) => [cityState.prodSetTurn ?? -99, cityState.prodSetValue ?? FX_MIN_RAW]),
+  minorThreat: overCityStates((cityState) => cityState.threat ?? -1),
+  minorSavings: overCityStates((cityState) => [...(cityState.economy?.savings ?? [0, 0, 0, 0]), cityState.economy?.balance ?? 0]),
+  minorAiSlots: overCityStates((cityState) => cityAiSlots(cityState)),
+  minorAiTrees: overCityStates((cityState, state) => cityAiTrees(cityState, state)),
+  minorContracts: overCityStates((cityState) => cityAiContracts(cityState)),
+  minorReservations: overCityStates((cityState) => [...(cityState.cityAi?.reservations ?? [])].sort((a, b) => a.plot - b.plot)
+    .flatMap((r) => [r.plot, r.tree, r.value])),
+  minorAiHand: overCityStates((cityState) => [cityState.cityAi?.inHand[-1] ?? -1, cityState.cityAi?.nextContract ?? 1, cityState.cityAi?.nextTree ?? 100,
+    cityState.cityAi ? 1 : 0]),
   minorBuildersTrained: overCityStates((cityState) => cityState.buildersTrained),
   minorBestMeleeCS: overCityStates((cityState) => cityState.bestMeleeCS),
   minorBestRangedCS: overCityStates((cityState) => cityState.bestRangedCS ?? 0),
@@ -973,8 +1030,6 @@ const CITY: Record<string, Extractor> = {
   }),
   // the turn its owner founded or took the city (a FREE CITY's revolt)
   foundedTurn: overCities((r) => r.city.foundedTurn),
-  // a FREE CITY's build pot (`freeCityBuild`); 0 for any other city
-  freePot: overCities((r) => r.city.freePot ?? 0),
   freeGrantTurns: overCities((r) => r.city.freeGrantTurns ?? 0),
   // a FREE CITY's allowed units (`freeCityAllowed`), as unit rows
   freeAllowed: overCities((r) => (r.city.freeAllowed ?? []).map((x) => idx(UNIT_IDX, x)).sort((a, b) => a - b)),

@@ -2399,59 +2399,122 @@
           "note": "the minor's routes as the seat `routes` rows, the origin its city's centre"
         },
         {
-          "name": "minorBuildFrom",
+          "name": "minorProdSite",
           "compare": "exact",
           "covers": [
-            "CityState.buildFrom"
+            "CityState.prodSite"
           ],
           "planes": [
-            "citystate_build_from"
+            "citystate_prod_site"
           ],
-          "note": "the episode's draws: per build-table row the turn from which it wants its item (-1 never, 0 for a row that draws none); zeros until the minor's first build draws them."
+          "note": "the plot of the minor's district in hand (its contract's), -1 for none"
         },
         {
-          "name": "minorArmyCap",
+          "name": "minorProdSet",
           "compare": "exact",
           "covers": [
-            "CityState.armyCap"
+            "CityState.prodSetTurn",
+            "CityState.prodSetValue"
           ],
           "planes": [
-            "citystate_army_cap"
+            "citystate_prod_set_turn",
+            "citystate_prod_set_value"
           ],
-          "note": "the army the minor keeps, drawn once; -1 until drawn."
+          "note": "the turn the minor's AI set its item and the item's value then, raw 24.8 (city +0x2600, CityBuildAI +0xa48); -99 and FX(-9999) before its first"
         },
         {
-          "name": "minorBuilderBuyRate",
+          "name": "minorThreat",
           "compare": "exact",
           "covers": [
-            "CityState.builderBuyRate"
+            "CityState.threat"
           ],
           "planes": [
-            "citystate_builder_buy"
+            "citystate_threat"
           ],
-          "note": "the episode's Builder purchase rate per mille, drawn once with the build table's draws; -1 until drawn."
+          "note": "the minor city's threat (CityBuildAI +0x1b8), -1 for none"
         },
         {
-          "name": "minorArmySeen",
+          "name": "minorSavings",
           "compare": "exact",
           "covers": [
-            "CityState.armySeen"
+            "CityState.economy"
           ],
           "planes": [
-            "citystate_army_seen"
+            "citystate_savings",
+            "citystate_balance"
           ],
-          "note": "the minor's military count at the end of its last turn; -1 before its first."
+          "note": "the Economic AI's savings slots and its last balance, raw 24.8 (AI::Economic +0x540, +0x1b8)"
         },
         {
-          "name": "minorLossTurn",
+          "name": "minorAiSlots",
           "compare": "exact",
           "covers": [
-            "CityState.lossTurn"
+            "CityState.cityAi"
           ],
           "planes": [
-            "citystate_loss_turn"
+            "cai_slots"
           ],
-          "note": "the turn the minor was last seen to have lost a military unit, which its purchase rate reads; -1 for none."
+          "note": "per CityEvents slot the tree (or the operation) the minor's city runs there, -1 none"
+        },
+        {
+          "name": "minorAiTrees",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_tr_alive",
+            "cai_tr_id",
+            "cai_tr_units",
+            "cai_tr_trigger"
+          ],
+          "note": "per slot the running tree's id (-1 none), its living units as plot x 1000 + unit index sorted (-1 padded to 4), its trigger (unit, building, district, improvement rows, plot, tech, civic)"
+        },
+        {
+          "name": "minorContracts",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_c_id",
+            "cai_c_tree",
+            "cai_c_unit",
+            "cai_c_building",
+            "cai_c_district",
+            "cai_c_goal_kind",
+            "cai_c_goal",
+            "cai_c_plot",
+            "cai_c_value",
+            "cai_c_max_turns",
+            "cai_c_turns",
+            "cai_c_progress",
+            "cai_c_assign",
+            "cai_c_queued",
+            "cai_c_in_tree",
+            "cai_c_listed",
+            "cai_c_city"
+          ],
+          "note": "the minor's contracts by id: [id, tree, unit, building, district rows, goal kind, goal, plot, value, city, most turns, turns, progress, assign, queued, held by its tree, listed by the city]"
+        },
+        {
+          "name": "minorReservations",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_r_plot",
+            "cai_r_tree",
+            "cai_r_value"
+          ],
+          "note": "the minor's plot reservations by plot: [plot, tree, value]"
+        },
+        {
+          "name": "minorAiHand",
+          "compare": "exact",
+          "covers": [],
+          "planes": [
+            "cai_in_hand",
+            "cai_c_serial",
+            "cai_t_serial",
+            "citystate_ai_on"
+          ],
+          "note": "the contract the city holds in hand (-1 none), the ids its next contract and tree take, and whether its AI has run"
         },
         {
           "name": "minorBuildersTrained",
@@ -2881,17 +2944,6 @@
             "city_founded_turn"
           ],
           "note": "the turn its owner founded or took the city — a Free City's revolt; the luxury allocation serves no city founded this turn"
-        },
-        {
-          "name": "freePot",
-          "compare": "milli",
-          "covers": [
-            "City.freePot"
-          ],
-          "planes": [
-            "city_free_pot"
-          ],
-          "note": "a FREE CITY's build pot: its Production, banked until its build table's next item is covered; 0 for any other city."
         },
         {
           "name": "freeGrantTurns",
@@ -4223,6 +4275,22 @@
       {
         "plane": "_nfeat_adj",
         "why": "the non-removable twin of _feat_adj, zeroed on the same Volcanic Soil paint; TS reads adjacency live."
+      },
+      {
+        "plane": "cai_tr_status",
+        "why": "a city tree's node statuses: FRESH between turns while the tree runs (`tick` resets them), so nothing a turn leaves holds there; compared through the trees' and contracts' effect."
+      },
+      {
+        "plane": "cai_tr_mem_a",
+        "why": "a city tree's node memory (TS `BtRun.mem`, a record per node whose keys the handler names): the GPU's two numbers per node carry what each handler keeps; compared through the trees' and contracts' effect."
+      },
+      {
+        "plane": "cai_tr_mem_b",
+        "why": "the second number of a city tree's node memory (see cai_tr_mem_a)."
+      },
+      {
+        "plane": "cai_tr_bb",
+        "why": "a city tree's tagged data (TS `CityTree.bb`, keyed by tag name; the GPU's one value per tag): compared through the trees' and contracts' effect."
       }
     ]
   }

@@ -585,7 +585,7 @@ class SimEconomy:
         row's own figure: base + (base·escalation/100 − base)·P/100 in
         integers, P the game's progress; an improved plot's degradation (a
         pillaged one's beside it); the game speed; the plot's governor
-        harvest multiplier, floored."""
+        harvest multiplier (a major's plot alone holds a governor), floored."""
         lp = self.rules.lump
         base = base.long()
         p = self._progress_pct(row)[rows]
@@ -595,7 +595,7 @@ class SimEconomy:
                 - self.pillaged[rows, tiles].long() * int(lp["pillagedDegradation"]))
         a = torch.where(self.improvement[rows, tiles] >= 0, torch.div(a * keep, 100, rounding_mode="trunc"), a)
         a = self.rules.scale_by_game_speed(a.double())
-        if self.n_governors:
+        if self.n_governors and row < self.n_majors:
             a = torch.floor(a * self._governor_tile_mult(row, "harvestMult")[rows, tiles])
         return a.long()
 

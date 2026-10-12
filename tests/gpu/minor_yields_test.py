@@ -125,18 +125,26 @@ def test_clock(rules, path) -> None:
     sim.citystate_tech_prog[B0, s] = 0.0
     sim.citystate_civic_prog[B0, s] = 0.0
     sim.citystate_prod[B0, s] = 0.0
+    sim.citystate_item[B0, s] = -1
+    sim.citystate_ovf[B0, s] = 0.0
     sim.citystate_treasury[B0, s] = 0.0
     sim.citystate_faith[B0, s] = 0.0
     tot = walk(sim, row)
-    sim._city_state_phase()
+    # the clock alone: the city AI's purchases and its units' walk (a camp
+    # or a village it clears pays Gold) sit this phase out
+    sim._minor_ai_turn = lambda s_: None
+    sim._minor_tactics = lambda s_: None
+    try:
+        sim._city_state_phase()
+    finally:
+        del sim._minor_ai_turn
+        del sim._minor_tactics
     assert abs(float(sim.citystate_tech_prog[B0, s]) - tot[3]) < 1e-9, "the tech pot did not take the walk's Science"
     assert abs(float(sim.citystate_civic_prog[B0, s]) - tot[4]) < 1e-9, "the civic pot did not take the Culture"
-    # the build pot takes it under the minor's production rows — half the
-    # yield, times the toward-row of whichever item it goes to (1, 3 or 6;
-    # `minor_builds_test::test_the_production_rows` pins which)
-    took = float(sim.citystate_prod[B0, s]) / (tot[1] * 0.5)
-    assert any(abs(took - m) < 1e-9 for m in (1.0, 3.0, 6.0)), \
-        f"the build pot did not take the Production ({took} x half the yield)"
+    # with nothing in hand the step stores the walk's Production
+    # (tests/gpu/minor_builds_test.py pins the rows an item in hand pays under)
+    took = float(sim.citystate_ovf[B0, s])
+    assert abs(took - tot[1]) < 1e-9, f"the store took {took}, the walk's Production is {tot[1]}"
     # the Gold pays the units' upkeep, the balance stopping at 0
     mine = sim.major_unit_alive[B0] & (sim.major_unit_seat[B0] == 100 + s)
     upkeep = float((sim._type_maintenance[sim.major_unit_type[B0].clamp(min=0)].double() * mine.double()).sum())

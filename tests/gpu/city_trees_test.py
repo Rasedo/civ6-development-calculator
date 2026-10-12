@@ -111,7 +111,7 @@ class World:
         return out.reshape(shape)
 
     # the city
-    def city_id(self):
+    def home_city(self):
         return SC["city"]
 
     def city_alive(self):

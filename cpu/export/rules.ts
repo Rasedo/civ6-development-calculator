@@ -22,7 +22,7 @@ import { GENERAL_AURA_MP } from '../core/aura';
 import { CARDIFF_HARBOR_POWER, VALLETTA_WALLS_DISCOUNT_PCT } from '../data/cityStates';
 import { MOUNTIE_PARK_RANGE } from '../core/combat';
 import { SUZ_EFFECTS, KABUL_XP_MULT, PRESLAV_BUILDING_LOYALTY, REGIONAL_REACH_BONUS, ANSHAN_WRITING_SCIENCE, ANSHAN_RELIC_SCIENCE, KUMASI_ROUTE_CULTURE, KUMASI_ROUTE_GOLD, GENEVA_SCIENCE_PCT, BOLOGNA_DISTRICT_GPP, BOLOGNA_GPP_BUILDING, NAN_MADOL_WATER_CULTURE, AMSTERDAM_DEST_LUXURY_GOLD, ZANZIBAR_LUXURIES, ZANZIBAR_LUXURY_AMENITIES, HUNZA_PATH_TILE_GOLD_FX, HONG_KONG_PROJECT_PCT, NGAZARGAMU_PURCHASE_PCT, MILITARISTIC_BUILDING_ROWS, BUENOS_AIRES_AMENITIES, AUCKLAND_PLOT_ROWS, JOHANNESBURG_RESOURCE_PROD, JOHANNESBURG_RESOURCE_PROD_LATE, JOHANNESBURG_LATE_TECH, MUSCAT_HUB_AMENITIES, MUSCAT_HUB_DISTRICT, KANDY_RELIC_FAITH_PCT, KANDY_WONDER_RELICS, SINGAPORE_PARTNER_PROD, BRUSSELS_WONDER_PCT, HATTUSA_FREE_STRATEGIC } from '../data/cityStates';
-import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_BUILD_KINDS, MINOR_BUILD_ROWS, MINOR_BUILD_SLOTS, MINOR_ARMY_CAP_SLOTS, MINOR_ARMY_CLASSES, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_BUILDER_RATE_PERMILLE, MINOR_BUILDER_RADIUS, MINOR_BUILDER_BUY_SLOTS, MINOR_MILITARY_BUY_FLOOR, MINOR_MILITARY_BUY_BP, MINOR_LOSS_BUY_MULT, MINOR_LOSS_BUY_TURNS, MINOR_NAVAL_BUY_BP, MINOR_NAVAL_CLASS, MINOR_UPGRADE_GOLD, FREE_CITY_BUILD_ROWS, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
+import { CITY_STATE_TYPES, ENVOY_COST, INFLUENCE_PER_TURN, CITY_STATE_ENVOY_ROWS, CITY_STATE_TYPE_YIELD, CITY_STATE_ROUTE_TO_OTHERS, CITY_STATE_TYPE_DISTRICT, CITY_STATE_ITEM_PROD, CITY_STATE_MAX_HP, LEVY_TURNS, MINOR_REPAIR_RESUME_PCT, MINOR_PRODUCTION_PCT, MINOR_WALLS_PROD_PCT, MINOR_HARBOR_PROD_PCT, MINOR_TYPE_DISTRICT_PROD_PCT, MINOR_BUILDER_PROD_PCT, MINOR_MILITARY_PROD_PCT, MINOR_SMALL_MILITARY, MINOR_EXCLUDED_UNIT_CLASSES, MINOR_UPGRADE_GOLD, FIRST_MEET_ENVOYS, MINOR_CATCHUP_PCT } from '../data/cityStates';
 import { GP_ADJ_TOURISM_PCT, GP_BUILDING_TOURISM, GP_BUILDING_YIELDS, GP_CITY_FREE_EXTRACTION, GP_CITY_PERM, GP_FREE_EXTRACTION, GP_FX, GP_PERM, GP_TILE_PERM, GP_PER_ADJ_SOURCES, GP_RESOURCE_REVEAL, GP_SITES, GP_UNIT_PROD_CLASSES, GP_YIELD_KEYS, GW_WORK_CLASSES, gpChargesOf, gpEffectOf, gpNoMilitaryOf, gpSiteOf, type GreatPersonDef } from '../data/greatPeople';
 import { gpSiteArgOf } from '../core/targetSites';
 import { strategicSlot } from '../core/stockpile';
@@ -323,6 +323,9 @@ import { engineId, gameTypeOf, installFeature, installTerrain } from '../data/al
  *  its catalog tag names */
 const installTypeOf = (kind: string, id: string, prefix: string, known: object): string =>
   engineId(kind, prefix + id, prefix, known) === id ? prefix + id : gameTypeOf(kind, id, prefix);
+/** the install types naming an engine row: its own and its catalog tag's */
+const namesOf = (kind: string, id: string, prefix: string, known: object): string[] =>
+  [...new Set([installTypeOf(kind, id, prefix, known), gameTypeOf(kind, id, prefix)])];
 import { AI_MODIFIER_READS } from '../core/aiModifiers';
 import { promotionWeight } from '../core/minorBuild';
 import { AI_CITY_EVENTS, AI_CITY_EVENT_LISTS, AI_CITY_EVENT_TYPES, AI_CITY_TREES } from '../data/aiCityTrees';
@@ -1061,9 +1064,12 @@ export function buildRules() {
         unit: AI_UNITS.map((r) => Object.values(UNITS).findIndex((u) => u.id === engineId('unit', r.type, 'UNIT_', UNITS))),
         district: AI_DISTRICTS.map((r) => PLACEABLE_DISTRICTS.indexOf(engineId('district', r.type, 'DISTRICT_', DISTRICTS) as never)),
         project: AI_PROJECTS.map((r) => Object.keys(PROJECTS).indexOf(engineId('project', r.type, 'PROJECT_', PROJECTS) ?? '')),
-        tech: Object.fromEntries(techList.map((t, i) => [installTypeOf('tech', t.id, 'TECH_', TECHS), i])),
-        civic: Object.fromEntries(civicList.map((c, i) => [installTypeOf('civic', c.id, 'CIVIC_', CIVICS), i])),
-        resource: Object.fromEntries(RESOURCE_IDS.map((id, i) => [installTypeOf('resource', id, 'RESOURCE_', RESOURCES), i])),
+        improvement: AI_IMPROVEMENTS.map((r) => IMPROVEMENT_IDS.indexOf(engineId('improvement', r.type, 'IMPROVEMENT_', IMPROVEMENTS) as never)),
+        // every install type that names the row: its own and the one its
+        // catalog tag names (CIVIC_DRAMA_POETRY for DRAMA_AND_POETRY)
+        tech: Object.fromEntries(techList.flatMap((t, i) => namesOf('tech', t.id, 'TECH_', TECHS).map((k) => [k, i] as const))),
+        civic: Object.fromEntries(civicList.flatMap((c, i) => namesOf('civic', c.id, 'CIVIC_', CIVICS).map((k) => [k, i] as const))),
+        resource: Object.fromEntries(RESOURCE_IDS.flatMap((id, i) => namesOf('resource', id, 'RESOURCE_', RESOURCES).map((k) => [k, i] as const))),
       },
       engineUnitRow: Object.values(UNITS).map((u) => AI_UNITS.findIndex((r) => r.type === installTypeOf('unit', u.id, 'UNIT_', UNITS))),
       // a plot as the modifiers read it: per engine terrain its install type
@@ -1074,10 +1080,21 @@ export function buildRules() {
         feature: FEAT_IDS.map((f) => installFeature(f)),
         featureImpassable: FEAT_IDS.map((f) => !!(FEATURES[f] as { impassable?: boolean }).impassable),
         resource: RESOURCE_IDS.map((r) => `RESOURCE_${r}`),
+        // the install types the plot value reads: per engine resource and improvement
+        resourceType: RESOURCE_IDS.map((r) => gameTypeOf('resource', r, 'RESOURCE_')),
+        improvement: IMPROVEMENT_IDS.map((i) => gameTypeOf('improvement', i, 'IMPROVEMENT_')),
       },
       // a minor's promotion class weights (MINOR_CIV_DEFAULT_TRAIT's list)
       minorPromotionWeights: Object.fromEntries([...new Set(AI_UNITS.map((u) => u.promotionClass).filter((c): c is string => !!c))]
         .map((c) => [c, promotionWeight(['MINOR_CIV_DEFAULT_TRAIT'], c)])),
+      // the Free Cities' (TRAIT_LEADER_FREE_CITIES' list)
+      freePromotionWeights: Object.fromEntries([...new Set(AI_UNITS.map((u) => u.promotionClass).filter((c): c is string => !!c))]
+        .map((c) => [c, promotionWeight(['TRAIT_LEADER_FREE_CITIES'], c)])),
+      // the plot facts' engine terms: the Lake terrain, the city centre's Housing
+      lakeTerrain: TERRAIN_IDS.indexOf('LAKE'),
+      centreHousing: DISTRICTS.CITY_CENTER.housing,
+      // the handicap a seat with no row of its own reads (the Free Cities)
+      defaultHandicap: DEFAULT_HANDICAP,
       // the city events (their slots in table order), each leader trait's
       // list of the tree an event starts, and the trees' nodes
       // (`aiCityTrees.ts`, `behaviorTree.ts`)
@@ -1134,52 +1151,9 @@ export function buildRules() {
       builderProdPct: MINOR_BUILDER_PROD_PCT,
       militaryProdPct: MINOR_MILITARY_PROD_PCT,
       smallMilitary: MINOR_SMALL_MILITARY,
-      // THE BUILD TABLE (`MINOR_BUILD_ROWS`), in table order: `k` the row's
-      // kind (a `buildKinds` index); `item` per minor type its building (a
-      // buildings index), district (a PLACEABLE_DISTRICTS index) or project
-      // (a projects index), -1 none; `c` a unit row's class (PROMO_CLASSES),
-      // -1; `n` its `below`, -1; `d` 1 where the row draws, and `from` its
-      // slots per type (zeros where it draws none)
-      buildKinds: [...MINOR_BUILD_KINDS],
-      buildRows: MINOR_BUILD_ROWS.map((row) => ({
-        k: MINOR_BUILD_KINDS.indexOf(row.kind),
-        item: CITY_STATE_TYPES.map((t) => {
-          const id = row.item?.[t];
-          if (!id) return -1;
-          if (row.kind === 'building') return buildingIdx.get(id) ?? -1;
-          if (row.kind === 'project') return Object.keys(PROJECTS).indexOf(id);
-          return (PLACEABLE_DISTRICTS as readonly string[]).indexOf(id);
-        }),
-        c: row.cls ? PROMO_CLASSES.indexOf(row.cls) : -1,
-        n: row.below ?? -1,
-        d: row.from ? 1 : 0,
-        from: CITY_STATE_TYPES.map((t) => (row.from ? [...row.from[t]] : Array<number>(MINOR_BUILD_SLOTS).fill(0))),
-      })),
-      buildSlots: MINOR_BUILD_SLOTS,
-      armyCapSlots: [...MINOR_ARMY_CAP_SLOTS],
-      armyClasses: MINOR_ARMY_CLASSES.map(([c, w]) => [PROMO_CLASSES.indexOf(c), w]),
       excludedUnitClasses: MINOR_EXCLUDED_UNIT_CLASSES.map((c) => PROMO_CLASSES.indexOf(c)),
-      builderRatePermille: MINOR_BUILDER_RATE_PERMILLE,
-      builderRadius: MINOR_BUILDER_RADIUS,
-      // THE MINOR'S PURSE (`minorPurchases`, `minorUpgrades`)
-      builderBuySlots: [...MINOR_BUILDER_BUY_SLOTS],
-      militaryBuyFloor: MINOR_MILITARY_BUY_FLOOR,
-      militaryBuyBp: [...MINOR_MILITARY_BUY_BP],
-      lossBuyMult: MINOR_LOSS_BUY_MULT,
-      lossBuyTurns: MINOR_LOSS_BUY_TURNS,
+      // a minor's upgrade price (`minorUpgrades`)
       upgradeGold: MINOR_UPGRADE_GOLD,
-      // the ships a minor buys: the rate per ten thousand, the class
-      navalBuyBp: MINOR_NAVAL_BUY_BP,
-      navalClass: PROMO_CLASSES.indexOf(MINOR_NAVAL_CLASS),
-      // THE FREE CITY'S BUILD TABLE (`FREE_CITY_BUILD_ROWS`): `k` its kind (a
-      // `freeBuildKinds` index), `c` a unit row's class (PROMO_CLASSES) or -1,
-      // `items` a building row's buildings (buildings indices, table order)
-      freeBuildKinds: ['unit', 'building', 'repair'],
-      freeBuildRows: FREE_CITY_BUILD_ROWS.map((row) => ({
-        k: ['unit', 'building', 'repair'].indexOf(row.kind),
-        c: row.cls ? PROMO_CLASSES.indexOf(row.cls) : -1,
-        items: (row.items ?? []).map((b) => buildingIdx.get(b) ?? -1),
-      })),
       // Suzerain perks modeled as RULES — `effects` is the code order the
       // per-CS `suzCode` plane indexes.
       suz: {

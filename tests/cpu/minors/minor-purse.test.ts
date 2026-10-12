@@ -1,25 +1,20 @@
 /**
- * THE MINOR'S PURSE (C-38's census): its units' upkeep, the
- * Builder and military purchases at the fitted rates, the Warrior Monk bought
- * with Faith and the upgrade a research completion triggers. The GPU twin is
- * tests/gpu/minor_purse_test.py.
+ * THE MINOR'S PURSE: its units' upkeep, the units a threatened city buys
+ * (`minorAiTurn`'s purchases: the Economic AI's savings, TryPurchaseUnits
+ * over the city's unit list) and the upgrade a research completion
+ * triggers. The GPU twin is tests/gpu/minor_purse_test.py.
  */
 import { describe, it, expect } from 'vitest';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
-import { emptySeat, seatOf, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
+import { BARB_SEAT, emptySeat, seatOfCityState, setTileOwner, tileSeat } from '../../../cpu/core/seats';
 import { minorCity } from '../../../cpu/core/cityStates';
-import { minorBuilderWork, minorEconomy, minorPlan, minorPurchases, minorUpgrades } from '../../../cpu/core/minorBuild';
+import { minorEconomy, minorUpgrades } from '../../../cpu/core/minorBuild';
+import { minorAiTurn, minorThreat } from '../../../cpu/core/minorCityAi';
 import { computeCityStats } from '../../../cpu/core/city';
-import { builderCost, spawnUnit } from '../../../cpu/core/units';
-import { purchaseStep } from '../../../cpu/core/effects';
-import { randRange } from '../../../cpu/core/rand';
-import {
-  MINOR_BUILDER_BUY_SLOTS, MINOR_LOSS_BUY_MULT, MINOR_MILITARY_BUY_BP, MINOR_MILITARY_BUY_FLOOR,
-  MINOR_UPGRADE_GOLD,
-} from '../../../cpu/data/cityStates';
-import { FAITH_PURCHASE_MULT, GOLD_PURCHASE_MULT } from '../../../cpu/data/constants';
+import { spawnUnit } from '../../../cpu/core/units';
+import { MINOR_UPGRADE_GOLD } from '../../../cpu/data/cityStates';
 import { UNITS } from '../../../cpu/data/units';
-import { hexDistance, neighbors, tilesWithin } from '../../../world/hex';
+import { hexDistance, tilesWithin } from '../../../world/hex';
 import type { CityState, GameState, Unit } from '../../../cpu/core/types';
 
 function addCs(state: GameState, col: number, row: number): CityState {
@@ -35,51 +30,16 @@ function addCs(state: GameState, col: number, row: number): CityState {
   return cityState;
 }
 
-/** A minor at (6, 6) of a 14x14 grassland, its episode's draws made. */
+/** A minor at (6, 6) of a 14x14 grassland. */
 function scene(): { state: GameState; cs: CityState } {
   const state = makeState(makeMap(14, 14));
   const cs = addCs(state, 6, 6);
-  cs.armyCap = 3;
-  cs.buildFrom = [];
-  cs.builderBuyRate = 1000;
   return { state, cs };
 }
 
 const army = (state: GameState, cs: CityState): Unit[] => state.units.filter((u) => u.seat === cs.seat);
 
-/** A pillaged Monument the minor repairs first: its production is off the
- *  Builder (`minorTrainsBuilder`). */
-function pillageForRepair(cs: CityState): void {
-  cs.buildings = [...(cs.buildings ?? []), 'MONUMENT'];
-  cs.pillagedBuildings = ['MONUMENT'];
-  cs.repairWait = false;
-}
-
-/** Set the stream so its next draw over 10000 satisfies `pred`. */
-function seek(state: GameState, pred: (r: number) => boolean): void {
-  for (let s = 1; s < 1_000_000; s++) {
-    state.rngState = s;
-    if (pred(randRange(state, 10000, 'Engine: minor buy'))) {
-      state.rngState = s;
-      return;
-    }
-  }
-  throw new Error('no stream state draws that');
-}
-
 describe("a city-state's purse", () => {
-  it('draws the Builder purchase rate once, with the episode', () => {
-    const state = makeState(makeMap(14, 14));
-    const cs = addCs(state, 6, 6);
-    minorPlan(state, cs);
-    expect(MINOR_BUILDER_BUY_SLOTS).toContain(cs.builderBuyRate);
-    const rate = cs.builderBuyRate;
-    const rng = state.rngState;
-    minorPlan(state, cs);
-    expect(cs.builderBuyRate).toBe(rate);
-    expect(state.rngState).toBe(rng);
-  });
-
   it("pays its units' upkeep out of the city's Gold and stops at 0", () => {
     const { state, cs } = scene();
     spawnUnit(state, 'SWORDSMAN', cs.centerIndex, cs.seat);
@@ -96,119 +56,27 @@ describe("a city-state's purse", () => {
     expect(cs.treasury).toBeGreaterThanOrEqual(0);
   });
 
-  it('buys a Builder only with Builder work and none standing or in production', () => {
+  it('a city its knowledge base sees a barbarian army beside is threatened, and buys its list\'s first unit while its savings meet it', () => {
     const { state, cs } = scene();
-    const price = purchaseStep(builderCost(state, cs.seat) * GOLD_PURCHASE_MULT);
-    cs.treasury = price + 50;
-    // the Builder row trains one while none stands: no purchase
-    expect(minorBuilderWork(state, cs)).toBe(true);
-    minorPurchases(state, cs);
-    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(0);
-    cs.treasury = price + 50;
-    // a pillaged building's repair takes the production: the Builder is bought
-    pillageForRepair(cs);
-    minorPurchases(state, cs);
-    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(1);
-    expect(cs.treasury).toBe(50);
-    expect(cs.buildersTrained).toBe(1);
-    // one stands now: no second, and no draw for it
-    cs.treasury = 1000;
-    minorPurchases(state, cs);
-    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(1);
+    state.turn = 5;
+    cs.treasury = 2000;
+    const ring = tilesWithin(state.map, 6, 6, 2).filter((t) => hexDistance(state.map, t.col, t.row, 6, 6) === 2);
+    cs.armyKnown = ring.slice(0, 6).map((t, i) => ({ id: 900 + i, owner: BARB_SEAT, type: 'HORSEMAN', seen: 5, plot: t.index }));
+    expect(minorThreat(state, cs)).toBeGreaterThan(-1);
+    minorAiTurn(state, cs);
+    expect(cs.threat).toBeGreaterThan(-1);
+    expect(army(state, cs).length).toBeGreaterThan(0);
+    expect(cs.treasury).toBeLessThan(2000);
   });
 
-  it('has no Builder work with every owned plot improved, until one is pillaged', () => {
+  it('an unthreatened city buys nothing', () => {
     const { state, cs } = scene();
-    const owned = state.map.tiles.filter((t) => tileSeat(t) === cs.seat && t.index !== cs.centerIndex);
-    for (const t of owned) t.improvement = 'FARM';
-    expect(minorBuilderWork(state, cs)).toBe(false);
-    pillageForRepair(cs);
-    cs.treasury = 500;
-    minorPurchases(state, cs);
-    expect(army(state, cs).filter((u) => u.type === 'BUILDER').length).toBe(0);
-    owned[0].pillaged = true;
-    expect(minorBuilderWork(state, cs)).toBe(true);
-  });
-
-  it('draws for a Builder but buys none at a rate of 0, and asks no draw it cannot pay', () => {
-    const { state, cs } = scene();
-    pillageForRepair(cs);
-    cs.builderBuyRate = 0;
-    cs.treasury = 500;
-    const rng = state.rngState;
-    minorPurchases(state, cs);
-    expect(army(state, cs).length).toBe(0);
-    expect(state.rngState).not.toBe(rng);
-    cs.treasury = 10;
-    const rng2 = state.rngState;
-    minorPurchases(state, cs);
-    expect(state.rngState).toBe(rng2);
-  });
-
-  it("buys the army row's chassis at its military count's rate, above the floor", () => {
-    const { state, cs } = scene();
-    spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat);
-    spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
-    const bp = MINOR_MILITARY_BUY_BP[1];
-    // a treasury under the floor asks no draw
-    cs.treasury = MINOR_MILITARY_BUY_FLOOR - 1;
-    const rng = state.rngState;
-    minorPurchases(state, cs);
-    expect(state.rngState).toBe(rng);
-    // a draw above the rate buys nothing
-    cs.treasury = 500;
-    seek(state, (r) => r >= bp);
-    minorPurchases(state, cs);
-    expect(army(state, cs).length).toBe(2);
-    // a draw under it buys the army row's pick — the ranged class the army
-    // lacks, its strongest chassis the minor's research opens
-    seek(state, (r) => r < bp);
-    minorPurchases(state, cs);
-    const bought = army(state, cs).filter((u) => u.type === 'SLINGER');
-    expect(bought.length).toBe(1);
-    expect(cs.treasury).toBe(500 - purchaseStep(UNITS.SLINGER.cost * GOLD_PURCHASE_MULT));
-  });
-
-  it('buys at three times the rate within the turns after a loss, and never at eight or more', () => {
-    const { state, cs } = scene();
-    spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat);
-    spawnUnit(state, 'WARRIOR', cs.centerIndex, cs.seat);
-    const bp = MINOR_MILITARY_BUY_BP[1];
-    cs.treasury = 500;
-    cs.lossTurn = state.turn - 1;
-    seek(state, (r) => r >= bp && r < bp * MINOR_LOSS_BUY_MULT);
-    minorPurchases(state, cs);
-    expect(army(state, cs).length).toBe(3);
-    // eight military units: no draw at all
-    for (const t of tilesWithin(state.map, 6, 6, 2)) {
-      if (army(state, cs).filter((u) => u.type !== 'BUILDER').length >= 8) break;
-      spawnUnit(state, 'WARRIOR', t.index, cs.seat);
-    }
-    expect(army(state, cs).filter((u) => u.type !== 'BUILDER').length).toBe(8);
-    const rng = state.rngState;
-    minorPurchases(state, cs);
-    expect(state.rngState).toBe(rng);
-  });
-
-  it('buys a Warrior Monk with Faith where its majority religion carries Warrior Monks', () => {
-    const { state, cs } = scene();
-    spawnUnit(state, 'BUILDER', cs.centerIndex, cs.seat);
-    const founder = seatOf(state, 0)!;
-    founder.religion.founded = true;
-    founder.religion.follower = 'WARRIOR_MONKS';
-    cs.religionPressure = [100_000];
-    cs.buildings = ['SHRINE', 'TEMPLE'];
-    const hs = neighbors(state.map, state.map.tiles[cs.centerIndex])[0];
-    hs.district = 'HOLY_SITE';
-    hs.districtComplete = true;
-    cs.districts = [{ type: 'HOLY_SITE', tileIndex: hs.index }];
-    const price = purchaseStep(Math.round(UNITS.WARRIOR_MONK.cost * FAITH_PURCHASE_MULT));
-    cs.faith = price + 7;
-    cs.treasury = 0; // the monk needs no gold floor
-    seek(state, (r) => r < MINOR_MILITARY_BUY_BP[0]);
-    minorPurchases(state, cs);
-    expect(army(state, cs).filter((u) => u.type === 'WARRIOR_MONK').length).toBe(1);
-    expect(cs.faith).toBe(7);
+    state.turn = 5;
+    cs.treasury = 2000;
+    minorAiTurn(state, cs);
+    expect(cs.threat).toBe(-1);
+    expect(army(state, cs)).toEqual([]);
+    expect(cs.treasury).toBe(2000);
   });
 });
 

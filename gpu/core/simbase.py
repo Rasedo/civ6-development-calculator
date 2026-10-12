@@ -1191,14 +1191,20 @@ _MUTABLE = [
     "citystate_cai_valid",  # the civics AI's last turn's analysis
     "citystate_item", "citystate_ovf", "citystate_kept",  # the minor's item in hand, overflow store and kept progress
     "citystate_treasury", "citystate_faith",
-    "citystate_build_from", "citystate_army_cap", "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
-    "citystate_builder_buy", "citystate_army_seen", "citystate_loss_turn",  # the minor's purse draws and loss window
+    "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
+    # its city AI: the district's plot, the item's turn and value, the threat, the savings
+    "citystate_prod_site", "citystate_prod_set_turn", "citystate_prod_set_value", "citystate_threat",
+    "citystate_savings", "citystate_balance", "citystate_ai_on",
+    # its events' slots, trees, contracts and reservations (`CityAi`)
+    "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",
+    "cai_tr_units", "cai_c_id", "cai_c_tree", "cai_c_unit", "cai_c_building", "cai_c_district", "cai_c_goal_kind", "cai_c_goal",
+    "cai_c_plot", "cai_c_value", "cai_c_city", "cai_c_max_turns", "cai_c_turns", "cai_c_progress", "cai_c_assign", "cai_c_queued",
+    "cai_c_in_tree", "cai_c_listed", "cai_in_hand", "cai_r_plot", "cai_r_tree", "cai_r_value", "cai_c_serial", "cai_t_serial",
     "citystate_kb_slot", "citystate_kb_owner", "citystate_kb_type", "citystate_kb_seen", "citystate_kb_plot",  # its knowledge base's army records
     "citystate_kb_seq", "citystate_kb_next",  # the records' order
     "citystate_full_power",  # a running `fullyPowered` project lights the minor's grid
     "citystate_build_proj",  # the unfinished district project the minor's last step worked on
     "citystate_repair_wait",  # a pillaged building's repair waits for the minor's item in hand
-    "city_free_pot",  # a Free City's build pot
     "city_free_grant",  # a Free City's count of turns toward its next grant
     "city_free_allowed",  # a Free City's allowed units
     "city_proj_conv", "city_proj_yield",  # a district project's converted yield, read until the next step

@@ -8431,20 +8431,13 @@ class SimSeats:
         return out
 
     def _imp_adjacency(self, row: int) -> torch.Tensor | None:
-        """[B, T, 6] — what a SUZERAIN improvement's neighbours pay it, or None
-        where no such improvement stands on the map. Each catalog rule counts
-        the neighbours matching any of its sources, divides by `per`, and pays
-        once per whole group (a `once` rule: once if any match); the row's
-        civics swap in the improved rate and payout (`improvementAdjacency`)."""
+        """[B, T, 6] — what a standing improvement's neighbours pay it
+        (`_imp_adj_at` on the plots it stands on, unpillaged), or None where
+        no improvement with an adjacency stands on the map."""
         if not self._imp_adj_live:
             return None
         live = (self.improvement >= 0) & ~self.pillaged
         out = None
-        cv = self._seat_civics(row)
-        tv = self._seat_techs(row)
-        nb = self.neigh
-        nbc = nb.clamp(min=0)
-        on = (nb >= 0).unsqueeze(0)
         # the improvements standing live anywhere, read once: a rule of one
         # standing nowhere pays nothing
         standing = set(torch.unique(self.improvement[live]).tolist())
@@ -8452,77 +8445,96 @@ class SimSeats:
             if not rules or k not in standing:
                 continue
             here = live & (self.improvement == k)
-            for r in rules:
-                # a rule may WAIT on a civic of its own (Terrace_MedievalAdjacency)
-                rc = int(r["rc"])
-                if rc >= 0 and not bool(cv[:, rc].count_nonzero()):
-                    continue
-                # ...or on a TECH (the Great Wall's Masonry and Castles rows)
-                rt = int(r["rt"])
-                if rt >= 0 and not bool(tv[:, rt].count_nonzero()):
-                    continue
-                uc, ut = int(r["uc"]), int(r["ut"])
-                up = (cv[:, uc] if uc >= 0 else
-                      torch.zeros(self.B, dtype=torch.bool, device=self.device))
-                if ut >= 0:
-                    up = up | tv[:, ut]
-                hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
-                if int(r["bres"]):
-                    hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
-                di = int(r["dist"])
-                if int(r["bw"]):
-                    hit |= (self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc]
-                # a district counts complete and unpillaged; OtherDistrictAdjacent
-                # only the plot owner's own, a named district whoever owns it
-                # (DLL 0x365ae0)
-                live_d = self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
-                if int(r["anyd"]):
-                    # a city centre is one of the owner's districts too
-                    # (`tile.district = 'CITY_CENTER'`)
-                    hit |= ((((self.district[:, nbc] >= 0) & live_d) | self._centre_plane()[:, nbc])
-                            & (self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)))
-                elif di >= 0:
-                    hit |= (self.district[:, nbc] == di) & live_d
-                for f in r["feats"]:
-                    hit |= (self.feat_id[:, nbc] == f) & ~self.feat_stripped[:, nbc]
-                if int(r["mtn"]):
-                    hit |= self.tile_mountain[:, nbc]
-                if int(r["same"]):
-                    hit |= (self.improvement[:, nbc] == k) & ~self.pillaged[:, nbc]
-                # a row that names SOMEBODY ELSE's improvement (the Kurgan's
-                # Pasture, the Great Wall's own segments)
-                _ri = int(r["imp"])
-                if _ri >= 0:
-                    hit |= (self.improvement[:, nbc] == _ri) & ~self.pillaged[:, nbc]
-                if int(r["lux"]):
-                    hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc]
-                # CIV6 (AdjacentSeaResource, Fishery_SeaResourceAdjacency): a
-                # neighbour that is WATER and carries a resource of any kind.
-                if int(r["sres"]):
-                    hit |= ((self.res_priority[:, nbc] > 0) & ~self.res_stripped[:, nbc]
-                            & self.water[:, nbc])
-                for _rt in r["terr"]:
-                    hit |= self.terrain[:, nbc] == int(_rt)
-                n = (hit & on).sum(dim=2)                    # [B, T]
-                uper = int(r["uper"])
-                per = torch.where(up.unsqueeze(1) & (uper > 0),
-                                  torch.full_like(n, max(1, uper)),
-                                  torch.full_like(n, max(1, int(r["per"]))))
-                groups = torch.div(n, per.clamp(min=1), rounding_mode="floor").to(self.dtype)
-                # a yes/no requirement set pays once, however many neighbours match
-                if int(r["once"]):
-                    groups = (n > 0).to(self.dtype)
-                if rc >= 0:
-                    groups = groups * cv[:, rc].reshape(-1, 1).to(self.dtype)
-                if rt >= 0:
-                    groups = groups * tv[:, rt].reshape(-1, 1).to(self.dtype)
-                base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
-                upy = torch.tensor(r["uy"], dtype=self.dtype, device=self.device)
-                pay = (torch.where(up.reshape(-1, 1, 1), upy.reshape(1, 1, 6),
-                                   base.reshape(1, 1, 6))
-                       if bool(upy.count_nonzero()) else base.reshape(1, 1, 6))
-                add = groups.unsqueeze(2) * pay * here.unsqueeze(2).to(self.dtype)
-                out = add if out is None else out + add
+            add = self._imp_adj_at(row, k) * here.unsqueeze(2).to(self.dtype)
+            out = add if out is None else out + add
+        return out
+
+    def _imp_adj_at(self, row: int, k: int) -> torch.Tensor:
+        """[B, T, 6] — `improvementAdjacency` of improvement `k` on every plot,
+        as seat row `row`'s research reads its rules: each catalog rule counts
+        the neighbours matching any of its sources, divides by `per`, and pays
+        once per whole group (a `once` rule: once if any match); the row's
+        civics and techs swap in the improved rate and payout, and a rule
+        waiting on a civic or tech of its own pays nothing before it."""
+        out = torch.zeros(self.B, self.T, 6, dtype=self.dtype, device=self.device)
+        rules = self._imp_adj[k]
+        if not rules:
+            return out
+        cv = self._seat_civics(row)
+        tv = self._seat_techs(row)
+        nb = self.neigh
+        nbc = nb.clamp(min=0)
+        on = (nb >= 0).unsqueeze(0)
+        for r in rules:
+            # a rule may WAIT on a civic of its own (Terrace_MedievalAdjacency)
+            rc = int(r["rc"])
+            if rc >= 0 and not bool(cv[:, rc].count_nonzero()):
+                continue
+            # ...or on a TECH (the Great Wall's Masonry and Castles rows)
+            rt = int(r["rt"])
+            if rt >= 0 and not bool(tv[:, rt].count_nonzero()):
+                continue
+            uc, ut = int(r["uc"]), int(r["ut"])
+            up = (cv[:, uc] if uc >= 0 else
+                  torch.zeros(self.B, dtype=torch.bool, device=self.device))
+            if ut >= 0:
+                up = up | tv[:, ut]
+            hit = torch.zeros(self.B, self.T, 6, dtype=torch.bool, device=self.device)
+            if int(r["bres"]):
+                hit |= (self.res_priority[:, nbc] == 1) & ~self.res_stripped[:, nbc]
+            di = int(r["dist"])
+            if int(r["bw"]):
+                hit |= (self.built_wonder[:, nbc] >= 0) & self.built_wonder_complete[:, nbc]
+            # a district counts complete and unpillaged; OtherDistrictAdjacent
+            # only the plot owner's own, a named district whoever owns it
+            # (DLL 0x365ae0)
+            live_d = self.district_complete[:, nbc] & ~self.district_pillaged[:, nbc]
+            if int(r["anyd"]):
+                # a city centre is one of the owner's districts too
+                # (`tile.district = 'CITY_CENTER'`)
+                hit |= ((((self.district[:, nbc] >= 0) & live_d) | self._centre_plane()[:, nbc])
+                        & (self.tile_seat[:, nbc] == self.tile_seat.unsqueeze(2)))
+            elif di >= 0:
+                hit |= (self.district[:, nbc] == di) & live_d
+            for f in r["feats"]:
+                hit |= (self.feat_id[:, nbc] == f) & ~self.feat_stripped[:, nbc]
+            if int(r["mtn"]):
+                hit |= self.tile_mountain[:, nbc]
+            if int(r["same"]):
+                hit |= (self.improvement[:, nbc] == k) & ~self.pillaged[:, nbc]
+            # a row that names SOMEBODY ELSE's improvement (the Kurgan's
+            # Pasture, the Great Wall's own segments)
+            _ri = int(r["imp"])
+            if _ri >= 0:
+                hit |= (self.improvement[:, nbc] == _ri) & ~self.pillaged[:, nbc]
+            if int(r["lux"]):
+                hit |= (self.res_priority[:, nbc] == 3) & ~self.res_stripped[:, nbc]
+            # CIV6 (AdjacentSeaResource, Fishery_SeaResourceAdjacency): a
+            # neighbour that is WATER and carries a resource of any kind.
+            if int(r["sres"]):
+                hit |= ((self.res_priority[:, nbc] > 0) & ~self.res_stripped[:, nbc]
+                        & self.water[:, nbc])
+            for _rt in r["terr"]:
+                hit |= self.terrain[:, nbc] == int(_rt)
+            n = (hit & on).sum(dim=2)                    # [B, T]
+            uper = int(r["uper"])
+            per = torch.where(up.unsqueeze(1) & (uper > 0),
+                              torch.full_like(n, max(1, uper)),
+                              torch.full_like(n, max(1, int(r["per"]))))
+            groups = torch.div(n, per.clamp(min=1), rounding_mode="floor").to(self.dtype)
+            # a yes/no requirement set pays once, however many neighbours match
+            if int(r["once"]):
+                groups = (n > 0).to(self.dtype)
+            if rc >= 0:
+                groups = groups * cv[:, rc].reshape(-1, 1).to(self.dtype)
+            if rt >= 0:
+                groups = groups * tv[:, rt].reshape(-1, 1).to(self.dtype)
+            base = torch.tensor(r["y"], dtype=self.dtype, device=self.device)
+            upy = torch.tensor(r["uy"], dtype=self.dtype, device=self.device)
+            pay = (torch.where(up.reshape(-1, 1, 1), upy.reshape(1, 1, 6),
+                               base.reshape(1, 1, 6))
+                   if bool(upy.count_nonzero()) else base.reshape(1, 1, 6))
+            out = out + groups.unsqueeze(2) * pay
         return out
 
     def _seat_tile_add(self, row: int) -> torch.Tensor:
@@ -10988,7 +11000,6 @@ class SimSeats:
         self.city_prod_bank[b, row, col] = 0
         self.city_proj_conv[b, row, col] = 0
         self.city_proj_yield[b, row, col] = -1
-        self.city_free_pot[b, row, col] = 0
         self.city_free_grant[b, row, col] = 0
         self.city_free_allowed[b, row, col] = False
         self.city_lasers[b, row, col] = 0

@@ -295,32 +295,41 @@ class SimInit:
         self.citystate_cai_score = torch.zeros(B, r_pad, nc_ai, dtype=torch.long, device=device)
         self.citystate_cai_owned = torch.zeros(B, r_pad, nc_ai, dtype=torch.bool, device=device)
         self.citystate_cai_valid = torch.zeros(B, r_pad, dtype=torch.bool, device=device)
-        # the minor's PRODUCTION pot (`minorBuild`): its city's Production,
-        # spent down the fitted build table. The built results live on the
-        # shared city planes (`city_bldg`, `city_dist_tile`, `city_outer_hp`)
-        # at the minor's row and its units in the majors' pool.
+        # the minor's PRODUCTION toward the item in hand (`minorBuild`). The
+        # built results live on the shared city planes (`city_bldg`,
+        # `city_dist_tile`, `city_outer_hp`) at the minor's row and its units in
+        # the majors' pool. The Builders it has trained price the next
+        # (`builderCost`).
         self.citystate_prod = torch.zeros(B, s_pad, dtype=torch.float64, device=device)
-        # the episode's draws (`minorPlan`): per build-table row the turn it
-        # wants its item from (-1 never), and the army it keeps — -1 until
-        # drawn at the minor's first build; and the Builders it has trained,
-        # which price the next (`builderCost`)
-        self.citystate_build_from = torch.zeros(
-            B, s_pad, len(rules.citystate["buildRows"]), dtype=torch.long, device=device)
-        self.citystate_army_cap = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         self.citystate_builders_trained = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # its city AI (`minorAiTurn`): the plot of its district in hand (-1),
+        # the turn its AI set the item (-99 never) and the item's value then
+        # (raw 24.8), its city's threat (-1 none), the Economic AI's savings
+        # slots and last balance (raw 24.8)
+        self.citystate_prod_site = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_prod_set_turn = torch.full((B, s_pad), -99, dtype=torch.long, device=device)
+        self.citystate_prod_set_value = torch.full((B, s_pad), -9999 * 256, dtype=torch.long, device=device)
+        self.citystate_threat = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
+        self.citystate_savings = torch.zeros(B, s_pad, len(rules.ai_city_build["savings"]), dtype=torch.long, device=device)
+        self.citystate_balance = torch.zeros(B, s_pad, dtype=torch.long, device=device)
+        # its city AI has run (`CityState.cityAi` made): a city its AI first
+        # sees runs no events
+        self.citystate_ai_on = torch.zeros(B, s_pad, dtype=torch.bool, device=device)
+        # the events' slots, the trees, the contracts and the reservations of
+        # each minor's city (`CityAi`, gpu/core/sim_citytrees.py): its planes
+        # are the sim's `cai_*`
+        from .sim_citytrees import CityAi, city_tree_tables
+        _ctt = city_tree_tables(rules)
+        self.cityai = CityAi(_ctt, _ctt.trees_of("MINOR_CIV_DEFAULT_TRAIT"), B, s_pad, device)
+        for _n, _v in vars(self.cityai).items():
+            if torch.is_tensor(_v):
+                setattr(self, "cai_" + _n, _v)
         # the strongest melee Combat Strength the minor has trained or bought — the base
         # its centre stands on (`holderStrength`, the Seat's `bestMeleeCS`)
         self.citystate_best_melee = torch.zeros(B, s_pad, dtype=torch.long, device=device)
         # the strongest Ranged Strength it has made — what its centre strikes
         # from (`cityStrikeStrength`, the Seat's `bestRangedCS`)
         self.citystate_best_ranged = torch.zeros(B, s_pad, dtype=torch.long, device=device)
-        # the episode's Builder purchase rate (per mille, -1 undrawn), the
-        # military count at the end of the minor's last turn (-1 before its
-        # first) and the turn it was last seen to lose a unit (-1 none) — the
-        # `builderBuyRate` / `armySeen` / `lossTurn` twins
-        self.citystate_builder_buy = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_army_seen = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
-        self.citystate_loss_turn = torch.full((B, s_pad), -1, dtype=torch.long, device=device)
         # the knowledge base's army records (`armyKnown`, `_knowledge_look`):
         # one row per city-state, then the barbarians' (`BK`); per record the
         # unit's pool slot (-1 once the slot is reclaimed, -2 an empty
@@ -3902,9 +3911,6 @@ class SimInit:
         # row for family-shape consistency; every city starts with an empty bank,
         # so unlike the fixture-loaded city_* table it allocates plain).
         self.city_prod_bank = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=dtype, device=device)
-        # a FREE CITY's build pot (`City.freePot`), read at the Free Cities row
-        # alone; a full city-block plane so compaction carries it
-        self.city_free_pot = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.float64, device=device)
         # a FREE CITY's count of turns toward its next grant (`City.freeGrantTurns`)
         self.city_free_grant = torch.zeros(B, self.CITY_ROWS, self.RC, dtype=torch.long, device=device)
         # a FREE CITY's allowed units (`City.freeAllowed`), its grants' chassis

@@ -308,7 +308,7 @@ for (let i = 0; i + 1 < recs.length; i++) {
       buildersMakeDistricts: false,
       buildersMakeWonders: false,
       districtTie: () => drawsOf.get(player)?.shift() ?? 0,
-      plotCity: (plot) => (state.map.tiles[plot].ownerSeat === cs.seat ? cityId : -1),
+      plotCity: (plot) => (state.map.tiles[plot].ownerSeat === cs.seat ? cityId : -2),
       reachable: () => true,
       distance: (p, q) => hexDistance(state.map, state.map.tiles[p].col, state.map.tiles[p].row, state.map.tiles[q].col, state.map.tiles[q].row),
       newContractId: () => contractSerial++,
