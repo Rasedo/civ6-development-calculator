@@ -172,5 +172,9 @@ export function pseudoYieldWeights(state: GameState, seat: number, inputs: AiWei
   for (const [p, v] of listSum(seat, s, followedStrategies(seat, inputs), 'PseudoYields', false)) out.set(p, Math.max(2 * v, -FX));
   const chronology = civEraIndex(s.research.techs, s.research.civics) + 1;
   out.set('PSEUDOYIELD_DISTRICT', (out.get('PSEUDOYIELD_DISTRICT') ?? 0) + fxConst(0.5 * chronology));
+  // a city-state's military AI writes its Combat Desire over its
+  // PSEUDOYIELD_UNIT_COMBAT weight
+  const cs = state.cityStates.find((c) => c.seat === seat);
+  if (cs) out.set('PSEUDOYIELD_UNIT_COMBAT', cs.combatDesire ?? 0);
   return out;
 }

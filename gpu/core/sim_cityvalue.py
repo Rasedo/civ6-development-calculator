@@ -314,7 +314,9 @@ class SimCityValue:
 
     def _cv_cut(self, f, t: torch.Tensor, h: torch.Tensor, floods: bool = True):
         """a flood or an eruption the AI expects before the horizon ends it
-        there: the cut horizon and where it falls at or before `t`"""
+        there: the cut horizon and where it falls at or before `t`; a
+        hazard's raw -1 reads none (a flood no named river holds is -1.0,
+        raw -256, and cuts)"""
         like = f.like()
         dead = torch.zeros_like(like, dtype=torch.bool)
         hz = [f.eruption_turns()]
@@ -322,7 +324,7 @@ class SimCityValue:
             hz.insert(0, f.flood_turns())
         for hazard in hz:
             z = _t(hazard, like)
-            cut = (z >= 0) & (z < h * _FX) & ~dead
+            cut = (z != -1) & (z < h * _FX) & ~dead
             h = torch.where(cut, z >> 8, h)
             dead = dead | (cut & (h <= t))
         return h, dead
@@ -1388,6 +1390,10 @@ class _MinorFacts:
     def pseudo_w(self, p):
         if p == "PSEUDOYIELD_DISTRICT":
             return (self.era() + 1) * (_FX // 2)
+        # a city-state's military AI writes its Combat Desire over
+        # PSEUDOYIELD_UNIT_COMBAT (the Free Cities' row past the city-states')
+        if p == "PSEUDOYIELD_UNIT_COMBAT" and self.s < self.sim.S:
+            return self.sim.citystate_combat_desire[:, self.s]
         return 0
 
     def _stats(self):
@@ -1429,7 +1435,7 @@ class _MinorFacts:
 
     def unit_version(self, u):
         r = self.T["unit"].get(u)
-        ok = r is not None and not r["trait"] and not r["majorOnly"] and not r["foundCity"] and r["canTrain"]
+        ok = r is not None and not r["trait"] and not r["majorOnly"] and not r["foundCity"] and not r["religion"] and r["canTrain"]
         return u if ok else None
 
     def _building_index(self, b):
@@ -1623,8 +1629,9 @@ class _MinorFacts:
 
     def _analysed(self, key, ids, held, cur, left, entries):
         """`analysedTurns`: 0 for none or one held; else the analysis' turns
-        (500 at 0 or below), plus the turns left on the research in hand
-        where the entry's walk does not lead through it"""
+        (500 at 0 or below, and before the AI's first analysis), plus the
+        turns left on the research in hand where the entry's walk does not
+        lead through it"""
         turns, nxt, owned, valid = entries
         if key is None:
             return self.like()
@@ -1635,8 +1642,8 @@ class _MinorFacts:
         t = torch.where(e_turns > 0, e_turns, torch.full_like(e_turns, 500))
         add = (t < 500) & (cur != nxt[:, i]) & (cur != i)
         t = torch.where(add, t + left, t)
-        none = held[:, i] | ~valid | owned[:, i]
-        return torch.where(none, torch.zeros_like(t), t)
+        t = torch.where(valid, torch.where(owned[:, i], torch.zeros_like(t), t), torch.full_like(t, 500))
+        return torch.where(held[:, i], torch.zeros_like(t), t)
 
     def tech_turns(self, t):
         return self._get(("tt", t), lambda: self._tech_turns(t))

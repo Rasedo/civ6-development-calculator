@@ -2434,6 +2434,17 @@
           "note": "the minor city's threat (CityBuildAI +0x1b8), -1 for none"
         },
         {
+          "name": "minorCombatDesire",
+          "compare": "exact",
+          "covers": [
+            "CityState.combatDesire"
+          ],
+          "planes": [
+            "citystate_combat_desire"
+          ],
+          "note": "the minor's military AI's Combat Desire, its PSEUDOYIELD_UNIT_COMBAT weight, raw 24.8"
+        },
+        {
           "name": "minorSavings",
           "compare": "exact",
           "covers": [

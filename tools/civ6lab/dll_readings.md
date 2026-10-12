@@ -4200,12 +4200,20 @@ Fishing Boats 4,458 of 4,810, Mine 15,547 of 22,576, Farm 22,568 of
   0x7a37d0: Resource_Harvests at DefaultValue discounted T, less a charge
   and Resource_YieldChanges from T to H.
 - 0x7b1320: T >= H FX(-9999); a drought hitting it 0; the XP2 river manager
-  (0xa2cbf0 / 0xa2af70: 100 over the summed flood chances of the rivers
-  whose floodplains hold the plot) and the feature manager (0xa1cc70, its
-  +0x28 / +0x98: a volcano beside the plot) cut H to their turns, H <= T
-  0 (LAB: the logs fit a flood in 1 turn on an unrevealed flood river's
-  floodplains and an eruption in 31 beside a volcano; the computations
-  unread). A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges
+  (0xa2cbf0 / 0xa2af70 at severity 1: over the named rivers whose
+  Floodplains list holds the plot, each severity from MAJOR up adds 100 /
+  its river entry +0x98[sev] — 0xa2efb0's N / OccurrencesPerGame at the
+  game's realism (0x339140), N the event draw's 0x339020 — and the turns are
+  100 over the sum, -1.0 where no named river holds the plot; an unnamed
+  river is skipped, so a farm on its floodplains reads -8, its charge;
+  `floodHazardTurns` / `_minor_flood_turns`) and the feature manager
+  (0xa1cc70, its +0x28 / +0x98: a volcano beside the plot) cut H to their
+  turns, H <= T 0 (LAB: an eruption in 31 beside a volcano, its computation
+  unread). The plot test 0x35fd60 takes a removable feature cleared and a
+  harvestable resource harvested (the five verbose duels: the Farm on
+  Woods, Rainforest and Marsh at 54.34, on Cattle beside the Pasture; none on
+  Sugar or Ivory) and a ground row's civic held (no Farm on Hills before
+  Civil Engineering). A turn: PSEUDOYIELD_IMPROVEMENT 1.0, Improvement_YieldChanges
   and, per adjacency row, its yield's whole adjacency (0x365ae0; a Farm's
   three Food rows count it three times), YieldFromAppeal at the plot's
   Appeal x the percent, each at the player's value (0x7a6690, 0x7a60d0);

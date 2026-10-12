@@ -56,15 +56,17 @@ class SimCivics:
 
     def _cai_grants(self) -> dict:
         """the civic value's grants at a city-state's weights (0 but the
-        district's): a token's points as PSEUDOYIELD_INFLUENCE (a player in no
-        government's, Chiefdom's at the speed), a spy as PSEUDOYIELD_UNIT_SPY, a
-        land formation's units as PSEUDOYIELD_UNIT_COMBAT — the modifier
-        analyzers' too (`sim_cityvalue.py`)"""
+        district's and the Combat Desire's): a token's points as
+        PSEUDOYIELD_INFLUENCE (a player in no government's, Chiefdom's at the
+        speed), a spy as PSEUDOYIELD_UNIT_SPY, a land formation's units and
+        PSEUDOYIELD_UNIT_COMBAT's default (valued at the minor's Combat Desire
+        in `_cai_analysis`) — the modifier analyzers' too (`sim_cityvalue.py`)"""
         av, ca = self.rules.ai_value, self.rules.civic_ai
         return {
             "token": _imul(int(ca["tokenPoints"]) * _FX, _fx_const(float(av["pyInfluence"]))),
             "spy": _imul(_FX, _fx_const(float(av["pyUnitSpy"]))),
-            "formation": _imul(int(ca["formationUnits"]) * _FX, _fx_const(float(av["pyUnitCombat"]))),
+            "formation": int(ca["formationUnits"]) * _FX,
+            "formation_def": _fx_const(float(av["pyUnitCombat"])),
         }
 
     def _cai_analysis(self, s: int, cul: torch.Tensor):
@@ -144,8 +146,14 @@ class SimCivics:
         spies = whole(self._rai_from_landing(m[:, :, 1] * T["spy"], nn))
         strength = self._cai_strength(s).unsqueeze(1).expand(B, NC)
         adjacency = whole(self._rai_from_landing(strength * _FX, nn)) * m[:, :, 2]
+        # a formation's units at the minor's PSEUDOYIELD_UNIT_COMBAT weight,
+        # its military AI's Combat Desire (a Free City's none)
+        desire = (self.citystate_combat_desire[:, s] if s < self.S
+                  else torch.zeros(B, dtype=torch.long, device=self.device))
+        formation = _fmul(torch.full_like(desire, T["formation"]),
+                          _fmul(_FX + desire, torch.full_like(desire, T["formation_def"])))
         val = (own + u[:, :, 0] * land(T["share"]) + u[:, :, 2] * land(T["wonder"]) + u[:, :, 1] * district
-               + m[:, :, 3] * T["formation"] + T["floor"] + tokens + spies + adjacency)
+               + m[:, :, 3] * formation.unsqueeze(1) + T["floor"] + tokens + spies + adjacency)
         return torch.where(turns >= T["horizon"], torch.full_like(val, _fx_const(-9999)), val)
 
     def _cai_strength(self, s: int) -> torch.Tensor:

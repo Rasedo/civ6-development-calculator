@@ -155,7 +155,10 @@
   cases:
     - recording: 1127
       value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
-  impl: [cpu/core/aiPlotValue.ts:PlotValueFacts]
+  impl:
+    - cpu/core/aiPlotValue.ts:PlotValueFacts
+    - cpu/core/disasters.ts:floodHazardTurns
+    - gpu/core/sim_minorai.py:_minor_flood_turns
   readings:
     - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:

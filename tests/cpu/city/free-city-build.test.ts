@@ -56,7 +56,7 @@ describe("the Free City's production", () => {
     const f = freeCityBuildFacts(state, city);
     const bt = buildingTable(f).filter((v) => v !== FX_MIN);
     const ut = unitTable(f).filter((v): v is number => v !== null && v !== FX_MIN);
-    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([19, 70346, 33, 48795]);
+    expect([bt.length, bt.reduce((a, b) => a + b, 0), ut.length, ut.reduce((a, b) => a + b, 0)]).toEqual([1, 7728, 6, 25778]);
     const seq: unknown[] = [];
     for (let k = 0; k < 8; k++) {
       freeCityBuild(state, city, 5);

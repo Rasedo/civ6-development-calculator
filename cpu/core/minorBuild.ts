@@ -78,7 +78,8 @@ import { combatDesire, type CombatDesire } from './aiMilitary';
  *  research that completes on it, then its city — the Production its city
  *  makes now, then growth and borders on the city as it stands after that
  *  (`minorGrowth`) — its city presses a religion it follows on that
- *  religion's founder's turn (`spreadReligiousPressure`) — then its
+ *  religion's founder's turn (`spreadReligiousPressure`) — then its military
+ *  AI's Combat Desire (`minorCombatDesire`), then its
  *  knowledge base's look (`minorKnowledge`), then its actions: a research
  *  completion's upgrades, its city AI's turn (`minorAiTurn`: its builds,
  *  purchases and trees, the trees' Builders' work), its routes' walk and a
@@ -92,6 +93,9 @@ export function minorPhase(state: GameState): void {
     const gained = minorEconomy(state, cityState);
     minorBuild(state, cityState, computeCityStats(state, minorCity(cityState)).total.production);
     minorGrowth(state, cityState);
+    // its military AI's turn: the Combat Desire on the records as its last
+    // update aged them
+    cityState.combatDesire = minorCombatDesire(state, cityState, state.turn - 1).desire;
     minorKnowledge(state, cityState, true);
     if (!ordersHeld) minorUpgrades(state, cityState, gained);
     minorAiTurn(state, cityState);
@@ -764,13 +768,15 @@ export function minorItemType(cityState: CityState): string | null {
 
 /** The turns the research AI's analysis gives a technology or the civics
  *  AI's a civic (0x7610e0 / 0x621920): 0 for none or one held; else its
- *  entry's turns (500 out of reach), plus the turns left on the item in
- *  hand where its walk does not lead through it (runs/h1_duelv1124: a
- *  city-state's Walls at t3 lands at Masonry's 21 turns plus the 4 left on
- *  its Pottery as its turn before set them) */
+ *  entry's turns (500 out of reach, and before the AI's first analysis:
+ *  its -1), plus the turns left on the item in hand where its walk does not
+ *  lead through it (runs/h1_duelv1124: a city-state's Walls at t3 lands at
+ *  Masonry's 21 turns plus the 4 left on its Pottery as its turn before
+ *  set them) */
 export function analysedTurns(entries: readonly { id: string; next: string; turns: number; owned: boolean }[],
   id: string | null, held: readonly string[], current: string | null, currentLeft: number): number {
   if (!id || held.includes(id)) return 0;
+  if (!entries.length) return 500;
   const e = entries.find((x) => x.id === id);
   if (!e || e.owned) return 0;
   const t = e.turns > 0 ? e.turns : 500;
@@ -779,10 +785,11 @@ export function analysedTurns(entries: readonly { id: string; next: string; turn
 
 /** A minor's version of a unit (player +0x12e8 +0x1c0): none for a
  *  civilization's unique unit, a MajorCivOnly one, a unit that founds a
- *  city, one the database bars from training */
+ *  city, one a belief enables (EnabledByReligion; a minor holds none), one
+ *  the database bars from training */
 export function minorUnitVersion(u: string): string | null {
   const row = AI_UNITS[AI_UNIT_INDEX.get(u) ?? -1];
-  return row && !row.trait && !row.majorOnly && !row.foundCity && row.canTrain ? u : null;
+  return row && !row.trait && !row.majorOnly && !row.foundCity && !row.religion && row.canTrain ? u : null;
 }
 
 /** The promotion class weight (0x723bb0) of a player whose lists are
@@ -846,7 +853,9 @@ export function minorCombatDesire(state: GameState, cityState: CityState, turn: 
   ];
   return combatDesire({
     best: Math.max(1, cityState.bestMeleeCS ?? 0, Math.max(cityState.bestRangedCS ?? 0, CITY_MIN_STRIKE_CS)),
-    cities: cityState.centerIndex >= 0 ? 1 : 0,
+    // the game's city-states found their city on turn 1, after its military
+    // AI's turn: on turn 1 it holds none
+    cities: cityState.centerIndex >= 0 && state.turn > 1 ? 1 : 0,
     areas,
     self: cityState.seat,
     players,

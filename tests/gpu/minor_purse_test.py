@@ -312,7 +312,7 @@ def test_free_city_pick(rules) -> None:
     fx_min = -9999 * 256
     bt = [int(v[0]) for v in sim._cv_building_table(f) if int(v[0]) != fx_min]
     ut = [int(v[0]) for v, read in sim._cv_unit_table(f) if bool(read[0]) and int(v[0]) != fx_min]
-    assert (len(bt), sum(bt), len(ut), sum(ut)) == (19, 70346, 33, 48795), (len(bt), sum(bt), len(ut), sum(ut))
+    assert (len(bt), sum(bt), len(ut), sum(ut)) == (1, 7728, 6, 25778), (len(bt), sum(bt), len(ut), sum(ut))
     act = torch.zeros(sim.B, dtype=torch.bool)
     act[B0] = True
     seq = []

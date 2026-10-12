@@ -1171,6 +1171,9 @@ export interface CityState extends Seat {
   cityAi?: CityAi;
   economy?: EconomicMemory;
   threat?: number;
+  /** its military AI's Combat Desire (`minorCombatDesire`), raw 24.8: its
+   *  PSEUDOYIELD_UNIT_COMBAT weight */
+  combatDesire?: number;
   /** the yield its last build step converted from a district project
    *  (`City.projectYield`, which `minorCity` hands its city) */
   projectYield?: ProjectYield;

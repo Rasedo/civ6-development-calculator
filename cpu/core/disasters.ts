@@ -636,6 +636,35 @@ export function riverRevealed(state: GameState, river: FloodRiver): boolean {
   return state.seats.some((s) => isCiv(s.seat) && river.plots.some((t) => isExplored(state, s.seat, t.index)));
 }
 
+/** a float as the game's fixed point (raw: whole part << 8 | the fraction's 256ths) */
+const fxOf = (x: number): number => (Math.floor(x) << 8) | Math.trunc((x - Math.floor(x)) * 256);
+/** the game's fixed-point quotient a / b (raw), truncated */
+const fxDiv = (a: number, b: number): number => Math.trunc((a * 256) / b);
+
+/**
+ * THE TURNS THE AI EXPECTS TO A FLOOD of a plot (0xa2af70 at severity 1,
+ * raw fixed point; the improvement and district values cut their horizon
+ * there): over the flood rivers whose Floodplains list holds the plot and
+ * that have their name, each severity from MAJOR up adds 100 / (N /
+ * OccurrencesPerGame) (the river's expected turns per flood of the row,
+ * 0xa2efb0, N the game's turns), and the turns are 100 over the sum; -1.0
+ * where no such river is named. Null for a plot no flood river's list holds.
+ */
+export function floodHazardTurns(state: GameState, plot: number): number | null {
+  const rivers = floodRivers(state.map).filter((r) => r.list.some((t) => t.index === plot));
+  if (!rivers.length) return null;
+  let sum = 0;
+  for (const r of rivers) {
+    if (!riverRevealed(state, r)) continue;
+    for (let sev = 1; sev < FLOOD_WEIGHT.length; sev++) {
+      // a row the realism never fires keeps its -1.0
+      const turns = FLOOD_WEIGHT[sev] > 0 ? fxDiv(fxOf(TURN_LIMIT), fxOf(FLOOD_WEIGHT[sev])) : -fxOf(1);
+      sum += fxDiv(fxOf(100), turns);
+    }
+  }
+  return sum > 0 ? fxDiv(fxOf(100), sum) : -fxOf(1);
+}
+
 /**
  * A FLOOD of severity `sev` on the river through `start` (GameCore_XP2
  * 0xa2f200: the damage pass 0xa2a4d0, then the yields pass 0xa2ed80) over

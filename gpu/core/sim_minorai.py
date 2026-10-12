@@ -250,50 +250,177 @@ class SimMinorAi:
     # -- the plot analysis ---------------------------------------------------
 
     def _minor_ground_imps(self, s: int) -> torch.Tensor:
-        """[B, T, K] — the improvements the ground of each plot takes for minor
-        `s`, research waived (CanHaveImprovement 0x35fd60, `validImprovementsIn`
-        with no research gate): its own plots with no district, centre,
-        wonder or natural wonder and passable; a resource's plot its own
-        improvement alone; a water plot the water rows; land the minor's own
-        trait improvement, the Farm, the Mine, the Lumber Mill, the Seaside
-        Resort and the ground-only rows, each on its own ground; no row a
-        governor gates; none a drought bars"""
-        row = self._CITY_MINOR0 + s
+        """[B, T, K] — `groundImprovements`: the improvements the ground of
+        each plot takes for minor `s`, the improvements' own research waived
+        and a ground row's civic held (the Farm on Hills, the Lumber Mill's
+        Rainforest) (CanHaveImprovement 0x35fd60, `validImprovementsIn`): of
+        the plot as it stands, with its resource harvested (one with
+        Resource_Harvests rows) and with its removable feature cleared — its
+        own plots with no district, centre, wonder or natural wonder and
+        passable; a resource's plot its own improvement alone; a water plot
+        the water rows; land the minor's own trait improvement, the Farm, the
+        Mine, the Lumber Mill, the Seaside Resort and the ground-only rows,
+        each on its own ground; no row a governor gates; none a drought bars"""
         B, T, dev = self.B, self.T, self.device
         K = int(self._imp_unlock.numel())
+        PN = self._cv_tables()["plot_names"]
+        tabs = self._cv_tables()
+        civ = self.citystate_civics[:, s]
+        hf = (civ[:, self._hillfarms_civic] if self._hillfarms_civic >= 0
+              else torch.zeros(B, dtype=torch.bool, device=dev)).unsqueeze(1)
         res = self._res_live()
+        harv_tab = torch.tensor([bool(tabs["res"].get(n, {}).get("harvests")) for n in PN["resourceType"]] + [False],
+                                dtype=torch.bool, device=dev)
+        rem_tab = torch.tensor([bool(tabs["feat"].get(n, {}).get("removable")) for n in PN["feature"]] + [False],
+                               dtype=torch.bool, device=dev)
+        live_feat = (self.feat_id >= 0) & ~self.feat_stripped
+        harvestable = res & harv_tab[torch.where(self.res_id >= 0, self.res_id, len(PN["resourceType"]))]
+        clearable = live_feat & rem_tab[torch.where(self.feat_id >= 0, self.feat_id, len(PN["feature"]))]
         base = ((self.tile_seat == 100 + s) & (self.district < 0) & ~self._centre_plane() & ~self.nwonder
                 & (self.built_wonder < 0) & (self.passable | self.wpass))
         dry = self.drought > 0
+        bare = ~live_feat
+        appeal_ok = self._tile_appeal() >= self._seaside_min_appeal
+        nr = self._nr_bare
+        gone = self.feat_stripped
+        # the resource-free planes (a harvested plot's), on a plot whose
+        # feature is gone the bare ground's
+        nr_farm_flat = torch.where(gone, nr["_fa_f_c"], nr["farm_flat"])
+        nr_farm_hill = torch.where(gone, nr["_fa_h_c"], nr["farm_hill"])
+        nr_mine = torch.where(gone, nr["_mi_c"], nr["mine_ok"])
+        lumber_civic = torch.ones(B, T, dtype=torch.bool, device=dev)
+        for _lf, _lc in self._lumber_feat_civic:
+            lumber_civic = lumber_civic & ~((self.feat_id == _lf) & ~civ[:, _lc].unsqueeze(1))
+        lumber_live = ~gone & (self.feat_id == self.feat_id0) & lumber_civic
+        # the three readings: as it stands, harvested, cleared (and both)
         land = base & ~res & ~self.water
         sea = base & ~res & self.water
-        bare = (self.feat_id < 0) | self.feat_stripped
+        land_h = base & harvestable & ~self.water
+        sea_h = base & harvestable & self.water
+        land_c = base & clearable & (~res | harvestable) & ~self.water
+        sea_c = base & clearable & (~res | harvestable) & self.water
+        any_c = bool(land_c.any()) or bool(sea_c.any())
         out = torch.zeros(B, T, K, dtype=torch.bool, device=dev)
         for k in range(K):
             ok = base & res & (self.res_imp == k)
             gov = self._imp_gov_promo[k] < 0
             if self._imp_water[k]:
                 if self._imp_uniq[k] < 0 and gov:
-                    ok = ok | (sea & self._imp_ground_ok(k))
+                    ok = ok | ((sea | sea_h) & self._imp_ground_ok(k))
+                    if any_c:
+                        ok = ok | (sea_c & self._imp_ground_compute(k, cleared=True))
             elif k == self.FARM:
-                ok = ok | (land & (self.farm_flat | self.farm_hill))
+                ok = (ok | (land & (self.farm_flat | (self.farm_hill & hf)))
+                      | (land_h & (nr_farm_flat | (nr_farm_hill & hf)))
+                      | (land_c & (nr["_fa_f_c"] | (nr["_fa_h_c"] & hf))))
             elif k == self.MINE:
-                ok = ok | (land & self.mine_ok)
+                ok = ok | (land & self.mine_ok) | (land_h & nr_mine) | (land_c & nr["_mi_c"])
             elif k == self.LUMBER:
-                ok = ok | (land & self.lumber_ok & ~self.feat_stripped & (self.feat_id == self.feat_id0))
+                ok = ok | (land & self.lumber_ok & lumber_live) | (land_h & nr["lumber_ok"] & lumber_live)
             elif self.SEASIDE >= 0 and k == self.SEASIDE:
-                ok = ok | (land & self._sr_c & bare & (self._tile_appeal() >= self._seaside_min_appeal))
+                ok = ok | (((land & self._sr_c & bare) | (land_h & nr["_sr_c"] & bare) | (land_c & nr["_sr_c"]))
+                           & appeal_ok)
             elif self._imp_suz[k] and self._imp_built_by[k] < 0:
                 if gov:
-                    ok = ok | (land & (self.citystate_suz_imp[:, s] == k).unsqueeze(1) & self._imp_ground_ok(k))
+                    mine_k = (self.citystate_suz_imp[:, s] == k).unsqueeze(1)
+                    ok = ok | ((land | land_h) & mine_k & self._imp_ground_ok(k))
+                    if any_c:
+                        ok = ok | (land_c & mine_k & self._imp_ground_compute(k, cleared=True))
             elif self._imp_ground[k] and self._imp_built_by[k] < 0 and self._imp_uniq[k] < 0:
                 if gov:
-                    ok = ok | (land & self._imp_ground_ok(k))
+                    ok = ok | ((land | land_h) & self._imp_ground_ok(k))
+                    if any_c:
+                        ok = ok | (land_c & self._imp_ground_compute(k, cleared=True))
             if k in self._drought_imps:
                 ok = ok & ~dry
             out[:, :, k] = ok
-        _ = row
         return out
+
+    def _minor_combat_desire(self, s: int) -> None:
+        """`minorCombatDesire` — THE COMBAT DESIRE of minor `s` at its
+        military AI's turn (`citystate_combat_desire`, raw 24.8, its
+        PSEUDOYIELD_UNIT_COMBAT weight), on the records as its last update
+        aged them (the turn before): the area of its city, its unit in
+        training, the players in the game's order — the majors, the
+        city-states, the Free Cities, the barbarians (a tribe, always at war)
+        — at war where its seat is; on turn 1 it holds no city (the game's
+        city-states found theirs after their military AI's turn). The player
+        flags, a city's threat and its standing-army count read none."""
+        B, dev = self.B, self.device
+        alive = self.citystate_alive[:, s]
+        if not bool(alive.count_nonzero()):
+            return
+        row = self._CITY_MINOR0 + s
+        T = self._cv_tables()
+        rows = T["unit_rows"]
+        er = T["engine_row"].to(dev)
+        st_row = torch.tensor([max(int(r["combat"]), int(r["rangedCombat"])) for r in rows] + [0],
+                              dtype=torch.long, device=dev)
+
+        def strength_of(typ: torch.Tensor) -> torch.Tensor:
+            ar = torch.where(typ >= 0, er.take(typ.clamp(min=0, max=er.numel() - 1)), torch.full_like(typ, -1))
+            return st_row.take(torch.where(ar >= 0, ar, torch.full_like(ar, len(rows))))
+        slot = self.citystate_kb_slot[:, s].long()
+        owner = self.citystate_kb_owner[:, s].long()
+        typ = self.citystate_kb_type[:, s].long()
+        seen = self.citystate_kb_seen[:, s].long()
+        plot = self.citystate_kb_plot[:, s].long()
+        centre = self.citystate_center[:, s]
+        area = torch.where(centre >= 0, self.tile_area.gather(1, centre.clamp(min=0).unsqueeze(1)).squeeze(1),
+                           torch.full_like(centre, -1))
+        rec_area = self.tile_area.gather(1, plot.clamp(min=0))
+        turn = int(self.turn) - 1
+        counted = (slot != -2) & (turn - seen <= 2) & (area >= 0).unsqueeze(1) & (rec_area == area.unsqueeze(1))
+        strength = strength_of(typ)
+        best = torch.maximum(torch.maximum(torch.ones_like(centre), self.citystate_best_melee[:, s].long()),
+                             self.citystate_best_ranged[:, s].long().clamp(min=self._city_min_strike))
+        item = self.citystate_item[:, s].long()
+        q = torch.where((item >= 0) & (item < self._mk_b0), strength_of(item), torch.zeros_like(item))
+        queued = torch.where(q + 20 > best, q, torch.zeros_like(q))
+        cities = ((centre >= 0) & (int(self.turn) > 1)).long()
+        players = []
+        for p in list(range(self.n_majors)) + [100 + k for k in range(self.S)] + [FREE_SEAT, BARB_SEAT]:
+            if p == BARB_SEAT:
+                players.append((p, True, True, False))
+            elif p == 100 + s:
+                players.append((p, False, False, False))
+            else:
+                players.append((p, self.war[:, row, int(self._seat_row[p])], False, False))
+        zero = torch.zeros(B, dtype=torch.bool, device=dev)
+        _r, _e, _o, w = self._cv_combat_desire(owner, strength, counted, best, cities, players, 100 + s, queued,
+                                              zero, zero, 0)
+        self.citystate_combat_desire[:, s] = torch.where(alive, w, self.citystate_combat_desire[:, s])
+
+    def _minor_flood_turns(self) -> torch.Tensor:
+        """[B, T] `floodHazardTurns` — THE TURNS THE AI EXPECTS TO A FLOOD of
+        each plot (0xa2af70 at severity 1, raw fixed point): over the flood
+        rivers whose Floodplains list holds the plot and that have their
+        name (`_flood_open`), each severity from MAJOR up adds 100 / (N /
+        OccurrencesPerGame), and the turns are 100 over the sum; -1.0 (raw
+        -256) where no such river is named; raw -1 (none) for a plot no
+        flood river's list holds."""
+        B, T, dev = self.B, self.T, self.device
+
+        def fx_of(x: float) -> int:
+            return (math.floor(x) << 8) | int((x - math.floor(x)) * 256)
+
+        def fx_div(a: int, b: int) -> int:
+            q = abs(a) * 256 // abs(b)
+            return q if (a >= 0) == (b >= 0) else -q
+        per_river = 0
+        for occ in self._flood_weight[1:]:
+            turns = fx_div(fx_of(self._event_turns), fx_of(occ)) if occ > 0 else -fx_of(1)
+            per_river += fx_div(fx_of(100), turns)
+        lists = self._flood_lists
+        R = lists.shape[1]
+        member = torch.zeros(B, R, T + 1, dtype=torch.bool, device=dev)
+        member.scatter_(2, torch.where(lists >= 0, lists, T), True)
+        member = member[:, :, :T]
+        named = (member & self._flood_open().unsqueeze(2)).sum(dim=1)
+        tot = named * per_river
+        turns = torch.where(tot > 0, torch.div(fx_of(100) * 256, tot.clamp(min=1), rounding_mode="trunc"),
+                            torch.full_like(tot, -fx_of(1)))
+        return torch.where(member.any(dim=1), turns, torch.full_like(turns, -1))
 
     def _minor_plot_evals(self, s: int, f: _MinorFacts) -> dict:
         """`minorPlotEvals` — THE PLOT ANALYSIS of minor `s`'s city (0x5ce970
@@ -896,7 +1023,7 @@ class _PlotFacts:
         return self.sim.pillaged[self.bb, self.tiles].long()
 
     def flood_turns(self):
-        return -1
+        return self.ctx.get("flood", self.sim._minor_flood_turns)[self.bb, self.tiles]
 
     def eruption_turns(self):
         return -1

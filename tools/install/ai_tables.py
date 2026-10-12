@@ -101,7 +101,7 @@ def build() -> str:
         s = rsets.get(rid, {})
         return {"test": {"REQUIREMENTSET_TEST_ANY": "ANY", "REQUIREMENTSET_TEST_NONE": "NONE"}.get(s.get("RequirementSetType"), "ALL"),
                 "reqs": [{"type": reqs.get(r, {}).get("RequirementType", "?"),
-                          "inverse": reqs.get(r, {}).get("Inverse") == "true",
+                          "inverse": reqs.get(r, {}).get("Inverse", "").lower() == "true",
                           "args": rargs.get(r, {})} for r in rset_reqs[rid]]}
 
     amods: dict[str, list[str]] = collections.defaultdict(list)
@@ -154,7 +154,7 @@ def build() -> str:
         x = xp1.get(p, {})
         policies.append({
             "type": p, "slot": c.get("GovernmentSlotType"), "civic": c.get("PrereqCivic"),
-            "darkAge": x.get("RequiresDarkAge") == "true", "goldenAge": x.get("RequiresGoldenAge") == "true",
+            "darkAge": x.get("RequiresDarkAge", "").lower() == "true", "goldenAge": x.get("RequiresGoldenAge", "").lower() == "true",
             "minEra": era_index.get(x.get("MinimumGameEra", ""), -1),
             "maxEra": era_index.get(x.get("MaximumGameEra", ""), -1),
             "government": excl.get(p), "obsolete": obs.get(p, []),
@@ -173,7 +173,7 @@ def build() -> str:
             "influenceThreshold": int(c.get("InfluencePointsThreshold", 0) or 0),
             "modifiers": [modifier(m) for m in gmods[g]],
         })
-    slots = [{"type": c["GovernmentSlotType"], "any": c.get("AllowsAnyPolicy") == "true"}
+    slots = [{"type": c["GovernmentSlotType"], "any": c.get("AllowsAnyPolicy", "").lower() == "true"}
              for c in keyed(rows("GovernmentSlots"), "GovernmentSlotType").values()]
     yields = {k: float(c.get("DefaultValue", 1)) for k, c in keyed(rows("Yields"), "YieldType").items()}
     pseudo = {k: float(c.get("DefaultValue", 1)) for k, c in keyed(rows("PseudoYields"), "PseudoYieldType").items()}
@@ -245,7 +245,7 @@ def build() -> str:
     pe_items: dict[str, list] = collections.defaultdict(list)
     for c in rows("AiFavoredItems"):
         if c.get("ListType") in pe_lists:
-            pe_items[c["ListType"]].append({"condition": c["Item"], "favored": c.get("Favored") == "true",
+            pe_items[c["ListType"]].append({"condition": c["Item"], "favored": c.get("Favored", "").lower() == "true",
                                             "value": int(c.get("Value", 0) or 0), "stringVal": c.get("StringVal")})
     atraits: dict[str, list[str]] = collections.defaultdict(list)
     for c in rows("AgendaTraits"):
@@ -268,7 +268,7 @@ def build() -> str:
         if c.get("ListType") in pe_items:
             by_strategy[c["StrategyType"]].append(c["ListType"])
     features = [{"type": k, "settlement": c.get("Settlement", "true") != "false",
-                 "naturalWonder": c.get("NaturalWonder") == "true"}
+                 "naturalWonder": c.get("NaturalWonder", "").lower() == "true"}
                 for k, c in keyed(rows("Features"), "FeatureType").items()]
     res_class = {k: c.get("ResourceClassType") for k, c in keyed(rows("Resources"), "ResourceType").items()}
     # the victory manager's strategies (Strategies) in database order, each
@@ -317,7 +317,7 @@ def build() -> str:
             bmods[c["BeliefType"]].append(c.get("ModifierID") or c.get("ModifierId"))
     beliefs = [{"type": b, "class": c.get("BeliefClassType"), "modifiers": [modifier(m) for m in bmods[b]]}
                for b, c in in_game_order("Beliefs", "BeliefType", keyed(rows("Beliefs"), "BeliefType"))]
-    religions = [{"type": r, "pantheon": c.get("Pantheon") == "true", "customName": c.get("RequiresCustomName") == "true"}
+    religions = [{"type": r, "pantheon": c.get("Pantheon", "").lower() == "true", "customName": c.get("RequiresCustomName", "").lower() == "true"}
                  for r, c in in_game_order("Religions", "ReligionType", keyed(rows("Religions"), "ReligionType"))]
     fav_leader: dict[str, list[str]] = collections.defaultdict(list)
     fav_civ: dict[str, list[str]] = collections.defaultdict(list)
@@ -347,7 +347,7 @@ def build() -> str:
     gov_promos = []
     for p, c in promo_rows:
         gov_promos.append({
-            "type": p, "level": int(c.get("Level", 0) or 0), "baseAbility": c.get("BaseAbility") == "true",
+            "type": p, "level": int(c.get("Level", 0) or 0), "baseAbility": c.get("BaseAbility", "").lower() == "true",
             "governors": [g for g, _ in gov_rows if p in gp_sets[g]],
             "modifiers": [modifier(m) for m in sorted(gp_mods[p])],
         })
@@ -391,10 +391,10 @@ def build() -> str:
         mine = [p for p, _ in promo_rows if p in gp_sets[g]]
         governors_ai.append({
             "type": g, "identityPressure": int(c.get("IdentityPressure", 0) or 0),
-            "assignCityState": c.get("AssignCityState") == "true",
-            "assignToMajor": gov_xp2.get(g, {}).get("AssignToMajor") == "true",
+            "assignCityState": c.get("AssignCityState", "").lower() == "true",
+            "assignToMajor": gov_xp2.get(g, {}).get("AssignToMajor", "").lower() == "true",
             "trait": c.get("TraitType"), "promotions": mine,
-            "modifiers": [modifier(m) for p in mine if dict(promo_rows)[p].get("BaseAbility") == "true" for m in gp_mods[p]],
+            "modifiers": [modifier(m) for p in mine if dict(promo_rows)[p].get("BaseAbility", "").lower() == "true" for m in gp_mods[p]],
         })
 
     def lit(name, value, typ):
@@ -519,7 +519,7 @@ def build() -> str:
         + lit("AI_MINOR_INFLUENCE_MODIFIERS", dict(sorted(minor_influence.items())), "Readonly<Record<string, readonly AiModifier[]>>")
         + lit("AI_CIVIC_MODIFIERS", {k: [modifier(m) for m in v] for k, v in sorted(civic_mods.items())},
               "Readonly<Record<string, readonly AiModifier[]>>")
-        + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace") == "true"],
+        + lit("AI_SPACE_RACE_PROJECTS", [k for k, c in keyed(rows("Projects"), "ProjectType").items() if c.get("SpaceRace", "").lower() == "true"],
               "readonly string[]")
         + lit("AI_DEFAULT_SAVINGS", savings, "readonly { saving: string; weight: number }[]")
     )
@@ -680,12 +680,12 @@ def build_city(rows, modifier) -> str:
             "outerDefenseHitPoints": c.get("OuterDefenseHitPoints") not in (None, "", "NULL"),
             "outerDefenseStrength": num(c, "OuterDefenseStrength"), "defenseModifier": num(c, "DefenseModifier"),
             "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "district": c.get("PrereqDistrict"),
-            "wonder": c.get("IsWonder") == "true", "placement": c.get("RequiresPlacement") == "true",
+            "wonder": c.get("IsWonder", "").lower() == "true", "placement": c.get("RequiresPlacement", "").lower() == "true",
             "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
             "maxPlayerInstances": num(c, "MaxPlayerInstances", -1), "maxWorldInstances": num(c, "MaxWorldInstances", -1),
             "trait": c.get("TraitType"), "replaces": replaces.get(b),
-            "capital": c.get("Capital") == "true", "religion": c.get("EnabledByReligion") == "true",
-            "adjacentRiver": c.get("RequiresAdjacentRiver") == "true",
+            "capital": c.get("Capital", "").lower() == "true", "religion": c.get("EnabledByReligion", "").lower() == "true",
+            "adjacentRiver": c.get("RequiresAdjacentRiver", "").lower() == "true",
             "governmentTier": int((c.get("GovernmentTierRequirement") or "Tier0")[4:] or 0),
             "exclusive": [r["MutuallyExclusiveBuilding"] for r in exclusive[b]],
             "yields": [[r["YieldType"], num(r, "YieldChange")] for r in by_yield[b]],
@@ -706,8 +706,8 @@ def build_city(rows, modifier) -> str:
     for u, c in in_game_order("Units", "UnitType", keyed(rows("Units"), "UnitType")):
         x = uxp2.get(u, {})
         units.append({
-            "type": u, "foundCity": c.get("FoundCity") == "true", "buildCharges": num(c, "BuildCharges"),
-            "mustPurchase": c.get("MustPurchase") == "true", "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
+            "type": u, "foundCity": c.get("FoundCity", "").lower() == "true", "buildCharges": num(c, "BuildCharges"),
+            "mustPurchase": c.get("MustPurchase", "").lower() == "true", "goldPurchase": c.get("PurchaseYield") == "YIELD_GOLD",
             "combat": num(c, "Combat"),
             "recon": any(t.get("Tag") == "CLASS_RECON" for t in tags[u]),
             "rangedCombat": num(c, "RangedCombat"), "bombard": num(c, "Bombard"), "antiAir": num(c, "AntiAirCombat"),
@@ -720,7 +720,8 @@ def build_city(rows, modifier) -> str:
             "obsolete": [c[k] for k in ("MandatoryObsoleteCivic", "MandatoryObsoleteTech", "ObsoleteCivic", "ObsoleteTech")
                          if c.get(k)],
             "buildings": [r["PrereqBuilding"] for r in unit_bld[u]],
-            "spy": c.get("Spy") == "true", "wmd": c.get("WMDCapable") == "true",
+            "spy": c.get("Spy", "").lower() == "true", "wmd": c.get("WMDCapable", "").lower() == "true",
+            "religion": c.get("EnabledByReligion", "").lower() == "true",
             "religiousStrength": num(c, "ReligiousStrength"), "spreadCharges": num(c, "SpreadCharges"),
             "healCharges": num(c, "ReligiousHealCharges"), "parkCharges": num(c, "ParkCharges"),
             "canTrain": str(c.get("CanTrain", "")).lower() not in ("false", "0"),
@@ -764,7 +765,7 @@ def build_city(rows, modifier) -> str:
     imp_adj = multi("Improvement_Adjacencies", "ImprovementType")
     adj_yield = {k: c.get("YieldType") for k, c in keyed(rows("Adjacency_YieldChanges"), "ID").items()}
     improvements = [{"type": i, "tech": c.get("PrereqTech"), "civic": c.get("PrereqCivic"), "trait": c.get("TraitType"),
-                     "buildable": c.get("Buildable") == "true",
+                     "buildable": c.get("Buildable", "").lower() == "true",
                      "resources": [r["ResourceType"] for r in valid[i]],
                      "keepsFeature": [r["ResourceType"] for r in valid[i] if r.get("MustRemoveFeature") == "false"],
                      "yields": [[y["YieldType"], num(y, "YieldChange")] for y in imp_yields[i]],
@@ -818,7 +819,7 @@ def build_city(rows, modifier) -> str:
     # RemoveTech), in DATABASE ORDER
     feat_yields = multi("Feature_YieldChanges", "FeatureType")
     feat_removes = multi("Feature_Removes", "FeatureType")
-    features = [{"type": f, "removable": c.get("Removable") == "true", "removeTech": c.get("RemoveTech") or None,
+    features = [{"type": f, "removable": c.get("Removable", "").lower() == "true", "removeTech": c.get("RemoveTech") or None,
                  "appeal": num(c, "Appeal"),
                  "yields": [[y["YieldType"], num(y, "YieldChange")] for y in feat_yields[f]],
                  "removes": [[y["YieldType"], num(y, "Yield")] for y in feat_removes[f]]}

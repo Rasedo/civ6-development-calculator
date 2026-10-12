@@ -47,7 +47,7 @@ import { GAME_COST_ESCALATION, gameProgressPct, scaleByGameSpeed } from '../data
 import { neighbors } from '../../world/hex';
 import { RESOURCES } from '../../world/resources';
 import { tileAppeal } from '../core/appeal';
-import { floodRiverIndex, floodRivers, riverRevealed } from '../core/disasters';
+import { floodHazardTurns } from '../core/disasters';
 import { loadCityBuildPlots } from './cityBuildLog';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
@@ -146,7 +146,6 @@ for (const rec of recs) {
       if ((districtsMode ? lp.districts : lp.improvements).every((v) => v === 0)) continue;
       const plot = lp.y * W + lp.x;
       const tile = state.map.tiles[plot];
-      const floodHome = floodRiverIndex(state.map, tile);
       const f: PlotValueFacts = {
         view: facts.view, seat: cs.seat,
         improvement: tile.improvement ? gameTypeOf('improvement', tile.improvement, 'IMPROVEMENT_') : null,
@@ -155,11 +154,10 @@ for (const rec of recs) {
         resource: tile.resource && (!RESOURCES[tile.resource]?.revealTech || r.techs.includes(RESOURCES[tile.resource].revealTech!))
           ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
         feature: tile.feature ? installFeature(tile.feature) : null,
-        // LAB: the hazards' turns as the logged values give them (a farm's
-        // value on the Floodplains of a flood river no major has revealed
-        // ends at 1 turn, an improvement's beside a volcano at 31 in
-        // runs/h1_duelv1127); their computation is unread
-        floodTurns: floodHome >= 0 && !riverRevealed(state, floodRivers(state.map)[floodHome]) ? FX : null,
+        // LAB: the eruption's turns as the logged values give them (an
+        // improvement's beside a volcano at 31 in runs/h1_duelv1127); its
+        // computation is unread
+        floodTurns: floodHazardTurns(state, tile.index),
         eruptionTurns: neighbors(state.map, tile).some((n) => (n as unknown as { volcano?: boolean }).volcano) ? 31 * FX : null,
         appeal: tileAppeal(state.map, tile),
         besideHousingDistrict: neighbors(state.map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),

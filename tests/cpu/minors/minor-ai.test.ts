@@ -6,8 +6,9 @@
  * kept progress, the overflow store, the turn and value it was set, the
  * threat, the savings, the event slots, the trees, the contracts, the
  * reservations, the hand and the serials, the treasury, the Builders
- * trained and the best melee strength. Pinned in minor-ai-pins.json; the
- * GPU twin is tests/gpu/minor_ai_test.py, against the same pins.
+ * trained, the best melee strength and the Combat Desire. Pinned in
+ * minor-ai-pins.json; the GPU twin is tests/gpu/minor_ai_test.py, against the
+ * same pins.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -19,7 +20,7 @@ import type { WorldFile } from '../../../world/file';
 const TURNS = 16;
 const FIELDS = ['prodProgress', 'minorProdItem', 'minorProdOverflow', 'minorProdKept', 'minorProdSite', 'minorProdSet', 'minorThreat',
   'minorSavings', 'minorAiSlots', 'minorAiTrees', 'minorContracts', 'minorReservations', 'minorAiHand', 'minorTreasury',
-  'minorBuildersTrained', 'minorBestMeleeCS'];
+  'minorBuildersTrained', 'minorBestMeleeCS', 'minorCombatDesire'];
 
 function run(): unknown[] {
   const state = loadWorld(JSON.parse(readFileSync('seeder/worlds/seed9001.world.json', 'utf-8')) as WorldFile);

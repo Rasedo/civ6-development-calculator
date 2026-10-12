@@ -1193,7 +1193,7 @@ _MUTABLE = [
     "citystate_treasury", "citystate_faith",
     "citystate_builders_trained", "citystate_best_melee", "citystate_best_ranged",
     # its city AI: the district's plot, the item's turn and value, the threat, the savings
-    "citystate_prod_site", "citystate_prod_set_turn", "citystate_prod_set_value", "citystate_threat",
+    "citystate_prod_site", "citystate_prod_set_turn", "citystate_prod_set_value", "citystate_threat", "citystate_combat_desire",
     "citystate_savings", "citystate_balance", "citystate_ai_on",
     # its events' slots, trees, contracts and reservations (`CityAi`)
     "cai_slots", "cai_tr_alive", "cai_tr_id", "cai_tr_status", "cai_tr_mem_a", "cai_tr_mem_b", "cai_tr_bb", "cai_tr_trigger",

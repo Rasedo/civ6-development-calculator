@@ -4047,6 +4047,19 @@
     - "- An event's yield gain 0xa190d0 (from the flood 0xa2ed80 \"Boosted Yield Chance\", the storms 0x2867f0 / 0x286f80, the eruption soil 0xa219e0 \"F..."
     - "- a flood (0xa2f200) skips its yield pass 0xa2ed80 — no \"Boosted Yield Chance\" draw at all (runs/h1_duelw1124 t243, t245; 1123 t245, t248;..."
   review: imported
+- addr: 0xa2efb0
+  final: 0x731910
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  impl: [cpu/core/disasters.ts:floodHazardTurns]
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...ist holds the plot, each severity from MAJOR up adds 100 / its river entry +0x98[sev] — 0xa2efb0's N / OccurrencesPerGame at the game's realism (0x339140), N the event draw's 0x339020..."
+  review: imported
 - addr: 0xa2f200
   final: 0x731b10
   kind: function

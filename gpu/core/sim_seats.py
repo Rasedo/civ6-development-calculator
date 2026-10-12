@@ -4358,13 +4358,14 @@ class SimSeats:
         self._imp_ground_cache[k] = (simbase.plane_stamp(planes), ap, ok)
         return ok
 
-    def _imp_ground_compute(self, k: int) -> torch.Tensor:
-        """`_imp_ground_ok` computed."""
+    def _imp_ground_compute(self, k: int, cleared: bool = False) -> torch.Tensor:
+        """`_imp_ground_ok` computed; `cleared`: of each plot with its feature
+        gone (the minors' plot analysis prices the clearing)."""
         B, dev = self.B, self.device
         ok = torch.ones(B, self.T, dtype=torch.bool, device=dev)
         _rf = self._imp_req_feat[k]
         if _rf >= 0:
-            ok &= (self.feat_id == _rf) & ~self.feat_stripped
+            ok &= torch.zeros_like(ok) if cleared else (self.feat_id == _rf) & ~self.feat_stripped
         terr = self._imp_terr[k]
         if terr:
             allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
@@ -4382,7 +4383,7 @@ class SimSeats:
         # CIV6 (Improvement_ValidFeatures, `featureOk`): a live feature takes
         # only the rows that list it; a row with no list takes bare ground. A
         # volcano is its plot's feature and no row lists it.
-        live = (self.feat_id >= 0) & ~self.feat_stripped
+        live = torch.zeros_like(ok) if cleared else (self.feat_id >= 0) & ~self.feat_stripped
         allow = torch.zeros(B, self.T, dtype=torch.bool, device=dev)
         for f in self._imp_feats_ok[k]:
             allow |= self.feat_id == f

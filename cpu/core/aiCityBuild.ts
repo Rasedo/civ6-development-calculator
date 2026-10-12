@@ -514,6 +514,8 @@ export interface AiUnitRow {
   buildings: readonly string[];
   spy: boolean;
   wmd: boolean;
+  /** EnabledByReligion: trained only where a belief enables it */
+  religion: boolean;
   religiousStrength: number;
   spreadCharges: number;
   healCharges: number;

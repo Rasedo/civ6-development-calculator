@@ -60,7 +60,8 @@ import { cityAppealResolver } from './governors';
 import { canPlaceDistrictIn, canRemoveFeature, suzerainNames, validImprovementsIn } from './rules';
 import { borderCandidates } from './city';
 import { tilePurchaseCost } from './game';
-import { makeYieldCtx } from './effects';
+import { computeUnlocksIn, makeYieldCtx } from './effects';
+import { floodHazardTurns } from './disasters';
 import { baseAdjacency, improvementAdjacency } from './yields';
 import { tileAppeal } from './appeal';
 import { builderHarvest, builderRemoveFeature, tileFreeForUnit } from './units';
@@ -108,13 +109,28 @@ const IMPROVEMENT_ENGINE = new Map(AI_IMPROVEMENTS.map((r) => [r.type, engineId(
 const districtType = (id: string): string =>
   AI_DISTRICTS.find((r) => r.trait === null && engineId('district', r.type, 'DISTRICT_', DISTRICTS) === id)?.type ?? `DISTRICT_${id}`;
 
-/** the improvements the ground of a plot takes for the seat, research waived
- *  (CanHaveImprovement, 0x35fd60) */
-function groundImprovements(state: GameState, seat: number, tile: Tile): string[] {
-  return validImprovementsIn(tile, {
-    unlocks: null, ownsTile: (t) => tileSeat(t) === seat, map: state.map, camps: campTiles(state),
+/** the improvements the ground of a plot takes for the minor, the
+ *  improvements' own research waived (CanHaveImprovement, 0x35fd60) — a
+ *  ground row's civic (the Farm on Hills, a feature row) held: those of the
+ *  plot as it stands, of the plot with its resource harvested (one with
+ *  Resource_Harvests rows) and with its
+ *  removable feature cleared (the value prices the harvest and the clearing) */
+function groundImprovements(state: GameState, cs: CityState, tile: Tile): Set<string> {
+  const seat = cs.seat;
+  const unlocks = { ...computeUnlocksIn(cs.research, []), improvements: new Set(Object.keys(IMPROVEMENTS)) };
+  const opts = {
+    unlocks, ownsTile: (t: Tile) => tileSeat(t) === seat, map: state.map, camps: campTiles(state),
     gpAppeal: cityAppealResolver(state), suzerain: suzerainNames(state, seat), civ: civOf(state, seat),
-  }) as string[];
+  };
+  const clearable = !!tile.feature && !!FEATURE_ROW.get(installFeature(tile.feature))?.removable;
+  const harvestable = !!tile.resource && (RES.get(gameTypeOf('resource', tile.resource, 'RESOURCE_'))?.harvests.length ?? 0) > 0;
+  const out = new Set<string>(validImprovementsIn(tile, opts));
+  for (const [harvest, clear] of [[true, false], [false, true], [true, true]]) {
+    if ((harvest && !harvestable) || (clear && !clearable)) continue;
+    const ground = { ...tile, resource: harvest ? null : tile.resource, feature: clear ? null : tile.feature };
+    for (const id of validImprovementsIn(ground, opts)) out.add(id);
+  }
+  return out;
 }
 
 /**
@@ -127,7 +143,8 @@ function groundImprovements(state: GameState, seat: number, tile: Tile): string[
  * the city has: FX(-9999). The centre and a district's plot stand
  * unanalysed (0). T: an improvement's the research and civics AIs' turns to
  * its technology and civic (the larger), a district's its build turns plus
- * those. LAB: the hazards' turns (flood, eruption) unread, none; an inland
+ * those. A flood's turns as the AI expects them (`floodHazardTurns`); LAB: the
+ * eruption's turns unread, none; an inland
  * city-state on a river trains ships (0x1c77c0's sea test unread).
  */
 export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuildFacts): PlotEval[] {
@@ -162,7 +179,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
       pillaged: !!tile.pillaged,
       resource: tile.resource && !hidden(tile.resource) ? gameTypeOf('resource', tile.resource, 'RESOURCE_') : null,
       feature: tile.feature ? installFeature(tile.feature) : null,
-      floodTurns: null,
+      floodTurns: floodHazardTurns(state, plot),
       eruptionTurns: null,
       appeal: tileAppeal(map, tile, camps, gp),
       besideHousingDistrict: neighbors(map, tile).some((n) => n.district !== null && (DISTRICTS[n.district]?.housing ?? 0) > 0),
@@ -184,7 +201,7 @@ export function minorPlotEvals(state: GameState, cs: CityState, facts: CityBuild
         return row ? resourceValue(resFacts, row, count, t, h) : 0;
       },
     };
-    const ground = new Set(owned ? groundImprovements(state, cs.seat, tile) : []);
+    const ground = owned ? groundImprovements(state, cs, tile) : new Set<string>();
     const improvements = AI_IMPROVEMENTS.map((row, i) => {
       const id = IMPROVEMENT_ENGINE.get(row.type);
       if (!id || !ground.has(id)) return FX_MIN;
@@ -356,7 +373,7 @@ function minorTreeWorld(state: GameState, cs: CityState, ai: CityAi, city: CityT
     },
     canImprove: (plot, imp) => {
       const id = engineId('improvement', imp, 'IMPROVEMENT_', IMPROVEMENTS);
-      return !!id && owned(plot) && groundImprovements(state, cs.seat, state.map.tiles[plot]).includes(id);
+      return !!id && owned(plot) && groundImprovements(state, cs, state.map.tiles[plot]).has(id);
     },
     builderType: () => (minorUnitVersion('UNIT_BUILDER') === 'UNIT_BUILDER' ? 'UNIT_BUILDER' : null),
     plotCity: (plot) => (owned(plot) ? city.id : -2),

@@ -1,6 +1,8 @@
 /**
  * THE CITY-STATES' VALUE TABLES ON A WORLD (`minorTables`, the Default
- * Specialization pick over them): seed9001's opening state, and the same
+ * Specialization pick over them): seed9001's opening state (before the
+ * research and civics AIs' first analysis, a row behind a technology or civic
+ * at 500 turns), and the same
  * with each minor at population 3, a Monument held and a Warrior in hand (7
  * in, 2 in the overflow store). Per minor the valued rows' count and sum of
  * the buildings, units and projects tables, and the pick.
@@ -38,9 +40,9 @@ function digest(state: GameState) {
 describe("the city-states' value tables on a world", () => {
   it('reads the opening state', () => {
     expect(digest(world())).toEqual({
-      100: [[[9, 62956], [32, 10710], [1, 0]], ['building', 'BUILDING_WALLS', 23332]],
-      101: [[[15, 94682], [34, 5880], [1, 0]], ['building', 'BUILDING_WALLS', 23981]],
-      102: [[[17, 111536], [35, 1269], [1, 0]], ['building', 'BUILDING_WALLS', 25389]],
+      100: [[[1, 4850], [4, 13364], [1, 0]], ['building', 'BUILDING_MONUMENT', 4850]],
+      101: [[[1, 6156], [4, 13816], [1, 0]], ['building', 'BUILDING_MONUMENT', 6156]],
+      102: [[[1, 6667], [4, 14305], [1, 0]], ['building', 'BUILDING_MONUMENT', 6667]],
     });
   });
 
@@ -54,9 +56,9 @@ describe("the city-states' value tables on a world", () => {
       cs.prodOverflow = 2;
     }
     expect(digest(state)).toEqual({
-      100: [[[11, 52891], [34, 6046], [1, 0]], ['building', 'BUILDING_WALLS', 15277]],
-      101: [[[18, 100114], [35, -161], [1, 0]], ['building', 'BUILDING_WALLS', 16493]],
-      102: [[[18, 94321], [35, -161], [1, 0]], ['building', 'BUILDING_WALLS', 16493]],
+      100: [[[0, 0], [4, 10771], [1, 0]], ['unit', 'UNIT_WARRIOR', 4939]],
+      101: [[[0, 0], [4, 11316], [1, 0]], ['unit', 'UNIT_WARRIOR', 5148]],
+      102: [[[0, 0], [4, 11316], [1, 0]], ['unit', 'UNIT_WARRIOR', 5148]],
     });
   });
 });

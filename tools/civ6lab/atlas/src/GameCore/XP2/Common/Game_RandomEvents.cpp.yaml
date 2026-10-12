@@ -203,10 +203,25 @@
     - cpu/core/disasters.ts:volcanoRoll
     - cpu/data/disasters.ts:EVENT_OCC_SCALE
     - cpu/harness/eventReplay.ts:EVENT_ROLL_TOTAL
-  readings: ["C-74: the event draw, the volcanoes, the drought", "C-74: the volcano roll's gate — READ"]
+  readings:
+    - "C-74: the event draw, the volcanoes, the drought"
+    - "C-74: the volcano roll's gate — READ"
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
   context:
     - "...− 1), the volcano roll 0x335040, the weights 0x335260, \"Random Event Roll\" at 0x338814; N 0x339020; families: storms 0x28f490 (map-size 0x28d0f0), floods 0xa2cfc0, eruptions 0xa1e470, warm..."
     - "...; +0x58 0xa1d130 the active volcanoes; +0x60 0xa1d450 the total. With N the game's turns (0x339020): no draw when the named count N' is 0 or N is 0; D = N // (2 × all volcanoes); below Per..."
+  review: imported
+- addr: 0x339140
+  final: 0x23e520
+  kind: function
+  status: PARTLY
+  cases:
+    - recording: 1127
+      value: the 1127 Farm   misses are mostly a constant +10 to +16 over turns 10..25 the housing or   modifiers term owes.
+  readings:
+    - "C-96: the improvement value — READ (0x7a58f0, 0x7b1320's yields, the feature removal 0x7a3010, the harvest 0x7a37d0, the build unit 0x7a2e20), PARTLY READ (the hazards' turns, 0x7b1320's tourism, defence, claimed plots, modifiers and neighbours terms), unwired"
+  context:
+    - "...its river entry +0x98[sev] — 0xa2efb0's N / OccurrencesPerGame at the game's realism (0x339140), N the event draw's 0x339020 — and the turns are 100 over the sum, -1.0 where no named..."
   review: imported
 - addr: 0x339960
   final: 0x23eb10

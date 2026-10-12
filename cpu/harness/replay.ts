@@ -77,11 +77,11 @@ import { UNITS, UNIT_HP } from '../data/units';
 import { CAMP_DISPERSAL_GOLD, MP_SCALE, scaleByGameSpeed } from '../data/constants';
 import { PROMOTE_HEAL, attacksPerTurn, takePromotion, unitPromoRows } from '../core/promotions';
 import { fireFeature } from '../data/disasters';
-import { holdMinorCatchUp, holdMinorOrders, minorBuildFacts, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
+import { holdMinorCatchUp, holdMinorOrders, minorBuildFacts, minorKnowledge, minorKnownUnits, minorItemKey, minorUnitPrice, minorUpgradeUnit, holdLevies, releaseLevies } from '../core/minorBuild';
 import { DEDICATED_IMPROVEMENTS, IMPROVEMENT_IDS, unitActionIndex } from '../core/unitActions';
 import { loadCatalog, type Catalog, type DumpCity, type TurnRecord } from './record';
 import { num, bool } from './record';
-import { traceMinorAi } from '../core/minorCityAi';
+import { minorAiTurn, traceMinorAi } from '../core/minorCityAi';
 import { newCityAi } from '../core/aiCityTrees';
 import { newEconomicMemory, savingsTurn } from '../core/aiEconomic';
 import { FX } from '../core/aiValue';
@@ -1521,11 +1521,14 @@ function applyFound(ctx: Ctx, d: Extract<Decision, { kind: 'found' }>): void {
     // a city-state's founding (`placeCityStateAt`, the engine's setup step)
     const placed = placeCityStateAt(state, minor.id, minor.name, minor.type, d.plot);
     Object.assign(placed, { envoys: minor.envoys, met: minor.met, suzerain: minor.suzerain, research: minor.research });
-    // the game's city AI took its first look the turn the city was founded,
-    // which runs no events: its next turn runs them
-    placed.cityAi = newCityAi();
     state.cityStates.sort((a, b) => a.id - b.id);
     if (settler) disbandUnit(state, settler.id);
+    // the game's minor took its first turn the turn the city was founded:
+    // its knowledge base's look, which its military AI reads on its next
+    // turn, and its city AI's first look, which runs no events and picks
+    // the Default Specialization
+    minorKnowledge(state, placed, false);
+    minorAiTurn(state, placed);
     count(ctx, 'found:minor', 'applied');
     return;
   }
@@ -2633,6 +2636,20 @@ function minorBuilds(ctx: Ctx, b: TurnRecord, tally: MinorBuildTally): void {
     const record = minorItemKey(head);
     const ours = cs.prodItem ?? '';
     const kind = record ? record.slice(0, record.indexOf(':')) : 'none';
+    // REPLAY_TRACE=minorRows: each city-state's item and inputs beside the
+    // record's, one JSON line (the record counts the centre's building and district)
+    if (TRACE.has('minorRows')) {
+      const pid = ctx.playerOfSeat.get(cs.seat) ?? -1;
+      const pl = b.players.find((q) => q.id === pid);
+      const bits = (s: string | undefined) => [...(s ?? '')].filter((x) => x === '1').length;
+      console.error('ROW ' + JSON.stringify({ t: b.turn, p: pid, name: cs.name, ours, record, set: cs.prodSetTurn ?? -1, val: cs.prodSetValue ?? null,
+        prog: Math.round(cs.prodProgress ?? 0), rprog: Math.round(Number(c?.queueProgress?.[0] ?? 0)),
+        pop: cs.population, rpop: c?.pop, bld: (cs.buildings ?? []).length, rbld: c?.buildings.length,
+        dis: (cs.districts ?? []).length, rdis: c?.districts.length,
+        tech: cs.research.techs.length, rtech: bits(pl?.techs), civ: cs.research.civics.length, rciv: bits(pl?.civics),
+        units: ctx.state.units.filter((u) => u.seat === cs.seat).length, runits: b.units.filter((u) => u.owner === pid).length,
+        threat: cs.threat ?? null, gold: Math.round(cs.treasury), desire: cs.combatDesire ?? 0 }));
+    }
     const k = (tally.byKind[kind] ??= { turns: 0, same: 0 });
     tally.turns += 1;
     k.turns += 1;
@@ -3168,6 +3185,9 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
       savingsTurn(cs.economy, Math.trunc(cs.treasury * FX), false);
     }
   }
+  // their knowledge bases hold the look of the import's turn, which their
+  // military AI reads on the next
+  for (const cs of state.cityStates) if (cs.centerIndex >= 0) minorKnowledge(state, cs, false);
   // the AI majors: every major the record's first turn names no human
   const aiSeats = new Map<number, number>();
   const majorSeats = new Map<number, number>();
