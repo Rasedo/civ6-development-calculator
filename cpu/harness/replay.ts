@@ -46,6 +46,7 @@ import { availableCivicsIn, availableTechsIn, computeUnlocks, fitPolicies, goldP
   unlockedPolicyIds } from '../core/effects';
 import { selectResearch, chopGrant, harvestGrant, applyLumpYield, holdResearchEra, researchCost } from '../core/economy';
 import { computeCityStats } from '../core/city';
+import { getModifiers } from '../core/effects';
 import { researchAiChoice, researchAnalysis, type ResearchEntry } from '../core/aiResearch';
 import { civicAiChoice, civicAnalysis, type CivicEntry } from '../core/aiCivics';
 import { detectBoosts, grantBoost, markBoost } from '../core/boosts';
@@ -2721,6 +2722,37 @@ function minorResearch(ctx: Ctx, b: TurnRecord, tally: MinorResearchTally): void
       cost(r.civic, true), pl.civicCost === undefined ? null : Number(pl.civicCost),
       r.boosted.filter((x) => !q.boosted.includes(x)).join(' '), q.boosted.filter((x) => !r.boosted.includes(x)).join(' ')]);
   }
+  // their food and growth, and our formula on the record's own state
+  for (const cs of state.cityStates) {
+    const rcs = ctx.next.state.cityStates.find((x) => x.centerIndex === cs.centerIndex);
+    const pid = ctx.playerOfSeat.get(cs.seat) ?? -1;
+    const c = b.cities.find((x) => x.y * ctx.W + x.x === cs.centerIndex);
+    if (!rcs || !c) continue;
+    const ours = computeCityStats(state, minorCity(cs));
+    const theirs = computeCityStats(ctx.next.state, minorCity(rcs));
+    if (TRACE.has('minorFood') && ours.amenities.have - ours.amenities.needed !== theirs.amenities.have - theirs.amenities.needed) {
+      console.error(`AMEN t${b.turn} p${pid} ours ${JSON.stringify(ours.amenities)} record ${JSON.stringify(theirs.amenities)} wars ${JSON.stringify(cs.wars)} / ${JSON.stringify(rcs.wars)} hp ${cs.hp} / ${rcs.hp}`);
+    }
+    // REPLAY_TRACE=minorFood: each city-state's yield modifiers beside the record's
+    if (TRACE.has('minorFood') && ours.breakdown.bonuses.food !== theirs.breakdown.bonuses.food) {
+      console.error(`FOOD t${b.turn} p${pid} ours ${JSON.stringify(getModifiers(state, cs.seat).cityYields)} record ${JSON.stringify(getModifiers(ctx.next.state, rcs.seat).cityYields)} civics ${cs.research.civics.filter((x) => !rcs.research.civics.includes(x)).join(',')} / ${rcs.research.civics.filter((x) => !cs.research.civics.includes(x)).join(',')} techs ${cs.research.techs.filter((x) => !rcs.research.techs.includes(x)).join(',')} / ${rcs.research.techs.filter((x) => !cs.research.techs.includes(x)).join(',')} bld ${(cs.buildings ?? []).join(',')} / ${(rcs.buildings ?? []).join(',')}`);
+    }
+    const owned = (st: GameState, seat: number) => st.map.tiles.filter((t) => t.ownerSeat === seat).map((t) => t.index);
+    const mine = owned(state, cs.seat);
+    const impDiff = mine.filter((i) => (state.map.tiles[i].improvement ?? null) !== (ctx.next.state.map.tiles[i].improvement ?? null)).length;
+    tally.food.push([b.turn, pid, r3(cs.foodBox ?? 0), r3(Number(c.food ?? 0)), r3(ours.foodSurplus), r3(Number(c.foodSurplus ?? 0)),
+      r3(theirs.foodSurplus), cs.population, c.pop, [...ours.workedTiles].sort((x, y) => x - y).join(' '),
+      [...(c.worked ?? [])].sort((x, y) => x - y).join(' '), mine.length, owned(ctx.next.state, rcs.seat).length, impDiff,
+      r3(ours.housing), r3(Number(c.housing ?? 0)), r3(ours.amenities.have - ours.amenities.needed),
+      r3(Number(c.amenities ?? 0) - Number(c.amenitiesNeeded ?? 0)),
+      mine.filter((i) => (state.map.tiles[i].improvement ?? null) !== (ctx.next.state.map.tiles[i].improvement ?? null))
+        .map((i) => `${i}:${state.map.tiles[i].improvement ?? '-'}/${ctx.next.state.map.tiles[i].improvement ?? '-'}`).join(' '),
+      (['tiles', 'districts', 'buildings', 'citizens', 'bonuses', 'trade'] as const).map((k) => `${k} ${r3(ours.breakdown[k].food)}/${r3(theirs.breakdown[k].food)}`).join(' '),
+      r3(ours.total.food), r3(theirs.total.food),
+      [...ours.workedTiles].filter((i) => { const x = state.map.tiles[i]; const y = ctx.next.state.map.tiles[i];
+        return x.feature !== y.feature || x.resource !== y.resource || x.terrain !== y.terrain || !!x.pillaged !== !!y.pillaged; })
+        .map((i) => `${i}:${state.map.tiles[i].feature ?? '-'},${state.map.tiles[i].resource ?? '-'}/${ctx.next.state.map.tiles[i].feature ?? '-'},${ctx.next.state.map.tiles[i].resource ?? '-'}`).join(' ')]);
+  }
   // the majors' counts beside them, whose holdings the catch-up reads
   for (const s of state.seats) {
     const pid = ctx.playerOfSeat.get(s.seat) ?? -1;
@@ -3115,6 +3147,13 @@ export interface BarbTally {
  *  alone] */
 export interface MinorResearchTally {
   rows: (number | string | null)[][];
+  /** each city-state's food and growth after its turn against record t+1's:
+   *  [turn, player, food box ours, record, surplus ours, record, our formula
+   *  on the record's own state, population ours, record, worked plots ours,
+   *  record, the plots it owns ours, record, the improved plots whose
+   *  improvement differs, the housing ours, record, the amenities' balance
+   *  ours, record, the differing improvements "plot:ours/record"] */
+  food: (number | string)[][];
   /** each major's [turn, player, techs ours, record, civics ours, record,
    *  Science a turn ours, record, Culture ours, record, cities ours, record] */
   majors: number[][];
@@ -3232,7 +3271,7 @@ export function runReplay(dumpPath: string, opts: { from?: number; to?: number; 
     researchScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } },
     civicAi: { major: newResearchTally(), minor: newResearchTally(), free: newResearchTally() },
     civicScores: { major: { rows: 0, turns: 0, score: 0 }, minor: { rows: 0, turns: 0, score: 0 }, free: { rows: 0, turns: 0, score: 0 } }, barbTactics: {},
-    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [] } };
+    minorTactics: {}, minorDraws: { turns: 0, paired: 0, draws: 0, sameRange: 0 }, minorBuilds: { turns: 0, same: 0, byKind: {}, samples: [] }, minorResearch: { rows: [], majors: [], food: [] } };
   if (recs.length < 2) return report;
   advanceHistory(history, recs[0], cat);
   const first = importTurn(recs[0], cat, history);

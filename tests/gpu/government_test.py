@@ -314,6 +314,14 @@ def main() -> None:
     # the tier INDEX ranks best-first, so more amenities is a SMALLER index
     assert int(t_hi[0, 0]) < int(t_lo[0, 0]), "the amenity grant reaches the tier balance of the districted city"
 
+    # a city-state is in Chiefdom whatever its civics unlock, the Free Cities in none
+    sim.citystate_civics[:, 0] = civics_with(["CODE_OF_LAWS", "EARLY_EMPIRE", "POLITICAL_PHILOSOPHY"])
+    pos, has = sim._adopted_gov(sim._CITY_MINOR0)
+    assert bool(has.all()) and int(pos[0]) == gov_idx["CHIEFDOM"], "a city-state's government is Chiefdom"
+    _, has_f = sim._adopted_gov(sim.FREE_ROW)
+    assert not bool(has_f.any()), "the Free Cities hold no government"
+    print("  a city-state is in Chiefdom, the Free Cities in none")
+
     print("government_test OK — adoption, slot fill incl. wildcard overflow, influence tier, card slotting + the two inert cards + the CASTLES eureka + the sourced rows (unit CS by promotion class, xp/weariness/GPP factors, the specialty-district grant)")
 
 

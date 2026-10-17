@@ -3360,7 +3360,8 @@ class SimEconomy:
         is IN: none in Anarchy (`_in_anarchy`: position 0, has-one false,
         what a seat with no government unlocked reads), else the one its
         record chose (`civ_gov_chosen`), else the newest its civics unlock. A
-        city-state never records one. `seatGovernment`'s twin.
+        city-state is in Chiefdom, the Free Cities in none.
+        `seatGovernment`'s twin.
 
         Memoised per row under the turn and the write counters of the planes
         it reads (`simbase.plane_stamp`); callers never write into the
@@ -3374,9 +3375,12 @@ class SimEconomy:
         return out
 
     def _adopted_gov_of(self, row: int) -> tuple[torch.Tensor, torch.Tensor]:
-        newest, has = self._newest_gov(self._seat_civics(row))
         if row >= self.n_majors:
-            return newest, has
+            # a city-state stays in Chiefdom, the Free Cities hold none
+            minor = row < self.FREE_ROW
+            pos = torch.full((self.B,), self._gov_city_state if minor else 0, dtype=torch.long, device=self.device)
+            return pos, torch.full((self.B,), minor, dtype=torch.bool, device=self.device)
+        newest, has = self._newest_gov(self._seat_civics(row))
         ch = self.civ_gov_chosen[:, row]
         anarch = self._in_anarchy(row)
         pos = torch.where(ch >= 0, ch, newest)

@@ -3183,6 +3183,36 @@ city-states' techs then stand at 187 / 189, 171 / 171, 204 / 212, 168 / 168
 at t248 and 128 / 136 at t200 (1128), their record catch-up completions 561
 of 626.
 
+## C-96: the city-states' government and food — the records
+
+A city-state is in Chiefdom from its founding to the game's end: every
+city-state's government row of runs/h1_duelw1117-1128 is 0
+(GOVERNMENT_CHIEFDOM) at every turn, whatever its civics unlock, the Free
+Cities' -1. The engines held a city-state in the newest government its
+civics unlocked, so Political Philosophy put each into Autocracy, +1 to
+every yield of the city with a Palace (runs/h1_duelw1124 t41: the three
+city-states' +1 Food against the record's). The engines now read
+`CITY_STATE_GOVERNMENT` (`seatGovernment`, `_adopted_gov_of`).
+
+The action replay's city-states' food first diverges (`minorResearch.food`:
+their food box, surplus, worked plots, improvements, housing, amenities and
+our formula on the record's own state, against record t+1) on the five
+seeds, by the first input that differs:
+- an improvement the record's Builder laid that ours did not, or another
+  one, or a Rainforest ours left standing: 4 of 15 (runs/h1_duelw1121
+  minor 2's Pasture at t20 where ours keeps a Farm; 1127 minor 2's Farm at
+  t32). Over the five seeds the replay copies 270 of the minors' plot
+  changes (152 the record's laid where ours laid none, 83 ours where the
+  record laid none, 35 another), against 66 matched. The record's minors lay
+  an improvement where their Builder stood the turn before 144 times, the
+  turn it arrived 88, the turn it was trained 27.
+- a Food building the record holds and ours does not (its builds): 3.
+- the government's +1 Food, Chiefdom's absence: 3 (fixed).
+- a worked plot or the population: 3; an amenity drop to Revolt for a
+  turn (runs/h1_duelw1127 minor 4 t24, -10 against -1) or Unrest: 2; the
+  surplus banked before a worked plot's yield fell in the record's turn
+  (runs/h1_duelw1128 minor 2 t5): 1.
+
 ## H-1: a city-state meets a major by a look — PARTLY READ (the records)
 
 A city-state and a major meet when a look of either takes in the other:

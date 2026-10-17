@@ -14,7 +14,7 @@ import { CIVICS, type CivicDef } from '../data/civics';
 import { GOVERNMENTS, POLICIES, POLICY_LIST, GOVERNMENT_LIST, SLOT_KINDS, cardFitsSlot, type PolicyEffects, type GovernmentDef, type SlotKind, type BuildingYieldBoost, type ProdBoost } from '../data/policies';
 import { congressWildcardDelta } from './congress';
 import { PANTHEONS, FOLLOWER_BELIEFS, FOUNDER_BELIEFS, ENHANCER_BELIEFS, followedReligionOf, followersOf, unconvertedOf, type BeliefEffects, type BeliefDef } from '../data/religion';
-import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf, isCityStateSeat } from './seats';
+import { alliedAtLevel, civOf, seatOf, citiesOf, campTiles, isCiv, civsAtWar, leaderOf, onHomeContinent, tileSeat, tileCity, majorityReligionOf, isCityStateSeat, FREE_SEAT } from './seats';
 import { hexDistance } from '../../world/hex';
 import { cityGreatWorks } from './greatWorks';
 import { civEraIndex, seatBuildingSum } from './city';
@@ -25,7 +25,7 @@ import { addYields, emptyYields } from './types';
 import { BUILT_WONDERS, WONDER_ERA_INDEX } from '../data/builtWonders';
 import { FORMATION_COST_MULT, UNITS, UNIT_ERA_INDEX, unitHasClass } from '../data/units';
 import { cityStateEnvoyBonuses, isSuzerain, suzerainEffect, suzerainOf, suzerainSciencePct } from './cityStates';
-import { NAN_MADOL_WATER_CULTURE, AUCKLAND_PLOT_ROWS } from '../data/cityStates';
+import { CITY_STATE_GOVERNMENT, NAN_MADOL_WATER_CULTURE, AUCKLAND_PLOT_ROWS } from '../data/cityStates';
 import { IMPROVEMENTS } from '../data/improvements';
 
 import { GP_PERM, GP_UNIT_PROD_CLASSES } from '../data/greatPeople';
@@ -1691,6 +1691,11 @@ export function inAnarchy(state: GameState, seat: number): boolean {
  *  civics unlock. A city-state never records one. `_adopted_gov` is the
  *  twin. */
 export function seatGovernment(state: GameState, seat: number): string | null {
+  // a city-state stays in Chiefdom and the Free Cities hold none, whatever
+  // their civics unlock (runs/h1_duelw1117-1128: every city-state's
+  // government row 0 from t1 to the end, the Free Cities' -1)
+  if (isCityStateSeat(seat)) return CITY_STATE_GOVERNMENT;
+  if (seat === FREE_SEAT) return null;
   const s = seatOf(state, seat);
   if (!s || inAnarchy(state, seat)) return null;
   return s.government.chosen ?? newestGovernment(s.research);

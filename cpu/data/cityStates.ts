@@ -12,6 +12,13 @@ import type { PlotYieldRow } from './civilizations';
 import { type Src, type SrcMap, srcConst, xml } from './provenance';
 import { GAME_SPEED, scaleByGameSpeed } from './constants';
 
+/** The government a city-state is in: Chiefdom from its founding to the end
+ *  of the game, whatever its civics unlock — every city-state's government
+ *  row is 0 (GOVERNMENT_CHIEFDOM) on every record of the H-1 duels. */
+export const CITY_STATE_GOVERNMENT = srcConst('cityStates.government', 'CHIEFDOM', {
+  lab: 'C-96: h1_duelw1124 players 2, 3, 4 government 0 at every turn, the Free Cities -1 (tools/civ6lab/dll_readings.md C-96: the city-states government and food)',
+});
+
 export const CITY_STATE_TYPES: CityStateType[] = [
   'scientific',
   'cultural',

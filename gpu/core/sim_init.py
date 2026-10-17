@@ -2795,6 +2795,8 @@ class SimInit:
         self.civ_policy_lapsed = torch.zeros_like(self.civ_policies)
         if self._ngov:
             self._gov_tier = torch.tensor([int(g["tier"]) for g in _govs], dtype=torch.long, device=device)
+            # the government a city-state is in (`CITY_STATE_GOVERNMENT`)
+            self._gov_city_state = next(i for i, g in enumerate(_govs) if g["id"] == rules.citystate["government"])
             self._gov_intol = torch.tensor([int(g["intolerance"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_unlock_civic = torch.tensor([int(g["unlockCivic"]) for g in _govs], dtype=torch.long, device=device)
             self._gov_slots = torch.tensor([[int(x) for x in g["slots"]] for g in _govs], dtype=torch.long, device=device)  # [nGov,4] m/e/d/w

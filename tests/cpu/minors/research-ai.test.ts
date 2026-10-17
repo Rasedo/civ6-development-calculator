@@ -3,6 +3,8 @@ import { emptySeat, seatOfCityState } from '../../../cpu/core/seats';
 import { makeMap, makeState, tileAtCoords } from '../helpers';
 import { researchAnalysis, researchChoice, researchCompletionChoice, techValue } from '../../../cpu/core/aiResearch';
 import { detectBoosts } from '../../../cpu/core/boosts';
+import { seatGovernment } from '../../../cpu/core/effects';
+import { FREE_SEAT } from '../../../cpu/core/seats';
 import type { CityState, GameState } from '../../../cpu/core/types';
 
 // THE RESEARCH AI (tools/civ6lab/dll_readings.md "H-1: the research AI");
@@ -134,5 +136,16 @@ describe("a city-state's boosts (detectBoosts at its turn)", () => {
     // filled to its cost, Banking is held and its kept progress spent
     expect(cs.research.techs).toContain('BANKING');
     expect(cs.research.techRetained.BANKING).toBeUndefined();
+  });
+});
+
+describe("a city-state's government", () => {
+  it('is Chiefdom whatever its civics unlock; the Free Cities hold none', () => {
+    const state = makeState(makeMap(12, 12));
+    const cs = minor(state);
+    cs.research.civics = ['CODE_OF_LAWS', 'EARLY_EMPIRE', 'POLITICAL_PHILOSOPHY'];
+    // runs/h1_duelw1124: every city-state's government row 0 at every turn
+    expect(seatGovernment(state, cs.seat)).toBe('CHIEFDOM');
+    expect(seatGovernment(state, FREE_SEAT)).toBeNull();
   });
 });
