@@ -1331,7 +1331,8 @@ class SimMinors:
                         self.encamp_hp[r_d, t_d] = self._encamp_hp_max
                         self.encamp_outer_hp[r_d, t_d] = self._walls_tier_hp[self._minor_walls_tier(s)][r_d]
                 self._eff_version += 1
-                d_row = torch.where(place, T["district_row"].to(dev).take((item - self._mk_d0).clamp(min=0)), d_row)
+                dr = T["district_row"].to(dev)
+                d_row = torch.where(place, dr.take((item - self._mk_d0).clamp(min=0, max=dr.numel() - 1)), d_row)
                 fin = fin | place
         m = done & is_p
         if bool(m.any()):

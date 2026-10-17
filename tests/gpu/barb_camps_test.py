@@ -134,7 +134,8 @@ def main() -> None:
 
     # THE RAID REACHES THE FREE CITIES: `isTerritorial` counts FREE_SEAT ground,
     # so a Free City's Campus two flat steps away is the nearest job and the
-    # raider walks onto it (the `hostileUnitAct` twin).
+    # stand-in walks its raider onto it (`hostileUnitAct`'s twin, the units a
+    # city assault still moves; tests/cpu/units/barbarians.test.ts).
     clear_barbs(sim)
     sim.barb_camps_begun[0] = True
 
@@ -175,7 +176,10 @@ def main() -> None:
     sim.barb_unit_hp[0, slot] = 100
     sim.military_at[0, start] = slot + lo
     sim.next_slot[0] += 1   # the raider loop walks slots below next_slot
-    sim._barbarian_phase()
+    sim._barb_reset_mp()
+    one = torch.zeros_like(sim.barb_unit_alive)
+    one[0, slot] = True
+    sim._barb_stand_in(lambda: sim.barb_unit_alive & one, lambda u, tgt: torch.ones(sim.B, dtype=torch.bool))
     assert int(sim.barb_unit_tile[0, slot]) == campus, (
         f"the raider stands on {int(sim.barb_unit_tile[0, slot])}, not the Free City's Campus {campus} "
         f"(start {start}, mid {_mid}, alive {bool(sim.barb_unit_alive[0, slot])})")
